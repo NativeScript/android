@@ -1,6 +1,6 @@
 #include "jni.h"
 #include "zip.h"
-#include <assert.h>
+#include <cassert>
 #include <libgen.h>
 #include <utime.h>
 #include <sys/stat.h>

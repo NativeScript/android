@@ -129,7 +129,7 @@ int MessageLoopTimer::PumpMessageLoopCallback(int fd, int events, void* data) {
     v8::HandleScope handleScope(isolate);
 
     while (v8::platform::PumpMessageLoop(Runtime::platform, isolate)) {
-        isolate->RunMicrotasks();
+        isolate->PerformMicrotaskCheckpoint();
     }
 
     return msg;

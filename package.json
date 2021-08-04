@@ -1,7 +1,7 @@
 {
   "name": "@nativescript/android",
   "description": "NativeScript Runtime for Android",
-  "version": "7.0.1",
+  "version": "8.0.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/NativeScript/android-runtime.git"
@@ -10,9 +10,9 @@
     "**/*"
   ],
   "gradle": {
-    "version": "6.4",
-    "android": "3.6.4"
+    "version": "7.0.0",
+    "android": "7.0.0"
   },
-  "android_ndk_version": "21b",
+  "android_ndk_version": "22b",
   "publishConfig": {"tag":"next", "access": "public"}
 }

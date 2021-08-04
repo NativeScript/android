@@ -626,7 +626,7 @@ private:
     _LIBCPP_INLINE_VISIBILITY
     void __execute(__tuple_indices<_Indices...>)
     {
-        __invoke(_VSTD::get<0>(_VSTD::move(__f_)), _VSTD::get<_Indices>(_VSTD::move(__f_))...);
+        _VSTD::__invoke(_VSTD::get<0>(_VSTD::move(__f_)), _VSTD::get<_Indices>(_VSTD::move(__f_))...);
     }
 };
 
@@ -650,7 +650,7 @@ public:
 #endif
 
 template <class _Fp>
-void
+void _LIBCPP_INLINE_VISIBILITY
 __call_once_proxy(void* __vp)
 {
     __call_once_param<_Fp>* __p = static_cast<__call_once_param<_Fp>*>(__vp);

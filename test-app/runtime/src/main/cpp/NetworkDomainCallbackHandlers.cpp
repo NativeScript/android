@@ -71,19 +71,14 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
         v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(responseJsonString.characters16(), responseJsonString.length()), &cbor);
         std::unique_ptr<protocol::Value> protocolResponseJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
 
-        protocol::ErrorSupport errorSupport;
-        auto protocolResponseObj = protocol::Network::Response::fromValue(protocolResponseJson.get(), &errorSupport);
-
-        std::vector<uint8_t> json;
-        v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
-        auto errorString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
-
-        if (!errorString.empty()) {
-            auto errorMessage = "Error while parsing debug `response` object. ";
-            DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorString.c_str());
-
-            throw NativeScriptException(errorMessage + errorString);
+        auto status = protocol::Network::Response::ReadFrom(cbor);
+        if(!status.ok()){
+            auto errorMessage = "Error while parsing debug `response` object.";
+            auto errorStatusMessage = status.status().Message();
+            DEBUG_WRITE_FORCE("%s Error: %s", errorMessage,  errorStatusMessage.c_str());
+            throw NativeScriptException(errorMessage + std::string(errorStatusMessage));
         }
+
 
         auto requestIdString = ArgConverter::ConvertToString(requestId);
         auto networkRequestData = new v8_inspector::utils::NetworkRequestData();
@@ -97,7 +92,7 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
             LoaderId,
             timeStamp,
             ArgConverter::ConvertToString(type).c_str(),
-            std::move(protocolResponseObj),
+            std::move(*status),
             std::move(frameId));
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -173,20 +168,22 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
         v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(requestJsonString16.characters16(), requestJsonString16.length()), &cbor);
         std::unique_ptr<protocol::Value> protocolRequestJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
 
-        protocol::ErrorSupport errorSupport;
-        auto protocolRequestObj = protocol::Network::Request::fromValue(protocolRequestJson.get(), &errorSupport);
+        auto status = protocol::Network::Request::ReadFrom(cbor);
+
+        if (!status.ok()) {
+            auto errorMessage = "Error while parsing debug `request` object. ";
+            auto errorStatusMessage = status.status().Message();
+            DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorStatusMessage.c_str());
+
+            throw NativeScriptException(errorMessage + std::string(errorStatusMessage));
+            return;
+        }
+
+
+
+
         auto initiator = protocol::Network::Initiator::create().setType(protocol::Network::Initiator::TypeEnum::Script).build();
 
-        std::vector<uint8_t> json;
-        v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
-        auto errorString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
-
-        if (!errorString.empty()) {
-            auto errorMessage = "Error while parsing debug `request` object. ";
-            DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorString.c_str());
-
-            throw NativeScriptException(errorMessage + errorString);
-        }
 
         protocol::Maybe<String16> frameId(ArgConverter::ConvertToString(ArgConverter::ConvertToV8String(isolate, FrameId)).c_str());
         protocol::Maybe<String16> type(ArgConverter::ConvertToString(typeArg).c_str());
@@ -195,7 +192,7 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
             ArgConverter::ConvertToString(requestId).c_str(),
             LoaderId,
             ArgConverter::ConvertToString(url).c_str(),
-            std::move(protocolRequestObj),
+            std::move(*status),
             timeStamp,
             wallTime,
             std::move(initiator),

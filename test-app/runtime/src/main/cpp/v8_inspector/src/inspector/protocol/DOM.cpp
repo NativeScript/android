@@ -10,12 +10,14 @@
 
 #include "third_party/inspector_protocol/crdtp/cbor.h"
 #include "third_party/inspector_protocol/crdtp/find_by_first.h"
-#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
 #include "third_party/inspector_protocol/crdtp/span.h"
 
 namespace v8_inspector {
 namespace protocol {
 namespace DOM {
+
+using v8_crdtp::DeserializerState;
+using v8_crdtp::ProtocolTypeTraits;
 
 // ------------- Enum values from types.
 
@@ -23,56 +25,20 @@ const char Metainfo::domainName[] = "DOM";
 const char Metainfo::commandPrefix[] = "DOM.";
 const char Metainfo::version[] = "1.3";
 
-std::unique_ptr<BackendNode> BackendNode::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
 
-    std::unique_ptr<BackendNode> result(new BackendNode());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* nodeTypeValue = object->get("nodeType");
-    errors->SetName("nodeType");
-    result->m_nodeType = ValueConversions<int>::fromValue(nodeTypeValue, errors);
-    protocol::Value* nodeNameValue = object->get("nodeName");
-    errors->SetName("nodeName");
-    result->m_nodeName = ValueConversions<String>::fromValue(nodeNameValue, errors);
-    protocol::Value* backendNodeIdValue = object->get("backendNodeId");
-    errors->SetName("backendNodeId");
-    result->m_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
 
-std::unique_ptr<protocol::DictionaryValue> BackendNode::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("nodeType", ValueConversions<int>::toValue(m_nodeType));
-    result->setValue("nodeName", ValueConversions<String>::toValue(m_nodeName));
-    result->setValue("backendNodeId", ValueConversions<int>::toValue(m_backendNodeId));
-    return result;
-}
+V8_CRDTP_BEGIN_DESERIALIZER(BackendNode)
+    V8_CRDTP_DESERIALIZE_FIELD("backendNodeId", m_backendNodeId),
+    V8_CRDTP_DESERIALIZE_FIELD("nodeName", m_nodeName),
+    V8_CRDTP_DESERIALIZE_FIELD("nodeType", m_nodeType),
+V8_CRDTP_END_DESERIALIZER()
 
-void BackendNode::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeType"), m_nodeType, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeName"), m_nodeName, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("backendNodeId"), m_backendNodeId, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
+V8_CRDTP_BEGIN_SERIALIZER(BackendNode)
+    V8_CRDTP_SERIALIZE_FIELD("nodeType", m_nodeType);
+    V8_CRDTP_SERIALIZE_FIELD("nodeName", m_nodeName);
+    V8_CRDTP_SERIALIZE_FIELD("backendNodeId", m_backendNodeId);
+V8_CRDTP_END_SERIALIZER();
 
-std::unique_ptr<BackendNode> BackendNode::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
 
 namespace PseudoTypeEnum {
 const char FirstLine[] = "first-line";
@@ -92,1096 +58,141 @@ const char Resizer[] = "resizer";
 const char InputListButton[] = "input-list-button";
 } // namespace PseudoTypeEnum
 
+
 namespace ShadowRootTypeEnum {
 const char UserAgent[] = "user-agent";
 const char Open[] = "open";
 const char Closed[] = "closed";
 } // namespace ShadowRootTypeEnum
 
-std::unique_ptr<Node> Node::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
 
-    std::unique_ptr<Node> result(new Node());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* nodeIdValue = object->get("nodeId");
-    errors->SetName("nodeId");
-    result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* parentIdValue = object->get("parentId");
-    if (parentIdValue) {
-        errors->SetName("parentId");
-        result->m_parentId = ValueConversions<int>::fromValue(parentIdValue, errors);
-    }
-    protocol::Value* backendNodeIdValue = object->get("backendNodeId");
-    errors->SetName("backendNodeId");
-    result->m_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
-    protocol::Value* nodeTypeValue = object->get("nodeType");
-    errors->SetName("nodeType");
-    result->m_nodeType = ValueConversions<int>::fromValue(nodeTypeValue, errors);
-    protocol::Value* nodeNameValue = object->get("nodeName");
-    errors->SetName("nodeName");
-    result->m_nodeName = ValueConversions<String>::fromValue(nodeNameValue, errors);
-    protocol::Value* localNameValue = object->get("localName");
-    errors->SetName("localName");
-    result->m_localName = ValueConversions<String>::fromValue(localNameValue, errors);
-    protocol::Value* nodeValueValue = object->get("nodeValue");
-    errors->SetName("nodeValue");
-    result->m_nodeValue = ValueConversions<String>::fromValue(nodeValueValue, errors);
-    protocol::Value* childNodeCountValue = object->get("childNodeCount");
-    if (childNodeCountValue) {
-        errors->SetName("childNodeCount");
-        result->m_childNodeCount = ValueConversions<int>::fromValue(childNodeCountValue, errors);
-    }
-    protocol::Value* childrenValue = object->get("children");
-    if (childrenValue) {
-        errors->SetName("children");
-        result->m_children = ValueConversions<protocol::Array<protocol::DOM::Node>>::fromValue(childrenValue, errors);
-    }
-    protocol::Value* attributesValue = object->get("attributes");
-    if (attributesValue) {
-        errors->SetName("attributes");
-        result->m_attributes = ValueConversions<protocol::Array<String>>::fromValue(attributesValue, errors);
-    }
-    protocol::Value* documentURLValue = object->get("documentURL");
-    if (documentURLValue) {
-        errors->SetName("documentURL");
-        result->m_documentURL = ValueConversions<String>::fromValue(documentURLValue, errors);
-    }
-    protocol::Value* baseURLValue = object->get("baseURL");
-    if (baseURLValue) {
-        errors->SetName("baseURL");
-        result->m_baseURL = ValueConversions<String>::fromValue(baseURLValue, errors);
-    }
-    protocol::Value* publicIdValue = object->get("publicId");
-    if (publicIdValue) {
-        errors->SetName("publicId");
-        result->m_publicId = ValueConversions<String>::fromValue(publicIdValue, errors);
-    }
-    protocol::Value* systemIdValue = object->get("systemId");
-    if (systemIdValue) {
-        errors->SetName("systemId");
-        result->m_systemId = ValueConversions<String>::fromValue(systemIdValue, errors);
-    }
-    protocol::Value* internalSubsetValue = object->get("internalSubset");
-    if (internalSubsetValue) {
-        errors->SetName("internalSubset");
-        result->m_internalSubset = ValueConversions<String>::fromValue(internalSubsetValue, errors);
-    }
-    protocol::Value* xmlVersionValue = object->get("xmlVersion");
-    if (xmlVersionValue) {
-        errors->SetName("xmlVersion");
-        result->m_xmlVersion = ValueConversions<String>::fromValue(xmlVersionValue, errors);
-    }
-    protocol::Value* nameValue = object->get("name");
-    if (nameValue) {
-        errors->SetName("name");
-        result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
-    }
-    protocol::Value* valueValue = object->get("value");
-    if (valueValue) {
-        errors->SetName("value");
-        result->m_value = ValueConversions<String>::fromValue(valueValue, errors);
-    }
-    protocol::Value* pseudoTypeValue = object->get("pseudoType");
-    if (pseudoTypeValue) {
-        errors->SetName("pseudoType");
-        result->m_pseudoType = ValueConversions<String>::fromValue(pseudoTypeValue, errors);
-    }
-    protocol::Value* shadowRootTypeValue = object->get("shadowRootType");
-    if (shadowRootTypeValue) {
-        errors->SetName("shadowRootType");
-        result->m_shadowRootType = ValueConversions<String>::fromValue(shadowRootTypeValue, errors);
-    }
-    protocol::Value* frameIdValue = object->get("frameId");
-    if (frameIdValue) {
-        errors->SetName("frameId");
-        result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
-    }
-    protocol::Value* contentDocumentValue = object->get("contentDocument");
-    if (contentDocumentValue) {
-        errors->SetName("contentDocument");
-        result->m_contentDocument = ValueConversions<protocol::DOM::Node>::fromValue(contentDocumentValue, errors);
-    }
-    protocol::Value* shadowRootsValue = object->get("shadowRoots");
-    if (shadowRootsValue) {
-        errors->SetName("shadowRoots");
-        result->m_shadowRoots = ValueConversions<protocol::Array<protocol::DOM::Node>>::fromValue(shadowRootsValue, errors);
-    }
-    protocol::Value* templateContentValue = object->get("templateContent");
-    if (templateContentValue) {
-        errors->SetName("templateContent");
-        result->m_templateContent = ValueConversions<protocol::DOM::Node>::fromValue(templateContentValue, errors);
-    }
-    protocol::Value* pseudoElementsValue = object->get("pseudoElements");
-    if (pseudoElementsValue) {
-        errors->SetName("pseudoElements");
-        result->m_pseudoElements = ValueConversions<protocol::Array<protocol::DOM::Node>>::fromValue(pseudoElementsValue, errors);
-    }
-    protocol::Value* importedDocumentValue = object->get("importedDocument");
-    if (importedDocumentValue) {
-        errors->SetName("importedDocument");
-        result->m_importedDocument = ValueConversions<protocol::DOM::Node>::fromValue(importedDocumentValue, errors);
-    }
-    protocol::Value* distributedNodesValue = object->get("distributedNodes");
-    if (distributedNodesValue) {
-        errors->SetName("distributedNodes");
-        result->m_distributedNodes = ValueConversions<protocol::Array<protocol::DOM::BackendNode>>::fromValue(distributedNodesValue, errors);
-    }
-    protocol::Value* isSVGValue = object->get("isSVG");
-    if (isSVGValue) {
-        errors->SetName("isSVG");
-        result->m_isSVG = ValueConversions<bool>::fromValue(isSVGValue, errors);
-    }
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
+V8_CRDTP_BEGIN_DESERIALIZER(Node)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("attributes", m_attributes),
+    V8_CRDTP_DESERIALIZE_FIELD("backendNodeId", m_backendNodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("baseURL", m_baseURL),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("childNodeCount", m_childNodeCount),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("children", m_children),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("contentDocument", m_contentDocument),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("distributedNodes", m_distributedNodes),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("documentURL", m_documentURL),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("frameId", m_frameId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("importedDocument", m_importedDocument),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("internalSubset", m_internalSubset),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("isSVG", m_isSVG),
+    V8_CRDTP_DESERIALIZE_FIELD("localName", m_localName),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("name", m_name),
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", m_nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD("nodeName", m_nodeName),
+    V8_CRDTP_DESERIALIZE_FIELD("nodeType", m_nodeType),
+    V8_CRDTP_DESERIALIZE_FIELD("nodeValue", m_nodeValue),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("parentId", m_parentId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("pseudoElements", m_pseudoElements),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("pseudoType", m_pseudoType),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("publicId", m_publicId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("shadowRootType", m_shadowRootType),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("shadowRoots", m_shadowRoots),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("systemId", m_systemId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("templateContent", m_templateContent),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("value", m_value),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("xmlVersion", m_xmlVersion),
+V8_CRDTP_END_DESERIALIZER()
+
+V8_CRDTP_BEGIN_SERIALIZER(Node)
+    V8_CRDTP_SERIALIZE_FIELD("nodeId", m_nodeId);
+    V8_CRDTP_SERIALIZE_FIELD("parentId", m_parentId);
+    V8_CRDTP_SERIALIZE_FIELD("backendNodeId", m_backendNodeId);
+    V8_CRDTP_SERIALIZE_FIELD("nodeType", m_nodeType);
+    V8_CRDTP_SERIALIZE_FIELD("nodeName", m_nodeName);
+    V8_CRDTP_SERIALIZE_FIELD("localName", m_localName);
+    V8_CRDTP_SERIALIZE_FIELD("nodeValue", m_nodeValue);
+    V8_CRDTP_SERIALIZE_FIELD("childNodeCount", m_childNodeCount);
+    V8_CRDTP_SERIALIZE_FIELD("children", m_children);
+    V8_CRDTP_SERIALIZE_FIELD("attributes", m_attributes);
+    V8_CRDTP_SERIALIZE_FIELD("documentURL", m_documentURL);
+    V8_CRDTP_SERIALIZE_FIELD("baseURL", m_baseURL);
+    V8_CRDTP_SERIALIZE_FIELD("publicId", m_publicId);
+    V8_CRDTP_SERIALIZE_FIELD("systemId", m_systemId);
+    V8_CRDTP_SERIALIZE_FIELD("internalSubset", m_internalSubset);
+    V8_CRDTP_SERIALIZE_FIELD("xmlVersion", m_xmlVersion);
+    V8_CRDTP_SERIALIZE_FIELD("name", m_name);
+    V8_CRDTP_SERIALIZE_FIELD("value", m_value);
+    V8_CRDTP_SERIALIZE_FIELD("pseudoType", m_pseudoType);
+    V8_CRDTP_SERIALIZE_FIELD("shadowRootType", m_shadowRootType);
+    V8_CRDTP_SERIALIZE_FIELD("frameId", m_frameId);
+    V8_CRDTP_SERIALIZE_FIELD("contentDocument", m_contentDocument);
+    V8_CRDTP_SERIALIZE_FIELD("shadowRoots", m_shadowRoots);
+    V8_CRDTP_SERIALIZE_FIELD("templateContent", m_templateContent);
+    V8_CRDTP_SERIALIZE_FIELD("pseudoElements", m_pseudoElements);
+    V8_CRDTP_SERIALIZE_FIELD("importedDocument", m_importedDocument);
+    V8_CRDTP_SERIALIZE_FIELD("distributedNodes", m_distributedNodes);
+    V8_CRDTP_SERIALIZE_FIELD("isSVG", m_isSVG);
+V8_CRDTP_END_SERIALIZER();
+
+
+V8_CRDTP_BEGIN_DESERIALIZER(RGBA)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("a", m_a),
+    V8_CRDTP_DESERIALIZE_FIELD("b", m_b),
+    V8_CRDTP_DESERIALIZE_FIELD("g", m_g),
+    V8_CRDTP_DESERIALIZE_FIELD("r", m_r),
+V8_CRDTP_END_DESERIALIZER()
+
+V8_CRDTP_BEGIN_SERIALIZER(RGBA)
+    V8_CRDTP_SERIALIZE_FIELD("r", m_r);
+    V8_CRDTP_SERIALIZE_FIELD("g", m_g);
+    V8_CRDTP_SERIALIZE_FIELD("b", m_b);
+    V8_CRDTP_SERIALIZE_FIELD("a", m_a);
+V8_CRDTP_END_SERIALIZER();
+
+
+
+V8_CRDTP_BEGIN_DESERIALIZER(BoxModel)
+    V8_CRDTP_DESERIALIZE_FIELD("border", m_border),
+    V8_CRDTP_DESERIALIZE_FIELD("content", m_content),
+    V8_CRDTP_DESERIALIZE_FIELD("height", m_height),
+    V8_CRDTP_DESERIALIZE_FIELD("margin", m_margin),
+    V8_CRDTP_DESERIALIZE_FIELD("padding", m_padding),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("shapeOutside", m_shapeOutside),
+    V8_CRDTP_DESERIALIZE_FIELD("width", m_width),
+V8_CRDTP_END_DESERIALIZER()
+
+V8_CRDTP_BEGIN_SERIALIZER(BoxModel)
+    V8_CRDTP_SERIALIZE_FIELD("content", m_content);
+    V8_CRDTP_SERIALIZE_FIELD("padding", m_padding);
+    V8_CRDTP_SERIALIZE_FIELD("border", m_border);
+    V8_CRDTP_SERIALIZE_FIELD("margin", m_margin);
+    V8_CRDTP_SERIALIZE_FIELD("width", m_width);
+    V8_CRDTP_SERIALIZE_FIELD("height", m_height);
+    V8_CRDTP_SERIALIZE_FIELD("shapeOutside", m_shapeOutside);
+V8_CRDTP_END_SERIALIZER();
+
+
+V8_CRDTP_BEGIN_DESERIALIZER(ShapeOutsideInfo)
+    V8_CRDTP_DESERIALIZE_FIELD("bounds", m_bounds),
+    V8_CRDTP_DESERIALIZE_FIELD("marginShape", m_marginShape),
+    V8_CRDTP_DESERIALIZE_FIELD("shape", m_shape),
+V8_CRDTP_END_DESERIALIZER()
+
+V8_CRDTP_BEGIN_SERIALIZER(ShapeOutsideInfo)
+    V8_CRDTP_SERIALIZE_FIELD("bounds", m_bounds);
+    V8_CRDTP_SERIALIZE_FIELD("shape", m_shape);
+    V8_CRDTP_SERIALIZE_FIELD("marginShape", m_marginShape);
+V8_CRDTP_END_SERIALIZER();
+
+
+V8_CRDTP_BEGIN_DESERIALIZER(Rect)
+    V8_CRDTP_DESERIALIZE_FIELD("height", m_height),
+    V8_CRDTP_DESERIALIZE_FIELD("width", m_width),
+    V8_CRDTP_DESERIALIZE_FIELD("x", m_x),
+    V8_CRDTP_DESERIALIZE_FIELD("y", m_y),
+V8_CRDTP_END_DESERIALIZER()
+
+V8_CRDTP_BEGIN_SERIALIZER(Rect)
+    V8_CRDTP_SERIALIZE_FIELD("x", m_x);
+    V8_CRDTP_SERIALIZE_FIELD("y", m_y);
+    V8_CRDTP_SERIALIZE_FIELD("width", m_width);
+    V8_CRDTP_SERIALIZE_FIELD("height", m_height);
+V8_CRDTP_END_SERIALIZER();
 
-std::unique_ptr<protocol::DictionaryValue> Node::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
-    if (m_parentId.isJust())
-        result->setValue("parentId", ValueConversions<int>::toValue(m_parentId.fromJust()));
-    result->setValue("backendNodeId", ValueConversions<int>::toValue(m_backendNodeId));
-    result->setValue("nodeType", ValueConversions<int>::toValue(m_nodeType));
-    result->setValue("nodeName", ValueConversions<String>::toValue(m_nodeName));
-    result->setValue("localName", ValueConversions<String>::toValue(m_localName));
-    result->setValue("nodeValue", ValueConversions<String>::toValue(m_nodeValue));
-    if (m_childNodeCount.isJust())
-        result->setValue("childNodeCount", ValueConversions<int>::toValue(m_childNodeCount.fromJust()));
-    if (m_children.isJust())
-        result->setValue("children", ValueConversions<protocol::Array<protocol::DOM::Node>>::toValue(m_children.fromJust()));
-    if (m_attributes.isJust())
-        result->setValue("attributes", ValueConversions<protocol::Array<String>>::toValue(m_attributes.fromJust()));
-    if (m_documentURL.isJust())
-        result->setValue("documentURL", ValueConversions<String>::toValue(m_documentURL.fromJust()));
-    if (m_baseURL.isJust())
-        result->setValue("baseURL", ValueConversions<String>::toValue(m_baseURL.fromJust()));
-    if (m_publicId.isJust())
-        result->setValue("publicId", ValueConversions<String>::toValue(m_publicId.fromJust()));
-    if (m_systemId.isJust())
-        result->setValue("systemId", ValueConversions<String>::toValue(m_systemId.fromJust()));
-    if (m_internalSubset.isJust())
-        result->setValue("internalSubset", ValueConversions<String>::toValue(m_internalSubset.fromJust()));
-    if (m_xmlVersion.isJust())
-        result->setValue("xmlVersion", ValueConversions<String>::toValue(m_xmlVersion.fromJust()));
-    if (m_name.isJust())
-        result->setValue("name", ValueConversions<String>::toValue(m_name.fromJust()));
-    if (m_value.isJust())
-        result->setValue("value", ValueConversions<String>::toValue(m_value.fromJust()));
-    if (m_pseudoType.isJust())
-        result->setValue("pseudoType", ValueConversions<String>::toValue(m_pseudoType.fromJust()));
-    if (m_shadowRootType.isJust())
-        result->setValue("shadowRootType", ValueConversions<String>::toValue(m_shadowRootType.fromJust()));
-    if (m_frameId.isJust())
-        result->setValue("frameId", ValueConversions<String>::toValue(m_frameId.fromJust()));
-    if (m_contentDocument.isJust())
-        result->setValue("contentDocument", ValueConversions<protocol::DOM::Node>::toValue(m_contentDocument.fromJust()));
-    if (m_shadowRoots.isJust())
-        result->setValue("shadowRoots", ValueConversions<protocol::Array<protocol::DOM::Node>>::toValue(m_shadowRoots.fromJust()));
-    if (m_templateContent.isJust())
-        result->setValue("templateContent", ValueConversions<protocol::DOM::Node>::toValue(m_templateContent.fromJust()));
-    if (m_pseudoElements.isJust())
-        result->setValue("pseudoElements", ValueConversions<protocol::Array<protocol::DOM::Node>>::toValue(m_pseudoElements.fromJust()));
-    if (m_importedDocument.isJust())
-        result->setValue("importedDocument", ValueConversions<protocol::DOM::Node>::toValue(m_importedDocument.fromJust()));
-    if (m_distributedNodes.isJust())
-        result->setValue("distributedNodes", ValueConversions<protocol::Array<protocol::DOM::BackendNode>>::toValue(m_distributedNodes.fromJust()));
-    if (m_isSVG.isJust())
-        result->setValue("isSVG", ValueConversions<bool>::toValue(m_isSVG.fromJust()));
-    return result;
-}
-
-void Node::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), m_nodeId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parentId"), m_parentId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("backendNodeId"), m_backendNodeId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeType"), m_nodeType, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeName"), m_nodeName, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("localName"), m_localName, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeValue"), m_nodeValue, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("childNodeCount"), m_childNodeCount, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("children"), m_children, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("attributes"), m_attributes, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("documentURL"), m_documentURL, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("baseURL"), m_baseURL, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("publicId"), m_publicId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("systemId"), m_systemId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("internalSubset"), m_internalSubset, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("xmlVersion"), m_xmlVersion, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("value"), m_value, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pseudoType"), m_pseudoType, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("shadowRootType"), m_shadowRootType, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("contentDocument"), m_contentDocument, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("shadowRoots"), m_shadowRoots, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("templateContent"), m_templateContent, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pseudoElements"), m_pseudoElements, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("importedDocument"), m_importedDocument, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("distributedNodes"), m_distributedNodes, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("isSVG"), m_isSVG, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<Node> Node::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<RGBA> RGBA::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<RGBA> result(new RGBA());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* rValue = object->get("r");
-    errors->SetName("r");
-    result->m_r = ValueConversions<int>::fromValue(rValue, errors);
-    protocol::Value* gValue = object->get("g");
-    errors->SetName("g");
-    result->m_g = ValueConversions<int>::fromValue(gValue, errors);
-    protocol::Value* bValue = object->get("b");
-    errors->SetName("b");
-    result->m_b = ValueConversions<int>::fromValue(bValue, errors);
-    protocol::Value* aValue = object->get("a");
-    if (aValue) {
-        errors->SetName("a");
-        result->m_a = ValueConversions<double>::fromValue(aValue, errors);
-    }
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> RGBA::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("r", ValueConversions<int>::toValue(m_r));
-    result->setValue("g", ValueConversions<int>::toValue(m_g));
-    result->setValue("b", ValueConversions<int>::toValue(m_b));
-    if (m_a.isJust())
-        result->setValue("a", ValueConversions<double>::toValue(m_a.fromJust()));
-    return result;
-}
-
-void RGBA::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("r"), m_r, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("g"), m_g, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("b"), m_b, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("a"), m_a, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<RGBA> RGBA::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<BoxModel> BoxModel::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<BoxModel> result(new BoxModel());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* contentValue = object->get("content");
-    errors->SetName("content");
-    result->m_content = ValueConversions<protocol::Array<double>>::fromValue(contentValue, errors);
-    protocol::Value* paddingValue = object->get("padding");
-    errors->SetName("padding");
-    result->m_padding = ValueConversions<protocol::Array<double>>::fromValue(paddingValue, errors);
-    protocol::Value* borderValue = object->get("border");
-    errors->SetName("border");
-    result->m_border = ValueConversions<protocol::Array<double>>::fromValue(borderValue, errors);
-    protocol::Value* marginValue = object->get("margin");
-    errors->SetName("margin");
-    result->m_margin = ValueConversions<protocol::Array<double>>::fromValue(marginValue, errors);
-    protocol::Value* widthValue = object->get("width");
-    errors->SetName("width");
-    result->m_width = ValueConversions<int>::fromValue(widthValue, errors);
-    protocol::Value* heightValue = object->get("height");
-    errors->SetName("height");
-    result->m_height = ValueConversions<int>::fromValue(heightValue, errors);
-    protocol::Value* shapeOutsideValue = object->get("shapeOutside");
-    if (shapeOutsideValue) {
-        errors->SetName("shapeOutside");
-        result->m_shapeOutside = ValueConversions<protocol::DOM::ShapeOutsideInfo>::fromValue(shapeOutsideValue, errors);
-    }
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> BoxModel::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("content", ValueConversions<protocol::Array<double>>::toValue(m_content.get()));
-    result->setValue("padding", ValueConversions<protocol::Array<double>>::toValue(m_padding.get()));
-    result->setValue("border", ValueConversions<protocol::Array<double>>::toValue(m_border.get()));
-    result->setValue("margin", ValueConversions<protocol::Array<double>>::toValue(m_margin.get()));
-    result->setValue("width", ValueConversions<int>::toValue(m_width));
-    result->setValue("height", ValueConversions<int>::toValue(m_height));
-    if (m_shapeOutside.isJust())
-        result->setValue("shapeOutside", ValueConversions<protocol::DOM::ShapeOutsideInfo>::toValue(m_shapeOutside.fromJust()));
-    return result;
-}
-
-void BoxModel::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("content"), m_content, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("padding"), m_padding, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("border"), m_border, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("margin"), m_margin, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("width"), m_width, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("height"), m_height, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("shapeOutside"), m_shapeOutside, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<BoxModel> BoxModel::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<ShapeOutsideInfo> ShapeOutsideInfo::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<ShapeOutsideInfo> result(new ShapeOutsideInfo());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* boundsValue = object->get("bounds");
-    errors->SetName("bounds");
-    result->m_bounds = ValueConversions<protocol::Array<double>>::fromValue(boundsValue, errors);
-    protocol::Value* shapeValue = object->get("shape");
-    errors->SetName("shape");
-    result->m_shape = ValueConversions<protocol::Array<protocol::Value>>::fromValue(shapeValue, errors);
-    protocol::Value* marginShapeValue = object->get("marginShape");
-    errors->SetName("marginShape");
-    result->m_marginShape = ValueConversions<protocol::Array<protocol::Value>>::fromValue(marginShapeValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> ShapeOutsideInfo::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("bounds", ValueConversions<protocol::Array<double>>::toValue(m_bounds.get()));
-    result->setValue("shape", ValueConversions<protocol::Array<protocol::Value>>::toValue(m_shape.get()));
-    result->setValue("marginShape", ValueConversions<protocol::Array<protocol::Value>>::toValue(m_marginShape.get()));
-    return result;
-}
-
-void ShapeOutsideInfo::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("bounds"), m_bounds, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("shape"), m_shape, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("marginShape"), m_marginShape, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<ShapeOutsideInfo> ShapeOutsideInfo::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<Rect> Rect::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<Rect> result(new Rect());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* xValue = object->get("x");
-    errors->SetName("x");
-    result->m_x = ValueConversions<double>::fromValue(xValue, errors);
-    protocol::Value* yValue = object->get("y");
-    errors->SetName("y");
-    result->m_y = ValueConversions<double>::fromValue(yValue, errors);
-    protocol::Value* widthValue = object->get("width");
-    errors->SetName("width");
-    result->m_width = ValueConversions<double>::fromValue(widthValue, errors);
-    protocol::Value* heightValue = object->get("height");
-    errors->SetName("height");
-    result->m_height = ValueConversions<double>::fromValue(heightValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> Rect::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("x", ValueConversions<double>::toValue(m_x));
-    result->setValue("y", ValueConversions<double>::toValue(m_y));
-    result->setValue("width", ValueConversions<double>::toValue(m_width));
-    result->setValue("height", ValueConversions<double>::toValue(m_height));
-    return result;
-}
-
-void Rect::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("x"), m_x, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("y"), m_y, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("width"), m_width, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("height"), m_height, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<Rect> Rect::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<AttributeModifiedNotification> AttributeModifiedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<AttributeModifiedNotification> result(new AttributeModifiedNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* nodeIdValue = object->get("nodeId");
-    errors->SetName("nodeId");
-    result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* nameValue = object->get("name");
-    errors->SetName("name");
-    result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
-    protocol::Value* valueValue = object->get("value");
-    errors->SetName("value");
-    result->m_value = ValueConversions<String>::fromValue(valueValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> AttributeModifiedNotification::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
-    result->setValue("name", ValueConversions<String>::toValue(m_name));
-    result->setValue("value", ValueConversions<String>::toValue(m_value));
-    return result;
-}
-
-void AttributeModifiedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), m_nodeId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("value"), m_value, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<AttributeModifiedNotification> AttributeModifiedNotification::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<AttributeRemovedNotification> AttributeRemovedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<AttributeRemovedNotification> result(new AttributeRemovedNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* nodeIdValue = object->get("nodeId");
-    errors->SetName("nodeId");
-    result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* nameValue = object->get("name");
-    errors->SetName("name");
-    result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> AttributeRemovedNotification::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
-    result->setValue("name", ValueConversions<String>::toValue(m_name));
-    return result;
-}
-
-void AttributeRemovedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), m_nodeId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<AttributeRemovedNotification> AttributeRemovedNotification::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<CharacterDataModifiedNotification> CharacterDataModifiedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<CharacterDataModifiedNotification> result(new CharacterDataModifiedNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* nodeIdValue = object->get("nodeId");
-    errors->SetName("nodeId");
-    result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* characterDataValue = object->get("characterData");
-    errors->SetName("characterData");
-    result->m_characterData = ValueConversions<String>::fromValue(characterDataValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> CharacterDataModifiedNotification::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
-    result->setValue("characterData", ValueConversions<String>::toValue(m_characterData));
-    return result;
-}
-
-void CharacterDataModifiedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), m_nodeId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("characterData"), m_characterData, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<CharacterDataModifiedNotification> CharacterDataModifiedNotification::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<ChildNodeCountUpdatedNotification> ChildNodeCountUpdatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<ChildNodeCountUpdatedNotification> result(new ChildNodeCountUpdatedNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* nodeIdValue = object->get("nodeId");
-    errors->SetName("nodeId");
-    result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* childNodeCountValue = object->get("childNodeCount");
-    errors->SetName("childNodeCount");
-    result->m_childNodeCount = ValueConversions<int>::fromValue(childNodeCountValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> ChildNodeCountUpdatedNotification::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
-    result->setValue("childNodeCount", ValueConversions<int>::toValue(m_childNodeCount));
-    return result;
-}
-
-void ChildNodeCountUpdatedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), m_nodeId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("childNodeCount"), m_childNodeCount, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<ChildNodeCountUpdatedNotification> ChildNodeCountUpdatedNotification::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<ChildNodeInsertedNotification> ChildNodeInsertedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<ChildNodeInsertedNotification> result(new ChildNodeInsertedNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* parentNodeIdValue = object->get("parentNodeId");
-    errors->SetName("parentNodeId");
-    result->m_parentNodeId = ValueConversions<int>::fromValue(parentNodeIdValue, errors);
-    protocol::Value* previousNodeIdValue = object->get("previousNodeId");
-    errors->SetName("previousNodeId");
-    result->m_previousNodeId = ValueConversions<int>::fromValue(previousNodeIdValue, errors);
-    protocol::Value* nodeValue = object->get("node");
-    errors->SetName("node");
-    result->m_node = ValueConversions<protocol::DOM::Node>::fromValue(nodeValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> ChildNodeInsertedNotification::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("parentNodeId", ValueConversions<int>::toValue(m_parentNodeId));
-    result->setValue("previousNodeId", ValueConversions<int>::toValue(m_previousNodeId));
-    result->setValue("node", ValueConversions<protocol::DOM::Node>::toValue(m_node.get()));
-    return result;
-}
-
-void ChildNodeInsertedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parentNodeId"), m_parentNodeId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("previousNodeId"), m_previousNodeId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("node"), m_node, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<ChildNodeInsertedNotification> ChildNodeInsertedNotification::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<ChildNodeRemovedNotification> ChildNodeRemovedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<ChildNodeRemovedNotification> result(new ChildNodeRemovedNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* parentNodeIdValue = object->get("parentNodeId");
-    errors->SetName("parentNodeId");
-    result->m_parentNodeId = ValueConversions<int>::fromValue(parentNodeIdValue, errors);
-    protocol::Value* nodeIdValue = object->get("nodeId");
-    errors->SetName("nodeId");
-    result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> ChildNodeRemovedNotification::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("parentNodeId", ValueConversions<int>::toValue(m_parentNodeId));
-    result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
-    return result;
-}
-
-void ChildNodeRemovedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parentNodeId"), m_parentNodeId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), m_nodeId, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<ChildNodeRemovedNotification> ChildNodeRemovedNotification::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<DistributedNodesUpdatedNotification> DistributedNodesUpdatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<DistributedNodesUpdatedNotification> result(new DistributedNodesUpdatedNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* insertionPointIdValue = object->get("insertionPointId");
-    errors->SetName("insertionPointId");
-    result->m_insertionPointId = ValueConversions<int>::fromValue(insertionPointIdValue, errors);
-    protocol::Value* distributedNodesValue = object->get("distributedNodes");
-    errors->SetName("distributedNodes");
-    result->m_distributedNodes = ValueConversions<protocol::Array<protocol::DOM::BackendNode>>::fromValue(distributedNodesValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> DistributedNodesUpdatedNotification::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("insertionPointId", ValueConversions<int>::toValue(m_insertionPointId));
-    result->setValue("distributedNodes", ValueConversions<protocol::Array<protocol::DOM::BackendNode>>::toValue(m_distributedNodes.get()));
-    return result;
-}
-
-void DistributedNodesUpdatedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("insertionPointId"), m_insertionPointId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("distributedNodes"), m_distributedNodes, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<DistributedNodesUpdatedNotification> DistributedNodesUpdatedNotification::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<InlineStyleInvalidatedNotification> InlineStyleInvalidatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<InlineStyleInvalidatedNotification> result(new InlineStyleInvalidatedNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* nodeIdsValue = object->get("nodeIds");
-    errors->SetName("nodeIds");
-    result->m_nodeIds = ValueConversions<protocol::Array<int>>::fromValue(nodeIdsValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> InlineStyleInvalidatedNotification::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("nodeIds", ValueConversions<protocol::Array<int>>::toValue(m_nodeIds.get()));
-    return result;
-}
-
-void InlineStyleInvalidatedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeIds"), m_nodeIds, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<InlineStyleInvalidatedNotification> InlineStyleInvalidatedNotification::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<PseudoElementAddedNotification> PseudoElementAddedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<PseudoElementAddedNotification> result(new PseudoElementAddedNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* parentIdValue = object->get("parentId");
-    errors->SetName("parentId");
-    result->m_parentId = ValueConversions<int>::fromValue(parentIdValue, errors);
-    protocol::Value* pseudoElementValue = object->get("pseudoElement");
-    errors->SetName("pseudoElement");
-    result->m_pseudoElement = ValueConversions<protocol::DOM::Node>::fromValue(pseudoElementValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> PseudoElementAddedNotification::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("parentId", ValueConversions<int>::toValue(m_parentId));
-    result->setValue("pseudoElement", ValueConversions<protocol::DOM::Node>::toValue(m_pseudoElement.get()));
-    return result;
-}
-
-void PseudoElementAddedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parentId"), m_parentId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pseudoElement"), m_pseudoElement, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<PseudoElementAddedNotification> PseudoElementAddedNotification::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<PseudoElementRemovedNotification> PseudoElementRemovedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<PseudoElementRemovedNotification> result(new PseudoElementRemovedNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* parentIdValue = object->get("parentId");
-    errors->SetName("parentId");
-    result->m_parentId = ValueConversions<int>::fromValue(parentIdValue, errors);
-    protocol::Value* pseudoElementIdValue = object->get("pseudoElementId");
-    errors->SetName("pseudoElementId");
-    result->m_pseudoElementId = ValueConversions<int>::fromValue(pseudoElementIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> PseudoElementRemovedNotification::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("parentId", ValueConversions<int>::toValue(m_parentId));
-    result->setValue("pseudoElementId", ValueConversions<int>::toValue(m_pseudoElementId));
-    return result;
-}
-
-void PseudoElementRemovedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parentId"), m_parentId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pseudoElementId"), m_pseudoElementId, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<PseudoElementRemovedNotification> PseudoElementRemovedNotification::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<SetChildNodesNotification> SetChildNodesNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<SetChildNodesNotification> result(new SetChildNodesNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* parentIdValue = object->get("parentId");
-    errors->SetName("parentId");
-    result->m_parentId = ValueConversions<int>::fromValue(parentIdValue, errors);
-    protocol::Value* nodesValue = object->get("nodes");
-    errors->SetName("nodes");
-    result->m_nodes = ValueConversions<protocol::Array<protocol::DOM::Node>>::fromValue(nodesValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> SetChildNodesNotification::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("parentId", ValueConversions<int>::toValue(m_parentId));
-    result->setValue("nodes", ValueConversions<protocol::Array<protocol::DOM::Node>>::toValue(m_nodes.get()));
-    return result;
-}
-
-void SetChildNodesNotification::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parentId"), m_parentId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodes"), m_nodes, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<SetChildNodesNotification> SetChildNodesNotification::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<ShadowRootPoppedNotification> ShadowRootPoppedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<ShadowRootPoppedNotification> result(new ShadowRootPoppedNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* hostIdValue = object->get("hostId");
-    errors->SetName("hostId");
-    result->m_hostId = ValueConversions<int>::fromValue(hostIdValue, errors);
-    protocol::Value* rootIdValue = object->get("rootId");
-    errors->SetName("rootId");
-    result->m_rootId = ValueConversions<int>::fromValue(rootIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> ShadowRootPoppedNotification::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("hostId", ValueConversions<int>::toValue(m_hostId));
-    result->setValue("rootId", ValueConversions<int>::toValue(m_rootId));
-    return result;
-}
-
-void ShadowRootPoppedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hostId"), m_hostId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("rootId"), m_rootId, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<ShadowRootPoppedNotification> ShadowRootPoppedNotification::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<ShadowRootPushedNotification> ShadowRootPushedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<ShadowRootPushedNotification> result(new ShadowRootPushedNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* hostIdValue = object->get("hostId");
-    errors->SetName("hostId");
-    result->m_hostId = ValueConversions<int>::fromValue(hostIdValue, errors);
-    protocol::Value* rootValue = object->get("root");
-    errors->SetName("root");
-    result->m_root = ValueConversions<protocol::DOM::Node>::fromValue(rootValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> ShadowRootPushedNotification::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("hostId", ValueConversions<int>::toValue(m_hostId));
-    result->setValue("root", ValueConversions<protocol::DOM::Node>::toValue(m_root.get()));
-    return result;
-}
-
-void ShadowRootPushedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hostId"), m_hostId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("root"), m_root, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<ShadowRootPushedNotification> ShadowRootPushedNotification::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
 
 // ------------- Enum values from params.
 
@@ -1192,79 +203,72 @@ void Frontend::attributeModified(int nodeId, const String& name, const String& v
 {
     if (!frontend_channel_)
         return;
-    std::unique_ptr<AttributeModifiedNotification> messageData = AttributeModifiedNotification::create()
-        .setNodeId(nodeId)
-        .setName(name)
-        .setValue(value)
-        .build();
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.attributeModified", std::move(messageData)));
+    v8_crdtp::ObjectSerializer serializer;
+    serializer.AddField(v8_crdtp::MakeSpan("nodeId"), nodeId);
+    serializer.AddField(v8_crdtp::MakeSpan("name"), name);
+    serializer.AddField(v8_crdtp::MakeSpan("value"), value);
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.attributeModified", serializer.Finish()));
 }
 
 void Frontend::attributeRemoved(int nodeId, const String& name)
 {
     if (!frontend_channel_)
         return;
-    std::unique_ptr<AttributeRemovedNotification> messageData = AttributeRemovedNotification::create()
-        .setNodeId(nodeId)
-        .setName(name)
-        .build();
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.attributeRemoved", std::move(messageData)));
+    v8_crdtp::ObjectSerializer serializer;
+    serializer.AddField(v8_crdtp::MakeSpan("nodeId"), nodeId);
+    serializer.AddField(v8_crdtp::MakeSpan("name"), name);
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.attributeRemoved", serializer.Finish()));
 }
 
 void Frontend::characterDataModified(int nodeId, const String& characterData)
 {
     if (!frontend_channel_)
         return;
-    std::unique_ptr<CharacterDataModifiedNotification> messageData = CharacterDataModifiedNotification::create()
-        .setNodeId(nodeId)
-        .setCharacterData(characterData)
-        .build();
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.characterDataModified", std::move(messageData)));
+    v8_crdtp::ObjectSerializer serializer;
+    serializer.AddField(v8_crdtp::MakeSpan("nodeId"), nodeId);
+    serializer.AddField(v8_crdtp::MakeSpan("characterData"), characterData);
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.characterDataModified", serializer.Finish()));
 }
 
 void Frontend::childNodeCountUpdated(int nodeId, int childNodeCount)
 {
     if (!frontend_channel_)
         return;
-    std::unique_ptr<ChildNodeCountUpdatedNotification> messageData = ChildNodeCountUpdatedNotification::create()
-        .setNodeId(nodeId)
-        .setChildNodeCount(childNodeCount)
-        .build();
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.childNodeCountUpdated", std::move(messageData)));
+    v8_crdtp::ObjectSerializer serializer;
+    serializer.AddField(v8_crdtp::MakeSpan("nodeId"), nodeId);
+    serializer.AddField(v8_crdtp::MakeSpan("childNodeCount"), childNodeCount);
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.childNodeCountUpdated", serializer.Finish()));
 }
 
 void Frontend::childNodeInserted(int parentNodeId, int previousNodeId, std::unique_ptr<protocol::DOM::Node> node)
 {
     if (!frontend_channel_)
         return;
-    std::unique_ptr<ChildNodeInsertedNotification> messageData = ChildNodeInsertedNotification::create()
-        .setParentNodeId(parentNodeId)
-        .setPreviousNodeId(previousNodeId)
-        .setNode(std::move(node))
-        .build();
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.childNodeInserted", std::move(messageData)));
+    v8_crdtp::ObjectSerializer serializer;
+    serializer.AddField(v8_crdtp::MakeSpan("parentNodeId"), parentNodeId);
+    serializer.AddField(v8_crdtp::MakeSpan("previousNodeId"), previousNodeId);
+    serializer.AddField(v8_crdtp::MakeSpan("node"), node);
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.childNodeInserted", serializer.Finish()));
 }
 
 void Frontend::childNodeRemoved(int parentNodeId, int nodeId)
 {
     if (!frontend_channel_)
         return;
-    std::unique_ptr<ChildNodeRemovedNotification> messageData = ChildNodeRemovedNotification::create()
-        .setParentNodeId(parentNodeId)
-        .setNodeId(nodeId)
-        .build();
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.childNodeRemoved", std::move(messageData)));
+    v8_crdtp::ObjectSerializer serializer;
+    serializer.AddField(v8_crdtp::MakeSpan("parentNodeId"), parentNodeId);
+    serializer.AddField(v8_crdtp::MakeSpan("nodeId"), nodeId);
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.childNodeRemoved", serializer.Finish()));
 }
 
 void Frontend::distributedNodesUpdated(int insertionPointId, std::unique_ptr<protocol::Array<protocol::DOM::BackendNode>> distributedNodes)
 {
     if (!frontend_channel_)
         return;
-    std::unique_ptr<DistributedNodesUpdatedNotification> messageData = DistributedNodesUpdatedNotification::create()
-        .setInsertionPointId(insertionPointId)
-        .setDistributedNodes(std::move(distributedNodes))
-        .build();
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.distributedNodesUpdated", std::move(messageData)));
+    v8_crdtp::ObjectSerializer serializer;
+    serializer.AddField(v8_crdtp::MakeSpan("insertionPointId"), insertionPointId);
+    serializer.AddField(v8_crdtp::MakeSpan("distributedNodes"), distributedNodes);
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.distributedNodesUpdated", serializer.Finish()));
 }
 
 void Frontend::documentUpdated()
@@ -1278,65 +282,59 @@ void Frontend::inlineStyleInvalidated(std::unique_ptr<protocol::Array<int>> node
 {
     if (!frontend_channel_)
         return;
-    std::unique_ptr<InlineStyleInvalidatedNotification> messageData = InlineStyleInvalidatedNotification::create()
-        .setNodeIds(std::move(nodeIds))
-        .build();
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.inlineStyleInvalidated", std::move(messageData)));
+    v8_crdtp::ObjectSerializer serializer;
+    serializer.AddField(v8_crdtp::MakeSpan("nodeIds"), nodeIds);
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.inlineStyleInvalidated", serializer.Finish()));
 }
 
 void Frontend::pseudoElementAdded(int parentId, std::unique_ptr<protocol::DOM::Node> pseudoElement)
 {
     if (!frontend_channel_)
         return;
-    std::unique_ptr<PseudoElementAddedNotification> messageData = PseudoElementAddedNotification::create()
-        .setParentId(parentId)
-        .setPseudoElement(std::move(pseudoElement))
-        .build();
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.pseudoElementAdded", std::move(messageData)));
+    v8_crdtp::ObjectSerializer serializer;
+    serializer.AddField(v8_crdtp::MakeSpan("parentId"), parentId);
+    serializer.AddField(v8_crdtp::MakeSpan("pseudoElement"), pseudoElement);
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.pseudoElementAdded", serializer.Finish()));
 }
 
 void Frontend::pseudoElementRemoved(int parentId, int pseudoElementId)
 {
     if (!frontend_channel_)
         return;
-    std::unique_ptr<PseudoElementRemovedNotification> messageData = PseudoElementRemovedNotification::create()
-        .setParentId(parentId)
-        .setPseudoElementId(pseudoElementId)
-        .build();
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.pseudoElementRemoved", std::move(messageData)));
+    v8_crdtp::ObjectSerializer serializer;
+    serializer.AddField(v8_crdtp::MakeSpan("parentId"), parentId);
+    serializer.AddField(v8_crdtp::MakeSpan("pseudoElementId"), pseudoElementId);
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.pseudoElementRemoved", serializer.Finish()));
 }
 
 void Frontend::setChildNodes(int parentId, std::unique_ptr<protocol::Array<protocol::DOM::Node>> nodes)
 {
     if (!frontend_channel_)
         return;
-    std::unique_ptr<SetChildNodesNotification> messageData = SetChildNodesNotification::create()
-        .setParentId(parentId)
-        .setNodes(std::move(nodes))
-        .build();
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.setChildNodes", std::move(messageData)));
+    v8_crdtp::ObjectSerializer serializer;
+    serializer.AddField(v8_crdtp::MakeSpan("parentId"), parentId);
+    serializer.AddField(v8_crdtp::MakeSpan("nodes"), nodes);
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.setChildNodes", serializer.Finish()));
 }
 
 void Frontend::shadowRootPopped(int hostId, int rootId)
 {
     if (!frontend_channel_)
         return;
-    std::unique_ptr<ShadowRootPoppedNotification> messageData = ShadowRootPoppedNotification::create()
-        .setHostId(hostId)
-        .setRootId(rootId)
-        .build();
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.shadowRootPopped", std::move(messageData)));
+    v8_crdtp::ObjectSerializer serializer;
+    serializer.AddField(v8_crdtp::MakeSpan("hostId"), hostId);
+    serializer.AddField(v8_crdtp::MakeSpan("rootId"), rootId);
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.shadowRootPopped", serializer.Finish()));
 }
 
 void Frontend::shadowRootPushed(int hostId, std::unique_ptr<protocol::DOM::Node> root)
 {
     if (!frontend_channel_)
         return;
-    std::unique_ptr<ShadowRootPushedNotification> messageData = ShadowRootPushedNotification::create()
-        .setHostId(hostId)
-        .setRoot(std::move(root))
-        .build();
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.shadowRootPushed", std::move(messageData)));
+    v8_crdtp::ObjectSerializer serializer;
+    serializer.AddField(v8_crdtp::MakeSpan("hostId"), hostId);
+    serializer.AddField(v8_crdtp::MakeSpan("root"), root);
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.shadowRootPushed", serializer.Finish()));
 }
 
 void Frontend::flush()
@@ -1358,49 +356,49 @@ public:
         , m_backend(backend) {}
     ~DomainDispatcherImpl() override { }
 
-    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable);
 
     std::function<void(const v8_crdtp::Dispatchable&)> Dispatch(v8_crdtp::span<uint8_t> command_name) override;
 
-    void collectClassNamesFromSubtree(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void copyTo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void describeNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void discardSearchResults(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void focus(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void getAttributes(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void getBoxModel(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void getContentQuads(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void getDocument(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void getFlattenedDocument(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void getNodeForLocation(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void getOuterHTML(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void getRelayoutBoundary(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void getSearchResults(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void markUndoableState(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void moveTo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void performSearch(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void pushNodeByPathToFrontend(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void pushNodesByBackendIdsToFrontend(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void querySelector(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void querySelectorAll(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void redo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void removeAttribute(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void removeNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void requestChildNodes(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void requestNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void resolveNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void setAttributeValue(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void setAttributesAsText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void setFileInputFiles(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void getFileInfo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void setInspectedNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void setNodeName(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void setNodeValue(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void setOuterHTML(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void undo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void getFrameOwner(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void collectClassNamesFromSubtree(const v8_crdtp::Dispatchable& dispatchable);
+    void copyTo(const v8_crdtp::Dispatchable& dispatchable);
+    void describeNode(const v8_crdtp::Dispatchable& dispatchable);
+    void disable(const v8_crdtp::Dispatchable& dispatchable);
+    void discardSearchResults(const v8_crdtp::Dispatchable& dispatchable);
+    void enable(const v8_crdtp::Dispatchable& dispatchable);
+    void focus(const v8_crdtp::Dispatchable& dispatchable);
+    void getAttributes(const v8_crdtp::Dispatchable& dispatchable);
+    void getBoxModel(const v8_crdtp::Dispatchable& dispatchable);
+    void getContentQuads(const v8_crdtp::Dispatchable& dispatchable);
+    void getDocument(const v8_crdtp::Dispatchable& dispatchable);
+    void getFlattenedDocument(const v8_crdtp::Dispatchable& dispatchable);
+    void getNodeForLocation(const v8_crdtp::Dispatchable& dispatchable);
+    void getOuterHTML(const v8_crdtp::Dispatchable& dispatchable);
+    void getRelayoutBoundary(const v8_crdtp::Dispatchable& dispatchable);
+    void getSearchResults(const v8_crdtp::Dispatchable& dispatchable);
+    void markUndoableState(const v8_crdtp::Dispatchable& dispatchable);
+    void moveTo(const v8_crdtp::Dispatchable& dispatchable);
+    void performSearch(const v8_crdtp::Dispatchable& dispatchable);
+    void pushNodeByPathToFrontend(const v8_crdtp::Dispatchable& dispatchable);
+    void pushNodesByBackendIdsToFrontend(const v8_crdtp::Dispatchable& dispatchable);
+    void querySelector(const v8_crdtp::Dispatchable& dispatchable);
+    void querySelectorAll(const v8_crdtp::Dispatchable& dispatchable);
+    void redo(const v8_crdtp::Dispatchable& dispatchable);
+    void removeAttribute(const v8_crdtp::Dispatchable& dispatchable);
+    void removeNode(const v8_crdtp::Dispatchable& dispatchable);
+    void requestChildNodes(const v8_crdtp::Dispatchable& dispatchable);
+    void requestNode(const v8_crdtp::Dispatchable& dispatchable);
+    void resolveNode(const v8_crdtp::Dispatchable& dispatchable);
+    void setAttributeValue(const v8_crdtp::Dispatchable& dispatchable);
+    void setAttributesAsText(const v8_crdtp::Dispatchable& dispatchable);
+    void setFileInputFiles(const v8_crdtp::Dispatchable& dispatchable);
+    void getFileInfo(const v8_crdtp::Dispatchable& dispatchable);
+    void setInspectedNode(const v8_crdtp::Dispatchable& dispatchable);
+    void setNodeName(const v8_crdtp::Dispatchable& dispatchable);
+    void setNodeValue(const v8_crdtp::Dispatchable& dispatchable);
+    void setOuterHTML(const v8_crdtp::Dispatchable& dispatchable);
+    void undo(const v8_crdtp::Dispatchable& dispatchable);
+    void getFrameOwner(const v8_crdtp::Dispatchable& dispatchable);
  protected:
     Backend* m_backend;
 };
@@ -1579,148 +577,169 @@ DomainDispatcherImpl::CallHandler CommandByName(v8_crdtp::span<uint8_t> command_
 std::function<void(const v8_crdtp::Dispatchable&)> DomainDispatcherImpl::Dispatch(v8_crdtp::span<uint8_t> command_name) {
   CallHandler handler = CommandByName(command_name);
   if (!handler) return nullptr;
-  return [this, handler](const v8_crdtp::Dispatchable& dispatchable){
-    std::unique_ptr<DictionaryValue> params =
-        DictionaryValue::cast(protocol::Value::parseBinary(dispatchable.Params().data(),
-        dispatchable.Params().size()));
-    ErrorSupport errors;
-    errors.Push();
-    (this->*handler)(dispatchable, params.get(), &errors);
+
+  return [this, handler](const v8_crdtp::Dispatchable& dispatchable) {
+    (this->*handler)(dispatchable);
   };
 }
 
 
-void DomainDispatcherImpl::collectClassNamesFromSubtree(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct collectClassNamesFromSubtreeParams : public v8_crdtp::DeserializableProtocolObject<collectClassNamesFromSubtreeParams> {
+    int nodeId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(collectClassNamesFromSubtreeParams)
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::collectClassNamesFromSubtree(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    collectClassNamesFromSubtreeParams params;
+    collectClassNamesFromSubtreeParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     std::unique_ptr<protocol::Array<String>> out_classNames;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->collectClassNamesFromSubtree(in_nodeId, &out_classNames);
+    DispatchResponse response = m_backend->collectClassNamesFromSubtree(params.nodeId, &out_classNames);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.collectClassNamesFromSubtree"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("classNames"), out_classNames, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("classNames"), out_classNames);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::copyTo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct copyToParams : public v8_crdtp::DeserializableProtocolObject<copyToParams> {
+    int nodeId;
+    int targetNodeId;
+    Maybe<int> insertBeforeNodeId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(copyToParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("insertBeforeNodeId", insertBeforeNodeId),
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD("targetNodeId", targetNodeId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::copyTo(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* targetNodeIdValue = params ? params->get("targetNodeId") : nullptr;
-    errors->SetName("targetNodeId");
-    int in_targetNodeId = ValueConversions<int>::fromValue(targetNodeIdValue, errors);
-    protocol::Value* insertBeforeNodeIdValue = params ? params->get("insertBeforeNodeId") : nullptr;
-    Maybe<int> in_insertBeforeNodeId;
-    if (insertBeforeNodeIdValue) {
-        errors->SetName("insertBeforeNodeId");
-        in_insertBeforeNodeId = ValueConversions<int>::fromValue(insertBeforeNodeIdValue, errors);
-    }
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    copyToParams params;
+    copyToParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     int out_nodeId;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->copyTo(in_nodeId, in_targetNodeId, std::move(in_insertBeforeNodeId), &out_nodeId);
+    DispatchResponse response = m_backend->copyTo(params.nodeId, params.targetNodeId, std::move(params.insertBeforeNodeId), &out_nodeId);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.copyTo"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("nodeId"), out_nodeId);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::describeNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct describeNodeParams : public v8_crdtp::DeserializableProtocolObject<describeNodeParams> {
+    Maybe<int> nodeId;
+    Maybe<int> backendNodeId;
+    Maybe<String> objectId;
+    Maybe<int> depth;
+    Maybe<bool> pierce;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(describeNodeParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("backendNodeId", backendNodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("depth", depth),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("objectId", objectId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("pierce", pierce),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::describeNode(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    Maybe<int> in_nodeId;
-    if (nodeIdValue) {
-        errors->SetName("nodeId");
-        in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    }
-    protocol::Value* backendNodeIdValue = params ? params->get("backendNodeId") : nullptr;
-    Maybe<int> in_backendNodeId;
-    if (backendNodeIdValue) {
-        errors->SetName("backendNodeId");
-        in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
-    }
-    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
-    Maybe<String> in_objectId;
-    if (objectIdValue) {
-        errors->SetName("objectId");
-        in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
-    }
-    protocol::Value* depthValue = params ? params->get("depth") : nullptr;
-    Maybe<int> in_depth;
-    if (depthValue) {
-        errors->SetName("depth");
-        in_depth = ValueConversions<int>::fromValue(depthValue, errors);
-    }
-    protocol::Value* pierceValue = params ? params->get("pierce") : nullptr;
-    Maybe<bool> in_pierce;
-    if (pierceValue) {
-        errors->SetName("pierce");
-        in_pierce = ValueConversions<bool>::fromValue(pierceValue, errors);
-    }
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    describeNodeParams params;
+    describeNodeParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     std::unique_ptr<protocol::DOM::Node> out_node;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->describeNode(std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectId), std::move(in_depth), std::move(in_pierce), &out_node);
+    DispatchResponse response = m_backend->describeNode(std::move(params.nodeId), std::move(params.backendNodeId), std::move(params.objectId), std::move(params.depth), std::move(params.pierce), &out_node);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.describeNode"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("node"), out_node, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("node"), out_node);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+
+}  // namespace
+
+void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable)
 {
+    // Prepare input parameters.
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
@@ -1733,16 +752,31 @@ void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable, D
     return;
 }
 
-void DomainDispatcherImpl::discardSearchResults(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct discardSearchResultsParams : public v8_crdtp::DeserializableProtocolObject<discardSearchResultsParams> {
+    String searchId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(discardSearchResultsParams)
+    V8_CRDTP_DESERIALIZE_FIELD("searchId", searchId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::discardSearchResults(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* searchIdValue = params ? params->get("searchId") : nullptr;
-    errors->SetName("searchId");
-    String in_searchId = ValueConversions<String>::fromValue(searchIdValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    discardSearchResultsParams params;
+    discardSearchResultsParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->discardSearchResults(in_searchId);
+    DispatchResponse response = m_backend->discardSearchResults(params.searchId);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.discardSearchResults"), dispatchable.Serialized());
         return;
@@ -1752,8 +786,15 @@ void DomainDispatcherImpl::discardSearchResults(const v8_crdtp::Dispatchable& di
     return;
 }
 
-void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+
+}  // namespace
+
+void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable)
 {
+    // Prepare input parameters.
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->enable();
@@ -1766,31 +807,35 @@ void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable, Di
     return;
 }
 
-void DomainDispatcherImpl::focus(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct focusParams : public v8_crdtp::DeserializableProtocolObject<focusParams> {
+    Maybe<int> nodeId;
+    Maybe<int> backendNodeId;
+    Maybe<String> objectId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(focusParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("backendNodeId", backendNodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("objectId", objectId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::focus(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    Maybe<int> in_nodeId;
-    if (nodeIdValue) {
-        errors->SetName("nodeId");
-        in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    }
-    protocol::Value* backendNodeIdValue = params ? params->get("backendNodeId") : nullptr;
-    Maybe<int> in_backendNodeId;
-    if (backendNodeIdValue) {
-        errors->SetName("backendNodeId");
-        in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
-    }
-    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
-    Maybe<String> in_objectId;
-    if (objectIdValue) {
-        errors->SetName("objectId");
-        in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
-    }
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    focusParams params;
+    focusParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->focus(std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectId));
+    DispatchResponse response = m_backend->focus(std::move(params.nodeId), std::move(params.backendNodeId), std::move(params.objectId));
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.focus"), dispatchable.Serialized());
         return;
@@ -1800,376 +845,446 @@ void DomainDispatcherImpl::focus(const v8_crdtp::Dispatchable& dispatchable, Dic
     return;
 }
 
-void DomainDispatcherImpl::getAttributes(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct getAttributesParams : public v8_crdtp::DeserializableProtocolObject<getAttributesParams> {
+    int nodeId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(getAttributesParams)
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::getAttributes(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    getAttributesParams params;
+    getAttributesParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     std::unique_ptr<protocol::Array<String>> out_attributes;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getAttributes(in_nodeId, &out_attributes);
+    DispatchResponse response = m_backend->getAttributes(params.nodeId, &out_attributes);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getAttributes"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("attributes"), out_attributes, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("attributes"), out_attributes);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::getBoxModel(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct getBoxModelParams : public v8_crdtp::DeserializableProtocolObject<getBoxModelParams> {
+    Maybe<int> nodeId;
+    Maybe<int> backendNodeId;
+    Maybe<String> objectId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(getBoxModelParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("backendNodeId", backendNodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("objectId", objectId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::getBoxModel(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    Maybe<int> in_nodeId;
-    if (nodeIdValue) {
-        errors->SetName("nodeId");
-        in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    }
-    protocol::Value* backendNodeIdValue = params ? params->get("backendNodeId") : nullptr;
-    Maybe<int> in_backendNodeId;
-    if (backendNodeIdValue) {
-        errors->SetName("backendNodeId");
-        in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
-    }
-    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
-    Maybe<String> in_objectId;
-    if (objectIdValue) {
-        errors->SetName("objectId");
-        in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
-    }
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    getBoxModelParams params;
+    getBoxModelParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     std::unique_ptr<protocol::DOM::BoxModel> out_model;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getBoxModel(std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectId), &out_model);
+    DispatchResponse response = m_backend->getBoxModel(std::move(params.nodeId), std::move(params.backendNodeId), std::move(params.objectId), &out_model);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getBoxModel"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("model"), out_model, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("model"), out_model);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::getContentQuads(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct getContentQuadsParams : public v8_crdtp::DeserializableProtocolObject<getContentQuadsParams> {
+    Maybe<int> nodeId;
+    Maybe<int> backendNodeId;
+    Maybe<String> objectId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(getContentQuadsParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("backendNodeId", backendNodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("objectId", objectId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::getContentQuads(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    Maybe<int> in_nodeId;
-    if (nodeIdValue) {
-        errors->SetName("nodeId");
-        in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    }
-    protocol::Value* backendNodeIdValue = params ? params->get("backendNodeId") : nullptr;
-    Maybe<int> in_backendNodeId;
-    if (backendNodeIdValue) {
-        errors->SetName("backendNodeId");
-        in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
-    }
-    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
-    Maybe<String> in_objectId;
-    if (objectIdValue) {
-        errors->SetName("objectId");
-        in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
-    }
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    getContentQuadsParams params;
+    getContentQuadsParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Array<double>>> out_quads;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getContentQuads(std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectId), &out_quads);
+    DispatchResponse response = m_backend->getContentQuads(std::move(params.nodeId), std::move(params.backendNodeId), std::move(params.objectId), &out_quads);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getContentQuads"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("quads"), out_quads, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("quads"), out_quads);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::getDocument(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct getDocumentParams : public v8_crdtp::DeserializableProtocolObject<getDocumentParams> {
+    Maybe<int> depth;
+    Maybe<bool> pierce;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(getDocumentParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("depth", depth),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("pierce", pierce),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::getDocument(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* depthValue = params ? params->get("depth") : nullptr;
-    Maybe<int> in_depth;
-    if (depthValue) {
-        errors->SetName("depth");
-        in_depth = ValueConversions<int>::fromValue(depthValue, errors);
-    }
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    getDocumentParams params;
+    getDocumentParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
 
-    protocol::Value* pierceValue = params ? params->get("pierce") : nullptr;
-    Maybe<bool> in_pierce;
-    if (pierceValue) {
-        errors->SetName("pierce");
-        in_pierce = ValueConversions<bool>::fromValue(pierceValue, errors);
-    }
-
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::DOM::Node> out_root;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-
-    if (depthValue && pierceValue) {
-        //NOTE: in_depth & in_pierce are not used in the method getDocument, see in v8-dom-agent-impl.cpp:63
-        DispatchResponse response = m_backend->getDocument(std::move(in_depth),
-                                                           std::move(in_pierce), &out_root);
-        if (response.IsFallThrough()) {
-            channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getDocument"),
-                                   dispatchable.Serialized());
-            return;
-        }
-        if (weak->get()) {
-            std::vector<uint8_t> result;
-            if (response.IsSuccess()) {
-                v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-                envelope_encoder.EncodeStart(&result);
-                result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-                v8_crdtp::SerializeField(v8_crdtp::SpanFrom("root"), out_root, &result);
-                result.push_back(v8_crdtp::cbor::EncodeStop());
-                envelope_encoder.EncodeStop(&result);
-            }
-            weak->get()->sendResponse(dispatchable.CallId(), response,
-                                      v8_crdtp::Serializable::From(std::move(result)));
-        }
+    DispatchResponse response = m_backend->getDocument(std::move(params.depth), std::move(params.pierce), &out_root);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getDocument"), dispatchable.Serialized());
+        return;
     }
+      if (weak->get()) {
+        std::unique_ptr<v8_crdtp::Serializable> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("root"), out_root);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+      }
     return;
 }
 
-void DomainDispatcherImpl::getFlattenedDocument(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct getFlattenedDocumentParams : public v8_crdtp::DeserializableProtocolObject<getFlattenedDocumentParams> {
+    Maybe<int> depth;
+    Maybe<bool> pierce;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(getFlattenedDocumentParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("depth", depth),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("pierce", pierce),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::getFlattenedDocument(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* depthValue = params ? params->get("depth") : nullptr;
-    Maybe<int> in_depth;
-    if (depthValue) {
-        errors->SetName("depth");
-        in_depth = ValueConversions<int>::fromValue(depthValue, errors);
-    }
-    protocol::Value* pierceValue = params ? params->get("pierce") : nullptr;
-    Maybe<bool> in_pierce;
-    if (pierceValue) {
-        errors->SetName("pierce");
-        in_pierce = ValueConversions<bool>::fromValue(pierceValue, errors);
-    }
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    getFlattenedDocumentParams params;
+    getFlattenedDocumentParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::DOM::Node>> out_nodes;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getFlattenedDocument(std::move(in_depth), std::move(in_pierce), &out_nodes);
+    DispatchResponse response = m_backend->getFlattenedDocument(std::move(params.depth), std::move(params.pierce), &out_nodes);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getFlattenedDocument"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodes"), out_nodes, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("nodes"), out_nodes);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::getNodeForLocation(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct getNodeForLocationParams : public v8_crdtp::DeserializableProtocolObject<getNodeForLocationParams> {
+    int x;
+    int y;
+    Maybe<bool> includeUserAgentShadowDOM;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(getNodeForLocationParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("includeUserAgentShadowDOM", includeUserAgentShadowDOM),
+    V8_CRDTP_DESERIALIZE_FIELD("x", x),
+    V8_CRDTP_DESERIALIZE_FIELD("y", y),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::getNodeForLocation(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* xValue = params ? params->get("x") : nullptr;
-    errors->SetName("x");
-    int in_x = ValueConversions<int>::fromValue(xValue, errors);
-    protocol::Value* yValue = params ? params->get("y") : nullptr;
-    errors->SetName("y");
-    int in_y = ValueConversions<int>::fromValue(yValue, errors);
-    protocol::Value* includeUserAgentShadowDOMValue = params ? params->get("includeUserAgentShadowDOM") : nullptr;
-    Maybe<bool> in_includeUserAgentShadowDOM;
-    if (includeUserAgentShadowDOMValue) {
-        errors->SetName("includeUserAgentShadowDOM");
-        in_includeUserAgentShadowDOM = ValueConversions<bool>::fromValue(includeUserAgentShadowDOMValue, errors);
-    }
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    getNodeForLocationParams params;
+    getNodeForLocationParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     int out_backendNodeId;
     Maybe<int> out_nodeId;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getNodeForLocation(in_x, in_y, std::move(in_includeUserAgentShadowDOM), &out_backendNodeId, &out_nodeId);
+    DispatchResponse response = m_backend->getNodeForLocation(params.x, params.y, std::move(params.includeUserAgentShadowDOM), &out_backendNodeId, &out_nodeId);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getNodeForLocation"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("backendNodeId"), out_backendNodeId, &result);
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("backendNodeId"), out_backendNodeId);
+          serializer.AddField(v8_crdtp::MakeSpan("nodeId"), out_nodeId);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::getOuterHTML(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct getOuterHTMLParams : public v8_crdtp::DeserializableProtocolObject<getOuterHTMLParams> {
+    Maybe<int> nodeId;
+    Maybe<int> backendNodeId;
+    Maybe<String> objectId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(getOuterHTMLParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("backendNodeId", backendNodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("objectId", objectId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::getOuterHTML(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    Maybe<int> in_nodeId;
-    if (nodeIdValue) {
-        errors->SetName("nodeId");
-        in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    }
-    protocol::Value* backendNodeIdValue = params ? params->get("backendNodeId") : nullptr;
-    Maybe<int> in_backendNodeId;
-    if (backendNodeIdValue) {
-        errors->SetName("backendNodeId");
-        in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
-    }
-    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
-    Maybe<String> in_objectId;
-    if (objectIdValue) {
-        errors->SetName("objectId");
-        in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
-    }
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    getOuterHTMLParams params;
+    getOuterHTMLParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     String out_outerHTML;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getOuterHTML(std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectId), &out_outerHTML);
+    DispatchResponse response = m_backend->getOuterHTML(std::move(params.nodeId), std::move(params.backendNodeId), std::move(params.objectId), &out_outerHTML);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getOuterHTML"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("outerHTML"), out_outerHTML, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("outerHTML"), out_outerHTML);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::getRelayoutBoundary(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct getRelayoutBoundaryParams : public v8_crdtp::DeserializableProtocolObject<getRelayoutBoundaryParams> {
+    int nodeId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(getRelayoutBoundaryParams)
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::getRelayoutBoundary(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    getRelayoutBoundaryParams params;
+    getRelayoutBoundaryParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     int out_nodeId;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getRelayoutBoundary(in_nodeId, &out_nodeId);
+    DispatchResponse response = m_backend->getRelayoutBoundary(params.nodeId, &out_nodeId);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getRelayoutBoundary"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("nodeId"), out_nodeId);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::getSearchResults(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct getSearchResultsParams : public v8_crdtp::DeserializableProtocolObject<getSearchResultsParams> {
+    String searchId;
+    int fromIndex;
+    int toIndex;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(getSearchResultsParams)
+    V8_CRDTP_DESERIALIZE_FIELD("fromIndex", fromIndex),
+    V8_CRDTP_DESERIALIZE_FIELD("searchId", searchId),
+    V8_CRDTP_DESERIALIZE_FIELD("toIndex", toIndex),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::getSearchResults(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* searchIdValue = params ? params->get("searchId") : nullptr;
-    errors->SetName("searchId");
-    String in_searchId = ValueConversions<String>::fromValue(searchIdValue, errors);
-    protocol::Value* fromIndexValue = params ? params->get("fromIndex") : nullptr;
-    errors->SetName("fromIndex");
-    int in_fromIndex = ValueConversions<int>::fromValue(fromIndexValue, errors);
-    protocol::Value* toIndexValue = params ? params->get("toIndex") : nullptr;
-    errors->SetName("toIndex");
-    int in_toIndex = ValueConversions<int>::fromValue(toIndexValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    getSearchResultsParams params;
+    getSearchResultsParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     std::unique_ptr<protocol::Array<int>> out_nodeIds;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getSearchResults(in_searchId, in_fromIndex, in_toIndex, &out_nodeIds);
+    DispatchResponse response = m_backend->getSearchResults(params.searchId, params.fromIndex, params.toIndex, &out_nodeIds);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getSearchResults"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeIds"), out_nodeIds, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("nodeIds"), out_nodeIds);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::markUndoableState(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+
+}  // namespace
+
+void DomainDispatcherImpl::markUndoableState(const v8_crdtp::Dispatchable& dispatchable)
 {
+    // Prepare input parameters.
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->markUndoableState();
@@ -2182,217 +1297,297 @@ void DomainDispatcherImpl::markUndoableState(const v8_crdtp::Dispatchable& dispa
     return;
 }
 
-void DomainDispatcherImpl::moveTo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct moveToParams : public v8_crdtp::DeserializableProtocolObject<moveToParams> {
+    int nodeId;
+    int targetNodeId;
+    Maybe<int> insertBeforeNodeId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(moveToParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("insertBeforeNodeId", insertBeforeNodeId),
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD("targetNodeId", targetNodeId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::moveTo(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* targetNodeIdValue = params ? params->get("targetNodeId") : nullptr;
-    errors->SetName("targetNodeId");
-    int in_targetNodeId = ValueConversions<int>::fromValue(targetNodeIdValue, errors);
-    protocol::Value* insertBeforeNodeIdValue = params ? params->get("insertBeforeNodeId") : nullptr;
-    Maybe<int> in_insertBeforeNodeId;
-    if (insertBeforeNodeIdValue) {
-        errors->SetName("insertBeforeNodeId");
-        in_insertBeforeNodeId = ValueConversions<int>::fromValue(insertBeforeNodeIdValue, errors);
-    }
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    moveToParams params;
+    moveToParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     int out_nodeId;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->moveTo(in_nodeId, in_targetNodeId, std::move(in_insertBeforeNodeId), &out_nodeId);
+    DispatchResponse response = m_backend->moveTo(params.nodeId, params.targetNodeId, std::move(params.insertBeforeNodeId), &out_nodeId);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.moveTo"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("nodeId"), out_nodeId);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::performSearch(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct performSearchParams : public v8_crdtp::DeserializableProtocolObject<performSearchParams> {
+    String query;
+    Maybe<bool> includeUserAgentShadowDOM;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(performSearchParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("includeUserAgentShadowDOM", includeUserAgentShadowDOM),
+    V8_CRDTP_DESERIALIZE_FIELD("query", query),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::performSearch(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* queryValue = params ? params->get("query") : nullptr;
-    errors->SetName("query");
-    String in_query = ValueConversions<String>::fromValue(queryValue, errors);
-    protocol::Value* includeUserAgentShadowDOMValue = params ? params->get("includeUserAgentShadowDOM") : nullptr;
-    Maybe<bool> in_includeUserAgentShadowDOM;
-    if (includeUserAgentShadowDOMValue) {
-        errors->SetName("includeUserAgentShadowDOM");
-        in_includeUserAgentShadowDOM = ValueConversions<bool>::fromValue(includeUserAgentShadowDOMValue, errors);
-    }
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    performSearchParams params;
+    performSearchParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     String out_searchId;
     int out_resultCount;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->performSearch(in_query, std::move(in_includeUserAgentShadowDOM), &out_searchId, &out_resultCount);
+    DispatchResponse response = m_backend->performSearch(params.query, std::move(params.includeUserAgentShadowDOM), &out_searchId, &out_resultCount);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.performSearch"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("searchId"), out_searchId, &result);
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("resultCount"), out_resultCount, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("searchId"), out_searchId);
+          serializer.AddField(v8_crdtp::MakeSpan("resultCount"), out_resultCount);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::pushNodeByPathToFrontend(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct pushNodeByPathToFrontendParams : public v8_crdtp::DeserializableProtocolObject<pushNodeByPathToFrontendParams> {
+    String path;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(pushNodeByPathToFrontendParams)
+    V8_CRDTP_DESERIALIZE_FIELD("path", path),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::pushNodeByPathToFrontend(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* pathValue = params ? params->get("path") : nullptr;
-    errors->SetName("path");
-    String in_path = ValueConversions<String>::fromValue(pathValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    pushNodeByPathToFrontendParams params;
+    pushNodeByPathToFrontendParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     int out_nodeId;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->pushNodeByPathToFrontend(in_path, &out_nodeId);
+    DispatchResponse response = m_backend->pushNodeByPathToFrontend(params.path, &out_nodeId);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.pushNodeByPathToFrontend"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("nodeId"), out_nodeId);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::pushNodesByBackendIdsToFrontend(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct pushNodesByBackendIdsToFrontendParams : public v8_crdtp::DeserializableProtocolObject<pushNodesByBackendIdsToFrontendParams> {
+    std::unique_ptr<protocol::Array<int>> backendNodeIds;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(pushNodesByBackendIdsToFrontendParams)
+    V8_CRDTP_DESERIALIZE_FIELD("backendNodeIds", backendNodeIds),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::pushNodesByBackendIdsToFrontend(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* backendNodeIdsValue = params ? params->get("backendNodeIds") : nullptr;
-    errors->SetName("backendNodeIds");
-    std::unique_ptr<protocol::Array<int>> in_backendNodeIds = ValueConversions<protocol::Array<int>>::fromValue(backendNodeIdsValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    pushNodesByBackendIdsToFrontendParams params;
+    pushNodesByBackendIdsToFrontendParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     std::unique_ptr<protocol::Array<int>> out_nodeIds;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->pushNodesByBackendIdsToFrontend(std::move(in_backendNodeIds), &out_nodeIds);
+    DispatchResponse response = m_backend->pushNodesByBackendIdsToFrontend(std::move(params.backendNodeIds), &out_nodeIds);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.pushNodesByBackendIdsToFrontend"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeIds"), out_nodeIds, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("nodeIds"), out_nodeIds);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::querySelector(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct querySelectorParams : public v8_crdtp::DeserializableProtocolObject<querySelectorParams> {
+    int nodeId;
+    String selector;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(querySelectorParams)
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD("selector", selector),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::querySelector(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* selectorValue = params ? params->get("selector") : nullptr;
-    errors->SetName("selector");
-    String in_selector = ValueConversions<String>::fromValue(selectorValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    querySelectorParams params;
+    querySelectorParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     int out_nodeId;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->querySelector(in_nodeId, in_selector, &out_nodeId);
+    DispatchResponse response = m_backend->querySelector(params.nodeId, params.selector, &out_nodeId);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.querySelector"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("nodeId"), out_nodeId);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::querySelectorAll(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct querySelectorAllParams : public v8_crdtp::DeserializableProtocolObject<querySelectorAllParams> {
+    int nodeId;
+    String selector;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(querySelectorAllParams)
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD("selector", selector),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::querySelectorAll(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* selectorValue = params ? params->get("selector") : nullptr;
-    errors->SetName("selector");
-    String in_selector = ValueConversions<String>::fromValue(selectorValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    querySelectorAllParams params;
+    querySelectorAllParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     std::unique_ptr<protocol::Array<int>> out_nodeIds;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->querySelectorAll(in_nodeId, in_selector, &out_nodeIds);
+    DispatchResponse response = m_backend->querySelectorAll(params.nodeId, params.selector, &out_nodeIds);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.querySelectorAll"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeIds"), out_nodeIds, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("nodeIds"), out_nodeIds);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::redo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+
+}  // namespace
+
+void DomainDispatcherImpl::redo(const v8_crdtp::Dispatchable& dispatchable)
 {
+    // Prepare input parameters.
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->redo();
@@ -2405,19 +1600,33 @@ void DomainDispatcherImpl::redo(const v8_crdtp::Dispatchable& dispatchable, Dict
     return;
 }
 
-void DomainDispatcherImpl::removeAttribute(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct removeAttributeParams : public v8_crdtp::DeserializableProtocolObject<removeAttributeParams> {
+    int nodeId;
+    String name;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(removeAttributeParams)
+    V8_CRDTP_DESERIALIZE_FIELD("name", name),
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::removeAttribute(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* nameValue = params ? params->get("name") : nullptr;
-    errors->SetName("name");
-    String in_name = ValueConversions<String>::fromValue(nameValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    removeAttributeParams params;
+    removeAttributeParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->removeAttribute(in_nodeId, in_name);
+    DispatchResponse response = m_backend->removeAttribute(params.nodeId, params.name);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.removeAttribute"), dispatchable.Serialized());
         return;
@@ -2427,16 +1636,31 @@ void DomainDispatcherImpl::removeAttribute(const v8_crdtp::Dispatchable& dispatc
     return;
 }
 
-void DomainDispatcherImpl::removeNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct removeNodeParams : public v8_crdtp::DeserializableProtocolObject<removeNodeParams> {
+    int nodeId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(removeNodeParams)
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::removeNode(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    removeNodeParams params;
+    removeNodeParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->removeNode(in_nodeId);
+    DispatchResponse response = m_backend->removeNode(params.nodeId);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.removeNode"), dispatchable.Serialized());
         return;
@@ -2446,28 +1670,35 @@ void DomainDispatcherImpl::removeNode(const v8_crdtp::Dispatchable& dispatchable
     return;
 }
 
-void DomainDispatcherImpl::requestChildNodes(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct requestChildNodesParams : public v8_crdtp::DeserializableProtocolObject<requestChildNodesParams> {
+    int nodeId;
+    Maybe<int> depth;
+    Maybe<bool> pierce;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(requestChildNodesParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("depth", depth),
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("pierce", pierce),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::requestChildNodes(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* depthValue = params ? params->get("depth") : nullptr;
-    Maybe<int> in_depth;
-    if (depthValue) {
-        errors->SetName("depth");
-        in_depth = ValueConversions<int>::fromValue(depthValue, errors);
-    }
-    protocol::Value* pierceValue = params ? params->get("pierce") : nullptr;
-    Maybe<bool> in_pierce;
-    if (pierceValue) {
-        errors->SetName("pierce");
-        in_pierce = ValueConversions<bool>::fromValue(pierceValue, errors);
-    }
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    requestChildNodesParams params;
+    requestChildNodesParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->requestChildNodes(in_nodeId, std::move(in_depth), std::move(in_pierce));
+    DispatchResponse response = m_backend->requestChildNodes(params.nodeId, std::move(params.depth), std::move(params.pierce));
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.requestChildNodes"), dispatchable.Serialized());
         return;
@@ -2477,105 +1708,131 @@ void DomainDispatcherImpl::requestChildNodes(const v8_crdtp::Dispatchable& dispa
     return;
 }
 
-void DomainDispatcherImpl::requestNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct requestNodeParams : public v8_crdtp::DeserializableProtocolObject<requestNodeParams> {
+    String objectId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(requestNodeParams)
+    V8_CRDTP_DESERIALIZE_FIELD("objectId", objectId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::requestNode(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
-    errors->SetName("objectId");
-    String in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    requestNodeParams params;
+    requestNodeParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     int out_nodeId;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->requestNode(in_objectId, &out_nodeId);
+    DispatchResponse response = m_backend->requestNode(params.objectId, &out_nodeId);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.requestNode"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("nodeId"), out_nodeId);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::resolveNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct resolveNodeParams : public v8_crdtp::DeserializableProtocolObject<resolveNodeParams> {
+    Maybe<int> nodeId;
+    Maybe<int> backendNodeId;
+    Maybe<String> objectGroup;
+    Maybe<int> executionContextId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(resolveNodeParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("backendNodeId", backendNodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("executionContextId", executionContextId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("objectGroup", objectGroup),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::resolveNode(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    Maybe<int> in_nodeId;
-    if (nodeIdValue) {
-        errors->SetName("nodeId");
-        in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    }
-    protocol::Value* backendNodeIdValue = params ? params->get("backendNodeId") : nullptr;
-    Maybe<int> in_backendNodeId;
-    if (backendNodeIdValue) {
-        errors->SetName("backendNodeId");
-        in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
-    }
-    protocol::Value* objectGroupValue = params ? params->get("objectGroup") : nullptr;
-    Maybe<String> in_objectGroup;
-    if (objectGroupValue) {
-        errors->SetName("objectGroup");
-        in_objectGroup = ValueConversions<String>::fromValue(objectGroupValue, errors);
-    }
-    protocol::Value* executionContextIdValue = params ? params->get("executionContextId") : nullptr;
-    Maybe<int> in_executionContextId;
-    if (executionContextIdValue) {
-        errors->SetName("executionContextId");
-        in_executionContextId = ValueConversions<int>::fromValue(executionContextIdValue, errors);
-    }
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    resolveNodeParams params;
+    resolveNodeParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     std::unique_ptr<protocol::Runtime::RemoteObject> out_object;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->resolveNode(std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectGroup), std::move(in_executionContextId), &out_object);
+    DispatchResponse response = m_backend->resolveNode(std::move(params.nodeId), std::move(params.backendNodeId), std::move(params.objectGroup), std::move(params.executionContextId), &out_object);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.resolveNode"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("object"), out_object, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("object"), out_object);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::setAttributeValue(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct setAttributeValueParams : public v8_crdtp::DeserializableProtocolObject<setAttributeValueParams> {
+    int nodeId;
+    String name;
+    String value;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(setAttributeValueParams)
+    V8_CRDTP_DESERIALIZE_FIELD("name", name),
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD("value", value),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::setAttributeValue(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* nameValue = params ? params->get("name") : nullptr;
-    errors->SetName("name");
-    String in_name = ValueConversions<String>::fromValue(nameValue, errors);
-    protocol::Value* valueValue = params ? params->get("value") : nullptr;
-    errors->SetName("value");
-    String in_value = ValueConversions<String>::fromValue(valueValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    setAttributeValueParams params;
+    setAttributeValueParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setAttributeValue(in_nodeId, in_name, in_value);
+    DispatchResponse response = m_backend->setAttributeValue(params.nodeId, params.name, params.value);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setAttributeValue"), dispatchable.Serialized());
         return;
@@ -2585,25 +1842,35 @@ void DomainDispatcherImpl::setAttributeValue(const v8_crdtp::Dispatchable& dispa
     return;
 }
 
-void DomainDispatcherImpl::setAttributesAsText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct setAttributesAsTextParams : public v8_crdtp::DeserializableProtocolObject<setAttributesAsTextParams> {
+    int nodeId;
+    String text;
+    Maybe<String> name;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(setAttributesAsTextParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("name", name),
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD("text", text),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::setAttributesAsText(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* textValue = params ? params->get("text") : nullptr;
-    errors->SetName("text");
-    String in_text = ValueConversions<String>::fromValue(textValue, errors);
-    protocol::Value* nameValue = params ? params->get("name") : nullptr;
-    Maybe<String> in_name;
-    if (nameValue) {
-        errors->SetName("name");
-        in_name = ValueConversions<String>::fromValue(nameValue, errors);
-    }
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    setAttributesAsTextParams params;
+    setAttributesAsTextParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setAttributesAsText(in_nodeId, in_text, std::move(in_name));
+    DispatchResponse response = m_backend->setAttributesAsText(params.nodeId, params.text, std::move(params.name));
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setAttributesAsText"), dispatchable.Serialized());
         return;
@@ -2613,34 +1880,37 @@ void DomainDispatcherImpl::setAttributesAsText(const v8_crdtp::Dispatchable& dis
     return;
 }
 
-void DomainDispatcherImpl::setFileInputFiles(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct setFileInputFilesParams : public v8_crdtp::DeserializableProtocolObject<setFileInputFilesParams> {
+    std::unique_ptr<protocol::Array<String>> files;
+    Maybe<int> nodeId;
+    Maybe<int> backendNodeId;
+    Maybe<String> objectId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(setFileInputFilesParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("backendNodeId", backendNodeId),
+    V8_CRDTP_DESERIALIZE_FIELD("files", files),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("objectId", objectId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::setFileInputFiles(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* filesValue = params ? params->get("files") : nullptr;
-    errors->SetName("files");
-    std::unique_ptr<protocol::Array<String>> in_files = ValueConversions<protocol::Array<String>>::fromValue(filesValue, errors);
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    Maybe<int> in_nodeId;
-    if (nodeIdValue) {
-        errors->SetName("nodeId");
-        in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    }
-    protocol::Value* backendNodeIdValue = params ? params->get("backendNodeId") : nullptr;
-    Maybe<int> in_backendNodeId;
-    if (backendNodeIdValue) {
-        errors->SetName("backendNodeId");
-        in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
-    }
-    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
-    Maybe<String> in_objectId;
-    if (objectIdValue) {
-        errors->SetName("objectId");
-        in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
-    }
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    setFileInputFilesParams params;
+    setFileInputFilesParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setFileInputFiles(std::move(in_files), std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectId));
+    DispatchResponse response = m_backend->setFileInputFiles(std::move(params.files), std::move(params.nodeId), std::move(params.backendNodeId), std::move(params.objectId));
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setFileInputFiles"), dispatchable.Serialized());
         return;
@@ -2650,47 +1920,76 @@ void DomainDispatcherImpl::setFileInputFiles(const v8_crdtp::Dispatchable& dispa
     return;
 }
 
-void DomainDispatcherImpl::getFileInfo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct getFileInfoParams : public v8_crdtp::DeserializableProtocolObject<getFileInfoParams> {
+    String objectId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(getFileInfoParams)
+    V8_CRDTP_DESERIALIZE_FIELD("objectId", objectId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::getFileInfo(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
-    errors->SetName("objectId");
-    String in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    getFileInfoParams params;
+    getFileInfoParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     String out_path;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getFileInfo(in_objectId, &out_path);
+    DispatchResponse response = m_backend->getFileInfo(params.objectId, &out_path);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getFileInfo"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("path"), out_path, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("path"), out_path);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::setInspectedNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct setInspectedNodeParams : public v8_crdtp::DeserializableProtocolObject<setInspectedNodeParams> {
+    int nodeId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(setInspectedNodeParams)
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::setInspectedNode(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    setInspectedNodeParams params;
+    setInspectedNodeParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setInspectedNode(in_nodeId);
+    DispatchResponse response = m_backend->setInspectedNode(params.nodeId);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setInspectedNode"), dispatchable.Serialized());
         return;
@@ -2700,53 +1999,80 @@ void DomainDispatcherImpl::setInspectedNode(const v8_crdtp::Dispatchable& dispat
     return;
 }
 
-void DomainDispatcherImpl::setNodeName(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct setNodeNameParams : public v8_crdtp::DeserializableProtocolObject<setNodeNameParams> {
+    int nodeId;
+    String name;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(setNodeNameParams)
+    V8_CRDTP_DESERIALIZE_FIELD("name", name),
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::setNodeName(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* nameValue = params ? params->get("name") : nullptr;
-    errors->SetName("name");
-    String in_name = ValueConversions<String>::fromValue(nameValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    setNodeNameParams params;
+    setNodeNameParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     int out_nodeId;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setNodeName(in_nodeId, in_name, &out_nodeId);
+    DispatchResponse response = m_backend->setNodeName(params.nodeId, params.name, &out_nodeId);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setNodeName"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("nodeId"), out_nodeId);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }
 
-void DomainDispatcherImpl::setNodeValue(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct setNodeValueParams : public v8_crdtp::DeserializableProtocolObject<setNodeValueParams> {
+    int nodeId;
+    String value;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(setNodeValueParams)
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD("value", value),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::setNodeValue(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* valueValue = params ? params->get("value") : nullptr;
-    errors->SetName("value");
-    String in_value = ValueConversions<String>::fromValue(valueValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    setNodeValueParams params;
+    setNodeValueParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setNodeValue(in_nodeId, in_value);
+    DispatchResponse response = m_backend->setNodeValue(params.nodeId, params.value);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setNodeValue"), dispatchable.Serialized());
         return;
@@ -2756,19 +2082,33 @@ void DomainDispatcherImpl::setNodeValue(const v8_crdtp::Dispatchable& dispatchab
     return;
 }
 
-void DomainDispatcherImpl::setOuterHTML(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct setOuterHTMLParams : public v8_crdtp::DeserializableProtocolObject<setOuterHTMLParams> {
+    int nodeId;
+    String outerHTML;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(setOuterHTMLParams)
+    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
+    V8_CRDTP_DESERIALIZE_FIELD("outerHTML", outerHTML),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::setOuterHTML(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
-    errors->SetName("nodeId");
-    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* outerHTMLValue = params ? params->get("outerHTML") : nullptr;
-    errors->SetName("outerHTML");
-    String in_outerHTML = ValueConversions<String>::fromValue(outerHTMLValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    setOuterHTMLParams params;
+    setOuterHTMLParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setOuterHTML(in_nodeId, in_outerHTML);
+    DispatchResponse response = m_backend->setOuterHTML(params.nodeId, params.outerHTML);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setOuterHTML"), dispatchable.Serialized());
         return;
@@ -2778,8 +2118,15 @@ void DomainDispatcherImpl::setOuterHTML(const v8_crdtp::Dispatchable& dispatchab
     return;
 }
 
-void DomainDispatcherImpl::undo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+
+}  // namespace
+
+void DomainDispatcherImpl::undo(const v8_crdtp::Dispatchable& dispatchable)
 {
+    // Prepare input parameters.
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->undo();
@@ -2792,35 +2139,49 @@ void DomainDispatcherImpl::undo(const v8_crdtp::Dispatchable& dispatchable, Dict
     return;
 }
 
-void DomainDispatcherImpl::getFrameOwner(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct getFrameOwnerParams : public v8_crdtp::DeserializableProtocolObject<getFrameOwnerParams> {
+    String frameId;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(getFrameOwnerParams)
+    V8_CRDTP_DESERIALIZE_FIELD("frameId", frameId),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::getFrameOwner(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* frameIdValue = params ? params->get("frameId") : nullptr;
-    errors->SetName("frameId");
-    String in_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    getFrameOwnerParams params;
+    getFrameOwnerParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
     // Declare output parameters.
     int out_backendNodeId;
     Maybe<int> out_nodeId;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getFrameOwner(in_frameId, &out_backendNodeId, &out_nodeId);
+    DispatchResponse response = m_backend->getFrameOwner(params.frameId, &out_backendNodeId, &out_nodeId);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getFrameOwner"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::vector<uint8_t> result;
+        std::unique_ptr<v8_crdtp::Serializable> result;
         if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("backendNodeId"), out_backendNodeId, &result);
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+          v8_crdtp::ObjectSerializer serializer;
+          serializer.AddField(v8_crdtp::MakeSpan("backendNodeId"), out_backendNodeId);
+          serializer.AddField(v8_crdtp::MakeSpan("nodeId"), out_nodeId);
+          result = serializer.Finish();
+        } else {
+          result = Serializable::From({});
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
       }
     return;
 }

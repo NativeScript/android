@@ -10,18 +10,21 @@
 
 #include "third_party/inspector_protocol/crdtp/cbor.h"
 #include "third_party/inspector_protocol/crdtp/find_by_first.h"
-#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
 #include "third_party/inspector_protocol/crdtp/span.h"
 
 namespace v8_inspector {
 namespace protocol {
 namespace Log {
 
+using v8_crdtp::DeserializerState;
+using v8_crdtp::ProtocolTypeTraits;
+
 // ------------- Enum values from types.
 
 const char Metainfo::domainName[] = "Log";
 const char Metainfo::commandPrefix[] = "Log.";
 const char Metainfo::version[] = "1.3";
+
 
 const char* LogEntry::SourceEnum::Xml = "xml";
 const char* LogEntry::SourceEnum::Javascript = "javascript";
@@ -41,110 +44,33 @@ const char* LogEntry::LevelEnum::Verbose = "verbose";
 const char* LogEntry::LevelEnum::Info = "info";
 const char* LogEntry::LevelEnum::Warning = "warning";
 const char* LogEntry::LevelEnum::Error = "error";
+V8_CRDTP_BEGIN_DESERIALIZER(LogEntry)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("args", m_args),
+    V8_CRDTP_DESERIALIZE_FIELD("level", m_level),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("lineNumber", m_lineNumber),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("networkRequestId", m_networkRequestId),
+    V8_CRDTP_DESERIALIZE_FIELD("source", m_source),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("stackTrace", m_stackTrace),
+    V8_CRDTP_DESERIALIZE_FIELD("text", m_text),
+    V8_CRDTP_DESERIALIZE_FIELD("timestamp", m_timestamp),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("url", m_url),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("workerId", m_workerId),
+V8_CRDTP_END_DESERIALIZER()
 
-std::unique_ptr<LogEntry> LogEntry::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
+V8_CRDTP_BEGIN_SERIALIZER(LogEntry)
+    V8_CRDTP_SERIALIZE_FIELD("source", m_source);
+    V8_CRDTP_SERIALIZE_FIELD("level", m_level);
+    V8_CRDTP_SERIALIZE_FIELD("text", m_text);
+    V8_CRDTP_SERIALIZE_FIELD("timestamp", m_timestamp);
+    V8_CRDTP_SERIALIZE_FIELD("url", m_url);
+    V8_CRDTP_SERIALIZE_FIELD("lineNumber", m_lineNumber);
+    V8_CRDTP_SERIALIZE_FIELD("stackTrace", m_stackTrace);
+    V8_CRDTP_SERIALIZE_FIELD("networkRequestId", m_networkRequestId);
+    V8_CRDTP_SERIALIZE_FIELD("workerId", m_workerId);
+    V8_CRDTP_SERIALIZE_FIELD("args", m_args);
+V8_CRDTP_END_SERIALIZER();
 
-    std::unique_ptr<LogEntry> result(new LogEntry());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* sourceValue = object->get("source");
-    errors->SetName("source");
-    result->m_source = ValueConversions<String>::fromValue(sourceValue, errors);
-    protocol::Value* levelValue = object->get("level");
-    errors->SetName("level");
-    result->m_level = ValueConversions<String>::fromValue(levelValue, errors);
-    protocol::Value* textValue = object->get("text");
-    errors->SetName("text");
-    result->m_text = ValueConversions<String>::fromValue(textValue, errors);
-    protocol::Value* timestampValue = object->get("timestamp");
-    errors->SetName("timestamp");
-    result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
-    protocol::Value* urlValue = object->get("url");
-    if (urlValue) {
-        errors->SetName("url");
-        result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
-    }
-    protocol::Value* lineNumberValue = object->get("lineNumber");
-    if (lineNumberValue) {
-        errors->SetName("lineNumber");
-        result->m_lineNumber = ValueConversions<int>::fromValue(lineNumberValue, errors);
-    }
-    protocol::Value* stackTraceValue = object->get("stackTrace");
-    if (stackTraceValue) {
-        errors->SetName("stackTrace");
-        result->m_stackTrace = ValueConversions<protocol::Runtime::StackTrace>::fromValue(stackTraceValue, errors);
-    }
-    protocol::Value* networkRequestIdValue = object->get("networkRequestId");
-    if (networkRequestIdValue) {
-        errors->SetName("networkRequestId");
-        result->m_networkRequestId = ValueConversions<String>::fromValue(networkRequestIdValue, errors);
-    }
-    protocol::Value* workerIdValue = object->get("workerId");
-    if (workerIdValue) {
-        errors->SetName("workerId");
-        result->m_workerId = ValueConversions<String>::fromValue(workerIdValue, errors);
-    }
-    protocol::Value* argsValue = object->get("args");
-    if (argsValue) {
-        errors->SetName("args");
-        result->m_args = ValueConversions<protocol::Array<protocol::Runtime::RemoteObject>>::fromValue(argsValue, errors);
-    }
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
 
-std::unique_ptr<protocol::DictionaryValue> LogEntry::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("source", ValueConversions<String>::toValue(m_source));
-    result->setValue("level", ValueConversions<String>::toValue(m_level));
-    result->setValue("text", ValueConversions<String>::toValue(m_text));
-    result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
-    if (m_url.isJust())
-        result->setValue("url", ValueConversions<String>::toValue(m_url.fromJust()));
-    if (m_lineNumber.isJust())
-        result->setValue("lineNumber", ValueConversions<int>::toValue(m_lineNumber.fromJust()));
-    if (m_stackTrace.isJust())
-        result->setValue("stackTrace", ValueConversions<protocol::Runtime::StackTrace>::toValue(m_stackTrace.fromJust()));
-    if (m_networkRequestId.isJust())
-        result->setValue("networkRequestId", ValueConversions<String>::toValue(m_networkRequestId.fromJust()));
-    if (m_workerId.isJust())
-        result->setValue("workerId", ValueConversions<String>::toValue(m_workerId.fromJust()));
-    if (m_args.isJust())
-        result->setValue("args", ValueConversions<protocol::Array<protocol::Runtime::RemoteObject>>::toValue(m_args.fromJust()));
-    return result;
-}
-
-void LogEntry::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("source"), m_source, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("level"), m_level, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), m_text, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("lineNumber"), m_lineNumber, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("stackTrace"), m_stackTrace, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("networkRequestId"), m_networkRequestId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("workerId"), m_workerId, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("args"), m_args, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<LogEntry> LogEntry::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
 
 const char* ViolationSetting::NameEnum::LongTask = "longTask";
 const char* ViolationSetting::NameEnum::LongLayout = "longLayout";
@@ -153,93 +79,16 @@ const char* ViolationSetting::NameEnum::BlockedParser = "blockedParser";
 const char* ViolationSetting::NameEnum::DiscouragedAPIUse = "discouragedAPIUse";
 const char* ViolationSetting::NameEnum::Handler = "handler";
 const char* ViolationSetting::NameEnum::RecurringHandler = "recurringHandler";
+V8_CRDTP_BEGIN_DESERIALIZER(ViolationSetting)
+    V8_CRDTP_DESERIALIZE_FIELD("name", m_name),
+    V8_CRDTP_DESERIALIZE_FIELD("threshold", m_threshold),
+V8_CRDTP_END_DESERIALIZER()
 
-std::unique_ptr<ViolationSetting> ViolationSetting::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
+V8_CRDTP_BEGIN_SERIALIZER(ViolationSetting)
+    V8_CRDTP_SERIALIZE_FIELD("name", m_name);
+    V8_CRDTP_SERIALIZE_FIELD("threshold", m_threshold);
+V8_CRDTP_END_SERIALIZER();
 
-    std::unique_ptr<ViolationSetting> result(new ViolationSetting());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* nameValue = object->get("name");
-    errors->SetName("name");
-    result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
-    protocol::Value* thresholdValue = object->get("threshold");
-    errors->SetName("threshold");
-    result->m_threshold = ValueConversions<double>::fromValue(thresholdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> ViolationSetting::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("name", ValueConversions<String>::toValue(m_name));
-    result->setValue("threshold", ValueConversions<double>::toValue(m_threshold));
-    return result;
-}
-
-void ViolationSetting::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("threshold"), m_threshold, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<ViolationSetting> ViolationSetting::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<EntryAddedNotification> EntryAddedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
-{
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->AddError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<EntryAddedNotification> result(new EntryAddedNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->Push();
-    protocol::Value* entryValue = object->get("entry");
-    errors->SetName("entry");
-    result->m_entry = ValueConversions<protocol::Log::LogEntry>::fromValue(entryValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty())
-        return nullptr;
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> EntryAddedNotification::toValue() const
-{
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("entry", ValueConversions<protocol::Log::LogEntry>::toValue(m_entry.get()));
-    return result;
-}
-
-void EntryAddedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-    envelope_encoder.EncodeStart(out);
-    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("entry"), m_entry, out);
-    out->push_back(v8_crdtp::cbor::EncodeStop());
-    envelope_encoder.EncodeStop(out);
-}
-
-std::unique_ptr<EntryAddedNotification> EntryAddedNotification::clone() const
-{
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
 
 // ------------- Enum values from params.
 
@@ -250,10 +99,9 @@ void Frontend::entryAdded(std::unique_ptr<protocol::Log::LogEntry> entry)
 {
     if (!frontend_channel_)
         return;
-    std::unique_ptr<EntryAddedNotification> messageData = EntryAddedNotification::create()
-        .setEntry(std::move(entry))
-        .build();
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Log.entryAdded", std::move(messageData)));
+    v8_crdtp::ObjectSerializer serializer;
+    serializer.AddField(v8_crdtp::MakeSpan("entry"), entry);
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Log.entryAdded", serializer.Finish()));
 }
 
 void Frontend::flush()
@@ -275,15 +123,15 @@ public:
         , m_backend(backend) {}
     ~DomainDispatcherImpl() override { }
 
-    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable);
 
     std::function<void(const v8_crdtp::Dispatchable&)> Dispatch(v8_crdtp::span<uint8_t> command_name) override;
 
-    void clear(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void startViolationsReport(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
-    void stopViolationsReport(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void clear(const v8_crdtp::Dispatchable& dispatchable);
+    void disable(const v8_crdtp::Dispatchable& dispatchable);
+    void enable(const v8_crdtp::Dispatchable& dispatchable);
+    void startViolationsReport(const v8_crdtp::Dispatchable& dispatchable);
+    void stopViolationsReport(const v8_crdtp::Dispatchable& dispatchable);
  protected:
     Backend* m_backend;
 };
@@ -326,19 +174,22 @@ DomainDispatcherImpl::CallHandler CommandByName(v8_crdtp::span<uint8_t> command_
 std::function<void(const v8_crdtp::Dispatchable&)> DomainDispatcherImpl::Dispatch(v8_crdtp::span<uint8_t> command_name) {
   CallHandler handler = CommandByName(command_name);
   if (!handler) return nullptr;
-  return [this, handler](const v8_crdtp::Dispatchable& dispatchable){
-    std::unique_ptr<DictionaryValue> params =
-        DictionaryValue::cast(protocol::Value::parseBinary(dispatchable.Params().data(),
-        dispatchable.Params().size()));
-    ErrorSupport errors;
-    errors.Push();
-    (this->*handler)(dispatchable, params.get(), &errors);
+
+  return [this, handler](const v8_crdtp::Dispatchable& dispatchable) {
+    (this->*handler)(dispatchable);
   };
 }
 
 
-void DomainDispatcherImpl::clear(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+
+}  // namespace
+
+void DomainDispatcherImpl::clear(const v8_crdtp::Dispatchable& dispatchable)
 {
+    // Prepare input parameters.
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->clear();
@@ -351,8 +202,15 @@ void DomainDispatcherImpl::clear(const v8_crdtp::Dispatchable& dispatchable, Dic
     return;
 }
 
-void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+
+}  // namespace
+
+void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable)
 {
+    // Prepare input parameters.
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
@@ -365,8 +223,15 @@ void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable, D
     return;
 }
 
-void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+
+}  // namespace
+
+void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable)
 {
+    // Prepare input parameters.
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->enable();
@@ -379,16 +244,31 @@ void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable, Di
     return;
 }
 
-void DomainDispatcherImpl::startViolationsReport(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+struct startViolationsReportParams : public v8_crdtp::DeserializableProtocolObject<startViolationsReportParams> {
+    std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> config;
+    DECLARE_DESERIALIZATION_SUPPORT();
+};
+
+V8_CRDTP_BEGIN_DESERIALIZER(startViolationsReportParams)
+    V8_CRDTP_DESERIALIZE_FIELD("config", config),
+V8_CRDTP_END_DESERIALIZER()
+
+}  // namespace
+
+void DomainDispatcherImpl::startViolationsReport(const v8_crdtp::Dispatchable& dispatchable)
 {
     // Prepare input parameters.
-    protocol::Value* configValue = params ? params->get("config") : nullptr;
-    errors->SetName("config");
-    std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> in_config = ValueConversions<protocol::Array<protocol::Log::ViolationSetting>>::fromValue(configValue, errors);
-    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
+    startViolationsReportParams params;
+    startViolationsReportParams::Deserialize(&deserializer, &params);
+    if (MaybeReportInvalidParams(dispatchable, deserializer))
+      return;
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->startViolationsReport(std::move(in_config));
+    DispatchResponse response = m_backend->startViolationsReport(std::move(params.config));
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Log.startViolationsReport"), dispatchable.Serialized());
         return;
@@ -398,8 +278,15 @@ void DomainDispatcherImpl::startViolationsReport(const v8_crdtp::Dispatchable& d
     return;
 }
 
-void DomainDispatcherImpl::stopViolationsReport(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+namespace {
+
+
+}  // namespace
+
+void DomainDispatcherImpl::stopViolationsReport(const v8_crdtp::Dispatchable& dispatchable)
 {
+    // Prepare input parameters.
+
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->stopViolationsReport();

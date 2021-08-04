@@ -24,7 +24,6 @@ import java.util.List;
 public class GeneratorTest {
     private static String dependenciesDir;
     private static String runtimePath;
-
     @BeforeClass
     public static void setUp() {
         URL u = com.tns.Runtime.class.getResource('/' + com.tns.Runtime.class.getName().replace('.', '/') + ".class");

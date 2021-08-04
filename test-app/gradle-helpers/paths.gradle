@@ -1,5 +1,7 @@
 import groovy.json.JsonSlurper
 
+import java.nio.file.Paths
+
 ext.getAppPath = { userDir ->
     def relativePathToApp = "app"
     def nsConfigFile = file("$userDir/nsconfig.json")
@@ -17,7 +19,7 @@ ext.getAppPath = { userDir ->
         relativePathToApp = nsConfig.appPath
     }
 
-    return java.nio.file.Paths.get(userDir).resolve(relativePathToApp).toAbsolutePath()
+    return Paths.get(userDir).resolve(relativePathToApp).toAbsolutePath()
 }
 
 ext.getAppResourcesPath = { userDir ->
@@ -34,10 +36,10 @@ ext.getAppResourcesPath = { userDir ->
         // when appResourcesPath is passed through -PappResourcesPath=/path/to/App_Resources
         // the path could be relative or absolute - either case will work
         relativePathToAppResources = ext.appResourcesPath
-        absolutePathToAppResources = java.nio.file.Paths.get(userDir).resolve(relativePathToAppResources).toAbsolutePath()
+        absolutePathToAppResources = Paths.get(userDir).resolve(relativePathToAppResources).toAbsolutePath()
     } else if (nsConfig != null && nsConfig.appResourcesPath != null) {
         relativePathToAppResources = nsConfig.appResourcesPath
-        absolutePathToAppResources = java.nio.file.Paths.get(userDir).resolve(relativePathToAppResources).toAbsolutePath()
+        absolutePathToAppResources = Paths.get(userDir).resolve(relativePathToAppResources).toAbsolutePath()
     } else {
         absolutePathToAppResources = "${getAppPath(userDir)}/App_Resources"
     }

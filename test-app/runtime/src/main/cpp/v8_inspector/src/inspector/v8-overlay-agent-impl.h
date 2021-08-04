@@ -10,6 +10,10 @@
 
 namespace v8_inspector {
 
+#define DISALLOW_COPY_AND_ASSIGN(TypeName) \
+  TypeName(const TypeName&) = delete;      \
+  void operator=(const TypeName&) = delete
+
     class V8InspectorSessionImpl;
 
     using v8_inspector::protocol::Maybe;

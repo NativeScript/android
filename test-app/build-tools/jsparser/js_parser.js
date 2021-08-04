@@ -20,8 +20,8 @@ loggingSettings = {
 };
 
 var fs = require("fs"),
-    babelParser = require("babylon"),
-    traverse = require("babel-traverse"),
+    babelParser = require("@babel/parser"),
+    traverse = require("@babel/traverse"),
     split = require('split'),
     logger = require('./helpers/logger')(loggingSettings),
     path = require("path"),
@@ -132,7 +132,7 @@ function getFileAst(tsHelpersFilePath) {
 
             var ast = babelParser.parse(fileContent, {
                 minify: false,
-                plugins: ["decorators"]
+                plugins: [["@babel/plugin-proposal-decorators", {decoratorsBeforeExport:true}]]
             });
 
 
@@ -225,7 +225,7 @@ var astFromFileContent = function (path, data, err) {
 
         var ast = babelParser.parse(data.data, {
             minify: false,
-            plugins: ["decorators", "objectRestSpread"]
+            plugins: [["@babel/plugin-proposal-decorators", {decoratorsBeforeExport:true}], "objectRestSpread"]
         });
         data.ast = ast;
         return resolve(data);
