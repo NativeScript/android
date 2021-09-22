@@ -19,14 +19,16 @@ buildscript {
 
     def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "${kotlin_version}"
     }
+    def computeBuildToolsVersion = { -> project.hasProperty("androidBuildToolsVersion") ? androidBuildToolsVersion : "7.0.2"}
     def kotlinVersion = computeKotlinVersion()
+    def androidBuildToolsVersion = computeBuildToolsVersion()
 
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        classpath "com.android.tools.build:gradle:${android_build_tools_version}"
+        classpath "com.android.tools.build:gradle:$androidBuildToolsVersion"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
         classpath group: 'org.codehaus.groovy', name: 'groovy-all', version: '3.0.8', ext: 'pom'
     }
