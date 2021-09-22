@@ -37,7 +37,7 @@ android {
     }
 
     defaultConfig {
-        minSdkVersion 17
+        minSdkVersion MIN_SDK_VERSION as int
         targetSdkVersion COMPILE_SDK_VERSION as int
 
         if (!optimized && !optimizedWithInspector) {
@@ -52,7 +52,6 @@ android {
 
         externalNativeBuild {
             cmake {
-
                 if (optimized) {
                     arguments.add("-DOPTIMIZED_BUILD=true")
                 }
@@ -70,6 +69,7 @@ android {
         }
 
         ndk {
+            minSdkVersion = MIN_SDK_VERSION as int
             if (onlyX86) {
                 abiFilters 'x86'
             } else {

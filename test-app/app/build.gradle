@@ -271,7 +271,7 @@ android {
 
     defaultConfig {
         def manifest = new XmlSlurper().parse(file(android.sourceSets.main.manifest.srcFile))
-        def minSdkVer = manifest."uses-sdk"."@android:minSdkVersion".text() ?: 17
+        def minSdkVer = manifest."uses-sdk"."@android:minSdkVersion".text() ?: MIN_SDK_VERSION
         minSdkVersion minSdkVer
         targetSdkVersion computeTargetSdkVersion()
         ndk {

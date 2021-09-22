@@ -44,6 +44,7 @@ jar {
             it.isDirectory() ? it : zipTree(it)
         }
     }
+    duplicatesStrategy = 'include'
 }
 
 task copyJar(dependsOn: 'jar') {
