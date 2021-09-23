@@ -632,39 +632,15 @@ def getMergedAssetsOutputPath() {
 
 // Discover all jars and dynamically create tasks for the extraction of each of them
 project.ext.allJars = []
-afterEvaluate { project ->
-    def buildType = project.selectedBuildType == "release" ? "Release" : "Debug"
-    def jars = []
-    def artifactType = Attribute.of('artifactType', String)
-    configurations.all { config ->
-        if (config.name.toLowerCase().endsWith("${buildType}RuntimeClasspath".toLowerCase())) {
-            config.incoming.artifactView {
-                attributes {
-                    it.attribute(artifactType, 'jar')
-                }
-            }.artifacts.each {
-                processJar(it.file, jars)
-            }
-
-            def projectDependencies = config.getAllDependencies().withType(ProjectDependency)
-            def dependentProjects = projectDependencies*.dependencyProject
-            dependentProjects.findAll {
-                // if there's a project dependency search for its result jar file in the build/intermediates/runtime_library_classes folder
-                // this is the output folder in gradle 5.1.1, but it can be changed in the future versions of gradle
-                def jarDir = new File("${it.getBuildDir()}/intermediates/runtime_library_classes/${buildType.toLowerCase()}")
-
-                // gradle 6.5+
-                if(!jarDir.exists()){
-                    jarDir = new File("${it.getBuildDir()}/intermediates/runtime_library_classes_jar/${buildType.toLowerCase()}")
-                }
-                if (jarDir.exists()) {
-                    jarDir.eachFileRecurse(FileType.FILES) { file ->
-                        if (file.path.endsWith(".jar")) {
-                            processJar(file, jars)
-                        }
-                    }
-                } else {
-                    outLogger.withStyle(Style.Info).println "WARNING: Folder ${jarDir.path} does not exists, the dependent project's classes won't be included in the metadata"
+allprojects {
+    afterEvaluate { project ->
+        def buildType = project.selectedBuildType
+        def jars = []
+        def artifactType = Attribute.of('artifactType', String)
+        android.applicationVariants.all { variant ->
+            if (variant.buildType.name == buildType) {
+                variant.getCompileClasspath().each { fileDependency ->
+                    processJar(fileDependency, jars)
                 }
             }
         }
