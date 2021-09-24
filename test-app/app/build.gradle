@@ -533,7 +533,7 @@ tasks.whenTaskAdded({ DefaultTask currentTask ->
         currentTask.finalizedBy(buildMetadata)
     }
     if (currentTask =~ /merge.*Assets/) {
-        currentTask.shouldRunAfter(buildMetadata)
+        currentTask.dependsOn(buildMetadata)
     }
     if (currentTask =~ /assemble.*Debug/ || currentTask =~ /assemble.*Release/) {
         currentTask.finalizedBy("validateAppIdMatch")
