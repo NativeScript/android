@@ -665,7 +665,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     }
 #endif
 
-    m_weakRef.Init(isolate, globalTemplate, m_objectManager);
 
     SimpleProfiler::Init(isolate, globalTemplate);
 
@@ -673,6 +672,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
     context->Enter();
+
+    m_weakRef.Init(context);
 
     m_objectManager->Init(isolate);
 
