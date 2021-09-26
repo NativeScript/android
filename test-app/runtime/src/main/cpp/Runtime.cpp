@@ -673,7 +673,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
     context->Enter();
 
-    m_weakRef.Init(context);
 
     m_objectManager->Init(isolate);
 
@@ -690,6 +689,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "global"), global, readOnlyFlags);
     global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "__global"), global, readOnlyFlags);
 
+    m_weakRef.Init(context);
     // Do not set 'self' accessor to main thread JavaScript
     if (s_mainThreadInitialized) {
         global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "self"), global, readOnlyFlags);
