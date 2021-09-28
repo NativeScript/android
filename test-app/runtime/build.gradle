@@ -21,6 +21,14 @@ if (useCCache) {
 }
 
 
+
+def hasNdkVersion = project.hasProperty("ndkVersion")
+if (hasNdkVersion) {
+    println "Runtime using NDK version " + ndkVersion
+}
+
+
+
 android {
 
     compileSdkVersion COMPILE_SDK_VERSION as int
@@ -34,6 +42,10 @@ android {
             // embed runtime binding generator in runtime, while keeping it in a separate project
             java.srcDirs = [bindingGeneratorSourcePath, defaultSrcPath]
         }
+    }
+
+    if (hasNdkVersion) {
+        ndkVersion ndkVersion
     }
 
     defaultConfig {
