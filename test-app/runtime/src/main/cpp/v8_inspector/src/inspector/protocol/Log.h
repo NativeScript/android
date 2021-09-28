@@ -16,19 +16,15 @@
 namespace v8_inspector {
 namespace protocol {
 namespace Log {
-
-// ------------- Forward and enum declarations.
 class LogEntry;
 class ViolationSetting;
-class EntryAddedNotification;
+
+// ------------- Forward and enum declarations.
 
 // ------------- Type and builder declarations.
 
-class  LogEntry : public Serializable{
-    PROTOCOL_DISALLOW_COPY(LogEntry);
+class  LogEntry : public ::v8_crdtp::ProtocolObject<LogEntry> {
 public:
-    static std::unique_ptr<LogEntry> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~LogEntry() override { }
 
     struct  SourceEnum {
@@ -89,10 +85,6 @@ public:
     bool hasArgs() { return m_args.isJust(); }
     protocol::Array<protocol::Runtime::RemoteObject>* getArgs(protocol::Array<protocol::Runtime::RemoteObject>* defaultValue) { return m_args.isJust() ? m_args.fromJust() : defaultValue; }
     void setArgs(std::unique_ptr<protocol::Array<protocol::Runtime::RemoteObject>> value) { m_args = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<LogEntry> clone() const;
 
     template<int STATE>
     class LogEntryBuilder {
@@ -194,6 +186,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     LogEntry()
     {
           m_timestamp = 0;
@@ -212,11 +206,8 @@ private:
 };
 
 
-class  ViolationSetting : public Serializable{
-    PROTOCOL_DISALLOW_COPY(ViolationSetting);
+class  ViolationSetting : public ::v8_crdtp::ProtocolObject<ViolationSetting> {
 public:
-    static std::unique_ptr<ViolationSetting> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~ViolationSetting() override { }
 
     struct  NameEnum {
@@ -234,10 +225,6 @@ public:
 
     double getThreshold() { return m_threshold; }
     void setThreshold(double value) { m_threshold = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<ViolationSetting> clone() const;
 
     template<int STATE>
     class ViolationSettingBuilder {
@@ -287,6 +274,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     ViolationSetting()
     {
           m_threshold = 0;
@@ -294,68 +283,6 @@ private:
 
     String m_name;
     double m_threshold;
-};
-
-
-class  EntryAddedNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(EntryAddedNotification);
-public:
-    static std::unique_ptr<EntryAddedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~EntryAddedNotification() override { }
-
-    protocol::Log::LogEntry* getEntry() { return m_entry.get(); }
-    void setEntry(std::unique_ptr<protocol::Log::LogEntry> value) { m_entry = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<EntryAddedNotification> clone() const;
-
-    template<int STATE>
-    class EntryAddedNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            EntrySet = 1 << 1,
-            AllFieldsSet = (EntrySet | 0)};
-
-
-        EntryAddedNotificationBuilder<STATE | EntrySet>& setEntry(std::unique_ptr<protocol::Log::LogEntry> value)
-        {
-            static_assert(!(STATE & EntrySet), "property entry should not be set yet");
-            m_result->setEntry(std::move(value));
-            return castState<EntrySet>();
-        }
-
-        std::unique_ptr<EntryAddedNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class EntryAddedNotification;
-        EntryAddedNotificationBuilder() : m_result(new EntryAddedNotification()) { }
-
-        template<int STEP> EntryAddedNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<EntryAddedNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Log::EntryAddedNotification> m_result;
-    };
-
-    static EntryAddedNotificationBuilder<0> create()
-    {
-        return EntryAddedNotificationBuilder<0>();
-    }
-
-private:
-    EntryAddedNotification()
-    {
-    }
-
-    std::unique_ptr<protocol::Log::LogEntry> m_entry;
 };
 
 

@@ -1,7 +1,7 @@
 # documentation: https://d.android.com/studio/projects/add-native-code.html
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/cmake_minimum_required.html
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 3.10.2)
 
 # Add the ccache to the build system
 find_program(CCACHE_FOUND ccache)
@@ -16,12 +16,14 @@ endif (CCACHE_FOUND AND (USE_CCACHE))
 # "-DANDROID_STL=c++_static" is just not enough for clang++ to find some libraries in the ndk
 MESSAGE(STATUS "## ANDROID_NDK_ROOT: " ${ANDROID_NDK_ROOT})
 
-set(COMMON_CMAKE_ARGUMENTS "-nostdinc++ -std=c++14 -Werror -Wno-unused-result -mstackrealign -fexceptions -fno-builtin-stpcpy -fno-rtti -D_LIBCPP_ABI_VERSION=Cr -D_LIBCPP_ENABLE_NODISCARD -D_LIBCPP_ABI_UNSTABLE -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_ENABLE_REGEXP_INTERPRETER_THREADED_DISPATCH -DV8_EMBEDDED_BUILTINS")
+
+set(COMMON_CMAKE_ARGUMENTS "-nostdinc++ -std=c++14 -Werror -Wno-unused-result -mstackrealign -fexceptions -fno-builtin-stpcpy -fno-rtti -D_LIBCPP_ABI_VERSION=Cr -D_LIBCPP_ENABLE_NODISCARD -D_LIBCPP_ABI_UNSTABLE -D_LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_ENABLE_REGEXP_INTERPRETER_THREADED_DISPATCH -DV8_EMBEDDED_BUILTINS")
 
 if("${ANDROID_ABI}" MATCHES "arm64-v8a$" OR "${ANDROID_ABI}" MATCHES "x86_64$")
     # Enable pointer compression on 64 bit platforms
     set(COMMON_CMAKE_ARGUMENTS "${COMMON_CMAKE_ARGUMENTS} -DV8_COMPRESS_POINTERS")
 endif()
+
 
 # AOSP has switched to using LLD by default and the NDK will use it by default in the next release.
 # BFD and Gold will be removed once LLD has been through a release cycle with no major unresolved issues (estimated r21)
@@ -105,6 +107,7 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
         src/main/cpp/v8_inspector/src/inspector/v8-console-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-console-message.cc
         src/main/cpp/v8_inspector/src/inspector/v8-debugger.cc
+            src/main/cpp/v8_inspector/src/inspector/v8-debugger-id.cc
         src/main/cpp/v8_inspector/src/inspector/v8-debugger-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-debugger-script.cc
         src/main/cpp/v8_inspector/src/inspector/v8-heap-profiler-agent-impl.cc

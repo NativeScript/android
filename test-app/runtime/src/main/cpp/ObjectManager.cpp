@@ -500,10 +500,12 @@ bool ObjectManager::HasImplObject(Isolate *isolate, const Local<Object> &obj) {
     return hasImplObj;
 }
 
+
 /*
  * When "MarkReachableObjects" is called V8 has marked all JS objects that can be released.
  * This method builds on top of V8s marking phase, because we need to consider the JAVA counterpart objects (is it "regular" or "callback"), when marking JS ones.
  * */
+/* // uses markinMode: full
 void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object> &obj) {
     tns::instrumentation::Frame frame;
 
@@ -643,6 +645,8 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object> &
     }
 }
 
+*/
+
 void ObjectManager::MarkReachableArrayElements(Local<Object> &o, stack<Local<Value>> &s) {
     auto arr = o.As<Array>();
 
@@ -721,17 +725,20 @@ void ObjectManager::OnGcFinished(GCType type, GCCallbackFlags flags) {
 
     //deal with all "callback" objects
     auto isolate = m_isolate;
+    /*
     for (auto weakObj : m_implObjWeak) {
         auto obj = Local<Object>::New(isolate, *weakObj.po);
         MarkReachableObjects(isolate, obj);
-    }
+    }*/
+
+    /*
     for (const auto &kv : m_implObjStrong) {
         Persistent<Object> *po = kv.second;
         if (po != nullptr) {
             auto obj = Local<Object>::New(isolate, *po);
             MarkReachableObjects(isolate, obj);
         }
-    }
+    }*/
 
     //deal with regular objects
     ReleaseRegularObjects();

@@ -10,6 +10,10 @@
 
 namespace v8_inspector {
 
+#define DISALLOW_COPY_AND_ASSIGN(TypeName) \
+  TypeName(const TypeName&) = delete;      \
+  void operator=(const TypeName&) = delete
+
     class NSV8DebuggerAgentImpl : public V8DebuggerAgentImpl {
     public:
         NSV8DebuggerAgentImpl(V8InspectorSessionImpl *, protocol::FrontendChannel *,

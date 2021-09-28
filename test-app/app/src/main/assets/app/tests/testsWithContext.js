@@ -116,7 +116,7 @@ exports.run = function(cntxt)
 		it("TestOldAPIForGettingMethodsListForMethodsWithParametersFromMissingType", function () {
             __log("TEST: TestOldAPIForGettingMethodsListForMethodsWithParametersFromMissingType");
 
-            if(android.support.design && android.support.design.widget) {
+            if(android.support && android.support.design && android.support.design.widget) {
                 var til = new android.support.design.widget.TextInputLayout(context);
                 var editText = new android.widget.EditText(context);
                 var relativeLayout = new android.widget.RelativeLayout(context);

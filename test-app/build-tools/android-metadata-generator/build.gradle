@@ -7,11 +7,11 @@ targetCompatibility = JavaVersion.VERSION_1_8
 buildscript {
     repositories {
         google()
-        jcenter()
+        mavenCentral()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.5.3'
+        classpath "com.android.tools.build:gradle:$ANDRIOD_BUILD_TOOLS_VERSION"
     }
 }
 
@@ -40,18 +40,16 @@ compileKotlin {
 repositories {
     google()
     mavenCentral()
-    jcenter()
 }
 
 dependencies {
-    compile 'org.apache.bcel:bcel:6.2'
-    compile 'com.google.code.gson:gson:2.8.5'
-    compile group: 'org.jetbrains.kotlinx', name: 'kotlinx-metadata-jvm', version: '0.1.0'
-    compile files("./src/libs/dx.jar")
+    api "org.apache.bcel:bcel:${bcel_version}"
+    api "com.google.code.gson:gson:${gson_version}"
+    api group: 'org.jetbrains.kotlinx', name: 'kotlinx-metadata-jvm', version: "${kotlinx_metadata_jvm_version}"
+    implementation files("./src/libs/dx.jar")
 
-    testCompile 'junit:junit:4.13'
-    testCompile 'org.mockito:mockito-core:3.0.0'
-    testImplementation 'junit:junit:4.12'
+    testImplementation "junit:junit:${junit_version}"
+    testImplementation "org.mockito:mockito-core:${mockito_core_version}"
 }
 
 task copyNecessaryFiles {
@@ -69,21 +67,19 @@ task copyNecessaryFiles {
 }
 
 jar {
+    configurations.api.setCanBeResolved(true)
     manifest {
-        attributes("Manifest-Version": "1.0",
+        attributes("Manifest-Version": "2.0",
                    "Main-Class": "com.telerik.metadata.Generator")
     }
 
     from {
-
-        configurations.runtime.collect {
-            it.isDirectory() ? it : zipTree(it)
-        }
-
-        configurations.compile.collect {
+        configurations.api.collect {
             it.isDirectory() ? it : zipTree(it)
         }
     }
+
+    duplicatesStrategy = 'include'
 }
 
 task copyJarToBuildTools (type: Copy) {

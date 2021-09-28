@@ -28,7 +28,7 @@
 #include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
 #include "ManualInstrumentation.h"
-#include <snapshot_blob.h>
+//#include <snapshot_blob.h>
 
 #ifdef APPLICATION_IN_DEBUG
 #include "JsV8InspectorClient.h"
@@ -570,6 +570,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         }
     }
 
+    /* Don't use snapshot
     if (!isCustomSnapshotFound) {
         // Load V8's built-in snapshot
         auto* snapshotBlobStartupData = new StartupData();
@@ -577,7 +578,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         snapshotBlobStartupData->raw_size = snapshot_blob_bin_len;
         V8::SetSnapshotDataBlob(snapshotBlobStartupData);
     }
-
+*/
     /*
      * Setup the V8Platform only once per process - once for the application lifetime
      * Don't execute again if main thread has already been initialized

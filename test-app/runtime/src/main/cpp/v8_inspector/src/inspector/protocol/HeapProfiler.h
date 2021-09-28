@@ -15,25 +15,17 @@
 namespace v8_inspector {
 namespace protocol {
 namespace HeapProfiler {
-
-// ------------- Forward and enum declarations.
 using HeapSnapshotObjectId = String;
 class SamplingHeapProfileNode;
 class SamplingHeapProfileSample;
 class SamplingHeapProfile;
-class AddHeapSnapshotChunkNotification;
-class HeapStatsUpdateNotification;
-class LastSeenObjectIdNotification;
-class ReportHeapSnapshotProgressNotification;
-using ResetProfilesNotification = Object;
+
+// ------------- Forward and enum declarations.
 
 // ------------- Type and builder declarations.
 
-class  SamplingHeapProfileNode : public Serializable{
-    PROTOCOL_DISALLOW_COPY(SamplingHeapProfileNode);
+class  SamplingHeapProfileNode : public ::v8_crdtp::ProtocolObject<SamplingHeapProfileNode> {
 public:
-    static std::unique_ptr<SamplingHeapProfileNode> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~SamplingHeapProfileNode() override { }
 
     protocol::Runtime::CallFrame* getCallFrame() { return m_callFrame.get(); }
@@ -47,10 +39,6 @@ public:
 
     protocol::Array<protocol::HeapProfiler::SamplingHeapProfileNode>* getChildren() { return m_children.get(); }
     void setChildren(std::unique_ptr<protocol::Array<protocol::HeapProfiler::SamplingHeapProfileNode>> value) { m_children = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<SamplingHeapProfileNode> clone() const;
 
     template<int STATE>
     class SamplingHeapProfileNodeBuilder {
@@ -116,6 +104,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     SamplingHeapProfileNode()
     {
           m_selfSize = 0;
@@ -129,11 +119,8 @@ private:
 };
 
 
-class  SamplingHeapProfileSample : public Serializable{
-    PROTOCOL_DISALLOW_COPY(SamplingHeapProfileSample);
+class  SamplingHeapProfileSample : public ::v8_crdtp::ProtocolObject<SamplingHeapProfileSample> {
 public:
-    static std::unique_ptr<SamplingHeapProfileSample> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~SamplingHeapProfileSample() override { }
 
     double getSize() { return m_size; }
@@ -144,10 +131,6 @@ public:
 
     double getOrdinal() { return m_ordinal; }
     void setOrdinal(double value) { m_ordinal = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<SamplingHeapProfileSample> clone() const;
 
     template<int STATE>
     class SamplingHeapProfileSampleBuilder {
@@ -205,6 +188,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     SamplingHeapProfileSample()
     {
           m_size = 0;
@@ -218,11 +203,8 @@ private:
 };
 
 
-class  SamplingHeapProfile : public Serializable{
-    PROTOCOL_DISALLOW_COPY(SamplingHeapProfile);
+class  SamplingHeapProfile : public ::v8_crdtp::ProtocolObject<SamplingHeapProfile> {
 public:
-    static std::unique_ptr<SamplingHeapProfile> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~SamplingHeapProfile() override { }
 
     protocol::HeapProfiler::SamplingHeapProfileNode* getHead() { return m_head.get(); }
@@ -230,10 +212,6 @@ public:
 
     protocol::Array<protocol::HeapProfiler::SamplingHeapProfileSample>* getSamples() { return m_samples.get(); }
     void setSamples(std::unique_ptr<protocol::Array<protocol::HeapProfiler::SamplingHeapProfileSample>> value) { m_samples = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<SamplingHeapProfile> clone() const;
 
     template<int STATE>
     class SamplingHeapProfileBuilder {
@@ -283,299 +261,14 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     SamplingHeapProfile()
     {
     }
 
     std::unique_ptr<protocol::HeapProfiler::SamplingHeapProfileNode> m_head;
     std::unique_ptr<protocol::Array<protocol::HeapProfiler::SamplingHeapProfileSample>> m_samples;
-};
-
-
-class  AddHeapSnapshotChunkNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(AddHeapSnapshotChunkNotification);
-public:
-    static std::unique_ptr<AddHeapSnapshotChunkNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~AddHeapSnapshotChunkNotification() override { }
-
-    String getChunk() { return m_chunk; }
-    void setChunk(const String& value) { m_chunk = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<AddHeapSnapshotChunkNotification> clone() const;
-
-    template<int STATE>
-    class AddHeapSnapshotChunkNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            ChunkSet = 1 << 1,
-            AllFieldsSet = (ChunkSet | 0)};
-
-
-        AddHeapSnapshotChunkNotificationBuilder<STATE | ChunkSet>& setChunk(const String& value)
-        {
-            static_assert(!(STATE & ChunkSet), "property chunk should not be set yet");
-            m_result->setChunk(value);
-            return castState<ChunkSet>();
-        }
-
-        std::unique_ptr<AddHeapSnapshotChunkNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class AddHeapSnapshotChunkNotification;
-        AddHeapSnapshotChunkNotificationBuilder() : m_result(new AddHeapSnapshotChunkNotification()) { }
-
-        template<int STEP> AddHeapSnapshotChunkNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<AddHeapSnapshotChunkNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::HeapProfiler::AddHeapSnapshotChunkNotification> m_result;
-    };
-
-    static AddHeapSnapshotChunkNotificationBuilder<0> create()
-    {
-        return AddHeapSnapshotChunkNotificationBuilder<0>();
-    }
-
-private:
-    AddHeapSnapshotChunkNotification()
-    {
-    }
-
-    String m_chunk;
-};
-
-
-class  HeapStatsUpdateNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(HeapStatsUpdateNotification);
-public:
-    static std::unique_ptr<HeapStatsUpdateNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~HeapStatsUpdateNotification() override { }
-
-    protocol::Array<int>* getStatsUpdate() { return m_statsUpdate.get(); }
-    void setStatsUpdate(std::unique_ptr<protocol::Array<int>> value) { m_statsUpdate = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<HeapStatsUpdateNotification> clone() const;
-
-    template<int STATE>
-    class HeapStatsUpdateNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            StatsUpdateSet = 1 << 1,
-            AllFieldsSet = (StatsUpdateSet | 0)};
-
-
-        HeapStatsUpdateNotificationBuilder<STATE | StatsUpdateSet>& setStatsUpdate(std::unique_ptr<protocol::Array<int>> value)
-        {
-            static_assert(!(STATE & StatsUpdateSet), "property statsUpdate should not be set yet");
-            m_result->setStatsUpdate(std::move(value));
-            return castState<StatsUpdateSet>();
-        }
-
-        std::unique_ptr<HeapStatsUpdateNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class HeapStatsUpdateNotification;
-        HeapStatsUpdateNotificationBuilder() : m_result(new HeapStatsUpdateNotification()) { }
-
-        template<int STEP> HeapStatsUpdateNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<HeapStatsUpdateNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::HeapProfiler::HeapStatsUpdateNotification> m_result;
-    };
-
-    static HeapStatsUpdateNotificationBuilder<0> create()
-    {
-        return HeapStatsUpdateNotificationBuilder<0>();
-    }
-
-private:
-    HeapStatsUpdateNotification()
-    {
-    }
-
-    std::unique_ptr<protocol::Array<int>> m_statsUpdate;
-};
-
-
-class  LastSeenObjectIdNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(LastSeenObjectIdNotification);
-public:
-    static std::unique_ptr<LastSeenObjectIdNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~LastSeenObjectIdNotification() override { }
-
-    int getLastSeenObjectId() { return m_lastSeenObjectId; }
-    void setLastSeenObjectId(int value) { m_lastSeenObjectId = value; }
-
-    double getTimestamp() { return m_timestamp; }
-    void setTimestamp(double value) { m_timestamp = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<LastSeenObjectIdNotification> clone() const;
-
-    template<int STATE>
-    class LastSeenObjectIdNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            LastSeenObjectIdSet = 1 << 1,
-            TimestampSet = 1 << 2,
-            AllFieldsSet = (LastSeenObjectIdSet | TimestampSet | 0)};
-
-
-        LastSeenObjectIdNotificationBuilder<STATE | LastSeenObjectIdSet>& setLastSeenObjectId(int value)
-        {
-            static_assert(!(STATE & LastSeenObjectIdSet), "property lastSeenObjectId should not be set yet");
-            m_result->setLastSeenObjectId(value);
-            return castState<LastSeenObjectIdSet>();
-        }
-
-        LastSeenObjectIdNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
-        {
-            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
-            m_result->setTimestamp(value);
-            return castState<TimestampSet>();
-        }
-
-        std::unique_ptr<LastSeenObjectIdNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class LastSeenObjectIdNotification;
-        LastSeenObjectIdNotificationBuilder() : m_result(new LastSeenObjectIdNotification()) { }
-
-        template<int STEP> LastSeenObjectIdNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<LastSeenObjectIdNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::HeapProfiler::LastSeenObjectIdNotification> m_result;
-    };
-
-    static LastSeenObjectIdNotificationBuilder<0> create()
-    {
-        return LastSeenObjectIdNotificationBuilder<0>();
-    }
-
-private:
-    LastSeenObjectIdNotification()
-    {
-          m_lastSeenObjectId = 0;
-          m_timestamp = 0;
-    }
-
-    int m_lastSeenObjectId;
-    double m_timestamp;
-};
-
-
-class  ReportHeapSnapshotProgressNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(ReportHeapSnapshotProgressNotification);
-public:
-    static std::unique_ptr<ReportHeapSnapshotProgressNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~ReportHeapSnapshotProgressNotification() override { }
-
-    int getDone() { return m_done; }
-    void setDone(int value) { m_done = value; }
-
-    int getTotal() { return m_total; }
-    void setTotal(int value) { m_total = value; }
-
-    bool hasFinished() { return m_finished.isJust(); }
-    bool getFinished(bool defaultValue) { return m_finished.isJust() ? m_finished.fromJust() : defaultValue; }
-    void setFinished(bool value) { m_finished = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<ReportHeapSnapshotProgressNotification> clone() const;
-
-    template<int STATE>
-    class ReportHeapSnapshotProgressNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            DoneSet = 1 << 1,
-            TotalSet = 1 << 2,
-            AllFieldsSet = (DoneSet | TotalSet | 0)};
-
-
-        ReportHeapSnapshotProgressNotificationBuilder<STATE | DoneSet>& setDone(int value)
-        {
-            static_assert(!(STATE & DoneSet), "property done should not be set yet");
-            m_result->setDone(value);
-            return castState<DoneSet>();
-        }
-
-        ReportHeapSnapshotProgressNotificationBuilder<STATE | TotalSet>& setTotal(int value)
-        {
-            static_assert(!(STATE & TotalSet), "property total should not be set yet");
-            m_result->setTotal(value);
-            return castState<TotalSet>();
-        }
-
-        ReportHeapSnapshotProgressNotificationBuilder<STATE>& setFinished(bool value)
-        {
-            m_result->setFinished(value);
-            return *this;
-        }
-
-        std::unique_ptr<ReportHeapSnapshotProgressNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class ReportHeapSnapshotProgressNotification;
-        ReportHeapSnapshotProgressNotificationBuilder() : m_result(new ReportHeapSnapshotProgressNotification()) { }
-
-        template<int STEP> ReportHeapSnapshotProgressNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<ReportHeapSnapshotProgressNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::HeapProfiler::ReportHeapSnapshotProgressNotification> m_result;
-    };
-
-    static ReportHeapSnapshotProgressNotificationBuilder<0> create()
-    {
-        return ReportHeapSnapshotProgressNotificationBuilder<0>();
-    }
-
-private:
-    ReportHeapSnapshotProgressNotification()
-    {
-          m_done = 0;
-          m_total = 0;
-    }
-
-    int m_done;
-    int m_total;
-    Maybe<bool> m_finished;
 };
 
 
@@ -586,7 +279,14 @@ public:
     virtual ~Backend() { }
 
     virtual DispatchResponse addInspectedHeapObject(const String& in_heapObjectId) = 0;
-    virtual DispatchResponse collectGarbage() = 0;
+    class  CollectGarbageCallback {
+    public:
+        virtual void sendSuccess() = 0;
+        virtual void sendFailure(const DispatchResponse&) = 0;
+        virtual void fallThrough() = 0;
+        virtual ~CollectGarbageCallback() { }
+    };
+    virtual void collectGarbage(std::unique_ptr<CollectGarbageCallback> callback) = 0;
     virtual DispatchResponse disable() = 0;
     virtual DispatchResponse enable() = 0;
     virtual DispatchResponse getHeapObjectId(const String& in_objectId, String* out_heapSnapshotObjectId) = 0;
@@ -595,8 +295,8 @@ public:
     virtual DispatchResponse startSampling(Maybe<double> in_samplingInterval) = 0;
     virtual DispatchResponse startTrackingHeapObjects(Maybe<bool> in_trackAllocations) = 0;
     virtual DispatchResponse stopSampling(std::unique_ptr<protocol::HeapProfiler::SamplingHeapProfile>* out_profile) = 0;
-    virtual DispatchResponse stopTrackingHeapObjects(Maybe<bool> in_reportProgress, Maybe<bool> in_treatGlobalObjectsAsRoots) = 0;
-    virtual DispatchResponse takeHeapSnapshot(Maybe<bool> in_reportProgress, Maybe<bool> in_treatGlobalObjectsAsRoots) = 0;
+    virtual DispatchResponse stopTrackingHeapObjects(Maybe<bool> in_reportProgress, Maybe<bool> in_treatGlobalObjectsAsRoots, Maybe<bool> in_captureNumericValue) = 0;
+    virtual DispatchResponse takeHeapSnapshot(Maybe<bool> in_reportProgress, Maybe<bool> in_treatGlobalObjectsAsRoots, Maybe<bool> in_captureNumericValue) = 0;
 
 };
 

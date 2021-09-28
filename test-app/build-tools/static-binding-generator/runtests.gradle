@@ -1,3 +1,6 @@
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+
 apply plugin: 'application'
 apply plugin: 'java-library'
 
@@ -5,19 +8,21 @@ defaultTasks 'runSbg'
 
 repositories {
     google()
-    jcenter()
+    mavenCentral()
 }
 
 dependencies {
-    compile 'org.ow2.asm:asm:7.0'
-    compile 'org.ow2.asm:asm-util:7.0'
-    compile 'org.apache.bcel:bcel:6.2'
-    compile group: 'org.json', name: 'json', version: '20090211'
-    compile 'commons-io:commons-io:2.5'
-    compile 'com.google.code.gson:gson:2.8.5'
-    testCompile 'com.google.code.gson:gson:2.8.5'
-    testCompile 'junit:junit:4.+'
-    compile 'com.google.googlejavaformat:google-java-format:1.6'
+    api "org.ow2.asm:asm:${asm_version}"
+    api "org.ow2.asm:asm-util:${asm_util_version}"
+    api "org.apache.bcel:bcel:${bcel_version}"
+    api group: 'org.json', name: 'json', version: "${json_version}"
+    api "commons-io:commons-io:${commons_io_version}"
+    api "com.google.code.gson:gson:${gson_version}"
+    api "com.google.googlejavaformat:google-java-format:${google_java_format_version}"
+
+    testImplementation "com.google.code.gson:gson:${gson_version}"
+    testImplementation "junit:junit:${junit_version}"
+    testImplementation "org.mockito:mockito-core:${mockito_core_version}"
 }
 
 def appRoot = file(project.appRoot).getAbsolutePath()
@@ -29,19 +34,17 @@ def javaDependenciesFile = file('../sbg-java-dependencies.txt')
 def interfaceNamesFile = file('../sbg-interfaces-names.txt')
 
 jar {
+    configurations.api.setCanBeResolved(true)
     manifest {
         attributes("Manifest-Version": "1.0",
                 "Main-Class": "org.nativescript.staticbindinggenerator.Main")
     }
     from {
-        configurations.runtime.collect {
-            it.isDirectory() ? it : zipTree(it)
-        }
-
-        configurations.compile.collect {
+        configurations.api.collect {
             it.isDirectory() ? it : zipTree(it)
         }
     }
+    duplicatesStrategy = 'include'
 }
 
 task copyJar(dependsOn: 'jar') {
@@ -49,7 +52,7 @@ task copyJar(dependsOn: 'jar') {
         def source = file("$projectDir/build/libs/static-binding-generator.jar").toPath()
         print source.toFile().exists()
         def dest = file("$projectDir/../static-binding-generator.jar").toPath()
-        java.nio.file.Files.copy(source, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        Files.copy(source, dest, StandardCopyOption.REPLACE_EXISTING)
     }
 }
 
@@ -66,4 +69,8 @@ task runSbg(type: JavaExec, dependsOn: 'prepareInputFiles') {
     classpath = files('../static-binding-generator.jar', '../')
     workingDir = "../"
     main = "org.nativescript.staticbindinggenerator.Main"
+}
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
 }

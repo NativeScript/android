@@ -18,8 +18,6 @@
 namespace v8_inspector {
 namespace protocol {
 namespace Page {
-
-// ------------- Forward and enum declarations.
 using FrameId = String;
 class Frame;
 class FrameResource;
@@ -31,20 +29,8 @@ class VisualViewport;
 class Viewport;
 class FontFamilies;
 class FontSizes;
-class DomContentEventFiredNotification;
-class FrameAttachedNotification;
-class FrameClearedScheduledNavigationNotification;
-class FrameDetachedNotification;
-class FrameNavigatedNotification;
-using FrameResizedNotification = Object;
-class FrameScheduledNavigationNotification;
-class FrameStartedLoadingNotification;
-class FrameStoppedLoadingNotification;
-class LifecycleEventNotification;
-class LoadEventFiredNotification;
-class NavigatedWithinDocumentNotification;
-class WindowOpenNotification;
-class CompilationCacheProducedNotification;
+
+// ------------- Forward and enum declarations.
 
 namespace CaptureScreenshot {
 namespace FormatEnum {
@@ -102,11 +88,8 @@ namespace ReasonEnum {
 
 // ------------- Type and builder declarations.
 
-class  Frame : public Serializable{
-    PROTOCOL_DISALLOW_COPY(Frame);
+class  Frame : public ::v8_crdtp::ProtocolObject<Frame> {
 public:
-    static std::unique_ptr<Frame> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~Frame() override { }
 
     String getId() { return m_id; }
@@ -135,10 +118,6 @@ public:
     bool hasUnreachableUrl() { return m_unreachableUrl.isJust(); }
     String getUnreachableUrl(const String& defaultValue) { return m_unreachableUrl.isJust() ? m_unreachableUrl.fromJust() : defaultValue; }
     void setUnreachableUrl(const String& value) { m_unreachableUrl = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<Frame> clone() const;
 
     template<int STATE>
     class FrameBuilder {
@@ -230,6 +209,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     Frame()
     {
     }
@@ -245,11 +226,8 @@ private:
 };
 
 
-class  FrameResource : public Serializable{
-    PROTOCOL_DISALLOW_COPY(FrameResource);
+class  FrameResource : public ::v8_crdtp::ProtocolObject<FrameResource> {
 public:
-    static std::unique_ptr<FrameResource> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~FrameResource() override { }
 
     String getUrl() { return m_url; }
@@ -276,10 +254,6 @@ public:
     bool hasCanceled() { return m_canceled.isJust(); }
     bool getCanceled(bool defaultValue) { return m_canceled.isJust() ? m_canceled.fromJust() : defaultValue; }
     void setCanceled(bool value) { m_canceled = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<FrameResource> clone() const;
 
     template<int STATE>
     class FrameResourceBuilder {
@@ -361,6 +335,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     FrameResource()
     {
     }
@@ -375,11 +351,8 @@ private:
 };
 
 
-class  FrameResourceTree : public Serializable{
-    PROTOCOL_DISALLOW_COPY(FrameResourceTree);
+class  FrameResourceTree : public ::v8_crdtp::ProtocolObject<FrameResourceTree> {
 public:
-    static std::unique_ptr<FrameResourceTree> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~FrameResourceTree() override { }
 
     protocol::Page::Frame* getFrame() { return m_frame.get(); }
@@ -391,10 +364,6 @@ public:
 
     protocol::Array<protocol::Page::FrameResource>* getResources() { return m_resources.get(); }
     void setResources(std::unique_ptr<protocol::Array<protocol::Page::FrameResource>> value) { m_resources = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<FrameResourceTree> clone() const;
 
     template<int STATE>
     class FrameResourceTreeBuilder {
@@ -450,6 +419,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     FrameResourceTree()
     {
     }
@@ -460,11 +431,8 @@ private:
 };
 
 
-class  FrameTree : public Serializable{
-    PROTOCOL_DISALLOW_COPY(FrameTree);
+class  FrameTree : public ::v8_crdtp::ProtocolObject<FrameTree> {
 public:
-    static std::unique_ptr<FrameTree> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~FrameTree() override { }
 
     protocol::Page::Frame* getFrame() { return m_frame.get(); }
@@ -473,10 +441,6 @@ public:
     bool hasChildFrames() { return m_childFrames.isJust(); }
     protocol::Array<protocol::Page::FrameTree>* getChildFrames(protocol::Array<protocol::Page::FrameTree>* defaultValue) { return m_childFrames.isJust() ? m_childFrames.fromJust() : defaultValue; }
     void setChildFrames(std::unique_ptr<protocol::Array<protocol::Page::FrameTree>> value) { m_childFrames = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<FrameTree> clone() const;
 
     template<int STATE>
     class FrameTreeBuilder {
@@ -524,6 +488,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     FrameTree()
     {
     }
@@ -533,11 +499,8 @@ private:
 };
 
 
-class  LayoutViewport : public Serializable{
-    PROTOCOL_DISALLOW_COPY(LayoutViewport);
+class  LayoutViewport : public ::v8_crdtp::ProtocolObject<LayoutViewport> {
 public:
-    static std::unique_ptr<LayoutViewport> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~LayoutViewport() override { }
 
     int getPageX() { return m_pageX; }
@@ -551,10 +514,6 @@ public:
 
     int getClientHeight() { return m_clientHeight; }
     void setClientHeight(int value) { m_clientHeight = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<LayoutViewport> clone() const;
 
     template<int STATE>
     class LayoutViewportBuilder {
@@ -620,6 +579,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     LayoutViewport()
     {
           m_pageX = 0;
@@ -635,11 +596,8 @@ private:
 };
 
 
-class  VisualViewport : public Serializable{
-    PROTOCOL_DISALLOW_COPY(VisualViewport);
+class  VisualViewport : public ::v8_crdtp::ProtocolObject<VisualViewport> {
 public:
-    static std::unique_ptr<VisualViewport> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~VisualViewport() override { }
 
     double getOffsetX() { return m_offsetX; }
@@ -666,10 +624,6 @@ public:
     bool hasZoom() { return m_zoom.isJust(); }
     double getZoom(double defaultValue) { return m_zoom.isJust() ? m_zoom.fromJust() : defaultValue; }
     void setZoom(double value) { m_zoom = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<VisualViewport> clone() const;
 
     template<int STATE>
     class VisualViewportBuilder {
@@ -765,6 +719,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     VisualViewport()
     {
           m_offsetX = 0;
@@ -787,11 +743,8 @@ private:
 };
 
 
-class  Viewport : public Serializable{
-    PROTOCOL_DISALLOW_COPY(Viewport);
+class  Viewport : public ::v8_crdtp::ProtocolObject<Viewport> {
 public:
-    static std::unique_ptr<Viewport> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~Viewport() override { }
 
     double getX() { return m_x; }
@@ -808,10 +761,6 @@ public:
 
     double getScale() { return m_scale; }
     void setScale(double value) { m_scale = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<Viewport> clone() const;
 
     template<int STATE>
     class ViewportBuilder {
@@ -885,6 +834,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     Viewport()
     {
           m_x = 0;
@@ -902,11 +853,8 @@ private:
 };
 
 
-class  FontFamilies : public Serializable{
-    PROTOCOL_DISALLOW_COPY(FontFamilies);
+class  FontFamilies : public ::v8_crdtp::ProtocolObject<FontFamilies> {
 public:
-    static std::unique_ptr<FontFamilies> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~FontFamilies() override { }
 
     bool hasStandard() { return m_standard.isJust(); }
@@ -936,10 +884,6 @@ public:
     bool hasPictograph() { return m_pictograph.isJust(); }
     String getPictograph(const String& defaultValue) { return m_pictograph.isJust() ? m_pictograph.fromJust() : defaultValue; }
     void setPictograph(const String& value) { m_pictograph = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<FontFamilies> clone() const;
 
     template<int STATE>
     class FontFamiliesBuilder {
@@ -1015,6 +959,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     FontFamilies()
     {
     }
@@ -1029,11 +975,8 @@ private:
 };
 
 
-class  FontSizes : public Serializable{
-    PROTOCOL_DISALLOW_COPY(FontSizes);
+class  FontSizes : public ::v8_crdtp::ProtocolObject<FontSizes> {
 public:
-    static std::unique_ptr<FontSizes> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~FontSizes() override { }
 
     bool hasStandard() { return m_standard.isJust(); }
@@ -1043,10 +986,6 @@ public:
     bool hasFixed() { return m_fixed.isJust(); }
     int getFixed(int defaultValue) { return m_fixed.isJust() ? m_fixed.fromJust() : defaultValue; }
     void setFixed(int value) { m_fixed = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<FontSizes> clone() const;
 
     template<int STATE>
     class FontSizesBuilder {
@@ -1092,988 +1031,14 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     FontSizes()
     {
     }
 
     Maybe<int> m_standard;
     Maybe<int> m_fixed;
-};
-
-
-class  DomContentEventFiredNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(DomContentEventFiredNotification);
-public:
-    static std::unique_ptr<DomContentEventFiredNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~DomContentEventFiredNotification() override { }
-
-    double getTimestamp() { return m_timestamp; }
-    void setTimestamp(double value) { m_timestamp = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<DomContentEventFiredNotification> clone() const;
-
-    template<int STATE>
-    class DomContentEventFiredNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            TimestampSet = 1 << 1,
-            AllFieldsSet = (TimestampSet | 0)};
-
-
-        DomContentEventFiredNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
-        {
-            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
-            m_result->setTimestamp(value);
-            return castState<TimestampSet>();
-        }
-
-        std::unique_ptr<DomContentEventFiredNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class DomContentEventFiredNotification;
-        DomContentEventFiredNotificationBuilder() : m_result(new DomContentEventFiredNotification()) { }
-
-        template<int STEP> DomContentEventFiredNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<DomContentEventFiredNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Page::DomContentEventFiredNotification> m_result;
-    };
-
-    static DomContentEventFiredNotificationBuilder<0> create()
-    {
-        return DomContentEventFiredNotificationBuilder<0>();
-    }
-
-private:
-    DomContentEventFiredNotification()
-    {
-          m_timestamp = 0;
-    }
-
-    double m_timestamp;
-};
-
-
-class  FrameAttachedNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(FrameAttachedNotification);
-public:
-    static std::unique_ptr<FrameAttachedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~FrameAttachedNotification() override { }
-
-    String getFrameId() { return m_frameId; }
-    void setFrameId(const String& value) { m_frameId = value; }
-
-    String getParentFrameId() { return m_parentFrameId; }
-    void setParentFrameId(const String& value) { m_parentFrameId = value; }
-
-    bool hasStack() { return m_stack.isJust(); }
-    protocol::Runtime::StackTrace* getStack(protocol::Runtime::StackTrace* defaultValue) { return m_stack.isJust() ? m_stack.fromJust() : defaultValue; }
-    void setStack(std::unique_ptr<protocol::Runtime::StackTrace> value) { m_stack = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<FrameAttachedNotification> clone() const;
-
-    template<int STATE>
-    class FrameAttachedNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            FrameIdSet = 1 << 1,
-            ParentFrameIdSet = 1 << 2,
-            AllFieldsSet = (FrameIdSet | ParentFrameIdSet | 0)};
-
-
-        FrameAttachedNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value)
-        {
-            static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
-            m_result->setFrameId(value);
-            return castState<FrameIdSet>();
-        }
-
-        FrameAttachedNotificationBuilder<STATE | ParentFrameIdSet>& setParentFrameId(const String& value)
-        {
-            static_assert(!(STATE & ParentFrameIdSet), "property parentFrameId should not be set yet");
-            m_result->setParentFrameId(value);
-            return castState<ParentFrameIdSet>();
-        }
-
-        FrameAttachedNotificationBuilder<STATE>& setStack(std::unique_ptr<protocol::Runtime::StackTrace> value)
-        {
-            m_result->setStack(std::move(value));
-            return *this;
-        }
-
-        std::unique_ptr<FrameAttachedNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class FrameAttachedNotification;
-        FrameAttachedNotificationBuilder() : m_result(new FrameAttachedNotification()) { }
-
-        template<int STEP> FrameAttachedNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<FrameAttachedNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Page::FrameAttachedNotification> m_result;
-    };
-
-    static FrameAttachedNotificationBuilder<0> create()
-    {
-        return FrameAttachedNotificationBuilder<0>();
-    }
-
-private:
-    FrameAttachedNotification()
-    {
-    }
-
-    String m_frameId;
-    String m_parentFrameId;
-    Maybe<protocol::Runtime::StackTrace> m_stack;
-};
-
-
-class  FrameClearedScheduledNavigationNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(FrameClearedScheduledNavigationNotification);
-public:
-    static std::unique_ptr<FrameClearedScheduledNavigationNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~FrameClearedScheduledNavigationNotification() override { }
-
-    String getFrameId() { return m_frameId; }
-    void setFrameId(const String& value) { m_frameId = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<FrameClearedScheduledNavigationNotification> clone() const;
-
-    template<int STATE>
-    class FrameClearedScheduledNavigationNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            FrameIdSet = 1 << 1,
-            AllFieldsSet = (FrameIdSet | 0)};
-
-
-        FrameClearedScheduledNavigationNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value)
-        {
-            static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
-            m_result->setFrameId(value);
-            return castState<FrameIdSet>();
-        }
-
-        std::unique_ptr<FrameClearedScheduledNavigationNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class FrameClearedScheduledNavigationNotification;
-        FrameClearedScheduledNavigationNotificationBuilder() : m_result(new FrameClearedScheduledNavigationNotification()) { }
-
-        template<int STEP> FrameClearedScheduledNavigationNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<FrameClearedScheduledNavigationNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Page::FrameClearedScheduledNavigationNotification> m_result;
-    };
-
-    static FrameClearedScheduledNavigationNotificationBuilder<0> create()
-    {
-        return FrameClearedScheduledNavigationNotificationBuilder<0>();
-    }
-
-private:
-    FrameClearedScheduledNavigationNotification()
-    {
-    }
-
-    String m_frameId;
-};
-
-
-class  FrameDetachedNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(FrameDetachedNotification);
-public:
-    static std::unique_ptr<FrameDetachedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~FrameDetachedNotification() override { }
-
-    String getFrameId() { return m_frameId; }
-    void setFrameId(const String& value) { m_frameId = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<FrameDetachedNotification> clone() const;
-
-    template<int STATE>
-    class FrameDetachedNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            FrameIdSet = 1 << 1,
-            AllFieldsSet = (FrameIdSet | 0)};
-
-
-        FrameDetachedNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value)
-        {
-            static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
-            m_result->setFrameId(value);
-            return castState<FrameIdSet>();
-        }
-
-        std::unique_ptr<FrameDetachedNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class FrameDetachedNotification;
-        FrameDetachedNotificationBuilder() : m_result(new FrameDetachedNotification()) { }
-
-        template<int STEP> FrameDetachedNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<FrameDetachedNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Page::FrameDetachedNotification> m_result;
-    };
-
-    static FrameDetachedNotificationBuilder<0> create()
-    {
-        return FrameDetachedNotificationBuilder<0>();
-    }
-
-private:
-    FrameDetachedNotification()
-    {
-    }
-
-    String m_frameId;
-};
-
-
-class  FrameNavigatedNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(FrameNavigatedNotification);
-public:
-    static std::unique_ptr<FrameNavigatedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~FrameNavigatedNotification() override { }
-
-    protocol::Page::Frame* getFrame() { return m_frame.get(); }
-    void setFrame(std::unique_ptr<protocol::Page::Frame> value) { m_frame = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<FrameNavigatedNotification> clone() const;
-
-    template<int STATE>
-    class FrameNavigatedNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            FrameSet = 1 << 1,
-            AllFieldsSet = (FrameSet | 0)};
-
-
-        FrameNavigatedNotificationBuilder<STATE | FrameSet>& setFrame(std::unique_ptr<protocol::Page::Frame> value)
-        {
-            static_assert(!(STATE & FrameSet), "property frame should not be set yet");
-            m_result->setFrame(std::move(value));
-            return castState<FrameSet>();
-        }
-
-        std::unique_ptr<FrameNavigatedNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class FrameNavigatedNotification;
-        FrameNavigatedNotificationBuilder() : m_result(new FrameNavigatedNotification()) { }
-
-        template<int STEP> FrameNavigatedNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<FrameNavigatedNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Page::FrameNavigatedNotification> m_result;
-    };
-
-    static FrameNavigatedNotificationBuilder<0> create()
-    {
-        return FrameNavigatedNotificationBuilder<0>();
-    }
-
-private:
-    FrameNavigatedNotification()
-    {
-    }
-
-    std::unique_ptr<protocol::Page::Frame> m_frame;
-};
-
-
-class  FrameScheduledNavigationNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(FrameScheduledNavigationNotification);
-public:
-    static std::unique_ptr<FrameScheduledNavigationNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~FrameScheduledNavigationNotification() override { }
-
-    String getFrameId() { return m_frameId; }
-    void setFrameId(const String& value) { m_frameId = value; }
-
-    double getDelay() { return m_delay; }
-    void setDelay(double value) { m_delay = value; }
-
-    struct  ReasonEnum {
-        static const char* FormSubmissionGet;
-        static const char* FormSubmissionPost;
-        static const char* HttpHeaderRefresh;
-        static const char* ScriptInitiated;
-        static const char* MetaTagRefresh;
-        static const char* PageBlockInterstitial;
-        static const char* Reload;
-    }; // ReasonEnum
-
-    String getReason() { return m_reason; }
-    void setReason(const String& value) { m_reason = value; }
-
-    String getUrl() { return m_url; }
-    void setUrl(const String& value) { m_url = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<FrameScheduledNavigationNotification> clone() const;
-
-    template<int STATE>
-    class FrameScheduledNavigationNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            FrameIdSet = 1 << 1,
-            DelaySet = 1 << 2,
-            ReasonSet = 1 << 3,
-            UrlSet = 1 << 4,
-            AllFieldsSet = (FrameIdSet | DelaySet | ReasonSet | UrlSet | 0)};
-
-
-        FrameScheduledNavigationNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value)
-        {
-            static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
-            m_result->setFrameId(value);
-            return castState<FrameIdSet>();
-        }
-
-        FrameScheduledNavigationNotificationBuilder<STATE | DelaySet>& setDelay(double value)
-        {
-            static_assert(!(STATE & DelaySet), "property delay should not be set yet");
-            m_result->setDelay(value);
-            return castState<DelaySet>();
-        }
-
-        FrameScheduledNavigationNotificationBuilder<STATE | ReasonSet>& setReason(const String& value)
-        {
-            static_assert(!(STATE & ReasonSet), "property reason should not be set yet");
-            m_result->setReason(value);
-            return castState<ReasonSet>();
-        }
-
-        FrameScheduledNavigationNotificationBuilder<STATE | UrlSet>& setUrl(const String& value)
-        {
-            static_assert(!(STATE & UrlSet), "property url should not be set yet");
-            m_result->setUrl(value);
-            return castState<UrlSet>();
-        }
-
-        std::unique_ptr<FrameScheduledNavigationNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class FrameScheduledNavigationNotification;
-        FrameScheduledNavigationNotificationBuilder() : m_result(new FrameScheduledNavigationNotification()) { }
-
-        template<int STEP> FrameScheduledNavigationNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<FrameScheduledNavigationNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Page::FrameScheduledNavigationNotification> m_result;
-    };
-
-    static FrameScheduledNavigationNotificationBuilder<0> create()
-    {
-        return FrameScheduledNavigationNotificationBuilder<0>();
-    }
-
-private:
-    FrameScheduledNavigationNotification()
-    {
-          m_delay = 0;
-    }
-
-    String m_frameId;
-    double m_delay;
-    String m_reason;
-    String m_url;
-};
-
-
-class  FrameStartedLoadingNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(FrameStartedLoadingNotification);
-public:
-    static std::unique_ptr<FrameStartedLoadingNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~FrameStartedLoadingNotification() override { }
-
-    String getFrameId() { return m_frameId; }
-    void setFrameId(const String& value) { m_frameId = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<FrameStartedLoadingNotification> clone() const;
-
-    template<int STATE>
-    class FrameStartedLoadingNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            FrameIdSet = 1 << 1,
-            AllFieldsSet = (FrameIdSet | 0)};
-
-
-        FrameStartedLoadingNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value)
-        {
-            static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
-            m_result->setFrameId(value);
-            return castState<FrameIdSet>();
-        }
-
-        std::unique_ptr<FrameStartedLoadingNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class FrameStartedLoadingNotification;
-        FrameStartedLoadingNotificationBuilder() : m_result(new FrameStartedLoadingNotification()) { }
-
-        template<int STEP> FrameStartedLoadingNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<FrameStartedLoadingNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Page::FrameStartedLoadingNotification> m_result;
-    };
-
-    static FrameStartedLoadingNotificationBuilder<0> create()
-    {
-        return FrameStartedLoadingNotificationBuilder<0>();
-    }
-
-private:
-    FrameStartedLoadingNotification()
-    {
-    }
-
-    String m_frameId;
-};
-
-
-class  FrameStoppedLoadingNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(FrameStoppedLoadingNotification);
-public:
-    static std::unique_ptr<FrameStoppedLoadingNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~FrameStoppedLoadingNotification() override { }
-
-    String getFrameId() { return m_frameId; }
-    void setFrameId(const String& value) { m_frameId = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<FrameStoppedLoadingNotification> clone() const;
-
-    template<int STATE>
-    class FrameStoppedLoadingNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            FrameIdSet = 1 << 1,
-            AllFieldsSet = (FrameIdSet | 0)};
-
-
-        FrameStoppedLoadingNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value)
-        {
-            static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
-            m_result->setFrameId(value);
-            return castState<FrameIdSet>();
-        }
-
-        std::unique_ptr<FrameStoppedLoadingNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class FrameStoppedLoadingNotification;
-        FrameStoppedLoadingNotificationBuilder() : m_result(new FrameStoppedLoadingNotification()) { }
-
-        template<int STEP> FrameStoppedLoadingNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<FrameStoppedLoadingNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Page::FrameStoppedLoadingNotification> m_result;
-    };
-
-    static FrameStoppedLoadingNotificationBuilder<0> create()
-    {
-        return FrameStoppedLoadingNotificationBuilder<0>();
-    }
-
-private:
-    FrameStoppedLoadingNotification()
-    {
-    }
-
-    String m_frameId;
-};
-
-
-class  LifecycleEventNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(LifecycleEventNotification);
-public:
-    static std::unique_ptr<LifecycleEventNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~LifecycleEventNotification() override { }
-
-    String getFrameId() { return m_frameId; }
-    void setFrameId(const String& value) { m_frameId = value; }
-
-    String getLoaderId() { return m_loaderId; }
-    void setLoaderId(const String& value) { m_loaderId = value; }
-
-    String getName() { return m_name; }
-    void setName(const String& value) { m_name = value; }
-
-    double getTimestamp() { return m_timestamp; }
-    void setTimestamp(double value) { m_timestamp = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<LifecycleEventNotification> clone() const;
-
-    template<int STATE>
-    class LifecycleEventNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            FrameIdSet = 1 << 1,
-            LoaderIdSet = 1 << 2,
-            NameSet = 1 << 3,
-            TimestampSet = 1 << 4,
-            AllFieldsSet = (FrameIdSet | LoaderIdSet | NameSet | TimestampSet | 0)};
-
-
-        LifecycleEventNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value)
-        {
-            static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
-            m_result->setFrameId(value);
-            return castState<FrameIdSet>();
-        }
-
-        LifecycleEventNotificationBuilder<STATE | LoaderIdSet>& setLoaderId(const String& value)
-        {
-            static_assert(!(STATE & LoaderIdSet), "property loaderId should not be set yet");
-            m_result->setLoaderId(value);
-            return castState<LoaderIdSet>();
-        }
-
-        LifecycleEventNotificationBuilder<STATE | NameSet>& setName(const String& value)
-        {
-            static_assert(!(STATE & NameSet), "property name should not be set yet");
-            m_result->setName(value);
-            return castState<NameSet>();
-        }
-
-        LifecycleEventNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
-        {
-            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
-            m_result->setTimestamp(value);
-            return castState<TimestampSet>();
-        }
-
-        std::unique_ptr<LifecycleEventNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class LifecycleEventNotification;
-        LifecycleEventNotificationBuilder() : m_result(new LifecycleEventNotification()) { }
-
-        template<int STEP> LifecycleEventNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<LifecycleEventNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Page::LifecycleEventNotification> m_result;
-    };
-
-    static LifecycleEventNotificationBuilder<0> create()
-    {
-        return LifecycleEventNotificationBuilder<0>();
-    }
-
-private:
-    LifecycleEventNotification()
-    {
-          m_timestamp = 0;
-    }
-
-    String m_frameId;
-    String m_loaderId;
-    String m_name;
-    double m_timestamp;
-};
-
-
-class  LoadEventFiredNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(LoadEventFiredNotification);
-public:
-    static std::unique_ptr<LoadEventFiredNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~LoadEventFiredNotification() override { }
-
-    double getTimestamp() { return m_timestamp; }
-    void setTimestamp(double value) { m_timestamp = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<LoadEventFiredNotification> clone() const;
-
-    template<int STATE>
-    class LoadEventFiredNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            TimestampSet = 1 << 1,
-            AllFieldsSet = (TimestampSet | 0)};
-
-
-        LoadEventFiredNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
-        {
-            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
-            m_result->setTimestamp(value);
-            return castState<TimestampSet>();
-        }
-
-        std::unique_ptr<LoadEventFiredNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class LoadEventFiredNotification;
-        LoadEventFiredNotificationBuilder() : m_result(new LoadEventFiredNotification()) { }
-
-        template<int STEP> LoadEventFiredNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<LoadEventFiredNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Page::LoadEventFiredNotification> m_result;
-    };
-
-    static LoadEventFiredNotificationBuilder<0> create()
-    {
-        return LoadEventFiredNotificationBuilder<0>();
-    }
-
-private:
-    LoadEventFiredNotification()
-    {
-          m_timestamp = 0;
-    }
-
-    double m_timestamp;
-};
-
-
-class  NavigatedWithinDocumentNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(NavigatedWithinDocumentNotification);
-public:
-    static std::unique_ptr<NavigatedWithinDocumentNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~NavigatedWithinDocumentNotification() override { }
-
-    String getFrameId() { return m_frameId; }
-    void setFrameId(const String& value) { m_frameId = value; }
-
-    String getUrl() { return m_url; }
-    void setUrl(const String& value) { m_url = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<NavigatedWithinDocumentNotification> clone() const;
-
-    template<int STATE>
-    class NavigatedWithinDocumentNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            FrameIdSet = 1 << 1,
-            UrlSet = 1 << 2,
-            AllFieldsSet = (FrameIdSet | UrlSet | 0)};
-
-
-        NavigatedWithinDocumentNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value)
-        {
-            static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
-            m_result->setFrameId(value);
-            return castState<FrameIdSet>();
-        }
-
-        NavigatedWithinDocumentNotificationBuilder<STATE | UrlSet>& setUrl(const String& value)
-        {
-            static_assert(!(STATE & UrlSet), "property url should not be set yet");
-            m_result->setUrl(value);
-            return castState<UrlSet>();
-        }
-
-        std::unique_ptr<NavigatedWithinDocumentNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class NavigatedWithinDocumentNotification;
-        NavigatedWithinDocumentNotificationBuilder() : m_result(new NavigatedWithinDocumentNotification()) { }
-
-        template<int STEP> NavigatedWithinDocumentNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<NavigatedWithinDocumentNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Page::NavigatedWithinDocumentNotification> m_result;
-    };
-
-    static NavigatedWithinDocumentNotificationBuilder<0> create()
-    {
-        return NavigatedWithinDocumentNotificationBuilder<0>();
-    }
-
-private:
-    NavigatedWithinDocumentNotification()
-    {
-    }
-
-    String m_frameId;
-    String m_url;
-};
-
-
-class  WindowOpenNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(WindowOpenNotification);
-public:
-    static std::unique_ptr<WindowOpenNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~WindowOpenNotification() override { }
-
-    String getUrl() { return m_url; }
-    void setUrl(const String& value) { m_url = value; }
-
-    String getWindowName() { return m_windowName; }
-    void setWindowName(const String& value) { m_windowName = value; }
-
-    protocol::Array<String>* getWindowFeatures() { return m_windowFeatures.get(); }
-    void setWindowFeatures(std::unique_ptr<protocol::Array<String>> value) { m_windowFeatures = std::move(value); }
-
-    bool getUserGesture() { return m_userGesture; }
-    void setUserGesture(bool value) { m_userGesture = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<WindowOpenNotification> clone() const;
-
-    template<int STATE>
-    class WindowOpenNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            UrlSet = 1 << 1,
-            WindowNameSet = 1 << 2,
-            WindowFeaturesSet = 1 << 3,
-            UserGestureSet = 1 << 4,
-            AllFieldsSet = (UrlSet | WindowNameSet | WindowFeaturesSet | UserGestureSet | 0)};
-
-
-        WindowOpenNotificationBuilder<STATE | UrlSet>& setUrl(const String& value)
-        {
-            static_assert(!(STATE & UrlSet), "property url should not be set yet");
-            m_result->setUrl(value);
-            return castState<UrlSet>();
-        }
-
-        WindowOpenNotificationBuilder<STATE | WindowNameSet>& setWindowName(const String& value)
-        {
-            static_assert(!(STATE & WindowNameSet), "property windowName should not be set yet");
-            m_result->setWindowName(value);
-            return castState<WindowNameSet>();
-        }
-
-        WindowOpenNotificationBuilder<STATE | WindowFeaturesSet>& setWindowFeatures(std::unique_ptr<protocol::Array<String>> value)
-        {
-            static_assert(!(STATE & WindowFeaturesSet), "property windowFeatures should not be set yet");
-            m_result->setWindowFeatures(std::move(value));
-            return castState<WindowFeaturesSet>();
-        }
-
-        WindowOpenNotificationBuilder<STATE | UserGestureSet>& setUserGesture(bool value)
-        {
-            static_assert(!(STATE & UserGestureSet), "property userGesture should not be set yet");
-            m_result->setUserGesture(value);
-            return castState<UserGestureSet>();
-        }
-
-        std::unique_ptr<WindowOpenNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class WindowOpenNotification;
-        WindowOpenNotificationBuilder() : m_result(new WindowOpenNotification()) { }
-
-        template<int STEP> WindowOpenNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<WindowOpenNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Page::WindowOpenNotification> m_result;
-    };
-
-    static WindowOpenNotificationBuilder<0> create()
-    {
-        return WindowOpenNotificationBuilder<0>();
-    }
-
-private:
-    WindowOpenNotification()
-    {
-          m_userGesture = false;
-    }
-
-    String m_url;
-    String m_windowName;
-    std::unique_ptr<protocol::Array<String>> m_windowFeatures;
-    bool m_userGesture;
-};
-
-
-class  CompilationCacheProducedNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(CompilationCacheProducedNotification);
-public:
-    static std::unique_ptr<CompilationCacheProducedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~CompilationCacheProducedNotification() override { }
-
-    String getUrl() { return m_url; }
-    void setUrl(const String& value) { m_url = value; }
-
-    Binary getData() { return m_data; }
-    void setData(const Binary& value) { m_data = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<CompilationCacheProducedNotification> clone() const;
-
-    template<int STATE>
-    class CompilationCacheProducedNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            UrlSet = 1 << 1,
-            DataSet = 1 << 2,
-            AllFieldsSet = (UrlSet | DataSet | 0)};
-
-
-        CompilationCacheProducedNotificationBuilder<STATE | UrlSet>& setUrl(const String& value)
-        {
-            static_assert(!(STATE & UrlSet), "property url should not be set yet");
-            m_result->setUrl(value);
-            return castState<UrlSet>();
-        }
-
-        CompilationCacheProducedNotificationBuilder<STATE | DataSet>& setData(const Binary& value)
-        {
-            static_assert(!(STATE & DataSet), "property data should not be set yet");
-            m_result->setData(value);
-            return castState<DataSet>();
-        }
-
-        std::unique_ptr<CompilationCacheProducedNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class CompilationCacheProducedNotification;
-        CompilationCacheProducedNotificationBuilder() : m_result(new CompilationCacheProducedNotification()) { }
-
-        template<int STEP> CompilationCacheProducedNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<CompilationCacheProducedNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Page::CompilationCacheProducedNotification> m_result;
-    };
-
-    static CompilationCacheProducedNotificationBuilder<0> create()
-    {
-        return CompilationCacheProducedNotificationBuilder<0>();
-    }
-
-private:
-    CompilationCacheProducedNotification()
-    {
-    }
-
-    String m_url;
-    Binary m_data;
 };
 
 
