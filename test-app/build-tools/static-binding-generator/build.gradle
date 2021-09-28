@@ -3,6 +3,15 @@ apply plugin: 'java-library'
 sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
 
+if(!project.hasProperty("loadedProjectDeps")){
+    Properties projectDeps = new Properties()
+    projectDeps.load(new FileInputStream("$project.rootDir/gradle.properties"))
+    projectDeps.each { prop ->
+        project.ext.set(prop.key, prop.value)
+    }
+    project.ext.loadedProjectDeps = true
+}
+
 repositories {
     google()
     mavenCentral()
