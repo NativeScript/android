@@ -8,6 +8,16 @@
 #include "MetadataEntry.h"
 
 namespace tns {
+
+enum class BufferCastType {
+    Byte,
+    Short,
+    Int,
+    Long,
+    Float,
+    Double
+};
+
 class JsArgConverter {
     public:
 
@@ -37,6 +47,8 @@ class JsArgConverter {
             int index;
             std::string msg;
         };
+
+    static BufferCastType GetCastType(const v8::Local<v8::ArrayBufferView>& view);
 
     private:
 

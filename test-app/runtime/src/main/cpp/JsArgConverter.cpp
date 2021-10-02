@@ -90,6 +90,21 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, cons
     }
 }
 
+tns::BufferCastType JsArgConverter::GetCastType(const v8::Local<v8::ArrayBufferView>& view) {
+    if (view->IsUint16Array() || view->IsInt16Array()){
+        return tns::BufferCastType::Short;
+    }else if (view->IsUint32Array() || view->IsInt32Array()){
+        return tns::BufferCastType::Int;
+    }else if (view->IsFloat32Array()){
+        return tns::BufferCastType::Float;
+    }else if (view->IsFloat64Array()){
+        return tns::BufferCastType::Double;
+    }else if (view->IsBigUint64Array() || view->IsBigInt64Array()){
+        return tns::BufferCastType::Long;
+    }
+    return tns::BufferCastType::Byte;
+}
+
 bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
     bool success = false;
 
@@ -105,7 +120,6 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
 
         if (success) {
             auto jsArr = Local<Array>::Cast(arg);
-
             success = ConvertJavaScriptArray(jsArr, index);
         }
 
@@ -143,6 +157,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
         auto objectManager = runtime->GetObjectManager();
 
         JEnv env;
+
 
         auto isSupportSig = typeSignature == "Ljava/nio/ByteBuffer;" ||
                             typeSignature == "Ljava/nio/ShortBuffer;" ||
@@ -222,9 +237,10 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
         case CastType::None:
             obj = objectManager->GetJavaObjectByJsObject(jsObject);
 
-            if (obj.IsNull() && (jsObject->IsTypedArray() || jsObject->IsArrayBuffer() || jsObject->IsArrayBufferView()) && isSupportSig)
+            if (obj.IsNull() && (jsObject->IsTypedArray() || jsObject->IsArrayBuffer() || jsObject->IsArrayBufferView()))
             {
 
+                BufferCastType bufferCastType = tns::BufferCastType::Byte;
                 shared_ptr<BackingStore> store;
                 size_t offset = 0;
                 size_t length;
@@ -237,6 +253,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
                 else if (jsObject->IsArrayBufferView())
                 {
                     auto array = jsObject.As<v8::ArrayBufferView>();
+
                     if (!array->HasBuffer())
                     {
 
@@ -250,6 +267,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
                     }
                     offset = array->ByteOffset();
                     store = array->Buffer()->GetBackingStore();
+                    bufferCastType = JsArgConverter::GetCastType(array);
                 }
                 else
                 {
@@ -257,6 +275,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
                     offset = array->ByteOffset();
                     store = array->Buffer()->GetBackingStore();
                     length = array->ByteLength();
+                    bufferCastType = JsArgConverter::GetCastType(array);
                 }
 
                 auto data = static_cast<uint8_t *>(store->Data()) + offset;
@@ -281,35 +300,35 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
 
                 jobject buffer;
 
-                if (typeSignature == "Ljava/nio/ShortBuffer;")
+                if (bufferCastType == BufferCastType::Short)
                 {
 
                     auto id = env.GetMethodID(directBufferClazz, "asShortBuffer",
                                               "()Ljava/nio/ShortBuffer;");
                     buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
                 }
-                else if (typeSignature == "Ljava/nio/IntBuffer;")
+                else if (bufferCastType == BufferCastType::Int)
                 {
 
                     auto id = env.GetMethodID(directBufferClazz, "asIntBuffer",
                                               "()Ljava/nio/IntBuffer;");
                     buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
                 }
-                else if (typeSignature == "Ljava/nio/LongBuffer;")
+                else if (bufferCastType == BufferCastType::Long)
                 {
 
                     auto id = env.GetMethodID(directBufferClazz, "asLongBuffer",
                                               "()Ljava/nio/LongBuffer;");
                     buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
                 }
-                else if (typeSignature == "Ljava/nio/FloatBuffer;")
+                else if (bufferCastType == BufferCastType::Float)
                 {
 
                     auto id = env.GetMethodID(directBufferClazz, "asFloatBuffer",
                                               "()Ljava/nio/FloatBuffer;");
                     buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
                 }
-                else if (typeSignature == "Ljava/nio/DoubleBuffer;")
+                else if (bufferCastType == BufferCastType::Double)
                 {
 
                     auto id = env.GetMethodID(directBufferClazz, "asDoubleBuffer",
