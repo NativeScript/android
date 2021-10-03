@@ -9,10 +9,15 @@
   "files": [
     "**/*"
   ],
-  "gradle": {
-    "version": "7.0.0",
-    "android": "7.0.2"
+  "versions":{
+    "v8": "9.2.230.18",
+    "gradle": "7.0.2",
+    "ndk": "r22",
+    "ndkApiLevel": "19",
+    "minSdk": "19",
+    "compileSdk": "31",
+    "buildTools":"31.0.0",
+    "kotlin":"1.5.21"
   },
-  "android_ndk_version": "22b",
   "publishConfig": {"tag":"next", "access": "public"}
 }
