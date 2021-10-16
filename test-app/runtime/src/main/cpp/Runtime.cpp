@@ -665,12 +665,14 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     }
 #endif
 
+
     SimpleProfiler::Init(isolate, globalTemplate);
 
     CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
 
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
     context->Enter();
+
 
     m_objectManager->Init(isolate);
 

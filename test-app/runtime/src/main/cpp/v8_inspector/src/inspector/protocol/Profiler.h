@@ -964,7 +964,7 @@ public:
   explicit Frontend(FrontendChannel* frontend_channel) : frontend_channel_(frontend_channel) {}
     void consoleProfileFinished(const String& id, std::unique_ptr<protocol::Debugger::Location> location, std::unique_ptr<protocol::Profiler::Profile> profile, Maybe<String> title = Maybe<String>());
     void consoleProfileStarted(const String& id, std::unique_ptr<protocol::Debugger::Location> location, Maybe<String> title = Maybe<String>());
-    void preciseCoverageDeltaUpdate(double timestamp, const String& occassion, std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> result);
+    void preciseCoverageDeltaUpdate(double timestamp, const String& occasion, std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> result);
 
   void flush();
   void sendRawNotification(std::unique_ptr<Serializable>);

@@ -271,19 +271,26 @@ void LiftoffAssembler::StoreTaggedPointer(Register dst_addr,
   CheckPageFlag(src.gp(), r1, MemoryChunk::kPointersToHereAreInterestingMask,
                 eq, &exit);
   lay(r1, dst_op);
-  CallRecordWriteStub(dst_addr, r1, RememberedSetAction::kEmit,
-                      SaveFPRegsMode::kSave, wasm::WasmCode::kRecordWrite);
+  CallRecordWriteStubSaveRegisters(dst_addr, r1, RememberedSetAction::kEmit,
+                                   SaveFPRegsMode::kSave,
+                                   StubCallMode::kCallWasmRuntimeStub);
   bind(&exit);
 }
 
 void LiftoffAssembler::Load(LiftoffRegister dst, Register src_addr,
                             Register offset_reg, uintptr_t offset_imm,
                             LoadType type, LiftoffRegList pinned,
-                            uint32_t* protected_load_pc, bool is_load_mem) {
+                            uint32_t* protected_load_pc, bool is_load_mem,
+                            bool i64_offset) {
   UseScratchRegisterScope temps(this);
   if (!is_int20(offset_imm)) {
     mov(ip, Operand(offset_imm));
     if (offset_reg != no_reg) {
+      if (!i64_offset) {
+        // Clear the upper 32 bits of the 64 bit offset register.
+        llgfr(r0, offset_reg);
+        offset_reg = r0;
+      }
       AddS64(ip, offset_reg);
     }
     offset_reg = ip;
@@ -444,6 +451,14 @@ void LiftoffAssembler::AtomicLoad(LiftoffRegister dst, Register src_addr,
 void LiftoffAssembler::AtomicStore(Register dst_addr, Register offset_reg,
                                    uintptr_t offset_imm, LiftoffRegister src,
                                    StoreType type, LiftoffRegList pinned) {
+  if (!is_int20(offset_imm)) {
+    mov(ip, Operand(offset_imm));
+    if (offset_reg != no_reg) {
+      AddS64(ip, offset_reg);
+    }
+    offset_reg = ip;
+    offset_imm = 0;
+  }
   lay(ip,
       MemOperand(dst_addr, offset_reg == no_reg ? r0 : offset_reg, offset_imm));
 
@@ -508,6 +523,14 @@ void LiftoffAssembler::AtomicAdd(Register dst_addr, Register offset_reg,
                                                         value, result, tmp1))
           .gp();
 
+  if (!is_int20(offset_imm)) {
+    mov(ip, Operand(offset_imm));
+    if (offset_reg != no_reg) {
+      AddS64(ip, offset_reg);
+    }
+    offset_reg = ip;
+    offset_imm = 0;
+  }
   lay(ip,
       MemOperand(dst_addr, offset_reg == no_reg ? r0 : offset_reg, offset_imm));
 
@@ -592,6 +615,14 @@ void LiftoffAssembler::AtomicSub(Register dst_addr, Register offset_reg,
                                                         value, result, tmp1))
           .gp();
 
+  if (!is_int20(offset_imm)) {
+    mov(ip, Operand(offset_imm));
+    if (offset_reg != no_reg) {
+      AddS64(ip, offset_reg);
+    }
+    offset_reg = ip;
+    offset_imm = 0;
+  }
   lay(ip,
       MemOperand(dst_addr, offset_reg == no_reg ? r0 : offset_reg, offset_imm));
 
@@ -676,6 +707,14 @@ void LiftoffAssembler::AtomicAnd(Register dst_addr, Register offset_reg,
                                                         value, result, tmp1))
           .gp();
 
+  if (!is_int20(offset_imm)) {
+    mov(ip, Operand(offset_imm));
+    if (offset_reg != no_reg) {
+      AddS64(ip, offset_reg);
+    }
+    offset_reg = ip;
+    offset_imm = 0;
+  }
   lay(ip,
       MemOperand(dst_addr, offset_reg == no_reg ? r0 : offset_reg, offset_imm));
 
@@ -760,6 +799,14 @@ void LiftoffAssembler::AtomicOr(Register dst_addr, Register offset_reg,
                                                         value, result, tmp1))
           .gp();
 
+  if (!is_int20(offset_imm)) {
+    mov(ip, Operand(offset_imm));
+    if (offset_reg != no_reg) {
+      AddS64(ip, offset_reg);
+    }
+    offset_reg = ip;
+    offset_imm = 0;
+  }
   lay(ip,
       MemOperand(dst_addr, offset_reg == no_reg ? r0 : offset_reg, offset_imm));
 
@@ -844,6 +891,14 @@ void LiftoffAssembler::AtomicXor(Register dst_addr, Register offset_reg,
                                                         value, result, tmp1))
           .gp();
 
+  if (!is_int20(offset_imm)) {
+    mov(ip, Operand(offset_imm));
+    if (offset_reg != no_reg) {
+      AddS64(ip, offset_reg);
+    }
+    offset_reg = ip;
+    offset_imm = 0;
+  }
   lay(ip,
       MemOperand(dst_addr, offset_reg == no_reg ? r0 : offset_reg, offset_imm));
 
@@ -920,6 +975,14 @@ void LiftoffAssembler::AtomicExchange(Register dst_addr, Register offset_reg,
                                       uintptr_t offset_imm,
                                       LiftoffRegister value,
                                       LiftoffRegister result, StoreType type) {
+  if (!is_int20(offset_imm)) {
+    mov(ip, Operand(offset_imm));
+    if (offset_reg != no_reg) {
+      AddS64(ip, offset_reg);
+    }
+    offset_reg = ip;
+    offset_imm = 0;
+  }
   lay(ip,
       MemOperand(dst_addr, offset_reg == no_reg ? r0 : offset_reg, offset_imm));
 
@@ -988,6 +1051,14 @@ void LiftoffAssembler::AtomicCompareExchange(
     Register dst_addr, Register offset_reg, uintptr_t offset_imm,
     LiftoffRegister expected, LiftoffRegister new_value, LiftoffRegister result,
     StoreType type) {
+  if (!is_int20(offset_imm)) {
+    mov(ip, Operand(offset_imm));
+    if (offset_reg != no_reg) {
+      AddS64(ip, offset_reg);
+    }
+    offset_reg = ip;
+    offset_imm = 0;
+  }
   lay(ip,
       MemOperand(dst_addr, offset_reg == no_reg ? r0 : offset_reg, offset_imm));
 
@@ -3233,11 +3304,11 @@ void LiftoffAssembler::AssertUnreachable(AbortReason reason) {
 
 void LiftoffAssembler::PushRegisters(LiftoffRegList regs) {
   MultiPush(regs.GetGpList());
-  MultiPushDoubles(regs.GetFpList());
+  MultiPushF64OrV128(regs.GetFpList());
 }
 
 void LiftoffAssembler::PopRegisters(LiftoffRegList regs) {
-  MultiPopDoubles(regs.GetFpList());
+  MultiPopF64OrV128(regs.GetFpList());
   MultiPop(regs.GetGpList());
 }
 
@@ -3386,6 +3457,18 @@ void LiftoffAssembler::DeallocateStackSlot(uint32_t size) {
 }
 
 void LiftoffAssembler::MaybeOSR() {}
+
+void LiftoffAssembler::emit_set_if_nan(Register dst, DoubleRegister src,
+                                       ValueKind kind) {
+  UNIMPLEMENTED();
+}
+
+void LiftoffAssembler::emit_s128_set_if_nan(Register dst, DoubleRegister src,
+                                            Register tmp_gp,
+                                            DoubleRegister tmp_fp,
+                                            ValueKind lane_kind) {
+  UNIMPLEMENTED();
+}
 
 void LiftoffStackSlots::Construct(int param_slots) {
   DCHECK_LT(0, slots_.size());
