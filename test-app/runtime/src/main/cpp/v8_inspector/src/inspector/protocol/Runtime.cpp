@@ -292,6 +292,7 @@ V8_CRDTP_BEGIN_DESERIALIZER(ExceptionDetails)
     V8_CRDTP_DESERIALIZE_FIELD("columnNumber", m_columnNumber),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("exception", m_exception),
     V8_CRDTP_DESERIALIZE_FIELD("exceptionId", m_exceptionId),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("exceptionMetaData", m_exceptionMetaData),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("executionContextId", m_executionContextId),
     V8_CRDTP_DESERIALIZE_FIELD("lineNumber", m_lineNumber),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("scriptId", m_scriptId),
@@ -310,6 +311,7 @@ V8_CRDTP_BEGIN_SERIALIZER(ExceptionDetails)
     V8_CRDTP_SERIALIZE_FIELD("stackTrace", m_stackTrace);
     V8_CRDTP_SERIALIZE_FIELD("exception", m_exception);
     V8_CRDTP_SERIALIZE_FIELD("executionContextId", m_executionContextId);
+    V8_CRDTP_SERIALIZE_FIELD("exceptionMetaData", m_exceptionMetaData);
 V8_CRDTP_END_SERIALIZER();
 
 
@@ -729,6 +731,7 @@ struct callFunctionOnParams : public v8_crdtp::DeserializableProtocolObject<call
     Maybe<bool> awaitPromise;
     Maybe<int> executionContextId;
     Maybe<String> objectGroup;
+    Maybe<bool> throwOnSideEffect;
     DECLARE_DESERIALIZATION_SUPPORT();
 };
 
@@ -742,6 +745,7 @@ V8_CRDTP_BEGIN_DESERIALIZER(callFunctionOnParams)
     V8_CRDTP_DESERIALIZE_FIELD_OPT("objectId", objectId),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("returnByValue", returnByValue),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("silent", silent),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("throwOnSideEffect", throwOnSideEffect),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("userGesture", userGesture),
 V8_CRDTP_END_DESERIALIZER()
 
@@ -757,7 +761,7 @@ void DomainDispatcherImpl::callFunctionOn(const v8_crdtp::Dispatchable& dispatch
       return;
 
 
-    m_backend->callFunctionOn(params.functionDeclaration, std::move(params.objectId), std::move(params.arguments), std::move(params.silent), std::move(params.returnByValue), std::move(params.generatePreview), std::move(params.userGesture), std::move(params.awaitPromise), std::move(params.executionContextId), std::move(params.objectGroup), std::make_unique<CallFunctionOnCallbackImpl>(weakPtr(), dispatchable.CallId(), dispatchable.Serialized()));
+    m_backend->callFunctionOn(params.functionDeclaration, std::move(params.objectId), std::move(params.arguments), std::move(params.silent), std::move(params.returnByValue), std::move(params.generatePreview), std::move(params.userGesture), std::move(params.awaitPromise), std::move(params.executionContextId), std::move(params.objectGroup), std::move(params.throwOnSideEffect), std::make_unique<CallFunctionOnCallbackImpl>(weakPtr(), dispatchable.CallId(), dispatchable.Serialized()));
 }
 
 namespace {

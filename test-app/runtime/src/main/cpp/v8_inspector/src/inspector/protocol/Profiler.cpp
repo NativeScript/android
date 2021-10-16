@@ -196,13 +196,13 @@ void Frontend::consoleProfileStarted(const String& id, std::unique_ptr<protocol:
     frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Profiler.consoleProfileStarted", serializer.Finish()));
 }
 
-void Frontend::preciseCoverageDeltaUpdate(double timestamp, const String& occassion, std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> result)
+void Frontend::preciseCoverageDeltaUpdate(double timestamp, const String& occasion, std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> result)
 {
     if (!frontend_channel_)
         return;
     v8_crdtp::ObjectSerializer serializer;
     serializer.AddField(v8_crdtp::MakeSpan("timestamp"), timestamp);
-    serializer.AddField(v8_crdtp::MakeSpan("occassion"), occassion);
+    serializer.AddField(v8_crdtp::MakeSpan("occasion"), occasion);
     serializer.AddField(v8_crdtp::MakeSpan("result"), result);
     frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Profiler.preciseCoverageDeltaUpdate", serializer.Finish()));
 }

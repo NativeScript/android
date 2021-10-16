@@ -101,6 +101,7 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
         src/main/cpp/v8_inspector/src/inspector/inspected-context.cc
         src/main/cpp/v8_inspector/src/inspector/remote-object-id.cc
         src/main/cpp/v8_inspector/src/inspector/search-util.cc
+        src/main/cpp/v8_inspector/src/numbers/conversions.cc
         src/main/cpp/v8_inspector/src/inspector/string-16.cc
         src/main/cpp/v8_inspector/src/inspector/string-util.cc
         src/main/cpp/v8_inspector/src/inspector/v8-console.cc
