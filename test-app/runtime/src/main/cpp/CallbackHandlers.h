@@ -80,6 +80,8 @@ namespace tns {
         static void
         DumpReferenceTablesMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
+        static void DrainMicrotaskCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+
         static void DumpReferenceTablesMethod();
 
         static void ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
