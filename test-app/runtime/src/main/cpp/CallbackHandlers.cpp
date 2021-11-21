@@ -677,6 +677,23 @@ void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Valu
     }
 }
 
+void CallbackHandlers::DrainMicrotaskCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    try {
+        auto isolate = args.GetIsolate();
+        isolate->PerformMicrotaskCheckpoint();
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToV8();
+    }
+}
+
 void CallbackHandlers::TimeCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     auto nano = std::chrono::time_point_cast<std::chrono::milliseconds>(
                     std::chrono::system_clock::now());
