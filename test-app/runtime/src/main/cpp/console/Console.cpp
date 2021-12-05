@@ -478,7 +478,7 @@ void Console::timeCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
             // throw?
         }
 
-        auto nano = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+        auto nano = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::system_clock::now());
         double timeStamp = nano.time_since_epoch().count();
 
         it->second.insert(std::make_pair(label, timeStamp));
@@ -527,16 +527,17 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
             return;
         }
 
-        auto nano = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+        auto nano = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::system_clock::now());
         double endTimeStamp = nano.time_since_epoch().count();
         double startTimeStamp = itTimersMap->second;
 
         it->second.erase(label);
 
-        auto diff = endTimeStamp - startTimeStamp;
+        double diffMicroseconds = endTimeStamp - startTimeStamp;
+        double diffMilliseconds = diffMicroseconds / 1000.0;
 
         std::stringstream ss;
-        ss << label << ": " << std::fixed << std::setprecision(2) << diff << "ms" ;
+        ss << label << ": " << std::fixed << std::setprecision(3) << diffMilliseconds << "ms" ;
         std::string log = ss.str();
 
         __android_log_write(ANDROID_LOG_INFO, LOG_TAG, log.c_str());
