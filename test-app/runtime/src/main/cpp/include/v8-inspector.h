@@ -6,12 +6,20 @@
 #define V8_V8_INSPECTOR_H_
 
 #include <stdint.h>
+
 #include <cctype>
-
 #include <memory>
-#include <unordered_map>
 
-#include "v8.h"  // NOLINT(build/include_directory)
+#include "v8-isolate.h"       // NOLINT(build/include_directory)
+#include "v8-local-handle.h"  // NOLINT(build/include_directory)
+
+namespace v8 {
+class Context;
+class Name;
+class Object;
+class StackTrace;
+class Value;
+}  // namespace v8
 
 namespace v8_inspector {
 
@@ -106,7 +114,7 @@ class V8_EXPORT V8StackTrace {
   virtual int topLineNumber() const = 0;
   virtual int topColumnNumber() const = 0;
   virtual int topScriptId() const = 0;
-  V8_DEPRECATE_SOON("Use V8::StackTrace::topScriptId() instead.")
+  V8_DEPRECATED("Use V8::StackTrace::topScriptId() instead.")
   int topScriptIdAsInteger() const { return topScriptId(); }
   virtual StringView topFunctionName() const = 0;
 
@@ -193,9 +201,6 @@ class V8_EXPORT V8InspectorClient {
   virtual std::unique_ptr<StringBuffer> descriptionForValueSubtype(
       v8::Local<v8::Context>, v8::Local<v8::Value>) {
     return nullptr;
-  }
-  virtual bool formatAccessorsAsProperties(v8::Local<v8::Value>) {
-    return false;
   }
   virtual bool isInspectableHeapObject(v8::Local<v8::Object>) { return true; }
 
@@ -323,24 +328,6 @@ class V8_EXPORT V8Inspector {
   virtual std::unique_ptr<V8StackTrace> createStackTrace(
       v8::Local<v8::StackTrace>) = 0;
   virtual std::unique_ptr<V8StackTrace> captureStackTrace(bool fullStack) = 0;
-
-  // Performance counters.
-  class V8_EXPORT Counters : public std::enable_shared_from_this<Counters> {
-   public:
-    explicit Counters(v8::Isolate* isolate);
-    ~Counters();
-    const std::unordered_map<std::string, int>& getCountersMap() const {
-      return m_countersMap;
-    }
-
-   private:
-    static int* getCounterPtr(const char* name);
-
-    v8::Isolate* m_isolate;
-    std::unordered_map<std::string, int> m_countersMap;
-  };
-
-  virtual std::shared_ptr<Counters> enableCounters() = 0;
 };
 
 }  // namespace v8_inspector

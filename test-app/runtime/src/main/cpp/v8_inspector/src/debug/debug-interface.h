@@ -7,9 +7,14 @@
 
 #include <memory>
 
+#include "include/v8-callbacks.h"
+#include "include/v8-debug.h"
+#include "include/v8-embedder-heap.h"
+#include "include/v8-local-handle.h"
+#include "include/v8-memory-span.h"
+#include "include/v8-promise.h"
+#include "include/v8-script.h"
 #include "include/v8-util.h"
-#include "include/v8.h"
-#include "src/base/platform/time.h"
 #include "src/base/vector.h"
 #include "src/common/globals.h"
 #include "src/debug/interface-types.h"
@@ -19,6 +24,8 @@ class V8Inspector;
 }  // namespace v8_inspector
 
 namespace v8 {
+
+class Platform;
 
 namespace internal {
 struct CoverageBlock;
@@ -266,9 +273,6 @@ Local<Function> GetBuiltin(Isolate* isolate, Builtin builtin);
 V8_EXPORT_PRIVATE void SetConsoleDelegate(Isolate* isolate,
                                           ConsoleDelegate* delegate);
 
-V8_DEPRECATED("See http://crbug.com/v8/10566.")
-int GetStackFrameId(v8::Local<v8::StackFrame> frame);
-
 v8::Local<v8::StackTrace> GetDetailedStackTrace(Isolate* isolate,
                                                 v8::Local<v8::Object> error);
 
@@ -515,11 +519,6 @@ enum class NativeAccessorType {
 
 int64_t GetNextRandomInt64(v8::Isolate* isolate);
 
-using RuntimeCallCounterCallback =
-    std::function<void(const char* name, int64_t count, base::TimeDelta time)>;
-void EnumerateRuntimeCallCounters(v8::Isolate* isolate,
-                                  RuntimeCallCounterCallback callback);
-
 MaybeLocal<Value> CallFunctionOn(Local<Context> context,
                                  Local<Function> function, Local<Value> recv,
                                  int argc, Local<Value> argv[],
@@ -568,19 +567,17 @@ class V8_NODISCARD DisableBreakScope {
   std::unique_ptr<i::DisableBreak> scope_;
 };
 
-class WeakMap : public v8::Object {
+class EphemeronTable : public v8::Object {
  public:
-  WeakMap() = delete;
+  EphemeronTable() = delete;
   V8_EXPORT_PRIVATE V8_WARN_UNUSED_RESULT v8::MaybeLocal<v8::Value> Get(
-      v8::Local<v8::Context> context, v8::Local<v8::Value> key);
-  V8_EXPORT_PRIVATE V8_WARN_UNUSED_RESULT v8::Maybe<bool> Delete(
-      v8::Local<v8::Context> context, v8::Local<v8::Value> key);
-  V8_EXPORT_PRIVATE V8_WARN_UNUSED_RESULT v8::MaybeLocal<WeakMap> Set(
-      v8::Local<v8::Context> context, v8::Local<v8::Value> key,
+      v8::Isolate* isolate, v8::Local<v8::Value> key);
+  V8_EXPORT_PRIVATE V8_WARN_UNUSED_RESULT v8::Local<EphemeronTable> Set(
+      v8::Isolate* isolate, v8::Local<v8::Value> key,
       v8::Local<v8::Value> value);
 
-  V8_EXPORT_PRIVATE static Local<WeakMap> New(v8::Isolate* isolate);
-  V8_INLINE static WeakMap* Cast(Value* obj);
+  V8_EXPORT_PRIVATE static Local<EphemeronTable> New(v8::Isolate* isolate);
+  V8_INLINE static EphemeronTable* Cast(Value* obj);
 };
 
 /**
@@ -614,12 +611,13 @@ struct PropertyDescriptor {
   v8::Local<v8::Value> set;
 };
 
-class PropertyIterator {
+class V8_EXPORT_PRIVATE PropertyIterator {
  public:
   // Creating a PropertyIterator can potentially throw an exception.
   // The returned std::unique_ptr is empty iff that happens.
   V8_WARN_UNUSED_RESULT static std::unique_ptr<PropertyIterator> Create(
-      v8::Local<v8::Context> context, v8::Local<v8::Object> object);
+      v8::Local<v8::Context> context, v8::Local<v8::Object> object,
+      bool skip_indices = false);
 
   virtual ~PropertyIterator() = default;
 
@@ -667,6 +665,8 @@ AccessorPair* AccessorPair::Cast(v8::Value* value) {
 }
 
 MaybeLocal<Message> GetMessageFromPromise(Local<Promise> promise);
+
+bool isExperimentalAsyncStackTaggingApiEnabled();
 
 }  // namespace debug
 }  // namespace v8

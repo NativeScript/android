@@ -25,8 +25,6 @@ class ScriptCoverage;
 class TypeObject;
 class TypeProfileEntry;
 class ScriptTypeProfile;
-class CounterInfo;
-class RuntimeCallCounterInfo;
 
 // ------------- Forward and enum declarations.
 
@@ -777,159 +775,6 @@ private:
 };
 
 
-class  CounterInfo : public ::v8_crdtp::ProtocolObject<CounterInfo> {
-public:
-    ~CounterInfo() override { }
-
-    String getName() { return m_name; }
-    void setName(const String& value) { m_name = value; }
-
-    int getValue() { return m_value; }
-    void setValue(int value) { m_value = value; }
-
-    template<int STATE>
-    class CounterInfoBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            NameSet = 1 << 1,
-            ValueSet = 1 << 2,
-            AllFieldsSet = (NameSet | ValueSet | 0)};
-
-
-        CounterInfoBuilder<STATE | NameSet>& setName(const String& value)
-        {
-            static_assert(!(STATE & NameSet), "property name should not be set yet");
-            m_result->setName(value);
-            return castState<NameSet>();
-        }
-
-        CounterInfoBuilder<STATE | ValueSet>& setValue(int value)
-        {
-            static_assert(!(STATE & ValueSet), "property value should not be set yet");
-            m_result->setValue(value);
-            return castState<ValueSet>();
-        }
-
-        std::unique_ptr<CounterInfo> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class CounterInfo;
-        CounterInfoBuilder() : m_result(new CounterInfo()) { }
-
-        template<int STEP> CounterInfoBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<CounterInfoBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Profiler::CounterInfo> m_result;
-    };
-
-    static CounterInfoBuilder<0> create()
-    {
-        return CounterInfoBuilder<0>();
-    }
-
-private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
-    CounterInfo()
-    {
-          m_value = 0;
-    }
-
-    String m_name;
-    int m_value;
-};
-
-
-class  RuntimeCallCounterInfo : public ::v8_crdtp::ProtocolObject<RuntimeCallCounterInfo> {
-public:
-    ~RuntimeCallCounterInfo() override { }
-
-    String getName() { return m_name; }
-    void setName(const String& value) { m_name = value; }
-
-    double getValue() { return m_value; }
-    void setValue(double value) { m_value = value; }
-
-    double getTime() { return m_time; }
-    void setTime(double value) { m_time = value; }
-
-    template<int STATE>
-    class RuntimeCallCounterInfoBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            NameSet = 1 << 1,
-            ValueSet = 1 << 2,
-            TimeSet = 1 << 3,
-            AllFieldsSet = (NameSet | ValueSet | TimeSet | 0)};
-
-
-        RuntimeCallCounterInfoBuilder<STATE | NameSet>& setName(const String& value)
-        {
-            static_assert(!(STATE & NameSet), "property name should not be set yet");
-            m_result->setName(value);
-            return castState<NameSet>();
-        }
-
-        RuntimeCallCounterInfoBuilder<STATE | ValueSet>& setValue(double value)
-        {
-            static_assert(!(STATE & ValueSet), "property value should not be set yet");
-            m_result->setValue(value);
-            return castState<ValueSet>();
-        }
-
-        RuntimeCallCounterInfoBuilder<STATE | TimeSet>& setTime(double value)
-        {
-            static_assert(!(STATE & TimeSet), "property time should not be set yet");
-            m_result->setTime(value);
-            return castState<TimeSet>();
-        }
-
-        std::unique_ptr<RuntimeCallCounterInfo> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class RuntimeCallCounterInfo;
-        RuntimeCallCounterInfoBuilder() : m_result(new RuntimeCallCounterInfo()) { }
-
-        template<int STEP> RuntimeCallCounterInfoBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<RuntimeCallCounterInfoBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Profiler::RuntimeCallCounterInfo> m_result;
-    };
-
-    static RuntimeCallCounterInfoBuilder<0> create()
-    {
-        return RuntimeCallCounterInfoBuilder<0>();
-    }
-
-private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
-    RuntimeCallCounterInfo()
-    {
-          m_value = 0;
-          m_time = 0;
-    }
-
-    String m_name;
-    double m_value;
-    double m_time;
-};
-
-
 // ------------- Backend interface.
 
 class  Backend {
@@ -948,12 +793,6 @@ public:
     virtual DispatchResponse stopTypeProfile() = 0;
     virtual DispatchResponse takePreciseCoverage(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>>* out_result, double* out_timestamp) = 0;
     virtual DispatchResponse takeTypeProfile(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptTypeProfile>>* out_result) = 0;
-    virtual DispatchResponse enableCounters() = 0;
-    virtual DispatchResponse disableCounters() = 0;
-    virtual DispatchResponse getCounters(std::unique_ptr<protocol::Array<protocol::Profiler::CounterInfo>>* out_result) = 0;
-    virtual DispatchResponse enableRuntimeCallStats() = 0;
-    virtual DispatchResponse disableRuntimeCallStats() = 0;
-    virtual DispatchResponse getRuntimeCallStats(std::unique_ptr<protocol::Array<protocol::Profiler::RuntimeCallCounterInfo>>* out_result) = 0;
 
 };
 

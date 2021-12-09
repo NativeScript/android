@@ -28,6 +28,20 @@ if (hasNdkVersion) {
 }
 
 
+def NDK_PATH = ""
+def hasNdkDirectory = project.hasProperty("ndkDirectory")
+if(!hasNdkDirectory){
+    NDK_PATH = "$System.env.ANDROID_NDK"
+    if (NDK_PATH == null){
+        NDK_PATH = "$System.env.ANDROID_NDK_ROOT"
+    }
+    println NDK_PATH
+}else {
+    NDK_PATH = ndkDirectory
+}
+
+
+
 
 android {
 
@@ -46,6 +60,8 @@ android {
 
     if (hasNdkVersion) {
         ndkVersion ndkVersion
+    }else {
+        ndkVersion "21.4.7075529"
     }
 
     defaultConfig {
@@ -64,6 +80,7 @@ android {
 
         externalNativeBuild {
             cmake {
+
                 if (optimized) {
                     arguments.add("-DOPTIMIZED_BUILD=true")
                 }
@@ -76,12 +93,12 @@ android {
                     arguments.add("-DUSE_CCACHE=true")
                 }
 
-                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${ndkDirectory}"
+                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}"
             }
         }
 
         ndk {
-            minSdkVersion = MIN_SDK_VERSION as int
+            minSdkVersion MIN_SDK_VERSION as int
             if (onlyX86) {
                 abiFilters 'x86'
             } else {

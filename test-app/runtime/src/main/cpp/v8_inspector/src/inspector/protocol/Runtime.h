@@ -1629,7 +1629,7 @@ public:
     virtual void evaluate(const String& in_expression, Maybe<String> in_objectGroup, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_silent, Maybe<int> in_contextId, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_userGesture, Maybe<bool> in_awaitPromise, Maybe<bool> in_throwOnSideEffect, Maybe<double> in_timeout, Maybe<bool> in_disableBreaks, Maybe<bool> in_replMode, Maybe<bool> in_allowUnsafeEvalBlockedByCSP, Maybe<String> in_uniqueContextId, std::unique_ptr<EvaluateCallback> callback) = 0;
     virtual DispatchResponse getIsolateId(String* out_id) = 0;
     virtual DispatchResponse getHeapUsage(double* out_usedSize, double* out_totalSize) = 0;
-    virtual DispatchResponse getProperties(const String& in_objectId, Maybe<bool> in_ownProperties, Maybe<bool> in_accessorPropertiesOnly, Maybe<bool> in_generatePreview, std::unique_ptr<protocol::Array<protocol::Runtime::PropertyDescriptor>>* out_result, Maybe<protocol::Array<protocol::Runtime::InternalPropertyDescriptor>>* out_internalProperties, Maybe<protocol::Array<protocol::Runtime::PrivatePropertyDescriptor>>* out_privateProperties, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
+    virtual DispatchResponse getProperties(const String& in_objectId, Maybe<bool> in_ownProperties, Maybe<bool> in_accessorPropertiesOnly, Maybe<bool> in_generatePreview, Maybe<bool> in_nonIndexedPropertiesOnly, std::unique_ptr<protocol::Array<protocol::Runtime::PropertyDescriptor>>* out_result, Maybe<protocol::Array<protocol::Runtime::InternalPropertyDescriptor>>* out_internalProperties, Maybe<protocol::Array<protocol::Runtime::PrivatePropertyDescriptor>>* out_privateProperties, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
     virtual DispatchResponse globalLexicalScopeNames(Maybe<int> in_executionContextId, std::unique_ptr<protocol::Array<String>>* out_names) = 0;
     virtual DispatchResponse queryObjects(const String& in_prototypeObjectId, Maybe<String> in_objectGroup, std::unique_ptr<protocol::Runtime::RemoteObject>* out_objects) = 0;
     virtual DispatchResponse releaseObject(const String& in_objectId) = 0;
@@ -1670,7 +1670,7 @@ public:
     void executionContextCreated(std::unique_ptr<protocol::Runtime::ExecutionContextDescription> context);
     void executionContextDestroyed(int executionContextId);
     void executionContextsCleared();
-    void inspectRequested(std::unique_ptr<protocol::Runtime::RemoteObject> object, std::unique_ptr<protocol::DictionaryValue> hints);
+    void inspectRequested(std::unique_ptr<protocol::Runtime::RemoteObject> object, std::unique_ptr<protocol::DictionaryValue> hints, Maybe<int> executionContextId = Maybe<int>());
 
   void flush();
   void sendRawNotification(std::unique_ptr<Serializable>);

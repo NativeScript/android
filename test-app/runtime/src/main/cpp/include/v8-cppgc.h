@@ -14,8 +14,9 @@
 #include "cppgc/heap-statistics.h"
 #include "cppgc/internal/write-barrier.h"
 #include "cppgc/visitor.h"
-#include "v8-internal.h"  // NOLINT(build/include_directory)
-#include "v8.h"           // NOLINT(build/include_directory)
+#include "v8-internal.h"       // NOLINT(build/include_directory)
+#include "v8-platform.h"       // NOLINT(build/include_directory)
+#include "v8-traced-handle.h"  // NOLINT(build/include_directory)
 
 namespace cppgc {
 class AllocationHandle;
@@ -23,6 +24,8 @@ class HeapHandle;
 }  // namespace cppgc
 
 namespace v8 {
+
+class Object;
 
 namespace internal {
 class CppHeap;
@@ -192,9 +195,11 @@ class V8_EXPORT JSHeapConsistency final {
    * \returns whether a write barrier is needed and which barrier to invoke.
    */
   template <typename HeapHandleCallback>
+  V8_DEPRECATE_SOON("Write barriers automatically emitted by TracedReference.")
   static V8_INLINE WriteBarrierType
-  GetWriteBarrierType(const TracedReferenceBase& ref,
-                      WriteBarrierParams& params, HeapHandleCallback callback) {
+      GetWriteBarrierType(const TracedReferenceBase& ref,
+                          WriteBarrierParams& params,
+                          HeapHandleCallback callback) {
     if (ref.IsEmpty()) return WriteBarrierType::kNone;
 
     if (V8_LIKELY(!cppgc::internal::WriteBarrier::
@@ -248,6 +253,7 @@ class V8_EXPORT JSHeapConsistency final {
    * \param params The parameters retrieved from `GetWriteBarrierType()`.
    * \param ref The reference being written to.
    */
+  V8_DEPRECATE_SOON("Write barriers automatically emitted by TracedReference.")
   static V8_INLINE void DijkstraMarkingBarrier(const WriteBarrierParams& params,
                                                cppgc::HeapHandle& heap_handle,
                                                const TracedReferenceBase& ref) {
@@ -277,6 +283,7 @@ class V8_EXPORT JSHeapConsistency final {
    * \param params The parameters retrieved from `GetWriteBarrierType()`.
    * \param ref The reference being written to.
    */
+  V8_DEPRECATE_SOON("Write barriers automatically emitted by TracedReference.")
   static V8_INLINE void GenerationalBarrier(const WriteBarrierParams& params,
                                             const TracedReferenceBase& ref) {}
 
@@ -315,8 +322,13 @@ namespace cppgc {
 
 template <typename T>
 struct TraceTrait<v8::TracedReference<T>> {
-  static void Trace(Visitor* visitor, const v8::TracedReference<T>* self) {
-    static_cast<v8::JSVisitor*>(visitor)->Trace(*self);
+  static cppgc::TraceDescriptor GetTraceDescriptor(const void* self) {
+    return {nullptr, Trace};
+  }
+
+  static void Trace(Visitor* visitor, const void* self) {
+    static_cast<v8::JSVisitor*>(visitor)->Trace(
+        *static_cast<const v8::TracedReference<T>*>(self));
   }
 };
 

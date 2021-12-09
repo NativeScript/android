@@ -41,11 +41,11 @@ class PersistentBase {
     node_ = nullptr;
   }
 
- private:
+ protected:
   mutable const void* raw_ = nullptr;
   mutable PersistentNode* node_ = nullptr;
 
-  friend class PersistentRegion;
+  friend class PersistentRegionBase;
 };
 
 // The basic class from which all Persistent classes are generated.
@@ -141,7 +141,7 @@ class BasicPersistent final : public PersistentBase,
   }
 
   // Move assignment.
-  BasicPersistent& operator=(BasicPersistent&& other) {
+  BasicPersistent& operator=(BasicPersistent&& other) noexcept {
     if (this == &other) return *this;
     Clear();
     PersistentBase::operator=(std::move(other));
@@ -257,6 +257,12 @@ class BasicPersistent final : public PersistentBase,
       WeaknessPolicy::GetPersistentRegion(GetValue()).FreeNode(GetNode());
       PersistentBase::ClearFromGC();
     }
+  }
+
+  // Set Get() for details.
+  V8_CLANG_NO_SANITIZE("cfi-unrelated-cast")
+  T* GetFromGC() const {
+    return static_cast<T*>(const_cast<void*>(GetValue()));
   }
 
   friend class cppgc::Visitor;

@@ -144,30 +144,6 @@ V8_CRDTP_BEGIN_SERIALIZER(ScriptTypeProfile)
 V8_CRDTP_END_SERIALIZER();
 
 
-V8_CRDTP_BEGIN_DESERIALIZER(CounterInfo)
-    V8_CRDTP_DESERIALIZE_FIELD("name", m_name),
-    V8_CRDTP_DESERIALIZE_FIELD("value", m_value),
-V8_CRDTP_END_DESERIALIZER()
-
-V8_CRDTP_BEGIN_SERIALIZER(CounterInfo)
-    V8_CRDTP_SERIALIZE_FIELD("name", m_name);
-    V8_CRDTP_SERIALIZE_FIELD("value", m_value);
-V8_CRDTP_END_SERIALIZER();
-
-
-V8_CRDTP_BEGIN_DESERIALIZER(RuntimeCallCounterInfo)
-    V8_CRDTP_DESERIALIZE_FIELD("name", m_name),
-    V8_CRDTP_DESERIALIZE_FIELD("time", m_time),
-    V8_CRDTP_DESERIALIZE_FIELD("value", m_value),
-V8_CRDTP_END_DESERIALIZER()
-
-V8_CRDTP_BEGIN_SERIALIZER(RuntimeCallCounterInfo)
-    V8_CRDTP_SERIALIZE_FIELD("name", m_name);
-    V8_CRDTP_SERIALIZE_FIELD("value", m_value);
-    V8_CRDTP_SERIALIZE_FIELD("time", m_time);
-V8_CRDTP_END_SERIALIZER();
-
-
 // ------------- Enum values from params.
 
 
@@ -242,12 +218,6 @@ public:
     void stopTypeProfile(const v8_crdtp::Dispatchable& dispatchable);
     void takePreciseCoverage(const v8_crdtp::Dispatchable& dispatchable);
     void takeTypeProfile(const v8_crdtp::Dispatchable& dispatchable);
-    void enableCounters(const v8_crdtp::Dispatchable& dispatchable);
-    void disableCounters(const v8_crdtp::Dispatchable& dispatchable);
-    void getCounters(const v8_crdtp::Dispatchable& dispatchable);
-    void enableRuntimeCallStats(const v8_crdtp::Dispatchable& dispatchable);
-    void disableRuntimeCallStats(const v8_crdtp::Dispatchable& dispatchable);
-    void getRuntimeCallStats(const v8_crdtp::Dispatchable& dispatchable);
  protected:
     Backend* m_backend;
 };
@@ -265,36 +235,12 @@ DomainDispatcherImpl::CallHandler CommandByName(v8_crdtp::span<uint8_t> command_
           &DomainDispatcherImpl::disable
     },
     {
-          v8_crdtp::SpanFrom("disableCounters"),
-          &DomainDispatcherImpl::disableCounters
-    },
-    {
-          v8_crdtp::SpanFrom("disableRuntimeCallStats"),
-          &DomainDispatcherImpl::disableRuntimeCallStats
-    },
-    {
           v8_crdtp::SpanFrom("enable"),
           &DomainDispatcherImpl::enable
     },
     {
-          v8_crdtp::SpanFrom("enableCounters"),
-          &DomainDispatcherImpl::enableCounters
-    },
-    {
-          v8_crdtp::SpanFrom("enableRuntimeCallStats"),
-          &DomainDispatcherImpl::enableRuntimeCallStats
-    },
-    {
           v8_crdtp::SpanFrom("getBestEffortCoverage"),
           &DomainDispatcherImpl::getBestEffortCoverage
-    },
-    {
-          v8_crdtp::SpanFrom("getCounters"),
-          &DomainDispatcherImpl::getCounters
-    },
-    {
-          v8_crdtp::SpanFrom("getRuntimeCallStats"),
-          &DomainDispatcherImpl::getRuntimeCallStats
     },
     {
           v8_crdtp::SpanFrom("setSamplingInterval"),
@@ -672,154 +618,6 @@ void DomainDispatcherImpl::takeTypeProfile(const v8_crdtp::Dispatchable& dispatc
     DispatchResponse response = m_backend->takeTypeProfile(&out_result);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.takeTypeProfile"), dispatchable.Serialized());
-        return;
-    }
-      if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
-        if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("result"), out_result);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
-        }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
-      }
-    return;
-}
-
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::enableCounters(const v8_crdtp::Dispatchable& dispatchable)
-{
-    // Prepare input parameters.
-
-
-    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->enableCounters();
-    if (response.IsFallThrough()) {
-        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.enableCounters"), dispatchable.Serialized());
-        return;
-    }
-    if (weak->get())
-        weak->get()->sendResponse(dispatchable.CallId(), response);
-    return;
-}
-
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::disableCounters(const v8_crdtp::Dispatchable& dispatchable)
-{
-    // Prepare input parameters.
-
-
-    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->disableCounters();
-    if (response.IsFallThrough()) {
-        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.disableCounters"), dispatchable.Serialized());
-        return;
-    }
-    if (weak->get())
-        weak->get()->sendResponse(dispatchable.CallId(), response);
-    return;
-}
-
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::getCounters(const v8_crdtp::Dispatchable& dispatchable)
-{
-    // Prepare input parameters.
-
-    // Declare output parameters.
-    std::unique_ptr<protocol::Array<protocol::Profiler::CounterInfo>> out_result;
-
-    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getCounters(&out_result);
-    if (response.IsFallThrough()) {
-        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.getCounters"), dispatchable.Serialized());
-        return;
-    }
-      if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
-        if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("result"), out_result);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
-        }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
-      }
-    return;
-}
-
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::enableRuntimeCallStats(const v8_crdtp::Dispatchable& dispatchable)
-{
-    // Prepare input parameters.
-
-
-    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->enableRuntimeCallStats();
-    if (response.IsFallThrough()) {
-        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.enableRuntimeCallStats"), dispatchable.Serialized());
-        return;
-    }
-    if (weak->get())
-        weak->get()->sendResponse(dispatchable.CallId(), response);
-    return;
-}
-
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::disableRuntimeCallStats(const v8_crdtp::Dispatchable& dispatchable)
-{
-    // Prepare input parameters.
-
-
-    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->disableRuntimeCallStats();
-    if (response.IsFallThrough()) {
-        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.disableRuntimeCallStats"), dispatchable.Serialized());
-        return;
-    }
-    if (weak->get())
-        weak->get()->sendResponse(dispatchable.CallId(), response);
-    return;
-}
-
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::getRuntimeCallStats(const v8_crdtp::Dispatchable& dispatchable)
-{
-    // Prepare input parameters.
-
-    // Declare output parameters.
-    std::unique_ptr<protocol::Array<protocol::Profiler::RuntimeCallCounterInfo>> out_result;
-
-    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getRuntimeCallStats(&out_result);
-    if (response.IsFallThrough()) {
-        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.getRuntimeCallStats"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
