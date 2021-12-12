@@ -21,27 +21,12 @@ if (useCCache) {
 }
 
 
-
 def hasNdkVersion = project.hasProperty("ndkVersion")
 if (hasNdkVersion) {
     println "Runtime using NDK version " + ndkVersion
 }
 
-
-def NDK_PATH = ""
-def hasNdkDirectory = project.hasProperty("ndkDirectory")
-if(!hasNdkDirectory){
-    NDK_PATH = "$System.env.ANDROID_NDK"
-    if (NDK_PATH == null){
-        NDK_PATH = "$System.env.ANDROID_NDK_ROOT"
-    }
-    println NDK_PATH
-}else {
-    NDK_PATH = ndkDirectory
-}
-
-
-
+def NDK_PATH =  System.getenv("ANDROID_NDK") ?: System.getenv("ANDROID_NDK_ROOT")
 
 android {
 
@@ -60,8 +45,6 @@ android {
 
     if (hasNdkVersion) {
         ndkVersion ndkVersion
-    }else {
-        ndkVersion "21.4.7075529"
     }
 
     defaultConfig {
@@ -79,8 +62,8 @@ android {
         }
 
         externalNativeBuild {
-            cmake {
-
+            ndkBuild {
+                arguments.add("NDK_APPLICATION_MK=$projectDir/src/main/jni/Application.mk")
                 if (optimized) {
                     arguments.add("-DOPTIMIZED_BUILD=true")
                 }
@@ -114,11 +97,10 @@ android {
         }
     }
     externalNativeBuild {
-        cmake {
-            path "CMakeLists.txt"
+        ndkBuild {
+            path "src/main/jni/nativescript/jni/Android.mk"
         }
     }
-
 }
 
 allprojects {
@@ -142,7 +124,7 @@ tasks.whenTaskAdded { task ->
         task.dependsOn(setRuntimeCommit)
     }
 
-    if(taskName.contains("bundleReleaseAar")){
+    if (taskName.contains("bundleReleaseAar")) {
         task.dependsOn("testDebugUnitTest")
     }
 
