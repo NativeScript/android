@@ -60,8 +60,6 @@ android {
 
     if (hasNdkVersion) {
         ndkVersion ndkVersion
-    }else {
-        ndkVersion "21.4.7075529"
     }
 
     defaultConfig {

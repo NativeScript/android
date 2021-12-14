@@ -50,9 +50,7 @@ wctrans_t wctrans(const char* property);
 #pragma GCC system_header
 #endif
 
-#if __has_include_next(<wctype.h>)
-#   include_next <wctype.h>
-#endif
+#include_next <wctype.h>
 
 #ifdef __cplusplus
 
