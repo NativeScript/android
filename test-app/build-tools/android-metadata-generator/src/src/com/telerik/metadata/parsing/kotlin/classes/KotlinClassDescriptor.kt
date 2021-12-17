@@ -96,6 +96,7 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
                     )
 
                     kotlinFields.add(kotlinField)
+                    break
                 }
             }
         }

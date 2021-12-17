@@ -512,14 +512,14 @@ def explodeAar(File compileDependency, File outputDir) {
         Enumeration enumEntries = jar.entries()
         while (enumEntries.hasMoreElements()) {
             JarEntry file = (JarEntry) enumEntries.nextElement()
+            if (file.isDirectory()) {
+                continue
+            }
             if (file.name.endsWith(".jar")) {
                 def targetFile = new File(outputDir, file.name)
                 InputStream inputStream = jar.getInputStream(file)
                 new File(targetFile.parent).mkdirs()
                 Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
-            }
-            if (file.isDirectory()) {
-                continue
             }
         }
         jar.close()

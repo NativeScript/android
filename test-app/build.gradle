@@ -134,7 +134,7 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
     dependencies {
         classpath "com.android.tools.build:gradle:$androidBuildToolsVersion"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
-        classpath group: 'org.codehaus.groovy', name: 'groovy-all', version: '3.0.8', ext: 'pom'
+        classpath "org.codehaus.groovy:groovy-all:3.0.8"
     }
 }
 
