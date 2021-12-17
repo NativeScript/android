@@ -84,9 +84,9 @@ class MethodResolver {
 
         Class<?> t = type;
 
-        String array = "";
-        while (t.isArray()) {
-            array += "[";
+        StringBuilder array = new StringBuilder();
+        while (t != null  && t.isArray()) {
+            array.append("[");
             t = t.getComponentType();
         }
 

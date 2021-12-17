@@ -244,7 +244,7 @@ public class TreeNode {
             if (pi.propertyName.equals(propertyInfo.propertyName)) {
                 if (pi.getterMethod != null || propertyInfo.getterMethod != null) {
                     if (pi.getterMethod != null && propertyInfo.getterMethod != null) {
-                        if (pi.getterMethod.sig != propertyInfo.getterMethod.sig) {
+                        if (!pi.getterMethod.sig.equals(propertyInfo.getterMethod.sig)) {
                             continue;
                         }
                     } else {
@@ -253,7 +253,7 @@ public class TreeNode {
                 }
                 if (pi.setterMethod != null || propertyInfo.setterMethod != null) {
                     if (pi.setterMethod != null && propertyInfo.setterMethod != null) {
-                        if (pi.setterMethod.sig != propertyInfo.setterMethod.sig) {
+                        if (!pi.setterMethod.sig.equals(propertyInfo.setterMethod.sig)) {
                             continue;
                         }
                     } else {

@@ -40,6 +40,17 @@
 #include <sanitizer/asan_interface.h>
 #endif  // V8_USE_ADDRESS_SANITIZER
 
+#ifndef V8_NO_FAST_TLS
+#if V8_CC_MSVC && V8_HOST_ARCH_IA32
+// __readfsdword is supposed to be declared in intrin.h but it is missing from
+// some versions of that file. See https://bugs.llvm.org/show_bug.cgi?id=51188
+// And, intrin.h is a very expensive header that we want to avoid here, and
+// the cheaper intrin0.h is not available for all build configurations. That is
+// why we declare this intrinsic.
+extern "C" unsigned long __readfsdword(unsigned long);  // NOLINT(runtime/int)
+#endif                                       // V8_CC_MSVC && V8_HOST_ARCH_IA32
+#endif                                       // V8_NO_FAST_TLS
+
 namespace v8 {
 
 namespace base {
@@ -299,6 +310,8 @@ class V8_BASE_EXPORT OS {
 
   V8_WARN_UNUSED_RESULT static bool DiscardSystemPages(void* address,
                                                        size_t size);
+
+  V8_WARN_UNUSED_RESULT static bool DecommitPages(void* address, size_t size);
 
   static const int msPerSecond = 1000;
 

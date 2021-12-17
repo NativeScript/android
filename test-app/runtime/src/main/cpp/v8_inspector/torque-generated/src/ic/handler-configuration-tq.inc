@@ -1,2 +1,0 @@
-class LoadHandler;
-class StoreHandler;

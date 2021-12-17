@@ -31,8 +31,8 @@ class Common {
             std::unique_ptr<protocol::Array<T>> result(new protocol::Array<T>());
             errors->Push();
             for (size_t i = 0; i < array->size(); ++i) {
-                const char* name = std::to_string(i).c_str();
-                errors->SetName(name);
+                auto name = std::to_string(i);
+                errors->SetName(name.c_str());
                 std::unique_ptr<T> item = protocol::ValueConversions<T>::fromValue(array->at(i), errors);
                 result->push_back(std::move(item));
             }

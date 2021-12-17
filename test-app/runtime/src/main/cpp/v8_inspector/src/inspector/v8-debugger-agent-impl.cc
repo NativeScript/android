@@ -7,7 +7,10 @@
 #include <algorithm>
 
 #include "../../third_party/inspector_protocol/crdtp/json.h"
+#include "include/v8-context.h"
+#include "include/v8-function.h"
 #include "include/v8-inspector.h"
+#include "include/v8-microtask-queue.h"
 #include "src/base/safe_conversions.h"
 #include "src/debug/debug-interface.h"
 #include "src/inspector/injected-script.h"
@@ -425,6 +428,7 @@ Response V8DebuggerAgentImpl::disable() {
   for (const auto& it : m_debuggerBreakpointIdToBreakpointId) {
     v8::debug::RemoveBreakpoint(m_isolate, it.first);
   }
+  m_breakpointsOnScriptRun.clear();
   m_breakpointIdToDebuggerBreakpointIds.clear();
   m_debuggerBreakpointIdToBreakpointId.clear();
   m_debugger->setAsyncCallStackDepth(this, 0);
@@ -730,6 +734,7 @@ void V8DebuggerAgentImpl::removeBreakpointImpl(
 #endif  // V8_ENABLE_WEBASSEMBLY
     v8::debug::RemoveBreakpoint(m_isolate, id);
     m_debuggerBreakpointIdToBreakpointId.erase(id);
+    m_breakpointsOnScriptRun.erase(id);
   }
   m_breakpointIdToDebuggerBreakpointIds.erase(breakpointId);
 }
@@ -1618,7 +1623,7 @@ void V8DebuggerAgentImpl::didParseSource(
       hasSourceURLComment ? &hasSourceURLComment : nullptr;
   const bool* isModuleParam = isModule ? &isModule : nullptr;
   std::unique_ptr<V8StackTraceImpl> stack =
-      V8StackTraceImpl::capture(m_inspector->debugger(), contextGroupId, 1);
+      V8StackTraceImpl::capture(m_inspector->debugger(), 1);
   std::unique_ptr<protocol::Runtime::StackTrace> stackTrace =
       stack && !stack->isEmpty()
           ? stack->buildInspectorObjectImpl(m_debugger, 0)
@@ -1776,14 +1781,23 @@ void V8DebuggerAgentImpl::didPause(
   }
 
   auto hitBreakpointIds = std::make_unique<Array<String16>>();
+  bool hitInstrumentationBreakpoint = false;
 
   for (const auto& id : hitBreakpoints) {
     auto it = m_breakpointsOnScriptRun.find(id);
     if (it != m_breakpointsOnScriptRun.end()) {
-      hitReasons.push_back(std::make_pair(
-          protocol::Debugger::Paused::ReasonEnum::Instrumentation,
-          std::move(it->second)));
-      m_breakpointsOnScriptRun.erase(it);
+      if (!hitInstrumentationBreakpoint) {
+        // We may hit several instrumentation breakpoints: 1. they are
+        // kept around, and 2. each session may set their own.
+        // Only report one.
+        // TODO(kimanh): This will not be needed anymore if we
+        // make sure that we can only hit an instrumentation
+        // breakpoint once. This workaround is currently for wasm.
+        hitInstrumentationBreakpoint = true;
+        hitReasons.push_back(std::make_pair(
+            protocol::Debugger::Paused::ReasonEnum::Instrumentation,
+            std::move(it->second)));
+      }
       continue;
     }
     auto breakpointIterator = m_debuggerBreakpointIdToBreakpointId.find(id);

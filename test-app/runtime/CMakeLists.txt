@@ -1,7 +1,7 @@
 # documentation: https://d.android.com/studio/projects/add-native-code.html
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/cmake_minimum_required.html
-cmake_minimum_required(VERSION 3.10.2)
+cmake_minimum_required(VERSION 3.18.1)
 
 # Add the ccache to the build system
 find_program(CCACHE_FOUND ccache)
@@ -101,7 +101,6 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
         src/main/cpp/v8_inspector/src/inspector/inspected-context.cc
         src/main/cpp/v8_inspector/src/inspector/remote-object-id.cc
         src/main/cpp/v8_inspector/src/inspector/search-util.cc
-        src/main/cpp/v8_inspector/src/numbers/conversions.cc
         src/main/cpp/v8_inspector/src/inspector/string-16.cc
         src/main/cpp/v8_inspector/src/inspector/string-util.cc
         src/main/cpp/v8_inspector/src/inspector/v8-console.cc
@@ -185,10 +184,14 @@ add_library(
     ${INSPECTOR_SOURCES}
 )
 
+if("${ANDROID_ABI}" MATCHES "arm64-v8a$" OR "${ANDROID_ABI}" MATCHES "x86_64$")
+    set(CMAKE_C_FLAGS "-mno-outline-atomics")
+endif()
+
 set(NATIVES_BLOB_INCLUDE_DIRECTORIES ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/include)
 
 if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
-    set_target_properties(
+        set_target_properties(
         NativeScript
         PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition -Wl,--exclude-libs=ALL -Wl,--gc-sections
         INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
@@ -200,6 +203,8 @@ else ()
         INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
     )
 endif ()
+
+target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libinspector_protocol.a)
 
 MESSAGE(STATUS "# General cmake Info")
 MESSAGE(STATUS "# PROJECT_SOURCE_DIR: " ${PROJECT_SOURCE_DIR})

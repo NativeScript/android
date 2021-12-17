@@ -32,7 +32,7 @@ void MethodCache::Init() {
 MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic) {
     CacheMethodInfo method_info;
 
-    auto encoded_method_signature= EncodeSignature(className, methodName, args, isStatic);
+    auto encoded_method_signature = EncodeSignature(className, methodName, args, isStatic);
     auto it = s_mthod_ctor_signature_cache.find(encoded_method_signature);
 
     if (it == s_mthod_ctor_signature_cache.end()) {
@@ -133,11 +133,20 @@ string MethodCache::GetType(Isolate* isolate, const v8::Local<v8::Value>& value)
         }
     }
 
-    if (value->IsArray() || value->IsArrayBuffer() || value->IsArrayBufferView() || value->IsTypedArray()
-            || value->IsFloat32Array() || value->IsFloat64Array()
-            || value->IsInt8Array() || value->IsInt16Array() || value->IsInt32Array()
-            || value->IsUint8Array() || value->IsUint16Array() || value->IsUint32Array()) {
+    if (value->IsArray()) {
         type = "array";
+    } else if (value->IsArrayBuffer() || value->IsInt8Array() || value->IsUint8Array() || value->IsUint8ClampedArray()) {
+        type = "bytebuffer";
+    } else if (value->IsInt16Array() || value->IsUint16Array()) {
+        type = "shortbuffer";
+    } else if (value->IsInt32Array() || value->IsUint32Array()) {
+        type = "intbuffer";
+    } else if (value->IsBigUint64Array() || value->IsBigInt64Array()) {
+        type = "longbuffer";
+    } else if (value->IsFloat32Array()) {
+        type = "floatbuffer";
+    } else if (value->IsFloat64Array()) {
+        type = "doublebuffer";
     } else if (value->IsBoolean() || value->IsBooleanObject() || value->IsFalse() || value->IsTrue()) {
         type = "bool";
     } else if (value->IsDataView()) {

@@ -11,7 +11,9 @@
 #include <unordered_set>
 #include <vector>
 
-#include "v8.h"  // NOLINT(build/include_directory)
+#include "v8-local-handle.h"       // NOLINT(build/include_directory)
+#include "v8-message.h"            // NOLINT(build/include_directory)
+#include "v8-persistent-handle.h"  // NOLINT(build/include_directory)
 
 /**
  * Profiler support for the V8 JavaScript engine.
@@ -20,6 +22,7 @@ namespace v8 {
 
 class HeapGraphNode;
 struct HeapStatsUpdate;
+class Object;
 
 using NativeObject = void*;
 using SnapshotObjectId = uint32_t;
@@ -600,7 +603,7 @@ class V8_EXPORT ActivityControl {
    * Notify about current progress. The activity can be stopped by
    * returning kAbort as the callback result.
    */
-  virtual ControlOption ReportProgressValue(int done, int total) = 0;
+  virtual ControlOption ReportProgressValue(uint32_t done, uint32_t total) = 0;
 };
 
 /**

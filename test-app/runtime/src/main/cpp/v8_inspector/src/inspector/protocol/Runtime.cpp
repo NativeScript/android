@@ -469,13 +469,14 @@ void Frontend::executionContextsCleared()
     frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Runtime.executionContextsCleared"));
 }
 
-void Frontend::inspectRequested(std::unique_ptr<protocol::Runtime::RemoteObject> object, std::unique_ptr<protocol::DictionaryValue> hints)
+void Frontend::inspectRequested(std::unique_ptr<protocol::Runtime::RemoteObject> object, std::unique_ptr<protocol::DictionaryValue> hints, Maybe<int> executionContextId)
 {
     if (!frontend_channel_)
         return;
     v8_crdtp::ObjectSerializer serializer;
     serializer.AddField(v8_crdtp::MakeSpan("object"), object);
     serializer.AddField(v8_crdtp::MakeSpan("hints"), hints);
+    serializer.AddField(v8_crdtp::MakeSpan("executionContextId"), executionContextId);
     frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Runtime.inspectRequested", serializer.Finish()));
 }
 
@@ -1033,12 +1034,14 @@ struct getPropertiesParams : public v8_crdtp::DeserializableProtocolObject<getPr
     Maybe<bool> ownProperties;
     Maybe<bool> accessorPropertiesOnly;
     Maybe<bool> generatePreview;
+    Maybe<bool> nonIndexedPropertiesOnly;
     DECLARE_DESERIALIZATION_SUPPORT();
 };
 
 V8_CRDTP_BEGIN_DESERIALIZER(getPropertiesParams)
     V8_CRDTP_DESERIALIZE_FIELD_OPT("accessorPropertiesOnly", accessorPropertiesOnly),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("generatePreview", generatePreview),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("nonIndexedPropertiesOnly", nonIndexedPropertiesOnly),
     V8_CRDTP_DESERIALIZE_FIELD("objectId", objectId),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("ownProperties", ownProperties),
 V8_CRDTP_END_DESERIALIZER()
@@ -1061,7 +1064,7 @@ void DomainDispatcherImpl::getProperties(const v8_crdtp::Dispatchable& dispatcha
     Maybe<protocol::Runtime::ExceptionDetails> out_exceptionDetails;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getProperties(params.objectId, std::move(params.ownProperties), std::move(params.accessorPropertiesOnly), std::move(params.generatePreview), &out_result, &out_internalProperties, &out_privateProperties, &out_exceptionDetails);
+    DispatchResponse response = m_backend->getProperties(params.objectId, std::move(params.ownProperties), std::move(params.accessorPropertiesOnly), std::move(params.generatePreview), std::move(params.nonIndexedPropertiesOnly), &out_result, &out_internalProperties, &out_privateProperties, &out_exceptionDetails);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Runtime.getProperties"), dispatchable.Serialized());
         return;

@@ -5,10 +5,10 @@
 
 namespace tns {
 
-class WeakRef {
-public:
-    static void Init(v8::Local<v8::Context> context);
-};
+    class WeakRef {
+    public:
+        static void Init(v8::Local<v8::Context> context);
+    };
 
 }
 

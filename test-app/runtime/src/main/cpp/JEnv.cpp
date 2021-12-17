@@ -1,5 +1,5 @@
 #include "JEnv.h"
-#include <assert.h>
+#include <cassert>
 #include "Util.h"
 #include "NativeScriptException.h"
 #include "DesugaredInterfaceCompanionClassNameResolver.h"

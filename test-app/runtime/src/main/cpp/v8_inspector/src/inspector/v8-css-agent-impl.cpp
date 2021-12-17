@@ -181,7 +181,7 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
 
                 for(uint32_t i =0; i < computedStyleArr->Length();i++){
                     v8::Local<v8::Value> element;
-                    bool success = computedStyleArr->Get(context, i).ToLocal(&element);
+                    success = computedStyleArr->Get(context, i).ToLocal(&element);
 
                     if (!success) {
                         std::string errorMessage = "Error while parsing CSSComputedStyleProperty object.";
@@ -208,8 +208,8 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
                 }
 
 
-                auto result = std::make_unique<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>(std::move(computedStyles));
-                *out_computedStyle = std::move(result);
+                auto ret = std::make_unique<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>(std::move(computedStyles));
+                *out_computedStyle = std::move(ret);
                 return DispatchResponse::Success();
             }
         }

@@ -5,10 +5,19 @@
 #ifndef V8_METRICS_H_
 #define V8_METRICS_H_
 
-#include "v8-internal.h"  // NOLINT(build/include_directory)
-#include "v8.h"           // NOLINT(build/include_directory)
+#include <stddef.h>
+#include <stdint.h>
+
+#include <vector>
+
+#include "v8-internal.h"      // NOLINT(build/include_directory)
+#include "v8-local-handle.h"  // NOLINT(build/include_directory)
 
 namespace v8 {
+
+class Context;
+class Isolate;
+
 namespace metrics {
 
 struct GarbageCollectionPhases {
@@ -37,12 +46,12 @@ struct GarbageCollectionFullCycle {
   GarbageCollectionSizes objects_cpp;
   GarbageCollectionSizes memory;
   GarbageCollectionSizes memory_cpp;
-  double collection_rate_in_percent;
-  double collection_rate_cpp_in_percent;
-  double efficiency_in_bytes_per_us;
-  double efficiency_cpp_in_bytes_per_us;
-  double main_thread_efficiency_in_bytes_per_us;
-  double main_thread_efficiency_cpp_in_bytes_per_us;
+  double collection_rate_in_percent = -1.0;
+  double collection_rate_cpp_in_percent = -1.0;
+  double efficiency_in_bytes_per_us = -1.0;
+  double efficiency_cpp_in_bytes_per_us = -1.0;
+  double main_thread_efficiency_in_bytes_per_us = -1.0;
+  double main_thread_efficiency_cpp_in_bytes_per_us = -1.0;
 };
 
 struct GarbageCollectionFullMainThreadIncrementalMark {
