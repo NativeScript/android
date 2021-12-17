@@ -35,6 +35,7 @@ public class ErrorReportActivity extends AppCompatActivity {
 
     // @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         try {
             Method onRequestPermissionsResultMethod = AppCompatActivity.class.getMethod("onRequestPermissionsResult", int.class, permissions.getClass(), grantResults.getClass());
             onRequestPermissionsResultMethod.invoke(new AppCompatActivity() /* never do this */, requestCode, permissions, grantResults);
