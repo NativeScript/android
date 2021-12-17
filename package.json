@@ -1,7 +1,7 @@
 {
   "name": "@nativescript/android",
   "description": "NativeScript Runtime for Android",
-  "version": "8.2.0-alpha.3",
+  "version": "8.2.0-alpha.4",
   "repository": {
     "type": "git",
     "url": "https://github.com/NativeScript/android-runtime.git"
@@ -19,5 +19,5 @@
     "buildTools":"30.0.2",
     "kotlin":"1.6.0"
   },
-  "publishConfig": {"tag":"next", "access": "public"}
+  "publishConfig": {"tag":"alpha", "access": "public"}
 }
