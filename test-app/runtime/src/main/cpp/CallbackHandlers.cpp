@@ -589,7 +589,7 @@ CallbackHandlers::GetImplementedInterfaces(JEnv& env, const Local<Object>& imple
 
                 if (length > 0) {
                     for (int j = 0; j < length; j++) {
-                        auto element = interfacesArr->Get(context, i).ToLocalChecked();
+                        auto element = interfacesArr->Get(context, j).ToLocalChecked();
 
                         if (element->IsFunction()) {
                             auto node = MetadataNode::GetTypeMetadataName(isolate, element);
