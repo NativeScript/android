@@ -11,6 +11,11 @@ using namespace std;
 
 static std::map<v8::Isolate*, v8::Persistent<v8::Function>*> isolateToPersistentSmartJSONStringify = std::map<v8::Isolate*, v8::Persistent<v8::Function>*>();
 
+
+void tns::ClearPersistentSmartJSONStringify(v8::Isolate *isolate) {
+    isolateToPersistentSmartJSONStringify.erase(isolate);
+}
+
 Local<Function> GetSmartJSONStringifyFunction(Isolate* isolate) {
     auto it = isolateToPersistentSmartJSONStringify.find(isolate);
     if (it != isolateToPersistentSmartJSONStringify.end()) {

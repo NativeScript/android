@@ -47,7 +47,7 @@ void* File::ReadBinary(const string& filePath, int& length) {
     length = ftell(file);
     rewind(file);
 
-    uint8_t* data = new uint8_t[length];
+    auto* data = new uint8_t[length];
     fread(data, sizeof(uint8_t), length, file);
     fclose(file);
 
@@ -96,7 +96,7 @@ MemoryMappedFile MemoryMappedFile::Open(const char* filePath) {
         if (fseek(file, 0, SEEK_END) == 0) {
             length = ftell(file);
             if (length >= 0) {
-                memory = mmap(NULL, length, PROT_READ, MAP_SHARED, fileno(file), 0);
+                memory = mmap(nullptr, length, PROT_READ, MAP_SHARED, fileno(file), 0);
                 if (memory == MAP_FAILED) {
                     memory = nullptr;
                 }

@@ -324,7 +324,7 @@ string NativeScriptException::GetErrorMessage(const Local<Message>& message, Loc
     //get whole error message from previous stack
     stringstream ss;
 
-    if (prependMessage != "") {
+    if (!prependMessage.empty()) {
         ss << prependMessage << endl;
     }
 

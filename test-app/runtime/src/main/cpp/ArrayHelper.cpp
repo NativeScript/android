@@ -118,7 +118,7 @@ void ArrayHelper::CreateJavaArray(const v8::FunctionCallbackInfo<v8::Value>& inf
 }
 
 void ArrayHelper::Throw(Isolate* isolate, const std::string& errorMessage) {
-    auto errMsg = ArgConverter::ConvertToV8String(isolate, errorMessage.c_str());
+    auto errMsg = ArgConverter::ConvertToV8String(isolate, errorMessage);
     auto err = Exception::Error(errMsg);
     isolate->ThrowException(err);
 }

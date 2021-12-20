@@ -58,6 +58,9 @@ class MetadataNode {
         static MetadataNode* GetOrCreate(const std::string& className);
 
         static std::string GetTypeMetadataName(v8::Isolate* isolate, v8::Local<v8::Value>& value);
+
+        static void DeInit(v8::Isolate* isolate);
+
     private:
         struct MethodCallbackData;
 

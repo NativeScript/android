@@ -1,6 +1,6 @@
 #include "JniSignatureParser.h"
 
-#include <assert.h>
+#include <cassert>
 
 using namespace std;
 using namespace tns;

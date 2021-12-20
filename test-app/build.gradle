@@ -123,7 +123,7 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
 
     def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "${kotlin_version}"
     }
-    def computeBuildToolsVersion = { -> project.hasProperty("androidBuildToolsVersion") ? androidBuildToolsVersion : "7.0.2"}
+    def computeBuildToolsVersion = { -> project.hasProperty("androidBuildToolsVersion") ? androidBuildToolsVersion : "${ANDRIOD_BUILD_TOOLS_VERSION}"}
     def kotlinVersion = computeKotlinVersion()
     def androidBuildToolsVersion = computeBuildToolsVersion()
 

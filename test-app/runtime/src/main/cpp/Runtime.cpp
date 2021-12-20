@@ -418,7 +418,7 @@ void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable excep
     auto context = isolate->GetCurrentContext();
     errObj->Set(context, V8StringConstants::GetNativeException(isolate), nativeExceptionObject);
     errObj->Set(context, V8StringConstants::GetStackTrace(isolate), ArgConverter::jstringToV8String(isolate, fullStackTrace));
-    if (jsStackTrace != NULL) {
+    if (jsStackTrace != nullptr) {
         errObj->Set(context, V8StringConstants::GetStack(isolate), ArgConverter::jstringToV8String(isolate, jsStackTrace));
     }
 
@@ -719,6 +719,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     }
 
     auto enableProfiler = !profilerOutputDir.empty();
+
     MetadataNode::EnableProfiler(enableProfiler);
 
     MetadataNode::CreateTopLevelNamespaces(isolate, global);
@@ -812,6 +813,10 @@ bool Runtime::RunExtraCode(Isolate* isolate, Local<Context> context, const char*
 void Runtime::DestroyRuntime() {
     s_id2RuntimeCache.erase(m_id);
     s_isolate2RuntimesCache.erase(m_isolate);
+    MetadataNode::DeInit(m_isolate);
+    ArgConverter::DeInit(m_isolate);
+    Console::DeInit(m_isolate);
+    tns::ClearPersistentSmartJSONStringify(m_isolate);
 }
 
 Local<Context> Runtime::GetContext() {

@@ -277,11 +277,11 @@ public class Runtime {
         while (lines.length > 0 && !lines[0].trim().startsWith("at")) {
             lines = Arrays.copyOfRange(lines, 1, lines.length);
         }
-        String result = "";
+        StringBuilder result = new StringBuilder();
         for (String line : lines) {
-            result += line + "\n";
+            result.append(line).append("\n");
         }
-        return result;
+        return result.toString();
     }
 
     public static String getJSStackTrace(Throwable ex) {
@@ -344,7 +344,7 @@ public class Runtime {
 
     public static boolean isInitialized() {
         Runtime runtime = Runtime.getCurrentRuntime();
-        return (runtime != null) ? runtime.isInitializedImpl() : false;
+        return runtime != null && runtime.isInitializedImpl();
     }
 
     public int getWorkerId() {
@@ -1447,11 +1447,13 @@ public class Runtime {
             }
 
             if (pendingWorkerMessages.get(workerId) == null) {
-                pendingWorkerMessages.put(workerId, new ConcurrentLinkedQueue<Message>());
+                pendingWorkerMessages.put(workerId, new ConcurrentLinkedQueue<>());
             }
 
             Queue<Message> messages = pendingWorkerMessages.get(workerId);
-            messages.add(msg);
+            if (messages != null){
+                messages.add(msg);
+            }
 
             return;
         }
@@ -1514,11 +1516,14 @@ public class Runtime {
                 }
 
                 if (pendingWorkerMessages.get(workerId) == null) {
-                    pendingWorkerMessages.put(workerId, new ConcurrentLinkedQueue<Message>());
+                    pendingWorkerMessages.put(workerId, new ConcurrentLinkedQueue<>());
                 }
 
                 Queue<Message> messages = pendingWorkerMessages.get(workerId);
-                messages.add(msg);
+                if (messages != null) {
+                    messages.add(msg);
+                }
+
                 return;
             }
         }

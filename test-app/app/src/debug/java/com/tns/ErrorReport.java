@@ -156,7 +156,8 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
     static void startPendingErrorActivity(Context context, Intent intent) throws CanceledException {
         int flags = PendingIntent.FLAG_CANCEL_CURRENT;
         if (Build.VERSION.SDK_INT >= 31) {
-            flags = PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_MUTABLE;
+            int FLAG_MUTABLE = 1<<25;
+            flags = PendingIntent.FLAG_CANCEL_CURRENT | FLAG_MUTABLE;
         }
 
         PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, flags);

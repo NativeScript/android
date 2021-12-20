@@ -588,7 +588,7 @@ CallbackHandlers::GetImplementedInterfaces(JEnv& env, const Local<Object>& imple
                                  context).ToChecked();
 
                 if (length > 0) {
-                    for (int i = 0; i < length; i++) {
+                    for (int j = 0; j < length; j++) {
                         auto element = interfacesArr->Get(context, i).ToLocalChecked();
 
                         if (element->IsFunction()) {

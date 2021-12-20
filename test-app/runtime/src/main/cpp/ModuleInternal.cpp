@@ -365,7 +365,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
 
 Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, const Local<String>& fullRequiredModulePath) {
     string frameName("LoadScript " + path);
-    tns::instrumentation::Frame frame(frameName.c_str());
+    tns::instrumentation::Frame frame(frameName);
     Local<Script> script;
 
     TryCatch tc(isolate);
@@ -406,7 +406,7 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, c
 
 Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
     string frameName("LoadData " + path);
-    tns::instrumentation::Frame frame(frameName.c_str());
+    tns::instrumentation::Frame frame(frameName);
     Local<Object> json;
 
     auto jsonData = Runtime::GetRuntime(m_isolate)->ReadFileText(path);

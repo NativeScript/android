@@ -15,6 +15,10 @@
 
 namespace tns {
 
+void Console::DeInit(v8::Isolate *isolate) {
+    s_isolateToConsoleTimersMap.erase(isolate);
+}
+
 v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, ConsoleCallback callback, const int maxLogcatObjectSize, const bool forceLog) {
     m_callback = callback;
     m_maxLogcatObjectSize = maxLogcatObjectSize;

@@ -183,7 +183,7 @@ Local<Value> ArgConverter::jstringToV8String(Isolate* isolate, jstring value) {
     }
 
     JEnv env;
-    auto chars = env.GetStringChars(value, NULL);
+    auto chars = env.GetStringChars(value, nullptr);
     auto length = env.GetStringLength(value);
     auto v8String = ConvertToV8String(isolate, chars, length);
     env.ReleaseStringChars(value, chars);
@@ -293,4 +293,7 @@ Local<String> ArgConverter::ConvertToV8UTF16String(Isolate* isolate, const u16st
     return String::NewFromTwoByte(isolate, ((const uint16_t*) utf16string.data())).ToLocalChecked();
 }
 
+void ArgConverter::DeInit(v8::Isolate *isolate) {
+    s_type_long_operations_cache.erase(isolate);
+}
 std::map<Isolate*, ArgConverter::TypeLongOperationsCache*> ArgConverter::s_type_long_operations_cache;

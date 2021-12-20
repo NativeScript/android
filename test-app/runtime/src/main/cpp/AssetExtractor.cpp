@@ -24,7 +24,7 @@ void AssetExtractor::ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstrin
 
     assert(z != nullptr);
     zip_int64_t num = zip_get_num_entries(z, 0);
-    struct zip_stat sb;
+    struct zip_stat sb{};
     struct zip_file* zf;
     char buf[65536];
     auto pathcopy = new char[1024];
@@ -37,7 +37,7 @@ void AssetExtractor::ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstrin
             std::string assetFullname(baseDir);
             assetFullname.append(name);
 
-            struct stat attrib;
+            struct stat attrib{};
             auto shouldOverwrite = true;
             int ret = stat(assetFullname.c_str(), &attrib);
             if (ret == 0 /* file exists */) {
@@ -67,7 +67,7 @@ void AssetExtractor::ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstrin
                         sum += len;
                     }
                     fclose(fd);
-                    utimbuf t;
+                    utimbuf t{};
                     t.modtime = sb.mtime;
                     utime(assetFullname.c_str(), &t);
                 }

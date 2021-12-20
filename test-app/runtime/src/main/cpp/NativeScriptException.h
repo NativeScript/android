@@ -8,7 +8,7 @@
 #include "include/v8.h"
 
 namespace tns {
-class NativeScriptException {
+class NativeScriptException: std::exception {
     public:
         /*
          * Generates a NativeScriptException with java error from environment

@@ -32,6 +32,11 @@ void MetadataNode::Init(Isolate* isolate) {
     cache->MetadataKey = new Persistent<String>(isolate, key);
 }
 
+void MetadataNode::DeInit(Isolate *isolate) {
+    s_metadata_node_cache.erase(isolate);
+    s_arrayObjectTemplates.erase(isolate);
+}
+
 Local<ObjectTemplate> MetadataNode::GetOrCreateArrayObjectTemplate(Isolate* isolate) {
     auto it = s_arrayObjectTemplates.find(isolate);
     if (it != s_arrayObjectTemplates.end()) {
@@ -2043,7 +2048,7 @@ bool MetadataNode::CheckClassHierarchy(JEnv& env, jclass currentClass, MetadataT
 }
 
 /*
- * This method handles scenrios like Bundle/BaseBundle class hierarchy change in API level 21.
+ * This method handles scenarios like Bundle/BaseBundle class hierarchy change in API level 21.
  * See https://github.com/NativeScript/android-runtime/issues/628
  */
 void MetadataNode::SetMissingBaseMethods(Isolate* isolate, const vector<MetadataTreeNode*>& skippedBaseTypes, const vector<MethodCallbackData*>& instanceMethodData, Local<ObjectTemplate>& prototypeTemplate) {

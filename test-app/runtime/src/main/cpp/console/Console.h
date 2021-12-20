@@ -27,6 +27,8 @@ class Console {
         static void timeCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
+        static void DeInit(v8::Isolate* isolate);
+
     private:
         static int m_maxLogcatObjectSize;
         static bool m_forceLog;
