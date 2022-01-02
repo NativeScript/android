@@ -37,7 +37,7 @@ The NativeScript Android Runtime architecture can be summarized in the following
 
 ![Android Runtime diagram](https://github.com/NativeScript/docs/blob/master/docs/img/ns-runtime-android.png)
 
-For more details on how it works, read the [documentation](https://docs.nativescript.org/runtimes/android/overview). 
+For more details on how it works, read the [documentation](https://v7.docs.nativescript.org/core-concepts/android-runtime/overview). 
 
 ## Build Prerequisites
 Following are the minimal prerequisites to build the runtime package.
