@@ -38,9 +38,9 @@ JsV8InspectorClient::JsV8InspectorClient(v8::Isolate* isolate)
     assert(getInspectorMessageMethod != nullptr);
 }
 
-void JsV8InspectorClient::connect(jobject connection) {
+void JsV8InspectorClient::connect(jobject conn) {
     JEnv env;
-    this->connection = env.NewGlobalRef(connection);
+    this->connection = env.NewGlobalRef(conn);
     this->isConnected = true;
 }
 
