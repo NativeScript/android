@@ -348,7 +348,7 @@ dependencies {
 
     implementation "androidx.multidex:multidex:$androidXMultidexVersion"
     implementation "androidx.appcompat:appcompat:$androidXAppCompatVersion"
-    implementation "com.google.android.material:material:$androidXMaterialVersion"
+    debugImplementation "com.google.android.material:material:$androidXMaterialVersion"
     implementation "androidx.exifinterface:exifinterface:$androidXExifInterfaceVersion"
     implementation "androidx.viewpager2:viewpager2:$androidXViewPagerVersion"
     //noinspection KtxExtensionAvailable
