@@ -463,6 +463,10 @@ tasks.whenTaskAdded({ DefaultTask currentTask ->
     if (currentTask =~ /merge.*Assets/) {
         currentTask.dependsOn(buildMetadata)
     }
+    // ensure buildMetadata is done before R8 to allow custom proguard from metadata
+    if (currentTask =~ /minify.*WithR8/) {
+        currentTask.dependsOn(buildMetadata)
+    }
     if (currentTask =~ /assemble.*Debug/ || currentTask =~ /assemble.*Release/) {
         currentTask.finalizedBy("validateAppIdMatch")
     }
