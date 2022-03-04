@@ -145,6 +145,7 @@ add_library(
     src/main/cpp/DirectBuffer.cpp
     src/main/cpp/FieldAccessor.cpp
     src/main/cpp/File.cpp
+    src/main/cpp/IsolateDisposer.cpp
     src/main/cpp/JEnv.cpp
     src/main/cpp/DesugaredInterfaceCompanionClassNameResolver.cpp
     src/main/cpp/JType.cpp

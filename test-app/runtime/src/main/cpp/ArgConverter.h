@@ -43,6 +43,8 @@ class ArgConverter {
 
         static v8::Local<v8::String> ConvertToV8UTF16String(v8::Isolate* isolate, const std::u16string& utf16string);
 
+        static void disposeIsolate(v8::Isolate* isolate);
+
     private:
 
         // TODO: plamen5kov: rewrite logic for java long number operations in javascript (java long -> javascript number operations check)

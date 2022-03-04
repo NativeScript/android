@@ -554,6 +554,10 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     }
 }
 
+void Console::disposeIsolate(v8::Isolate* isolate) {
+    s_isolateToConsoleTimersMap.erase(isolate);
+}
+
 const char* Console::LOG_TAG = "JS";
 std::map<v8::Isolate*, std::map<std::string, double>> Console::s_isolateToConsoleTimersMap;
 ConsoleCallback Console::m_callback = nullptr;
