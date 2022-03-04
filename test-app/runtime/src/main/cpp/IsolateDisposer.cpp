@@ -9,9 +9,8 @@
 #include <console/Console.h>
 
 
-
 namespace tns {
-    void disposeIsolate(v8::Isolate* isolate) {
+    void disposeIsolate(v8::Isolate *isolate) {
         tns::ArgConverter::disposeIsolate(isolate);
         tns::MetadataNode::disposeIsolate(isolate);
         tns::disposeHelperIsolate(isolate);

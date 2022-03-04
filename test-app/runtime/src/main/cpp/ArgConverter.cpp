@@ -294,7 +294,11 @@ Local<String> ArgConverter::ConvertToV8UTF16String(Isolate* isolate, const u16st
 }
 
 void ArgConverter::disposeIsolate(Isolate* isolate) {
-    s_type_long_operations_cache.erase(isolate);
+    auto itFound = s_type_long_operations_cache.find(isolate);
+    if (itFound != s_type_long_operations_cache.end()) {
+        delete itFound->second;
+        s_type_long_operations_cache.erase(itFound);
+    }
 }
 
 std::map<Isolate*, ArgConverter::TypeLongOperationsCache*> ArgConverter::s_type_long_operations_cache;

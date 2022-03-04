@@ -2177,10 +2177,28 @@ std::string MetadataNode::GetJniClassName(MetadataEntry entry) {
 }
 
 void MetadataNode::disposeIsolate(Isolate* isolate) {
-    s_metadata_node_cache.erase(isolate);
-    s_arrayObjectTemplates.erase(isolate);
-    for (auto it = s_treeNode2NodeCache.begin(); it != s_treeNode2NodeCache.end(); it++) {
-        it->second->m_poCtorCachePerIsolate.erase(isolate);
+    {
+        auto it = s_metadata_node_cache.find(isolate);
+        if (it != s_metadata_node_cache.end()) {
+            delete it->second;
+            s_metadata_node_cache.erase(it);
+        }
+    }
+    {
+        auto it = s_arrayObjectTemplates.find(isolate);
+        if (it != s_arrayObjectTemplates.end()) {
+            delete it->second;
+            s_arrayObjectTemplates.erase(it);
+        }
+    }
+    {
+        for (auto it = s_treeNode2NodeCache.begin(); it != s_treeNode2NodeCache.end(); it++) {
+            auto it2 = it->second->m_poCtorCachePerIsolate.find(isolate);
+            if(it2 != it->second->m_poCtorCachePerIsolate.end()) {
+                delete it2->second;
+                it->second->m_poCtorCachePerIsolate.erase(it2);
+            }
+        }
     }
 }
 
