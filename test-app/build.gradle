@@ -131,6 +131,7 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
             apply from: pathToBeforePluginGradle
         }
     }
+    
     def applyBuildScriptConfigurations = { ->
         def absolutePathToAppResources = getAppResourcesPath()
         def pathToBuildScriptGradle = "$absolutePathToAppResources/Android/rootbuildscript.gradle"
