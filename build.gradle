@@ -300,9 +300,8 @@ task copyFilesToProjectTemeplate {
             into "$DIST_FRAMEWORK_PATH"
         }
         copy {
-            from "$rootDir/gradle.properties"
+            from "$TEST_APP_PATH/gradle.properties"
             into "$DIST_FRAMEWORK_PATH"
-            rename "gradle.properties", "common.gradle.properties"
         }
         copy {
             from "$TEST_APP_PATH/gradle-helpers/paths.gradle"

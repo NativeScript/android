@@ -13,35 +13,12 @@ buildscript {
     def initialize = { ->
         // set up our logger
         project.ext.outLogger = services.get(StyledTextOutputFactory).create("colouredOutputLogger")
-
-        try {
-            // Load common properties if there's a commonPropertiesPath set
-            if(project.hasProperty("loadedCommonProperties")) {
-                logger.info "\t + common gradle properties already loaded. SKIPPING"
-            }
-
-            if(project.hasProperty("commonPropertiesPath") && !project.hasProperty("loadedCommonProperties")) {
-                def commonPropertiesPathFull = Paths.get("$rootDir").resolve("$commonPropertiesPath").toRealPath()
-                logger.info "\t + trying to load common gradle properties from \"$commonPropertiesPath\" (resolved to: \"$commonPropertiesPathFull\")"
-
-                Properties commonProperties = new Properties()
-                commonProperties.load(new FileInputStream("$commonPropertiesPathFull"))
-                commonProperties.each { prop ->
-                    logger.info "\t + [common properties] setting ${prop.key} = ${prop.value}"
-                    project.ext.set(prop.key, prop.value)
-                }
-                project.ext.loadedCommonProperties = true
-                
-                outLogger.withStyle(Style.SuccessHeader).println "\t + loaded common gradle properties from \"$commonPropertiesPath\" (resolved to: \"$commonPropertiesPathFull\")"
-            }
-        } catch(Exception ex) {
-            logger.warn "\t + failed to load common gradle properties. Error is: ${ex.getMessage()}"
-        }
-
         def userDir = "${rootProject.projectDir}/../.."
         apply from: "$rootDir/gradle-helpers/user_properties_reader.gradle"
         apply from: "$rootDir/gradle-helpers/paths.gradle"
         rootProject.ext.userDefinedGradleProperties = getUserProperties("${getAppResourcesPath(userDir)}/Android")
+
+        loadPropertyFile("$rootDir/additional_gradle.properties")
         
         if (rootProject.hasProperty("userDefinedGradleProperties")) {
             rootProject.ext.userDefinedGradleProperties.each { entry ->
@@ -50,7 +27,6 @@ buildscript {
                 project.ext.set(propertyName, propertyValue)
             }
         }
-
 
         // the build script will not work with previous versions of the CLI (3.1 or earlier)
         def dependenciesJson = file("$rootDir/dependencies.json")
