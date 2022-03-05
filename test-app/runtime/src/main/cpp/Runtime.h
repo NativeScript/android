@@ -82,8 +82,6 @@ class Runtime {
 
         ArrayBufferHelper m_arrayBufferHelper;
 
-        WeakRef m_weakRef;
-
         Profiler m_profiler;
 
         MessageLoopTimer* m_loopTimer;

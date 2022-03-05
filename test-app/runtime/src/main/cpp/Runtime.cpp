@@ -666,8 +666,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     }
 #endif
 
-    m_weakRef.Init(isolate, globalTemplate, m_objectManager);
-
     SimpleProfiler::Init(isolate, globalTemplate);
 
     CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
@@ -723,6 +721,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     MetadataNode::CreateTopLevelNamespaces(isolate, global);
 
     ArrayHelper::Init(context);
+
+    WeakRef::Init(context);
 
     m_arrayBufferHelper.CreateConvertFunctions(context, global, m_objectManager);
 
