@@ -141,3 +141,7 @@ bool tns::V8SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Lo
 
     return res.FromMaybe(false);
 }
+
+void tns::V8GlobalHelpers::onDisposeIsolate(Isolate* isolate) {
+    isolateToPersistentSmartJSONStringify.erase(isolate);
+}

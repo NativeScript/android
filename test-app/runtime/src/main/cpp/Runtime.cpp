@@ -29,6 +29,7 @@
 #include "sys/system_properties.h"
 #include "ManualInstrumentation.h"
 #include <snapshot_blob.h>
+#include "IsolateDisposer.h"
 
 #ifdef APPLICATION_IN_DEBUG
 #include "JsV8InspectorClient.h"
@@ -810,6 +811,7 @@ bool Runtime::RunExtraCode(Isolate* isolate, Local<Context> context, const char*
 void Runtime::DestroyRuntime() {
     s_id2RuntimeCache.erase(m_id);
     s_isolate2RuntimesCache.erase(m_isolate);
+    tns::disposeIsolate(m_isolate);
 }
 
 Local<Context> Runtime::GetContext() {
