@@ -9,7 +9,6 @@
 #include "Runtime.h"
 #include "V8GlobalHelpers.h"
 #include <cstdlib>
-#include <jni.h>
 
 using namespace v8;
 using namespace std;
