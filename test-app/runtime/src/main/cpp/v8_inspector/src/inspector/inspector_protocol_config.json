@@ -25,8 +25,35 @@
                 "domain": "Profiler"
             },
             {
-                "domain": "HeapProfiler",
-                "async": ["collectGarbage"]
+                "domain": "HeapProfiler"
+            },
+            {
+                "domain": "Page",
+                "exclude": ["getNavigationHistory", "navigateToHistoryEntry", "resetNavigationHistory", "captureScreenshot", "screencastFrameAck", "handleJavaScriptDialog", "setColorPickerEnabled", "getAppManifest", "setControlNavigations", "processNavigation", "printToPDF", "bringToFront", "setDownloadBehavior", "navigate", "crash", "close", "setWebLifecycleState", "captureSnapshot"],
+                "async": ["getResourceContent", "searchInResource"],
+                "exclude_events": ["screencastFrame", "screencastVisibilityChanged", "colorPicked", "interstitialShown", "interstitialHidden", "javascriptDialogOpening", "javascriptDialogClosed", "navigationRequested"]
+            },
+            {
+                "domain": "Network",
+                "exclude": ["clearBrowserCache", "clearBrowserCookies", "getCookies", "getAllCookies", "deleteCookies", "setCookie", "setCookies", "canEmulateNetworkConditions", "setRequestInterception", "continueInterceptedRequest", "getResponseBodyForInterception", "takeResponseBodyForInterceptionAsStream"],
+                "async": ["getResponseBody", "getRequestPostData"]
+            },
+            {
+                "domain": "DOM"
+            },
+            {
+                "domain": "CSS",
+                "async": ["enable"]
+            },
+            {
+                "domain": "Overlay"
+            },
+            {
+                "domain": "Log"
+            },
+            {
+                "domain": "Security",
+                "include": []
             }
         ]
     },

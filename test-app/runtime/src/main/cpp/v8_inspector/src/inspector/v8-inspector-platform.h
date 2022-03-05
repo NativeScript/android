@@ -27,6 +27,7 @@ class V8InspectorPlatform: public DefaultPlatform {
     private:
         static unique_ptr<Platform> NewDefaultPlatform() {
             unique_ptr<DefaultPlatform> platform(new V8InspectorPlatform());
+            platform->SetThreadPoolSize(0);
             platform->EnsureBackgroundTaskRunnerInitialized();
             return move(platform);
         }

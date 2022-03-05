@@ -6,7 +6,6 @@
 #define V8_BASE_MEMORY_H_
 
 #include "src/base/macros.h"
-#include "src/base/platform/wrappers.h"
 
 namespace v8 {
 namespace base {
@@ -77,9 +76,6 @@ static inline V ReadLittleEndianValue(V* p) {
 
 template <typename V>
 static inline void WriteLittleEndianValue(V* p, V value) {
-  static_assert(
-      !std::is_array<V>::value,
-      "Passing an array decays to pointer, causing unexpected results.");
   WriteLittleEndianValue<V>(reinterpret_cast<Address>(p), value);
 }
 

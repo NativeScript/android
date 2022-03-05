@@ -20,7 +20,7 @@ JNIEXPORT extern "C" void Java_com_tns_AndroidJsV8Inspector_scheduleBreak(JNIEnv
     JsV8InspectorClient::GetInstance()->scheduleBreak();
 }
 
-JNIEXPORT extern "C" void Java_com_tns_AndroidJsV8Inspector_disconnect(JNIEnv* env, jclass instance) {
+JNIEXPORT extern "C" void Java_com_tns_AndroidJsV8Inspector_disconnect(JNIEnv* env, jobject instance) {
     JsV8InspectorClient::GetInstance()->disconnect();
 }
 

@@ -31,7 +31,6 @@ namespace Paused {
 namespace ReasonEnum {
 V8_EXPORT extern const char* Ambiguous;
 V8_EXPORT extern const char* Assert;
-V8_EXPORT extern const char* CSPViolation;
 V8_EXPORT extern const char* DebugCommand;
 V8_EXPORT extern const char* DOM;
 V8_EXPORT extern const char* EventListener;

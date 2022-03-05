@@ -22,7 +22,6 @@
 #define V8_BASE_PLATFORM_PLATFORM_H_
 
 #include <cstdarg>
-#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -39,17 +38,6 @@
 #ifdef V8_USE_ADDRESS_SANITIZER
 #include <sanitizer/asan_interface.h>
 #endif  // V8_USE_ADDRESS_SANITIZER
-
-#ifndef V8_NO_FAST_TLS
-#if V8_CC_MSVC && V8_HOST_ARCH_IA32
-// __readfsdword is supposed to be declared in intrin.h but it is missing from
-// some versions of that file. See https://bugs.llvm.org/show_bug.cgi?id=51188
-// And, intrin.h is a very expensive header that we want to avoid here, and
-// the cheaper intrin0.h is not available for all build configurations. That is
-// why we declare this intrinsic.
-extern "C" unsigned long __readfsdword(unsigned long);  // NOLINT(runtime/int)
-#endif                                       // V8_CC_MSVC && V8_HOST_ARCH_IA32
-#endif                                       // V8_NO_FAST_TLS
 
 namespace v8 {
 
@@ -86,9 +74,6 @@ inline intptr_t InternalGetExistingThreadLocal(intptr_t index) {
 
 #elif defined(__APPLE__) && (V8_HOST_ARCH_IA32 || V8_HOST_ARCH_X64)
 
-// tvOS simulator does not use intptr_t as TLS key.
-#if !defined(V8_OS_STARBOARD) || !defined(TARGET_OS_SIMULATOR)
-
 #define V8_FAST_TLS_SUPPORTED 1
 
 extern V8_BASE_EXPORT intptr_t kMacTlsBaseOffset;
@@ -108,8 +93,6 @@ inline intptr_t InternalGetExistingThreadLocal(intptr_t index) {
 #endif
   return result;
 }
-
-#endif  // !defined(V8_OS_STARBOARD) || !defined(TARGET_OS_SIMULATOR)
 
 #endif
 
@@ -184,10 +167,7 @@ class V8_BASE_EXPORT OS {
     kReadWrite,
     // TODO(hpayer): Remove this flag. Memory should never be rwx.
     kReadWriteExecute,
-    kReadExecute,
-    // TODO(jkummerow): Remove this when Wasm has a platform-independent
-    // w^x implementation.
-    kNoAccessWillJitLater
+    kReadExecute
   };
 
   static bool HasLazyCommits();
@@ -274,7 +254,7 @@ class V8_BASE_EXPORT OS {
 
   static void AdjustSchedulingParams();
 
-  [[noreturn]] static void ExitProcess(int exit_code);
+  static void ExitProcess(int exit_code);
 
  private:
   // These classes use the private memory management API below.
@@ -294,13 +274,6 @@ class V8_BASE_EXPORT OS {
                                               size_t alignment,
                                               MemoryPermission access);
 
-  V8_WARN_UNUSED_RESULT static void* AllocateShared(size_t size,
-                                                    MemoryPermission access);
-
-  V8_WARN_UNUSED_RESULT static void* RemapShared(void* old_address,
-                                                 void* new_address,
-                                                 size_t size);
-
   V8_WARN_UNUSED_RESULT static bool Free(void* address, const size_t size);
 
   V8_WARN_UNUSED_RESULT static bool Release(void* address, size_t size);
@@ -310,8 +283,6 @@ class V8_BASE_EXPORT OS {
 
   V8_WARN_UNUSED_RESULT static bool DiscardSystemPages(void* address,
                                                        size_t size);
-
-  V8_WARN_UNUSED_RESULT static bool DecommitPages(void* address, size_t size);
 
   static const int msPerSecond = 1000;
 
@@ -345,11 +316,7 @@ inline void EnsureConsoleOutput() {
 class V8_BASE_EXPORT Thread {
  public:
   // Opaque data type for thread-local storage keys.
-#if V8_OS_STARBOARD
-  using LocalStorageKey = SbThreadLocalKey;
-#else
   using LocalStorageKey = int32_t;
-#endif
 
   class Options {
    public:
@@ -367,8 +334,6 @@ class V8_BASE_EXPORT Thread {
 
   // Create new thread.
   explicit Thread(const Options& options);
-  Thread(const Thread&) = delete;
-  Thread& operator=(const Thread&) = delete;
   virtual ~Thread();
 
   // Start new thread by calling the Run() method on the new thread.
@@ -398,7 +363,13 @@ class V8_BASE_EXPORT Thread {
   static LocalStorageKey CreateThreadLocalKey();
   static void DeleteThreadLocalKey(LocalStorageKey key);
   static void* GetThreadLocal(LocalStorageKey key);
+  static int GetThreadLocalInt(LocalStorageKey key) {
+    return static_cast<int>(reinterpret_cast<intptr_t>(GetThreadLocal(key)));
+  }
   static void SetThreadLocal(LocalStorageKey key, void* value);
+  static void SetThreadLocalInt(LocalStorageKey key, int value) {
+    SetThreadLocal(key, reinterpret_cast<void*>(static_cast<intptr_t>(value)));
+  }
   static bool HasThreadLocal(LocalStorageKey key) {
     return GetThreadLocal(key) != nullptr;
   }
@@ -436,48 +407,37 @@ class V8_BASE_EXPORT Thread {
   char name_[kMaxThreadNameLength];
   int stack_size_;
   Semaphore* start_semaphore_;
+
+  DISALLOW_COPY_AND_ASSIGN(Thread);
 };
 
 // TODO(v8:10354): Make use of the stack utilities here in V8.
 class V8_BASE_EXPORT Stack {
  public:
-  // Convenience wrapper to use stack slots as unsigned values or void*
-  // pointers.
-  struct StackSlot {
-    // NOLINTNEXTLINE
-    StackSlot(void* value) : value(reinterpret_cast<uintptr_t>(value)) {}
-    StackSlot(uintptr_t value) : value(value) {}  // NOLINT
-
-    // NOLINTNEXTLINE
-    operator void*() const { return reinterpret_cast<void*>(value); }
-    operator uintptr_t() const { return value; }  // NOLINT
-
-    uintptr_t value;
-  };
-
   // Gets the start of the stack of the current thread.
-  static StackSlot GetStackStart();
+  static void* GetStackStart();
 
   // Returns the current stack top. Works correctly with ASAN and SafeStack.
   // GetCurrentStackPosition() should not be inlined, because it works on stack
   // frames if it were inlined into a function with a huge stack frame it would
   // return an address significantly above the actual current stack position.
-  static V8_NOINLINE StackSlot GetCurrentStackPosition();
+  static V8_NOINLINE void* GetCurrentStackPosition();
 
-  // Returns the real stack frame if slot is part of a fake frame, and slot
-  // otherwise.
-  static StackSlot GetRealStackAddressForSlot(StackSlot slot) {
+  // Translates an ASAN-based slot to a real stack slot if necessary.
+  static void* GetStackSlot(void* slot) {
 #ifdef V8_USE_ADDRESS_SANITIZER
-    // ASAN fetches the real stack deeper in the __asan_addr_is_in_fake_stack()
-    // call (precisely, deeper in __asan_stack_malloc_()), which results in a
-    // real frame that could be outside of stack bounds. Adjust for this
-    // impreciseness here.
-    constexpr size_t kAsanRealFrameOffsetBytes = 32;
-    void* real_frame = __asan_addr_is_in_fake_stack(
-        __asan_get_current_fake_stack(), slot, nullptr, nullptr);
-    return real_frame
-               ? (static_cast<char*>(real_frame) + kAsanRealFrameOffsetBytes)
-               : slot;
+    void* fake_stack = __asan_get_current_fake_stack();
+    if (fake_stack) {
+      void* fake_frame_start;
+      void* real_frame = __asan_addr_is_in_fake_stack(
+          fake_stack, slot, &fake_frame_start, nullptr);
+      if (real_frame) {
+        return reinterpret_cast<void*>(
+            reinterpret_cast<uintptr_t>(real_frame) +
+            (reinterpret_cast<uintptr_t>(slot) -
+             reinterpret_cast<uintptr_t>(fake_frame_start)));
+      }
+    }
 #endif  // V8_USE_ADDRESS_SANITIZER
     return slot;
   }

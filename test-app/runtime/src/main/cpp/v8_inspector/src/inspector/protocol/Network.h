@@ -17,6 +17,8 @@
 namespace v8_inspector {
 namespace protocol {
 namespace Network {
+
+// ------------- Forward and enum declarations.
 using ResourceType = String;
 using LoaderId = String;
 using RequestId = String;
@@ -46,8 +48,23 @@ class SignedExchangeHeader;
 using SignedExchangeErrorField = String;
 class SignedExchangeError;
 class SignedExchangeInfo;
-
-// ------------- Forward and enum declarations.
+class DataReceivedNotification;
+class EventSourceMessageReceivedNotification;
+class LoadingFailedNotification;
+class LoadingFinishedNotification;
+class RequestInterceptedNotification;
+class RequestServedFromCacheNotification;
+class RequestWillBeSentNotification;
+class ResourceChangedPriorityNotification;
+class SignedExchangeReceivedNotification;
+class ResponseReceivedNotification;
+class WebSocketClosedNotification;
+class WebSocketCreatedNotification;
+class WebSocketFrameErrorNotification;
+class WebSocketFrameReceivedNotification;
+class WebSocketFrameSentNotification;
+class WebSocketHandshakeResponseReceivedNotification;
+class WebSocketWillSendHandshakeRequestNotification;
 
 namespace ResourceTypeEnum {
  extern const char Document[];
@@ -138,8 +155,11 @@ namespace SignedExchangeErrorFieldEnum {
 
 // ------------- Type and builder declarations.
 
-class  ResourceTiming : public ::v8_crdtp::ProtocolObject<ResourceTiming> {
+class  ResourceTiming : public Serializable{
+    PROTOCOL_DISALLOW_COPY(ResourceTiming);
 public:
+    static std::unique_ptr<ResourceTiming> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~ResourceTiming() override { }
 
     double getRequestTime() { return m_requestTime; }
@@ -189,6 +209,10 @@ public:
 
     double getReceiveHeadersEnd() { return m_receiveHeadersEnd; }
     void setReceiveHeadersEnd(double value) { m_receiveHeadersEnd = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<ResourceTiming> clone() const;
 
     template<int STATE>
     class ResourceTimingBuilder {
@@ -350,8 +374,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     ResourceTiming()
     {
           m_requestTime = 0;
@@ -391,8 +413,11 @@ private:
 };
 
 
-class  Request : public ::v8_crdtp::ProtocolObject<Request> {
+class  Request : public Serializable{
+    PROTOCOL_DISALLOW_COPY(Request);
 public:
+    static std::unique_ptr<Request> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~Request() override { }
 
     String getUrl() { return m_url; }
@@ -440,6 +465,10 @@ public:
     bool hasIsLinkPreload() { return m_isLinkPreload.isJust(); }
     bool getIsLinkPreload(bool defaultValue) { return m_isLinkPreload.isJust() ? m_isLinkPreload.fromJust() : defaultValue; }
     void setIsLinkPreload(bool value) { m_isLinkPreload = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<Request> clone() const;
 
     template<int STATE>
     class RequestBuilder {
@@ -543,8 +572,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     Request()
     {
     }
@@ -562,8 +589,11 @@ private:
 };
 
 
-class  SignedCertificateTimestamp : public ::v8_crdtp::ProtocolObject<SignedCertificateTimestamp> {
+class  SignedCertificateTimestamp : public Serializable{
+    PROTOCOL_DISALLOW_COPY(SignedCertificateTimestamp);
 public:
+    static std::unique_ptr<SignedCertificateTimestamp> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~SignedCertificateTimestamp() override { }
 
     String getStatus() { return m_status; }
@@ -589,6 +619,10 @@ public:
 
     String getSignatureData() { return m_signatureData; }
     void setSignatureData(const String& value) { m_signatureData = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<SignedCertificateTimestamp> clone() const;
 
     template<int STATE>
     class SignedCertificateTimestampBuilder {
@@ -686,8 +720,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     SignedCertificateTimestamp()
     {
           m_timestamp = 0;
@@ -704,8 +736,11 @@ private:
 };
 
 
-class  SecurityDetails : public ::v8_crdtp::ProtocolObject<SecurityDetails> {
+class  SecurityDetails : public Serializable{
+    PROTOCOL_DISALLOW_COPY(SecurityDetails);
 public:
+    static std::unique_ptr<SecurityDetails> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~SecurityDetails() override { }
 
     String getProtocol() { return m_protocol; }
@@ -748,6 +783,10 @@ public:
 
     String getCertificateTransparencyCompliance() { return m_certificateTransparencyCompliance; }
     void setCertificateTransparencyCompliance(const String& value) { m_certificateTransparencyCompliance = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<SecurityDetails> clone() const;
 
     template<int STATE>
     class SecurityDetailsBuilder {
@@ -881,8 +920,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     SecurityDetails()
     {
           m_certificateId = 0;
@@ -906,8 +943,11 @@ private:
 };
 
 
-class  Response : public ::v8_crdtp::ProtocolObject<Response> {
+class  Response : public Serializable{
+    PROTOCOL_DISALLOW_COPY(Response);
 public:
+    static std::unique_ptr<Response> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~Response() override { }
 
     String getUrl() { return m_url; }
@@ -976,6 +1016,10 @@ public:
     bool hasSecurityDetails() { return m_securityDetails.isJust(); }
     protocol::Network::SecurityDetails* getSecurityDetails(protocol::Network::SecurityDetails* defaultValue) { return m_securityDetails.isJust() ? m_securityDetails.fromJust() : defaultValue; }
     void setSecurityDetails(std::unique_ptr<protocol::Network::SecurityDetails> value) { m_securityDetails = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<Response> clone() const;
 
     template<int STATE>
     class ResponseBuilder {
@@ -1141,8 +1185,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     Response()
     {
           m_status = 0;
@@ -1173,12 +1215,19 @@ private:
 };
 
 
-class  WebSocketRequest : public ::v8_crdtp::ProtocolObject<WebSocketRequest> {
+class  WebSocketRequest : public Serializable{
+    PROTOCOL_DISALLOW_COPY(WebSocketRequest);
 public:
+    static std::unique_ptr<WebSocketRequest> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~WebSocketRequest() override { }
 
     protocol::Network::Headers* getHeaders() { return m_headers.get(); }
     void setHeaders(std::unique_ptr<protocol::Network::Headers> value) { m_headers = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<WebSocketRequest> clone() const;
 
     template<int STATE>
     class WebSocketRequestBuilder {
@@ -1220,8 +1269,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     WebSocketRequest()
     {
     }
@@ -1230,8 +1277,11 @@ private:
 };
 
 
-class  WebSocketResponse : public ::v8_crdtp::ProtocolObject<WebSocketResponse> {
+class  WebSocketResponse : public Serializable{
+    PROTOCOL_DISALLOW_COPY(WebSocketResponse);
 public:
+    static std::unique_ptr<WebSocketResponse> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~WebSocketResponse() override { }
 
     int getStatus() { return m_status; }
@@ -1254,6 +1304,10 @@ public:
     bool hasRequestHeadersText() { return m_requestHeadersText.isJust(); }
     String getRequestHeadersText(const String& defaultValue) { return m_requestHeadersText.isJust() ? m_requestHeadersText.fromJust() : defaultValue; }
     void setRequestHeadersText(const String& value) { m_requestHeadersText = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<WebSocketResponse> clone() const;
 
     template<int STATE>
     class WebSocketResponseBuilder {
@@ -1329,8 +1383,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     WebSocketResponse()
     {
           m_status = 0;
@@ -1345,8 +1397,11 @@ private:
 };
 
 
-class  WebSocketFrame : public ::v8_crdtp::ProtocolObject<WebSocketFrame> {
+class  WebSocketFrame : public Serializable{
+    PROTOCOL_DISALLOW_COPY(WebSocketFrame);
 public:
+    static std::unique_ptr<WebSocketFrame> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~WebSocketFrame() override { }
 
     double getOpcode() { return m_opcode; }
@@ -1357,6 +1412,10 @@ public:
 
     String getPayloadData() { return m_payloadData; }
     void setPayloadData(const String& value) { m_payloadData = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<WebSocketFrame> clone() const;
 
     template<int STATE>
     class WebSocketFrameBuilder {
@@ -1414,8 +1473,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     WebSocketFrame()
     {
           m_opcode = 0;
@@ -1428,8 +1485,11 @@ private:
 };
 
 
-class  Initiator : public ::v8_crdtp::ProtocolObject<Initiator> {
+class  Initiator : public Serializable{
+    PROTOCOL_DISALLOW_COPY(Initiator);
 public:
+    static std::unique_ptr<Initiator> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~Initiator() override { }
 
     struct  TypeEnum {
@@ -1454,6 +1514,10 @@ public:
     bool hasLineNumber() { return m_lineNumber.isJust(); }
     double getLineNumber(double defaultValue) { return m_lineNumber.isJust() ? m_lineNumber.fromJust() : defaultValue; }
     void setLineNumber(double value) { m_lineNumber = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<Initiator> clone() const;
 
     template<int STATE>
     class InitiatorBuilder {
@@ -1513,8 +1577,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     Initiator()
     {
     }
@@ -1526,8 +1588,11 @@ private:
 };
 
 
-class  Cookie : public ::v8_crdtp::ProtocolObject<Cookie> {
+class  Cookie : public Serializable{
+    PROTOCOL_DISALLOW_COPY(Cookie);
 public:
+    static std::unique_ptr<Cookie> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~Cookie() override { }
 
     String getName() { return m_name; }
@@ -1560,6 +1625,10 @@ public:
     bool hasSameSite() { return m_sameSite.isJust(); }
     String getSameSite(const String& defaultValue) { return m_sameSite.isJust() ? m_sameSite.fromJust() : defaultValue; }
     void setSameSite(const String& value) { m_sameSite = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<Cookie> clone() const;
 
     template<int STATE>
     class CookieBuilder {
@@ -1671,8 +1740,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     Cookie()
     {
           m_expires = 0;
@@ -1695,8 +1762,11 @@ private:
 };
 
 
-class  AuthChallenge : public ::v8_crdtp::ProtocolObject<AuthChallenge> {
+class  AuthChallenge : public Serializable{
+    PROTOCOL_DISALLOW_COPY(AuthChallenge);
 public:
+    static std::unique_ptr<AuthChallenge> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~AuthChallenge() override { }
 
     struct  SourceEnum {
@@ -1716,6 +1786,10 @@ public:
 
     String getRealm() { return m_realm; }
     void setRealm(const String& value) { m_realm = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<AuthChallenge> clone() const;
 
     template<int STATE>
     class AuthChallengeBuilder {
@@ -1779,8 +1853,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     AuthChallenge()
     {
     }
@@ -1792,8 +1864,11 @@ private:
 };
 
 
-class  SignedExchangeSignature : public ::v8_crdtp::ProtocolObject<SignedExchangeSignature> {
+class  SignedExchangeSignature : public Serializable{
+    PROTOCOL_DISALLOW_COPY(SignedExchangeSignature);
 public:
+    static std::unique_ptr<SignedExchangeSignature> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~SignedExchangeSignature() override { }
 
     String getLabel() { return m_label; }
@@ -1825,6 +1900,10 @@ public:
     bool hasCertificates() { return m_certificates.isJust(); }
     protocol::Array<String>* getCertificates(protocol::Array<String>* defaultValue) { return m_certificates.isJust() ? m_certificates.fromJust() : defaultValue; }
     void setCertificates(std::unique_ptr<protocol::Array<String>> value) { m_certificates = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<SignedExchangeSignature> clone() const;
 
     template<int STATE>
     class SignedExchangeSignatureBuilder {
@@ -1924,8 +2003,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     SignedExchangeSignature()
     {
           m_date = 0;
@@ -1944,8 +2021,11 @@ private:
 };
 
 
-class  SignedExchangeHeader : public ::v8_crdtp::ProtocolObject<SignedExchangeHeader> {
+class  SignedExchangeHeader : public Serializable{
+    PROTOCOL_DISALLOW_COPY(SignedExchangeHeader);
 public:
+    static std::unique_ptr<SignedExchangeHeader> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~SignedExchangeHeader() override { }
 
     String getRequestUrl() { return m_requestUrl; }
@@ -1959,6 +2039,10 @@ public:
 
     protocol::Array<protocol::Network::SignedExchangeSignature>* getSignatures() { return m_signatures.get(); }
     void setSignatures(std::unique_ptr<protocol::Array<protocol::Network::SignedExchangeSignature>> value) { m_signatures = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<SignedExchangeHeader> clone() const;
 
     template<int STATE>
     class SignedExchangeHeaderBuilder {
@@ -2024,8 +2108,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     SignedExchangeHeader()
     {
           m_responseCode = 0;
@@ -2038,8 +2120,11 @@ private:
 };
 
 
-class  SignedExchangeError : public ::v8_crdtp::ProtocolObject<SignedExchangeError> {
+class  SignedExchangeError : public Serializable{
+    PROTOCOL_DISALLOW_COPY(SignedExchangeError);
 public:
+    static std::unique_ptr<SignedExchangeError> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~SignedExchangeError() override { }
 
     String getMessage() { return m_message; }
@@ -2052,6 +2137,10 @@ public:
     bool hasErrorField() { return m_errorField.isJust(); }
     String getErrorField(const String& defaultValue) { return m_errorField.isJust() ? m_errorField.fromJust() : defaultValue; }
     void setErrorField(const String& value) { m_errorField = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<SignedExchangeError> clone() const;
 
     template<int STATE>
     class SignedExchangeErrorBuilder {
@@ -2105,8 +2194,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     SignedExchangeError()
     {
     }
@@ -2117,8 +2204,11 @@ private:
 };
 
 
-class  SignedExchangeInfo : public ::v8_crdtp::ProtocolObject<SignedExchangeInfo> {
+class  SignedExchangeInfo : public Serializable{
+    PROTOCOL_DISALLOW_COPY(SignedExchangeInfo);
 public:
+    static std::unique_ptr<SignedExchangeInfo> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~SignedExchangeInfo() override { }
 
     protocol::Network::Response* getOuterResponse() { return m_outerResponse.get(); }
@@ -2135,6 +2225,10 @@ public:
     bool hasErrors() { return m_errors.isJust(); }
     protocol::Array<protocol::Network::SignedExchangeError>* getErrors(protocol::Array<protocol::Network::SignedExchangeError>* defaultValue) { return m_errors.isJust() ? m_errors.fromJust() : defaultValue; }
     void setErrors(std::unique_ptr<protocol::Array<protocol::Network::SignedExchangeError>> value) { m_errors = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<SignedExchangeInfo> clone() const;
 
     template<int STATE>
     class SignedExchangeInfoBuilder {
@@ -2194,8 +2288,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     SignedExchangeInfo()
     {
     }
@@ -2204,6 +2296,1748 @@ private:
     Maybe<protocol::Network::SignedExchangeHeader> m_header;
     Maybe<protocol::Network::SecurityDetails> m_securityDetails;
     Maybe<protocol::Array<protocol::Network::SignedExchangeError>> m_errors;
+};
+
+
+class  DataReceivedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(DataReceivedNotification);
+public:
+    static std::unique_ptr<DataReceivedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~DataReceivedNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    int getDataLength() { return m_dataLength; }
+    void setDataLength(int value) { m_dataLength = value; }
+
+    int getEncodedDataLength() { return m_encodedDataLength; }
+    void setEncodedDataLength(int value) { m_encodedDataLength = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<DataReceivedNotification> clone() const;
+
+    template<int STATE>
+    class DataReceivedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            TimestampSet = 1 << 2,
+            DataLengthSet = 1 << 3,
+            EncodedDataLengthSet = 1 << 4,
+            AllFieldsSet = (RequestIdSet | TimestampSet | DataLengthSet | EncodedDataLengthSet | 0)};
+
+
+        DataReceivedNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        DataReceivedNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        DataReceivedNotificationBuilder<STATE | DataLengthSet>& setDataLength(int value)
+        {
+            static_assert(!(STATE & DataLengthSet), "property dataLength should not be set yet");
+            m_result->setDataLength(value);
+            return castState<DataLengthSet>();
+        }
+
+        DataReceivedNotificationBuilder<STATE | EncodedDataLengthSet>& setEncodedDataLength(int value)
+        {
+            static_assert(!(STATE & EncodedDataLengthSet), "property encodedDataLength should not be set yet");
+            m_result->setEncodedDataLength(value);
+            return castState<EncodedDataLengthSet>();
+        }
+
+        std::unique_ptr<DataReceivedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class DataReceivedNotification;
+        DataReceivedNotificationBuilder() : m_result(new DataReceivedNotification()) { }
+
+        template<int STEP> DataReceivedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<DataReceivedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::DataReceivedNotification> m_result;
+    };
+
+    static DataReceivedNotificationBuilder<0> create()
+    {
+        return DataReceivedNotificationBuilder<0>();
+    }
+
+private:
+    DataReceivedNotification()
+    {
+          m_timestamp = 0;
+          m_dataLength = 0;
+          m_encodedDataLength = 0;
+    }
+
+    String m_requestId;
+    double m_timestamp;
+    int m_dataLength;
+    int m_encodedDataLength;
+};
+
+
+class  EventSourceMessageReceivedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(EventSourceMessageReceivedNotification);
+public:
+    static std::unique_ptr<EventSourceMessageReceivedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~EventSourceMessageReceivedNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    String getEventName() { return m_eventName; }
+    void setEventName(const String& value) { m_eventName = value; }
+
+    String getEventId() { return m_eventId; }
+    void setEventId(const String& value) { m_eventId = value; }
+
+    String getData() { return m_data; }
+    void setData(const String& value) { m_data = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<EventSourceMessageReceivedNotification> clone() const;
+
+    template<int STATE>
+    class EventSourceMessageReceivedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            TimestampSet = 1 << 2,
+            EventNameSet = 1 << 3,
+            EventIdSet = 1 << 4,
+            DataSet = 1 << 5,
+            AllFieldsSet = (RequestIdSet | TimestampSet | EventNameSet | EventIdSet | DataSet | 0)};
+
+
+        EventSourceMessageReceivedNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        EventSourceMessageReceivedNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        EventSourceMessageReceivedNotificationBuilder<STATE | EventNameSet>& setEventName(const String& value)
+        {
+            static_assert(!(STATE & EventNameSet), "property eventName should not be set yet");
+            m_result->setEventName(value);
+            return castState<EventNameSet>();
+        }
+
+        EventSourceMessageReceivedNotificationBuilder<STATE | EventIdSet>& setEventId(const String& value)
+        {
+            static_assert(!(STATE & EventIdSet), "property eventId should not be set yet");
+            m_result->setEventId(value);
+            return castState<EventIdSet>();
+        }
+
+        EventSourceMessageReceivedNotificationBuilder<STATE | DataSet>& setData(const String& value)
+        {
+            static_assert(!(STATE & DataSet), "property data should not be set yet");
+            m_result->setData(value);
+            return castState<DataSet>();
+        }
+
+        std::unique_ptr<EventSourceMessageReceivedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class EventSourceMessageReceivedNotification;
+        EventSourceMessageReceivedNotificationBuilder() : m_result(new EventSourceMessageReceivedNotification()) { }
+
+        template<int STEP> EventSourceMessageReceivedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<EventSourceMessageReceivedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::EventSourceMessageReceivedNotification> m_result;
+    };
+
+    static EventSourceMessageReceivedNotificationBuilder<0> create()
+    {
+        return EventSourceMessageReceivedNotificationBuilder<0>();
+    }
+
+private:
+    EventSourceMessageReceivedNotification()
+    {
+          m_timestamp = 0;
+    }
+
+    String m_requestId;
+    double m_timestamp;
+    String m_eventName;
+    String m_eventId;
+    String m_data;
+};
+
+
+class  LoadingFailedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(LoadingFailedNotification);
+public:
+    static std::unique_ptr<LoadingFailedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~LoadingFailedNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    String getType() { return m_type; }
+    void setType(const String& value) { m_type = value; }
+
+    String getErrorText() { return m_errorText; }
+    void setErrorText(const String& value) { m_errorText = value; }
+
+    bool hasCanceled() { return m_canceled.isJust(); }
+    bool getCanceled(bool defaultValue) { return m_canceled.isJust() ? m_canceled.fromJust() : defaultValue; }
+    void setCanceled(bool value) { m_canceled = value; }
+
+    bool hasBlockedReason() { return m_blockedReason.isJust(); }
+    String getBlockedReason(const String& defaultValue) { return m_blockedReason.isJust() ? m_blockedReason.fromJust() : defaultValue; }
+    void setBlockedReason(const String& value) { m_blockedReason = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<LoadingFailedNotification> clone() const;
+
+    template<int STATE>
+    class LoadingFailedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            TimestampSet = 1 << 2,
+            TypeSet = 1 << 3,
+            ErrorTextSet = 1 << 4,
+            AllFieldsSet = (RequestIdSet | TimestampSet | TypeSet | ErrorTextSet | 0)};
+
+
+        LoadingFailedNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        LoadingFailedNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        LoadingFailedNotificationBuilder<STATE | TypeSet>& setType(const String& value)
+        {
+            static_assert(!(STATE & TypeSet), "property type should not be set yet");
+            m_result->setType(value);
+            return castState<TypeSet>();
+        }
+
+        LoadingFailedNotificationBuilder<STATE | ErrorTextSet>& setErrorText(const String& value)
+        {
+            static_assert(!(STATE & ErrorTextSet), "property errorText should not be set yet");
+            m_result->setErrorText(value);
+            return castState<ErrorTextSet>();
+        }
+
+        LoadingFailedNotificationBuilder<STATE>& setCanceled(bool value)
+        {
+            m_result->setCanceled(value);
+            return *this;
+        }
+
+        LoadingFailedNotificationBuilder<STATE>& setBlockedReason(const String& value)
+        {
+            m_result->setBlockedReason(value);
+            return *this;
+        }
+
+        std::unique_ptr<LoadingFailedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class LoadingFailedNotification;
+        LoadingFailedNotificationBuilder() : m_result(new LoadingFailedNotification()) { }
+
+        template<int STEP> LoadingFailedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<LoadingFailedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::LoadingFailedNotification> m_result;
+    };
+
+    static LoadingFailedNotificationBuilder<0> create()
+    {
+        return LoadingFailedNotificationBuilder<0>();
+    }
+
+private:
+    LoadingFailedNotification()
+    {
+          m_timestamp = 0;
+    }
+
+    String m_requestId;
+    double m_timestamp;
+    String m_type;
+    String m_errorText;
+    Maybe<bool> m_canceled;
+    Maybe<String> m_blockedReason;
+};
+
+
+class  LoadingFinishedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(LoadingFinishedNotification);
+public:
+    static std::unique_ptr<LoadingFinishedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~LoadingFinishedNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    double getEncodedDataLength() { return m_encodedDataLength; }
+    void setEncodedDataLength(double value) { m_encodedDataLength = value; }
+
+    bool hasShouldReportCorbBlocking() { return m_shouldReportCorbBlocking.isJust(); }
+    bool getShouldReportCorbBlocking(bool defaultValue) { return m_shouldReportCorbBlocking.isJust() ? m_shouldReportCorbBlocking.fromJust() : defaultValue; }
+    void setShouldReportCorbBlocking(bool value) { m_shouldReportCorbBlocking = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<LoadingFinishedNotification> clone() const;
+
+    template<int STATE>
+    class LoadingFinishedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            TimestampSet = 1 << 2,
+            EncodedDataLengthSet = 1 << 3,
+            AllFieldsSet = (RequestIdSet | TimestampSet | EncodedDataLengthSet | 0)};
+
+
+        LoadingFinishedNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        LoadingFinishedNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        LoadingFinishedNotificationBuilder<STATE | EncodedDataLengthSet>& setEncodedDataLength(double value)
+        {
+            static_assert(!(STATE & EncodedDataLengthSet), "property encodedDataLength should not be set yet");
+            m_result->setEncodedDataLength(value);
+            return castState<EncodedDataLengthSet>();
+        }
+
+        LoadingFinishedNotificationBuilder<STATE>& setShouldReportCorbBlocking(bool value)
+        {
+            m_result->setShouldReportCorbBlocking(value);
+            return *this;
+        }
+
+        std::unique_ptr<LoadingFinishedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class LoadingFinishedNotification;
+        LoadingFinishedNotificationBuilder() : m_result(new LoadingFinishedNotification()) { }
+
+        template<int STEP> LoadingFinishedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<LoadingFinishedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::LoadingFinishedNotification> m_result;
+    };
+
+    static LoadingFinishedNotificationBuilder<0> create()
+    {
+        return LoadingFinishedNotificationBuilder<0>();
+    }
+
+private:
+    LoadingFinishedNotification()
+    {
+          m_timestamp = 0;
+          m_encodedDataLength = 0;
+    }
+
+    String m_requestId;
+    double m_timestamp;
+    double m_encodedDataLength;
+    Maybe<bool> m_shouldReportCorbBlocking;
+};
+
+
+class  RequestInterceptedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(RequestInterceptedNotification);
+public:
+    static std::unique_ptr<RequestInterceptedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~RequestInterceptedNotification() override { }
+
+    String getInterceptionId() { return m_interceptionId; }
+    void setInterceptionId(const String& value) { m_interceptionId = value; }
+
+    protocol::Network::Request* getRequest() { return m_request.get(); }
+    void setRequest(std::unique_ptr<protocol::Network::Request> value) { m_request = std::move(value); }
+
+    String getFrameId() { return m_frameId; }
+    void setFrameId(const String& value) { m_frameId = value; }
+
+    String getResourceType() { return m_resourceType; }
+    void setResourceType(const String& value) { m_resourceType = value; }
+
+    bool getIsNavigationRequest() { return m_isNavigationRequest; }
+    void setIsNavigationRequest(bool value) { m_isNavigationRequest = value; }
+
+    bool hasIsDownload() { return m_isDownload.isJust(); }
+    bool getIsDownload(bool defaultValue) { return m_isDownload.isJust() ? m_isDownload.fromJust() : defaultValue; }
+    void setIsDownload(bool value) { m_isDownload = value; }
+
+    bool hasRedirectUrl() { return m_redirectUrl.isJust(); }
+    String getRedirectUrl(const String& defaultValue) { return m_redirectUrl.isJust() ? m_redirectUrl.fromJust() : defaultValue; }
+    void setRedirectUrl(const String& value) { m_redirectUrl = value; }
+
+    bool hasAuthChallenge() { return m_authChallenge.isJust(); }
+    protocol::Network::AuthChallenge* getAuthChallenge(protocol::Network::AuthChallenge* defaultValue) { return m_authChallenge.isJust() ? m_authChallenge.fromJust() : defaultValue; }
+    void setAuthChallenge(std::unique_ptr<protocol::Network::AuthChallenge> value) { m_authChallenge = std::move(value); }
+
+    bool hasResponseErrorReason() { return m_responseErrorReason.isJust(); }
+    String getResponseErrorReason(const String& defaultValue) { return m_responseErrorReason.isJust() ? m_responseErrorReason.fromJust() : defaultValue; }
+    void setResponseErrorReason(const String& value) { m_responseErrorReason = value; }
+
+    bool hasResponseStatusCode() { return m_responseStatusCode.isJust(); }
+    int getResponseStatusCode(int defaultValue) { return m_responseStatusCode.isJust() ? m_responseStatusCode.fromJust() : defaultValue; }
+    void setResponseStatusCode(int value) { m_responseStatusCode = value; }
+
+    bool hasResponseHeaders() { return m_responseHeaders.isJust(); }
+    protocol::Network::Headers* getResponseHeaders(protocol::Network::Headers* defaultValue) { return m_responseHeaders.isJust() ? m_responseHeaders.fromJust() : defaultValue; }
+    void setResponseHeaders(std::unique_ptr<protocol::Network::Headers> value) { m_responseHeaders = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<RequestInterceptedNotification> clone() const;
+
+    template<int STATE>
+    class RequestInterceptedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            InterceptionIdSet = 1 << 1,
+            RequestSet = 1 << 2,
+            FrameIdSet = 1 << 3,
+            ResourceTypeSet = 1 << 4,
+            IsNavigationRequestSet = 1 << 5,
+            AllFieldsSet = (InterceptionIdSet | RequestSet | FrameIdSet | ResourceTypeSet | IsNavigationRequestSet | 0)};
+
+
+        RequestInterceptedNotificationBuilder<STATE | InterceptionIdSet>& setInterceptionId(const String& value)
+        {
+            static_assert(!(STATE & InterceptionIdSet), "property interceptionId should not be set yet");
+            m_result->setInterceptionId(value);
+            return castState<InterceptionIdSet>();
+        }
+
+        RequestInterceptedNotificationBuilder<STATE | RequestSet>& setRequest(std::unique_ptr<protocol::Network::Request> value)
+        {
+            static_assert(!(STATE & RequestSet), "property request should not be set yet");
+            m_result->setRequest(std::move(value));
+            return castState<RequestSet>();
+        }
+
+        RequestInterceptedNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value)
+        {
+            static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
+            m_result->setFrameId(value);
+            return castState<FrameIdSet>();
+        }
+
+        RequestInterceptedNotificationBuilder<STATE | ResourceTypeSet>& setResourceType(const String& value)
+        {
+            static_assert(!(STATE & ResourceTypeSet), "property resourceType should not be set yet");
+            m_result->setResourceType(value);
+            return castState<ResourceTypeSet>();
+        }
+
+        RequestInterceptedNotificationBuilder<STATE | IsNavigationRequestSet>& setIsNavigationRequest(bool value)
+        {
+            static_assert(!(STATE & IsNavigationRequestSet), "property isNavigationRequest should not be set yet");
+            m_result->setIsNavigationRequest(value);
+            return castState<IsNavigationRequestSet>();
+        }
+
+        RequestInterceptedNotificationBuilder<STATE>& setIsDownload(bool value)
+        {
+            m_result->setIsDownload(value);
+            return *this;
+        }
+
+        RequestInterceptedNotificationBuilder<STATE>& setRedirectUrl(const String& value)
+        {
+            m_result->setRedirectUrl(value);
+            return *this;
+        }
+
+        RequestInterceptedNotificationBuilder<STATE>& setAuthChallenge(std::unique_ptr<protocol::Network::AuthChallenge> value)
+        {
+            m_result->setAuthChallenge(std::move(value));
+            return *this;
+        }
+
+        RequestInterceptedNotificationBuilder<STATE>& setResponseErrorReason(const String& value)
+        {
+            m_result->setResponseErrorReason(value);
+            return *this;
+        }
+
+        RequestInterceptedNotificationBuilder<STATE>& setResponseStatusCode(int value)
+        {
+            m_result->setResponseStatusCode(value);
+            return *this;
+        }
+
+        RequestInterceptedNotificationBuilder<STATE>& setResponseHeaders(std::unique_ptr<protocol::Network::Headers> value)
+        {
+            m_result->setResponseHeaders(std::move(value));
+            return *this;
+        }
+
+        std::unique_ptr<RequestInterceptedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class RequestInterceptedNotification;
+        RequestInterceptedNotificationBuilder() : m_result(new RequestInterceptedNotification()) { }
+
+        template<int STEP> RequestInterceptedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<RequestInterceptedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::RequestInterceptedNotification> m_result;
+    };
+
+    static RequestInterceptedNotificationBuilder<0> create()
+    {
+        return RequestInterceptedNotificationBuilder<0>();
+    }
+
+private:
+    RequestInterceptedNotification()
+    {
+          m_isNavigationRequest = false;
+    }
+
+    String m_interceptionId;
+    std::unique_ptr<protocol::Network::Request> m_request;
+    String m_frameId;
+    String m_resourceType;
+    bool m_isNavigationRequest;
+    Maybe<bool> m_isDownload;
+    Maybe<String> m_redirectUrl;
+    Maybe<protocol::Network::AuthChallenge> m_authChallenge;
+    Maybe<String> m_responseErrorReason;
+    Maybe<int> m_responseStatusCode;
+    Maybe<protocol::Network::Headers> m_responseHeaders;
+};
+
+
+class  RequestServedFromCacheNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(RequestServedFromCacheNotification);
+public:
+    static std::unique_ptr<RequestServedFromCacheNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~RequestServedFromCacheNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<RequestServedFromCacheNotification> clone() const;
+
+    template<int STATE>
+    class RequestServedFromCacheNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            AllFieldsSet = (RequestIdSet | 0)};
+
+
+        RequestServedFromCacheNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        std::unique_ptr<RequestServedFromCacheNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class RequestServedFromCacheNotification;
+        RequestServedFromCacheNotificationBuilder() : m_result(new RequestServedFromCacheNotification()) { }
+
+        template<int STEP> RequestServedFromCacheNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<RequestServedFromCacheNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::RequestServedFromCacheNotification> m_result;
+    };
+
+    static RequestServedFromCacheNotificationBuilder<0> create()
+    {
+        return RequestServedFromCacheNotificationBuilder<0>();
+    }
+
+private:
+    RequestServedFromCacheNotification()
+    {
+    }
+
+    String m_requestId;
+};
+
+
+class  RequestWillBeSentNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(RequestWillBeSentNotification);
+public:
+    static std::unique_ptr<RequestWillBeSentNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~RequestWillBeSentNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    String getLoaderId() { return m_loaderId; }
+    void setLoaderId(const String& value) { m_loaderId = value; }
+
+    String getDocumentURL() { return m_documentURL; }
+    void setDocumentURL(const String& value) { m_documentURL = value; }
+
+    protocol::Network::Request* getRequest() { return m_request.get(); }
+    void setRequest(std::unique_ptr<protocol::Network::Request> value) { m_request = std::move(value); }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    double getWallTime() { return m_wallTime; }
+    void setWallTime(double value) { m_wallTime = value; }
+
+    protocol::Network::Initiator* getInitiator() { return m_initiator.get(); }
+    void setInitiator(std::unique_ptr<protocol::Network::Initiator> value) { m_initiator = std::move(value); }
+
+    bool hasRedirectResponse() { return m_redirectResponse.isJust(); }
+    protocol::Network::Response* getRedirectResponse(protocol::Network::Response* defaultValue) { return m_redirectResponse.isJust() ? m_redirectResponse.fromJust() : defaultValue; }
+    void setRedirectResponse(std::unique_ptr<protocol::Network::Response> value) { m_redirectResponse = std::move(value); }
+
+    bool hasType() { return m_type.isJust(); }
+    String getType(const String& defaultValue) { return m_type.isJust() ? m_type.fromJust() : defaultValue; }
+    void setType(const String& value) { m_type = value; }
+
+    bool hasFrameId() { return m_frameId.isJust(); }
+    String getFrameId(const String& defaultValue) { return m_frameId.isJust() ? m_frameId.fromJust() : defaultValue; }
+    void setFrameId(const String& value) { m_frameId = value; }
+
+    bool hasHasUserGesture() { return m_hasUserGesture.isJust(); }
+    bool getHasUserGesture(bool defaultValue) { return m_hasUserGesture.isJust() ? m_hasUserGesture.fromJust() : defaultValue; }
+    void setHasUserGesture(bool value) { m_hasUserGesture = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<RequestWillBeSentNotification> clone() const;
+
+    template<int STATE>
+    class RequestWillBeSentNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            LoaderIdSet = 1 << 2,
+            DocumentURLSet = 1 << 3,
+            RequestSet = 1 << 4,
+            TimestampSet = 1 << 5,
+            WallTimeSet = 1 << 6,
+            InitiatorSet = 1 << 7,
+            AllFieldsSet = (RequestIdSet | LoaderIdSet | DocumentURLSet | RequestSet | TimestampSet | WallTimeSet | InitiatorSet | 0)};
+
+
+        RequestWillBeSentNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        RequestWillBeSentNotificationBuilder<STATE | LoaderIdSet>& setLoaderId(const String& value)
+        {
+            static_assert(!(STATE & LoaderIdSet), "property loaderId should not be set yet");
+            m_result->setLoaderId(value);
+            return castState<LoaderIdSet>();
+        }
+
+        RequestWillBeSentNotificationBuilder<STATE | DocumentURLSet>& setDocumentURL(const String& value)
+        {
+            static_assert(!(STATE & DocumentURLSet), "property documentURL should not be set yet");
+            m_result->setDocumentURL(value);
+            return castState<DocumentURLSet>();
+        }
+
+        RequestWillBeSentNotificationBuilder<STATE | RequestSet>& setRequest(std::unique_ptr<protocol::Network::Request> value)
+        {
+            static_assert(!(STATE & RequestSet), "property request should not be set yet");
+            m_result->setRequest(std::move(value));
+            return castState<RequestSet>();
+        }
+
+        RequestWillBeSentNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        RequestWillBeSentNotificationBuilder<STATE | WallTimeSet>& setWallTime(double value)
+        {
+            static_assert(!(STATE & WallTimeSet), "property wallTime should not be set yet");
+            m_result->setWallTime(value);
+            return castState<WallTimeSet>();
+        }
+
+        RequestWillBeSentNotificationBuilder<STATE | InitiatorSet>& setInitiator(std::unique_ptr<protocol::Network::Initiator> value)
+        {
+            static_assert(!(STATE & InitiatorSet), "property initiator should not be set yet");
+            m_result->setInitiator(std::move(value));
+            return castState<InitiatorSet>();
+        }
+
+        RequestWillBeSentNotificationBuilder<STATE>& setRedirectResponse(std::unique_ptr<protocol::Network::Response> value)
+        {
+            m_result->setRedirectResponse(std::move(value));
+            return *this;
+        }
+
+        RequestWillBeSentNotificationBuilder<STATE>& setType(const String& value)
+        {
+            m_result->setType(value);
+            return *this;
+        }
+
+        RequestWillBeSentNotificationBuilder<STATE>& setFrameId(const String& value)
+        {
+            m_result->setFrameId(value);
+            return *this;
+        }
+
+        RequestWillBeSentNotificationBuilder<STATE>& setHasUserGesture(bool value)
+        {
+            m_result->setHasUserGesture(value);
+            return *this;
+        }
+
+        std::unique_ptr<RequestWillBeSentNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class RequestWillBeSentNotification;
+        RequestWillBeSentNotificationBuilder() : m_result(new RequestWillBeSentNotification()) { }
+
+        template<int STEP> RequestWillBeSentNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<RequestWillBeSentNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::RequestWillBeSentNotification> m_result;
+    };
+
+    static RequestWillBeSentNotificationBuilder<0> create()
+    {
+        return RequestWillBeSentNotificationBuilder<0>();
+    }
+
+private:
+    RequestWillBeSentNotification()
+    {
+          m_timestamp = 0;
+          m_wallTime = 0;
+    }
+
+    String m_requestId;
+    String m_loaderId;
+    String m_documentURL;
+    std::unique_ptr<protocol::Network::Request> m_request;
+    double m_timestamp;
+    double m_wallTime;
+    std::unique_ptr<protocol::Network::Initiator> m_initiator;
+    Maybe<protocol::Network::Response> m_redirectResponse;
+    Maybe<String> m_type;
+    Maybe<String> m_frameId;
+    Maybe<bool> m_hasUserGesture;
+};
+
+
+class  ResourceChangedPriorityNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(ResourceChangedPriorityNotification);
+public:
+    static std::unique_ptr<ResourceChangedPriorityNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~ResourceChangedPriorityNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    String getNewPriority() { return m_newPriority; }
+    void setNewPriority(const String& value) { m_newPriority = value; }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<ResourceChangedPriorityNotification> clone() const;
+
+    template<int STATE>
+    class ResourceChangedPriorityNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            NewPrioritySet = 1 << 2,
+            TimestampSet = 1 << 3,
+            AllFieldsSet = (RequestIdSet | NewPrioritySet | TimestampSet | 0)};
+
+
+        ResourceChangedPriorityNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        ResourceChangedPriorityNotificationBuilder<STATE | NewPrioritySet>& setNewPriority(const String& value)
+        {
+            static_assert(!(STATE & NewPrioritySet), "property newPriority should not be set yet");
+            m_result->setNewPriority(value);
+            return castState<NewPrioritySet>();
+        }
+
+        ResourceChangedPriorityNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        std::unique_ptr<ResourceChangedPriorityNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class ResourceChangedPriorityNotification;
+        ResourceChangedPriorityNotificationBuilder() : m_result(new ResourceChangedPriorityNotification()) { }
+
+        template<int STEP> ResourceChangedPriorityNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<ResourceChangedPriorityNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::ResourceChangedPriorityNotification> m_result;
+    };
+
+    static ResourceChangedPriorityNotificationBuilder<0> create()
+    {
+        return ResourceChangedPriorityNotificationBuilder<0>();
+    }
+
+private:
+    ResourceChangedPriorityNotification()
+    {
+          m_timestamp = 0;
+    }
+
+    String m_requestId;
+    String m_newPriority;
+    double m_timestamp;
+};
+
+
+class  SignedExchangeReceivedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(SignedExchangeReceivedNotification);
+public:
+    static std::unique_ptr<SignedExchangeReceivedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~SignedExchangeReceivedNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    protocol::Network::SignedExchangeInfo* getInfo() { return m_info.get(); }
+    void setInfo(std::unique_ptr<protocol::Network::SignedExchangeInfo> value) { m_info = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<SignedExchangeReceivedNotification> clone() const;
+
+    template<int STATE>
+    class SignedExchangeReceivedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            InfoSet = 1 << 2,
+            AllFieldsSet = (RequestIdSet | InfoSet | 0)};
+
+
+        SignedExchangeReceivedNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        SignedExchangeReceivedNotificationBuilder<STATE | InfoSet>& setInfo(std::unique_ptr<protocol::Network::SignedExchangeInfo> value)
+        {
+            static_assert(!(STATE & InfoSet), "property info should not be set yet");
+            m_result->setInfo(std::move(value));
+            return castState<InfoSet>();
+        }
+
+        std::unique_ptr<SignedExchangeReceivedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class SignedExchangeReceivedNotification;
+        SignedExchangeReceivedNotificationBuilder() : m_result(new SignedExchangeReceivedNotification()) { }
+
+        template<int STEP> SignedExchangeReceivedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<SignedExchangeReceivedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::SignedExchangeReceivedNotification> m_result;
+    };
+
+    static SignedExchangeReceivedNotificationBuilder<0> create()
+    {
+        return SignedExchangeReceivedNotificationBuilder<0>();
+    }
+
+private:
+    SignedExchangeReceivedNotification()
+    {
+    }
+
+    String m_requestId;
+    std::unique_ptr<protocol::Network::SignedExchangeInfo> m_info;
+};
+
+
+class  ResponseReceivedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(ResponseReceivedNotification);
+public:
+    static std::unique_ptr<ResponseReceivedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~ResponseReceivedNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    String getLoaderId() { return m_loaderId; }
+    void setLoaderId(const String& value) { m_loaderId = value; }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    String getType() { return m_type; }
+    void setType(const String& value) { m_type = value; }
+
+    protocol::Network::Response* getResponse() { return m_response.get(); }
+    void setResponse(std::unique_ptr<protocol::Network::Response> value) { m_response = std::move(value); }
+
+    bool hasFrameId() { return m_frameId.isJust(); }
+    String getFrameId(const String& defaultValue) { return m_frameId.isJust() ? m_frameId.fromJust() : defaultValue; }
+    void setFrameId(const String& value) { m_frameId = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<ResponseReceivedNotification> clone() const;
+
+    template<int STATE>
+    class ResponseReceivedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            LoaderIdSet = 1 << 2,
+            TimestampSet = 1 << 3,
+            TypeSet = 1 << 4,
+            ResponseSet = 1 << 5,
+            AllFieldsSet = (RequestIdSet | LoaderIdSet | TimestampSet | TypeSet | ResponseSet | 0)};
+
+
+        ResponseReceivedNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        ResponseReceivedNotificationBuilder<STATE | LoaderIdSet>& setLoaderId(const String& value)
+        {
+            static_assert(!(STATE & LoaderIdSet), "property loaderId should not be set yet");
+            m_result->setLoaderId(value);
+            return castState<LoaderIdSet>();
+        }
+
+        ResponseReceivedNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        ResponseReceivedNotificationBuilder<STATE | TypeSet>& setType(const String& value)
+        {
+            static_assert(!(STATE & TypeSet), "property type should not be set yet");
+            m_result->setType(value);
+            return castState<TypeSet>();
+        }
+
+        ResponseReceivedNotificationBuilder<STATE | ResponseSet>& setResponse(std::unique_ptr<protocol::Network::Response> value)
+        {
+            static_assert(!(STATE & ResponseSet), "property response should not be set yet");
+            m_result->setResponse(std::move(value));
+            return castState<ResponseSet>();
+        }
+
+        ResponseReceivedNotificationBuilder<STATE>& setFrameId(const String& value)
+        {
+            m_result->setFrameId(value);
+            return *this;
+        }
+
+        std::unique_ptr<ResponseReceivedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class ResponseReceivedNotification;
+        ResponseReceivedNotificationBuilder() : m_result(new ResponseReceivedNotification()) { }
+
+        template<int STEP> ResponseReceivedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<ResponseReceivedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::ResponseReceivedNotification> m_result;
+    };
+
+    static ResponseReceivedNotificationBuilder<0> create()
+    {
+        return ResponseReceivedNotificationBuilder<0>();
+    }
+
+private:
+    ResponseReceivedNotification()
+    {
+          m_timestamp = 0;
+    }
+
+    String m_requestId;
+    String m_loaderId;
+    double m_timestamp;
+    String m_type;
+    std::unique_ptr<protocol::Network::Response> m_response;
+    Maybe<String> m_frameId;
+};
+
+
+class  WebSocketClosedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(WebSocketClosedNotification);
+public:
+    static std::unique_ptr<WebSocketClosedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~WebSocketClosedNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<WebSocketClosedNotification> clone() const;
+
+    template<int STATE>
+    class WebSocketClosedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            TimestampSet = 1 << 2,
+            AllFieldsSet = (RequestIdSet | TimestampSet | 0)};
+
+
+        WebSocketClosedNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        WebSocketClosedNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        std::unique_ptr<WebSocketClosedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class WebSocketClosedNotification;
+        WebSocketClosedNotificationBuilder() : m_result(new WebSocketClosedNotification()) { }
+
+        template<int STEP> WebSocketClosedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<WebSocketClosedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::WebSocketClosedNotification> m_result;
+    };
+
+    static WebSocketClosedNotificationBuilder<0> create()
+    {
+        return WebSocketClosedNotificationBuilder<0>();
+    }
+
+private:
+    WebSocketClosedNotification()
+    {
+          m_timestamp = 0;
+    }
+
+    String m_requestId;
+    double m_timestamp;
+};
+
+
+class  WebSocketCreatedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(WebSocketCreatedNotification);
+public:
+    static std::unique_ptr<WebSocketCreatedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~WebSocketCreatedNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    String getUrl() { return m_url; }
+    void setUrl(const String& value) { m_url = value; }
+
+    bool hasInitiator() { return m_initiator.isJust(); }
+    protocol::Network::Initiator* getInitiator(protocol::Network::Initiator* defaultValue) { return m_initiator.isJust() ? m_initiator.fromJust() : defaultValue; }
+    void setInitiator(std::unique_ptr<protocol::Network::Initiator> value) { m_initiator = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<WebSocketCreatedNotification> clone() const;
+
+    template<int STATE>
+    class WebSocketCreatedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            UrlSet = 1 << 2,
+            AllFieldsSet = (RequestIdSet | UrlSet | 0)};
+
+
+        WebSocketCreatedNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        WebSocketCreatedNotificationBuilder<STATE | UrlSet>& setUrl(const String& value)
+        {
+            static_assert(!(STATE & UrlSet), "property url should not be set yet");
+            m_result->setUrl(value);
+            return castState<UrlSet>();
+        }
+
+        WebSocketCreatedNotificationBuilder<STATE>& setInitiator(std::unique_ptr<protocol::Network::Initiator> value)
+        {
+            m_result->setInitiator(std::move(value));
+            return *this;
+        }
+
+        std::unique_ptr<WebSocketCreatedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class WebSocketCreatedNotification;
+        WebSocketCreatedNotificationBuilder() : m_result(new WebSocketCreatedNotification()) { }
+
+        template<int STEP> WebSocketCreatedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<WebSocketCreatedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::WebSocketCreatedNotification> m_result;
+    };
+
+    static WebSocketCreatedNotificationBuilder<0> create()
+    {
+        return WebSocketCreatedNotificationBuilder<0>();
+    }
+
+private:
+    WebSocketCreatedNotification()
+    {
+    }
+
+    String m_requestId;
+    String m_url;
+    Maybe<protocol::Network::Initiator> m_initiator;
+};
+
+
+class  WebSocketFrameErrorNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(WebSocketFrameErrorNotification);
+public:
+    static std::unique_ptr<WebSocketFrameErrorNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~WebSocketFrameErrorNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    String getErrorMessage() { return m_errorMessage; }
+    void setErrorMessage(const String& value) { m_errorMessage = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<WebSocketFrameErrorNotification> clone() const;
+
+    template<int STATE>
+    class WebSocketFrameErrorNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            TimestampSet = 1 << 2,
+            ErrorMessageSet = 1 << 3,
+            AllFieldsSet = (RequestIdSet | TimestampSet | ErrorMessageSet | 0)};
+
+
+        WebSocketFrameErrorNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        WebSocketFrameErrorNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        WebSocketFrameErrorNotificationBuilder<STATE | ErrorMessageSet>& setErrorMessage(const String& value)
+        {
+            static_assert(!(STATE & ErrorMessageSet), "property errorMessage should not be set yet");
+            m_result->setErrorMessage(value);
+            return castState<ErrorMessageSet>();
+        }
+
+        std::unique_ptr<WebSocketFrameErrorNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class WebSocketFrameErrorNotification;
+        WebSocketFrameErrorNotificationBuilder() : m_result(new WebSocketFrameErrorNotification()) { }
+
+        template<int STEP> WebSocketFrameErrorNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<WebSocketFrameErrorNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::WebSocketFrameErrorNotification> m_result;
+    };
+
+    static WebSocketFrameErrorNotificationBuilder<0> create()
+    {
+        return WebSocketFrameErrorNotificationBuilder<0>();
+    }
+
+private:
+    WebSocketFrameErrorNotification()
+    {
+          m_timestamp = 0;
+    }
+
+    String m_requestId;
+    double m_timestamp;
+    String m_errorMessage;
+};
+
+
+class  WebSocketFrameReceivedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(WebSocketFrameReceivedNotification);
+public:
+    static std::unique_ptr<WebSocketFrameReceivedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~WebSocketFrameReceivedNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    protocol::Network::WebSocketFrame* getResponse() { return m_response.get(); }
+    void setResponse(std::unique_ptr<protocol::Network::WebSocketFrame> value) { m_response = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<WebSocketFrameReceivedNotification> clone() const;
+
+    template<int STATE>
+    class WebSocketFrameReceivedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            TimestampSet = 1 << 2,
+            ResponseSet = 1 << 3,
+            AllFieldsSet = (RequestIdSet | TimestampSet | ResponseSet | 0)};
+
+
+        WebSocketFrameReceivedNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        WebSocketFrameReceivedNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        WebSocketFrameReceivedNotificationBuilder<STATE | ResponseSet>& setResponse(std::unique_ptr<protocol::Network::WebSocketFrame> value)
+        {
+            static_assert(!(STATE & ResponseSet), "property response should not be set yet");
+            m_result->setResponse(std::move(value));
+            return castState<ResponseSet>();
+        }
+
+        std::unique_ptr<WebSocketFrameReceivedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class WebSocketFrameReceivedNotification;
+        WebSocketFrameReceivedNotificationBuilder() : m_result(new WebSocketFrameReceivedNotification()) { }
+
+        template<int STEP> WebSocketFrameReceivedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<WebSocketFrameReceivedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::WebSocketFrameReceivedNotification> m_result;
+    };
+
+    static WebSocketFrameReceivedNotificationBuilder<0> create()
+    {
+        return WebSocketFrameReceivedNotificationBuilder<0>();
+    }
+
+private:
+    WebSocketFrameReceivedNotification()
+    {
+          m_timestamp = 0;
+    }
+
+    String m_requestId;
+    double m_timestamp;
+    std::unique_ptr<protocol::Network::WebSocketFrame> m_response;
+};
+
+
+class  WebSocketFrameSentNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(WebSocketFrameSentNotification);
+public:
+    static std::unique_ptr<WebSocketFrameSentNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~WebSocketFrameSentNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    protocol::Network::WebSocketFrame* getResponse() { return m_response.get(); }
+    void setResponse(std::unique_ptr<protocol::Network::WebSocketFrame> value) { m_response = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<WebSocketFrameSentNotification> clone() const;
+
+    template<int STATE>
+    class WebSocketFrameSentNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            TimestampSet = 1 << 2,
+            ResponseSet = 1 << 3,
+            AllFieldsSet = (RequestIdSet | TimestampSet | ResponseSet | 0)};
+
+
+        WebSocketFrameSentNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        WebSocketFrameSentNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        WebSocketFrameSentNotificationBuilder<STATE | ResponseSet>& setResponse(std::unique_ptr<protocol::Network::WebSocketFrame> value)
+        {
+            static_assert(!(STATE & ResponseSet), "property response should not be set yet");
+            m_result->setResponse(std::move(value));
+            return castState<ResponseSet>();
+        }
+
+        std::unique_ptr<WebSocketFrameSentNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class WebSocketFrameSentNotification;
+        WebSocketFrameSentNotificationBuilder() : m_result(new WebSocketFrameSentNotification()) { }
+
+        template<int STEP> WebSocketFrameSentNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<WebSocketFrameSentNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::WebSocketFrameSentNotification> m_result;
+    };
+
+    static WebSocketFrameSentNotificationBuilder<0> create()
+    {
+        return WebSocketFrameSentNotificationBuilder<0>();
+    }
+
+private:
+    WebSocketFrameSentNotification()
+    {
+          m_timestamp = 0;
+    }
+
+    String m_requestId;
+    double m_timestamp;
+    std::unique_ptr<protocol::Network::WebSocketFrame> m_response;
+};
+
+
+class  WebSocketHandshakeResponseReceivedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(WebSocketHandshakeResponseReceivedNotification);
+public:
+    static std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~WebSocketHandshakeResponseReceivedNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    protocol::Network::WebSocketResponse* getResponse() { return m_response.get(); }
+    void setResponse(std::unique_ptr<protocol::Network::WebSocketResponse> value) { m_response = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> clone() const;
+
+    template<int STATE>
+    class WebSocketHandshakeResponseReceivedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            TimestampSet = 1 << 2,
+            ResponseSet = 1 << 3,
+            AllFieldsSet = (RequestIdSet | TimestampSet | ResponseSet | 0)};
+
+
+        WebSocketHandshakeResponseReceivedNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        WebSocketHandshakeResponseReceivedNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        WebSocketHandshakeResponseReceivedNotificationBuilder<STATE | ResponseSet>& setResponse(std::unique_ptr<protocol::Network::WebSocketResponse> value)
+        {
+            static_assert(!(STATE & ResponseSet), "property response should not be set yet");
+            m_result->setResponse(std::move(value));
+            return castState<ResponseSet>();
+        }
+
+        std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class WebSocketHandshakeResponseReceivedNotification;
+        WebSocketHandshakeResponseReceivedNotificationBuilder() : m_result(new WebSocketHandshakeResponseReceivedNotification()) { }
+
+        template<int STEP> WebSocketHandshakeResponseReceivedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<WebSocketHandshakeResponseReceivedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::WebSocketHandshakeResponseReceivedNotification> m_result;
+    };
+
+    static WebSocketHandshakeResponseReceivedNotificationBuilder<0> create()
+    {
+        return WebSocketHandshakeResponseReceivedNotificationBuilder<0>();
+    }
+
+private:
+    WebSocketHandshakeResponseReceivedNotification()
+    {
+          m_timestamp = 0;
+    }
+
+    String m_requestId;
+    double m_timestamp;
+    std::unique_ptr<protocol::Network::WebSocketResponse> m_response;
+};
+
+
+class  WebSocketWillSendHandshakeRequestNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(WebSocketWillSendHandshakeRequestNotification);
+public:
+    static std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~WebSocketWillSendHandshakeRequestNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    double getWallTime() { return m_wallTime; }
+    void setWallTime(double value) { m_wallTime = value; }
+
+    protocol::Network::WebSocketRequest* getRequest() { return m_request.get(); }
+    void setRequest(std::unique_ptr<protocol::Network::WebSocketRequest> value) { m_request = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> clone() const;
+
+    template<int STATE>
+    class WebSocketWillSendHandshakeRequestNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            TimestampSet = 1 << 2,
+            WallTimeSet = 1 << 3,
+            RequestSet = 1 << 4,
+            AllFieldsSet = (RequestIdSet | TimestampSet | WallTimeSet | RequestSet | 0)};
+
+
+        WebSocketWillSendHandshakeRequestNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        WebSocketWillSendHandshakeRequestNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        WebSocketWillSendHandshakeRequestNotificationBuilder<STATE | WallTimeSet>& setWallTime(double value)
+        {
+            static_assert(!(STATE & WallTimeSet), "property wallTime should not be set yet");
+            m_result->setWallTime(value);
+            return castState<WallTimeSet>();
+        }
+
+        WebSocketWillSendHandshakeRequestNotificationBuilder<STATE | RequestSet>& setRequest(std::unique_ptr<protocol::Network::WebSocketRequest> value)
+        {
+            static_assert(!(STATE & RequestSet), "property request should not be set yet");
+            m_result->setRequest(std::move(value));
+            return castState<RequestSet>();
+        }
+
+        std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class WebSocketWillSendHandshakeRequestNotification;
+        WebSocketWillSendHandshakeRequestNotificationBuilder() : m_result(new WebSocketWillSendHandshakeRequestNotification()) { }
+
+        template<int STEP> WebSocketWillSendHandshakeRequestNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<WebSocketWillSendHandshakeRequestNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::WebSocketWillSendHandshakeRequestNotification> m_result;
+    };
+
+    static WebSocketWillSendHandshakeRequestNotificationBuilder<0> create()
+    {
+        return WebSocketWillSendHandshakeRequestNotificationBuilder<0>();
+    }
+
+private:
+    WebSocketWillSendHandshakeRequestNotification()
+    {
+          m_timestamp = 0;
+          m_wallTime = 0;
+    }
+
+    String m_requestId;
+    double m_timestamp;
+    double m_wallTime;
+    std::unique_ptr<protocol::Network::WebSocketRequest> m_request;
 };
 
 

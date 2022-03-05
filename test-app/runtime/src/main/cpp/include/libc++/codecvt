@@ -102,14 +102,13 @@ protected:
     virtual result
         do_unshift(state_type& __st,
                    extern_type* __to, extern_type* __to_end, extern_type*& __to_nxt) const;
-    virtual int do_encoding() const _NOEXCEPT;
-    virtual bool do_always_noconv() const _NOEXCEPT;
+    virtual int do_encoding() const throw();
+    virtual bool do_always_noconv() const throw();
     virtual int do_length(state_type&, const extern_type* __frm, const extern_type* __end,
                           size_t __mx) const;
-    virtual int do_max_length() const _NOEXCEPT;
+    virtual int do_max_length() const throw();
 };
 
-_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf8<char16_t>
     : public codecvt<char16_t, char, mbstate_t>
@@ -126,8 +125,6 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char16_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
-_LIBCPP_SUPPRESS_DEPRECATED_POP
-
 protected:
     virtual result
         do_out(state_type& __st,
@@ -140,14 +137,13 @@ protected:
     virtual result
         do_unshift(state_type& __st,
                    extern_type* __to, extern_type* __to_end, extern_type*& __to_nxt) const;
-    virtual int do_encoding() const _NOEXCEPT;
-    virtual bool do_always_noconv() const _NOEXCEPT;
+    virtual int do_encoding() const throw();
+    virtual bool do_always_noconv() const throw();
     virtual int do_length(state_type&, const extern_type* __frm, const extern_type* __end,
                           size_t __mx) const;
-    virtual int do_max_length() const _NOEXCEPT;
+    virtual int do_max_length() const throw();
 };
 
-_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf8<char32_t>
     : public codecvt<char32_t, char, mbstate_t>
@@ -164,8 +160,6 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char32_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
-_LIBCPP_SUPPRESS_DEPRECATED_POP
-
 protected:
     virtual result
         do_out(state_type& __st,
@@ -178,11 +172,11 @@ protected:
     virtual result
         do_unshift(state_type& __st,
                    extern_type* __to, extern_type* __to_end, extern_type*& __to_nxt) const;
-    virtual int do_encoding() const _NOEXCEPT;
-    virtual bool do_always_noconv() const _NOEXCEPT;
+    virtual int do_encoding() const throw();
+    virtual bool do_always_noconv() const throw();
     virtual int do_length(state_type&, const extern_type* __frm, const extern_type* __end,
                           size_t __mx) const;
-    virtual int do_max_length() const _NOEXCEPT;
+    virtual int do_max_length() const throw();
 };
 
 template <class _Elem, unsigned long _Maxcode = 0x10ffff,
@@ -231,11 +225,11 @@ protected:
     virtual result
         do_unshift(state_type& __st,
                    extern_type* __to, extern_type* __to_end, extern_type*& __to_nxt) const;
-    virtual int do_encoding() const _NOEXCEPT;
-    virtual bool do_always_noconv() const _NOEXCEPT;
+    virtual int do_encoding() const throw();
+    virtual bool do_always_noconv() const throw();
     virtual int do_length(state_type&, const extern_type* __frm, const extern_type* __end,
                           size_t __mx) const;
-    virtual int do_max_length() const _NOEXCEPT;
+    virtual int do_max_length() const throw();
 };
 
 template <>
@@ -266,14 +260,13 @@ protected:
     virtual result
         do_unshift(state_type& __st,
                    extern_type* __to, extern_type* __to_end, extern_type*& __to_nxt) const;
-    virtual int do_encoding() const _NOEXCEPT;
-    virtual bool do_always_noconv() const _NOEXCEPT;
+    virtual int do_encoding() const throw();
+    virtual bool do_always_noconv() const throw();
     virtual int do_length(state_type&, const extern_type* __frm, const extern_type* __end,
                           size_t __mx) const;
-    virtual int do_max_length() const _NOEXCEPT;
+    virtual int do_max_length() const throw();
 };
 
-_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf16<char16_t, false>
     : public codecvt<char16_t, char, mbstate_t>
@@ -290,8 +283,6 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char16_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
-_LIBCPP_SUPPRESS_DEPRECATED_POP
-
 protected:
     virtual result
         do_out(state_type& __st,
@@ -304,14 +295,13 @@ protected:
     virtual result
         do_unshift(state_type& __st,
                    extern_type* __to, extern_type* __to_end, extern_type*& __to_nxt) const;
-    virtual int do_encoding() const _NOEXCEPT;
-    virtual bool do_always_noconv() const _NOEXCEPT;
+    virtual int do_encoding() const throw();
+    virtual bool do_always_noconv() const throw();
     virtual int do_length(state_type&, const extern_type* __frm, const extern_type* __end,
                           size_t __mx) const;
-    virtual int do_max_length() const _NOEXCEPT;
+    virtual int do_max_length() const throw();
 };
 
-_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf16<char16_t, true>
     : public codecvt<char16_t, char, mbstate_t>
@@ -328,8 +318,6 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char16_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
-_LIBCPP_SUPPRESS_DEPRECATED_POP
-
 protected:
     virtual result
         do_out(state_type& __st,
@@ -342,14 +330,13 @@ protected:
     virtual result
         do_unshift(state_type& __st,
                    extern_type* __to, extern_type* __to_end, extern_type*& __to_nxt) const;
-    virtual int do_encoding() const _NOEXCEPT;
-    virtual bool do_always_noconv() const _NOEXCEPT;
+    virtual int do_encoding() const throw();
+    virtual bool do_always_noconv() const throw();
     virtual int do_length(state_type&, const extern_type* __frm, const extern_type* __end,
                           size_t __mx) const;
-    virtual int do_max_length() const _NOEXCEPT;
+    virtual int do_max_length() const throw();
 };
 
-_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf16<char32_t, false>
     : public codecvt<char32_t, char, mbstate_t>
@@ -366,8 +353,6 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char32_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
-_LIBCPP_SUPPRESS_DEPRECATED_POP
-
 protected:
     virtual result
         do_out(state_type& __st,
@@ -380,14 +365,13 @@ protected:
     virtual result
         do_unshift(state_type& __st,
                    extern_type* __to, extern_type* __to_end, extern_type*& __to_nxt) const;
-    virtual int do_encoding() const _NOEXCEPT;
-    virtual bool do_always_noconv() const _NOEXCEPT;
+    virtual int do_encoding() const throw();
+    virtual bool do_always_noconv() const throw();
     virtual int do_length(state_type&, const extern_type* __frm, const extern_type* __end,
                           size_t __mx) const;
-    virtual int do_max_length() const _NOEXCEPT;
+    virtual int do_max_length() const throw();
 };
 
-_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf16<char32_t, true>
     : public codecvt<char32_t, char, mbstate_t>
@@ -404,8 +388,6 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char32_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
-_LIBCPP_SUPPRESS_DEPRECATED_POP
-
 protected:
     virtual result
         do_out(state_type& __st,
@@ -418,11 +400,11 @@ protected:
     virtual result
         do_unshift(state_type& __st,
                    extern_type* __to, extern_type* __to_end, extern_type*& __to_nxt) const;
-    virtual int do_encoding() const _NOEXCEPT;
-    virtual bool do_always_noconv() const _NOEXCEPT;
+    virtual int do_encoding() const throw();
+    virtual bool do_always_noconv() const throw();
     virtual int do_length(state_type&, const extern_type* __frm, const extern_type* __end,
                           size_t __mx) const;
-    virtual int do_max_length() const _NOEXCEPT;
+    virtual int do_max_length() const throw();
 };
 
 template <class _Elem, unsigned long _Maxcode = 0x10ffff,
@@ -471,14 +453,13 @@ protected:
     virtual result
         do_unshift(state_type& __st,
                    extern_type* __to, extern_type* __to_end, extern_type*& __to_nxt) const;
-    virtual int do_encoding() const _NOEXCEPT;
-    virtual bool do_always_noconv() const _NOEXCEPT;
+    virtual int do_encoding() const throw();
+    virtual bool do_always_noconv() const throw();
     virtual int do_length(state_type&, const extern_type* __frm, const extern_type* __end,
                           size_t __mx) const;
-    virtual int do_max_length() const _NOEXCEPT;
+    virtual int do_max_length() const throw();
 };
 
-_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf8_utf16<char32_t>
     : public codecvt<char32_t, char, mbstate_t>
@@ -495,8 +476,6 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char32_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
-_LIBCPP_SUPPRESS_DEPRECATED_POP
-
 protected:
     virtual result
         do_out(state_type& __st,
@@ -509,14 +488,13 @@ protected:
     virtual result
         do_unshift(state_type& __st,
                    extern_type* __to, extern_type* __to_end, extern_type*& __to_nxt) const;
-    virtual int do_encoding() const _NOEXCEPT;
-    virtual bool do_always_noconv() const _NOEXCEPT;
+    virtual int do_encoding() const throw();
+    virtual bool do_always_noconv() const throw();
     virtual int do_length(state_type&, const extern_type* __frm, const extern_type* __end,
                           size_t __mx) const;
-    virtual int do_max_length() const _NOEXCEPT;
+    virtual int do_max_length() const throw();
 };
 
-_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf8_utf16<char16_t>
     : public codecvt<char16_t, char, mbstate_t>
@@ -533,8 +511,6 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char16_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
-_LIBCPP_SUPPRESS_DEPRECATED_POP
-
 protected:
     virtual result
         do_out(state_type& __st,
@@ -547,11 +523,11 @@ protected:
     virtual result
         do_unshift(state_type& __st,
                    extern_type* __to, extern_type* __to_end, extern_type*& __to_nxt) const;
-    virtual int do_encoding() const _NOEXCEPT;
-    virtual bool do_always_noconv() const _NOEXCEPT;
+    virtual int do_encoding() const throw();
+    virtual bool do_always_noconv() const throw();
     virtual int do_length(state_type&, const extern_type* __frm, const extern_type* __end,
                           size_t __mx) const;
-    virtual int do_max_length() const _NOEXCEPT;
+    virtual int do_max_length() const throw();
 };
 
 template <class _Elem, unsigned long _Maxcode = 0x10ffff,

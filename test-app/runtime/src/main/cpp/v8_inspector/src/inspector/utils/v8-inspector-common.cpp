@@ -26,7 +26,7 @@ v8::Local<v8::Object> Common::getGlobalInspectorObject(v8::Isolate* isolate) {
         return outInspector->ToObject(context).ToLocalChecked();
     }
 
-    return {};
+    return v8::Local<v8::Object>();
 }
 
 std::string Common::getJSCallErrorMessage(const std::string& functionName, v8::Local<v8::String> tcMessage) {
@@ -45,8 +45,8 @@ std::vector<uint16_t> Common::toVector(const std::string &value) {
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
     std::u16string valueu16 = convert.from_bytes(value);
 
-    const auto *begin = reinterpret_cast<uint16_t const *>(valueu16.data());
-    const auto *end = reinterpret_cast<uint16_t const *>(valueu16.data() + valueu16.size());
+    const uint16_t *begin = reinterpret_cast<uint16_t const *>(valueu16.data());
+    const uint16_t *end = reinterpret_cast<uint16_t const *>(valueu16.data() + valueu16.size());
     std::vector<uint16_t> vector(begin, end);
     return vector;
 }

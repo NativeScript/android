@@ -48,16 +48,19 @@ void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCall
         v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(nodeString16.characters16(), nodeString16.length()), &cbor);
         std::unique_ptr<protocol::Value> protocolNodeJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
 
-        auto status = protocol::DOM::Node::ReadFrom(cbor);
-        if (!status.ok()) {
-            auto errorMessage = "Error while parsing debug `DOM Node` object.";
-            auto errorStatusMessage = status.status().Message();
-            DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorStatusMessage.c_str());
+        protocol::ErrorSupport errorSupport;
+        auto domNode = protocol::DOM::Node::fromValue(protocolNodeJson.get(), &errorSupport);
+
+        std::vector<uint8_t> json;
+        v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
+        auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
+        if (!errorSupportString.empty()) {
+            auto errorMessage = "Error while parsing debug `DOM Node` object. ";
+            DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());
             return;
         }
 
-
-        domAgentInstance->m_frontend.childNodeInserted(parentId->Int32Value(context).ToChecked(), lastId->Int32Value(context).ToChecked(), std::move(*status));
+        domAgentInstance->m_frontend.childNodeInserted(parentId->Int32Value(context).ToChecked(), lastId->Int32Value(context).ToChecked(), std::move(domNode));
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {

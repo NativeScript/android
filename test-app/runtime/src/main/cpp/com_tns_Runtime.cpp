@@ -25,8 +25,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
     return JNI_VERSION_1_6;
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_SetManualInstrumentationMode(JNIEnv* _env,
-                                                                            jclass obj, jstring mode) {
+extern "C" JNIEXPORT void Java_com_tns_Runtime_SetManualInstrumentationMode(JNIEnv* _env, jobject obj, jstring mode) {
     try {
         Runtime::SetManualInstrumentationMode(mode);
     } catch (...) {
@@ -298,11 +297,11 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_clearStartupData(JNIEnv* env, job
     runtime->ClearStartupData(env, obj);
 }
 
-extern "C" JNIEXPORT jint Java_com_tns_Runtime_getPointerSize(JNIEnv* env, jclass obj) {
+extern "C" JNIEXPORT jint Java_com_tns_Runtime_getPointerSize(JNIEnv* env, jobject obj) {
     return sizeof(void*);
 }
 
-extern "C" JNIEXPORT jint Java_com_tns_Runtime_getCurrentRuntimeId(JNIEnv* _env, jclass obj) {
+extern "C" JNIEXPORT jint Java_com_tns_Runtime_getCurrentRuntimeId(JNIEnv* _env, jobject obj) {
     Isolate* isolate = Isolate::GetCurrent();
     if (isolate == nullptr) {
         return -1;
@@ -313,8 +312,7 @@ extern "C" JNIEXPORT jint Java_com_tns_Runtime_getCurrentRuntimeId(JNIEnv* _env,
     return id;
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerGlobalOnMessageCallback(JNIEnv* env,
-                                                                             jclass obj, jint runtimeId, jstring msg) {
+extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerGlobalOnMessageCallback(JNIEnv* env, jobject obj, jint runtimeId, jstring msg) {
     // Worker Thread runtime
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
@@ -332,8 +330,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerGlobalOnMessageCallback(JNI
     CallbackHandlers::WorkerGlobalOnMessageCallback(isolate, msg);
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerObjectOnMessageCallback(JNIEnv* env,
-                                                                             jclass obj, jint runtimeId, jint workerId, jstring msg) {
+extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerObjectOnMessageCallback(JNIEnv* env, jobject obj, jint runtimeId, jint workerId, jstring msg) {
     // Main Thread runtime
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
@@ -351,8 +348,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerObjectOnMessageCallback(JNI
     CallbackHandlers::WorkerObjectOnMessageCallback(isolate, workerId, msg);
 }
 
-
-extern "C" JNIEXPORT void Java_com_tns_Runtime_TerminateWorkerCallback(JNIEnv* env, jclass obj, jint runtimeId) {
+extern "C" JNIEXPORT void Java_com_tns_Runtime_TerminateWorkerCallback(JNIEnv* env, jobject obj, jint runtimeId) {
     // Worker Thread runtime
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
@@ -365,16 +361,18 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_TerminateWorkerCallback(JNIEnv* e
         v8::Locker locker(isolate);
         v8::Isolate::Scope isolate_scope(isolate);
         v8::HandleScope handleScope(isolate);
+
         CallbackHandlers::TerminateWorkerThread(isolate);
+
         runtime->DestroyRuntime();
     }
 
-     isolate->Dispose();
+    isolate->Dispose();
 
     delete runtime;
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_ClearWorkerPersistent(JNIEnv* env, jclass obj, jint runtimeId, jint workerId) {
+extern "C" JNIEXPORT void Java_com_tns_Runtime_ClearWorkerPersistent(JNIEnv* env, jobject obj, jint runtimeId, jint workerId) {
     // Worker Thread runtime
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
@@ -392,8 +390,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_ClearWorkerPersistent(JNIEnv* env
     CallbackHandlers::ClearWorkerPersistent(workerId);
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain(JNIEnv* env,
-                                                                                 jclass obj, jint runtimeId, jint workerId, jstring message, jstring stackTrace, jstring filename, jint lineno, jstring threadName) {
+extern "C" JNIEXPORT void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain(JNIEnv* env, jobject obj, jint runtimeId, jint workerId, jstring message, jstring stackTrace, jstring filename, jint lineno, jstring threadName) {
     // Main Thread runtime
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
@@ -414,8 +411,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain
     }
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_ResetDateTimeConfigurationCache(JNIEnv* _env,
-                                                                               jclass obj, jint runtimeId) {
+extern "C" JNIEXPORT void Java_com_tns_Runtime_ResetDateTimeConfigurationCache(JNIEnv* _env, jobject obj, jint runtimeId) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
         return;

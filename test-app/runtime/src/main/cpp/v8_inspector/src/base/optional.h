@@ -35,7 +35,7 @@ constexpr in_place_t in_place = {};
 // http://en.cppreference.com/w/cpp/utility/optional/nullopt
 constexpr nullopt_t nullopt(0);
 
-// Forward declaration, which is referred by following helpers.
+// Forward declaration, which is refered by following helpers.
 template <typename T>
 class Optional;
 
@@ -557,32 +557,32 @@ class OPTIONAL_DECLSPEC_EMPTY_BASES Optional
     return *this;
   }
 
-  constexpr const T* operator->() const {
+  const T* operator->() const {
     DCHECK(storage_.is_populated_);
     return &storage_.value_;
   }
 
-  constexpr T* operator->() {
+  T* operator->() {
     DCHECK(storage_.is_populated_);
     return &storage_.value_;
   }
 
-  constexpr const T& operator*() const& {
+  const T& operator*() const & {
     DCHECK(storage_.is_populated_);
     return storage_.value_;
   }
 
-  constexpr T& operator*() & {
+  T& operator*() & {
     DCHECK(storage_.is_populated_);
     return storage_.value_;
   }
 
-  constexpr const T&& operator*() const&& {
+  const T&& operator*() const && {
     DCHECK(storage_.is_populated_);
     return std::move(storage_.value_);
   }
 
-  constexpr T&& operator*() && {
+  T&& operator*() && {
     DCHECK(storage_.is_populated_);
     return std::move(storage_.value_);
   }

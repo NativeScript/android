@@ -109,18 +109,21 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
                 std::vector<uint8_t> cbor;
                 v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(resultProtocolString.characters16(), resultProtocolString.length()), &cbor);
                 std::unique_ptr<protocol::Value> resultJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
+                protocol::ErrorSupport errorSupport;
+                std::unique_ptr<protocol::DOM::Node> domNode = protocol::DOM::Node::fromValue(resultJson.get(), &errorSupport);
 
-                auto status = protocol::DOM::Node::ReadFrom(cbor);
-                if(!status.ok()){
-                    auto errorMessage = "Error while parsing debug `DOM Node` object.";
-                    auto errorStatusMessage = status.status().Message();
-                    DEBUG_WRITE_FORCE("JS Error: %s, Error support: %s", errorMessage, errorStatusMessage.c_str());
-                    return DispatchResponse::ServerError(errorMessage + std::string(errorStatusMessage));
+                std::vector<uint8_t> json;
+                v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
+                auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
+                if (!errorSupportString.empty()) {
+                    auto errorMessage = "Error while parsing debug `DOM Node` object. ";
+                    DEBUG_WRITE_FORCE("JS Error: %s, Error support: %s", errorMessage, errorSupportString.c_str());
+                    return DispatchResponse::ServerError(errorMessage);
+                } else {
+                    *out_root = std::move(domNode);
+
+                    return DispatchResponse::Success();
                 }
-
-                *out_root = std::move(*status);
-                return DispatchResponse::Success();
-
             } else {
                 return DispatchResponse::ServerError("Didn't get a proper result from __getDocument call. Returning empty visual tree.");
             }

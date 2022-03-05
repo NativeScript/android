@@ -6,20 +6,12 @@
 #define V8_V8_INSPECTOR_H_
 
 #include <stdint.h>
-
 #include <cctype>
+
 #include <memory>
+#include <unordered_map>
 
-#include "v8-isolate.h"       // NOLINT(build/include_directory)
-#include "v8-local-handle.h"  // NOLINT(build/include_directory)
-
-namespace v8 {
-class Context;
-class Name;
-class Object;
-class StackTrace;
-class Value;
-}  // namespace v8
+#include "v8.h"  // NOLINT(build/include)
 
 namespace v8_inspector {
 
@@ -113,9 +105,7 @@ class V8_EXPORT V8StackTrace {
   virtual StringView topSourceURL() const = 0;
   virtual int topLineNumber() const = 0;
   virtual int topColumnNumber() const = 0;
-  virtual int topScriptId() const = 0;
-  V8_DEPRECATED("Use V8::StackTrace::topScriptId() instead.")
-  int topScriptIdAsInteger() const { return topScriptId(); }
+  virtual StringView topScriptId() const = 0;
   virtual StringView topFunctionName() const = 0;
 
   virtual ~V8StackTrace() = default;
@@ -139,10 +129,6 @@ class V8_EXPORT V8InspectorSession {
     virtual v8::Local<v8::Value> get(v8::Local<v8::Context>) = 0;
     virtual ~Inspectable() = default;
   };
-  class V8_EXPORT CommandLineAPIScope {
-   public:
-    virtual ~CommandLineAPIScope() = default;
-  };
   virtual void addInspectedObject(std::unique_ptr<Inspectable>) = 0;
 
   // Dispatching protocol messages.
@@ -151,9 +137,6 @@ class V8_EXPORT V8InspectorSession {
   virtual std::vector<uint8_t> state() = 0;
   virtual std::vector<std::unique_ptr<protocol::Schema::API::Domain>>
   supportedDomains() = 0;
-
-  virtual std::unique_ptr<V8InspectorSession::CommandLineAPIScope>
-  initializeCommandLineAPIScope(int executionContextId) = 0;
 
   // Debugger actions.
   virtual void schedulePauseOnNextStatement(StringView breakReason,
@@ -178,7 +161,7 @@ class V8_EXPORT V8InspectorSession {
                             v8::Local<v8::Context>*,
                             std::unique_ptr<StringBuffer>* objectGroup) = 0;
   virtual void releaseObjectGroup(StringView) = 0;
-  virtual void triggerPreciseCoverageDeltaUpdate(StringView occasion) = 0;
+  virtual void triggerPreciseCoverageDeltaUpdate(StringView occassion) = 0;
 };
 
 class V8_EXPORT V8InspectorClient {
@@ -198,9 +181,8 @@ class V8_EXPORT V8InspectorClient {
   virtual std::unique_ptr<StringBuffer> valueSubtype(v8::Local<v8::Value>) {
     return nullptr;
   }
-  virtual std::unique_ptr<StringBuffer> descriptionForValueSubtype(
-      v8::Local<v8::Context>, v8::Local<v8::Value>) {
-    return nullptr;
+  virtual bool formatAccessorsAsProperties(v8::Local<v8::Value>) {
+    return false;
   }
   virtual bool isInspectableHeapObject(v8::Local<v8::Object>) { return true; }
 
@@ -242,10 +224,6 @@ class V8_EXPORT V8InspectorClient {
       const StringView& resourceName) {
     return nullptr;
   }
-
-  // The caller would defer to generating a random 64 bit integer if
-  // this method returns 0.
-  virtual int64_t generateUniqueId() { return 0; }
 };
 
 // These stack trace ids are intended to be passed between debuggers and be
@@ -306,10 +284,6 @@ class V8_EXPORT V8Inspector {
                                    int scriptId) = 0;
   virtual void exceptionRevoked(v8::Local<v8::Context>, unsigned exceptionId,
                                 StringView message) = 0;
-  virtual bool associateExceptionData(v8::Local<v8::Context>,
-                                      v8::Local<v8::Value> exception,
-                                      v8::Local<v8::Name> key,
-                                      v8::Local<v8::Value> value) = 0;
 
   // Connection.
   class V8_EXPORT Channel {
@@ -328,6 +302,24 @@ class V8_EXPORT V8Inspector {
   virtual std::unique_ptr<V8StackTrace> createStackTrace(
       v8::Local<v8::StackTrace>) = 0;
   virtual std::unique_ptr<V8StackTrace> captureStackTrace(bool fullStack) = 0;
+
+  // Performance counters.
+  class V8_EXPORT Counters : public std::enable_shared_from_this<Counters> {
+   public:
+    explicit Counters(v8::Isolate* isolate);
+    ~Counters();
+    const std::unordered_map<std::string, int>& getCountersMap() const {
+      return m_countersMap;
+    }
+
+   private:
+    static int* getCounterPtr(const char* name);
+
+    v8::Isolate* m_isolate;
+    std::unordered_map<std::string, int> m_countersMap;
+  };
+
+  virtual std::shared_ptr<Counters> enableCounters() = 0;
 };
 
 }  // namespace v8_inspector

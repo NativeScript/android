@@ -10,21 +10,18 @@
 
 #include "third_party/inspector_protocol/crdtp/cbor.h"
 #include "third_party/inspector_protocol/crdtp/find_by_first.h"
+#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
 #include "third_party/inspector_protocol/crdtp/span.h"
 
 namespace v8_inspector {
 namespace protocol {
 namespace Console {
 
-using v8_crdtp::DeserializerState;
-using v8_crdtp::ProtocolTypeTraits;
-
 // ------------- Enum values from types.
 
 const char Metainfo::domainName[] = "Console";
 const char Metainfo::commandPrefix[] = "Console.";
 const char Metainfo::version[] = "1.3";
-
 
 const char* ConsoleMessage::SourceEnum::Xml = "xml";
 const char* ConsoleMessage::SourceEnum::Javascript = "javascript";
@@ -43,24 +40,122 @@ const char* ConsoleMessage::LevelEnum::Warning = "warning";
 const char* ConsoleMessage::LevelEnum::Error = "error";
 const char* ConsoleMessage::LevelEnum::Debug = "debug";
 const char* ConsoleMessage::LevelEnum::Info = "info";
-V8_CRDTP_BEGIN_DESERIALIZER(ConsoleMessage)
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("column", m_column),
-    V8_CRDTP_DESERIALIZE_FIELD("level", m_level),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("line", m_line),
-    V8_CRDTP_DESERIALIZE_FIELD("source", m_source),
-    V8_CRDTP_DESERIALIZE_FIELD("text", m_text),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("url", m_url),
-V8_CRDTP_END_DESERIALIZER()
 
-V8_CRDTP_BEGIN_SERIALIZER(ConsoleMessage)
-    V8_CRDTP_SERIALIZE_FIELD("source", m_source);
-    V8_CRDTP_SERIALIZE_FIELD("level", m_level);
-    V8_CRDTP_SERIALIZE_FIELD("text", m_text);
-    V8_CRDTP_SERIALIZE_FIELD("url", m_url);
-    V8_CRDTP_SERIALIZE_FIELD("line", m_line);
-    V8_CRDTP_SERIALIZE_FIELD("column", m_column);
-V8_CRDTP_END_SERIALIZER();
+std::unique_ptr<ConsoleMessage> ConsoleMessage::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
+    std::unique_ptr<ConsoleMessage> result(new ConsoleMessage());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* sourceValue = object->get("source");
+    errors->SetName("source");
+    result->m_source = ValueConversions<String>::fromValue(sourceValue, errors);
+    protocol::Value* levelValue = object->get("level");
+    errors->SetName("level");
+    result->m_level = ValueConversions<String>::fromValue(levelValue, errors);
+    protocol::Value* textValue = object->get("text");
+    errors->SetName("text");
+    result->m_text = ValueConversions<String>::fromValue(textValue, errors);
+    protocol::Value* urlValue = object->get("url");
+    if (urlValue) {
+        errors->SetName("url");
+        result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
+    }
+    protocol::Value* lineValue = object->get("line");
+    if (lineValue) {
+        errors->SetName("line");
+        result->m_line = ValueConversions<int>::fromValue(lineValue, errors);
+    }
+    protocol::Value* columnValue = object->get("column");
+    if (columnValue) {
+        errors->SetName("column");
+        result->m_column = ValueConversions<int>::fromValue(columnValue, errors);
+    }
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> ConsoleMessage::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("source", ValueConversions<String>::toValue(m_source));
+    result->setValue("level", ValueConversions<String>::toValue(m_level));
+    result->setValue("text", ValueConversions<String>::toValue(m_text));
+    if (m_url.isJust())
+        result->setValue("url", ValueConversions<String>::toValue(m_url.fromJust()));
+    if (m_line.isJust())
+        result->setValue("line", ValueConversions<int>::toValue(m_line.fromJust()));
+    if (m_column.isJust())
+        result->setValue("column", ValueConversions<int>::toValue(m_column.fromJust()));
+    return result;
+}
+
+void ConsoleMessage::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("source"), m_source, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("level"), m_level, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), m_text, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("line"), m_line, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("column"), m_column, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<ConsoleMessage> ConsoleMessage::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<MessageAddedNotification> MessageAddedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<MessageAddedNotification> result(new MessageAddedNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* messageValue = object->get("message");
+    errors->SetName("message");
+    result->m_message = ValueConversions<protocol::Console::ConsoleMessage>::fromValue(messageValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> MessageAddedNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("message", ValueConversions<protocol::Console::ConsoleMessage>::toValue(m_message.get()));
+    return result;
+}
+
+void MessageAddedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("message"), m_message, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<MessageAddedNotification> MessageAddedNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
 // ------------- Enum values from params.
 
@@ -71,9 +166,10 @@ void Frontend::messageAdded(std::unique_ptr<protocol::Console::ConsoleMessage> m
 {
     if (!frontend_channel_)
         return;
-    v8_crdtp::ObjectSerializer serializer;
-    serializer.AddField(v8_crdtp::MakeSpan("message"), message);
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Console.messageAdded", serializer.Finish()));
+    std::unique_ptr<MessageAddedNotification> messageData = MessageAddedNotification::create()
+        .setMessage(std::move(message))
+        .build();
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Console.messageAdded", std::move(messageData)));
 }
 
 void Frontend::flush()
@@ -95,13 +191,13 @@ public:
         , m_backend(backend) {}
     ~DomainDispatcherImpl() override { }
 
-    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable);
+    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
 
     std::function<void(const v8_crdtp::Dispatchable&)> Dispatch(v8_crdtp::span<uint8_t> command_name) override;
 
-    void clearMessages(const v8_crdtp::Dispatchable& dispatchable);
-    void disable(const v8_crdtp::Dispatchable& dispatchable);
-    void enable(const v8_crdtp::Dispatchable& dispatchable);
+    void clearMessages(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
  protected:
     Backend* m_backend;
 };
@@ -136,22 +232,19 @@ DomainDispatcherImpl::CallHandler CommandByName(v8_crdtp::span<uint8_t> command_
 std::function<void(const v8_crdtp::Dispatchable&)> DomainDispatcherImpl::Dispatch(v8_crdtp::span<uint8_t> command_name) {
   CallHandler handler = CommandByName(command_name);
   if (!handler) return nullptr;
-
-  return [this, handler](const v8_crdtp::Dispatchable& dispatchable) {
-    (this->*handler)(dispatchable);
+  return [this, handler](const v8_crdtp::Dispatchable& dispatchable){
+    std::unique_ptr<DictionaryValue> params =
+        DictionaryValue::cast(protocol::Value::parseBinary(dispatchable.Params().data(),
+        dispatchable.Params().size()));
+    ErrorSupport errors;
+    errors.Push();
+    (this->*handler)(dispatchable, params.get(), &errors);
   };
 }
 
 
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::clearMessages(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::clearMessages(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
-    // Prepare input parameters.
-
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->clearMessages();
@@ -164,15 +257,8 @@ void DomainDispatcherImpl::clearMessages(const v8_crdtp::Dispatchable& dispatcha
     return;
 }
 
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
-    // Prepare input parameters.
-
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
@@ -185,15 +271,8 @@ void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable)
     return;
 }
 
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
-    // Prepare input parameters.
-
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->enable();

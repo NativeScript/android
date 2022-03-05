@@ -4,11 +4,6 @@
 
 #include "src/inspector/v8-console-message.h"
 
-#include "include/v8-container.h"
-#include "include/v8-context.h"
-#include "include/v8-inspector.h"
-#include "include/v8-microtask-queue.h"
-#include "include/v8-primitive-object.h"
 #include "src/debug/debug-interface.h"
 #include "src/inspector/inspected-context.h"
 #include "src/inspector/protocol/Protocol.h"
@@ -18,8 +13,9 @@
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "src/inspector/v8-runtime-agent-impl.h"
 #include "src/inspector/v8-stack-trace-impl.h"
-#include "src/inspector/value-mirror.h"
 #include "src/tracing/trace-event.h"
+
+#include "include/v8-inspector.h"
 
 namespace v8_inspector {
 
@@ -94,33 +90,34 @@ class V8ValueStringBuilder {
     if (value.IsEmpty()) return true;
     if ((ignoreOptions & IgnoreNull) && value->IsNull()) return true;
     if ((ignoreOptions & IgnoreUndefined) && value->IsUndefined()) return true;
-    if (value->IsString()) return append(value.As<v8::String>());
+    if (value->IsString()) return append(v8::Local<v8::String>::Cast(value));
     if (value->IsStringObject())
-      return append(value.As<v8::StringObject>()->ValueOf());
-    if (value->IsBigInt()) return append(value.As<v8::BigInt>());
+      return append(v8::Local<v8::StringObject>::Cast(value)->ValueOf());
+    if (value->IsBigInt()) return append(v8::Local<v8::BigInt>::Cast(value));
     if (value->IsBigIntObject())
-      return append(value.As<v8::BigIntObject>()->ValueOf());
-    if (value->IsSymbol()) return append(value.As<v8::Symbol>());
+      return append(v8::Local<v8::BigIntObject>::Cast(value)->ValueOf());
+    if (value->IsSymbol()) return append(v8::Local<v8::Symbol>::Cast(value));
     if (value->IsSymbolObject())
-      return append(value.As<v8::SymbolObject>()->ValueOf());
+      return append(v8::Local<v8::SymbolObject>::Cast(value)->ValueOf());
     if (value->IsNumberObject()) {
-      m_builder.append(
-          String16::fromDouble(value.As<v8::NumberObject>()->ValueOf(), 6));
+      m_builder.append(String16::fromDouble(
+          v8::Local<v8::NumberObject>::Cast(value)->ValueOf(), 6));
       return true;
     }
     if (value->IsBooleanObject()) {
-      m_builder.append(value.As<v8::BooleanObject>()->ValueOf() ? "true"
-                                                                : "false");
+      m_builder.append(v8::Local<v8::BooleanObject>::Cast(value)->ValueOf()
+                           ? "true"
+                           : "false");
       return true;
     }
-    if (value->IsArray()) return append(value.As<v8::Array>());
+    if (value->IsArray()) return append(v8::Local<v8::Array>::Cast(value));
     if (value->IsProxy()) {
       m_builder.append("[object Proxy]");
       return true;
     }
     if (value->IsObject() && !value->IsDate() && !value->IsFunction() &&
         !value->IsNativeError() && !value->IsRegExp()) {
-      v8::Local<v8::Object> object = value.As<v8::Object>();
+      v8::Local<v8::Object> object = v8::Local<v8::Object>::Cast(value);
       v8::Local<v8::String> stringValue;
       if (object->ObjectProtoToString(m_context).ToLocal(&stringValue))
         return append(stringValue);
@@ -156,7 +153,7 @@ class V8ValueStringBuilder {
 
   bool append(v8::Local<v8::Symbol> symbol) {
     m_builder.append("Symbol(");
-    bool result = append(symbol->Description(m_isolate), IgnoreUndefined);
+    bool result = append(symbol->Description(), IgnoreUndefined);
     m_builder.append(')');
     return result;
   }
@@ -212,12 +209,7 @@ void V8ConsoleMessage::setLocation(const String16& url, unsigned lineNumber,
                                    unsigned columnNumber,
                                    std::unique_ptr<V8StackTraceImpl> stackTrace,
                                    int scriptId) {
-  const char* dataURIPrefix = "data:";
-  if (url.substring(0, strlen(dataURIPrefix)) == dataURIPrefix) {
-    m_url = String16();
-  } else {
-    m_url = url;
-  }
+  m_url = url;
   m_lineNumber = lineNumber;
   m_columnNumber = columnNumber;
   m_stackTrace = std::move(stackTrace);
@@ -275,7 +267,7 @@ V8ConsoleMessage::wrapArguments(V8InspectorSessionImpl* session,
     if (m_arguments.size() > 1) {
       v8::Local<v8::Value> secondArgument = m_arguments[1]->Get(isolate);
       if (secondArgument->IsArray()) {
-        columns = secondArgument.As<v8::Array>();
+        columns = v8::Local<v8::Array>::Cast(secondArgument);
       } else if (secondArgument->IsString()) {
         v8::TryCatch tryCatch(isolate);
         v8::Local<v8::Array> array = v8::Array::New(isolate);
@@ -285,7 +277,8 @@ V8ConsoleMessage::wrapArguments(V8InspectorSessionImpl* session,
       }
     }
     std::unique_ptr<protocol::Runtime::RemoteObject> wrapped =
-        session->wrapTable(context, value.As<v8::Object>(), columns);
+        session->wrapTable(context, v8::Local<v8::Object>::Cast(value),
+                           columns);
     inspectedContext = inspector->getContext(contextGroupId, contextId);
     if (!inspectedContext) return nullptr;
     if (wrapped) {
@@ -336,9 +329,6 @@ void V8ConsoleMessage::reportToFrontend(protocol::Runtime::Frontend* frontend,
     }
     if (m_contextId) exceptionDetails->setExecutionContextId(m_contextId);
     if (exception) exceptionDetails->setException(std::move(exception));
-    std::unique_ptr<protocol::DictionaryValue> data =
-        getAssociatedExceptionData(inspector, session);
-    if (data) exceptionDetails->setExceptionMetaData(std::move(data));
     frontend->exceptionThrown(m_timestamp, std::move(exceptionDetails));
     return;
   }
@@ -386,33 +376,6 @@ void V8ConsoleMessage::reportToFrontend(protocol::Runtime::Frontend* frontend,
     return;
   }
   UNREACHABLE();
-}
-
-std::unique_ptr<protocol::DictionaryValue>
-V8ConsoleMessage::getAssociatedExceptionData(
-    V8InspectorImpl* inspector, V8InspectorSessionImpl* session) const {
-  if (!m_arguments.size() || !m_contextId) return nullptr;
-  DCHECK_EQ(1u, m_arguments.size());
-
-  v8::Isolate* isolate = inspector->isolate();
-  v8::HandleScope handles(isolate);
-  v8::Local<v8::Context> context;
-  if (!inspector->exceptionMetaDataContext().ToLocal(&context)) return nullptr;
-  v8::MaybeLocal<v8::Value> maybe_exception = m_arguments[0]->Get(isolate);
-  v8::Local<v8::Value> exception;
-  if (!maybe_exception.ToLocal(&exception)) return nullptr;
-
-  v8::MaybeLocal<v8::Object> maybe_data =
-      inspector->getAssociatedExceptionData(exception);
-  v8::Local<v8::Object> data;
-  if (!maybe_data.ToLocal(&data)) return nullptr;
-  v8::TryCatch tryCatch(isolate);
-  v8::MicrotasksScope microtasksScope(isolate,
-                                      v8::MicrotasksScope::kDoNotRunMicrotasks);
-  v8::Context::Scope contextScope(context);
-  std::unique_ptr<protocol::DictionaryValue> jsonObject;
-  objectToProtocolValue(context, data, 2, &jsonObject);
-  return jsonObject;
 }
 
 std::unique_ptr<protocol::Runtime::RemoteObject>
@@ -536,8 +499,7 @@ void V8ConsoleMessage::contextDestroyed(int contextId) {
   m_v8Size = 0;
 }
 
-// ------------------------ V8ConsoleMessageStorage
-// ----------------------------
+// ------------------------ V8ConsoleMessageStorage ----------------------------
 
 V8ConsoleMessageStorage::V8ConsoleMessageStorage(V8InspectorImpl* inspector,
                                                  int contextGroupId)

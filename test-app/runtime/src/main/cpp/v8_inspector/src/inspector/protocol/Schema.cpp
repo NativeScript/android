@@ -10,14 +10,12 @@
 
 #include "third_party/inspector_protocol/crdtp/cbor.h"
 #include "third_party/inspector_protocol/crdtp/find_by_first.h"
+#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
 #include "third_party/inspector_protocol/crdtp/span.h"
 
 namespace v8_inspector {
 namespace protocol {
 namespace Schema {
-
-using v8_crdtp::DeserializerState;
-using v8_crdtp::ProtocolTypeTraits;
 
 // ------------- Enum values from types.
 
@@ -25,21 +23,62 @@ const char Metainfo::domainName[] = "Schema";
 const char Metainfo::commandPrefix[] = "Schema.";
 const char Metainfo::version[] = "1.3";
 
-V8_CRDTP_BEGIN_DESERIALIZER(Domain)
-    V8_CRDTP_DESERIALIZE_FIELD("name", m_name),
-    V8_CRDTP_DESERIALIZE_FIELD("version", m_version),
-V8_CRDTP_END_DESERIALIZER()
+std::unique_ptr<Domain> Domain::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
-V8_CRDTP_BEGIN_SERIALIZER(Domain)
-    V8_CRDTP_SERIALIZE_FIELD("name", m_name);
-    V8_CRDTP_SERIALIZE_FIELD("version", m_version);
-V8_CRDTP_END_SERIALIZER();
+    std::unique_ptr<Domain> result(new Domain());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* nameValue = object->get("name");
+    errors->SetName("name");
+    result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
+    protocol::Value* versionValue = object->get("version");
+    errors->SetName("version");
+    result->m_version = ValueConversions<String>::fromValue(versionValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> Domain::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("name", ValueConversions<String>::toValue(m_name));
+    result->setValue("version", ValueConversions<String>::toValue(m_version));
+    return result;
+}
+
+void Domain::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("version"), m_version, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<Domain> Domain::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
 // static
 std::unique_ptr<API::Domain> API::Domain::fromBinary(const uint8_t* data, size_t length)
 {
-    return protocol::Schema::Domain::FromBinary(data, length);
+    ErrorSupport errors;
+    std::unique_ptr<Value> value = Value::parseBinary(data, length);
+    if (!value)
+        return nullptr;
+    return protocol::Schema::Domain::fromValue(value.get(), &errors);
 }
+
 
 // ------------- Enum values from params.
 
@@ -65,11 +104,11 @@ public:
         , m_backend(backend) {}
     ~DomainDispatcherImpl() override { }
 
-    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable);
+    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
 
     std::function<void(const v8_crdtp::Dispatchable&)> Dispatch(v8_crdtp::span<uint8_t> command_name) override;
 
-    void getDomains(const v8_crdtp::Dispatchable& dispatchable);
+    void getDomains(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
  protected:
     Backend* m_backend;
 };
@@ -96,22 +135,19 @@ DomainDispatcherImpl::CallHandler CommandByName(v8_crdtp::span<uint8_t> command_
 std::function<void(const v8_crdtp::Dispatchable&)> DomainDispatcherImpl::Dispatch(v8_crdtp::span<uint8_t> command_name) {
   CallHandler handler = CommandByName(command_name);
   if (!handler) return nullptr;
-
-  return [this, handler](const v8_crdtp::Dispatchable& dispatchable) {
-    (this->*handler)(dispatchable);
+  return [this, handler](const v8_crdtp::Dispatchable& dispatchable){
+    std::unique_ptr<DictionaryValue> params =
+        DictionaryValue::cast(protocol::Value::parseBinary(dispatchable.Params().data(),
+        dispatchable.Params().size()));
+    ErrorSupport errors;
+    errors.Push();
+    (this->*handler)(dispatchable, params.get(), &errors);
   };
 }
 
 
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::getDomains(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::getDomains(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
-    // Prepare input parameters.
-
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Schema::Domain>> out_domains;
 
@@ -122,15 +158,16 @@ void DomainDispatcherImpl::getDomains(const v8_crdtp::Dispatchable& dispatchable
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("domains"), out_domains);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("domains"), out_domains, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }

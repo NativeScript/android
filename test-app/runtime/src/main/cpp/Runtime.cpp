@@ -28,7 +28,7 @@
 #include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
 #include "ManualInstrumentation.h"
-//#include <snapshot_blob.h>
+#include <snapshot_blob.h>
 
 #ifdef APPLICATION_IN_DEBUG
 #include "JsV8InspectorClient.h"
@@ -58,6 +58,9 @@ void SIG_handler(int sigNumber) {
             break;
     }
     msg << ").\n=======\nCheck the 'adb logcat' for additional information about the error.\n=======\n";
+    auto msgStr = msg.str();
+    __android_log_print(ANDROID_LOG_INFO, "TNS.Runtime", "NativeScript ERR %s", msgStr.c_str());
+
     throw NativeScriptException(msg.str());
 }
 
@@ -570,7 +573,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         }
     }
 
-    /* Don't use snapshot
     if (!isCustomSnapshotFound) {
         // Load V8's built-in snapshot
         auto* snapshotBlobStartupData = new StartupData();
@@ -578,7 +580,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         snapshotBlobStartupData->raw_size = snapshot_blob_bin_len;
         V8::SetSnapshotDataBlob(snapshotBlobStartupData);
     }
-*/
+
     /*
      * Setup the V8Platform only once per process - once for the application lifetime
      * Don't execute again if main thread has already been initialized
@@ -811,10 +813,10 @@ bool Runtime::RunExtraCode(Isolate* isolate, Local<Context> context, const char*
 }
 
 void Runtime::DestroyRuntime() {
-    s_id2RuntimeCache.erase(m_id);
-    s_isolate2RuntimesCache.erase(m_isolate);
-    MetadataNode::DeInit(m_isolate);
-    ArgConverter::DeInit(m_isolate);
+    // s_id2RuntimeCache.erase(m_id);
+    // s_isolate2RuntimesCache.erase(m_isolate);
+    // MetadataNode::DeInit(m_isolate);
+    // ArgConverter::DeInit(m_isolate);
     Console::DeInit(m_isolate);
     tns::ClearPersistentSmartJSONStringify(m_isolate);
 }

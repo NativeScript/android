@@ -18,7 +18,7 @@
 #include "third_party/inspector_protocol/crdtp/error_support.h"
 #include "third_party/inspector_protocol/crdtp/dispatch.h"
 #include "third_party/inspector_protocol/crdtp/frontend_channel.h"
-#include "third_party/inspector_protocol/crdtp/protocol_core.h"
+#include "third_party/inspector_protocol/crdtp/glue.h"
 
 namespace v8_inspector {
 namespace protocol {
@@ -38,14 +38,7 @@ class SerializedValue;
 class StringValue;
 class Value;
 
-using v8_crdtp::detail::PtrMaybe;
-using v8_crdtp::detail::ValueMaybe;
-
-template<typename T>
-using Maybe = v8_crdtp::Maybe<T>;
-
 namespace detail {
-
 template <typename T>
 struct ArrayTypedef { typedef std::vector<std::unique_ptr<T>> type; };
 
@@ -60,14 +53,36 @@ struct ArrayTypedef<double> { typedef std::vector<double> type; };
 
 template <>
 struct ArrayTypedef<bool> { typedef std::vector<bool> type; };
-
-template <>
-struct ArrayTypedef<Binary> { typedef std::vector<Binary> type; };
-
 }  // namespace detail
 
 template <typename T>
 using Array = typename detail::ArrayTypedef<T>::type;
+
+namespace detail {
+using v8_crdtp::glue::detail::PtrMaybe;
+using v8_crdtp::glue::detail::ValueMaybe;
+
+template <typename T>
+struct MaybeTypedef { typedef PtrMaybe<T> type; };
+
+template <>
+struct MaybeTypedef<bool> { typedef ValueMaybe<bool> type; };
+
+template <>
+struct MaybeTypedef<int> { typedef ValueMaybe<int> type; };
+
+template <>
+struct MaybeTypedef<double> { typedef ValueMaybe<double> type; };
+
+template <>
+struct MaybeTypedef<String> { typedef ValueMaybe<String> type; };
+
+template <>
+struct MaybeTypedef<Binary> { typedef ValueMaybe<Binary> type; };
+}  // namespace detail
+
+template <typename T>
+using Maybe = typename detail::MaybeTypedef<T>::type;
 
 } // namespace v8_inspector
 } // namespace protocol

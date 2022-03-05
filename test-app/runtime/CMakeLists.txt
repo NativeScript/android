@@ -16,12 +16,11 @@ endif (CCACHE_FOUND AND (USE_CCACHE))
 # "-DANDROID_STL=c++_static" is just not enough for clang++ to find some libraries in the ndk
 MESSAGE(STATUS "## ANDROID_NDK_ROOT: " ${ANDROID_NDK_ROOT})
 
-
-set(COMMON_CMAKE_ARGUMENTS "-nostdinc++ -std=c++14 -Werror -Wno-unused-result -mstackrealign -fexceptions -fno-builtin-stpcpy -fno-rtti -D_LIBCPP_ABI_VERSION=Cr -D_LIBCPP_ENABLE_NODISCARD -D_LIBCPP_ABI_UNSTABLE -D_LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS -DV8_ENABLE_REGEXP_INTERPRETER_THREADED_DISPATCH -DV8_EMBEDDED_BUILTINS")
+set(COMMON_CMAKE_ARGUMENTS "-nostdinc++ -std=c++14 -Werror -Wno-unused-result -mstackrealign -fexceptions -fno-builtin-stpcpy -fno-rtti -D_LIBCPP_ABI_VERSION=Cr -D_LIBCPP_ENABLE_NODISCARD -D_LIBCPP_ABI_UNSTABLE -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_ENABLE_REGEXP_INTERPRETER_THREADED_DISPATCH -DV8_EMBEDDED_BUILTINS")
 
 if("${ANDROID_ABI}" MATCHES "arm64-v8a$" OR "${ANDROID_ABI}" MATCHES "x86_64$")
     # Enable pointer compression on 64 bit platforms
-    set(COMMON_CMAKE_ARGUMENTS "${COMMON_CMAKE_ARGUMENTS} -DV8_COMPRESS_POINTERS -DV8_31BIT_SMIS_ON_64BIT_ARCH")
+    set(COMMON_CMAKE_ARGUMENTS "${COMMON_CMAKE_ARGUMENTS} -DV8_COMPRESS_POINTERS")
 endif()
 
 
@@ -107,7 +106,6 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
         src/main/cpp/v8_inspector/src/inspector/v8-console-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-console-message.cc
         src/main/cpp/v8_inspector/src/inspector/v8-debugger.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-debugger-id.cc
         src/main/cpp/v8_inspector/src/inspector/v8-debugger-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-debugger-script.cc
         src/main/cpp/v8_inspector/src/inspector/v8-heap-profiler-agent-impl.cc
@@ -184,14 +182,14 @@ add_library(
     ${INSPECTOR_SOURCES}
 )
 
-if("${ANDROID_ABI}" MATCHES "arm64-v8a$" OR "${ANDROID_ABI}" MATCHES "x86_64$")
-    set(CMAKE_C_FLAGS "-mno-outline-atomics")
-endif()
+# if("${ANDROID_ABI}" MATCHES "arm64-v8a$" OR "${ANDROID_ABI}" MATCHES "x86_64$")
+#     set(CMAKE_C_FLAGS "-mno-outline-atomics")
+# endif()
 
 set(NATIVES_BLOB_INCLUDE_DIRECTORIES ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/include)
 
 if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
-        set_target_properties(
+    set_target_properties(
         NativeScript
         PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition -Wl,--exclude-libs=ALL -Wl,--gc-sections
         INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
@@ -203,8 +201,6 @@ else ()
         INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
     )
 endif ()
-
-target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libinspector_protocol.a)
 
 MESSAGE(STATUS "# General cmake Info")
 MESSAGE(STATUS "# PROJECT_SOURCE_DIR: " ${PROJECT_SOURCE_DIR})
@@ -223,7 +219,7 @@ if("${ANDROID_ABI}" MATCHES "armeabi-v7a$" OR "${ANDROID_ABI}" MATCHES "x86$")
     # On API Level 19 and lower we need to link with android_support
     # because it contains some implementation of functions such as "strtoll" and "strtoul"
     MESSAGE(STATUS "# Linking with libandroid_support.a")
-    target_link_libraries(NativeScript ${ANDROID_NDK_ROOT}/sources/cxx-stl/llvm-libc++/libs/${ANDROID_ABI}/libandroid_support.a)
+    target_link_libraries(NativeScript $ENV{ANDROID_NDK_ROOT}/sources/cxx-stl/llvm-libc++/libs/${ANDROID_ABI}/libandroid_support.a)
 endif()
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/find_library.html

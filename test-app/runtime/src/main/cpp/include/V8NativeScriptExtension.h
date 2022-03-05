@@ -7,7 +7,7 @@ namespace v8 {
 	public:
 		static unsigned long GetAddress(const v8::Local<v8::Object>& obj);
 
-		//static v8::Local<v8::Value>* GetClosureObjects(v8::Isolate* isolate, const v8::Local<v8::Function>& func, int* length);
+		static v8::Local<v8::Value>* GetClosureObjects(v8::Isolate* isolate, const v8::Local<v8::Function>& func, int* length);
 
 		static void ReleaseClosureObjects(v8::Local<v8::Value>* closureObjects);
 

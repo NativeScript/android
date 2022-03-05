@@ -10,21 +10,18 @@
 
 #include "third_party/inspector_protocol/crdtp/cbor.h"
 #include "third_party/inspector_protocol/crdtp/find_by_first.h"
+#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
 #include "third_party/inspector_protocol/crdtp/span.h"
 
 namespace v8_inspector {
 namespace protocol {
 namespace CSS {
 
-using v8_crdtp::DeserializerState;
-using v8_crdtp::ProtocolTypeTraits;
-
 // ------------- Enum values from types.
 
 const char Metainfo::domainName[] = "CSS";
 const char Metainfo::commandPrefix[] = "CSS.";
 const char Metainfo::version[] = "1.3";
-
 
 namespace StyleSheetOriginEnum {
 const char Injected[] = "injected";
@@ -33,332 +30,1440 @@ const char Inspector[] = "inspector";
 const char Regular[] = "regular";
 } // namespace StyleSheetOriginEnum
 
+std::unique_ptr<PseudoElementMatches> PseudoElementMatches::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
-V8_CRDTP_BEGIN_DESERIALIZER(PseudoElementMatches)
-    V8_CRDTP_DESERIALIZE_FIELD("matches", m_matches),
-    V8_CRDTP_DESERIALIZE_FIELD("pseudoType", m_pseudoType),
-V8_CRDTP_END_DESERIALIZER()
+    std::unique_ptr<PseudoElementMatches> result(new PseudoElementMatches());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* pseudoTypeValue = object->get("pseudoType");
+    errors->SetName("pseudoType");
+    result->m_pseudoType = ValueConversions<String>::fromValue(pseudoTypeValue, errors);
+    protocol::Value* matchesValue = object->get("matches");
+    errors->SetName("matches");
+    result->m_matches = ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::fromValue(matchesValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(PseudoElementMatches)
-    V8_CRDTP_SERIALIZE_FIELD("pseudoType", m_pseudoType);
-    V8_CRDTP_SERIALIZE_FIELD("matches", m_matches);
-V8_CRDTP_END_SERIALIZER();
+std::unique_ptr<protocol::DictionaryValue> PseudoElementMatches::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("pseudoType", ValueConversions<String>::toValue(m_pseudoType));
+    result->setValue("matches", ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::toValue(m_matches.get()));
+    return result;
+}
 
+void PseudoElementMatches::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pseudoType"), m_pseudoType, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("matches"), m_matches, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(InheritedStyleEntry)
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("inlineStyle", m_inlineStyle),
-    V8_CRDTP_DESERIALIZE_FIELD("matchedCSSRules", m_matchedCSSRules),
-V8_CRDTP_END_DESERIALIZER()
+std::unique_ptr<PseudoElementMatches> PseudoElementMatches::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(InheritedStyleEntry)
-    V8_CRDTP_SERIALIZE_FIELD("inlineStyle", m_inlineStyle);
-    V8_CRDTP_SERIALIZE_FIELD("matchedCSSRules", m_matchedCSSRules);
-V8_CRDTP_END_SERIALIZER();
+std::unique_ptr<InheritedStyleEntry> InheritedStyleEntry::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
+    std::unique_ptr<InheritedStyleEntry> result(new InheritedStyleEntry());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* inlineStyleValue = object->get("inlineStyle");
+    if (inlineStyleValue) {
+        errors->SetName("inlineStyle");
+        result->m_inlineStyle = ValueConversions<protocol::CSS::CSSStyle>::fromValue(inlineStyleValue, errors);
+    }
+    protocol::Value* matchedCSSRulesValue = object->get("matchedCSSRules");
+    errors->SetName("matchedCSSRules");
+    result->m_matchedCSSRules = ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::fromValue(matchedCSSRulesValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(RuleMatch)
-    V8_CRDTP_DESERIALIZE_FIELD("matchingSelectors", m_matchingSelectors),
-    V8_CRDTP_DESERIALIZE_FIELD("rule", m_rule),
-V8_CRDTP_END_DESERIALIZER()
+std::unique_ptr<protocol::DictionaryValue> InheritedStyleEntry::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (m_inlineStyle.isJust())
+        result->setValue("inlineStyle", ValueConversions<protocol::CSS::CSSStyle>::toValue(m_inlineStyle.fromJust()));
+    result->setValue("matchedCSSRules", ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::toValue(m_matchedCSSRules.get()));
+    return result;
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(RuleMatch)
-    V8_CRDTP_SERIALIZE_FIELD("rule", m_rule);
-    V8_CRDTP_SERIALIZE_FIELD("matchingSelectors", m_matchingSelectors);
-V8_CRDTP_END_SERIALIZER();
+void InheritedStyleEntry::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("inlineStyle"), m_inlineStyle, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("matchedCSSRules"), m_matchedCSSRules, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
 
+std::unique_ptr<InheritedStyleEntry> InheritedStyleEntry::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(Value)
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("range", m_range),
-    V8_CRDTP_DESERIALIZE_FIELD("text", m_text),
-V8_CRDTP_END_DESERIALIZER()
+std::unique_ptr<RuleMatch> RuleMatch::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
-V8_CRDTP_BEGIN_SERIALIZER(Value)
-    V8_CRDTP_SERIALIZE_FIELD("text", m_text);
-    V8_CRDTP_SERIALIZE_FIELD("range", m_range);
-V8_CRDTP_END_SERIALIZER();
+    std::unique_ptr<RuleMatch> result(new RuleMatch());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* ruleValue = object->get("rule");
+    errors->SetName("rule");
+    result->m_rule = ValueConversions<protocol::CSS::CSSRule>::fromValue(ruleValue, errors);
+    protocol::Value* matchingSelectorsValue = object->get("matchingSelectors");
+    errors->SetName("matchingSelectors");
+    result->m_matchingSelectors = ValueConversions<protocol::Array<int>>::fromValue(matchingSelectorsValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
 
+std::unique_ptr<protocol::DictionaryValue> RuleMatch::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("rule", ValueConversions<protocol::CSS::CSSRule>::toValue(m_rule.get()));
+    result->setValue("matchingSelectors", ValueConversions<protocol::Array<int>>::toValue(m_matchingSelectors.get()));
+    return result;
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(SelectorList)
-    V8_CRDTP_DESERIALIZE_FIELD("selectors", m_selectors),
-    V8_CRDTP_DESERIALIZE_FIELD("text", m_text),
-V8_CRDTP_END_DESERIALIZER()
+void RuleMatch::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("rule"), m_rule, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("matchingSelectors"), m_matchingSelectors, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(SelectorList)
-    V8_CRDTP_SERIALIZE_FIELD("selectors", m_selectors);
-    V8_CRDTP_SERIALIZE_FIELD("text", m_text);
-V8_CRDTP_END_SERIALIZER();
+std::unique_ptr<RuleMatch> RuleMatch::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
+std::unique_ptr<Value> Value::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
-V8_CRDTP_BEGIN_DESERIALIZER(CSSStyleSheetHeader)
-    V8_CRDTP_DESERIALIZE_FIELD("disabled", m_disabled),
-    V8_CRDTP_DESERIALIZE_FIELD("frameId", m_frameId),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("hasSourceURL", m_hasSourceURL),
-    V8_CRDTP_DESERIALIZE_FIELD("isInline", m_isInline),
-    V8_CRDTP_DESERIALIZE_FIELD("length", m_length),
-    V8_CRDTP_DESERIALIZE_FIELD("origin", m_origin),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("ownerNode", m_ownerNode),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("sourceMapURL", m_sourceMapURL),
-    V8_CRDTP_DESERIALIZE_FIELD("sourceURL", m_sourceURL),
-    V8_CRDTP_DESERIALIZE_FIELD("startColumn", m_startColumn),
-    V8_CRDTP_DESERIALIZE_FIELD("startLine", m_startLine),
-    V8_CRDTP_DESERIALIZE_FIELD("styleSheetId", m_styleSheetId),
-    V8_CRDTP_DESERIALIZE_FIELD("title", m_title),
-V8_CRDTP_END_DESERIALIZER()
+    std::unique_ptr<Value> result(new Value());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* textValue = object->get("text");
+    errors->SetName("text");
+    result->m_text = ValueConversions<String>::fromValue(textValue, errors);
+    protocol::Value* rangeValue = object->get("range");
+    if (rangeValue) {
+        errors->SetName("range");
+        result->m_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
+    }
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(CSSStyleSheetHeader)
-    V8_CRDTP_SERIALIZE_FIELD("styleSheetId", m_styleSheetId);
-    V8_CRDTP_SERIALIZE_FIELD("frameId", m_frameId);
-    V8_CRDTP_SERIALIZE_FIELD("sourceURL", m_sourceURL);
-    V8_CRDTP_SERIALIZE_FIELD("sourceMapURL", m_sourceMapURL);
-    V8_CRDTP_SERIALIZE_FIELD("origin", m_origin);
-    V8_CRDTP_SERIALIZE_FIELD("title", m_title);
-    V8_CRDTP_SERIALIZE_FIELD("ownerNode", m_ownerNode);
-    V8_CRDTP_SERIALIZE_FIELD("disabled", m_disabled);
-    V8_CRDTP_SERIALIZE_FIELD("hasSourceURL", m_hasSourceURL);
-    V8_CRDTP_SERIALIZE_FIELD("isInline", m_isInline);
-    V8_CRDTP_SERIALIZE_FIELD("startLine", m_startLine);
-    V8_CRDTP_SERIALIZE_FIELD("startColumn", m_startColumn);
-    V8_CRDTP_SERIALIZE_FIELD("length", m_length);
-V8_CRDTP_END_SERIALIZER();
+std::unique_ptr<protocol::DictionaryValue> Value::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("text", ValueConversions<String>::toValue(m_text));
+    if (m_range.isJust())
+        result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::toValue(m_range.fromJust()));
+    return result;
+}
 
+void Value::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), m_text, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("range"), m_range, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(CSSRule)
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("media", m_media),
-    V8_CRDTP_DESERIALIZE_FIELD("origin", m_origin),
-    V8_CRDTP_DESERIALIZE_FIELD("selectorList", m_selectorList),
-    V8_CRDTP_DESERIALIZE_FIELD("style", m_style),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("styleSheetId", m_styleSheetId),
-V8_CRDTP_END_DESERIALIZER()
+std::unique_ptr<Value> Value::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(CSSRule)
-    V8_CRDTP_SERIALIZE_FIELD("styleSheetId", m_styleSheetId);
-    V8_CRDTP_SERIALIZE_FIELD("selectorList", m_selectorList);
-    V8_CRDTP_SERIALIZE_FIELD("origin", m_origin);
-    V8_CRDTP_SERIALIZE_FIELD("style", m_style);
-    V8_CRDTP_SERIALIZE_FIELD("media", m_media);
-V8_CRDTP_END_SERIALIZER();
+std::unique_ptr<SelectorList> SelectorList::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
+    std::unique_ptr<SelectorList> result(new SelectorList());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* selectorsValue = object->get("selectors");
+    errors->SetName("selectors");
+    result->m_selectors = ValueConversions<protocol::Array<protocol::CSS::Value>>::fromValue(selectorsValue, errors);
+    protocol::Value* textValue = object->get("text");
+    errors->SetName("text");
+    result->m_text = ValueConversions<String>::fromValue(textValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(RuleUsage)
-    V8_CRDTP_DESERIALIZE_FIELD("endOffset", m_endOffset),
-    V8_CRDTP_DESERIALIZE_FIELD("startOffset", m_startOffset),
-    V8_CRDTP_DESERIALIZE_FIELD("styleSheetId", m_styleSheetId),
-    V8_CRDTP_DESERIALIZE_FIELD("used", m_used),
-V8_CRDTP_END_DESERIALIZER()
+std::unique_ptr<protocol::DictionaryValue> SelectorList::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("selectors", ValueConversions<protocol::Array<protocol::CSS::Value>>::toValue(m_selectors.get()));
+    result->setValue("text", ValueConversions<String>::toValue(m_text));
+    return result;
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(RuleUsage)
-    V8_CRDTP_SERIALIZE_FIELD("styleSheetId", m_styleSheetId);
-    V8_CRDTP_SERIALIZE_FIELD("startOffset", m_startOffset);
-    V8_CRDTP_SERIALIZE_FIELD("endOffset", m_endOffset);
-    V8_CRDTP_SERIALIZE_FIELD("used", m_used);
-V8_CRDTP_END_SERIALIZER();
+void SelectorList::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("selectors"), m_selectors, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), m_text, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
 
+std::unique_ptr<SelectorList> SelectorList::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(SourceRange)
-    V8_CRDTP_DESERIALIZE_FIELD("endColumn", m_endColumn),
-    V8_CRDTP_DESERIALIZE_FIELD("endLine", m_endLine),
-    V8_CRDTP_DESERIALIZE_FIELD("startColumn", m_startColumn),
-    V8_CRDTP_DESERIALIZE_FIELD("startLine", m_startLine),
-V8_CRDTP_END_DESERIALIZER()
+std::unique_ptr<CSSStyleSheetHeader> CSSStyleSheetHeader::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
-V8_CRDTP_BEGIN_SERIALIZER(SourceRange)
-    V8_CRDTP_SERIALIZE_FIELD("startLine", m_startLine);
-    V8_CRDTP_SERIALIZE_FIELD("startColumn", m_startColumn);
-    V8_CRDTP_SERIALIZE_FIELD("endLine", m_endLine);
-    V8_CRDTP_SERIALIZE_FIELD("endColumn", m_endColumn);
-V8_CRDTP_END_SERIALIZER();
+    std::unique_ptr<CSSStyleSheetHeader> result(new CSSStyleSheetHeader());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* styleSheetIdValue = object->get("styleSheetId");
+    errors->SetName("styleSheetId");
+    result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    protocol::Value* frameIdValue = object->get("frameId");
+    errors->SetName("frameId");
+    result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
+    protocol::Value* sourceURLValue = object->get("sourceURL");
+    errors->SetName("sourceURL");
+    result->m_sourceURL = ValueConversions<String>::fromValue(sourceURLValue, errors);
+    protocol::Value* sourceMapURLValue = object->get("sourceMapURL");
+    if (sourceMapURLValue) {
+        errors->SetName("sourceMapURL");
+        result->m_sourceMapURL = ValueConversions<String>::fromValue(sourceMapURLValue, errors);
+    }
+    protocol::Value* originValue = object->get("origin");
+    errors->SetName("origin");
+    result->m_origin = ValueConversions<String>::fromValue(originValue, errors);
+    protocol::Value* titleValue = object->get("title");
+    errors->SetName("title");
+    result->m_title = ValueConversions<String>::fromValue(titleValue, errors);
+    protocol::Value* ownerNodeValue = object->get("ownerNode");
+    if (ownerNodeValue) {
+        errors->SetName("ownerNode");
+        result->m_ownerNode = ValueConversions<int>::fromValue(ownerNodeValue, errors);
+    }
+    protocol::Value* disabledValue = object->get("disabled");
+    errors->SetName("disabled");
+    result->m_disabled = ValueConversions<bool>::fromValue(disabledValue, errors);
+    protocol::Value* hasSourceURLValue = object->get("hasSourceURL");
+    if (hasSourceURLValue) {
+        errors->SetName("hasSourceURL");
+        result->m_hasSourceURL = ValueConversions<bool>::fromValue(hasSourceURLValue, errors);
+    }
+    protocol::Value* isInlineValue = object->get("isInline");
+    errors->SetName("isInline");
+    result->m_isInline = ValueConversions<bool>::fromValue(isInlineValue, errors);
+    protocol::Value* startLineValue = object->get("startLine");
+    errors->SetName("startLine");
+    result->m_startLine = ValueConversions<double>::fromValue(startLineValue, errors);
+    protocol::Value* startColumnValue = object->get("startColumn");
+    errors->SetName("startColumn");
+    result->m_startColumn = ValueConversions<double>::fromValue(startColumnValue, errors);
+    protocol::Value* lengthValue = object->get("length");
+    errors->SetName("length");
+    result->m_length = ValueConversions<double>::fromValue(lengthValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
 
+std::unique_ptr<protocol::DictionaryValue> CSSStyleSheetHeader::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId));
+    result->setValue("frameId", ValueConversions<String>::toValue(m_frameId));
+    result->setValue("sourceURL", ValueConversions<String>::toValue(m_sourceURL));
+    if (m_sourceMapURL.isJust())
+        result->setValue("sourceMapURL", ValueConversions<String>::toValue(m_sourceMapURL.fromJust()));
+    result->setValue("origin", ValueConversions<String>::toValue(m_origin));
+    result->setValue("title", ValueConversions<String>::toValue(m_title));
+    if (m_ownerNode.isJust())
+        result->setValue("ownerNode", ValueConversions<int>::toValue(m_ownerNode.fromJust()));
+    result->setValue("disabled", ValueConversions<bool>::toValue(m_disabled));
+    if (m_hasSourceURL.isJust())
+        result->setValue("hasSourceURL", ValueConversions<bool>::toValue(m_hasSourceURL.fromJust()));
+    result->setValue("isInline", ValueConversions<bool>::toValue(m_isInline));
+    result->setValue("startLine", ValueConversions<double>::toValue(m_startLine));
+    result->setValue("startColumn", ValueConversions<double>::toValue(m_startColumn));
+    result->setValue("length", ValueConversions<double>::toValue(m_length));
+    return result;
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(ShorthandEntry)
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("important", m_important),
-    V8_CRDTP_DESERIALIZE_FIELD("name", m_name),
-    V8_CRDTP_DESERIALIZE_FIELD("value", m_value),
-V8_CRDTP_END_DESERIALIZER()
+void CSSStyleSheetHeader::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sourceURL"), m_sourceURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sourceMapURL"), m_sourceMapURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("origin"), m_origin, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("title"), m_title, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("ownerNode"), m_ownerNode, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("disabled"), m_disabled, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hasSourceURL"), m_hasSourceURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("isInline"), m_isInline, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startLine"), m_startLine, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startColumn"), m_startColumn, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("length"), m_length, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(ShorthandEntry)
-    V8_CRDTP_SERIALIZE_FIELD("name", m_name);
-    V8_CRDTP_SERIALIZE_FIELD("value", m_value);
-    V8_CRDTP_SERIALIZE_FIELD("important", m_important);
-V8_CRDTP_END_SERIALIZER();
+std::unique_ptr<CSSStyleSheetHeader> CSSStyleSheetHeader::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
+std::unique_ptr<CSSRule> CSSRule::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
-V8_CRDTP_BEGIN_DESERIALIZER(CSSComputedStyleProperty)
-    V8_CRDTP_DESERIALIZE_FIELD("name", m_name),
-    V8_CRDTP_DESERIALIZE_FIELD("value", m_value),
-V8_CRDTP_END_DESERIALIZER()
+    std::unique_ptr<CSSRule> result(new CSSRule());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* styleSheetIdValue = object->get("styleSheetId");
+    if (styleSheetIdValue) {
+        errors->SetName("styleSheetId");
+        result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    }
+    protocol::Value* selectorListValue = object->get("selectorList");
+    errors->SetName("selectorList");
+    result->m_selectorList = ValueConversions<protocol::CSS::SelectorList>::fromValue(selectorListValue, errors);
+    protocol::Value* originValue = object->get("origin");
+    errors->SetName("origin");
+    result->m_origin = ValueConversions<String>::fromValue(originValue, errors);
+    protocol::Value* styleValue = object->get("style");
+    errors->SetName("style");
+    result->m_style = ValueConversions<protocol::CSS::CSSStyle>::fromValue(styleValue, errors);
+    protocol::Value* mediaValue = object->get("media");
+    if (mediaValue) {
+        errors->SetName("media");
+        result->m_media = ValueConversions<protocol::Array<protocol::CSS::CSSMedia>>::fromValue(mediaValue, errors);
+    }
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(CSSComputedStyleProperty)
-    V8_CRDTP_SERIALIZE_FIELD("name", m_name);
-    V8_CRDTP_SERIALIZE_FIELD("value", m_value);
-V8_CRDTP_END_SERIALIZER();
+std::unique_ptr<protocol::DictionaryValue> CSSRule::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (m_styleSheetId.isJust())
+        result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId.fromJust()));
+    result->setValue("selectorList", ValueConversions<protocol::CSS::SelectorList>::toValue(m_selectorList.get()));
+    result->setValue("origin", ValueConversions<String>::toValue(m_origin));
+    result->setValue("style", ValueConversions<protocol::CSS::CSSStyle>::toValue(m_style.get()));
+    if (m_media.isJust())
+        result->setValue("media", ValueConversions<protocol::Array<protocol::CSS::CSSMedia>>::toValue(m_media.fromJust()));
+    return result;
+}
 
+void CSSRule::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("selectorList"), m_selectorList, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("origin"), m_origin, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("style"), m_style, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("media"), m_media, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(CSSStyle)
-    V8_CRDTP_DESERIALIZE_FIELD("cssProperties", m_cssProperties),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("cssText", m_cssText),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("range", m_range),
-    V8_CRDTP_DESERIALIZE_FIELD("shorthandEntries", m_shorthandEntries),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("styleSheetId", m_styleSheetId),
-V8_CRDTP_END_DESERIALIZER()
+std::unique_ptr<CSSRule> CSSRule::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(CSSStyle)
-    V8_CRDTP_SERIALIZE_FIELD("styleSheetId", m_styleSheetId);
-    V8_CRDTP_SERIALIZE_FIELD("cssProperties", m_cssProperties);
-    V8_CRDTP_SERIALIZE_FIELD("shorthandEntries", m_shorthandEntries);
-    V8_CRDTP_SERIALIZE_FIELD("cssText", m_cssText);
-    V8_CRDTP_SERIALIZE_FIELD("range", m_range);
-V8_CRDTP_END_SERIALIZER();
+std::unique_ptr<RuleUsage> RuleUsage::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
+    std::unique_ptr<RuleUsage> result(new RuleUsage());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* styleSheetIdValue = object->get("styleSheetId");
+    errors->SetName("styleSheetId");
+    result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    protocol::Value* startOffsetValue = object->get("startOffset");
+    errors->SetName("startOffset");
+    result->m_startOffset = ValueConversions<double>::fromValue(startOffsetValue, errors);
+    protocol::Value* endOffsetValue = object->get("endOffset");
+    errors->SetName("endOffset");
+    result->m_endOffset = ValueConversions<double>::fromValue(endOffsetValue, errors);
+    protocol::Value* usedValue = object->get("used");
+    errors->SetName("used");
+    result->m_used = ValueConversions<bool>::fromValue(usedValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(CSSProperty)
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("disabled", m_disabled),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("implicit", m_implicit),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("important", m_important),
-    V8_CRDTP_DESERIALIZE_FIELD("name", m_name),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("parsedOk", m_parsedOk),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("range", m_range),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("text", m_text),
-    V8_CRDTP_DESERIALIZE_FIELD("value", m_value),
-V8_CRDTP_END_DESERIALIZER()
+std::unique_ptr<protocol::DictionaryValue> RuleUsage::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId));
+    result->setValue("startOffset", ValueConversions<double>::toValue(m_startOffset));
+    result->setValue("endOffset", ValueConversions<double>::toValue(m_endOffset));
+    result->setValue("used", ValueConversions<bool>::toValue(m_used));
+    return result;
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(CSSProperty)
-    V8_CRDTP_SERIALIZE_FIELD("name", m_name);
-    V8_CRDTP_SERIALIZE_FIELD("value", m_value);
-    V8_CRDTP_SERIALIZE_FIELD("important", m_important);
-    V8_CRDTP_SERIALIZE_FIELD("implicit", m_implicit);
-    V8_CRDTP_SERIALIZE_FIELD("text", m_text);
-    V8_CRDTP_SERIALIZE_FIELD("parsedOk", m_parsedOk);
-    V8_CRDTP_SERIALIZE_FIELD("disabled", m_disabled);
-    V8_CRDTP_SERIALIZE_FIELD("range", m_range);
-V8_CRDTP_END_SERIALIZER();
+void RuleUsage::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startOffset"), m_startOffset, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endOffset"), m_endOffset, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("used"), m_used, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
 
+std::unique_ptr<RuleUsage> RuleUsage::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
+std::unique_ptr<SourceRange> SourceRange::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<SourceRange> result(new SourceRange());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* startLineValue = object->get("startLine");
+    errors->SetName("startLine");
+    result->m_startLine = ValueConversions<int>::fromValue(startLineValue, errors);
+    protocol::Value* startColumnValue = object->get("startColumn");
+    errors->SetName("startColumn");
+    result->m_startColumn = ValueConversions<int>::fromValue(startColumnValue, errors);
+    protocol::Value* endLineValue = object->get("endLine");
+    errors->SetName("endLine");
+    result->m_endLine = ValueConversions<int>::fromValue(endLineValue, errors);
+    protocol::Value* endColumnValue = object->get("endColumn");
+    errors->SetName("endColumn");
+    result->m_endColumn = ValueConversions<int>::fromValue(endColumnValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> SourceRange::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("startLine", ValueConversions<int>::toValue(m_startLine));
+    result->setValue("startColumn", ValueConversions<int>::toValue(m_startColumn));
+    result->setValue("endLine", ValueConversions<int>::toValue(m_endLine));
+    result->setValue("endColumn", ValueConversions<int>::toValue(m_endColumn));
+    return result;
+}
+
+void SourceRange::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startLine"), m_startLine, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startColumn"), m_startColumn, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endLine"), m_endLine, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endColumn"), m_endColumn, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<SourceRange> SourceRange::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<ShorthandEntry> ShorthandEntry::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<ShorthandEntry> result(new ShorthandEntry());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* nameValue = object->get("name");
+    errors->SetName("name");
+    result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
+    protocol::Value* valueValue = object->get("value");
+    errors->SetName("value");
+    result->m_value = ValueConversions<String>::fromValue(valueValue, errors);
+    protocol::Value* importantValue = object->get("important");
+    if (importantValue) {
+        errors->SetName("important");
+        result->m_important = ValueConversions<bool>::fromValue(importantValue, errors);
+    }
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> ShorthandEntry::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("name", ValueConversions<String>::toValue(m_name));
+    result->setValue("value", ValueConversions<String>::toValue(m_value));
+    if (m_important.isJust())
+        result->setValue("important", ValueConversions<bool>::toValue(m_important.fromJust()));
+    return result;
+}
+
+void ShorthandEntry::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("value"), m_value, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("important"), m_important, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<ShorthandEntry> ShorthandEntry::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<CSSComputedStyleProperty> CSSComputedStyleProperty::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<CSSComputedStyleProperty> result(new CSSComputedStyleProperty());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* nameValue = object->get("name");
+    errors->SetName("name");
+    result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
+    protocol::Value* valueValue = object->get("value");
+    errors->SetName("value");
+    result->m_value = ValueConversions<String>::fromValue(valueValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> CSSComputedStyleProperty::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("name", ValueConversions<String>::toValue(m_name));
+    result->setValue("value", ValueConversions<String>::toValue(m_value));
+    return result;
+}
+
+void CSSComputedStyleProperty::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("value"), m_value, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<CSSComputedStyleProperty> CSSComputedStyleProperty::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<CSSStyle> CSSStyle::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<CSSStyle> result(new CSSStyle());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* styleSheetIdValue = object->get("styleSheetId");
+    if (styleSheetIdValue) {
+        errors->SetName("styleSheetId");
+        result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    }
+    protocol::Value* cssPropertiesValue = object->get("cssProperties");
+    errors->SetName("cssProperties");
+    result->m_cssProperties = ValueConversions<protocol::Array<protocol::CSS::CSSProperty>>::fromValue(cssPropertiesValue, errors);
+    protocol::Value* shorthandEntriesValue = object->get("shorthandEntries");
+    errors->SetName("shorthandEntries");
+    result->m_shorthandEntries = ValueConversions<protocol::Array<protocol::CSS::ShorthandEntry>>::fromValue(shorthandEntriesValue, errors);
+    protocol::Value* cssTextValue = object->get("cssText");
+    if (cssTextValue) {
+        errors->SetName("cssText");
+        result->m_cssText = ValueConversions<String>::fromValue(cssTextValue, errors);
+    }
+    protocol::Value* rangeValue = object->get("range");
+    if (rangeValue) {
+        errors->SetName("range");
+        result->m_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
+    }
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> CSSStyle::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (m_styleSheetId.isJust())
+        result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId.fromJust()));
+    result->setValue("cssProperties", ValueConversions<protocol::Array<protocol::CSS::CSSProperty>>::toValue(m_cssProperties.get()));
+    result->setValue("shorthandEntries", ValueConversions<protocol::Array<protocol::CSS::ShorthandEntry>>::toValue(m_shorthandEntries.get()));
+    if (m_cssText.isJust())
+        result->setValue("cssText", ValueConversions<String>::toValue(m_cssText.fromJust()));
+    if (m_range.isJust())
+        result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::toValue(m_range.fromJust()));
+    return result;
+}
+
+void CSSStyle::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("cssProperties"), m_cssProperties, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("shorthandEntries"), m_shorthandEntries, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("cssText"), m_cssText, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("range"), m_range, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<CSSStyle> CSSStyle::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<CSSProperty> CSSProperty::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<CSSProperty> result(new CSSProperty());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* nameValue = object->get("name");
+    errors->SetName("name");
+    result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
+    protocol::Value* valueValue = object->get("value");
+    errors->SetName("value");
+    result->m_value = ValueConversions<String>::fromValue(valueValue, errors);
+    protocol::Value* importantValue = object->get("important");
+    if (importantValue) {
+        errors->SetName("important");
+        result->m_important = ValueConversions<bool>::fromValue(importantValue, errors);
+    }
+    protocol::Value* implicitValue = object->get("implicit");
+    if (implicitValue) {
+        errors->SetName("implicit");
+        result->m_implicit = ValueConversions<bool>::fromValue(implicitValue, errors);
+    }
+    protocol::Value* textValue = object->get("text");
+    if (textValue) {
+        errors->SetName("text");
+        result->m_text = ValueConversions<String>::fromValue(textValue, errors);
+    }
+    protocol::Value* parsedOkValue = object->get("parsedOk");
+    if (parsedOkValue) {
+        errors->SetName("parsedOk");
+        result->m_parsedOk = ValueConversions<bool>::fromValue(parsedOkValue, errors);
+    }
+    protocol::Value* disabledValue = object->get("disabled");
+    if (disabledValue) {
+        errors->SetName("disabled");
+        result->m_disabled = ValueConversions<bool>::fromValue(disabledValue, errors);
+    }
+    protocol::Value* rangeValue = object->get("range");
+    if (rangeValue) {
+        errors->SetName("range");
+        result->m_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
+    }
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> CSSProperty::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("name", ValueConversions<String>::toValue(m_name));
+    result->setValue("value", ValueConversions<String>::toValue(m_value));
+    if (m_important.isJust())
+        result->setValue("important", ValueConversions<bool>::toValue(m_important.fromJust()));
+    if (m_implicit.isJust())
+        result->setValue("implicit", ValueConversions<bool>::toValue(m_implicit.fromJust()));
+    if (m_text.isJust())
+        result->setValue("text", ValueConversions<String>::toValue(m_text.fromJust()));
+    if (m_parsedOk.isJust())
+        result->setValue("parsedOk", ValueConversions<bool>::toValue(m_parsedOk.fromJust()));
+    if (m_disabled.isJust())
+        result->setValue("disabled", ValueConversions<bool>::toValue(m_disabled.fromJust()));
+    if (m_range.isJust())
+        result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::toValue(m_range.fromJust()));
+    return result;
+}
+
+void CSSProperty::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("value"), m_value, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("important"), m_important, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("implicit"), m_implicit, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), m_text, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parsedOk"), m_parsedOk, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("disabled"), m_disabled, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("range"), m_range, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<CSSProperty> CSSProperty::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
 const char* CSSMedia::SourceEnum::MediaRule = "mediaRule";
 const char* CSSMedia::SourceEnum::ImportRule = "importRule";
 const char* CSSMedia::SourceEnum::LinkedSheet = "linkedSheet";
 const char* CSSMedia::SourceEnum::InlineSheet = "inlineSheet";
-V8_CRDTP_BEGIN_DESERIALIZER(CSSMedia)
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("mediaList", m_mediaList),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("range", m_range),
-    V8_CRDTP_DESERIALIZE_FIELD("source", m_source),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("sourceURL", m_sourceURL),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("styleSheetId", m_styleSheetId),
-    V8_CRDTP_DESERIALIZE_FIELD("text", m_text),
-V8_CRDTP_END_DESERIALIZER()
 
-V8_CRDTP_BEGIN_SERIALIZER(CSSMedia)
-    V8_CRDTP_SERIALIZE_FIELD("text", m_text);
-    V8_CRDTP_SERIALIZE_FIELD("source", m_source);
-    V8_CRDTP_SERIALIZE_FIELD("sourceURL", m_sourceURL);
-    V8_CRDTP_SERIALIZE_FIELD("range", m_range);
-    V8_CRDTP_SERIALIZE_FIELD("styleSheetId", m_styleSheetId);
-    V8_CRDTP_SERIALIZE_FIELD("mediaList", m_mediaList);
-V8_CRDTP_END_SERIALIZER();
+std::unique_ptr<CSSMedia> CSSMedia::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
+    std::unique_ptr<CSSMedia> result(new CSSMedia());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* textValue = object->get("text");
+    errors->SetName("text");
+    result->m_text = ValueConversions<String>::fromValue(textValue, errors);
+    protocol::Value* sourceValue = object->get("source");
+    errors->SetName("source");
+    result->m_source = ValueConversions<String>::fromValue(sourceValue, errors);
+    protocol::Value* sourceURLValue = object->get("sourceURL");
+    if (sourceURLValue) {
+        errors->SetName("sourceURL");
+        result->m_sourceURL = ValueConversions<String>::fromValue(sourceURLValue, errors);
+    }
+    protocol::Value* rangeValue = object->get("range");
+    if (rangeValue) {
+        errors->SetName("range");
+        result->m_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
+    }
+    protocol::Value* styleSheetIdValue = object->get("styleSheetId");
+    if (styleSheetIdValue) {
+        errors->SetName("styleSheetId");
+        result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    }
+    protocol::Value* mediaListValue = object->get("mediaList");
+    if (mediaListValue) {
+        errors->SetName("mediaList");
+        result->m_mediaList = ValueConversions<protocol::Array<protocol::CSS::MediaQuery>>::fromValue(mediaListValue, errors);
+    }
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(MediaQuery)
-    V8_CRDTP_DESERIALIZE_FIELD("active", m_active),
-    V8_CRDTP_DESERIALIZE_FIELD("expressions", m_expressions),
-V8_CRDTP_END_DESERIALIZER()
+std::unique_ptr<protocol::DictionaryValue> CSSMedia::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("text", ValueConversions<String>::toValue(m_text));
+    result->setValue("source", ValueConversions<String>::toValue(m_source));
+    if (m_sourceURL.isJust())
+        result->setValue("sourceURL", ValueConversions<String>::toValue(m_sourceURL.fromJust()));
+    if (m_range.isJust())
+        result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::toValue(m_range.fromJust()));
+    if (m_styleSheetId.isJust())
+        result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId.fromJust()));
+    if (m_mediaList.isJust())
+        result->setValue("mediaList", ValueConversions<protocol::Array<protocol::CSS::MediaQuery>>::toValue(m_mediaList.fromJust()));
+    return result;
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(MediaQuery)
-    V8_CRDTP_SERIALIZE_FIELD("expressions", m_expressions);
-    V8_CRDTP_SERIALIZE_FIELD("active", m_active);
-V8_CRDTP_END_SERIALIZER();
+void CSSMedia::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), m_text, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("source"), m_source, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sourceURL"), m_sourceURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("range"), m_range, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("mediaList"), m_mediaList, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
 
+std::unique_ptr<CSSMedia> CSSMedia::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(MediaQueryExpression)
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("computedLength", m_computedLength),
-    V8_CRDTP_DESERIALIZE_FIELD("feature", m_feature),
-    V8_CRDTP_DESERIALIZE_FIELD("unit", m_unit),
-    V8_CRDTP_DESERIALIZE_FIELD("value", m_value),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("valueRange", m_valueRange),
-V8_CRDTP_END_DESERIALIZER()
+std::unique_ptr<MediaQuery> MediaQuery::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
-V8_CRDTP_BEGIN_SERIALIZER(MediaQueryExpression)
-    V8_CRDTP_SERIALIZE_FIELD("value", m_value);
-    V8_CRDTP_SERIALIZE_FIELD("unit", m_unit);
-    V8_CRDTP_SERIALIZE_FIELD("feature", m_feature);
-    V8_CRDTP_SERIALIZE_FIELD("valueRange", m_valueRange);
-    V8_CRDTP_SERIALIZE_FIELD("computedLength", m_computedLength);
-V8_CRDTP_END_SERIALIZER();
+    std::unique_ptr<MediaQuery> result(new MediaQuery());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* expressionsValue = object->get("expressions");
+    errors->SetName("expressions");
+    result->m_expressions = ValueConversions<protocol::Array<protocol::CSS::MediaQueryExpression>>::fromValue(expressionsValue, errors);
+    protocol::Value* activeValue = object->get("active");
+    errors->SetName("active");
+    result->m_active = ValueConversions<bool>::fromValue(activeValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
 
+std::unique_ptr<protocol::DictionaryValue> MediaQuery::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("expressions", ValueConversions<protocol::Array<protocol::CSS::MediaQueryExpression>>::toValue(m_expressions.get()));
+    result->setValue("active", ValueConversions<bool>::toValue(m_active));
+    return result;
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(PlatformFontUsage)
-    V8_CRDTP_DESERIALIZE_FIELD("familyName", m_familyName),
-    V8_CRDTP_DESERIALIZE_FIELD("glyphCount", m_glyphCount),
-    V8_CRDTP_DESERIALIZE_FIELD("isCustomFont", m_isCustomFont),
-V8_CRDTP_END_DESERIALIZER()
+void MediaQuery::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("expressions"), m_expressions, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("active"), m_active, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(PlatformFontUsage)
-    V8_CRDTP_SERIALIZE_FIELD("familyName", m_familyName);
-    V8_CRDTP_SERIALIZE_FIELD("isCustomFont", m_isCustomFont);
-    V8_CRDTP_SERIALIZE_FIELD("glyphCount", m_glyphCount);
-V8_CRDTP_END_SERIALIZER();
+std::unique_ptr<MediaQuery> MediaQuery::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
+std::unique_ptr<MediaQueryExpression> MediaQueryExpression::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
-V8_CRDTP_BEGIN_DESERIALIZER(FontFace)
-    V8_CRDTP_DESERIALIZE_FIELD("fontFamily", m_fontFamily),
-    V8_CRDTP_DESERIALIZE_FIELD("fontStretch", m_fontStretch),
-    V8_CRDTP_DESERIALIZE_FIELD("fontStyle", m_fontStyle),
-    V8_CRDTP_DESERIALIZE_FIELD("fontVariant", m_fontVariant),
-    V8_CRDTP_DESERIALIZE_FIELD("fontWeight", m_fontWeight),
-    V8_CRDTP_DESERIALIZE_FIELD("platformFontFamily", m_platformFontFamily),
-    V8_CRDTP_DESERIALIZE_FIELD("src", m_src),
-    V8_CRDTP_DESERIALIZE_FIELD("unicodeRange", m_unicodeRange),
-V8_CRDTP_END_DESERIALIZER()
+    std::unique_ptr<MediaQueryExpression> result(new MediaQueryExpression());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* valueValue = object->get("value");
+    errors->SetName("value");
+    result->m_value = ValueConversions<double>::fromValue(valueValue, errors);
+    protocol::Value* unitValue = object->get("unit");
+    errors->SetName("unit");
+    result->m_unit = ValueConversions<String>::fromValue(unitValue, errors);
+    protocol::Value* featureValue = object->get("feature");
+    errors->SetName("feature");
+    result->m_feature = ValueConversions<String>::fromValue(featureValue, errors);
+    protocol::Value* valueRangeValue = object->get("valueRange");
+    if (valueRangeValue) {
+        errors->SetName("valueRange");
+        result->m_valueRange = ValueConversions<protocol::CSS::SourceRange>::fromValue(valueRangeValue, errors);
+    }
+    protocol::Value* computedLengthValue = object->get("computedLength");
+    if (computedLengthValue) {
+        errors->SetName("computedLength");
+        result->m_computedLength = ValueConversions<double>::fromValue(computedLengthValue, errors);
+    }
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(FontFace)
-    V8_CRDTP_SERIALIZE_FIELD("fontFamily", m_fontFamily);
-    V8_CRDTP_SERIALIZE_FIELD("fontStyle", m_fontStyle);
-    V8_CRDTP_SERIALIZE_FIELD("fontVariant", m_fontVariant);
-    V8_CRDTP_SERIALIZE_FIELD("fontWeight", m_fontWeight);
-    V8_CRDTP_SERIALIZE_FIELD("fontStretch", m_fontStretch);
-    V8_CRDTP_SERIALIZE_FIELD("unicodeRange", m_unicodeRange);
-    V8_CRDTP_SERIALIZE_FIELD("src", m_src);
-    V8_CRDTP_SERIALIZE_FIELD("platformFontFamily", m_platformFontFamily);
-V8_CRDTP_END_SERIALIZER();
+std::unique_ptr<protocol::DictionaryValue> MediaQueryExpression::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("value", ValueConversions<double>::toValue(m_value));
+    result->setValue("unit", ValueConversions<String>::toValue(m_unit));
+    result->setValue("feature", ValueConversions<String>::toValue(m_feature));
+    if (m_valueRange.isJust())
+        result->setValue("valueRange", ValueConversions<protocol::CSS::SourceRange>::toValue(m_valueRange.fromJust()));
+    if (m_computedLength.isJust())
+        result->setValue("computedLength", ValueConversions<double>::toValue(m_computedLength.fromJust()));
+    return result;
+}
 
+void MediaQueryExpression::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("value"), m_value, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("unit"), m_unit, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("feature"), m_feature, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("valueRange"), m_valueRange, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("computedLength"), m_computedLength, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(CSSKeyframesRule)
-    V8_CRDTP_DESERIALIZE_FIELD("animationName", m_animationName),
-    V8_CRDTP_DESERIALIZE_FIELD("keyframes", m_keyframes),
-V8_CRDTP_END_DESERIALIZER()
+std::unique_ptr<MediaQueryExpression> MediaQueryExpression::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(CSSKeyframesRule)
-    V8_CRDTP_SERIALIZE_FIELD("animationName", m_animationName);
-    V8_CRDTP_SERIALIZE_FIELD("keyframes", m_keyframes);
-V8_CRDTP_END_SERIALIZER();
+std::unique_ptr<PlatformFontUsage> PlatformFontUsage::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
+    std::unique_ptr<PlatformFontUsage> result(new PlatformFontUsage());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* familyNameValue = object->get("familyName");
+    errors->SetName("familyName");
+    result->m_familyName = ValueConversions<String>::fromValue(familyNameValue, errors);
+    protocol::Value* isCustomFontValue = object->get("isCustomFont");
+    errors->SetName("isCustomFont");
+    result->m_isCustomFont = ValueConversions<bool>::fromValue(isCustomFontValue, errors);
+    protocol::Value* glyphCountValue = object->get("glyphCount");
+    errors->SetName("glyphCount");
+    result->m_glyphCount = ValueConversions<double>::fromValue(glyphCountValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(CSSKeyframeRule)
-    V8_CRDTP_DESERIALIZE_FIELD("keyText", m_keyText),
-    V8_CRDTP_DESERIALIZE_FIELD("origin", m_origin),
-    V8_CRDTP_DESERIALIZE_FIELD("style", m_style),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("styleSheetId", m_styleSheetId),
-V8_CRDTP_END_DESERIALIZER()
+std::unique_ptr<protocol::DictionaryValue> PlatformFontUsage::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("familyName", ValueConversions<String>::toValue(m_familyName));
+    result->setValue("isCustomFont", ValueConversions<bool>::toValue(m_isCustomFont));
+    result->setValue("glyphCount", ValueConversions<double>::toValue(m_glyphCount));
+    return result;
+}
 
-V8_CRDTP_BEGIN_SERIALIZER(CSSKeyframeRule)
-    V8_CRDTP_SERIALIZE_FIELD("styleSheetId", m_styleSheetId);
-    V8_CRDTP_SERIALIZE_FIELD("origin", m_origin);
-    V8_CRDTP_SERIALIZE_FIELD("keyText", m_keyText);
-    V8_CRDTP_SERIALIZE_FIELD("style", m_style);
-V8_CRDTP_END_SERIALIZER();
+void PlatformFontUsage::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("familyName"), m_familyName, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("isCustomFont"), m_isCustomFont, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("glyphCount"), m_glyphCount, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
 
+std::unique_ptr<PlatformFontUsage> PlatformFontUsage::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
-V8_CRDTP_BEGIN_DESERIALIZER(StyleDeclarationEdit)
-    V8_CRDTP_DESERIALIZE_FIELD("range", m_range),
-    V8_CRDTP_DESERIALIZE_FIELD("styleSheetId", m_styleSheetId),
-    V8_CRDTP_DESERIALIZE_FIELD("text", m_text),
-V8_CRDTP_END_DESERIALIZER()
+std::unique_ptr<FontFace> FontFace::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
 
-V8_CRDTP_BEGIN_SERIALIZER(StyleDeclarationEdit)
-    V8_CRDTP_SERIALIZE_FIELD("styleSheetId", m_styleSheetId);
-    V8_CRDTP_SERIALIZE_FIELD("range", m_range);
-    V8_CRDTP_SERIALIZE_FIELD("text", m_text);
-V8_CRDTP_END_SERIALIZER();
+    std::unique_ptr<FontFace> result(new FontFace());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* fontFamilyValue = object->get("fontFamily");
+    errors->SetName("fontFamily");
+    result->m_fontFamily = ValueConversions<String>::fromValue(fontFamilyValue, errors);
+    protocol::Value* fontStyleValue = object->get("fontStyle");
+    errors->SetName("fontStyle");
+    result->m_fontStyle = ValueConversions<String>::fromValue(fontStyleValue, errors);
+    protocol::Value* fontVariantValue = object->get("fontVariant");
+    errors->SetName("fontVariant");
+    result->m_fontVariant = ValueConversions<String>::fromValue(fontVariantValue, errors);
+    protocol::Value* fontWeightValue = object->get("fontWeight");
+    errors->SetName("fontWeight");
+    result->m_fontWeight = ValueConversions<String>::fromValue(fontWeightValue, errors);
+    protocol::Value* fontStretchValue = object->get("fontStretch");
+    errors->SetName("fontStretch");
+    result->m_fontStretch = ValueConversions<String>::fromValue(fontStretchValue, errors);
+    protocol::Value* unicodeRangeValue = object->get("unicodeRange");
+    errors->SetName("unicodeRange");
+    result->m_unicodeRange = ValueConversions<String>::fromValue(unicodeRangeValue, errors);
+    protocol::Value* srcValue = object->get("src");
+    errors->SetName("src");
+    result->m_src = ValueConversions<String>::fromValue(srcValue, errors);
+    protocol::Value* platformFontFamilyValue = object->get("platformFontFamily");
+    errors->SetName("platformFontFamily");
+    result->m_platformFontFamily = ValueConversions<String>::fromValue(platformFontFamilyValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
 
+std::unique_ptr<protocol::DictionaryValue> FontFace::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("fontFamily", ValueConversions<String>::toValue(m_fontFamily));
+    result->setValue("fontStyle", ValueConversions<String>::toValue(m_fontStyle));
+    result->setValue("fontVariant", ValueConversions<String>::toValue(m_fontVariant));
+    result->setValue("fontWeight", ValueConversions<String>::toValue(m_fontWeight));
+    result->setValue("fontStretch", ValueConversions<String>::toValue(m_fontStretch));
+    result->setValue("unicodeRange", ValueConversions<String>::toValue(m_unicodeRange));
+    result->setValue("src", ValueConversions<String>::toValue(m_src));
+    result->setValue("platformFontFamily", ValueConversions<String>::toValue(m_platformFontFamily));
+    return result;
+}
+
+void FontFace::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fontFamily"), m_fontFamily, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fontStyle"), m_fontStyle, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fontVariant"), m_fontVariant, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fontWeight"), m_fontWeight, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fontStretch"), m_fontStretch, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("unicodeRange"), m_unicodeRange, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("src"), m_src, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("platformFontFamily"), m_platformFontFamily, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<FontFace> FontFace::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<CSSKeyframesRule> CSSKeyframesRule::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<CSSKeyframesRule> result(new CSSKeyframesRule());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* animationNameValue = object->get("animationName");
+    errors->SetName("animationName");
+    result->m_animationName = ValueConversions<protocol::CSS::Value>::fromValue(animationNameValue, errors);
+    protocol::Value* keyframesValue = object->get("keyframes");
+    errors->SetName("keyframes");
+    result->m_keyframes = ValueConversions<protocol::Array<protocol::CSS::CSSKeyframeRule>>::fromValue(keyframesValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> CSSKeyframesRule::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("animationName", ValueConversions<protocol::CSS::Value>::toValue(m_animationName.get()));
+    result->setValue("keyframes", ValueConversions<protocol::Array<protocol::CSS::CSSKeyframeRule>>::toValue(m_keyframes.get()));
+    return result;
+}
+
+void CSSKeyframesRule::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("animationName"), m_animationName, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("keyframes"), m_keyframes, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<CSSKeyframesRule> CSSKeyframesRule::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<CSSKeyframeRule> CSSKeyframeRule::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<CSSKeyframeRule> result(new CSSKeyframeRule());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* styleSheetIdValue = object->get("styleSheetId");
+    if (styleSheetIdValue) {
+        errors->SetName("styleSheetId");
+        result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    }
+    protocol::Value* originValue = object->get("origin");
+    errors->SetName("origin");
+    result->m_origin = ValueConversions<String>::fromValue(originValue, errors);
+    protocol::Value* keyTextValue = object->get("keyText");
+    errors->SetName("keyText");
+    result->m_keyText = ValueConversions<protocol::CSS::Value>::fromValue(keyTextValue, errors);
+    protocol::Value* styleValue = object->get("style");
+    errors->SetName("style");
+    result->m_style = ValueConversions<protocol::CSS::CSSStyle>::fromValue(styleValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> CSSKeyframeRule::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (m_styleSheetId.isJust())
+        result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId.fromJust()));
+    result->setValue("origin", ValueConversions<String>::toValue(m_origin));
+    result->setValue("keyText", ValueConversions<protocol::CSS::Value>::toValue(m_keyText.get()));
+    result->setValue("style", ValueConversions<protocol::CSS::CSSStyle>::toValue(m_style.get()));
+    return result;
+}
+
+void CSSKeyframeRule::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("origin"), m_origin, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("keyText"), m_keyText, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("style"), m_style, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<CSSKeyframeRule> CSSKeyframeRule::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<StyleDeclarationEdit> StyleDeclarationEdit::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<StyleDeclarationEdit> result(new StyleDeclarationEdit());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* styleSheetIdValue = object->get("styleSheetId");
+    errors->SetName("styleSheetId");
+    result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    protocol::Value* rangeValue = object->get("range");
+    errors->SetName("range");
+    result->m_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
+    protocol::Value* textValue = object->get("text");
+    errors->SetName("text");
+    result->m_text = ValueConversions<String>::fromValue(textValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> StyleDeclarationEdit::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId));
+    result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::toValue(m_range.get()));
+    result->setValue("text", ValueConversions<String>::toValue(m_text));
+    return result;
+}
+
+void StyleDeclarationEdit::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("range"), m_range, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), m_text, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<StyleDeclarationEdit> StyleDeclarationEdit::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<FontsUpdatedNotification> FontsUpdatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<FontsUpdatedNotification> result(new FontsUpdatedNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* fontValue = object->get("font");
+    if (fontValue) {
+        errors->SetName("font");
+        result->m_font = ValueConversions<protocol::CSS::FontFace>::fromValue(fontValue, errors);
+    }
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> FontsUpdatedNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (m_font.isJust())
+        result->setValue("font", ValueConversions<protocol::CSS::FontFace>::toValue(m_font.fromJust()));
+    return result;
+}
+
+void FontsUpdatedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("font"), m_font, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<FontsUpdatedNotification> FontsUpdatedNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<StyleSheetAddedNotification> StyleSheetAddedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<StyleSheetAddedNotification> result(new StyleSheetAddedNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* headerValue = object->get("header");
+    errors->SetName("header");
+    result->m_header = ValueConversions<protocol::CSS::CSSStyleSheetHeader>::fromValue(headerValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> StyleSheetAddedNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("header", ValueConversions<protocol::CSS::CSSStyleSheetHeader>::toValue(m_header.get()));
+    return result;
+}
+
+void StyleSheetAddedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("header"), m_header, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<StyleSheetAddedNotification> StyleSheetAddedNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<StyleSheetChangedNotification> StyleSheetChangedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<StyleSheetChangedNotification> result(new StyleSheetChangedNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* styleSheetIdValue = object->get("styleSheetId");
+    errors->SetName("styleSheetId");
+    result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> StyleSheetChangedNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId));
+    return result;
+}
+
+void StyleSheetChangedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<StyleSheetChangedNotification> StyleSheetChangedNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<StyleSheetRemovedNotification> StyleSheetRemovedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->AddError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<StyleSheetRemovedNotification> result(new StyleSheetRemovedNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->Push();
+    protocol::Value* styleSheetIdValue = object->get("styleSheetId");
+    errors->SetName("styleSheetId");
+    result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    errors->Pop();
+    if (!errors->Errors().empty())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> StyleSheetRemovedNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId));
+    return result;
+}
+
+void StyleSheetRemovedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<StyleSheetRemovedNotification> StyleSheetRemovedNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
 
 // ------------- Enum values from params.
 
@@ -369,9 +1474,11 @@ void Frontend::fontsUpdated(Maybe<protocol::CSS::FontFace> font)
 {
     if (!frontend_channel_)
         return;
-    v8_crdtp::ObjectSerializer serializer;
-    serializer.AddField(v8_crdtp::MakeSpan("font"), font);
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("CSS.fontsUpdated", serializer.Finish()));
+    std::unique_ptr<FontsUpdatedNotification> messageData = FontsUpdatedNotification::create()
+        .build();
+    if (font.isJust())
+        messageData->setFont(std::move(font).takeJust());
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("CSS.fontsUpdated", std::move(messageData)));
 }
 
 void Frontend::mediaQueryResultChanged()
@@ -385,27 +1492,30 @@ void Frontend::styleSheetAdded(std::unique_ptr<protocol::CSS::CSSStyleSheetHeade
 {
     if (!frontend_channel_)
         return;
-    v8_crdtp::ObjectSerializer serializer;
-    serializer.AddField(v8_crdtp::MakeSpan("header"), header);
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("CSS.styleSheetAdded", serializer.Finish()));
+    std::unique_ptr<StyleSheetAddedNotification> messageData = StyleSheetAddedNotification::create()
+        .setHeader(std::move(header))
+        .build();
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("CSS.styleSheetAdded", std::move(messageData)));
 }
 
 void Frontend::styleSheetChanged(const String& styleSheetId)
 {
     if (!frontend_channel_)
         return;
-    v8_crdtp::ObjectSerializer serializer;
-    serializer.AddField(v8_crdtp::MakeSpan("styleSheetId"), styleSheetId);
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("CSS.styleSheetChanged", serializer.Finish()));
+    std::unique_ptr<StyleSheetChangedNotification> messageData = StyleSheetChangedNotification::create()
+        .setStyleSheetId(styleSheetId)
+        .build();
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("CSS.styleSheetChanged", std::move(messageData)));
 }
 
 void Frontend::styleSheetRemoved(const String& styleSheetId)
 {
     if (!frontend_channel_)
         return;
-    v8_crdtp::ObjectSerializer serializer;
-    serializer.AddField(v8_crdtp::MakeSpan("styleSheetId"), styleSheetId);
-    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("CSS.styleSheetRemoved", serializer.Finish()));
+    std::unique_ptr<StyleSheetRemovedNotification> messageData = StyleSheetRemovedNotification::create()
+        .setStyleSheetId(styleSheetId)
+        .build();
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("CSS.styleSheetRemoved", std::move(messageData)));
 }
 
 void Frontend::flush()
@@ -427,32 +1537,32 @@ public:
         , m_backend(backend) {}
     ~DomainDispatcherImpl() override { }
 
-    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable);
+    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
 
     std::function<void(const v8_crdtp::Dispatchable&)> Dispatch(v8_crdtp::span<uint8_t> command_name) override;
 
-    void addRule(const v8_crdtp::Dispatchable& dispatchable);
-    void collectClassNames(const v8_crdtp::Dispatchable& dispatchable);
-    void createStyleSheet(const v8_crdtp::Dispatchable& dispatchable);
-    void disable(const v8_crdtp::Dispatchable& dispatchable);
-    void enable(const v8_crdtp::Dispatchable& dispatchable);
-    void forcePseudoState(const v8_crdtp::Dispatchable& dispatchable);
-    void getBackgroundColors(const v8_crdtp::Dispatchable& dispatchable);
-    void getComputedStyleForNode(const v8_crdtp::Dispatchable& dispatchable);
-    void getInlineStylesForNode(const v8_crdtp::Dispatchable& dispatchable);
-    void getMatchedStylesForNode(const v8_crdtp::Dispatchable& dispatchable);
-    void getMediaQueries(const v8_crdtp::Dispatchable& dispatchable);
-    void getPlatformFontsForNode(const v8_crdtp::Dispatchable& dispatchable);
-    void getStyleSheetText(const v8_crdtp::Dispatchable& dispatchable);
-    void setEffectivePropertyValueForNode(const v8_crdtp::Dispatchable& dispatchable);
-    void setKeyframeKey(const v8_crdtp::Dispatchable& dispatchable);
-    void setMediaText(const v8_crdtp::Dispatchable& dispatchable);
-    void setRuleSelector(const v8_crdtp::Dispatchable& dispatchable);
-    void setStyleSheetText(const v8_crdtp::Dispatchable& dispatchable);
-    void setStyleTexts(const v8_crdtp::Dispatchable& dispatchable);
-    void startRuleUsageTracking(const v8_crdtp::Dispatchable& dispatchable);
-    void stopRuleUsageTracking(const v8_crdtp::Dispatchable& dispatchable);
-    void takeCoverageDelta(const v8_crdtp::Dispatchable& dispatchable);
+    void addRule(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void collectClassNames(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void createStyleSheet(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void forcePseudoState(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getBackgroundColors(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getComputedStyleForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getInlineStylesForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getMatchedStylesForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getMediaQueries(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getPlatformFontsForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getStyleSheetText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setEffectivePropertyValueForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setKeyframeKey(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setMediaText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setRuleSelector(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setStyleSheetText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setStyleTexts(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void startRuleUsageTracking(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void stopRuleUsageTracking(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void takeCoverageDelta(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
  protected:
     Backend* m_backend;
 };
@@ -563,161 +1673,118 @@ DomainDispatcherImpl::CallHandler CommandByName(v8_crdtp::span<uint8_t> command_
 std::function<void(const v8_crdtp::Dispatchable&)> DomainDispatcherImpl::Dispatch(v8_crdtp::span<uint8_t> command_name) {
   CallHandler handler = CommandByName(command_name);
   if (!handler) return nullptr;
-
-  return [this, handler](const v8_crdtp::Dispatchable& dispatchable) {
-    (this->*handler)(dispatchable);
+  return [this, handler](const v8_crdtp::Dispatchable& dispatchable){
+    std::unique_ptr<DictionaryValue> params =
+        DictionaryValue::cast(protocol::Value::parseBinary(dispatchable.Params().data(),
+        dispatchable.Params().size()));
+    ErrorSupport errors;
+    errors.Push();
+    (this->*handler)(dispatchable, params.get(), &errors);
   };
 }
 
 
-namespace {
-
-struct addRuleParams : public v8_crdtp::DeserializableProtocolObject<addRuleParams> {
-    String styleSheetId;
-    String ruleText;
-    std::unique_ptr<protocol::CSS::SourceRange> location;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(addRuleParams)
-    V8_CRDTP_DESERIALIZE_FIELD("location", location),
-    V8_CRDTP_DESERIALIZE_FIELD("ruleText", ruleText),
-    V8_CRDTP_DESERIALIZE_FIELD("styleSheetId", styleSheetId),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::addRule(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::addRule(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    addRuleParams params;
-    addRuleParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* styleSheetIdValue = params ? params->get("styleSheetId") : nullptr;
+    errors->SetName("styleSheetId");
+    String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    protocol::Value* ruleTextValue = params ? params->get("ruleText") : nullptr;
+    errors->SetName("ruleText");
+    String in_ruleText = ValueConversions<String>::fromValue(ruleTextValue, errors);
+    protocol::Value* locationValue = params ? params->get("location") : nullptr;
+    errors->SetName("location");
+    std::unique_ptr<protocol::CSS::SourceRange> in_location = ValueConversions<protocol::CSS::SourceRange>::fromValue(locationValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::CSS::CSSRule> out_rule;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->addRule(params.styleSheetId, params.ruleText, std::move(params.location), &out_rule);
+    DispatchResponse response = m_backend->addRule(in_styleSheetId, in_ruleText, std::move(in_location), &out_rule);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.addRule"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("rule"), out_rule);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("rule"), out_rule, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-struct collectClassNamesParams : public v8_crdtp::DeserializableProtocolObject<collectClassNamesParams> {
-    String styleSheetId;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(collectClassNamesParams)
-    V8_CRDTP_DESERIALIZE_FIELD("styleSheetId", styleSheetId),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::collectClassNames(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::collectClassNames(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    collectClassNamesParams params;
-    collectClassNamesParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* styleSheetIdValue = params ? params->get("styleSheetId") : nullptr;
+    errors->SetName("styleSheetId");
+    String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<String>> out_classNames;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->collectClassNames(params.styleSheetId, &out_classNames);
+    DispatchResponse response = m_backend->collectClassNames(in_styleSheetId, &out_classNames);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.collectClassNames"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("classNames"), out_classNames);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("classNames"), out_classNames, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-struct createStyleSheetParams : public v8_crdtp::DeserializableProtocolObject<createStyleSheetParams> {
-    String frameId;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(createStyleSheetParams)
-    V8_CRDTP_DESERIALIZE_FIELD("frameId", frameId),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::createStyleSheet(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::createStyleSheet(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    createStyleSheetParams params;
-    createStyleSheetParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* frameIdValue = params ? params->get("frameId") : nullptr;
+    errors->SetName("frameId");
+    String in_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     String out_styleSheetId;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->createStyleSheet(params.frameId, &out_styleSheetId);
+    DispatchResponse response = m_backend->createStyleSheet(in_frameId, &out_styleSheetId);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.createStyleSheet"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("styleSheetId"), out_styleSheetId);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), out_styleSheetId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
-    // Prepare input parameters.
-
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
@@ -738,8 +1805,13 @@ v8_crdtp::SpanFrom("CSS.enable"), message) { }
 
     void sendSuccess() override
     {
-        v8_crdtp::ObjectSerializer serializer;
-        sendIfActive(serializer.Finish(), DispatchResponse::Success());
+        std::vector<uint8_t> result_buffer;
+        v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+        envelope_encoder.EncodeStart(&result_buffer);
+        result_buffer.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+        result_buffer.push_back(v8_crdtp::cbor::EncodeStop());
+        envelope_encoder.EncodeStop(&result_buffer);
+        sendIfActive(v8_crdtp::Serializable::From(std::move(result_buffer)), DispatchResponse::Success());
     }
 
     void fallThrough() override
@@ -754,46 +1826,25 @@ v8_crdtp::SpanFrom("CSS.enable"), message) { }
     }
 };
 
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
-    // Prepare input parameters.
-
 
     m_backend->enable(std::make_unique<EnableCallbackImpl>(weakPtr(), dispatchable.CallId(), dispatchable.Serialized()));
 }
 
-namespace {
-
-struct forcePseudoStateParams : public v8_crdtp::DeserializableProtocolObject<forcePseudoStateParams> {
-    int nodeId;
-    std::unique_ptr<protocol::Array<String>> forcedPseudoClasses;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(forcePseudoStateParams)
-    V8_CRDTP_DESERIALIZE_FIELD("forcedPseudoClasses", forcedPseudoClasses),
-    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::forcePseudoState(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::forcePseudoState(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    forcePseudoStateParams params;
-    forcePseudoStateParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
+    errors->SetName("nodeId");
+    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
+    protocol::Value* forcedPseudoClassesValue = params ? params->get("forcedPseudoClasses") : nullptr;
+    errors->SetName("forcedPseudoClasses");
+    std::unique_ptr<protocol::Array<String>> in_forcedPseudoClasses = ValueConversions<protocol::Array<String>>::fromValue(forcedPseudoClassesValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->forcePseudoState(params.nodeId, std::move(params.forcedPseudoClasses));
+    DispatchResponse response = m_backend->forcePseudoState(in_nodeId, std::move(in_forcedPseudoClasses));
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.forcePseudoState"), dispatchable.Serialized());
         return;
@@ -803,169 +1854,112 @@ void DomainDispatcherImpl::forcePseudoState(const v8_crdtp::Dispatchable& dispat
     return;
 }
 
-namespace {
-
-struct getBackgroundColorsParams : public v8_crdtp::DeserializableProtocolObject<getBackgroundColorsParams> {
-    int nodeId;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(getBackgroundColorsParams)
-    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::getBackgroundColors(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::getBackgroundColors(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    getBackgroundColorsParams params;
-    getBackgroundColorsParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
+    errors->SetName("nodeId");
+    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     Maybe<protocol::Array<String>> out_backgroundColors;
     Maybe<String> out_computedFontSize;
     Maybe<String> out_computedFontWeight;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getBackgroundColors(params.nodeId, &out_backgroundColors, &out_computedFontSize, &out_computedFontWeight);
+    DispatchResponse response = m_backend->getBackgroundColors(in_nodeId, &out_backgroundColors, &out_computedFontSize, &out_computedFontWeight);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.getBackgroundColors"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("backgroundColors"), out_backgroundColors);
-          serializer.AddField(v8_crdtp::MakeSpan("computedFontSize"), out_computedFontSize);
-          serializer.AddField(v8_crdtp::MakeSpan("computedFontWeight"), out_computedFontWeight);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("backgroundColors"), out_backgroundColors, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("computedFontSize"), out_computedFontSize, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("computedFontWeight"), out_computedFontWeight, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-struct getComputedStyleForNodeParams : public v8_crdtp::DeserializableProtocolObject<getComputedStyleForNodeParams> {
-    int nodeId;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(getComputedStyleForNodeParams)
-    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::getComputedStyleForNode(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::getComputedStyleForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    getComputedStyleForNodeParams params;
-    getComputedStyleForNodeParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
+    errors->SetName("nodeId");
+    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>> out_computedStyle;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getComputedStyleForNode(params.nodeId, &out_computedStyle);
+    DispatchResponse response = m_backend->getComputedStyleForNode(in_nodeId, &out_computedStyle);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.getComputedStyleForNode"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("computedStyle"), out_computedStyle);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("computedStyle"), out_computedStyle, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-struct getInlineStylesForNodeParams : public v8_crdtp::DeserializableProtocolObject<getInlineStylesForNodeParams> {
-    int nodeId;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(getInlineStylesForNodeParams)
-    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::getInlineStylesForNode(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::getInlineStylesForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    getInlineStylesForNodeParams params;
-    getInlineStylesForNodeParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
+    errors->SetName("nodeId");
+    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     Maybe<protocol::CSS::CSSStyle> out_inlineStyle;
     Maybe<protocol::CSS::CSSStyle> out_attributesStyle;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getInlineStylesForNode(params.nodeId, &out_inlineStyle, &out_attributesStyle);
+    DispatchResponse response = m_backend->getInlineStylesForNode(in_nodeId, &out_inlineStyle, &out_attributesStyle);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.getInlineStylesForNode"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("inlineStyle"), out_inlineStyle);
-          serializer.AddField(v8_crdtp::MakeSpan("attributesStyle"), out_attributesStyle);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("inlineStyle"), out_inlineStyle, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("attributesStyle"), out_attributesStyle, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-struct getMatchedStylesForNodeParams : public v8_crdtp::DeserializableProtocolObject<getMatchedStylesForNodeParams> {
-    int nodeId;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(getMatchedStylesForNodeParams)
-    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::getMatchedStylesForNode(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::getMatchedStylesForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    getMatchedStylesForNodeParams params;
-    getMatchedStylesForNodeParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
+    errors->SetName("nodeId");
+    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     Maybe<protocol::CSS::CSSStyle> out_inlineStyle;
     Maybe<protocol::CSS::CSSStyle> out_attributesStyle;
@@ -975,39 +1969,33 @@ void DomainDispatcherImpl::getMatchedStylesForNode(const v8_crdtp::Dispatchable&
     Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>> out_cssKeyframesRules;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getMatchedStylesForNode(params.nodeId, &out_inlineStyle, &out_attributesStyle, &out_matchedCSSRules, &out_pseudoElements, &out_inherited, &out_cssKeyframesRules);
+    DispatchResponse response = m_backend->getMatchedStylesForNode(in_nodeId, &out_inlineStyle, &out_attributesStyle, &out_matchedCSSRules, &out_pseudoElements, &out_inherited, &out_cssKeyframesRules);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.getMatchedStylesForNode"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("inlineStyle"), out_inlineStyle);
-          serializer.AddField(v8_crdtp::MakeSpan("attributesStyle"), out_attributesStyle);
-          serializer.AddField(v8_crdtp::MakeSpan("matchedCSSRules"), out_matchedCSSRules);
-          serializer.AddField(v8_crdtp::MakeSpan("pseudoElements"), out_pseudoElements);
-          serializer.AddField(v8_crdtp::MakeSpan("inherited"), out_inherited);
-          serializer.AddField(v8_crdtp::MakeSpan("cssKeyframesRules"), out_cssKeyframesRules);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("inlineStyle"), out_inlineStyle, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("attributesStyle"), out_attributesStyle, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("matchedCSSRules"), out_matchedCSSRules, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pseudoElements"), out_pseudoElements, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("inherited"), out_inherited, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("cssKeyframesRules"), out_cssKeyframesRules, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::getMediaQueries(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::getMediaQueries(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
-    // Prepare input parameters.
-
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::CSS::CSSMedia>> out_medias;
 
@@ -1018,138 +2006,98 @@ void DomainDispatcherImpl::getMediaQueries(const v8_crdtp::Dispatchable& dispatc
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("medias"), out_medias);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("medias"), out_medias, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-struct getPlatformFontsForNodeParams : public v8_crdtp::DeserializableProtocolObject<getPlatformFontsForNodeParams> {
-    int nodeId;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(getPlatformFontsForNodeParams)
-    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::getPlatformFontsForNode(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::getPlatformFontsForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    getPlatformFontsForNodeParams params;
-    getPlatformFontsForNodeParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
+    errors->SetName("nodeId");
+    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>> out_fonts;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getPlatformFontsForNode(params.nodeId, &out_fonts);
+    DispatchResponse response = m_backend->getPlatformFontsForNode(in_nodeId, &out_fonts);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.getPlatformFontsForNode"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("fonts"), out_fonts);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fonts"), out_fonts, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-struct getStyleSheetTextParams : public v8_crdtp::DeserializableProtocolObject<getStyleSheetTextParams> {
-    String styleSheetId;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(getStyleSheetTextParams)
-    V8_CRDTP_DESERIALIZE_FIELD("styleSheetId", styleSheetId),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::getStyleSheetText(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::getStyleSheetText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    getStyleSheetTextParams params;
-    getStyleSheetTextParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* styleSheetIdValue = params ? params->get("styleSheetId") : nullptr;
+    errors->SetName("styleSheetId");
+    String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     String out_text;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getStyleSheetText(params.styleSheetId, &out_text);
+    DispatchResponse response = m_backend->getStyleSheetText(in_styleSheetId, &out_text);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.getStyleSheetText"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("text"), out_text);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), out_text, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-struct setEffectivePropertyValueForNodeParams : public v8_crdtp::DeserializableProtocolObject<setEffectivePropertyValueForNodeParams> {
-    int nodeId;
-    String propertyName;
-    String value;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(setEffectivePropertyValueForNodeParams)
-    V8_CRDTP_DESERIALIZE_FIELD("nodeId", nodeId),
-    V8_CRDTP_DESERIALIZE_FIELD("propertyName", propertyName),
-    V8_CRDTP_DESERIALIZE_FIELD("value", value),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::setEffectivePropertyValueForNode(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::setEffectivePropertyValueForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    setEffectivePropertyValueForNodeParams params;
-    setEffectivePropertyValueForNodeParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
+    errors->SetName("nodeId");
+    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
+    protocol::Value* propertyNameValue = params ? params->get("propertyName") : nullptr;
+    errors->SetName("propertyName");
+    String in_propertyName = ValueConversions<String>::fromValue(propertyNameValue, errors);
+    protocol::Value* valueValue = params ? params->get("value") : nullptr;
+    errors->SetName("value");
+    String in_value = ValueConversions<String>::fromValue(valueValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setEffectivePropertyValueForNode(params.nodeId, params.propertyName, params.value);
+    DispatchResponse response = m_backend->setEffectivePropertyValueForNode(in_nodeId, in_propertyName, in_value);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.setEffectivePropertyValueForNode"), dispatchable.Serialized());
         return;
@@ -1159,254 +2107,184 @@ void DomainDispatcherImpl::setEffectivePropertyValueForNode(const v8_crdtp::Disp
     return;
 }
 
-namespace {
-
-struct setKeyframeKeyParams : public v8_crdtp::DeserializableProtocolObject<setKeyframeKeyParams> {
-    String styleSheetId;
-    std::unique_ptr<protocol::CSS::SourceRange> range;
-    String keyText;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(setKeyframeKeyParams)
-    V8_CRDTP_DESERIALIZE_FIELD("keyText", keyText),
-    V8_CRDTP_DESERIALIZE_FIELD("range", range),
-    V8_CRDTP_DESERIALIZE_FIELD("styleSheetId", styleSheetId),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::setKeyframeKey(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::setKeyframeKey(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    setKeyframeKeyParams params;
-    setKeyframeKeyParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* styleSheetIdValue = params ? params->get("styleSheetId") : nullptr;
+    errors->SetName("styleSheetId");
+    String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    protocol::Value* rangeValue = params ? params->get("range") : nullptr;
+    errors->SetName("range");
+    std::unique_ptr<protocol::CSS::SourceRange> in_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
+    protocol::Value* keyTextValue = params ? params->get("keyText") : nullptr;
+    errors->SetName("keyText");
+    String in_keyText = ValueConversions<String>::fromValue(keyTextValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::CSS::Value> out_keyText;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setKeyframeKey(params.styleSheetId, std::move(params.range), params.keyText, &out_keyText);
+    DispatchResponse response = m_backend->setKeyframeKey(in_styleSheetId, std::move(in_range), in_keyText, &out_keyText);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.setKeyframeKey"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("keyText"), out_keyText);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("keyText"), out_keyText, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-struct setMediaTextParams : public v8_crdtp::DeserializableProtocolObject<setMediaTextParams> {
-    String styleSheetId;
-    std::unique_ptr<protocol::CSS::SourceRange> range;
-    String text;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(setMediaTextParams)
-    V8_CRDTP_DESERIALIZE_FIELD("range", range),
-    V8_CRDTP_DESERIALIZE_FIELD("styleSheetId", styleSheetId),
-    V8_CRDTP_DESERIALIZE_FIELD("text", text),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::setMediaText(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::setMediaText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    setMediaTextParams params;
-    setMediaTextParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* styleSheetIdValue = params ? params->get("styleSheetId") : nullptr;
+    errors->SetName("styleSheetId");
+    String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    protocol::Value* rangeValue = params ? params->get("range") : nullptr;
+    errors->SetName("range");
+    std::unique_ptr<protocol::CSS::SourceRange> in_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
+    protocol::Value* textValue = params ? params->get("text") : nullptr;
+    errors->SetName("text");
+    String in_text = ValueConversions<String>::fromValue(textValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::CSS::CSSMedia> out_media;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setMediaText(params.styleSheetId, std::move(params.range), params.text, &out_media);
+    DispatchResponse response = m_backend->setMediaText(in_styleSheetId, std::move(in_range), in_text, &out_media);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.setMediaText"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("media"), out_media);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("media"), out_media, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-struct setRuleSelectorParams : public v8_crdtp::DeserializableProtocolObject<setRuleSelectorParams> {
-    String styleSheetId;
-    std::unique_ptr<protocol::CSS::SourceRange> range;
-    String selector;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(setRuleSelectorParams)
-    V8_CRDTP_DESERIALIZE_FIELD("range", range),
-    V8_CRDTP_DESERIALIZE_FIELD("selector", selector),
-    V8_CRDTP_DESERIALIZE_FIELD("styleSheetId", styleSheetId),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::setRuleSelector(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::setRuleSelector(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    setRuleSelectorParams params;
-    setRuleSelectorParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* styleSheetIdValue = params ? params->get("styleSheetId") : nullptr;
+    errors->SetName("styleSheetId");
+    String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    protocol::Value* rangeValue = params ? params->get("range") : nullptr;
+    errors->SetName("range");
+    std::unique_ptr<protocol::CSS::SourceRange> in_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
+    protocol::Value* selectorValue = params ? params->get("selector") : nullptr;
+    errors->SetName("selector");
+    String in_selector = ValueConversions<String>::fromValue(selectorValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::CSS::SelectorList> out_selectorList;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setRuleSelector(params.styleSheetId, std::move(params.range), params.selector, &out_selectorList);
+    DispatchResponse response = m_backend->setRuleSelector(in_styleSheetId, std::move(in_range), in_selector, &out_selectorList);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.setRuleSelector"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("selectorList"), out_selectorList);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("selectorList"), out_selectorList, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-struct setStyleSheetTextParams : public v8_crdtp::DeserializableProtocolObject<setStyleSheetTextParams> {
-    String styleSheetId;
-    String text;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(setStyleSheetTextParams)
-    V8_CRDTP_DESERIALIZE_FIELD("styleSheetId", styleSheetId),
-    V8_CRDTP_DESERIALIZE_FIELD("text", text),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::setStyleSheetText(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::setStyleSheetText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    setStyleSheetTextParams params;
-    setStyleSheetTextParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* styleSheetIdValue = params ? params->get("styleSheetId") : nullptr;
+    errors->SetName("styleSheetId");
+    String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    protocol::Value* textValue = params ? params->get("text") : nullptr;
+    errors->SetName("text");
+    String in_text = ValueConversions<String>::fromValue(textValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     Maybe<String> out_sourceMapURL;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setStyleSheetText(params.styleSheetId, params.text, &out_sourceMapURL);
+    DispatchResponse response = m_backend->setStyleSheetText(in_styleSheetId, in_text, &out_sourceMapURL);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.setStyleSheetText"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("sourceMapURL"), out_sourceMapURL);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sourceMapURL"), out_sourceMapURL, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-struct setStyleTextsParams : public v8_crdtp::DeserializableProtocolObject<setStyleTextsParams> {
-    std::unique_ptr<protocol::Array<protocol::CSS::StyleDeclarationEdit>> edits;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(setStyleTextsParams)
-    V8_CRDTP_DESERIALIZE_FIELD("edits", edits),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::setStyleTexts(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::setStyleTexts(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    setStyleTextsParams params;
-    setStyleTextsParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
+    protocol::Value* editsValue = params ? params->get("edits") : nullptr;
+    errors->SetName("edits");
+    std::unique_ptr<protocol::Array<protocol::CSS::StyleDeclarationEdit>> in_edits = ValueConversions<protocol::Array<protocol::CSS::StyleDeclarationEdit>>::fromValue(editsValue, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::CSS::CSSStyle>> out_styles;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setStyleTexts(std::move(params.edits), &out_styles);
+    DispatchResponse response = m_backend->setStyleTexts(std::move(in_edits), &out_styles);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.setStyleTexts"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("styles"), out_styles);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styles"), out_styles, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::startRuleUsageTracking(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::startRuleUsageTracking(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
-    // Prepare input parameters.
-
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->startRuleUsageTracking();
@@ -1419,15 +2297,8 @@ void DomainDispatcherImpl::startRuleUsageTracking(const v8_crdtp::Dispatchable& 
     return;
 }
 
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::stopRuleUsageTracking(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::stopRuleUsageTracking(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
-    // Prepare input parameters.
-
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>> out_ruleUsage;
 
@@ -1438,28 +2309,22 @@ void DomainDispatcherImpl::stopRuleUsageTracking(const v8_crdtp::Dispatchable& d
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("ruleUsage"), out_ruleUsage);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("ruleUsage"), out_ruleUsage, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }
 
-namespace {
-
-
-}  // namespace
-
-void DomainDispatcherImpl::takeCoverageDelta(const v8_crdtp::Dispatchable& dispatchable)
+void DomainDispatcherImpl::takeCoverageDelta(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
-    // Prepare input parameters.
-
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>> out_coverage;
 
@@ -1470,15 +2335,16 @@ void DomainDispatcherImpl::takeCoverageDelta(const v8_crdtp::Dispatchable& dispa
         return;
     }
       if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
+        std::vector<uint8_t> result;
         if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("coverage"), out_coverage);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("coverage"), out_coverage, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
       }
     return;
 }

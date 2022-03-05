@@ -13,7 +13,7 @@
 // So do not include this header in any of v8's public headers -- only
 // use it in src/, not in include/.
 #if defined(__clang__)
-#define V8_FALLTHROUGH [[clang::fallthrough]]
+#define V8_FALLTHROUGH [[clang::fallthrough]]  // NOLINT(whitespace/braces)
 #else
 #define V8_FALLTHROUGH
 #endif

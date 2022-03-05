@@ -6,8 +6,6 @@
 #define V8_BASE_ATOMIC_UTILS_H_
 
 #include <limits.h>
-
-#include <atomic>
 #include <type_traits>
 
 #include "src/base/atomicops.h"
@@ -191,20 +189,16 @@ using AsAtomicPointer = AsAtomicPointerImpl<base::AtomicWord>;
 
 template <typename T,
           typename = typename std::enable_if<std::is_unsigned<T>::value>::type>
-inline void CheckedIncrement(
-    std::atomic<T>* number, T amount,
-    std::memory_order order = std::memory_order_seq_cst) {
-  const T old = number->fetch_add(amount, order);
+inline void CheckedIncrement(std::atomic<T>* number, T amount) {
+  const T old = number->fetch_add(amount);
   DCHECK_GE(old + amount, old);
   USE(old);
 }
 
 template <typename T,
           typename = typename std::enable_if<std::is_unsigned<T>::value>::type>
-inline void CheckedDecrement(
-    std::atomic<T>* number, T amount,
-    std::memory_order order = std::memory_order_seq_cst) {
-  const T old = number->fetch_sub(amount, order);
+inline void CheckedDecrement(std::atomic<T>* number, T amount) {
+  const T old = number->fetch_sub(amount);
   DCHECK_GE(old, amount);
   USE(old);
 }

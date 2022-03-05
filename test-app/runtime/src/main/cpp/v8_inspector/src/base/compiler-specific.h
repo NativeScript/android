@@ -7,15 +7,13 @@
 
 #include "include/v8config.h"
 
-// Annotation to silence compiler warnings about unused
-// types/functions/variables. Use like:
-//
-//   using V8_ALLOW_UNUSED Bar = Foo;
-//   V8_ALLOW_UNUSED void foo() {}
+// Annotate a  using ALLOW_UNUSED_TYPE = or function indicating it's ok if it's
+// not used. Use like:
+//    using Bar = Foo;
 #if V8_HAS_ATTRIBUTE_UNUSED
-#define V8_ALLOW_UNUSED __attribute__((unused))
+#define ALLOW_UNUSED_TYPE __attribute__((unused))
 #else
-#define V8_ALLOW_UNUSED
+#define ALLOW_UNUSED_TYPE
 #endif
 
 // Tell the compiler a function is using a printf-style format string.
@@ -100,39 +98,11 @@
 // there.
 #if ((!defined(V8_CC_GNU) && !defined(V8_CC_MSVC) &&                      \
       !defined(V8_TARGET_ARCH_MIPS) && !defined(V8_TARGET_ARCH_MIPS64) && \
-      !defined(V8_TARGET_ARCH_PPC) && !defined(V8_TARGET_ARCH_PPC64) &&   \
-      !defined(V8_TARGET_ARCH_RISCV64)) ||                                \
+      !defined(V8_TARGET_ARCH_PPC) && !defined(V8_TARGET_ARCH_PPC64)) ||  \
      (defined(__clang__) && __cplusplus > 201300L))
 #define V8_NOEXCEPT noexcept
 #else
 #define V8_NOEXCEPT
-#endif
-
-// Specify memory alignment for structs, classes, etc.
-// Use like:
-//   class ALIGNAS(16) MyClass { ... }
-//   ALIGNAS(16) int array[4];
-//
-// In most places you can use the C++11 keyword "alignas", which is preferred.
-//
-// But compilers have trouble mixing __attribute__((...)) syntax with
-// alignas(...) syntax.
-//
-// Doesn't work in clang or gcc:
-//   struct alignas(16) __attribute__((packed)) S { char c; };
-// Works in clang but not gcc:
-//   struct __attribute__((packed)) alignas(16) S2 { char c; };
-// Works in clang and gcc:
-//   struct alignas(16) S3 { char c; } __attribute__((packed));
-//
-// There are also some attributes that must be specified *before* a class
-// definition: visibility (used for exporting functions/classes) is one of
-// these attributes. This means that it is not possible to use alignas() with a
-// class that is marked as exported.
-#if defined(V8_CC_MSVC)
-#define ALIGNAS(byte_alignment) __declspec(align(byte_alignment))
-#else
-#define ALIGNAS(byte_alignment) __attribute__((aligned(byte_alignment)))
 #endif
 
 #endif  // V8_BASE_COMPILER_SPECIFIC_H_

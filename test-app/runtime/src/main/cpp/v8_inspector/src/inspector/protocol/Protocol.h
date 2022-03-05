@@ -19,11 +19,6 @@ class ListValue;
 class DictionaryValue;
 class Value;
 
-#define PROTOCOL_DISALLOW_COPY(ClassName) \
- private:                                 \
-  ClassName(const ClassName&) = delete;   \
-  ClassName& operator=(const ClassName&) = delete
-
 class  Value : public Serializable {
     PROTOCOL_DISALLOW_COPY(Value);
 public:
@@ -284,11 +279,7 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     std::unique_ptr<Object> clone() const;
-
 private:
-    Object() = default;
-    friend struct v8_crdtp::ProtocolTypeTraits<std::unique_ptr<Object>, void>;
-
     std::unique_ptr<protocol::DictionaryValue> m_object;
 };
 
@@ -558,60 +549,7 @@ struct ValueConversions<ListValue> {
     }
 };
 
-template<typename T> struct ValueTypeConverter {
-  static std::unique_ptr<T> FromValue(const protocol::Value& value) {
-    std::vector<uint8_t> bytes;
-    value.AppendSerialized(&bytes);
-    return T::FromBinary(bytes.data(), bytes.size());
-  }
-
-  static std::unique_ptr<protocol::DictionaryValue> ToValue(const T& obj) {
-    std::vector<uint8_t> bytes;
-    obj.AppendSerialized(&bytes);
-    auto result = Value::parseBinary(bytes.data(), bytes.size());
-    return DictionaryValue::cast(std::move(result));
-  }
-};
-
 } // namespace v8_inspector
 } // namespace protocol
-
-namespace v8_crdtp {
-
-template<typename T>
-struct ProtocolTypeTraits<T,
-     typename std::enable_if<std::is_base_of<v8_inspector::protocol::Value, T>::value>::type> {
-  static void Serialize(const v8_inspector::protocol::Value& value, std::vector<uint8_t>* bytes) {
-    value.AppendSerialized(bytes);
-  }
-};
-
-template <>
-struct ProtocolTypeTraits<std::unique_ptr<v8_inspector::protocol::Value>> {
-  static bool Deserialize(DeserializerState* state, std::unique_ptr<v8_inspector::protocol::Value>* value);
-  static void Serialize(const std::unique_ptr<v8_inspector::protocol::Value>& value, std::vector<uint8_t>* bytes);
-};
-
-template <>
-struct ProtocolTypeTraits<std::unique_ptr<v8_inspector::protocol::DictionaryValue>> {
-  static bool Deserialize(DeserializerState* state, std::unique_ptr<v8_inspector::protocol::DictionaryValue>* value);
-  static void Serialize(const std::unique_ptr<v8_inspector::protocol::DictionaryValue>& value, std::vector<uint8_t>* bytes);
-};
-
-// TODO(caseq): get rid of it, it's just a DictionaryValue really.
-template <>
-struct ProtocolTypeTraits<std::unique_ptr<v8_inspector::protocol::Object>> {
-  static bool Deserialize(DeserializerState* state, std::unique_ptr<v8_inspector::protocol::Object>* value);
-  static void Serialize(const std::unique_ptr<v8_inspector::protocol::Object>& value, std::vector<uint8_t>* bytes);
-};
-
-template<>
-struct ProtocolTypeTraits<v8_inspector::protocol::Object> {
-  static void Serialize(const v8_inspector::protocol::Object& value, std::vector<uint8_t>* bytes) {
-    value.AppendSerialized(bytes);
-  }
-};
-
-}  // namespace v8_crdtp
 
 #endif // !defined(v8_inspector_protocol_ValueConversions_h)

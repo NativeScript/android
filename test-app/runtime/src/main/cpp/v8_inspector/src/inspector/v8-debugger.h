@@ -11,14 +11,14 @@
 #include <unordered_set>
 #include <vector>
 
-#include "include/v8-inspector.h"
 #include "src/base/macros.h"
 #include "src/inspector/inspected-context.h"
 #include "src/inspector/protocol/Debugger.h"
 #include "src/inspector/protocol/Forward.h"
 #include "src/inspector/protocol/Runtime.h"
-#include "src/inspector/v8-debugger-id.h"
 #include "src/inspector/v8-debugger-script.h"
+
+#include "include/v8-inspector.h"
 
 namespace v8_inspector {
 
@@ -36,13 +36,36 @@ using protocol::Response;
 using TerminateExecutionCallback =
     protocol::Runtime::Backend::TerminateExecutionCallback;
 
+// This debugger id tries to be unique by generating two random
+// numbers, which should most likely avoid collisions.
+// Debugger id has a 1:1 mapping to context group. It is used to
+// attribute stack traces to a particular debugging, when doing any
+// cross-debugger operations (e.g. async step in).
+// See also Runtime.UniqueDebuggerId in the protocol.
+class V8DebuggerId {
+ public:
+  V8DebuggerId() = default;
+  explicit V8DebuggerId(std::pair<int64_t, int64_t>);
+  explicit V8DebuggerId(const String16&);
+  V8DebuggerId(const V8DebuggerId&) V8_NOEXCEPT = default;
+  ~V8DebuggerId() = default;
+
+  static V8DebuggerId generate(v8::Isolate*);
+
+  String16 toString() const;
+  bool isValid() const;
+  std::pair<int64_t, int64_t> pair() const;
+
+ private:
+  int64_t m_first = 0;
+  int64_t m_second = 0;
+};
+
 class V8Debugger : public v8::debug::DebugDelegate,
                    public v8::debug::AsyncEventDelegate {
  public:
   V8Debugger(v8::Isolate*, V8InspectorImpl*);
   ~V8Debugger() override;
-  V8Debugger(const V8Debugger&) = delete;
-  V8Debugger& operator=(const V8Debugger&) = delete;
 
   bool enabled() const;
   v8::Isolate* isolate() const { return m_isolate; }
@@ -161,7 +184,7 @@ class V8Debugger : public v8::debug::DebugDelegate,
                                                v8::Local<v8::Value> value);
 
   void asyncTaskScheduledForStack(const String16& taskName, void* task,
-                                  bool recurring, bool skipTopFrame = false);
+                                  bool recurring);
   void asyncTaskCanceledForStack(void* task);
   void asyncTaskStartedForStack(void* task);
   void asyncTaskFinishedForStack(void* task);
@@ -186,9 +209,6 @@ class V8Debugger : public v8::debug::DebugDelegate,
   bool IsFunctionBlackboxed(v8::Local<v8::debug::Script> script,
                             const v8::debug::Location& start,
                             const v8::debug::Location& end) override;
-
-  bool ShouldBeSkipped(v8::Local<v8::debug::Script> script, int line,
-                       int column) override;
 
   int currentContextGroupId();
   bool asyncStepOutOfFunction(int targetContextGroupId, bool onlyAtReturn);
@@ -215,7 +235,7 @@ class V8Debugger : public v8::debug::DebugDelegate,
   AsyncTaskToStackTrace m_asyncTaskStacks;
   std::unordered_set<void*> m_recurringTasks;
 
-  size_t m_maxAsyncCallStacks;
+  int m_maxAsyncCallStacks;
   int m_maxAsyncCallStackDepth;
 
   std::vector<void*> m_currentTasks;
@@ -223,6 +243,7 @@ class V8Debugger : public v8::debug::DebugDelegate,
   std::vector<V8StackTraceId> m_currentExternalParent;
 
   void collectOldAsyncStacksIfNeeded();
+  int m_asyncStacksCount = 0;
   // V8Debugger owns all the async stacks, while most of the other references
   // are weak, which allows to collect some stacks when there are too many.
   std::list<std::shared_ptr<AsyncStackTrace>> m_allAsyncStacks;
@@ -249,6 +270,8 @@ class V8Debugger : public v8::debug::DebugDelegate,
   std::unordered_map<int, V8DebuggerId> m_contextGroupIdToDebuggerId;
 
   std::unique_ptr<TerminateExecutionCallback> m_terminateExecutionCallback;
+
+  DISALLOW_COPY_AND_ASSIGN(V8Debugger);
 };
 
 }  // namespace v8_inspector

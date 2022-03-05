@@ -18,10 +18,6 @@ using v8_inspector::protocol::Maybe;
 using String = v8_inspector::String16;
 using v8_inspector::protocol::DispatchResponse;
 
-#define DISALLOW_COPY_AND_ASSIGN(TypeName) \
-  TypeName(const TypeName&) = delete;      \
-  void operator=(const TypeName&) = delete
-
 class V8NetworkAgentImpl : public protocol::Network::Backend {
     public:
         V8NetworkAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
