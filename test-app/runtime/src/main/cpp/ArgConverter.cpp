@@ -293,7 +293,7 @@ Local<String> ArgConverter::ConvertToV8UTF16String(Isolate* isolate, const u16st
     return String::NewFromTwoByte(isolate, ((const uint16_t*) utf16string.data())).ToLocalChecked();
 }
 
-void ArgConverter::disposeIsolate(Isolate* isolate) {
+void ArgConverter::onDisposeIsolate(Isolate* isolate) {
     auto itFound = s_type_long_operations_cache.find(isolate);
     if (itFound != s_type_long_operations_cache.end()) {
         delete itFound->second;

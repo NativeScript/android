@@ -28,7 +28,7 @@ class Console {
         static void timeCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-        static void disposeIsolate(v8::Isolate* isolate);
+        static void onDisposeIsolate(v8::Isolate* isolate);
 
     private:
         static int m_maxLogcatObjectSize;

@@ -43,7 +43,7 @@ class ArgConverter {
 
         static v8::Local<v8::String> ConvertToV8UTF16String(v8::Isolate* isolate, const std::u16string& utf16string);
 
-        static void disposeIsolate(v8::Isolate* isolate);
+        static void onDisposeIsolate(v8::Isolate* isolate);
 
     private:
 

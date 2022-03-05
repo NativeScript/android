@@ -2176,7 +2176,7 @@ std::string MetadataNode::GetJniClassName(MetadataEntry entry) {
     return fullClassName;
 }
 
-void MetadataNode::disposeIsolate(Isolate* isolate) {
+void MetadataNode::onDisposeIsolate(Isolate* isolate) {
     {
         auto it = s_metadata_node_cache.find(isolate);
         if (it != s_metadata_node_cache.end()) {

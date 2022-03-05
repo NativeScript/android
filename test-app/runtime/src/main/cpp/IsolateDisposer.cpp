@@ -11,9 +11,9 @@
 
 namespace tns {
     void disposeIsolate(v8::Isolate *isolate) {
-        tns::ArgConverter::disposeIsolate(isolate);
-        tns::MetadataNode::disposeIsolate(isolate);
-        tns::disposeHelperIsolate(isolate);
-        Console::disposeIsolate(isolate);
+        tns::ArgConverter::onDisposeIsolate(isolate);
+        tns::MetadataNode::onDisposeIsolate(isolate);
+        tns::V8GlobalHelpers::onDisposeIsolate(isolate);
+        tns::Console::onDisposeIsolate(isolate);
     }
 }

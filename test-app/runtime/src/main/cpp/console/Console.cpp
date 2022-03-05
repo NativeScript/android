@@ -554,7 +554,7 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     }
 }
 
-void Console::disposeIsolate(v8::Isolate* isolate) {
+void Console::onDisposeIsolate(v8::Isolate* isolate) {
     s_isolateToConsoleTimersMap.erase(isolate);
 }
 

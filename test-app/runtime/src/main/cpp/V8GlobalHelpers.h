@@ -14,7 +14,9 @@ bool V8GetPrivateValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, c
 
 bool V8SetPrivateValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, const v8::Local<v8::String>& propName, const v8::Local<v8::Value>& value);
 
-void disposeHelperIsolate(v8::Isolate* isolate);
+namespace V8GlobalHelpers {
+    void onDisposeIsolate(v8::Isolate* isolate);
+}
 }
 
 #endif /* V8GLOBALHELPERS_H_ */

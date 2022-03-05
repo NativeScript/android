@@ -59,7 +59,7 @@ class MetadataNode {
 
         static std::string GetTypeMetadataName(v8::Isolate* isolate, v8::Local<v8::Value>& value);
 
-        static void disposeIsolate(v8::Isolate* isolate);
+        static void onDisposeIsolate(v8::Isolate* isolate);
     private:
         struct MethodCallbackData;
 
