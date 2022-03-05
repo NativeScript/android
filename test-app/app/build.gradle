@@ -82,11 +82,11 @@ def METADATA_OUT_PATH = "$projectDir/src/main/assets/metadata"
 def pluginsJarLibraries = new LinkedList<String>()
 def allJarLibraries = new LinkedList<String>()
 
-def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "${kotlin_version}" }
-def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : COMPILE_SDK_VERSION as int }
-def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : COMPILE_SDK_VERSION as int }
+def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "${ns_default_kotlin_version}" }
+def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : NS_DEFAULT_COMPILE_SDK_VERSION as int }
+def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : NS_DEFAULT_COMPILE_SDK_VERSION as int }
 def computeBuildToolsVersion = { ->
-    project.hasProperty("buildToolsVersion") ? buildToolsVersion : BUILD_TOOLS_VERSION as String
+    project.hasProperty("buildToolsVersion") ? buildToolsVersion : NS_DEFAULT_BUILD_TOOLS_VERSION as String
 }
 
 def enableAnalytics = (project.hasProperty("gatherAnalyticsData") && project.gatherAnalyticsData == "true")
@@ -198,7 +198,7 @@ android {
 
     defaultConfig {
         def manifest = new XmlSlurper().parse(file(android.sourceSets.main.manifest.srcFile))
-        def minSdkVer = manifest."uses-sdk"."@android:minSdkVersion".text() ?: MIN_SDK_VERSION
+        def minSdkVer = manifest."uses-sdk"."@android:minSdkVersion".text() ?: NS_DEFAULT_MIN_SDK_VERSION
         minSdkVersion minSdkVer
         targetSdkVersion computeTargetSdkVersion()
         ndk {
@@ -303,45 +303,45 @@ repositories {
 }
 
 dependencies {
-    // println "\t ~ [DEBUG][app] build.gradle - android_x_app_compat_version = ${android_x_app_compat_version}..."
+    // println "\t ~ [DEBUG][app] build.gradle - ns_default_androidx_appcompat_version = ${ns_default_androidx_appcompat_version}..."
 
-    def androidXAppCompatVersion = "${android_x_app_compat_version}"
+    def androidXAppCompatVersion = "${ns_default_androidx_appcompat_version}"
     if (project.hasProperty("androidXAppCompat")) {
         androidXAppCompatVersion = androidXAppCompat
         outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.appcompat:appcompat:$androidXAppCompatVersion"
     }
 
-    def androidXMaterialVersion = "${android_x_material_version}"
+    def androidXMaterialVersion = "${ns_default_androidx_material_version}"
     if (project.hasProperty("androidXMaterial")) {
         androidXMaterialVersion = androidXMaterial
         outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library com.google.android.material:material:$androidXMaterialVersion"
     }
 
-    def androidXExifInterfaceVersion = "${android_x_exif_interface_version}"
+    def androidXExifInterfaceVersion = "${ns_default_androidx_exifinterface_version}"
     if (project.hasProperty("androidXExifInterface")) {
         androidXExifInterfaceVersion = androidXExifInterface
         outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.exifinterface:exifinterface:$androidXExifInterfaceVersion"
     }
 
-    def androidXViewPagerVersion = "${android_x_view_pager_version}"
+    def androidXViewPagerVersion = "${ns_default_androidx_viewpager_version}"
     if (project.hasProperty("androidXViewPager")) {
         androidXViewPagerVersion = androidXViewPager
         outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.viewpager2:viewpager2:$androidXViewPagerVersion"
     }
 
-    def androidXFragmentVersion = "${android_x_fragment_version}"
+    def androidXFragmentVersion = "${ns_default_androidx_fragment_version}"
     if (project.hasProperty("androidXFragment")) {
         androidXFragmentVersion = androidXFragment
         outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.fragment:fragment:$androidXFragmentVersion"
     }
 
-    def androidXTransitionVersion = "${android_x_transition_version}"
+    def androidXTransitionVersion = "${ns_default_androidx_transition_version}"
     if (project.hasProperty("androidXTransition")) {
         androidXTransitionVersion = androidXTransition
         outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.transition:transition:$androidXTransitionVersion"
     }
 
-    def androidXMultidexVersion = "${android_x_multidex_version}"
+    def androidXMultidexVersion = "${ns_default_androidx_multidex_version}"
     if (project.hasProperty("androidXMultidex")) {
         androidXMultidexVersion = androidXMultidex
         outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.multidex:multidex:$androidXMultidexVersion"

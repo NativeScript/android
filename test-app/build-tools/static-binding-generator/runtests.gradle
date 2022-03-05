@@ -22,19 +22,19 @@ repositories {
 }
 
 dependencies {
-    // println "\t ~ [DEBUG][static-binding-generator] runtests.gradle - asm_version = ${asm_version}..."
+    // println "\t ~ [DEBUG][static-binding-generator] runtests.gradle - ns_default_asm_version = ${ns_default_asm_version}..."
 
-    api "org.ow2.asm:asm:${asm_version}"
-    api "org.ow2.asm:asm-util:${asm_util_version}"
-    api "org.apache.bcel:bcel:${bcel_version}"
-    api group: 'org.json', name: 'json', version: "${json_version}"
-    api "commons-io:commons-io:${commons_io_version}"
-    api "com.google.code.gson:gson:${gson_version}"
-    api "com.google.googlejavaformat:google-java-format:${google_java_format_version}"
+    api "org.ow2.asm:asm:${ns_default_asm_version}"
+    api "org.ow2.asm:asm-util:${ns_default_asm_util_version}"
+    api "org.apache.bcel:bcel:${ns_default_bcel_version}"
+    api group: 'org.json', name: 'json', version: "${ns_default_json_version}"
+    api "commons-io:commons-io:${ns_default_commons_io_version}"
+    api "com.google.code.gson:gson:${ns_default_gson_version}"
+    api "com.google.googlejavaformat:google-java-format:${ns_default_google_java_format_version}"
 
-    testImplementation "com.google.code.gson:gson:${gson_version}"
-    testImplementation "junit:junit:${junit_version}"
-    testImplementation "org.mockito:mockito-core:${mockito_core_version}"
+    testImplementation "com.google.code.gson:gson:${ns_default_gson_version}"
+    testImplementation "junit:junit:${ns_default_junit_version}"
+    testImplementation "org.mockito:mockito-core:${ns_default_mockito_core_version}"
 }
 
 def appRoot = file(project.appRoot).getAbsolutePath()

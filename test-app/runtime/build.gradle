@@ -50,8 +50,8 @@ println "Runtime using NDK_PATH: " + NDK_PATH
 
 android {
 
-    compileSdkVersion COMPILE_SDK_VERSION as int
-    buildToolsVersion BUILD_TOOLS_VERSION as String
+    compileSdkVersion NS_DEFAULT_COMPILE_SDK_VERSION as int
+    buildToolsVersion NS_DEFAULT_BUILD_TOOLS_VERSION as String
 
     sourceSets {
         main {
@@ -71,8 +71,8 @@ android {
     }
 
     defaultConfig {
-        minSdkVersion MIN_SDK_VERSION as int
-        targetSdkVersion COMPILE_SDK_VERSION as int
+        minSdkVersion NS_DEFAULT_MIN_SDK_VERSION as int
+        targetSdkVersion NS_DEFAULT_COMPILE_SDK_VERSION as int
 
         if (!optimized && !optimizedWithInspector) {
             project.archivesBaseName = "${archivesBaseName}-regular"
@@ -104,7 +104,7 @@ android {
         }
 
         ndk {
-            minSdkVersion MIN_SDK_VERSION as int
+            minSdkVersion NS_DEFAULT_MIN_SDK_VERSION as int
             if (onlyX86) {
                 abiFilters 'x86'
             } else {
@@ -137,11 +137,11 @@ allprojects {
 }
 
 dependencies {
-    // println "\t ~ [DEBUG][runtime] build.gradle - junit_version = ${junit_version}..."
+    // println "\t ~ [DEBUG][runtime] build.gradle - ns_default_junit_version = ${ns_default_junit_version}..."
 
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    testImplementation "junit:junit:${junit_version}"
-    testImplementation "org.mockito:mockito-core:${mockito_core_version}"
+    testImplementation "junit:junit:${ns_default_junit_version}"
+    testImplementation "org.mockito:mockito-core:${ns_default_mockito_core_version}"
 }
 
 tasks.whenTaskAdded { task ->

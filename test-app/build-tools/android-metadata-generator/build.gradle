@@ -21,7 +21,7 @@ buildscript {
     }
 
     dependencies {
-        classpath "com.android.tools.build:gradle:$ANDRIOD_BUILD_TOOLS_VERSION"
+        classpath "com.android.tools.build:gradle:$NS_DEFAULT_ANDROID_BUILD_TOOLS_VERSION"
     }
 }
 
@@ -53,15 +53,15 @@ repositories {
 }
 
 dependencies {
-    // println "\t ~ [DEBUG][android-metadata-generator] build.gradle - bcel_version = ${bcel_version}..."
+    // println "\t ~ [DEBUG][android-metadata-generator] build.gradle - ns_default_bcel_version = ${ns_default_bcel_version}..."
 
-    api "org.apache.bcel:bcel:${bcel_version}"
-    api "com.google.code.gson:gson:${gson_version}"
-    api group: 'org.jetbrains.kotlinx', name: 'kotlinx-metadata-jvm', version: "${kotlinx_metadata_jvm_version}"
+    api "org.apache.bcel:bcel:${ns_default_bcel_version}"
+    api "com.google.code.gson:gson:${ns_default_gson_version}"
+    api group: 'org.jetbrains.kotlinx', name: 'kotlinx-metadata-jvm', version: "${ns_default_kotlinx_metadata_jvm_version}"
     implementation files("./src/libs/dx.jar")
 
-    testImplementation "junit:junit:${junit_version}"
-    testImplementation "org.mockito:mockito-core:${mockito_core_version}"
+    testImplementation "junit:junit:${ns_default_junit_version}"
+    testImplementation "org.mockito:mockito-core:${ns_default_mockito_core_version}"
 }
 
 task copyNecessaryFiles {

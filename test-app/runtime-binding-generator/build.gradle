@@ -1,9 +1,9 @@
 apply plugin: 'java-library'
 
 dependencies {
-    // println "\t ~ [DEBUG][runtime-binding-generator] build.gradle - junit_version = ${junit_version}..."
+    // println "\t ~ [DEBUG][runtime-binding-generator] build.gradle - ns_default_junit_version = ${ns_default_junit_version}..."
 
-    testImplementation "junit:junit:${junit_version}"
+    testImplementation "junit:junit:${ns_default_junit_version}"
 }
 
 sourceCompatibility = JavaVersion.VERSION_1_7
