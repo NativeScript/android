@@ -42,6 +42,7 @@ buildscript {
         apply from: "$rootDir/gradle-helpers/user_properties_reader.gradle"
         apply from: "$rootDir/gradle-helpers/paths.gradle"
         rootProject.ext.userDefinedGradleProperties = getUserProperties("${getAppResourcesPath(userDir)}/Android")
+        
         if (rootProject.hasProperty("userDefinedGradleProperties")) {
             rootProject.ext.userDefinedGradleProperties.each { entry ->
                 def propertyName = entry.getKey()
@@ -155,9 +156,8 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
     applyBuildScriptConfigurations()
     applyBeforePluginGradleConfiguration()
 
-    def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "${kotlin_version}"
-    }
-    def computeBuildToolsVersion = { -> project.hasProperty("androidBuildToolsVersion") ? androidBuildToolsVersion : "${ANDRIOD_BUILD_TOOLS_VERSION}"}
+    def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "${kotlin_version}" }
+    def computeBuildToolsVersion = { -> project.hasProperty("androidBuildToolsVersion") ? androidBuildToolsVersion : "${ANDRIOD_BUILD_TOOLS_VERSION}" }
     def kotlinVersion = computeKotlinVersion()
     def androidBuildToolsVersion = computeBuildToolsVersion()
 
