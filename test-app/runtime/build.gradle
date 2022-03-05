@@ -20,9 +20,41 @@ if (useCCache) {
     println "Use CCache build triggered."
 }
 
-project.ext._buildToolsVersion = "30.0.1"
+
+
+def hasNdkVersion = project.hasProperty("ndkVersion")
+if (hasNdkVersion) {
+    println "Runtime using NDK version " + ndkVersion
+}
+
+
+def NDK_PATH = ""
+def hasNdkDirectory = project.hasProperty("ndkDirectory")
+if(!hasNdkDirectory){
+    println "No ndkDirectory set, checking environment \$ANDROID_NDK..."
+    
+    NDK_PATH = "$System.env.ANDROID_NDK"
+    if (NDK_PATH == null || NDK_PATH == "null"){
+        println "No ndkDirectory set, checking environment \$ANDROID_NDK_ROOT..."
+        NDK_PATH = "$System.env.ANDROID_NDK_ROOT"
+    }
+    
+    if (NDK_PATH == null || NDK_PATH == "null"){
+        println "No ndkDirectory set, checking environment \$ANDROID_NDK_HOME..."
+        NDK_PATH = "$System.env.ANDROID_NDK_HOME"
+    }
+} else {
+    NDK_PATH = ndkDirectory
+}
+println "Runtime using NDK_PATH: " + NDK_PATH
+
+
 
 android {
+
+    compileSdkVersion COMPILE_SDK_VERSION as int
+    buildToolsVersion BUILD_TOOLS_VERSION as String
+
     sourceSets {
         main {
             def defaultSrcPath = "src/main/java"
@@ -32,14 +64,17 @@ android {
             java.srcDirs = [bindingGeneratorSourcePath, defaultSrcPath]
         }
     }
-    compileSdkVersion 30
-    buildToolsVersion project.ext._buildToolsVersion
+
+    if (hasNdkVersion) {
+        ndkVersion ndkVersion
+    } else {
+        ndkVersion "21.1.6352462"
+        // ndkVersion "22.1.7171670"
+    }
 
     defaultConfig {
-        minSdkVersion 17
-        targetSdkVersion 30
-        versionCode 1
-        versionName "1.0"
+        minSdkVersion MIN_SDK_VERSION as int
+        targetSdkVersion COMPILE_SDK_VERSION as int
 
         if (!optimized && !optimizedWithInspector) {
             project.archivesBaseName = "${archivesBaseName}-regular"
@@ -53,6 +88,7 @@ android {
 
         externalNativeBuild {
             cmake {
+
                 if (optimized) {
                     arguments.add("-DOPTIMIZED_BUILD=true")
                 }
@@ -65,13 +101,12 @@ android {
                     arguments.add("-DUSE_CCACHE=true")
                 }
 
-                //https://developer.android.com/ndk/guides/cmake.html
-                //TODO: plamen5kov: figure out why can't ANDROID_TOOLCHAIN and ANDROID_STL be set in CMakeLists.txt
-                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${android.ndkDirectory}"
+                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}"
             }
         }
 
         ndk {
+            minSdkVersion MIN_SDK_VERSION as int
             if (onlyX86) {
                 abiFilters 'x86'
             } else {
@@ -86,12 +121,13 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-
     externalNativeBuild {
         cmake {
+            // version "3.18.1"
             path "CMakeLists.txt"
         }
     }
+
 }
 
 allprojects {
@@ -104,8 +140,8 @@ allprojects {
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    testImplementation 'junit:junit:4.12'
-    testImplementation 'org.mockito:mockito-core:1.10.19'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.mockito:mockito-core:3.0.0'
 }
 
 tasks.whenTaskAdded { task ->
@@ -150,7 +186,7 @@ task setRuntimeCommit {
     doFirst {
         println "Setting runtime commit: '${gitCommitVersion}'"
 
-        def versionFile = "$projectDir/src/main/cpp//Version.h"
+        def versionFile = "$projectDir/src/main/cpp/Version.h"
         String contents = new File(versionFile).getText("UTF-8")
         contents = contents.replaceAll(/RUNTIME_COMMIT_SHA_PLACEHOLDER/, gitCommitVersion)
         new File(versionFile).write(contents, "UTF-8")

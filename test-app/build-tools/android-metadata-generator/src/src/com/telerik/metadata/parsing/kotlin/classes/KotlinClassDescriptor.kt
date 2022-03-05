@@ -222,7 +222,6 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
         val kotlinClassHeader = KotlinClassHeader(
                 metadataAnnotation.kind,
                 metadataAnnotation.metadataVersion,
-                metadataAnnotation.bytecodeVersion,
                 metadataAnnotation.data1,
                 metadataAnnotation.data2,
                 metadataAnnotation.extraString,

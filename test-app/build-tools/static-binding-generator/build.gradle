@@ -3,27 +3,38 @@ apply plugin: 'java-library'
 sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
 
+if(!project.hasProperty("loadedProjectDeps")){
+    Properties projectDeps = new Properties()
+    projectDeps.load(new FileInputStream("$project.rootDir/gradle.properties"))
+    projectDeps.each { prop ->
+        project.ext.set(prop.key, prop.value)
+    }
+    project.ext.loadedProjectDeps = true
+}
+
 repositories {
     google()
     mavenCentral()
-    jcenter()
 }
 
 dependencies {
-    compile 'org.ow2.asm:asm:7.0'
-    compile 'org.ow2.asm:asm-util:7.0'
-    compile 'org.apache.bcel:bcel:6.2'
-    compile group: 'org.json', name: 'json', version: '20090211'
-    compile 'commons-io:commons-io:2.5'
-    compile 'com.google.code.gson:gson:2.8.5'
-    compile 'com.google.googlejavaformat:google-java-format:1.6'
+    api "org.ow2.asm:asm:${asm_version}"
+    api "org.ow2.asm:asm-util:${asm_util_version}"
+    api "org.apache.bcel:bcel:${bcel_version}"
+    api group: 'org.json', name: 'json', version: "${json_version}"
+    api "commons-io:commons-io:${commons_io_version}"
+    api "com.google.code.gson:gson:${gson_version}"
+    api "com.google.googlejavaformat:google-java-format:${google_java_format_version}"
 
-    testCompile 'com.google.code.gson:gson:2.8.5'
-    testCompile 'junit:junit:4.12'
-    testCompile 'org.mockito:mockito-core:3.0.0'
+    testImplementation "com.google.code.gson:gson:${gson_version}"
+    testImplementation "junit:junit:${junit_version}"
+    testImplementation "org.mockito:mockito-core:${mockito_core_version}"
 }
 
 compileJava {
+    if (!findProject(':dts-generator').is(null)) {
+        dependsOn ':dts-generator:copyJarToBuildTools'
+    }
     options.compilerArgs << "-Xlint:all" << "-Xlint:-options" << "-Werror"
 }
 
@@ -34,19 +45,31 @@ task copyJarToBuildTools (type: Copy) {
 }
 
 jar {
+
+    configurations.implementation.setCanBeResolved(true)
+    configurations.runtimeOnly.setCanBeResolved(true)
+    configurations.api.setCanBeResolved(true)
+
     manifest {
         attributes("Manifest-Version": "1.0",
                 "Main-Class": "org.nativescript.staticbindinggenerator.Main")
     }
     from {
-        configurations.runtime.collect {
+
+        configurations.implementation.collect {
             it.isDirectory() ? it : zipTree(it)
         }
 
-        configurations.compile.collect {
+        configurations.runtimeOnly.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+
+        configurations.api.collect {
             it.isDirectory() ? it : zipTree(it)
         }
     }
+
+    duplicatesStrategy = 'include'
 }
 
 jar.finalizedBy(copyJarToBuildTools)

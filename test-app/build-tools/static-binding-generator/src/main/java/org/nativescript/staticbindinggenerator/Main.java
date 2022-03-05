@@ -22,7 +22,7 @@ public class Main {
     public static final String SBG_OUTPUT_FILE = "sbg-output-file.txt";
     public static final String SBG_BINDINGS_NAME = "sbg-bindings.txt";
     public static final String SBG_JS_PARSED_FILES = "sbg-js-parsed-files.txt";
-    public static final String SBG_INTERFACE_NAMES = "sbg-interfaces-names.txt";
+    public static final String SBG_INTERFACE_NAMES = "sbg-interface-names.txt";
 
     private static String jsCodeAbsolutePath;
     private static List<String> inputJsFiles;
@@ -162,6 +162,7 @@ public class Main {
                     try {
                         pjson = new JSONObject(jsonContent);
                     } catch (JSONException e) {
+                        System.out.printf("Failed to parse json file at %s", jsonFile.getAbsolutePath());
                         e.printStackTrace();
                         return;
                     }
