@@ -1,8 +1,14 @@
 apply plugin: 'java-library'
 
 dependencies {
-    testImplementation 'junit:junit:4.13.2'
+    // println "\t ~ [DEBUG][runtime-binding-generator] build.gradle - junit_version = ${junit_version}..."
+
+    testImplementation "junit:junit:${junit_version}"
 }
 
 sourceCompatibility = JavaVersion.VERSION_1_7
 targetCompatibility = JavaVersion.VERSION_1_7
+
+// Disable compilation tasks as these are compiled *with* the runtime and not separately
+compileJava.enabled = false
+compileTestJava.enabled = false

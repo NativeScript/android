@@ -4,16 +4,15 @@ import java.nio.file.StandardCopyOption
 apply plugin: 'application'
 apply plugin: 'java-library'
 
-
-if(!project.hasProperty("loadedProjectDeps")){
-    Properties projectDeps = new Properties()
-    projectDeps.load(new FileInputStream("$project.rootDir/gradle.properties"))
-    projectDeps.each { prop ->
-        project.ext.set(prop.key, prop.value)
-    }
-    project.ext.loadedProjectDeps = true
-}
-
+// todo: check if still needed
+// if(!project.hasProperty("loadedProjectDeps")){
+//     Properties projectDeps = new Properties()
+//     projectDeps.load(new FileInputStream("$project.rootDir/gradle.properties"))
+//     projectDeps.each { prop ->
+//         project.ext.set(prop.key, prop.value)
+//     }
+//     project.ext.loadedProjectDeps = true
+// }
 
 defaultTasks 'runSbg'
 
@@ -23,6 +22,8 @@ repositories {
 }
 
 dependencies {
+    // println "\t ~ [DEBUG][static-binding-generator] runtests.gradle - asm_version = ${asm_version}..."
+
     api "org.ow2.asm:asm:${asm_version}"
     api "org.ow2.asm:asm-util:${asm_util_version}"
     api "org.apache.bcel:bcel:${bcel_version}"

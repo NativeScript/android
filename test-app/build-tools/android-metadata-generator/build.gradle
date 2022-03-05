@@ -4,14 +4,15 @@ apply plugin: 'kotlin'
 sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
 
-if(!project.hasProperty("loadedProjectDeps")){
-    Properties projectDeps = new Properties()
-    projectDeps.load(new FileInputStream("$project.rootDir/gradle.properties"))
-    projectDeps.each { prop ->
-        project.ext.set(prop.key, prop.value)
-    }
-    project.ext.loadedProjectDeps = true
-}
+// todo: check if still needed
+// if(!project.hasProperty("loadedProjectDeps")){
+//     Properties projectDeps = new Properties()
+//     projectDeps.load(new FileInputStream("$project.rootDir/gradle.properties"))
+//     projectDeps.each { prop ->
+//         project.ext.set(prop.key, prop.value)
+//     }
+//     project.ext.loadedProjectDeps = true
+// }
 
 buildscript {
     repositories {
@@ -52,6 +53,8 @@ repositories {
 }
 
 dependencies {
+    // println "\t ~ [DEBUG][android-metadata-generator] build.gradle - bcel_version = ${bcel_version}..."
+
     api "org.apache.bcel:bcel:${bcel_version}"
     api "com.google.code.gson:gson:${gson_version}"
     api group: 'org.jetbrains.kotlinx', name: 'kotlinx-metadata-jvm', version: "${kotlinx_metadata_jvm_version}"

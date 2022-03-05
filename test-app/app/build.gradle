@@ -302,6 +302,7 @@ repositories {
 }
 
 dependencies {
+    // println "\t ~ [DEBUG][app] build.gradle - android_x_app_compat_version = ${android_x_app_compat_version}..."
 
     def androidXAppCompatVersion = "${android_x_app_compat_version}"
     if (project.hasProperty("androidXAppCompat")) {

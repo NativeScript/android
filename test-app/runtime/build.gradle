@@ -48,8 +48,6 @@ if(!hasNdkDirectory){
 }
 println "Runtime using NDK_PATH: " + NDK_PATH
 
-
-
 android {
 
     compileSdkVersion COMPILE_SDK_VERSION as int
@@ -139,13 +137,16 @@ allprojects {
 }
 
 dependencies {
+    // println "\t ~ [DEBUG][runtime] build.gradle - junit_version = ${junit_version}..."
+
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.mockito:mockito-core:3.0.0'
+    testImplementation "junit:junit:${junit_version}"
+    testImplementation "org.mockito:mockito-core:${mockito_core_version}"
 }
 
 tasks.whenTaskAdded { task ->
     def taskName = task.getName()
+    // println "\t ~ [DEBUG][runtime] build.gradle whenTaskAdded taskName = ${taskName}"
     if (taskName.contains("externalNativeBuildRelease")) {
         setRuntimeCommit.dependsOn(setPackageVersion)
         task.dependsOn(setRuntimeCommit)
