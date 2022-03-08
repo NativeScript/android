@@ -3,6 +3,8 @@
 # Command info: https://cmake.org/cmake/help/v3.4/command/cmake_minimum_required.html
 cmake_minimum_required(VERSION 3.4.1)
 
+project(NativeScriptAndroidRuntime)
+
 # Add the ccache to the build system
 find_program(CCACHE_FOUND ccache)
 if (CCACHE_FOUND AND (USE_CCACHE))
@@ -145,6 +147,7 @@ add_library(
     src/main/cpp/DirectBuffer.cpp
     src/main/cpp/FieldAccessor.cpp
     src/main/cpp/File.cpp
+    src/main/cpp/IsolateDisposer.cpp
     src/main/cpp/JEnv.cpp
     src/main/cpp/DesugaredInterfaceCompanionClassNameResolver.cpp
     src/main/cpp/JType.cpp

@@ -23,13 +23,17 @@
 
 import groovy.io.FileType
 import groovy.json.JsonSlurper
+import org.apache.commons.io.FileUtils
 
 import javax.inject.Inject
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
-import org.gradle.internal.logging.text.StyledTextOutputFactory
+
+import java.util.jar.JarEntry
+import java.util.jar.JarFile
+
 import static org.gradle.internal.logging.text.StyledTextOutput.Style
 
 apply plugin: "com.android.application"
@@ -41,7 +45,7 @@ def enableKotlin = (project.hasProperty("useKotlin") && project.useKotlin == "tr
 
 if (enableKotlin) {
     apply plugin: 'kotlin-android'
-    apply plugin: 'kotlin-android-extensions'
+    apply plugin: 'kotlin-parcelize'
 }
 
 def onlyX86 = project.hasProperty("onlyX86")
@@ -78,11 +82,11 @@ def METADATA_OUT_PATH = "$projectDir/src/main/assets/metadata"
 def pluginsJarLibraries = new LinkedList<String>()
 def allJarLibraries = new LinkedList<String>()
 
-def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "1.3.41" }
-def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 29 }
-def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 29 }
+def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "${ns_default_kotlin_version}" }
+def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : NS_DEFAULT_COMPILE_SDK_VERSION as int }
+def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : NS_DEFAULT_COMPILE_SDK_VERSION as int }
 def computeBuildToolsVersion = { ->
-    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "29.0.2"
+    project.hasProperty("buildToolsVersion") ? buildToolsVersion : NS_DEFAULT_BUILD_TOOLS_VERSION as String
 }
 
 def enableAnalytics = (project.hasProperty("gatherAnalyticsData") && project.gatherAnalyticsData == "true")
@@ -97,76 +101,6 @@ if (enableAnalytics) {
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
 
 buildscript {
-    // we have moved these initializations here as we need getAppResourcesPath to search for buildscript.gradle files,
-    // but the buildscript is executed before executing anything else from the gradle file
-    def initialize = { ->
-        // the build script will not work with previous versions of the CLI (3.1 or earlier)
-        def dependenciesJson = file("$rootDir/dependencies.json")
-        if (!dependenciesJson.exists()) {
-            throw new BuildCancelledException("""
-'dependencies.json' file not found. Check whether the NativeScript CLI has prepared the project beforehand,
-and that your NativeScript version is 3.3, or a more recent one. To build an android project with the current
-version of the {N} CLI install a previous version of the runtime package - 'tns platform add android@3.2'.
-""")
-        }
-
-        project.ext.extractedDependenciesDir = "${project.buildDir}/exploded-dependencies"
-        project.ext.cleanupAllJarsTimestamp = "${project.buildDir}/cleanupAllJars.timestamp"
-        project.ext.extractAllJarsTimestamp = "${project.buildDir}/extractAllJars.timestamp"
-        project.ext.nativescriptDependencies = new JsonSlurper().parseText(dependenciesJson.text)
-        project.ext.PLATFORMS_ANDROID = "platforms/android"
-        project.ext.USER_PROJECT_ROOT = "$rootDir/../.."
-        project.ext.outLogger = services.get(StyledTextOutputFactory).create("colouredOutputLogger")
-
-        project.ext.getAppPath = { ->
-            def relativePathToApp = "app"
-            def nsConfigFile = file("$USER_PROJECT_ROOT/nsconfig.json")
-            def nsConfig
-
-            if (nsConfigFile.exists()) {
-                nsConfig = new JsonSlurper().parseText(nsConfigFile.getText("UTF-8"))
-            }
-
-            if (project.hasProperty("appPath")) {
-                // when appPath is passed through -PappPath=/path/to/app
-                // the path could be relative or absolute - either case will work
-                relativePathToApp = appPath
-            } else if (nsConfig != null && nsConfig.appPath != null) {
-                relativePathToApp = nsConfig.appPath
-            }
-
-            project.ext.appPath = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToApp).toAbsolutePath()
-
-            return project.ext.appPath
-        }
-
-        project.ext.getAppResourcesPath = { ->
-            def relativePathToAppResources
-            def absolutePathToAppResources
-            def nsConfigFile = file("$USER_PROJECT_ROOT/nsconfig.json")
-            def nsConfig
-
-            if (nsConfigFile.exists()) {
-                nsConfig = new JsonSlurper().parseText(nsConfigFile.getText("UTF-8"))
-            }
-
-            if (project.hasProperty("appResourcesPath")) {
-                // when appResourcesPath is passed through -PappResourcesPath=/path/to/App_Resources
-                // the path could be relative or absolute - either case will work
-                relativePathToAppResources = appResourcesPath
-                absolutePathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToAppResources).toAbsolutePath()
-            } else if (nsConfig != null && nsConfig.appResourcesPath != null) {
-                relativePathToAppResources = nsConfig.appResourcesPath
-                absolutePathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToAppResources).toAbsolutePath()
-            } else {
-                absolutePathToAppResources = "${getAppPath()}/App_Resources"
-            }
-
-            project.ext.appResourcesPath = absolutePathToAppResources
-
-            return absolutePathToAppResources
-        }
-    }
     def applyBuildScriptConfigurations = { ->
         def absolutePathToAppResources = getAppResourcesPath()
         def pathToBuildScriptGradle = "$absolutePathToAppResources/Android/buildscript.gradle"
@@ -185,8 +119,6 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
             }
         }
     }
-
-    initialize()
     applyBuildScriptConfigurations()
 }
 ////////////////////////////////////////////////////////////////////////////////////
@@ -266,7 +198,7 @@ android {
 
     defaultConfig {
         def manifest = new XmlSlurper().parse(file(android.sourceSets.main.manifest.srcFile))
-        def minSdkVer = manifest."uses-sdk"."@android:minSdkVersion".text() ?: 17
+        def minSdkVer = manifest."uses-sdk"."@android:minSdkVersion".text() ?: NS_DEFAULT_MIN_SDK_VERSION
         minSdkVersion minSdkVer
         targetSdkVersion computeTargetSdkVersion()
         ndk {
@@ -275,9 +207,6 @@ android {
             } else {
                 abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
             }
-        }
-        dexOptions {
-            jumboMode = true
         }
     }
 
@@ -369,58 +298,61 @@ repositories {
             dirs pluginDependencies
         }
     }
+    
     mavenCentral()
 }
 
 dependencies {
-    def androidXLegacyVersion = "1.0.0"
-    if (project.hasProperty("androidXLegacy")) {
-        androidXLegacyVersion = androidXLegacy
-        outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
-    }
+    // println "\t ~ [DEBUG][app] build.gradle - ns_default_androidx_appcompat_version = ${ns_default_androidx_appcompat_version}..."
 
-    def androidXAppCompatVersion = "1.1.0"
+    def androidXAppCompatVersion = "${ns_default_androidx_appcompat_version}"
     if (project.hasProperty("androidXAppCompat")) {
         androidXAppCompatVersion = androidXAppCompat
         outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.appcompat:appcompat:$androidXAppCompatVersion"
     }
 
-    def androidXMaterialVersion = "1.1.0"
+    def androidXMaterialVersion = "${ns_default_androidx_material_version}"
     if (project.hasProperty("androidXMaterial")) {
         androidXMaterialVersion = androidXMaterial
         outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library com.google.android.material:material:$androidXMaterialVersion"
     }
 
-    def androidXExifInterfaceVersion = "1.2.0"
+    def androidXExifInterfaceVersion = "${ns_default_androidx_exifinterface_version}"
     if (project.hasProperty("androidXExifInterface")) {
         androidXExifInterfaceVersion = androidXExifInterface
         outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.exifinterface:exifinterface:$androidXExifInterfaceVersion"
     }
 
-    def androidXViewPagerVersion = "1.0.0"
+    def androidXViewPagerVersion = "${ns_default_androidx_viewpager_version}"
     if (project.hasProperty("androidXViewPager")) {
         androidXViewPagerVersion = androidXViewPager
         outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.viewpager2:viewpager2:$androidXViewPagerVersion"
     }
 
-    def androidXFragmentVersion = "1.2.5"
+    def androidXFragmentVersion = "${ns_default_androidx_fragment_version}"
     if (project.hasProperty("androidXFragment")) {
         androidXFragmentVersion = androidXFragment
         outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.fragment:fragment:$androidXFragmentVersion"
     }
 
-    def androidXTransitionVersion = "1.3.1"
+    def androidXTransitionVersion = "${ns_default_androidx_transition_version}"
     if (project.hasProperty("androidXTransition")) {
         androidXTransitionVersion = androidXTransition
         outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.transition:transition:$androidXTransitionVersion"
     }
 
-    implementation "androidx.multidex:multidex:2.0.1"
-    implementation "androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
+    def androidXMultidexVersion = "${ns_default_androidx_multidex_version}"
+    if (project.hasProperty("androidXMultidex")) {
+        androidXMultidexVersion = androidXMultidex
+        outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.multidex:multidex:$androidXMultidexVersion"
+    }
+
+    implementation "androidx.multidex:multidex:$androidXMultidexVersion"
     implementation "androidx.appcompat:appcompat:$androidXAppCompatVersion"
-    implementation "com.google.android.material:material:$androidXMaterialVersion"
+    debugImplementation "com.google.android.material:material:$androidXMaterialVersion"
     implementation "androidx.exifinterface:exifinterface:$androidXExifInterfaceVersion"
     implementation "androidx.viewpager2:viewpager2:$androidXViewPagerVersion"
+    //noinspection KtxExtensionAvailable
     implementation "androidx.fragment:fragment:$androidXFragmentVersion"
     implementation "androidx.transition:transition:$androidXTransitionVersion"
 
@@ -520,7 +452,7 @@ if (failOnCompilationWarningsEnabled()) {
     }
 }
 
-tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
+tasks.whenTaskAdded({ DefaultTask currentTask ->
     if (currentTask =~ /generate.+BuildConfig/) {
         currentTask.finalizedBy(extractAllJars)
         extractAllJars.finalizedBy(collectAllJars)
@@ -530,7 +462,11 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
         currentTask.finalizedBy(buildMetadata)
     }
     if (currentTask =~ /merge.*Assets/) {
-        currentTask.shouldRunAfter(buildMetadata)
+        currentTask.dependsOn(buildMetadata)
+    }
+    // ensure buildMetadata is done before R8 to allow custom proguard from metadata
+    if (currentTask =~ /minify.*WithR8/) {
+        currentTask.dependsOn(buildMetadata)
     }
     if (currentTask =~ /assemble.*Debug/ || currentTask =~ /assemble.*Release/) {
         currentTask.finalizedBy("validateAppIdMatch")
@@ -578,18 +514,18 @@ def explodeAar(File compileDependency, File outputDir) {
     logger.info("explodeAar: Extracting ${compileDependency.path} -> ${outputDir.path}")
 
     if (compileDependency.name.endsWith(".aar")) {
-        java.util.jar.JarFile jar = new java.util.jar.JarFile(compileDependency)
+        JarFile jar = new JarFile(compileDependency)
         Enumeration enumEntries = jar.entries()
         while (enumEntries.hasMoreElements()) {
-            java.util.jar.JarEntry file = (java.util.jar.JarEntry) enumEntries.nextElement()
+            JarEntry file = (JarEntry) enumEntries.nextElement()
+            if (file.isDirectory()) {
+                continue
+            }
             if (file.name.endsWith(".jar")) {
                 def targetFile = new File(outputDir, file.name)
                 InputStream inputStream = jar.getInputStream(file)
                 new File(targetFile.parent).mkdirs()
                 Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
-            }
-            if (file.isDirectory()) {
-                continue
             }
         }
         jar.close()
@@ -629,34 +565,15 @@ def getMergedAssetsOutputPath() {
 
 // Discover all jars and dynamically create tasks for the extraction of each of them
 project.ext.allJars = []
-afterEvaluate { project ->
-    def buildType = project.selectedBuildType == "release" ? "Release" : "Debug"
-    def jars = []
-    def artifactType = Attribute.of('artifactType', String)
-    configurations.all { config ->
-        if (config.name.toLowerCase().endsWith("${buildType}RuntimeClasspath".toLowerCase())) {
-            config.incoming.artifactView {
-                attributes {
-                    it.attribute(artifactType, 'jar')
-                }
-            }.artifacts.each {
-                processJar(it.file, jars)
-            }
-
-            def projectDependencies = config.getAllDependencies().withType(ProjectDependency)
-            def dependentProjects = projectDependencies*.dependencyProject
-            dependentProjects.findAll {
-                // if there's a project dependency search for its result jar file in the build/intermediates/runtime_library_classes folder
-                // this is the output folder in gradle 5.1.1, but it can be changed in the future versions of gradle
-                def jarDir = new File("${it.getBuildDir()}/intermediates/runtime_library_classes/${buildType.toLowerCase()}")
-                if (jarDir.exists()) {
-                    jarDir.eachFileRecurse(FileType.FILES) { file ->
-                        if (file.path.endsWith(".jar")) {
-                            processJar(file, jars)
-                        }
-                    }
-                } else {
-                    outLogger.withStyle(Style.Info).println "WARNING: Folder ${jarDir.path} does not exists, the dependent project's classes won't be included in the metadata"
+allprojects {
+    afterEvaluate { project ->
+        def buildType = project.selectedBuildType
+        def jars = []
+        def artifactType = Attribute.of('artifactType', String)
+        android.applicationVariants.all { variant ->
+            if (variant.buildType.name == buildType) {
+                variant.getCompileClasspath().each { fileDependency ->
+                    processJar(fileDependency, jars)
                 }
             }
         }
@@ -718,7 +635,7 @@ task cleanupAllJars {
                 // An old directory which is no longer a dependency (e.g. orphaned by a deleted plugin)
                 if (!allDests.contains(it.name)) {
                     logger.info("Task cleanupAllJars: Deleting orphaned ${it.path}")
-                    org.apache.commons.io.FileUtils.deleteDirectory(it)
+                    FileUtils.deleteDirectory(it)
                 }
             }
         }
@@ -836,7 +753,7 @@ task buildMetadata(type: BuildToolTask) {
 
         def generatedClasses = new LinkedList<String>()
         for (File subDir : classesSubDirs) {
-            if (subDir.getName().equals(selectedBuildType)) {
+            if (subDir.getName() == selectedBuildType) {
                 generatedClasses.add(subDir.getAbsolutePath())
             }
         }

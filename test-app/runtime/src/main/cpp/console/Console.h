@@ -8,6 +8,7 @@
 #include <include/v8.h>
 #include <string>
 #include <ArgConverter.h>
+#include <android/log.h>
 
 namespace tns {
 
@@ -26,6 +27,8 @@ class Console {
         static void traceCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void timeCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+
+        static void onDisposeIsolate(v8::Isolate* isolate);
 
     private:
         static int m_maxLogcatObjectSize;

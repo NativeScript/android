@@ -16,6 +16,11 @@ import groovy.json.JsonOutput
 
 def onlyX86 = project.hasProperty("onlyX86")
 def useCCache = !project.hasProperty("noCCache")
+def hasNdkVersion = project.hasProperty("ndkVersion")
+
+if (hasNdkVersion) {
+    println "Using NDK version " + ndkVersion
+}
 
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def pVersion = "no package version was provided by build.gradle build"
@@ -35,6 +40,11 @@ task checkEnvironmentVariables {
     if ("$System.env.ANDROID_HOME" == "" || "$System.env.ANDROID_HOME" == "null") {
         throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n")
     }
+
+    if ("$System.env.ANDROID_NDK_HOME" == "" || "$System.env.ANDROID_NDK_HOME" == "null" && !project.hasProperty("ndkVersion")) {
+        logger.warn("Warning: The ANDROID_NDK_HOME is not set nor the ndkVersion project property. The build might fail if a ndk cannot be found.\n")
+    }
+
 
     if ("$System.env.GIT_COMMIT" == "null" && !project.hasProperty("gitCommitVersion")) {
         logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n")
@@ -185,6 +195,9 @@ def getAssembleReleaseBuildArguments = { ->
     if (useCCache) {
         arguments.add("-PuseCCache")
     }
+    if (hasNdkVersion) {
+        arguments.add("-PndkVersion="+ndkVersion)
+    }
     arguments += ["--warning-mode", "all"]
     return arguments
 }
@@ -284,6 +297,10 @@ task copyFilesToProjectTemeplate {
         }
         copy {
             from "$TEST_APP_PATH/build.gradle"
+            into "$DIST_FRAMEWORK_PATH"
+        }
+        copy {
+            from "$TEST_APP_PATH/gradle.properties"
             into "$DIST_FRAMEWORK_PATH"
         }
         copy {

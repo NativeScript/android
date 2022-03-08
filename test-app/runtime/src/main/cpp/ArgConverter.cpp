@@ -293,4 +293,12 @@ Local<String> ArgConverter::ConvertToV8UTF16String(Isolate* isolate, const u16st
     return String::NewFromTwoByte(isolate, ((const uint16_t*) utf16string.data())).ToLocalChecked();
 }
 
+void ArgConverter::onDisposeIsolate(Isolate* isolate) {
+    auto itFound = s_type_long_operations_cache.find(isolate);
+    if (itFound != s_type_long_operations_cache.end()) {
+        delete itFound->second;
+        s_type_long_operations_cache.erase(itFound);
+    }
+}
+
 std::map<Isolate*, ArgConverter::TypeLongOperationsCache*> ArgConverter::s_type_long_operations_cache;

@@ -588,8 +588,8 @@ CallbackHandlers::GetImplementedInterfaces(JEnv& env, const Local<Object>& imple
                                  context).ToChecked();
 
                 if (length > 0) {
-                    for (int i = 0; i < length; i++) {
-                        auto element = interfacesArr->Get(context, i).ToLocalChecked();
+                    for (int j = 0; j < length; j++) {
+                        auto element = interfacesArr->Get(context, j).ToLocalChecked();
 
                         if (element->IsFunction()) {
                             auto node = MetadataNode::GetTypeMetadataName(isolate, element);
@@ -664,6 +664,23 @@ void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Valu
             String::Utf8Value message(isolate, args[0]->ToString(context).ToLocalChecked());
             DEBUG_WRITE("%s", *message);
         }
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToV8();
+    }
+}
+
+void CallbackHandlers::DrainMicrotaskCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    try {
+        auto isolate = args.GetIsolate();
+        isolate->PerformMicrotaskCheckpoint();
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {

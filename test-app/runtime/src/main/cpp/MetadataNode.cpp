@@ -2176,6 +2176,32 @@ std::string MetadataNode::GetJniClassName(MetadataEntry entry) {
     return fullClassName;
 }
 
+void MetadataNode::onDisposeIsolate(Isolate* isolate) {
+    {
+        auto it = s_metadata_node_cache.find(isolate);
+        if (it != s_metadata_node_cache.end()) {
+            delete it->second;
+            s_metadata_node_cache.erase(it);
+        }
+    }
+    {
+        auto it = s_arrayObjectTemplates.find(isolate);
+        if (it != s_arrayObjectTemplates.end()) {
+            delete it->second;
+            s_arrayObjectTemplates.erase(it);
+        }
+    }
+    {
+        for (auto it = s_treeNode2NodeCache.begin(); it != s_treeNode2NodeCache.end(); it++) {
+            auto it2 = it->second->m_poCtorCachePerIsolate.find(isolate);
+            if(it2 != it->second->m_poCtorCachePerIsolate.end()) {
+                delete it2->second;
+                it->second->m_poCtorCachePerIsolate.erase(it2);
+            }
+        }
+    }
+}
+
 string MetadataNode::TNS_PREFIX = "com/tns/gen/";
 MetadataReader MetadataNode::s_metadataReader;
 std::map<std::string, MetadataNode*> MetadataNode::s_name2NodeCache;

@@ -8,6 +8,7 @@
 #include "Runtime.h"
 #include "MetadataNode.h"
 #include "V8GlobalHelpers.h"
+#include "JsArgConverter.h"
 
 using namespace v8;
 using namespace std;
@@ -65,7 +66,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
     if (arg.IsEmpty()) {
         s << "Cannot convert empty JavaScript object";
         success = false;
-    } else if (arg->IsInt32() && (returnType == Type::Int || returnType == Type::Null)) {
+    }else if (arg->IsInt32() && (returnType == Type::Int || returnType == Type::Null)) {
         jint value = arg->Int32Value(context).ToChecked();
         auto javaObject = JType::NewInt(env, value);
         SetConvertedObject(env, index, javaObject);
@@ -230,6 +231,120 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
 
         case CastType::None:
             obj = objectManager->GetJavaObjectByJsObject(jsObj);
+
+
+            if (obj.IsNull() && (jsObj->IsTypedArray() || jsObj->IsArrayBuffer() || jsObj->IsArrayBufferView()))
+                {
+
+                    BufferCastType bufferCastType = tns::BufferCastType::Byte;
+                    shared_ptr<BackingStore> store;
+                    size_t offset = 0;
+                    size_t length;
+                    if (jsObj->IsArrayBuffer())
+                    {
+                        auto array = jsObj.As<v8::ArrayBuffer>();
+                        store = array->GetBackingStore();
+                        length = array->ByteLength();
+                    }
+                    else if (jsObj->IsArrayBufferView())
+                    {
+                        auto array = jsObj.As<v8::ArrayBufferView>();
+
+                        if (!array->HasBuffer())
+                        {
+
+                            length = array->ByteLength();
+                            void *data = malloc(length);
+                            array->CopyContents(data, length);
+                        }
+                        else
+                        {
+                            length = array->ByteLength();
+                        }
+                        offset = array->ByteOffset();
+                        store = array->Buffer()->GetBackingStore();
+                        bufferCastType = JsArgConverter::GetCastType(array);
+                    }
+                    else
+                    {
+                        auto array = jsObj.As<v8::TypedArray>();
+                        offset = array->ByteOffset();
+                        store = array->Buffer()->GetBackingStore();
+                        length = array->ByteLength();
+                        bufferCastType = JsArgConverter::GetCastType(array);
+                    }
+
+                    auto data = static_cast<uint8_t *>(store->Data()) + offset;
+
+                    auto directBuffer = env.NewDirectByteBuffer(
+                            data,
+                            length);
+
+                    auto directBufferClazz = env.GetObjectClass(directBuffer);
+
+                    auto byteOrderId = env.GetMethodID(directBufferClazz, "order",
+                                                       "(Ljava/nio/ByteOrder;)Ljava/nio/ByteBuffer;");
+
+                    auto byteOrderClazz = env.FindClass("java/nio/ByteOrder");
+
+                    auto byteOrderEnumId = env.GetStaticMethodID(byteOrderClazz, "nativeOrder", "()Ljava/nio/ByteOrder;");
+
+                    auto nativeByteOrder = env.CallStaticObjectMethodA(byteOrderClazz, byteOrderEnumId,
+                                                                       nullptr);
+
+                    directBuffer = env.CallObjectMethod(directBuffer, byteOrderId, nativeByteOrder);
+
+                    jobject buffer;
+
+                    if (bufferCastType == BufferCastType::Short)
+                    {
+
+                        auto id = env.GetMethodID(directBufferClazz, "asShortBuffer",
+                                                  "()Ljava/nio/ShortBuffer;");
+                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
+                    }
+                    else if (bufferCastType == BufferCastType::Int)
+                    {
+
+                        auto id = env.GetMethodID(directBufferClazz, "asIntBuffer",
+                                                  "()Ljava/nio/IntBuffer;");
+                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
+                    }
+                    else if (bufferCastType == BufferCastType::Long)
+                    {
+
+                        auto id = env.GetMethodID(directBufferClazz, "asLongBuffer",
+                                                  "()Ljava/nio/LongBuffer;");
+                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
+                    }
+                    else if (bufferCastType == BufferCastType::Float)
+                    {
+
+                        auto id = env.GetMethodID(directBufferClazz, "asFloatBuffer",
+                                                  "()Ljava/nio/FloatBuffer;");
+                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
+                    }
+                    else if (bufferCastType == BufferCastType::Double)
+                    {
+
+                        auto id = env.GetMethodID(directBufferClazz, "asDoubleBuffer",
+                                                  "()Ljava/nio/DoubleBuffer;");
+                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
+                    }
+                    else
+                    {
+                        buffer = directBuffer;
+                    }
+
+                    buffer = env.NewGlobalRef(buffer);
+
+                    int id = objectManager->GetOrCreateObjectId(buffer);
+                    auto clazz = env.GetObjectClass(buffer);
+                    objectManager->Link(jsObj, id, clazz);
+
+                    obj = objectManager->GetJavaObjectByJsObject(jsObj);
+                }
+
 
             V8GetPrivateValue(isolate, jsObj, V8StringConstants::GetNullNodeName(isolate), castValue);
 

@@ -29,6 +29,7 @@
 #include "sys/system_properties.h"
 #include "ManualInstrumentation.h"
 #include <snapshot_blob.h>
+#include "IsolateDisposer.h"
 
 #ifdef APPLICATION_IN_DEBUG
 #include "JsV8InspectorClient.h"
@@ -616,6 +617,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__log"), FunctionTemplate::New(isolate, CallbackHandlers::LogMethodCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__dumpReferenceTables"), FunctionTemplate::New(isolate, CallbackHandlers::DumpReferenceTablesMethodCallback));
+    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__drainMicrotaskQueue"), FunctionTemplate::New(isolate, CallbackHandlers::DrainMicrotaskCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__enableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::EnableVerboseLoggingMethodCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__disableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::DisableVerboseLoggingMethodCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
@@ -809,6 +811,7 @@ bool Runtime::RunExtraCode(Isolate* isolate, Local<Context> context, const char*
 void Runtime::DestroyRuntime() {
     s_id2RuntimeCache.erase(m_id);
     s_isolate2RuntimesCache.erase(m_isolate);
+    tns::disposeIsolate(m_isolate);
 }
 
 Local<Context> Runtime::GetContext() {
