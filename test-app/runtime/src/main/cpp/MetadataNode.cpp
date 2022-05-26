@@ -1812,7 +1812,7 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
 
         // TODO: Is there a way to detect if the screen is locked as verification
         // We assume based on the error that this is the only way to get this specific error here at this point
-        if (errno == ENOENT) {
+        if (errno == ENOENT || errno == EACCES) {
             // Log the error with error code
             __android_log_print(ANDROID_LOG_ERROR, "TNS.error", "%s", ss.str().c_str());
 
