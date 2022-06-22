@@ -23,7 +23,7 @@ public class GcListener {
         private final long throttleTime;
 
         public GcMonitor(int throttleTime) {
-            this.throttleTime = throttleTime * 1000000;
+            this.throttleTime = throttleTime * 1000000L;
         }
 
         public void run() {

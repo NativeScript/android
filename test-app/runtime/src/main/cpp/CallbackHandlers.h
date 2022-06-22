@@ -14,6 +14,7 @@
 #include "ArrayElementAccessor.h"
 #include "ObjectManager.h"
 #include "include/v8.h"
+#include "robin_hood.h"
 
 namespace tns {
     class CallbackHandlers {
@@ -72,6 +73,11 @@ namespace tns {
 
         static void SetJavaField(v8::Isolate *isolate, const v8::Local<v8::Object> &target,
                                  const v8::Local<v8::Value> &value, FieldCallbackData *fieldData);
+
+
+        static void RunOnMainThreadCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+        static int RunOnMainThreadFdCallback(int fd, int events, void* data);
 
         static void LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
@@ -187,6 +193,39 @@ namespace tns {
                                       jstring stackTrace, jstring filename, jint lineno,
                                       jstring threadName);
 
+        static void RemoveIsolateEntries(v8::Isolate *isolate);
+
+
+        static void PostFrameCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+        static void RemoveFrameCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+        struct AChoreographer;
+
+
+        typedef void (*AChoreographer_frameCallback)(long frameTimeNanos, void* data);
+
+        typedef void (*AChoreographer_frameCallback64)(int64_t frameTimeNanos, void* data);
+
+        typedef AChoreographer* (*func_AChoreographer_getInstance)();
+
+        typedef void (*func_AChoreographer_postFrameCallback)(
+                AChoreographer* choreographer, AChoreographer_frameCallback callback,
+                void* data);
+
+        typedef void (*func_AChoreographer_postFrameCallback64)(
+                AChoreographer* choreographer, AChoreographer_frameCallback64 callback,
+                void* data);
+
+        typedef void (*func_AChoreographer_postFrameCallbackDelayed)(
+                AChoreographer* choreographer, AChoreographer_frameCallback callback,
+                void* data, long delayMillis);
+
+        typedef void (*func_AChoreographer_postFrameCallbackDelayed64)(
+                AChoreographer* choreographer, AChoreographer_frameCallback64 callback,
+                void* data, uint32_t delayMillis);
+
+
     private:
         CallbackHandlers() {
         }
@@ -242,7 +281,82 @@ namespace tns {
             jobject _runtime;
         };
 
+        static void RemoveKey(const uint32_t key);
 
+        static _Atomic uint32_t count_;
+
+        struct CacheEntry {
+            CacheEntry(v8::Isolate* isolate, v8::Persistent<v8::Function>* callback)
+                    : isolate_(isolate),
+                      callback_(callback) {
+            }
+
+            v8::Isolate* isolate_;
+            v8::Persistent<v8::Function>* callback_;
+
+        };
+
+        static robin_hood::unordered_map<uint32_t, CacheEntry> cache_;
+
+
+        static _Atomic uint64_t frameCallbackCount_;
+
+        struct FrameCallbackCacheEntry {
+            FrameCallbackCacheEntry(v8::Isolate *isolate, v8::Persistent<v8::Function> *callback)
+                    : isolate_(isolate),
+                      callback_(callback) {
+            }
+
+            v8::Isolate *isolate_;
+            v8::Persistent<v8::Function> *callback_;
+            bool removed;
+            uint64_t id;
+
+            AChoreographer_frameCallback frameCallback_ = [](long ts, void *data) {
+                execute((double)ts, data);
+            };
+
+            AChoreographer_frameCallback64 frameCallback64_ = [](int64_t ts, void *data) {
+                execute((double)ts, data);
+            };
+
+            static void execute(double ts, void *data){
+                if (data != nullptr) {
+                    auto entry = static_cast<FrameCallbackCacheEntry *>(data);
+                    if (entry->removed) {
+                        return;
+                    }
+                    v8::Isolate *isolate = entry->isolate_;
+
+                    v8::Persistent<v8::Function> *poCallback = entry->callback_;
+
+                    v8::Locker locker(isolate);
+                    v8::Isolate::Scope isolate_scope(isolate);
+                    v8::HandleScope handle_scope(isolate);
+                    auto context = v8::Context::New(isolate);
+                    v8::Context::Scope context_scope(context);
+
+
+                    v8::Local<v8::Function> cb = poCallback->Get(isolate);
+                    v8::Local<v8::Value> result;
+
+                    v8::Local<v8::Value> args[1] = {v8::Number::New(isolate, ts)};
+
+                    if (!cb->Call(context, context->Global(), 1, args).ToLocal(&result)) {
+                        assert(false);
+                    }
+
+                }
+            }
+
+        };
+
+        static robin_hood::unordered_map<uint64_t, FrameCallbackCacheEntry> frameCallbackCache_;
+
+        static void InitChoreographer();
+
+        static void PostCallback(const v8::FunctionCallbackInfo<v8::Value> &args,
+                          FrameCallbackCacheEntry *entry, v8::Local<v8::Context> context);
     };
 }
 

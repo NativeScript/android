@@ -29,33 +29,62 @@ var MyActivity = (function (_super) {
 	MyActivity.prototype.onCreate = function (bundle) {
 		_super.prototype.onCreate.call(this, bundle);
 
-		require("./tests/testsWithContext").run(this);
-		execute(); //run jasmine
+		var thread = java.util.concurrent.Executors.newSingleThreadExecutor();
+        thread.execute(
+        	new java.lang.Runnable({
+        		run() {
+        			console.log(java.lang.Thread.currentThread());
 
-		var layout = new android.widget.LinearLayout(this);
-		layout.setOrientation(1);
-		this.setContentView(layout);
+        			console.log('isMain', java.lang.Thread.currentThread() == android.os.Looper.getMainLooper().getThread());
 
-		var textView = new android.widget.TextView(this);
-		textView.setText("It's a button!");
-		layout.addView(textView);
+        			__runOnMainThread(function () {
+        				console.log('__runOnMainThread', 'isMain', java.lang.Thread.currentThread() == android.os.Looper.getMainLooper().getThread());
+        			});
+        		},
+        	})
+        );
 
-		var button = new android.widget.Button(this);
-		button.setText("Hit me");
-		layout.addView(button);
-		var counter = 0;
+        require('./tests/testsWithContext').run(this);
+        execute(); //run jasmine
 
-		var Color = android.graphics.Color;
-		var colors = [Color.BLUE, Color.RED, Color.MAGENTA, Color.YELLOW, Color.parseColor("#FF7F50")];
-		var taps = 0;
+        var layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(1);
+        this.setContentView(layout);
 
-		var dum = com.tns.tests.DummyClass.null;
+        var textView = new android.widget.TextView(this);
+        textView.setText("It's a button!");
+        layout.addView(textView);
 
-		button.setOnClickListener(new android.view.View.OnClickListener("AppClickListener", {
-			onClick:  function() {
-				button.setBackgroundColor(colors[taps % colors.length]);
-				taps++;
-			}}));
+        var button = new android.widget.Button(this);
+        button.setText('Hit me');
+        layout.addView(button);
+        var counter = 0;
+
+        var Color = android.graphics.Color;
+        var colors = [Color.BLUE, Color.RED, Color.MAGENTA, Color.YELLOW, Color.parseColor('#FF7F50')];
+        var taps = 0;
+
+        var dum = com.tns.tests.DummyClass.null;
+
+        button.setOnClickListener(
+        	new android.view.View.OnClickListener('AppClickListener', {
+        		onClick: function () {
+        			button.setBackgroundColor(colors[taps % colors.length]);
+        			taps++;
+        		},
+        	})
+        );
+
+        var count = 0;
+        var cb = (frame) => {
+        	console.log('cb', frame);
+        	count++;
+        	if (count == 100) {
+        		return;
+        	}
+        	__postFrameCallback(cb);
+        };
+        __postFrameCallback(cb);
 
 	};
 	MyActivity = __decorate([

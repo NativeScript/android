@@ -24,7 +24,7 @@ string Util::JniClassPathToCanonicalName(const string& jniClassPath) {
 
     case '[':
         canonicalName = jniClassPath;
-        lastIndex = canonicalName.find_last_of("[");
+        lastIndex = canonicalName.find_last_of('[');
         rest = canonicalName.substr(lastIndex + 1);
         canonicalName = canonicalName.substr(0, lastIndex + 1);
         canonicalName.append(JniClassPathToCanonicalName(rest));
@@ -54,17 +54,17 @@ void Util::SplitString(const string& str, const string& delimiters, vector<strin
                 if (tokenPos < delimPos) {
                     tokens.push_back(str.substr(pos, delimPos - pos));
                 } else {
-                    tokens.push_back("");
+                    tokens.emplace_back("");
                 }
             } else {
-                tokens.push_back("");
+                tokens.emplace_back("");
             }
             pos = delimPos + 1;
         } else {
             if (string::npos != tokenPos) {
                 tokens.push_back(str.substr(pos));
             } else {
-                tokens.push_back("");
+                tokens.emplace_back("");
             }
             break;
         }
@@ -112,11 +112,11 @@ u16string Util::ConvertFromUtf8ToUtf16(const string& str) {
     return utf16String;
 }
 
-uint16_t* Util::ConvertFromUtf8ToProtocolUtf16(const string& str) {
-    auto utf16String =
-        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>().from_bytes(str);
-    return (uint16_t*) utf16String.c_str();
-}
+//uint16_t* Util::ConvertFromUtf8ToProtocolUtf16(const string& str) {
+//    auto utf16String =
+//        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>().from_bytes(str);
+//    return (uint16_t *) utf16String.c_str();
+//}
 
 void Util::JoinString(const std::vector<std::string>& list, const std::string& delimiter,
                       std::string& out) {
@@ -124,7 +124,7 @@ void Util::JoinString(const std::vector<std::string>& list, const std::string& d
 
     stringstream ss;
 
-    for (vector<string>::const_iterator it = list.begin(); it != list.end(); ++it) {
+    for (auto it = list.begin(); it != list.end(); ++it) {
         ss << *it;
 
         if (it != list.end() - 1) {

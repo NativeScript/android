@@ -10,7 +10,8 @@
 		"maxLogcatObjectSize": 1024,
 		"forceLog": false,
 		"suppressCallJSMethodExceptions": false,
-		"enableLineBreakpoints": false
+		"enableLineBreakpoints": false,
+		"enableMultithreadedJavascript": true
 	},
 	"discardUncaughtJsExceptions": false
 }

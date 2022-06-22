@@ -12,6 +12,7 @@
 #include "MessageLoopTimer.h"
 #include "File.h"
 #include <mutex>
+#include <android/looper.h>
 
 namespace tns {
 class Runtime {
@@ -69,6 +70,8 @@ class Runtime {
 
         std::string ReadFileText(const std::string& filePath);
 
+        static int GetWriter();
+
     private:
         Runtime(JNIEnv* env, jobject runtime, int id);
 
@@ -114,6 +117,10 @@ class Runtime {
         static jmethodID GET_USED_MEMORY_METHOD_ID;
 
         static bool s_mainThreadInitialized;
+
+        static ALooper* m_mainLooper;
+
+        static int m_mainLooper_fd[2];
 
 #ifdef APPLICATION_IN_DEBUG
         std::mutex m_fileWriteMutex;

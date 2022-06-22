@@ -30,6 +30,7 @@
 #include "ManualInstrumentation.h"
 #include <snapshot_blob.h>
 #include "IsolateDisposer.h"
+#include <unistd.h>
 
 #ifdef APPLICATION_IN_DEBUG
 #include "JsV8InspectorClient.h"
@@ -209,6 +210,7 @@ Runtime::~Runtime() {
     delete this->m_loopTimer;
     delete this->m_heapSnapshotBlob;
     delete this->m_startupData;
+    CallbackHandlers::RemoveIsolateEntries(m_isolate);
 }
 
 std::string Runtime::ReadFileText(const std::string& filePath) {
@@ -625,13 +627,20 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__time"), FunctionTemplate::New(isolate, CallbackHandlers::TimeCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__releaseNativeCounterpart"), FunctionTemplate::New(isolate, CallbackHandlers::ReleaseNativeCounterpartCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__markingMode"), Number::New(isolate, m_objectManager->GetMarkingMode()), readOnlyFlags);
-
-
+    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runOnMainThread"), FunctionTemplate::New(isolate, CallbackHandlers::RunOnMainThreadCallback));
+    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__postFrameCallback"), FunctionTemplate::New(isolate, CallbackHandlers::PostFrameCallback));
+    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__removeFrameCallback"), FunctionTemplate::New(isolate, CallbackHandlers::RemoveFrameCallback));
     /*
      * Attach `Worker` object constructor only to the main thread (isolate)'s global object
      * Workers should not be created from within other Workers, for now
      */
     if (!s_mainThreadInitialized) {
+        pipe(m_mainLooper_fd);
+        m_mainLooper = ALooper_forThread();
+        ALooper_acquire(m_mainLooper);
+
+        ALooper_addFd(m_mainLooper, m_mainLooper_fd[0], 0, ALOOPER_EVENT_INPUT, CallbackHandlers::RunOnMainThreadFdCallback, nullptr);
+
         Local<FunctionTemplate> workerFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::NewThreadCallback);
         Local<ObjectTemplate> prototype = workerFuncTemplate->PrototypeTemplate();
 
@@ -822,6 +831,10 @@ int Runtime::GetId() {
     return this->m_id;
 }
 
+int Runtime::GetWriter(){
+    return m_mainLooper_fd[1];
+}
+
 JavaVM* Runtime::s_jvm = nullptr;
 jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
@@ -829,3 +842,6 @@ map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 bool Runtime::s_mainThreadInitialized = false;
 v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
+ALooper* Runtime::m_mainLooper = nullptr;
+int Runtime::m_mainLooper_fd[2] = {};
+
