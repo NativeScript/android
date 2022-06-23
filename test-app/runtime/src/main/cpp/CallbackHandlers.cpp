@@ -1615,7 +1615,7 @@ void CallbackHandlers::PostCallback(const FunctionCallbackInfo<v8::Value> &args,
         }
     }else {
         if(!delay.IsEmpty() && delay->IsNumber()){
-            AChoreographer_postFrameCallbackDelayed_(instance, entry->frameCallback_, entry, delay->IntegerValue(context).FromMaybe(0));
+            AChoreographer_postFrameCallbackDelayed_(instance, entry->frameCallback_, entry, (long)delay->IntegerValue(context).FromMaybe(0));
         }else {
             AChoreographer_postFrameCallback_(instance, entry->frameCallback_, entry);
         }
@@ -1644,9 +1644,8 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
 
         if (success && pId->IsNumber()){
             auto id = pId->IntegerValue(context).FromMaybe(0);
-            auto cb = frameCallbackCache_.find(id);
-
             if(frameCallbackCache_.contains(id)){
+                auto cb = frameCallbackCache_.find(id);
                 PostCallback(args, &cb->second, context);
                 return;
             }
