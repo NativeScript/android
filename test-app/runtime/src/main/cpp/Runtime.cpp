@@ -211,6 +211,10 @@ Runtime::~Runtime() {
     delete this->m_heapSnapshotBlob;
     delete this->m_startupData;
     CallbackHandlers::RemoveIsolateEntries(m_isolate);
+    if (m_isMainThread) {
+        close(m_mainLooper_fd[0]);
+        close(m_mainLooper_fd[1]);
+    }
 }
 
 std::string Runtime::ReadFileText(const std::string& filePath) {
@@ -635,6 +639,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
      * Workers should not be created from within other Workers, for now
      */
     if (!s_mainThreadInitialized) {
+        m_isMainThread = true;
         pipe(m_mainLooper_fd);
         m_mainLooper = ALooper_forThread();
         ALooper_acquire(m_mainLooper);
@@ -660,6 +665,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
      * Attach 'postMessage', 'close' to the global object
      */
     else {
+        m_isMainThread = false;
         auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalPostMessageCallback);
         globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate);
         auto closeFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalCloseCallback);
@@ -843,5 +849,5 @@ bool Runtime::s_mainThreadInitialized = false;
 v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 ALooper* Runtime::m_mainLooper = nullptr;
-int Runtime::m_mainLooper_fd[2] = {};
+int Runtime::m_mainLooper_fd[2];
 
