@@ -508,10 +508,21 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 
         if (result != nullptr) {
             auto isString = env.IsInstanceOf(result, JAVA_LANG_STRING);
-
             Local<Value> objectResult;
             if (isString) {
                 objectResult = ArgConverter::jstringToV8String(isolate, (jstring) result);
+            } else if(*returnType == JAVA_LANG_INT) {
+                objectResult = Number::New(isolate, JType::IntValue(env, result));
+            } else if(*returnType == JAVA_LANG_SHORT) {
+                objectResult = Number::New(isolate, JType::ShortValue(env, result));
+            } else if(*returnType == JAVA_LANG_DOUBLE) {
+                objectResult = Number::New(isolate, JType::DoubleValue(env, result));
+            } else if(*returnType == JAVA_LANG_FLOAT) {
+                objectResult = Number::New(isolate, JType::FloatValue(env, result));
+            } else if(*returnType == JAVA_LANG_LONG) {
+                objectResult = Number::New(isolate, JType::LongValue(env, result));
+            } else if(*returnType == JAVA_LANG_BOOLEAN) {
+                objectResult = Boolean::New(isolate, JType::BooleanValue(env, result));
             } else {
                 jint javaObjectID = objectManager->GetOrCreateObjectId(result);
                 objectResult = objectManager->GetJsObjectByJavaObject(javaObjectID);
@@ -1517,7 +1528,12 @@ jmethodID CallbackHandlers::GET_TYPE_METADATA = nullptr;
 jmethodID CallbackHandlers::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::DISABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::INIT_WORKER_METHOD_ID = nullptr;
-
+std::string CallbackHandlers::JAVA_LANG_INT = "Ljava/lang/Int;";
+std::string CallbackHandlers::JAVA_LANG_SHORT = "Ljava/lang/Short;";
+std::string CallbackHandlers::JAVA_LANG_LONG = "Ljava/lang/Long;";
+std::string CallbackHandlers::JAVA_LANG_FLOAT = "Ljava/lang/Float;";
+std::string CallbackHandlers::JAVA_LANG_DOUBLE = "Ljava/lang/Double;";
+std::string CallbackHandlers::JAVA_LANG_BOOLEAN = "Ljava/lang/Boolean;";
 
 
 NumericCasts CallbackHandlers::castFunctions;

@@ -226,6 +226,18 @@ namespace tns {
 
         static FieldAccessor fieldAccessor;
 
+        static std::string JAVA_LANG_LONG;
+
+        static std::string JAVA_LANG_INT;
+
+        static std::string JAVA_LANG_FLOAT;
+
+        static std::string JAVA_LANG_DOUBLE;
+
+        static std::string JAVA_LANG_SHORT;
+
+        static std::string JAVA_LANG_BOOLEAN;
+
         struct JavaObjectIdScope {
             JavaObjectIdScope(JEnv &env, jfieldID fieldId, jobject runtime, int javaObjectId)
                     : _env(env), _fieldID(fieldId), _runtime(runtime) {

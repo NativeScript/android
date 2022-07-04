@@ -35,4 +35,52 @@ describe("Tests metadata", function () {
 		var expected = 5;
 		expect(keywordClass.getValue5()).toBe(expected);
 	});
+
+	it("java method returning java.lang.Int should return JS number", function () {
+		var keywordClass = new $in.tns.tests.JavascriptKeywordClass();
+		var result = keywordClass.getIntValue5();
+		var expected = 5;
+		expect(result).toBe(expected);
+		expect(typeof result).toBe("number");
+	});
+
+	it("java method returning java.lang.Long should return JS number", function () {
+		var keywordClass = new $in.tns.tests.JavascriptKeywordClass();
+		var result = keywordClass.getLongValue5();
+		var expected = 5;
+		expect(result).toBe(expected);
+		expect(typeof result).toBe("number");
+	});
+
+	it("java method returning java.lang.Short should return JS number", function () {
+		var keywordClass = new $in.tns.tests.JavascriptKeywordClass();
+		var result = keywordClass.getShortValue5();
+		var expected = 5;
+		expect(result).toBe(expected);
+		expect(typeof result).toBe("number");
+	});
+
+	it("java method returning java.lang.Float should return JS number", function () {
+		var keywordClass = new $in.tns.tests.JavascriptKeywordClass();
+		var result = keywordClass.getFloatValue5();
+		var expected = 5;
+		expect(result).toBe(expected);
+		expect(typeof result).toBe("number");
+	});
+
+	it("java method returning java.lang.Double should return JS number", function () {
+		var keywordClass = new $in.tns.tests.JavascriptKeywordClass();
+		var result = keywordClass.getDoubleValue5();
+		var expected = 5;
+		expect(result).toBe(expected);
+		expect(typeof result).toBe("number");
+	});
+
+	it("java method returning java.lang.Boolean should return JS boolean", function () {
+		var keywordClass = new $in.tns.tests.JavascriptKeywordClass();
+		var result = keywordClass.getBooleanValueTrue();
+		var expected = true;
+		expect(result).toBe(expected);
+		expect(typeof result).toBe("boolean");
+	});
 });
