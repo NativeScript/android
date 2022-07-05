@@ -147,7 +147,7 @@ dependencies {
 tasks.whenTaskAdded { task ->
     def taskName = task.getName()
     // println "\t ~ [DEBUG][runtime] build.gradle whenTaskAdded taskName = ${taskName}"
-    if (taskName.contains("externalNativeBuildRelease")) {
+    if (taskName.contains("preReleaseBuild")) {
         setRuntimeCommit.dependsOn(setPackageVersion)
         task.dependsOn(setRuntimeCommit)
     }
