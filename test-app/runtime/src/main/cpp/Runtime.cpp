@@ -212,8 +212,18 @@ Runtime::~Runtime() {
     delete this->m_startupData;
     CallbackHandlers::RemoveIsolateEntries(m_isolate);
     if (m_isMainThread) {
-        close(m_mainLooper_fd[0]);
-        close(m_mainLooper_fd[1]);
+        if (m_mainLooper_fd[0] != -1) {
+            ALooper_removeFd(m_mainLooper, m_mainLooper_fd[0]);
+        }
+        ALooper_release(m_mainLooper);
+
+        if (m_mainLooper_fd[0] != -1) {
+            close(m_mainLooper_fd[0]);
+        }
+
+        if (m_mainLooper_fd[1] != -1) {
+            close(m_mainLooper_fd[1]);
+        }
     }
 }
 
