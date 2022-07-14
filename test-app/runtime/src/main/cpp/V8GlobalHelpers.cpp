@@ -142,6 +142,20 @@ bool tns::V8SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Lo
     return res.FromMaybe(false);
 }
 
+bool tns::V8DeletePrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<String>& propName) {
+    auto privateKey = Private::ForApi(isolate, propName);
+    auto context = obj->CreationContext();
+    auto res = obj->DeletePrivate(context, privateKey);
+
+    if (res.IsNothing()) {
+        stringstream ss;
+        ss << "Failed to Delete Private Value for prop: " << ArgConverter::ConvertToString(propName).c_str() << endl;
+        throw tns::NativeScriptException(ss.str());
+    }
+
+    return res.FromMaybe(false);
+}
+
 void tns::V8GlobalHelpers::onDisposeIsolate(Isolate* isolate) {
     isolateToPersistentSmartJSONStringify.erase(isolate);
 }

@@ -1589,12 +1589,14 @@ void CallbackHandlers::RemoveIsolateEntries(v8::Isolate *isolate) {
     }
 
     for (auto &item: frameCallbackCache_) {
-        if (item.second.isolate_ == isolate) {
+        if (item.second->isolate_ == isolate) {
             frameCallbackCache_.erase(item.first);
+            delete item.second;
         }
     }
 
 }
+
 CallbackHandlers::func_AChoreographer_getInstance AChoreographer_getInstance_;
 
 CallbackHandlers::func_AChoreographer_postFrameCallback AChoreographer_postFrameCallback_;
@@ -1603,25 +1605,29 @@ CallbackHandlers::func_AChoreographer_postFrameCallbackDelayed AChoreographer_po
 CallbackHandlers::func_AChoreographer_postFrameCallback64 AChoreographer_postFrameCallback64_;
 CallbackHandlers::func_AChoreographer_postFrameCallbackDelayed64 AChoreographer_postFrameCallbackDelayed64_;
 
-void CallbackHandlers::PostCallback(const FunctionCallbackInfo<v8::Value> &args, CallbackHandlers::FrameCallbackCacheEntry* entry, v8::Local<v8::Context> context){
+void CallbackHandlers::PostCallback(const FunctionCallbackInfo<v8::Value> &args,
+                                    CallbackHandlers::FrameCallbackCacheEntry *entry,
+                                    v8::Local<v8::Context> context) {
     ALooper_prepare(0);
     auto instance = AChoreographer_getInstance_();
     auto delay = args[1];
-    if(android_get_device_api_level() >= 29){
-        if(!delay.IsEmpty() && delay->IsNumber()){
-            AChoreographer_postFrameCallbackDelayed64_(instance, entry->frameCallback64_, entry, delay->Uint32Value(context).FromMaybe(0));
-        }else {
+    if (android_get_device_api_level() >= 29) {
+        if (!delay.IsEmpty() && delay->IsNumber()) {
+            AChoreographer_postFrameCallbackDelayed64_(instance, entry->frameCallback64_, entry,
+                                                       delay->Uint32Value(context).FromMaybe(0));
+        } else {
             AChoreographer_postFrameCallback64_(instance, entry->frameCallback64_, entry);
         }
-    }else {
-        if(!delay.IsEmpty() && delay->IsNumber()){
-            AChoreographer_postFrameCallbackDelayed_(instance, entry->frameCallback_, entry, (long)delay->IntegerValue(context).FromMaybe(0));
-        }else {
+    } else {
+        if (!delay.IsEmpty() && delay->IsNumber()) {
+            AChoreographer_postFrameCallbackDelayed_(instance, entry->frameCallback_, entry,
+                                                     (long) delay->IntegerValue(context).FromMaybe(
+                                                             0));
+        } else {
             AChoreographer_postFrameCallback_(instance, entry->frameCallback_, entry);
         }
     }
 }
-
 
 void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &args) {
     if (android_get_device_api_level() >= 24) {
@@ -1632,8 +1638,7 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
         v8::Locker locker(isolate);
         Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);
-        auto context = Context::New(isolate);
-        Context::Scope context_scope(context);
+        auto context = isolate->GetCurrentContext();
 
         auto func = args[0].As<Function>();
 
@@ -1642,11 +1647,11 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
         Local<Value> pId;
         bool success = V8GetPrivateValue(isolate, func, idKey, pId);
 
-        if (success && pId->IsNumber()){
-            auto id = pId->IntegerValue(context).FromMaybe(0);
-            if(frameCallbackCache_.contains(id)){
+        if (success && pId->IsNumber()) {
+            auto id = (int64_t) pId->NumberValue(context).FromMaybe(0);
+            if (frameCallbackCache_.contains(id)) {
                 auto cb = frameCallbackCache_.find(id);
-                PostCallback(args, &cb->second, context);
+                PostCallback(args, cb->second, context);
                 return;
             }
         }
@@ -1656,22 +1661,23 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
 
         V8SetPrivateValue(isolate, func, idKey, v8::Number::New(isolate, (double) key));
 
-        FrameCallbackCacheEntry entry (isolate, new Persistent<v8::Function>(isolate, callback));
-        entry.id = key;
+        auto entry = new FrameCallbackCacheEntry(isolate,context, callback);
+        entry->id = key;
         frameCallbackCache_.emplace(key, entry);
 
         auto finalCallback = [](const v8::WeakCallbackInfo<FrameCallbackCacheEntry> &data) {
             auto value = data.GetParameter();
             for (auto &item: frameCallbackCache_) {
-                if (item.second.id == value->id) {
-                    cache_.erase(item.first);
+                if (item.second->id == value->id) {
+                    auto ret = cache_.erase(item.first);
+                    delete item.second;
                     break;
                 }
             }
         };
-        entry.callback_->SetWeak(&entry, finalCallback, v8::WeakCallbackType::kFinalizer);
+        entry->callback_.SetWeak(entry, finalCallback, v8::WeakCallbackType::kFinalizer);
 
-        PostCallback(args, &entry, context);
+        PostCallback(args, entry, context);
     }
 }
 
@@ -1695,11 +1701,12 @@ void CallbackHandlers::RemoveFrameCallback(const FunctionCallbackInfo<v8::Value>
         Local<Value> pId;
         bool success = V8GetPrivateValue(isolate, func, idKey, pId);
 
-        if (success && pId->IsNumber()){
+        if (success && pId->IsNumber()) {
             auto id = pId->IntegerValue(context).FromMaybe(0);
-            if(frameCallbackCache_.contains(id)){
+            if (frameCallbackCache_.contains(id)) {
                 auto cb = frameCallbackCache_.find(id);
-                cb->second.removed = true;
+                cb->second->removed = true;
+              //  V8DeletePrivateValue(isolate, func, idKey);
             }
         }
 
@@ -1708,8 +1715,8 @@ void CallbackHandlers::RemoveFrameCallback(const FunctionCallbackInfo<v8::Value>
 }
 
 void CallbackHandlers::InitChoreographer() {
-    if(AChoreographer_getInstance_ == nullptr){
-        void* lib = dlopen("libandroid.so", RTLD_NOW | RTLD_LOCAL);
+    if (AChoreographer_getInstance_ == nullptr) {
+        void *lib = dlopen("libandroid.so", RTLD_NOW | RTLD_LOCAL);
         if (lib != nullptr) {
 
             // Retrieve function pointers from shared object.
@@ -1728,7 +1735,7 @@ void CallbackHandlers::InitChoreographer() {
             assert(AChoreographer_postFrameCallback_);
             assert(AChoreographer_postFrameCallbackDelayed_);
 
-            if(android_get_device_api_level() >= 29){
+            if (android_get_device_api_level() >= 29) {
                 AChoreographer_postFrameCallback64_ =
                         reinterpret_cast<func_AChoreographer_postFrameCallback64>(
                                 dlsym(lib, "AChoreographer_postFrameCallback64"));
@@ -1747,7 +1754,7 @@ void CallbackHandlers::InitChoreographer() {
 
 robin_hood::unordered_map<uint32_t, CallbackHandlers::CacheEntry> CallbackHandlers::cache_;
 
-robin_hood::unordered_map<uint64_t, CallbackHandlers::FrameCallbackCacheEntry> CallbackHandlers::frameCallbackCache_;
+robin_hood::unordered_map<uint64_t, CallbackHandlers::FrameCallbackCacheEntry *> CallbackHandlers::frameCallbackCache_;
 
 _Atomic uint32_t CallbackHandlers::count_ = 0;
 _Atomic uint64_t CallbackHandlers::frameCallbackCount_ = 0;

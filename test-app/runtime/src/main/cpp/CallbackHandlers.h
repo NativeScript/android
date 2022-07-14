@@ -298,17 +298,19 @@ namespace tns {
 
         static robin_hood::unordered_map<uint32_t, CacheEntry> cache_;
 
-
         static _Atomic uint64_t frameCallbackCount_;
 
+
         struct FrameCallbackCacheEntry {
-            FrameCallbackCacheEntry(v8::Isolate *isolate, v8::Persistent<v8::Function> *callback)
+            FrameCallbackCacheEntry(v8::Isolate *isolate, v8::Local<v8::Context> context ,v8::Local<v8::Function> callback)
                     : isolate_(isolate),
-                      callback_(callback) {
+                      callback_(isolate,callback),
+                      context_(isolate,context){
             }
 
             v8::Isolate *isolate_;
-            v8::Persistent<v8::Function> *callback_;
+            v8::Global<v8::Function> callback_;
+            v8::Global<v8::Context> context_;
             bool removed;
             uint64_t id;
 
@@ -320,29 +322,32 @@ namespace tns {
                 execute((double)ts, data);
             };
 
-            static void execute(double ts, void *data){
+            static void execute(double ts, void *data) {
                 if (data != nullptr) {
                     auto entry = static_cast<FrameCallbackCacheEntry *>(data);
-                    if (entry->removed) {
+
+
+                    if (entry == nullptr || entry->removed) {
                         return;
                     }
                     v8::Isolate *isolate = entry->isolate_;
 
-                    v8::Persistent<v8::Function> *poCallback = entry->callback_;
-
+                    if (isolate == nullptr) {
+                        return;
+                    }
                     v8::Locker locker(isolate);
                     v8::Isolate::Scope isolate_scope(isolate);
                     v8::HandleScope handle_scope(isolate);
-                    auto context = v8::Context::New(isolate);
+                    auto context = entry->context_.Get(isolate);
                     v8::Context::Scope context_scope(context);
 
-
-                    v8::Local<v8::Function> cb = poCallback->Get(isolate);
+                    auto cb = entry->callback_.Get(isolate);
                     v8::Local<v8::Value> result;
 
                     v8::Local<v8::Value> args[1] = {v8::Number::New(isolate, ts)};
 
-                    if (!cb->Call(context, context->Global(), 1, args).ToLocal(&result)) {
+                    if (!cb.IsEmpty() &&
+                        !cb->Call(context, context->Global(), 1, args).ToLocal(&result)) {
                         assert(false);
                     }
 
@@ -351,7 +356,7 @@ namespace tns {
 
         };
 
-        static robin_hood::unordered_map<uint64_t, FrameCallbackCacheEntry> frameCallbackCache_;
+        static robin_hood::unordered_map<uint64_t, FrameCallbackCacheEntry*> frameCallbackCache_;
 
         static void InitChoreographer();
 
