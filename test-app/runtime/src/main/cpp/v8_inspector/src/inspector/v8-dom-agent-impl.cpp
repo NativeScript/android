@@ -88,7 +88,7 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
             auto maybeResult = getDocumentFunc->Call(context, global, 0, args);
 
             if (tc.HasCaught()) {
-                auto error = utils::Common::getJSCallErrorMessage(getDocumentFunctionString, tc.Message()->Get()).c_str();
+                auto error = utils::Common::getJSCallErrorMessage(getDocumentFunctionString, tc.Message()->Get());
 
                 *out_root = std::move(defaultNode);
                 return DispatchResponse::ServerError(error);
@@ -156,7 +156,7 @@ DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
             removeNodeFunc->Call(context, global, 1, args);
 
             if (tc.HasCaught()) {
-                auto error = utils::Common::getJSCallErrorMessage(removeNodeFunctionString, tc.Message()->Get()).c_str();
+                auto error = utils::Common::getJSCallErrorMessage(removeNodeFunctionString, tc.Message()->Get());
                 return DispatchResponse::ServerError(error);
             }
 
@@ -198,7 +198,7 @@ DispatchResponse V8DOMAgentImpl::setAttributesAsText(int in_nodeId, const String
             setAttributeAsTextFunc->Call(context, global, 3, args);
 
             if (tc.HasCaught()) {
-                auto error = utils::Common::getJSCallErrorMessage(setAttributeAsTextFunctionString, tc.Message()->Get()).c_str();
+                auto error = utils::Common::getJSCallErrorMessage(setAttributeAsTextFunctionString, tc.Message()->Get());
                 return DispatchResponse::ServerError(error);
             }
 

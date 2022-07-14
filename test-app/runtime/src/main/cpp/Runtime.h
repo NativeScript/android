@@ -12,6 +12,7 @@
 #include "MessageLoopTimer.h"
 #include "File.h"
 #include <mutex>
+#include <android/looper.h>
 
 namespace tns {
 class Runtime {
@@ -69,6 +70,8 @@ class Runtime {
 
         std::string ReadFileText(const std::string& filePath);
 
+        static int GetWriter();
+
     private:
         Runtime(JNIEnv* env, jobject runtime, int id);
 
@@ -98,6 +101,8 @@ class Runtime {
 
         v8::Persistent<v8::Context>* m_context;
 
+        bool m_isMainThread;
+
         v8::Isolate* PrepareV8Runtime(const std::string& filesPath, const std::string& nativeLibsDir, const std::string& packageName, bool isDebuggable, const std::string& callingDir, const std::string& profilerOutputDir, const int maxLogcatObjectSize, const bool forceLog);
         jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
         static v8::StartupData CreateSnapshotDataBlob(const char* embedded_source);
@@ -114,6 +119,10 @@ class Runtime {
         static jmethodID GET_USED_MEMORY_METHOD_ID;
 
         static bool s_mainThreadInitialized;
+
+        static ALooper* m_mainLooper;
+
+        static int m_mainLooper_fd[2];
 
 #ifdef APPLICATION_IN_DEBUG
         std::mutex m_fileWriteMutex;
