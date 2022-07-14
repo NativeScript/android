@@ -29,21 +29,6 @@ var MyActivity = (function (_super) {
 	MyActivity.prototype.onCreate = function (bundle) {
 		_super.prototype.onCreate.call(this, bundle);
 
-		var thread = java.util.concurrent.Executors.newSingleThreadExecutor();
-        thread.execute(
-        	new java.lang.Runnable({
-        		run() {
-        			console.log(java.lang.Thread.currentThread());
-
-        			console.log('isMain', java.lang.Thread.currentThread() == android.os.Looper.getMainLooper().getThread());
-
-        			__runOnMainThread(function () {
-        				console.log('__runOnMainThread', 'isMain', java.lang.Thread.currentThread() == android.os.Looper.getMainLooper().getThread());
-        			});
-        		},
-        	})
-        );
-
         require('./tests/testsWithContext').run(this);
         execute(); //run jasmine
 
@@ -74,17 +59,6 @@ var MyActivity = (function (_super) {
         		},
         	})
         );
-
-        var count = 0;
-        var cb = (frame) => {
-        	console.log('cb', frame);
-        	count++;
-        	if (count == 100) {
-        		return;
-        	}
-        	__postFrameCallback(cb);
-        };
-        __postFrameCallback(cb);
 
 	};
 	MyActivity = __decorate([
