@@ -43,9 +43,9 @@ v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, Con
     return console;
 }
 
-void Console::sendToADBLogcat(const std::string& message, android_LogPriority logPriority) {
+void Console::sendToADBLogcat(const std::string& message, android_LogPriority logPriority, const std::string& logLevel) {
     // limit the size of the message that we send to logcat using the predefined value in package.json
-    auto messageToLog = message;
+    auto messageToLog = "CONSOLE " + std::toupper(logLevel) + ": " + logLevelmessage;
     if (messageToLog.length() > m_maxLogcatObjectSize) {
         messageToLog = messageToLog.erase(m_maxLogcatObjectSize, std::string::npos);
         messageToLog = messageToLog + "...";
@@ -189,7 +189,7 @@ void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
             }
 
             std::string log = assertionError.str();
-            sendToADBLogcat(log, ANDROID_LOG_ERROR);
+            sendToADBLogcat(log, ANDROID_LOG_ERROR, "error");
             sendToDevToolsFrontEnd(isolate, log, "error");
         }
     } catch (NativeScriptException& e) {
@@ -212,7 +212,7 @@ void Console::errorCallback(const v8::FunctionCallbackInfo <v8::Value>& info) {
     try {
         std::string log = buildLogString(info);
 
-        sendToADBLogcat(log, ANDROID_LOG_ERROR);
+        sendToADBLogcat(log, ANDROID_LOG_ERROR, "error");
         sendToDevToolsFrontEnd(info.GetIsolate(), log, "error");
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -234,7 +234,7 @@ void Console::infoCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     try {
         std::string log = buildLogString(info);
 
-        sendToADBLogcat(log, ANDROID_LOG_INFO);
+        sendToADBLogcat(log, ANDROID_LOG_INFO, "info");
         sendToDevToolsFrontEnd(info.GetIsolate(), log, "info");
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -256,7 +256,7 @@ void Console::logCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     try {
         std::string log = buildLogString(info);
 
-        sendToADBLogcat(log, ANDROID_LOG_INFO);
+        sendToADBLogcat(log, ANDROID_LOG_INFO, "info");
         sendToDevToolsFrontEnd(info.GetIsolate(), log, "info");
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -278,7 +278,7 @@ void Console::warnCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     try {
         std::string log = buildLogString(info);
 
-        sendToADBLogcat(log, ANDROID_LOG_WARN);
+        sendToADBLogcat(log, ANDROID_LOG_WARN, "warning");
         sendToDevToolsFrontEnd(info.GetIsolate(), log, "warning");
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -357,7 +357,7 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
         std::string log = ss.str();
 
-        sendToADBLogcat(log, ANDROID_LOG_INFO);
+        sendToADBLogcat(log, ANDROID_LOG_INFO, "info");
         sendToDevToolsFrontEnd(isolate, log, "info");
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
