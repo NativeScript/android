@@ -884,6 +884,10 @@ void MetadataNode::SetInnerTypes(Isolate* isolate, Local<Function>& ctorFunction
 
             // The call to GetConstructorFunctionTemplate bootstraps the ctor function for the childNode
             auto innerTypeCtorFuncTemplate = childNode->GetConstructorFunctionTemplate(isolate, curChild);
+            if(innerTypeCtorFuncTemplate.IsEmpty()) {
+                // this class does not exist, so just ignore it
+                continue;
+            }
             auto innerTypeCtorFunc = Local<Function>::New(isolate, *GetOrCreateInternal(curChild)->GetPersistentConstructorFunction(isolate));
             auto innerTypeName = ArgConverter::ConvertToV8String(isolate, curChild->name);
             ctorFunction->Set(context, innerTypeName, innerTypeCtorFunc);
@@ -917,6 +921,25 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     //
 
     auto node = GetOrCreateInternal(treeNode);
+
+
+    JEnv env;
+    // if we already have an exception (which will be rethrown later)
+    // then we don't want to ignore the next exception
+    bool ignoreFindClassException = env.ExceptionCheck() == JNI_FALSE;
+    auto currentClass = env.FindClass(node->m_name);
+    if (ignoreFindClassException && env.ExceptionCheck()) {
+        env.ExceptionClear();
+        // JNI found an exception looking up this class
+        // but we don't care, because this means this class doesn't exist
+        // like when you try to get a class that only exists in a higher API level
+        ctorFuncTemplate.Clear();
+        auto pft = new Persistent<FunctionTemplate>(isolate, ctorFuncTemplate);
+        CtorCacheData ctorCacheItem(pft, instanceMethodsCallbackData);
+        cache->CtorFuncCache.insert(make_pair(treeNode, ctorCacheItem));
+        return ctorFuncTemplate;
+    }
+
     auto ctorCallbackData = External::New(isolate, node);
     auto isInterface = s_metadataReader.IsNodeTypeInterface(treeNode->type);
     auto funcCallback = isInterface ? InterfaceConstructorCallback : ClassConstructorCallback;
@@ -926,8 +949,6 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     Local<Function> baseCtorFunc;
     std::vector<MethodCallbackData*> baseInstanceMethodsCallbackData;
     auto tmpTreeNode = treeNode;
-    JEnv env;
-    auto currentClass = env.FindClass(node->m_name);
     std::vector<MetadataTreeNode*> skippedBaseTypes;
     while (true) {
         auto baseTreeNode = s_metadataReader.GetBaseClassNode(tmpTreeNode);

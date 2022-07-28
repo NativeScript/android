@@ -723,16 +723,31 @@ jclass JEnv::FindClass(const string &className) {
     jclass global_class = CheckForClassInCache(className);
 
     if (global_class == nullptr) {
+        auto classIsMissing = CheckForClassMissingCache(className);
+        // class is missing. Set the same JNI error we had when we tried to find it the first time
+        if (classIsMissing != nullptr) {
+            m_env->Throw(classIsMissing);
+            return nullptr;
+        }
         jclass tmp = m_env->FindClass(className.c_str());
 
         if (m_env->ExceptionCheck() == JNI_TRUE) {
             m_env->ExceptionClear();
-            string cannonicalClassName = Util::ConvertFromJniToCanonicalName(className);
-            jstring s = m_env->NewStringUTF(cannonicalClassName.c_str());
-            tmp = static_cast<jclass>(m_env->CallStaticObjectMethod(RUNTIME_CLASS,
-                                                                    GET_CACHED_CLASS_METHOD_ID, s));
+             string cannonicalClassName = Util::ConvertFromJniToCanonicalName(className);
+             jstring s = m_env->NewStringUTF(cannonicalClassName.c_str());
+             tmp = static_cast<jclass>(m_env->CallStaticObjectMethod(RUNTIME_CLASS,
+                                                                     GET_CACHED_CLASS_METHOD_ID, s));
 
-            m_env->DeleteLocalRef(s);
+             m_env->DeleteLocalRef(s);
+            // we failed our static class check
+            // if we continue, we will crash (C++ level)
+            // so just return null and let the runtime deal with the NativeScriptException
+            if (m_env->ExceptionCheck() == JNI_TRUE) {
+                auto tmpException = m_env->ExceptionOccurred();
+                m_env->ExceptionClear();
+                m_env->Throw(InsertClassIntoMissingCache(className, tmpException));
+                return nullptr;
+            }
         }
 
         global_class = InsertClassIntoCache(className, tmp);
@@ -758,6 +773,25 @@ jclass JEnv::InsertClassIntoCache(const string &className, jclass &tmp) {
     m_env->DeleteLocalRef(tmp);
 
     return global_class;
+}
+
+jthrowable JEnv::CheckForClassMissingCache(const string &className) {
+    jthrowable throwable = nullptr;
+    auto itFound = s_missingClasses.find(className);
+
+    if (itFound != s_missingClasses.end()) {
+        throwable = itFound->second;
+    }
+
+    return throwable;
+}
+
+jthrowable JEnv::InsertClassIntoMissingCache(const string &className,const jthrowable &tmp) {
+    auto throwable = reinterpret_cast<jthrowable>(m_env->NewGlobalRef(tmp));
+    s_missingClasses.insert(make_pair(className, throwable));
+    m_env->DeleteLocalRef(tmp);
+
+    return throwable;
 }
 
 jobject JEnv::NewDirectByteBuffer(void *address, jlong capacity) {
@@ -822,6 +856,7 @@ void JEnv::CheckForJavaException() {
 
 JavaVM *JEnv::s_jvm = nullptr;
 map<string, jclass> JEnv::s_classCache;
+map<string, jthrowable> JEnv::s_missingClasses;
 jclass JEnv::RUNTIME_CLASS = nullptr;
 jmethodID JEnv::GET_CACHED_CLASS_METHOD_ID = nullptr;
 
