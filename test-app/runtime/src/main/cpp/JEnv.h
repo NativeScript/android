@@ -191,6 +191,16 @@ class JEnv {
          */
         jclass InsertClassIntoCache(const std::string& className, jclass& tmp);
 
+
+        /*
+         * The "CheckForClassMissing" will check if a class has been checked and it was missing, if it is, it will return the original throwable
+         * this is useful for rethrowing exceptions if they were caught in the previous attempt of loading it.
+         * if it is not: it will return "nullptr".
+         */
+        jthrowable CheckForClassMissingCache(const std::string& className);
+
+        jthrowable InsertClassIntoMissingCache(const std::string& className, const jthrowable& tmp);
+
         jobject NewDirectByteBuffer(void* address, jlong capacity);
         void* GetDirectBufferAddress(jobject buf);
         jlong GetDirectBufferCapacity(jobject buf);
@@ -333,6 +343,7 @@ class JEnv {
         static jmethodID GET_CACHED_CLASS_METHOD_ID;
 
         static std::map<std::string, jclass> s_classCache;
+        static std::map<std::string, jthrowable> s_missingClasses;
 };
 }
 
