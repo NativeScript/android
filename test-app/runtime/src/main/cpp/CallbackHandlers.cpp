@@ -676,16 +676,16 @@ void CallbackHandlers::RunOnMainThreadCallback(const FunctionCallbackInfo<v8::Va
     Local<v8::Function> callback = args[0].As<v8::Function>();
     CacheEntry entry(isolate, callback, context);
     cache_.emplace(key, std::move(entry));
-    auto value = new Callback(key);
-    write(Runtime::GetWriter(), &value, sizeof(Callback));
-    delete value;
+    auto value = Callback(key);
+
+    write(Runtime::GetWriter(),&value , sizeof(Callback));
 }
 
 int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) {
-    auto value = new Callback(0);
+    struct Callback value;
     ssize_t nr = read(fd, &value, sizeof(Callback));
 
-    auto key = value->id_;
+    auto key = value.id_;
 
     auto it = cache_.find(key);
     if (it == cache_.end()) {
@@ -709,7 +709,6 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
         throw NativeScriptException(tc);
     }
 
-    delete value;
     RemoveKey(key);
     return 1;
 }
