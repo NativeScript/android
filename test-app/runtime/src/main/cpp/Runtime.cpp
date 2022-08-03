@@ -652,9 +652,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         m_isMainThread = true;
         pipe(m_mainLooper_fd);
         m_mainLooper = ALooper_forThread();
+
         ALooper_acquire(m_mainLooper);
 
-        ALooper_addFd(m_mainLooper, m_mainLooper_fd[0], 0, ALOOPER_EVENT_INPUT, CallbackHandlers::RunOnMainThreadFdCallback, nullptr);
+        ALooper_addFd(m_mainLooper, m_mainLooper_fd[0], ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT, CallbackHandlers::RunOnMainThreadFdCallback, nullptr);
 
         Local<FunctionTemplate> workerFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::NewThreadCallback);
         Local<ObjectTemplate> prototype = workerFuncTemplate->PrototypeTemplate();
