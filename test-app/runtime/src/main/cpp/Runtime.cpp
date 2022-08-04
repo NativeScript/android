@@ -31,6 +31,8 @@
 #include <snapshot_blob.h>
 #include "IsolateDisposer.h"
 #include <unistd.h>
+#include <thread>
+#include "File.h"
 
 #ifdef APPLICATION_IN_DEBUG
 #include "JsV8InspectorClient.h"
@@ -650,10 +652,23 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
      */
     if (!s_mainThreadInitialized) {
         m_isMainThread = true;
-        pipe(m_mainLooper_fd);
+        pipe2(m_mainLooper_fd, O_NONBLOCK | O_CLOEXEC);
         m_mainLooper = ALooper_forThread();
 
-        ALooper_acquire(m_mainLooper);
+       ALooper_acquire(m_mainLooper);
+
+        // try using 2MB
+        int ret = fcntl(m_mainLooper_fd[1], F_SETPIPE_SZ, 2 * (1024 * 1024));
+
+        // try using 1MB
+        if (ret != 0) {
+            ret = fcntl(m_mainLooper_fd[1], F_SETPIPE_SZ, 1 * (1024 * 1024));
+        }
+
+        // try using 512KB
+        if (ret != 0) {
+            ret = fcntl(m_mainLooper_fd[1], F_SETPIPE_SZ, (512 * 1024));
+        }
 
         ALooper_addFd(m_mainLooper, m_mainLooper_fd[0], ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT, CallbackHandlers::RunOnMainThreadFdCallback, nullptr);
 
@@ -852,6 +867,10 @@ int Runtime::GetWriter(){
     return m_mainLooper_fd[1];
 }
 
+int Runtime::GetReader(){
+    return m_mainLooper_fd[0];
+}
+
 JavaVM* Runtime::s_jvm = nullptr;
 jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
@@ -861,4 +880,3 @@ v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 ALooper* Runtime::m_mainLooper = nullptr;
 int Runtime::m_mainLooper_fd[2];
-

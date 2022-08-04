@@ -15,6 +15,7 @@
 #include "ObjectManager.h"
 #include "include/v8.h"
 #include "robin_hood.h"
+#include <errno.h>
 
 namespace tns {
     class CallbackHandlers {
@@ -281,9 +282,9 @@ namespace tns {
             jobject _runtime;
         };
 
-        static void RemoveKey(const uint32_t key);
+        static void RemoveKey(const uint64_t key);
 
-        static std::atomic_int32_t count_;
+        static std::atomic_int64_t count_;
 
 
         struct Callback {
@@ -307,7 +308,7 @@ namespace tns {
             v8::Global<v8::Context> context_;
         };
 
-        static robin_hood::unordered_map<uint32_t, CacheEntry> cache_;
+        static robin_hood::unordered_map<uint64_t, CacheEntry> cache_;
 
 
         static std::atomic_uint64_t frameCallbackCount_;

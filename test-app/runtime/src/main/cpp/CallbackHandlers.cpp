@@ -20,7 +20,6 @@
 #include <unistd.h>
 #include <dlfcn.h>
 
-
 using namespace v8;
 using namespace std;
 using namespace tns;
@@ -672,18 +671,19 @@ void CallbackHandlers::RunOnMainThreadCallback(const FunctionCallbackInfo<v8::Va
 
     Local<Context> context = isolate->GetCurrentContext();
 
-    uint32_t key = ++count_;
+    uint64_t key = ++count_;
     Local<v8::Function> callback = args[0].As<v8::Function>();
     CacheEntry entry(isolate, callback, context);
     cache_.emplace(key, std::move(entry));
     auto value = Callback(key);
-
-    write(Runtime::GetWriter(),&value , sizeof(Callback));
+    auto size = sizeof(Callback);
+    auto wrote = write(Runtime::GetWriter(),&value , size);
 }
 
 int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) {
     struct Callback value;
-    ssize_t nr = read(fd, &value, sizeof(Callback));
+    auto size = sizeof(Callback);
+    ssize_t nr = read(fd, &value, sizeof(value));
 
     auto key = value.id_;
 
@@ -710,10 +710,11 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
     }
 
     RemoveKey(key);
+
     return 1;
 }
 
-void CallbackHandlers::RemoveKey(const uint32_t key) {
+void CallbackHandlers::RemoveKey(const uint64_t key) {
     auto it = cache_.find(key);
     if (it == cache_.end()) {
         return;
@@ -1757,11 +1758,11 @@ void CallbackHandlers::InitChoreographer() {
 }
 
 
-robin_hood::unordered_map<uint32_t, CallbackHandlers::CacheEntry> CallbackHandlers::cache_;
+robin_hood::unordered_map<uint64_t, CallbackHandlers::CacheEntry> CallbackHandlers::cache_;
 
 robin_hood::unordered_map<uint64_t, CallbackHandlers::FrameCallbackCacheEntry> CallbackHandlers::frameCallbackCache_;
 
-std::atomic_int32_t CallbackHandlers::count_ = {0};
+std::atomic_int64_t CallbackHandlers::count_ = {0};
 std::atomic_uint64_t CallbackHandlers::frameCallbackCount_ = {0};
 
 
