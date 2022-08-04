@@ -1,5 +1,4 @@
 #include "CallbackHandlers.h"
-#include "NativeScriptAssert.h"
 #include "MetadataNode.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
@@ -8,7 +7,6 @@
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
 #include "v8-profiler.h"
-#include "NativeScriptException.h"
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -1672,7 +1670,7 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
                 if (item.second.id == value->id) {
                     item.second.context_.Reset();
                     item.second.callback_.Reset();
-                    cache_.erase(item.first);
+                    frameCallbackCache_.erase(item.first);
                     break;
                 }
             }

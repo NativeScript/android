@@ -16,6 +16,8 @@
 #include "include/v8.h"
 #include "robin_hood.h"
 #include <errno.h>
+#include "NativeScriptAssert.h"
+#include "NativeScriptException.h"
 
 namespace tns {
     class CallbackHandlers {
@@ -354,8 +356,14 @@ namespace tns {
 
                     v8::Local<v8::Value> args[1] = {v8::Number::New(isolate, ts)};
 
+                    v8::TryCatch tc(isolate);
+
                     if (!cb->Call(context, context->Global(), 1, args).ToLocal(&result)) {
-                        assert(false);
+                        // TODO
+                    }
+
+                    if(tc.HasCaught()){
+                        throw NativeScriptException(tc);
                     }
 
                 }
