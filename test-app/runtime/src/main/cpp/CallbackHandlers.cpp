@@ -685,31 +685,200 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
 
     auto key = value.id_;
 
-    auto it = cache_.find(key);
-    if (it == cache_.end()) {
-        return 1;
+    if (value.type_ == Callback::Type::SetTimeout) {
+        auto it = setTimeoutCache_.find(key);
+        if (it == setTimeoutCache_.end()) {
+            return 1;
+        }
+        Isolate *isolate = it->second.isolate_;
+
+        v8::Locker locker(isolate);
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        auto context = it->second.context_.Get(isolate);
+        Context::Scope context_scope(context);
+
+        v8::TryCatch tc(isolate);
+        auto cb = it->second.callback_.Get(isolate);
+        Local<Value> result;
+        if (!cb->Call(context, context->Global(), 0, nullptr).ToLocal(&result)) {}
+
+        if (tc.HasCaught()) {
+            throw NativeScriptException(tc);
+        }
+
+        RemoveSetTimeoutKey(key);
+    } else if (value.type_ == Callback::Type::SetInterval) {
+        auto it = setIntervalCache_.find(key);
+        if (it == setIntervalCache_.end()) {
+            return 1;
+        }
+        Isolate *isolate = it->second.isolate_;
+
+        v8::Locker locker(isolate);
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        auto context = it->second.context_.Get(isolate);
+        Context::Scope context_scope(context);
+
+        v8::TryCatch tc(isolate);
+        auto cb = it->second.callback_.Get(isolate);
+        Local<Value> result;
+        if (!cb->Call(context, context->Global(), 0, nullptr).ToLocal(&result)) {}
+
+        if (tc.HasCaught()) {
+            throw NativeScriptException(tc);
+        }
+    } else {
+        auto it = cache_.find(key);
+        if (it == cache_.end()) {
+            return 1;
+        }
+
+        Isolate *isolate = it->second.isolate_;
+        v8::Locker locker(isolate);
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        auto context = it->second.context_.Get(isolate);
+        Context::Scope context_scope(context);
+        Local<v8::Function> cb = it->second.callback_.Get(isolate);
+        Local<Value> result;
+
+        v8::TryCatch tc(isolate);
+
+        if (!cb->Call(context, context->Global(), 0, nullptr).ToLocal(&result)) {}
+
+        if (tc.HasCaught()) {
+            throw NativeScriptException(tc);
+        }
+
+        RemoveKey(key);
     }
 
-    Isolate *isolate = it->second.isolate_;
+    return 1;
+}
+
+void CallbackHandlers::RunOnCurrentThreadCallback(const FunctionCallbackInfo<v8::Value> &args) {
+    Isolate *isolate = args.GetIsolate();
+
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
-    auto context = it->second.context_.Get(isolate);
-    Context::Scope context_scope(context);
-    Local<v8::Function> cb = it->second.callback_.Get(isolate);
-    Local<Value> result;
 
-    v8::TryCatch tc(isolate);
+    Local<Context> context = isolate->GetCurrentContext();
 
-    if (!cb->Call(context, context->Global(), 0, nullptr).ToLocal(&result)) {}
+    uint64_t key = ++currentCount_;
+    Local<v8::Function> callback = args[0].As<v8::Function>();
+    CacheEntry entry(isolate, callback, context);
+    cache_.emplace(key, std::move(entry));
+    auto value = Callback(key);
+    auto size = sizeof(Callback);
+    auto wrote = write(Runtime::GetWriter(),&value , size);
+}
 
-    if(tc.HasCaught()){
-        throw NativeScriptException(tc);
+int CallbackHandlers::RunOnCurrentThreadFdCallback(int fd, int events, void *data) {
+    struct Callback value;
+    auto size = sizeof(Callback);
+    ssize_t nr = read(fd, &value, sizeof(value));
+
+    auto key = value.id_;
+
+    if (value.type_ == Callback::Type::SetTimeout) {
+        auto it = setTimeoutCache_.find(key);
+        if (it == setTimeoutCache_.end()) {
+            return 1;
+        }
+        Isolate *isolate = it->second.isolate_;
+
+        v8::Locker locker(isolate);
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        auto context = it->second.context_.Get(isolate);
+        Context::Scope context_scope(context);
+
+        v8::TryCatch tc(isolate);
+        auto cb = it->second.callback_.Get(isolate);
+        Local<Value> result;
+        if (!cb->Call(context, context->Global(), 0, nullptr).ToLocal(&result)) {}
+
+        if (tc.HasCaught()) {
+            throw NativeScriptException(tc);
+        }
+    } else if (value.type_ == Callback::Type::SetInterval) {
+        auto it = setIntervalCache_.find(key);
+        if (it == setIntervalCache_.end()) {
+            return 1;
+        }
+        Isolate *isolate = it->second.isolate_;
+
+        v8::Locker locker(isolate);
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        auto context = it->second.context_.Get(isolate);
+        Context::Scope context_scope(context);
+
+        v8::TryCatch tc(isolate);
+        auto cb = it->second.callback_.Get(isolate);
+        Local<Value> result;
+        if (!cb->Call(context, context->Global(), 0, nullptr).ToLocal(&result)) {}
+
+        if (tc.HasCaught()) {
+            throw NativeScriptException(tc);
+        }
+    } else {
+        auto it = cache_.find(key);
+        if (it == cache_.end()) {
+            return 1;
+        }
+        Isolate *isolate = it->second.isolate_;
+
+        v8::Locker locker(isolate);
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        auto context = it->second.context_.Get(isolate);
+        Context::Scope context_scope(context);
+
+        v8::TryCatch tc(isolate);
+        auto cb = it->second.callback_.Get(isolate);
+        Local<Value> result;
+        if (!cb->Call(context, context->Global(), 0, nullptr).ToLocal(&result)) {}
+
+        if (tc.HasCaught()) {
+            throw NativeScriptException(tc);
+        }
     }
 
-    RemoveKey(key);
+    if (value.type_ == Callback::Type::SetTimeout) {
+        RemoveSetTimeoutKey(key);
+    } else if (value.type_ == Callback::Type::SetInterval) {
+        RemoveSetIntervalKey(key);
+    } else {
+        RemoveKey(key);
+    }
 
     return 1;
+}
+
+void CallbackHandlers::RemoveSetTimeoutKey(const uint64_t key) {
+    auto it = setTimeoutCache_.find(key);
+    if (it == setTimeoutCache_.end()) {
+        return;
+    }
+
+    it->second.callback_.Reset();
+    it->second.context_.Reset();
+    setTimeoutCache_.erase(it);
+}
+
+void CallbackHandlers::RemoveSetIntervalKey(const uint64_t key) {
+    auto it = setIntervalCache_.find(key);
+    if (it == setIntervalCache_.end()) {
+        return;
+    }
+
+    it->second.callback_.Reset();
+    it->second.context_.Reset();
+    setIntervalCache_.erase(it);
 }
 
 void CallbackHandlers::RemoveKey(const uint64_t key) {
@@ -766,6 +935,13 @@ void CallbackHandlers::TimeCallback(const v8::FunctionCallbackInfo<v8::Value> &a
             std::chrono::system_clock::now());
     double duration = nano.time_since_epoch().count();
     args.GetReturnValue().Set(duration);
+}
+
+void CallbackHandlers::NanoCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    timespec now{};
+    int err = clock_gettime(CLOCK_MONOTONIC, &now) ;
+    auto duration = now.tv_sec*1000000000L + now.tv_nsec;
+    args.GetReturnValue().Set((double)duration);
 }
 
 void CallbackHandlers::ReleaseNativeCounterpartCallback(
@@ -1757,10 +1933,12 @@ void CallbackHandlers::InitChoreographer() {
 
 
 robin_hood::unordered_map<uint64_t, CallbackHandlers::CacheEntry> CallbackHandlers::cache_;
-
+robin_hood::unordered_map<uint64_t, CallbackHandlers::CacheEntry> CallbackHandlers::setTimeoutCache_;
+robin_hood::unordered_map<uint64_t, CallbackHandlers::CacheEntry> CallbackHandlers::setIntervalCache_;
 robin_hood::unordered_map<uint64_t, CallbackHandlers::FrameCallbackCacheEntry> CallbackHandlers::frameCallbackCache_;
 
 std::atomic_int64_t CallbackHandlers::count_ = {0};
+std::atomic_int64_t CallbackHandlers::currentCount_ = {0};
 std::atomic_uint64_t CallbackHandlers::frameCallbackCount_ = {0};
 
 

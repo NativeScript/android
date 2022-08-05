@@ -1,5 +1,4 @@
-#ifndef CALLBACKHANDLERS_H_
-#define CALLBACKHANDLERS_H_
+#pragma once
 
 #include <string>
 #include <map>
@@ -18,6 +17,7 @@
 #include <errno.h>
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
+#include <time.h>
 
 namespace tns {
     class CallbackHandlers {
@@ -82,9 +82,16 @@ namespace tns {
 
         static int RunOnMainThreadFdCallback(int fd, int events, void* data);
 
+
+        static void RunOnCurrentThreadCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+        static int RunOnCurrentThreadFdCallback(int fd, int events, void* data);
+
         static void LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
         static void TimeCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+        static void NanoCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
         static void
         DumpReferenceTablesMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
@@ -228,6 +235,40 @@ namespace tns {
                 AChoreographer* choreographer, AChoreographer_frameCallback64 callback,
                 void* data, uint32_t delayMillis);
 
+        struct Callback {
+
+            enum class Type
+                    : int {
+                    Main,
+                    SetTimeout,
+                    SetInterval
+            };
+
+
+            Callback(){}
+            Callback(uint64_t id)
+                    : id_(id){
+            }
+            uint64_t id_;
+            Type type_ = Type::Main;
+        };
+
+        struct CacheEntry {
+            CacheEntry(v8::Isolate* isolate, v8::Local<v8::Function> callback, v8::Local<v8::Context> context)
+                    : isolate_(isolate),
+                      callback_(isolate, callback),
+                      context_(isolate, context){
+            }
+
+            v8::Isolate* isolate_;
+            v8::Global<v8::Function> callback_;
+            v8::Global<v8::Context> context_;
+        };
+
+        static robin_hood::unordered_map<uint64_t, CacheEntry> setTimeoutCache_;
+
+        static robin_hood::unordered_map<uint64_t, CacheEntry> setIntervalCache_;
+
 
     private:
         CallbackHandlers() {
@@ -286,32 +327,14 @@ namespace tns {
 
         static void RemoveKey(const uint64_t key);
 
+        static void RemoveSetTimeoutKey(const uint64_t key);
+
+        static void RemoveSetIntervalKey(const uint64_t key);
+
         static std::atomic_int64_t count_;
-
-
-        struct Callback {
-            Callback(){}
-            Callback(uint64_t id)
-                    : id_(id){
-            }
-            uint64_t id_;
-        };
-
-
-        struct CacheEntry {
-            CacheEntry(v8::Isolate* isolate, v8::Local<v8::Function> callback, v8::Local<v8::Context> context)
-                    : isolate_(isolate),
-                      callback_(isolate, callback),
-                      context_(isolate, context){
-            }
-
-            v8::Isolate* isolate_;
-            v8::Global<v8::Function> callback_;
-            v8::Global<v8::Context> context_;
-        };
+        static std::atomic_int64_t currentCount_;
 
         static robin_hood::unordered_map<uint64_t, CacheEntry> cache_;
-
 
         static std::atomic_uint64_t frameCallbackCount_;
 
@@ -379,5 +402,3 @@ namespace tns {
                           FrameCallbackCacheEntry *entry, v8::Local<v8::Context> context);
     };
 }
-
-#endif /* CALLBACKHANDLERS_H_ */

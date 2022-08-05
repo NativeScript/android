@@ -77,6 +77,13 @@ class Runtime {
             return m_mainLooper;
         }
 
+        int GetCurrentWriter();
+        int GetCurrentReader();
+
+        bool isMainThread(){
+            return m_isMainThread;
+        }
+
     private:
         Runtime(JNIEnv* env, jobject runtime, int id);
 
@@ -128,6 +135,11 @@ class Runtime {
         static ALooper* m_mainLooper;
 
         static int m_mainLooper_fd[2];
+
+        ALooper* looper = nullptr;
+
+        int looper_fd[2];
+
 
 #ifdef APPLICATION_IN_DEBUG
         std::mutex m_fileWriteMutex;

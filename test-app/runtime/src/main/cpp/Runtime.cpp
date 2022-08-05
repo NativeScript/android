@@ -33,6 +33,8 @@
 #include <unistd.h>
 #include <thread>
 #include "File.h"
+#include "SetTimeout.h"
+#include "SetInterval.h"
 
 #ifdef APPLICATION_IN_DEBUG
 #include "JsV8InspectorClient.h"
@@ -225,6 +227,19 @@ Runtime::~Runtime() {
 
         if (m_mainLooper_fd[1] != -1) {
             close(m_mainLooper_fd[1]);
+        }
+    }else {
+        if (looper_fd[0] != -1) {
+            ALooper_removeFd(looper, looper_fd[0]);
+        }
+        ALooper_release(looper);
+
+        if (looper_fd[0] != -1) {
+            close(looper_fd[0]);
+        }
+
+        if (looper_fd[1] != -1) {
+            close(looper_fd[1]);
         }
     }
 }
@@ -646,6 +661,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runOnMainThread"), FunctionTemplate::New(isolate, CallbackHandlers::RunOnMainThreadCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__postFrameCallback"), FunctionTemplate::New(isolate, CallbackHandlers::PostFrameCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__removeFrameCallback"), FunctionTemplate::New(isolate, CallbackHandlers::RemoveFrameCallback));
+    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__nano"), FunctionTemplate::New(isolate, CallbackHandlers::NanoCallback));
+
+    SetTimeout::Init(isolate, globalTemplate);
+    SetInterval::Init(isolate, globalTemplate);
+
     /*
      * Attach `Worker` object constructor only to the main thread (isolate)'s global object
      * Workers should not be created from within other Workers, for now
@@ -692,6 +712,27 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
      */
     else {
         m_isMainThread = false;
+
+        pipe2(looper_fd, O_NONBLOCK | O_CLOEXEC);
+        looper = ALooper_forThread();
+
+        ALooper_acquire(looper);
+
+        // try using 2MB
+        int ret = fcntl(looper_fd[1], F_SETPIPE_SZ, 2 * (1024 * 1024));
+
+        // try using 1MB
+        if (ret != 0) {
+            ret = fcntl(looper_fd[1], F_SETPIPE_SZ, 1 * (1024 * 1024));
+        }
+
+        // try using 512KB
+        if (ret != 0) {
+            ret = fcntl(looper_fd[1], F_SETPIPE_SZ, (512 * 1024));
+        }
+
+        ALooper_addFd(looper, looper_fd[0], ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT, CallbackHandlers::RunOnCurrentThreadFdCallback, nullptr);
+
         auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalPostMessageCallback);
         globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate);
         auto closeFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalCloseCallback);
@@ -871,6 +912,15 @@ int Runtime::GetReader(){
     return m_mainLooper_fd[0];
 }
 
+
+int Runtime::GetCurrentWriter() {
+    return looper_fd[1];
+}
+
+int Runtime::GetCurrentReader(){
+    return looper_fd[0];
+}
+
 JavaVM* Runtime::s_jvm = nullptr;
 jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
@@ -880,3 +930,6 @@ v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 ALooper* Runtime::m_mainLooper = nullptr;
 int Runtime::m_mainLooper_fd[2];
+
+
+

@@ -147,6 +147,7 @@ add_library(
     src/main/cpp/DirectBuffer.cpp
     src/main/cpp/FieldAccessor.cpp
     src/main/cpp/File.cpp
+        src/main/cpp/SetInterval.cpp
     src/main/cpp/IsolateDisposer.cpp
     src/main/cpp/JEnv.cpp
     src/main/cpp/DesugaredInterfaceCompanionClassNameResolver.cpp
@@ -172,6 +173,7 @@ add_library(
     src/main/cpp/Runtime.cpp
     src/main/cpp/SimpleAllocator.cpp
     src/main/cpp/SimpleProfiler.cpp
+        src/main/cpp/SetTimeout.cpp
     src/main/cpp/Util.cpp
     src/main/cpp/V8GlobalHelpers.cpp
     src/main/cpp/V8StringConstants.cpp
