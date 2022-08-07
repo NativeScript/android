@@ -21,6 +21,7 @@ namespace tns {
         static void SetTimeoutCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void ClearTimeoutCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void Elapsed(const uint64_t key);
+        static bool Has(const uint64_t key);
         static std::atomic_int64_t count_;
     };
 };

@@ -20,6 +20,7 @@ namespace tns {
         static void SetIntervalCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void ClearIntervalCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
         static bool Elapsed(const uint64_t key);
+        static bool Has(const uint64_t key);
         static std::atomic_int64_t count_;
     };
 };

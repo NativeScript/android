@@ -850,8 +850,6 @@ int CallbackHandlers::RunOnCurrentThreadFdCallback(int fd, int events, void *dat
 
     if (value.type_ == Callback::Type::SetTimeout) {
         RemoveSetTimeoutKey(key);
-    } else if (value.type_ == Callback::Type::SetInterval) {
-        RemoveSetIntervalKey(key);
     } else {
         RemoveKey(key);
     }
