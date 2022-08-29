@@ -944,6 +944,15 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     auto isInterface = s_metadataReader.IsNodeTypeInterface(treeNode->type);
     auto funcCallback = isInterface ? InterfaceConstructorCallback : ClassConstructorCallback;
     ctorFuncTemplate = FunctionTemplate::New(isolate, funcCallback, ctorCallbackData);
+    auto currentNode = treeNode;
+    std::string finalName(currentNode->name);
+    while (currentNode->parent) {
+        if (!currentNode->parent->name.empty()) {
+            finalName = currentNode->parent->name + "." + finalName;
+        }
+        currentNode = currentNode->parent;
+    }
+    ctorFuncTemplate->SetClassName(v8::String::NewFromUtf8(isolate, finalName.c_str()).ToLocalChecked());
     ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
 
     Local<Function> baseCtorFunc;
