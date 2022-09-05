@@ -1737,4 +1737,12 @@ describe("Tests ", function () {
             expect(com.tns.tests.LogcatUtil.logcatContainsString(str.slice(0, -1) + "...")).toBe(true);
         });
     }
+	it("should show the correct class name for native object", function () {
+		var obj = new java.lang.Object();
+		expect(java.lang.Object.name).toBe('java.lang.Object');
+		expect(obj.constructor.name).toBe('java.lang.Object');
+		var bool = new java.lang.Boolean(false);
+		expect(java.lang.Boolean.name).toBe('java.lang.Boolean');
+		expect(bool.constructor.name).toBe('java.lang.Boolean');
+	});
 });
