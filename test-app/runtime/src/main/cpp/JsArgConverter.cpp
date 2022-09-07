@@ -52,6 +52,7 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool
     m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 1;
 
     if (m_argsLen > 0) {
+        m_storedObjects.reserve(m_argsLen);
         if ((entry != nullptr) && (entry->isResolved)) {
             if (entry->parsedSig.empty()) {
                 JniSignatureParser parser(m_methodSignature);
@@ -79,6 +80,10 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, cons
 
     JniSignatureParser parser(m_methodSignature);
     m_tokens = parser.Parse();
+
+    if(m_argsLen > 0){
+        m_storedObjects.reserve(m_argsLen);
+    }
 
     for (int i = 0; i < m_argsLen; i++) {
         m_isValid = ConvertArg(args[i], i);
@@ -244,6 +249,8 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
                 shared_ptr<BackingStore> store;
                 size_t offset = 0;
                 size_t length;
+                uint8_t * data = nullptr;
+                auto link_with_data = false;
                 if (jsObject->IsArrayBuffer())
                 {
                     auto array = jsObject.As<v8::ArrayBuffer>();
@@ -258,8 +265,10 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
                     {
 
                         length = array->ByteLength();
-                        void *data = malloc(length);
-                        array->CopyContents(data, length);
+                        void *data_ = malloc(length);
+                        array->CopyContents(data_, length);
+                        data = (uint8_t *)data_;
+                        link_with_data = true;
                     }
                     else
                     {
@@ -278,7 +287,9 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
                     bufferCastType = JsArgConverter::GetCastType(array);
                 }
 
-                auto data = static_cast<uint8_t *>(store->Data()) + offset;
+                if(data != nullptr) {
+                    data = static_cast<uint8_t *>(store->Data()) + offset;
+                }
 
                 auto directBuffer = env.NewDirectByteBuffer(
                     data,
@@ -344,7 +355,12 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
 
                 int id = objectManager->GetOrCreateObjectId(buffer);
                 auto clazz = env.GetObjectClass(buffer);
-                objectManager->Link(jsObject, id, clazz);
+
+                if (link_with_data) {
+                    objectManager->LinkWithExtraData(jsObject, id, clazz, data);
+                } else {
+                    objectManager->Link(jsObject, id, clazz);
+                }
 
                 obj = objectManager->GetJavaObjectByJsObject(jsObject);
             }
