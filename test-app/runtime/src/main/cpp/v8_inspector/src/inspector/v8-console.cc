@@ -656,7 +656,7 @@ void V8Console::inspectedObject(const v8::FunctionCallbackInfo<v8::Value>& info,
     if (object)
       info.GetReturnValue().Set(object->get(isolate->GetCurrentContext()));
     else
-      info.GetReturnValue().Set(v8::Undefined(isolate));
+      info.GetReturnValue().SetUndefined();
   }
 }
 

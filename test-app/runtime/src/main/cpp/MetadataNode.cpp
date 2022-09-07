@@ -199,7 +199,7 @@ void MetadataNode::ArrayLengthGetterCallack(Local<Name> property, const Property
         auto thiz = info.This();
         auto isolate = info.GetIsolate();
         auto length = CallbackHandlers::GetArrayLength(isolate, thiz);
-        info.GetReturnValue().Set(Integer::New(isolate, length));
+        info.GetReturnValue().Set(length);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -309,7 +309,7 @@ void MetadataNode::NullObjectAccessorGetterCallback(Local<Name> property,const P
 void MetadataNode::NullValueOfCallback(const FunctionCallbackInfo<Value>& args) {
     try {
         auto isolate = args.GetIsolate();
-        args.GetReturnValue().Set(Null(isolate));
+        args.GetReturnValue().SetNull();
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
