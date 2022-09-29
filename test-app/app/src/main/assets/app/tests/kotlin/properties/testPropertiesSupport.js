@@ -1,4 +1,15 @@
 describe("Tests Kotlin properties support", function () {
+    it("Test Kotlin JvmField properties should work", function () {
+        var kotlinClass = new com.tns.tests.kotlin.properties.KotlinClassWithProperties();
+
+        expect(kotlinClass.jvmField).toBe(0);
+
+        kotlinClass.jvmField = 1;
+
+        expect(kotlinClass.jvmField).toBe(1);
+    });
+
+
     it("Test Kotlin public properties should work", function () {
     	var kotlinClass = new com.tns.tests.kotlin.properties.KotlinClassWithProperties();
 

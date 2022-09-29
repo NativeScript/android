@@ -154,28 +154,37 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
     }
 
     override val properties: Array<out NativePropertyDescriptor> by lazy {
+        // checking if prop is also jvm field if it is remove to avoid the runtime using the invalid data
+        val fields = this.fields
         val metadata = kotlinMetadata
         if (metadata is KotlinClassMetadata.Class) {
             val props = metadataParser
-                    .getKotlinProperties(metadata)
-                    .map {
-                        val propertyName = it.name
+                .getKotlinProperties(metadata)
+                .map {
+                    val propertyName = it.name
+                    var duplicate = false
 
-                        var getter: NativeMethodDescriptor? = null
-                        val getterSignature = it.getterSignature
-                        if (getterSignature != null) {
-                            getter = getMethodDescriptorWithSignature(getterSignature.name, getterSignature.desc)
-                        }
-
-                        var setter: NativeMethodDescriptor? = null
-                        val setterSignature = it.setterSignature
-                        if (setterSignature != null) {
-                            setter = getMethodDescriptorWithSignature(setterSignature.name, setterSignature.desc)
-                        }
-
-                        KotlinPropertyDescriptor(propertyName, getter, setter)
+                    if(fields.find { field ->  field.name == propertyName} != null){
+                        duplicate = true
                     }
-                    .collect(Collectors.toList())
+
+
+                    var getter: NativeMethodDescriptor? = null
+                    val getterSignature = it.getterSignature
+                    if (getterSignature != null) {
+                        getter = getMethodDescriptorWithSignature(getterSignature.name, getterSignature.desc)
+                    }
+
+                    var setter: NativeMethodDescriptor? = null
+                    val setterSignature = it.setterSignature
+                    if (setterSignature != null) {
+                        setter = getMethodDescriptorWithSignature(setterSignature.name, setterSignature.desc)
+                    }
+
+                    KotlinPropertyDescriptor(propertyName, getter, setter, duplicate)
+                }.filter {
+                    !it.duplicate
+                }.collect(Collectors.toList())
             return@lazy props.toTypedArray()
         }
 

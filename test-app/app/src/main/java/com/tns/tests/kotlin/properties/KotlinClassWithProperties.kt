@@ -26,4 +26,7 @@ open class KotlinClassWithProperties {
     var isMutableBooleanProperty = true
     var hasSomeData = true;
     var isSomeShit = 2;
+
+    @JvmField
+    var jvmField = 0
 }
