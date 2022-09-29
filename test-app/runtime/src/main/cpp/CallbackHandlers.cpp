@@ -378,7 +378,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             } else {
                 result = env.CallBooleanMethodA(callerJavaObject, mid, javaArgs);
             }
-            args.GetReturnValue().Set(result != 0 ? True(isolate) : False(isolate));
+            args.GetReturnValue().Set(result != 0);
             break;
         }
         case MethodReturnType::Byte: {
@@ -429,7 +429,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             } else if (isSuper) {
                 result = env.CallNonvirtualIntMethodA(callerJavaObject, clazz, mid, javaArgs);
             } else {
-                result = env.CallIntMethodA(callerJavaObject, mid, javaArgs);
+               result = env.CallIntMethodA(callerJavaObject, mid, javaArgs);
             }
             args.GetReturnValue().Set(result);
             break;
@@ -490,7 +490,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                 args.GetReturnValue().Set(objectResult);
                 env.DeleteLocalRef(result);
             } else {
-                args.GetReturnValue().Set(Null(isolate));
+                args.GetReturnValue().SetNull();
             }
 
             break;
@@ -526,7 +526,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                 args.GetReturnValue().Set(objectResult);
                 env.DeleteLocalRef(result);
             } else {
-                args.GetReturnValue().Set(Null(isolate));
+                args.GetReturnValue().SetNull();
             }
 
             break;

@@ -35,7 +35,7 @@ ModuleInternal::ModuleInternal()
 ModuleInternal::~ModuleInternal() {
     delete this->m_requireFunction;
     delete this->m_requireFactoryFunction;
-    for (const auto pair: this->m_requireCache) {
+    for (const auto& pair: this->m_requireCache) {
         delete pair.second;
     }
     this->m_requireCache.clear();
@@ -169,7 +169,7 @@ void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Valu
     }
 
     string moduleName = ArgConverter::ConvertToString(args[0].As<String>());
-    tns::instrumentation::Frame frame(("RequireCallback " + moduleName).c_str());
+    tns::instrumentation::Frame frame("RequireCallback " + moduleName);
     string callingModuleDirName = ArgConverter::ConvertToString(args[1].As<String>());
     auto isData = false;
 
@@ -242,12 +242,24 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleNam
     auto it = m_loadedModules.find(cachePathKey);
 
     if (it == m_loadedModules.end()) {
-        JEnv env;
-        JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
-        JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
-        JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsBaseDir));
+        std::string path;
 
-        auto path = ArgConverter::jstringToString((jstring) jsModulePath);
+        // Search App System libs
+        std::string sys_lib("system_lib://");
+        if (moduleName.rfind(sys_lib, 0) == 0) {
+            auto pos = moduleName.find(sys_lib);
+            path = std::string(moduleName);
+            path.replace(pos, sys_lib.length(), "");
+        } else {
+            JEnv env;
+            JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
+            JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
+            JniLocalRef jsModulePath(
+                    env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID,
+                                               (jstring) jsModulename, (jstring) jsBaseDir));
+
+            path = ArgConverter::jstringToString((jstring) jsModulePath);
+        }
 
         auto it2 = m_loadedModules.find(path);
 
@@ -278,7 +290,7 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleNam
 
 Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& modulePath, const string& moduleCacheKey) {
     string frameName("LoadModule " + modulePath);
-    tns::instrumentation::Frame frame(frameName.c_str());
+    tns::instrumentation::Frame frame(frameName);
     Local<Object> result;
 
     auto context = isolate->GetCurrentContext();
@@ -365,7 +377,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
 
 Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, const Local<String>& fullRequiredModulePath) {
     string frameName("LoadScript " + path);
-    tns::instrumentation::Frame frame(frameName.c_str());
+    tns::instrumentation::Frame frame(frameName);
     Local<Script> script;
 
     TryCatch tc(isolate);
@@ -406,7 +418,7 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, c
 
 Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
     string frameName("LoadData " + path);
-    tns::instrumentation::Frame frame(frameName.c_str());
+    tns::instrumentation::Frame frame(frameName);
     Local<Object> json;
 
     auto jsonData = Runtime::GetRuntime(m_isolate)->ReadFileText(path);

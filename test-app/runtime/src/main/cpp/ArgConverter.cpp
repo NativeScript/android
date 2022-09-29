@@ -29,8 +29,7 @@ void ArgConverter::Init(Local<Context> context) {
 
 void ArgConverter::NativeScriptLongValueOfFunctionCallback(const v8::FunctionCallbackInfo<Value>& args) {
     try {
-        auto isolate = args.GetIsolate();
-        args.GetReturnValue().Set(Number::New(isolate, numeric_limits<double>::quiet_NaN()));
+        args.GetReturnValue().Set(numeric_limits<double>::quiet_NaN());
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -52,7 +51,7 @@ void ArgConverter::NativeScriptLongToStringFunctionCallback(const v8::FunctionCa
         if (args.This()->Get(context, V8StringConstants::GetValue(isolate)).ToLocal(&result)) {
             args.GetReturnValue().Set(result);
         } else {
-            args.GetReturnValue().Set(v8::Undefined(isolate));
+            args.GetReturnValue().SetUndefined();
         }
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -87,10 +86,6 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
         NativeScriptException nsEx(std::string("Error: c++ exception!"));
         nsEx.ReThrowToV8();
     }
-}
-
-jstring ArgConverter::ObjectToString(jobject object) {
-    return (jstring) object;
 }
 
 Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Local<Context> context, jobjectArray args) {
@@ -162,40 +157,6 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Local<Context> context, jobje
     return arr;
 }
 
-std::string ArgConverter::jstringToString(jstring value) {
-    if (value == nullptr) {
-        return string();
-    }
-
-    JEnv env;
-
-    jboolean f = JNI_FALSE;
-    auto chars = env.GetStringUTFChars(value, &f);
-    string s(chars);
-    env.ReleaseStringUTFChars(value, chars);
-
-    return s;
-}
-
-Local<Value> ArgConverter::jstringToV8String(Isolate* isolate, jstring value) {
-    if (value == nullptr) {
-        return Null(isolate);
-    }
-
-    JEnv env;
-    auto chars = env.GetStringChars(value, NULL);
-    auto length = env.GetStringLength(value);
-    auto v8String = ConvertToV8String(isolate, chars, length);
-    env.ReleaseStringChars(value, chars);
-
-    return v8String;
-}
-
-Local<String> ArgConverter::jcharToV8String(Isolate* isolate, jchar value) {
-    auto v8String = ConvertToV8String(isolate, &value, 1);
-    return v8String;
-}
-
 Local<Value> ArgConverter::ConvertFromJavaLong(Isolate* isolate, jlong value) {
     Local<Value> convertedValue;
     long long longValue = value;
@@ -248,19 +209,9 @@ ArgConverter::TypeLongOperationsCache* ArgConverter::GetTypeLongCache(v8::Isolat
 }
 
 
-string ArgConverter::ConvertToString(const v8::Local<String>& s) {
-    if (s.IsEmpty()) {
-        return string();
-    } else {
-        auto isolate = v8::Isolate::GetCurrent();
-        String::Utf8Value str(isolate, s);
-        return string(*str);
-    }
-}
-
 u16string ArgConverter::ConvertToUtf16String(const v8::Local<String>& s) {
     if (s.IsEmpty()) {
-        return u16string();
+        return {};
     } else {
         auto str = ConvertToString(s);
         auto utf16str =  Util::ConvertFromUtf8ToUtf16(str);
@@ -269,29 +220,7 @@ u16string ArgConverter::ConvertToUtf16String(const v8::Local<String>& s) {
     }
 }
 
-jstring ArgConverter::ConvertToJavaString(const Local<Value>& value) {
-    JEnv env;
-    auto isolate = v8::Isolate::GetCurrent();
-    String::Value stringValue(isolate, value);
-    return env.NewString((const jchar*) *stringValue, stringValue.length());
-}
 
-Local<String> ArgConverter::ConvertToV8String(Isolate* isolate, const jchar* data, int length) {
-    return String::NewFromTwoByte(isolate, (const uint16_t*) data, NewStringType::kNormal, length).ToLocalChecked();
-}
-
-Local<String> ArgConverter::ConvertToV8String(Isolate* isolate, const string& s) {
-    Local<String> str =	String::NewFromUtf8(isolate, s.c_str(), NewStringType::kNormal, s.length()).ToLocalChecked();
-    return str;
-}
-
-Local<String> ArgConverter::ConvertToV8String(Isolate* isolate, const char* data, int length) {
-    return String::NewFromUtf8(isolate, (const char*) data, NewStringType::kNormal, length).ToLocalChecked();
-}
-
-Local<String> ArgConverter::ConvertToV8UTF16String(Isolate* isolate, const u16string& utf16string) {
-    return String::NewFromTwoByte(isolate, ((const uint16_t*) utf16string.data())).ToLocalChecked();
-}
 
 void ArgConverter::onDisposeIsolate(Isolate* isolate) {
     auto itFound = s_type_long_operations_cache.find(isolate);

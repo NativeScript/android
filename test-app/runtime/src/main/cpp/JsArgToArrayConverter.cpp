@@ -240,6 +240,8 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                     shared_ptr<BackingStore> store;
                     size_t offset = 0;
                     size_t length;
+                    uint8_t * data = nullptr;
+                    auto link_with_data = false;
                     if (jsObj->IsArrayBuffer())
                     {
                         auto array = jsObj.As<v8::ArrayBuffer>();
@@ -254,8 +256,10 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                         {
 
                             length = array->ByteLength();
-                            void *data = malloc(length);
-                            array->CopyContents(data, length);
+                            void *data_ = malloc(length);
+                            array->CopyContents(data_, length);
+                            data = (uint8_t *)data_;
+                            link_with_data = true;
                         }
                         else
                         {
@@ -274,7 +278,9 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                         bufferCastType = JsArgConverter::GetCastType(array);
                     }
 
-                    auto data = static_cast<uint8_t *>(store->Data()) + offset;
+                    if(data != nullptr){
+                        data = static_cast<uint8_t *>(store->Data()) + offset;
+                    }
 
                     auto directBuffer = env.NewDirectByteBuffer(
                             data,
@@ -340,7 +346,11 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
 
                     int id = objectManager->GetOrCreateObjectId(buffer);
                     auto clazz = env.GetObjectClass(buffer);
-                    objectManager->Link(jsObj, id, clazz);
+                    if (link_with_data) {
+                        objectManager->LinkWithExtraData(jsObj, id, clazz, data);
+                    } else {
+                        objectManager->Link(jsObj, id, clazz);
+                    }
 
                     obj = objectManager->GetJavaObjectByJsObject(jsObj);
                 }
