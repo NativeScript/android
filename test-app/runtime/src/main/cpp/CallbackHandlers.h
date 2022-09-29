@@ -15,6 +15,9 @@
 #include "ObjectManager.h"
 #include "include/v8.h"
 #include "robin_hood.h"
+#include <errno.h>
+#include "NativeScriptAssert.h"
+#include "NativeScriptException.h"
 
 namespace tns {
     class CallbackHandlers {
@@ -281,34 +284,48 @@ namespace tns {
             jobject _runtime;
         };
 
-        static void RemoveKey(const uint32_t key);
+        static void RemoveKey(const uint64_t key);
 
-        static _Atomic uint32_t count_;
+        static std::atomic_int64_t count_;
+
+
+        struct Callback {
+            Callback(){}
+            Callback(uint64_t id)
+                    : id_(id){
+            }
+            uint64_t id_;
+        };
+
 
         struct CacheEntry {
-            CacheEntry(v8::Isolate* isolate, v8::Persistent<v8::Function>* callback)
+            CacheEntry(v8::Isolate* isolate, v8::Local<v8::Function> callback, v8::Local<v8::Context> context)
                     : isolate_(isolate),
-                      callback_(callback) {
+                      callback_(isolate, callback),
+                      context_(isolate, context){
             }
 
             v8::Isolate* isolate_;
-            v8::Persistent<v8::Function>* callback_;
-
+            v8::Global<v8::Function> callback_;
+            v8::Global<v8::Context> context_;
         };
 
-        static robin_hood::unordered_map<uint32_t, CacheEntry> cache_;
+        static robin_hood::unordered_map<uint64_t, CacheEntry> cache_;
 
 
-        static _Atomic uint64_t frameCallbackCount_;
+        static std::atomic_uint64_t frameCallbackCount_;
 
         struct FrameCallbackCacheEntry {
-            FrameCallbackCacheEntry(v8::Isolate *isolate, v8::Persistent<v8::Function> *callback)
+            FrameCallbackCacheEntry(v8::Isolate *isolate, v8::Local<v8::Function> callback, v8::Local<v8::Context> context)
                     : isolate_(isolate),
-                      callback_(callback) {
+                      callback_(isolate,callback),
+                      context_(isolate, context)
+                      {
             }
 
             v8::Isolate *isolate_;
-            v8::Persistent<v8::Function> *callback_;
+            v8::Global<v8::Function> callback_;
+            v8::Global<v8::Context> context_;
             bool removed;
             uint64_t id;
 
@@ -328,22 +345,25 @@ namespace tns {
                     }
                     v8::Isolate *isolate = entry->isolate_;
 
-                    v8::Persistent<v8::Function> *poCallback = entry->callback_;
-
                     v8::Locker locker(isolate);
                     v8::Isolate::Scope isolate_scope(isolate);
                     v8::HandleScope handle_scope(isolate);
-                    auto context = v8::Context::New(isolate);
+                    auto context = entry->context_.Get(isolate);
                     v8::Context::Scope context_scope(context);
 
-
-                    v8::Local<v8::Function> cb = poCallback->Get(isolate);
+                    v8::Local<v8::Function> cb = entry->callback_.Get(isolate);
                     v8::Local<v8::Value> result;
 
                     v8::Local<v8::Value> args[1] = {v8::Number::New(isolate, ts)};
 
+                    v8::TryCatch tc(isolate);
+
                     if (!cb->Call(context, context->Global(), 1, args).ToLocal(&result)) {
-                        assert(false);
+                        // TODO
+                    }
+
+                    if(tc.HasCaught()){
+                        throw NativeScriptException(tc);
                     }
 
                 }

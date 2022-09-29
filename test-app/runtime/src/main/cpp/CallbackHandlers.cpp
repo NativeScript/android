@@ -1,5 +1,4 @@
 #include "CallbackHandlers.h"
-#include "NativeScriptAssert.h"
 #include "MetadataNode.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
@@ -8,7 +7,6 @@
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
 #include "v8-profiler.h"
-#include "NativeScriptException.h"
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -19,7 +17,6 @@
 #include "Runtime.h"
 #include <unistd.h>
 #include <dlfcn.h>
-
 
 using namespace v8;
 using namespace std;
@@ -670,22 +667,23 @@ void CallbackHandlers::RunOnMainThreadCallback(const FunctionCallbackInfo<v8::Va
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
-
     Local<Context> context = isolate->GetCurrentContext();
 
-    uint32_t key = ++count_;
+    uint64_t key = ++count_;
     Local<v8::Function> callback = args[0].As<v8::Function>();
-    CacheEntry entry(isolate, new Persistent<v8::Function>(isolate, callback));
-    cache_.emplace(key, entry);
-    auto key_str = std::to_string(key);
-    write(Runtime::GetWriter(), key_str.c_str(), 1);
+    CacheEntry entry(isolate, callback, context);
+    cache_.emplace(key, std::move(entry));
+    auto value = Callback(key);
+    auto size = sizeof(Callback);
+    auto wrote = write(Runtime::GetWriter(),&value , size);
 }
 
 int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) {
-    std::string buf;
-    read(fd, &buf, 1);
+    struct Callback value;
+    auto size = sizeof(Callback);
+    ssize_t nr = read(fd, &value, sizeof(value));
 
-    auto key = std::stoi(buf);
+    auto key = value.id_;
 
     auto it = cache_.find(key);
     if (it == cache_.end()) {
@@ -693,32 +691,35 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
     }
 
     Isolate *isolate = it->second.isolate_;
-    Persistent<v8::Function> *poCallback = it->second.callback_;
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
-    auto context = v8::Context::New(isolate);
+    auto context = it->second.context_.Get(isolate);
     Context::Scope context_scope(context);
-    Local<v8::Function> cb = poCallback->Get(isolate);
+    Local<v8::Function> cb = it->second.callback_.Get(isolate);
     Local<Value> result;
 
-    if (!cb->Call(context, context->Global(), 0, nullptr).ToLocal(&result)) {
-        assert(false);
+    v8::TryCatch tc(isolate);
+
+    if (!cb->Call(context, context->Global(), 0, nullptr).ToLocal(&result)) {}
+
+    if(tc.HasCaught()){
+        throw NativeScriptException(tc);
     }
 
     RemoveKey(key);
+
     return 1;
 }
 
-void CallbackHandlers::RemoveKey(const uint32_t key) {
+void CallbackHandlers::RemoveKey(const uint64_t key) {
     auto it = cache_.find(key);
     if (it == cache_.end()) {
         return;
     }
 
-    Persistent<v8::Function> *poCallback = it->second.callback_;
-    poCallback->Reset();
-    delete poCallback;
+    it->second.callback_.Reset();
+    it->second.context_.Reset();
     cache_.erase(it);
 }
 
@@ -1584,12 +1585,16 @@ void CallbackHandlers::TerminateWorkerThread(Isolate *isolate) {
 void CallbackHandlers::RemoveIsolateEntries(v8::Isolate *isolate) {
     for (auto &item: cache_) {
         if (item.second.isolate_ == isolate) {
+            item.second.callback_.Reset();
+            item.second.context_.Reset();
             cache_.erase(item.first);
         }
     }
 
     for (auto &item: frameCallbackCache_) {
         if (item.second.isolate_ == isolate) {
+            item.second.callback_.Reset();
+            item.second.context_.Reset();
             frameCallbackCache_.erase(item.first);
         }
     }
@@ -1632,7 +1637,7 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
         v8::Locker locker(isolate);
         Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);
-        auto context = Context::New(isolate);
+        auto context = isolate->GetCurrentContext();
         Context::Scope context_scope(context);
 
         auto func = args[0].As<Function>();
@@ -1651,27 +1656,33 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
             }
         }
 
-        Local<v8::Function> callback = args[0].As<v8::Function>();
+        Local<v8::Function> callback = func;
         uint64_t key = ++frameCallbackCount_;
 
         V8SetPrivateValue(isolate, func, idKey, v8::Number::New(isolate, (double) key));
 
-        FrameCallbackCacheEntry entry (isolate, new Persistent<v8::Function>(isolate, callback));
+        FrameCallbackCacheEntry entry (isolate, callback, context);
         entry.id = key;
-        frameCallbackCache_.emplace(key, entry);
 
         auto finalCallback = [](const v8::WeakCallbackInfo<FrameCallbackCacheEntry> &data) {
             auto value = data.GetParameter();
             for (auto &item: frameCallbackCache_) {
                 if (item.second.id == value->id) {
-                    cache_.erase(item.first);
+                    item.second.context_.Reset();
+                    item.second.callback_.Reset();
+                    frameCallbackCache_.erase(item.first);
                     break;
                 }
             }
         };
-        entry.callback_->SetWeak(&entry, finalCallback, v8::WeakCallbackType::kFinalizer);
 
-        PostCallback(args, &entry, context);
+        entry.callback_.SetWeak(&entry, finalCallback, v8::WeakCallbackType::kFinalizer);
+
+        frameCallbackCache_.emplace(key, std::move(entry));
+
+        auto val = frameCallbackCache_.find(key);
+
+        PostCallback(args, &val->second, context);
     }
 }
 
@@ -1685,7 +1696,7 @@ void CallbackHandlers::RemoveFrameCallback(const FunctionCallbackInfo<v8::Value>
         v8::Locker locker(isolate);
         Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);
-        auto context = Context::New(isolate);
+        auto context = isolate->GetCurrentContext();
         Context::Scope context_scope(context);
 
         auto func = args[0].As<Function>();
@@ -1745,12 +1756,12 @@ void CallbackHandlers::InitChoreographer() {
 }
 
 
-robin_hood::unordered_map<uint32_t, CallbackHandlers::CacheEntry> CallbackHandlers::cache_;
+robin_hood::unordered_map<uint64_t, CallbackHandlers::CacheEntry> CallbackHandlers::cache_;
 
 robin_hood::unordered_map<uint64_t, CallbackHandlers::FrameCallbackCacheEntry> CallbackHandlers::frameCallbackCache_;
 
-_Atomic uint32_t CallbackHandlers::count_ = 0;
-_Atomic uint64_t CallbackHandlers::frameCallbackCount_ = 0;
+std::atomic_int64_t CallbackHandlers::count_ = {0};
+std::atomic_uint64_t CallbackHandlers::frameCallbackCount_ = {0};
 
 
 int CallbackHandlers::nextWorkerId = 0;
