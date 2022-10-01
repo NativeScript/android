@@ -25,6 +25,7 @@ public class Generator {
     private static final String MDG_JAVA_DEPENDENCIES = "mdg-java-dependencies.txt";
     private static final String MDG_WHITELIST = "whitelist.mdg";
     private static final String MDG_BLACKLIST = "blacklist.mdg";
+    private static final String METADATA_JAVA_OUT = "mdg-java-out.txt";
 
     /**
      * @param args arguments
@@ -37,19 +38,27 @@ public class Generator {
         try {
             String metadataOutputDir;
             List<String> params;
+            List<String> classes;
 
             try {
                 metadataOutputDir = getFileRows(MDG_OUTPUT_DIR).get(0);
             } catch (Exception e) {
                 throw new InvalidParameterException(String.format("You need to pass a file containing a single line: the output dir for the metadata generator %s\n", e.getMessage()));
             }
+
+            try {
+                classes = getFileRows(METADATA_JAVA_OUT);
+            } catch (Exception e) {
+                throw new InvalidParameterException(String.format("You need to pass a file containing a list of local classes  %s\n", e.getMessage()));
+            }
+
             try {
                 params = getFileRows(MDG_JAVA_DEPENDENCIES);
             } catch (Exception e) {
                 throw new InvalidParameterException(String.format("You need to pass a file containing a list of jar/class paths, so metadata can be generated for them! %s\n", e.getMessage()));
             }
 
-            TreeNode root = Builder.build(params);
+            TreeNode root = Builder.build(params, classes);
 
             FileOutputStream ovs = new FileOutputStream(new File(metadataOutputDir, "treeValueStream.dat"));
             FileStreamWriter outValueStream = new FileStreamWriter(ovs);

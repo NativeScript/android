@@ -1,5 +1,6 @@
 package com.telerik.metadata.parsing.bytecode;
 
+import com.telerik.metadata.Builder;
 import com.telerik.metadata.ClassMapProvider;
 import com.telerik.metadata.analytics.AnalyticsCollector;
 import com.telerik.metadata.analytics.AnalyticsCollectorProvider;
@@ -62,6 +63,7 @@ public class JarFile implements ClassMapProvider {
 
                     ClassParser cp = new ClassParser(jis, name);
                     JavaClass javaClass = cp.parse();
+                    boolean isPackagePrivate = Builder.getIsPackagePrivate(javaClass.getPackageName());
                     boolean isKotlinClass = false;
 
                     AnnotationEntry[] annotationEntries = javaClass.getAnnotationEntries();
@@ -70,7 +72,7 @@ public class JarFile implements ClassMapProvider {
                             String annotationType = annotationEntry.getAnnotationType();
                             if ("Lkotlin/Metadata;".equals(annotationType)) {
                                 MetadataAnnotation kotlinClassMetadataAnnotation = new BytecodeMetadataAnnotation(annotationEntry);
-                                NativeClassDescriptor kotlinClassDescriptor = new KotlinClassDescriptor(javaClass, kotlinClassMetadataAnnotation);
+                                NativeClassDescriptor kotlinClassDescriptor = new KotlinClassDescriptor(javaClass, kotlinClassMetadataAnnotation, isPackagePrivate);
                                 isKotlinClass = true;
                                 analyticsCollector.markHasKotlinRuntimeClassesIfNotMarkedAlready();
                                 jar.classMap.put(name, kotlinClassDescriptor);
@@ -79,7 +81,7 @@ public class JarFile implements ClassMapProvider {
                     }
 
                     if (!isKotlinClass) {
-                        NativeClassDescriptor javaClassDescriptor = new JavaClassDescriptor(javaClass);
+                        NativeClassDescriptor javaClassDescriptor = new JavaClassDescriptor(javaClass, isPackagePrivate);
                         jar.classMap.put(name, javaClassDescriptor);
                     }
 

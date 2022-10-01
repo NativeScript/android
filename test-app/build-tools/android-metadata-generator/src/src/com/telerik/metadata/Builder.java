@@ -23,6 +23,9 @@ import com.telerik.metadata.storage.functions.FunctionsStorage;
 import com.telerik.metadata.storage.functions.extensions.ExtensionFunctionsStorage;
 import com.telerik.metadata.security.MetadataSecurityViolationException;
 
+import org.apache.bcel.classfile.ClassFormatException;
+import org.apache.bcel.classfile.JavaClass;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,7 +47,23 @@ public class Builder {
 
     private static MethodNameComparator methodNameComparator = new MethodNameComparator();
 
-    static TreeNode build(List<String> paths) throws Exception {
+    private static HashSet<String> packageNames = new HashSet<>();
+
+    public static boolean getIsPackagePrivate(String packageName){
+        return packageNames.contains(packageName);
+    }
+
+    static TreeNode build(List<String> paths, List<String> classes) throws Exception {
+        packageNames.clear();
+        for (String clazz: classes) {
+            try {
+                org.apache.bcel.classfile.ClassParser parser = new org.apache.bcel.classfile.ClassParser(clazz);
+                JavaClass javaClass = parser.parse();
+                packageNames.add(javaClass.getPackageName());
+            }catch (Exception e){}
+        }
+
+
         for (String path : paths) {
             File file = new File(path);
             if (file.exists()) {
@@ -129,8 +148,18 @@ public class Builder {
         try {
             NativeClassDescriptor currClass = clazz;
             while (currClass != null) {
-                if (!currClass.isPublic() && !currClass.isProtected()) {
+
+                // We are currently hiding kotlin internal modifiers
+                if(currClass.isPrivate() || currClass.isInternal()){
                     isPublic = false;
+                    break;
+                }
+
+                if(currClass.isProtected()){
+                    break;
+                }
+
+                if(currClass.isPackagePrivate() && !currClass.isPublic() && !currClass.isPrivate()){
                     break;
                 }
 
@@ -208,7 +237,11 @@ public class Builder {
                 }
             }
 
-            if (ownMethod.isPublic() || ownMethod.isProtected()) {
+            if(ownMethod.isInternal() && ownMethod.isPackagePrivate()){
+                continue;
+            }
+
+            if (ownMethod.isPublic() || ownMethod.isProtected() || (ownMethod.isPackagePrivate() && !ownMethod.isPrivate() && !ownMethod.isPublic())) {
                 boolean isStatic = ownMethod.isStatic();
 
                 MethodInfo mi = new MethodInfo(ownMethod);
@@ -217,7 +250,7 @@ public class Builder {
                 for (NativeMethodDescriptor ownOrParentMethod : ownAndParentMethodDescriptors) {
                     boolean m1IsStatic = ownOrParentMethod.isStatic();
                     if (!ownOrParentMethod.isSynthetic()
-                            && (ownOrParentMethod.isPublic() || ownOrParentMethod.isProtected())
+                            && (ownOrParentMethod.isPublic() || ownOrParentMethod.isProtected() || (ownOrParentMethod.isPackagePrivate() && !ownOrParentMethod.isPrivate() && !ownOrParentMethod.isPublic()))
                             && (isStatic == m1IsStatic)
                             && (ownOrParentMethod.getName().equals(mi.name) && (ownOrParentMethod.getArgumentTypes().length == ownMethod.getArgumentTypes().length))) {
                         if (++countUnique > 1) {
@@ -290,7 +323,10 @@ public class Builder {
 
     private static void setFieldInfo(NativeClassDescriptor clazz, TreeNode node, TreeNode root, NativeFieldDescriptor[] fields, NativeClassDescriptor interfaceClass) throws Exception {
         for (NativeFieldDescriptor f : fields) {
-            if (f.isPublic() || f.isProtected()) {
+            if(f.isInternal()  && f.isPackagePrivate()){
+                continue;
+            }
+            if (f.isPublic() || f.isProtected() || (f.isPackagePrivate() && !f.isPrivate() && !f.isPublic())) {
                 FieldInfo fi = new FieldInfo(f.getName());
 
                 NativeTypeDescriptor t = f.getType();

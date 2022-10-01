@@ -44,6 +44,8 @@ interface NativeClassDescriptor : AccessModifiable, NativeDescriptor {
         override val isPublic = false
         override val isInternal = false
         override val isProtected = false
+        override val isPackagePrivate = false
+        override val isPrivate = false
 
     }
 }

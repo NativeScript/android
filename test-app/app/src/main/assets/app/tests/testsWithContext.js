@@ -126,5 +126,20 @@ exports.run = function(cntxt)
                 til.addView(editText);
             }
         });
+
+        it("TestPackagePrivateAccessForOtherPackages", function () {
+
+                		      var ll = new android.widget.LinearLayout(context);
+                               var didThrow = false;
+                                try{
+                                // https://android.googlesource.com/platform/frameworks/base/+/master/core/java/android/widget/LinearLayout.java#685
+                                    ll.getVirtualChildCount();
+                                }catch(e){
+                                    // will throw since we don't have access to this
+                                    didThrow = true;
+                                }
+
+                			expect(didThrow).toEqual(true);
+                		});
 	});
 };

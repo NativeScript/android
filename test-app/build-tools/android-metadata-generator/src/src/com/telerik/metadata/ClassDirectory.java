@@ -70,6 +70,7 @@ public class ClassDirectory implements ClassMapProvider {
         if (name.endsWith(CLASS_EXT)) {
             ClassParser cp = new ClassParser(file.getAbsolutePath());
             JavaClass javaClass = cp.parse();
+            boolean isPackagePrivate = Builder.getIsPackagePrivate(javaClass.getPackageName());
 
             AnnotationEntry[] annotationEntries = javaClass.getAnnotationEntries();
             if (annotationEntries != null) {
@@ -77,14 +78,14 @@ public class ClassDirectory implements ClassMapProvider {
                     String annotationType = annotationEntry.getAnnotationType();
                     if ("Lkotlin/Metadata;".equals(annotationType)) {
                         MetadataAnnotation kotlinClassMetadataAnnotation = new BytecodeMetadataAnnotation(annotationEntry);
-                        NativeClassDescriptor kotlinClassDescriptor = new KotlinClassDescriptor(javaClass, kotlinClassMetadataAnnotation);
+                        NativeClassDescriptor kotlinClassDescriptor = new KotlinClassDescriptor(javaClass, kotlinClassMetadataAnnotation, isPackagePrivate);
                         analyticsCollector.markHasKotlinRuntimeClassesIfNotMarkedAlready();
                         return kotlinClassDescriptor;
                     }
                 }
             }
 
-            return new JavaClassDescriptor(javaClass);
+            return new JavaClassDescriptor(javaClass, isPackagePrivate);
         }
 
         return clazz;

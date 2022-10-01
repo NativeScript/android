@@ -35,6 +35,9 @@ import java.util.jar.JarEntry
 import java.util.jar.JarFile
 
 import static org.gradle.internal.logging.text.StyledTextOutput.Style
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 
 apply plugin: "com.android.application"
 apply from: "gradle-helpers/BuildToolTask.gradle"
@@ -77,6 +80,7 @@ def OUTPUT_JAVA_DIR = "$projectDir/src/main/java"
 def MDG_OUTPUT_DIR = "mdg-output-dir.txt"
 def MDG_JAVA_DEPENDENCIES = "mdg-java-dependencies.txt"
 def METADATA_OUT_PATH = "$projectDir/src/main/assets/metadata"
+def METADATA_JAVA_OUT = "mdg-java-out.txt"
 
 // paths to jar libraries
 def pluginsJarLibraries = new LinkedList<String>()
@@ -461,6 +465,13 @@ tasks.whenTaskAdded({ DefaultTask currentTask ->
         currentTask.dependsOn(runSbg)
         currentTask.finalizedBy(buildMetadata)
     }
+
+
+    if (currentTask =~ /compile.+Kotlin.+/) {
+        currentTask.dependsOn(runSbg)
+        currentTask.finalizedBy(buildMetadata)
+    }
+
     if (currentTask =~ /merge.*Assets/) {
         currentTask.dependsOn(buildMetadata)
     }
@@ -706,6 +717,23 @@ task copyMetadata {
     }
 }
 
+def listf(String directoryName, ArrayList<File> store) {
+    def directory = new File(directoryName);
+
+    def resultList = new ArrayList<File>();
+
+    def fList = directory.listFiles();
+    resultList.addAll(Arrays.asList(fList));
+    for (File file : fList) {
+        if (file.isFile()) {
+            store.add(file)
+        } else if (file.isDirectory()) {
+            resultList.addAll(listf(file.getAbsolutePath(), store))
+        }
+    }
+    return resultList
+}
+
 task buildMetadata(type: BuildToolTask) {
     if (!findProject(':android-metadata-generator').is(null)) {
         dependsOn ':android-metadata-generator:jar'
@@ -766,6 +794,19 @@ task buildMetadata(type: BuildToolTask) {
                 }
             }
         }
+
+        def store = new ArrayList<File>()
+        for (String dir: generatedClasses){
+            listf(dir, store)
+        }
+
+
+        new File("$BUILD_TOOLS_PATH/$METADATA_JAVA_OUT").withWriter { out ->
+            store.each {
+                out.println it.absolutePath
+            }
+        }
+
 
         new File("$BUILD_TOOLS_PATH/$MDG_OUTPUT_DIR").withWriter { out ->
             out.println "$METADATA_OUT_PATH"
@@ -890,6 +931,7 @@ task cleanSbg(type: Delete) {
             "$BUILD_TOOLS_PATH/$SBG_BINDINGS_NAME",
             "$BUILD_TOOLS_PATH/$SBG_INPUT_FILE",
             "$BUILD_TOOLS_PATH/$SBG_OUTPUT_FILE",
+            "$BUILD_TOOLS_PATH/$METADATA_JAVA_OUT",
             "$OUTPUT_JAVA_DIR/com/tns/gen"
 }
 

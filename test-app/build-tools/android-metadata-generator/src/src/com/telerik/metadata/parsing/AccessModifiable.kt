@@ -6,4 +6,8 @@ interface AccessModifiable {
     val isInternal: Boolean
 
     val isProtected: Boolean
+
+    val isPackagePrivate: Boolean
+
+    val isPrivate: Boolean
 }

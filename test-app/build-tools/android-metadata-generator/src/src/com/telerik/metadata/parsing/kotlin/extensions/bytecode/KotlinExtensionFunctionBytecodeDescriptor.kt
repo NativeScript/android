@@ -30,6 +30,10 @@ class KotlinExtensionFunctionBytecodeDescriptor(private val kotlinMethodDescript
 
     override val isProtected = kotlinMethodDescriptor.isProtected
 
+    override val isPackagePrivate = kotlinMethodDescriptor.isPackagePrivate
+
+    override val isPrivate = kotlinMethodDescriptor.isPrivate
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null || javaClass != other.javaClass) return false

@@ -23,17 +23,22 @@ import kotlinx.metadata.jvm.KotlinClassMetadata
 import kotlinx.metadata.jvm.getterSignature
 import kotlinx.metadata.jvm.setterSignature
 import org.apache.bcel.classfile.JavaClass
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 import java.util.*
 import java.util.stream.Collectors
-import kotlin.collections.ArrayList
 
-class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotation: MetadataAnnotation) : NativeClassBytecodeDescriptor(nativeClass) {
+class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotation: MetadataAnnotation,
+                            override val isPackagePrivate: Boolean
+) : NativeClassBytecodeDescriptor(nativeClass) {
 
 
     override val methods: Array<KotlinMethodDescriptor> by lazy {
         val ms = clazz.methods
         return@lazy Array(ms.size) {
-            KotlinMethodDescriptor(ms[it], this)
+            KotlinMethodDescriptor(ms[it], this, isPackagePrivate)
         }
     }
 
@@ -92,7 +97,9 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
                             field = field,
                             isPublic = Flag.IS_PUBLIC(prop.flags),
                             isInternal = Flag.IS_INTERNAL(prop.flags),
-                            isProtected = Flag.IS_PROTECTED(prop.flags)
+                            isProtected = Flag.IS_PROTECTED(prop.flags),
+                            isPackagePrivate,
+                            isPrivate = Flag.IS_PRIVATE(prop.flags),
                     )
 
                     kotlinFields.add(kotlinField)
@@ -147,7 +154,7 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
                     metadataEnumEntries.contains(it.name)
                 }
                 .map {
-                    KotlinEnumFieldDescriptor(it, isPublic, isInternal, isProtected)
+                    KotlinEnumFieldDescriptor(it, isPublic, isInternal, isProtected, isPackagePrivate, isPrivate)
                 }
 
         return matchingEnumFields
@@ -168,6 +175,18 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
                         duplicate = true
                     }
 
+                    // Ignoring kotlin fields with the @JvmName annotation since they will be included through the java method passed to the annotation
+                   val hasJvmNameMethod =  nativeClass
+                        .methods
+                        .find { field ->  field.name == propertyName }
+                        ?.annotationEntries?.any {
+                                annotationEntry -> annotationEntry.annotationType == "Lkotlin/jvm/JvmName;"
+                        } ?: false
+
+
+                    if (hasJvmNameMethod){
+                        duplicate = true
+                    }
 
                     var getter: NativeMethodDescriptor? = null
                     val getterSignature = it.getterSignature
@@ -191,14 +210,13 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
         return@lazy emptyArray<KotlinPropertyDescriptor>()
     }
 
-
     private fun getMethodDescriptorWithSignature(name: String, signature: String): NativeMethodDescriptor? {
         for (method in clazz.methods) {
             val methodSignature = method.signature
             val methodName = method.name
 
             if (methodSignature == signature && methodName == name) {
-                return KotlinMethodDescriptor(method, this)
+                return KotlinMethodDescriptor(method, this, isPackagePrivate)
             }
         }
 
@@ -223,6 +241,13 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
         when (val metadata = kotlinMetadata) {
             is KotlinClassMetadata.Class -> Flag.IS_PROTECTED(metadata.toKmClass().flags)
             else -> clazz.isProtected
+        }
+    }
+
+    override val isPrivate by lazy {
+        when (val metadata = kotlinMetadata) {
+            is KotlinClassMetadata.Class -> Flag.IS_PRIVATE(metadata.toKmClass().flags)
+            else -> clazz.isPrivate
         }
     }
 

@@ -8,13 +8,13 @@ import com.telerik.metadata.parsing.java.fields.JavaFieldDescriptor
 import com.telerik.metadata.parsing.java.methods.JavaMethodDescriptor
 import org.apache.bcel.classfile.JavaClass
 
-class JavaClassDescriptor(nativeClass: JavaClass) : NativeClassBytecodeDescriptor(nativeClass) {
+class JavaClassDescriptor(nativeClass: JavaClass, override val isPackagePrivate: Boolean) : NativeClassBytecodeDescriptor(nativeClass) {
 
     override val methods: Array<JavaMethodDescriptor>
         get() {
             val ms = clazz.methods
             return Array(ms.size) {
-                JavaMethodDescriptor(ms[it], this)
+                JavaMethodDescriptor(ms[it], this, isPackagePrivate)
             }
         }
 
@@ -22,7 +22,7 @@ class JavaClassDescriptor(nativeClass: JavaClass) : NativeClassBytecodeDescripto
         get() {
             val fs = clazz.fields
             return Array(fs.size) {
-                JavaFieldDescriptor(fs[it])
+                JavaFieldDescriptor(fs[it], isPackagePrivate)
             }
         }
 
@@ -30,4 +30,5 @@ class JavaClassDescriptor(nativeClass: JavaClass) : NativeClassBytecodeDescripto
     override val isPublic = nativeClass.isPublic
     override val isInternal = false
     override val isProtected = nativeClass.isProtected
+    override val isPrivate = nativeClass.isPrivate
 }

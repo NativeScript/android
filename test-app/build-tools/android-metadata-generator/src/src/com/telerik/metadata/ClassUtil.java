@@ -70,7 +70,7 @@ public class ClassUtil {
         while (currentClass != null) {
             NativeMethodDescriptor[] currentClassMethods = currentClass.getMethods();
             for (NativeMethodDescriptor m : currentClassMethods) {
-                if ((m.isPublic() || m.isProtected()) && !m.isSynthetic()) {
+                if ((m.isPublic() || m.isProtected() || (m.isPackagePrivate() && !m.isPrivate() && !m.isPublic())) && !m.isSynthetic()) {
                     methods.add(m);
                 }
             }

@@ -6,4 +6,7 @@ import org.apache.bcel.classfile.Field
 class KotlinEnumFieldDescriptor(field: Field,
                                 override val isPublic: Boolean,
                                 override val isInternal: Boolean,
-                                override val isProtected: Boolean) : NativeFieldBytecodeDescriptor(field)
+                                override val isProtected: Boolean,
+                                override val isPackagePrivate: Boolean,
+                                override val isPrivate: Boolean
+) : NativeFieldBytecodeDescriptor(field)
