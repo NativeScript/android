@@ -278,7 +278,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                         bufferCastType = JsArgConverter::GetCastType(array);
                     }
 
-                    if(data != nullptr){
+                    if(data == nullptr){
                         data = static_cast<uint8_t *>(store->Data()) + offset;
                     }
 
