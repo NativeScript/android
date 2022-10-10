@@ -8,7 +8,9 @@ import kotlinx.metadata.jvm.KotlinClassMetadata
 import kotlinx.metadata.jvm.signature
 import org.apache.bcel.classfile.Method
 
-class KotlinMethodDescriptor(private val method: Method, private val originClass: KotlinClassDescriptor) : NativeMethodBytecodeDescriptor(method, originClass) {
+class KotlinMethodDescriptor(private val method: Method, private val originClass: KotlinClassDescriptor,
+                             override val isPackagePrivate: Boolean
+) : NativeMethodBytecodeDescriptor(method, originClass) {
 
     override val isPublic by lazy {
         method.isPublic && !isInternal
@@ -16,6 +18,10 @@ class KotlinMethodDescriptor(private val method: Method, private val originClass
 
     override val isProtected by lazy {
         method.isProtected && !isInternal
+    }
+
+    override val isPrivate by lazy {
+        method.isPrivate && !isInternal
     }
 
     override val isInternal by lazy {

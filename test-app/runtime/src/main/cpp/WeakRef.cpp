@@ -157,7 +157,7 @@ void WeakRef::GettertCallback(const FunctionCallbackInfo<Value>& args) {
             auto target = Local<Object>::New(isolate, *poTarget);
             args.GetReturnValue().Set(target);
         } else {
-            args.GetReturnValue().Set(Null(isolate));
+            args.GetReturnValue().SetNull();
         }
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();

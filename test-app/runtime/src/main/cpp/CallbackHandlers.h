@@ -334,7 +334,30 @@ namespace tns {
         static std::atomic_int64_t count_;
         static std::atomic_int64_t currentCount_;
 
+
+        struct Callback {
+            Callback(){}
+            Callback(uint64_t id)
+                    : id_(id){
+            }
+            uint64_t id_;
+        };
+
+
+        struct CacheEntry {
+            CacheEntry(v8::Isolate* isolate, v8::Local<v8::Function> callback, v8::Local<v8::Context> context)
+                    : isolate_(isolate),
+                      callback_(isolate, callback),
+                      context_(isolate, context){
+            }
+
+            v8::Isolate* isolate_;
+            v8::Global<v8::Function> callback_;
+            v8::Global<v8::Context> context_;
+        };
+
         static robin_hood::unordered_map<uint64_t, CacheEntry> cache_;
+
 
         static std::atomic_uint64_t frameCallbackCount_;
 

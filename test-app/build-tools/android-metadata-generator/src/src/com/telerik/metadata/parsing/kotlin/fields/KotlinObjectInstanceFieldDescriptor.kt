@@ -8,4 +8,6 @@ class KotlinObjectInstanceFieldDescriptor(field: Field, companion: KotlinClassDe
     override val isPublic = companion.isPublic
     override val isInternal = companion.isInternal
     override val isProtected = companion.isProtected
+    override val isPackagePrivate = companion.isPackagePrivate
+    override val isPrivate = companion.isPrivate
 }

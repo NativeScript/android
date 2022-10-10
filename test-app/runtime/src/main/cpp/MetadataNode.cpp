@@ -199,7 +199,7 @@ void MetadataNode::ArrayLengthGetterCallack(Local<Name> property, const Property
         auto thiz = info.This();
         auto isolate = info.GetIsolate();
         auto length = CallbackHandlers::GetArrayLength(isolate, thiz);
-        info.GetReturnValue().Set(Integer::New(isolate, length));
+        info.GetReturnValue().Set(length);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -309,7 +309,7 @@ void MetadataNode::NullObjectAccessorGetterCallback(Local<Name> property,const P
 void MetadataNode::NullValueOfCallback(const FunctionCallbackInfo<Value>& args) {
     try {
         auto isolate = args.GetIsolate();
-        args.GetReturnValue().Set(Null(isolate));
+        args.GetReturnValue().SetNull();
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -944,6 +944,15 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     auto isInterface = s_metadataReader.IsNodeTypeInterface(treeNode->type);
     auto funcCallback = isInterface ? InterfaceConstructorCallback : ClassConstructorCallback;
     ctorFuncTemplate = FunctionTemplate::New(isolate, funcCallback, ctorCallbackData);
+    auto currentNode = treeNode;
+    std::string finalName(currentNode->name);
+    while (currentNode->parent) {
+        if (!currentNode->parent->name.empty()) {
+            finalName = currentNode->parent->name + "." + finalName;
+        }
+        currentNode = currentNode->parent;
+    }
+    ctorFuncTemplate->SetClassName(v8::String::NewFromUtf8(isolate, finalName.c_str()).ToLocalChecked());
     ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
 
     Local<Function> baseCtorFunc;

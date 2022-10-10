@@ -23,17 +23,22 @@ import kotlinx.metadata.jvm.KotlinClassMetadata
 import kotlinx.metadata.jvm.getterSignature
 import kotlinx.metadata.jvm.setterSignature
 import org.apache.bcel.classfile.JavaClass
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 import java.util.*
 import java.util.stream.Collectors
-import kotlin.collections.ArrayList
 
-class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotation: MetadataAnnotation) : NativeClassBytecodeDescriptor(nativeClass) {
+class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotation: MetadataAnnotation,
+                            override val isPackagePrivate: Boolean
+) : NativeClassBytecodeDescriptor(nativeClass) {
 
 
     override val methods: Array<KotlinMethodDescriptor> by lazy {
         val ms = clazz.methods
         return@lazy Array(ms.size) {
-            KotlinMethodDescriptor(ms[it], this)
+            KotlinMethodDescriptor(ms[it], this, isPackagePrivate)
         }
     }
 
@@ -92,7 +97,9 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
                             field = field,
                             isPublic = Flag.IS_PUBLIC(prop.flags),
                             isInternal = Flag.IS_INTERNAL(prop.flags),
-                            isProtected = Flag.IS_PROTECTED(prop.flags)
+                            isProtected = Flag.IS_PROTECTED(prop.flags),
+                            isPackagePrivate,
+                            isPrivate = Flag.IS_PRIVATE(prop.flags),
                     )
 
                     kotlinFields.add(kotlinField)
@@ -147,41 +154,61 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
                     metadataEnumEntries.contains(it.name)
                 }
                 .map {
-                    KotlinEnumFieldDescriptor(it, isPublic, isInternal, isProtected)
+                    KotlinEnumFieldDescriptor(it, isPublic, isInternal, isProtected, isPackagePrivate, isPrivate)
                 }
 
         return matchingEnumFields
     }
 
     override val properties: Array<out NativePropertyDescriptor> by lazy {
+        // checking if prop is also jvm field if it is remove to avoid the runtime using the invalid data
+        val fields = this.fields
         val metadata = kotlinMetadata
         if (metadata is KotlinClassMetadata.Class) {
             val props = metadataParser
-                    .getKotlinProperties(metadata)
-                    .map {
-                        val propertyName = it.name
+                .getKotlinProperties(metadata)
+                .map {
+                    val propertyName = it.name
+                    var duplicate = false
 
-                        var getter: NativeMethodDescriptor? = null
-                        val getterSignature = it.getterSignature
-                        if (getterSignature != null) {
-                            getter = getMethodDescriptorWithSignature(getterSignature.name, getterSignature.desc)
-                        }
-
-                        var setter: NativeMethodDescriptor? = null
-                        val setterSignature = it.setterSignature
-                        if (setterSignature != null) {
-                            setter = getMethodDescriptorWithSignature(setterSignature.name, setterSignature.desc)
-                        }
-
-                        KotlinPropertyDescriptor(propertyName, getter, setter)
+                    if(fields.find { field ->  field.name == propertyName} != null){
+                        duplicate = true
                     }
-                    .collect(Collectors.toList())
+
+                    // Ignoring kotlin fields with the @JvmName annotation since they will be included through the java method passed to the annotation
+                   val hasJvmNameMethod =  nativeClass
+                        .methods
+                        .find { field ->  field.name == propertyName }
+                        ?.annotationEntries?.any {
+                                annotationEntry -> annotationEntry.annotationType == "Lkotlin/jvm/JvmName;"
+                        } ?: false
+
+
+                    if (hasJvmNameMethod){
+                        duplicate = true
+                    }
+
+                    var getter: NativeMethodDescriptor? = null
+                    val getterSignature = it.getterSignature
+                    if (getterSignature != null) {
+                        getter = getMethodDescriptorWithSignature(getterSignature.name, getterSignature.desc)
+                    }
+
+                    var setter: NativeMethodDescriptor? = null
+                    val setterSignature = it.setterSignature
+                    if (setterSignature != null) {
+                        setter = getMethodDescriptorWithSignature(setterSignature.name, setterSignature.desc)
+                    }
+
+                    KotlinPropertyDescriptor(propertyName, getter, setter, duplicate)
+                }.filter {
+                    !it.duplicate
+                }.collect(Collectors.toList())
             return@lazy props.toTypedArray()
         }
 
         return@lazy emptyArray<KotlinPropertyDescriptor>()
     }
-
 
     private fun getMethodDescriptorWithSignature(name: String, signature: String): NativeMethodDescriptor? {
         for (method in clazz.methods) {
@@ -189,7 +216,7 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
             val methodName = method.name
 
             if (methodSignature == signature && methodName == name) {
-                return KotlinMethodDescriptor(method, this)
+                return KotlinMethodDescriptor(method, this, isPackagePrivate)
             }
         }
 
@@ -214,6 +241,13 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
         when (val metadata = kotlinMetadata) {
             is KotlinClassMetadata.Class -> Flag.IS_PROTECTED(metadata.toKmClass().flags)
             else -> clazz.isProtected
+        }
+    }
+
+    override val isPrivate by lazy {
+        when (val metadata = kotlinMetadata) {
+            is KotlinClassMetadata.Class -> Flag.IS_PRIVATE(metadata.toKmClass().flags)
+            else -> clazz.isPrivate
         }
     }
 

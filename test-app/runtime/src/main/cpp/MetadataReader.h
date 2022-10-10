@@ -5,7 +5,7 @@
 #include "MetadataFieldInfo.h"
 #include <map>
 #include <string>
-
+#include <assert.h>
 namespace tns {
 typedef std::vector<std::string> (*GetTypeMetadataCallback)(const std::string& classname, int index);
 
@@ -27,13 +27,39 @@ class MetadataReader {
 
         MetadataEntry ReadStaticFieldEntry(uint8_t** data);
 
-        std::string ReadTypeName(uint16_t nodeId);
+       inline std::string ReadTypeName(uint16_t nodeId){
+           MetadataTreeNode* treeNode = GetNodeById(nodeId);
 
-        std::string ReadTypeName(MetadataTreeNode* treeNode);
+           return ReadTypeName(treeNode);
+       }
 
-        std::string ReadName(uint32_t offset);
+       std::string ReadTypeName(MetadataTreeNode* treeNode);
 
-        std::string ReadInterfaceImplementationTypeName(MetadataTreeNode* treeNode, bool& isPrefix);
+       inline std::string ReadName(uint32_t offset) {
+           uint16_t length = *reinterpret_cast<short*>(m_nameData + offset);
+
+           std::string name(reinterpret_cast<char*>(m_nameData + offset + sizeof(uint16_t)), length);
+
+           return name;
+       }
+
+       inline std::string ReadInterfaceImplementationTypeName(MetadataTreeNode* treeNode, bool& isPrefix) {
+           uint8_t* data = m_valueData + treeNode->offsetValue + sizeof(uint8_t) + sizeof(uint16_t);
+
+           isPrefix = *data == 1;
+
+           uint32_t pos = *reinterpret_cast<uint32_t*>(data + sizeof(uint8_t));
+
+           uint16_t len = *reinterpret_cast<uint16_t*>(m_nameData + pos);
+
+           char* ptr = reinterpret_cast<char*>(m_nameData + pos + sizeof(uint16_t));
+
+           std::string name(ptr, len);
+
+           assert(name.length() == len);
+
+           return name;
+       }
 
         uint8_t* GetValueData() const;
 
@@ -49,21 +75,94 @@ class MetadataReader {
 
         MetadataTreeNode* GetNodeById(uint16_t nodeId);
 
-        bool IsNodeTypeArray(uint8_t type);
+        inline bool IsNodeTypeArray(uint8_t type) {
+            bool isArray = (((type & MetadataTreeNode::PRIMITIVE) == 0)
+                            && ((type & MetadataTreeNode::ARRAY) == MetadataTreeNode::ARRAY));
 
-        bool IsNodeTypeStatic(uint8_t type);
+            return isArray;
+        }
 
-        bool IsNodeTypeClass(uint8_t type);
+        inline bool IsNodeTypeStatic(uint8_t type) {
+            bool isStatic = (type & MetadataTreeNode::STATIC) == MetadataTreeNode::STATIC;
 
-        bool IsNodeTypeInterface(uint8_t type);
+            return isStatic;
+        }
 
-        bool IsNodeTypePackage(uint8_t type);
+        inline bool IsNodeTypeClass(uint8_t type) {
+            bool isClass = (((type & MetadataTreeNode::PRIMITIVE) == 0)
+                            && ((type & MetadataTreeNode::CLASS) == MetadataTreeNode::CLASS));
 
-        static void FillReturnType(MetadataEntry& entry);
+            return isClass;
+        }
 
-        static std::string ParseReturnType(const std::string& signature);
+        inline bool IsNodeTypeInterface(uint8_t type) {
+            bool isInterface = (((type & MetadataTreeNode::PRIMITIVE) == 0)
+                                && ((type & MetadataTreeNode::INTERFACE) == MetadataTreeNode::INTERFACE));
 
-        static MethodReturnType GetReturnType(const std::string& returnType);
+            return isInterface;
+        }
+
+        inline bool IsNodeTypePackage(uint8_t type) {
+            bool isPackage = type == MetadataTreeNode::PACKAGE;
+
+            return isPackage;
+        }
+
+        inline static void FillReturnType(MetadataEntry& entry) {
+            entry.returnType = ParseReturnType(entry.sig);
+            entry.retType = GetReturnType(entry.returnType);
+        }
+
+        inline static std::string ParseReturnType(const std::string& signature) {
+            int idx = signature.find(')');
+            auto returnType = signature.substr(idx + 1);
+            return returnType;
+        }
+
+        inline static MethodReturnType GetReturnType(const std::string& returnType) {
+            MethodReturnType retType;
+            char retTypePrefix = returnType[0];
+            switch (retTypePrefix) {
+                case 'V':
+                    retType = MethodReturnType::Void;
+                    break;
+                case 'B':
+                    retType = MethodReturnType::Byte;
+                    break;
+                case 'S':
+                    retType = MethodReturnType::Short;
+                    break;
+                case 'I':
+                    retType = MethodReturnType::Int;
+                    break;
+                case 'J':
+                    retType = MethodReturnType::Long;
+                    break;
+                case 'F':
+                    retType = MethodReturnType::Float;
+                    break;
+                case 'D':
+                    retType = MethodReturnType::Double;
+                    break;
+                case 'C':
+                    retType = MethodReturnType::Char;
+                    break;
+                case 'Z':
+                    retType = MethodReturnType::Boolean;
+                    break;
+                case '[':
+                case 'L':
+                    retType = (returnType == "Ljava/lang/String;")
+                              ? MethodReturnType::String
+                              :
+                              MethodReturnType::Object;
+                    break;
+                default:
+                    assert(false);
+                    break;
+            }
+            return retType;
+        }
 
     private:
 

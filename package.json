@@ -1,7 +1,7 @@
 {
   "name": "@nativescript/android",
   "description": "NativeScript Runtime for Android",
-  "version": "8.3.2-alpha.1",
+  "version": "8.4.0-alpha.3",
   "repository": {
     "type": "git",
     "url": "https://github.com/NativeScript/android-runtime.git"
@@ -11,18 +11,18 @@
   ],
   "version_info": {
     "v8": "8.3.110.9",
-    "gradle": "7.4",
-    "gradleAndroid": "7.1.2",
+    "gradle": "7.5",
+    "gradleAndroid": "7.3.0",
     "ndk": "r21",
     "ndkApiLevel": "22",
     "minSdk": "17",
-    "compileSdk": "31",
-    "buildTools": "31.0.0",
-    "kotlin": "1.6.0"
+    "compileSdk": "32",
+    "buildTools": "32.0.0",
+    "kotlin": "1.7.10"
   },
   "// this gradle key is here for backwards compatibility - we'll phase it out slowly...": "",
   "gradle": {
-    "version": "7.4",
-    "android": "7.1.2"
+    "version": "7.5",
+    "android": "7.3."
   }
 }

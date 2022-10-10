@@ -65,3 +65,5 @@ require("./tests/kotlin/functions/testTopLevelFunctionsSupport");
 require("./tests/kotlin/extensions/testExtensionFunctionsSupport");
 require("./tests/kotlin/enums/testEnumsSupport");
 require("./tests/kotlin/access/testInternalLanguageFeaturesSupport");
+require("./tests/testPackagePrivate");
+require("./tests/kotlin/properties/testPropertiesSupport.js")
