@@ -1651,7 +1651,10 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
             auto id = pId->IntegerValue(context).FromMaybe(0);
             if(frameCallbackCache_.contains(id)){
                 auto cb = frameCallbackCache_.find(id);
-                PostCallback(args, &cb->second, context);
+                if(cb != frameCallbackCache_.end()){
+                    cb->second.removed = false;
+                    PostCallback(args, &cb->second, context);
+                }
                 return;
             }
         }
