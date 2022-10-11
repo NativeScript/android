@@ -22,7 +22,8 @@ class AppConfig {
         ForceLog("forceLog", false),
         DiscardUncaughtJsExceptions("discardUncaughtJsExceptions", false),
         EnableLineBreakpoins("enableLineBreakpoints", false),
-        EnableMultithreadedJavascript("enableMultithreadedJavascript", false);
+        EnableMultithreadedJavascript("enableMultithreadedJavascript", false),
+        EnableTimers("enableTimers", false);
 
         private final String name;
         private final Object defaultValue;
@@ -126,6 +127,10 @@ class AppConfig {
                     if (androidObject.has(KnownKeys.EnableMultithreadedJavascript.getName())) {
                         values[KnownKeys.EnableMultithreadedJavascript.ordinal()] = androidObject.getBoolean(KnownKeys.EnableMultithreadedJavascript.getName());
                     }
+
+                    if (androidObject.has(KnownKeys.EnableTimers.getName())) {
+                        values[KnownKeys.EnableTimers.ordinal()] = androidObject.getBoolean(KnownKeys.EnableTimers.getName());
+                    }
                 }
             }
         } catch (Exception e) {
@@ -189,5 +194,9 @@ class AppConfig {
 
     public boolean getEnableMultithreadedJavascript() {
         return (boolean)values[KnownKeys.EnableMultithreadedJavascript.ordinal()];
+    }
+
+    public boolean getEnableTimers() {
+        return (boolean)values[KnownKeys.EnableTimers.ordinal()];
     }
 }

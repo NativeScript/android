@@ -690,6 +690,11 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
         if (it == setTimeoutCache_.end()) {
             return 1;
         }
+
+        if(it->second.GetRemoved()){
+            setTimeoutCache_.erase(key);
+            return 1;
+        }
         Isolate *isolate = it->second.isolate_;
 
         v8::Locker locker(isolate);
@@ -713,6 +718,13 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
         if (it == setIntervalCache_.end()) {
             return 1;
         }
+
+        if(it->second.GetRemoved()){
+            setIntervalCache_.erase(key);
+            return 1;
+        }
+
+
         Isolate *isolate = it->second.isolate_;
 
         v8::Locker locker(isolate);
@@ -732,6 +744,11 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
     } else {
         auto it = cache_.find(key);
         if (it == cache_.end()) {
+            return 1;
+        }
+
+        if(it->second.GetRemoved()){
+            cache_.erase(key);
             return 1;
         }
 
@@ -789,6 +806,12 @@ int CallbackHandlers::RunOnCurrentThreadFdCallback(int fd, int events, void *dat
         if (it == setTimeoutCache_.end()) {
             return 1;
         }
+
+        if(it->second.GetRemoved()){
+            setTimeoutCache_.erase(key);
+            return 1;
+        }
+
         Isolate *isolate = it->second.isolate_;
 
         v8::Locker locker(isolate);
@@ -810,6 +833,12 @@ int CallbackHandlers::RunOnCurrentThreadFdCallback(int fd, int events, void *dat
         if (it == setIntervalCache_.end()) {
             return 1;
         }
+
+        if(it->second.GetRemoved()){
+            setIntervalCache_.erase(key);
+            return 1;
+        }
+
         Isolate *isolate = it->second.isolate_;
 
         v8::Locker locker(isolate);
@@ -831,6 +860,13 @@ int CallbackHandlers::RunOnCurrentThreadFdCallback(int fd, int events, void *dat
         if (it == cache_.end()) {
             return 1;
         }
+
+        if(it->second.GetRemoved()){
+            cache_.erase(key);
+            return 1;
+        }
+
+
         Isolate *isolate = it->second.isolate_;
 
         v8::Locker locker(isolate);
@@ -1824,8 +1860,8 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
 
         if (success && pId->IsNumber()){
             auto id = pId->IntegerValue(context).FromMaybe(0);
-            if(frameCallbackCache_.contains(id)){
-                auto cb = frameCallbackCache_.find(id);
+            auto cb = frameCallbackCache_.find(id);
+            if(cb != frameCallbackCache_.end()){
                 if(cb != frameCallbackCache_.end()){
                     cb->second.removed = false;
                     PostCallback(args, &cb->second, context);
@@ -1886,8 +1922,8 @@ void CallbackHandlers::RemoveFrameCallback(const FunctionCallbackInfo<v8::Value>
 
         if (success && pId->IsNumber()){
             auto id = pId->IntegerValue(context).FromMaybe(0);
-            if(frameCallbackCache_.contains(id)){
-                auto cb = frameCallbackCache_.find(id);
+            auto cb = frameCallbackCache_.find(id);
+            if(cb != frameCallbackCache_.end()){
                 cb->second.removed = true;
             }
         }
@@ -1934,10 +1970,10 @@ void CallbackHandlers::InitChoreographer() {
 }
 
 
-robin_hood::unordered_map<uint64_t, CallbackHandlers::CacheEntry> CallbackHandlers::cache_;
-robin_hood::unordered_map<uint64_t, CallbackHandlers::CacheEntry> CallbackHandlers::setTimeoutCache_;
-robin_hood::unordered_map<uint64_t, CallbackHandlers::CacheEntry> CallbackHandlers::setIntervalCache_;
-robin_hood::unordered_map<uint64_t, CallbackHandlers::FrameCallbackCacheEntry> CallbackHandlers::frameCallbackCache_;
+std::unordered_map<uint64_t, CallbackHandlers::CacheEntry> CallbackHandlers::cache_;
+std::unordered_map<uint64_t, CallbackHandlers::CacheEntry> CallbackHandlers::setTimeoutCache_;
+std::unordered_map<uint64_t, CallbackHandlers::CacheEntry> CallbackHandlers::setIntervalCache_;
+std::unordered_map<uint64_t, CallbackHandlers::FrameCallbackCacheEntry> CallbackHandlers::frameCallbackCache_;
 
 std::atomic_int64_t CallbackHandlers::count_ = {0};
 std::atomic_int64_t CallbackHandlers::currentCount_ = {0};

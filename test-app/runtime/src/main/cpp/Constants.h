@@ -12,6 +12,7 @@ class Constants {
         static std::string V8_HEAP_SNAPSHOT_SCRIPT;
         static std::string V8_HEAP_SNAPSHOT_BLOB;
         static bool V8_CACHE_COMPILED_CODE;
+        static bool USE_EXPERIMENTAL_TIMERS;
 
     private:
         Constants() {

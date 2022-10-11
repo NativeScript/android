@@ -4,6 +4,7 @@
 
 #include "SetInterval.h"
 #include "Runtime.h"
+#include "Constants.h"
 
 using namespace v8;
 using namespace tns;
@@ -18,6 +19,18 @@ void SetInterval::Init(Isolate *isolate, Local<ObjectTemplate> globalTemplate) {
                                                                               ClearIntervalCallback);
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__clearInterval"),
                         clearIntervalFuncTemplate);
+
+    if (Constants::USE_EXPERIMENTAL_TIMERS) {
+        auto attr = static_cast<v8::PropertyAttribute>(v8::PropertyAttribute::DontDelete |
+                                                       v8::PropertyAttribute::ReadOnly |
+                                                       v8::PropertyAttribute::DontEnum);
+        globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "setInterval"),
+                            setIntervalFuncTemplate, attr);
+
+        globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "clearInterval"),
+                            clearIntervalFuncTemplate, attr);
+    }
+
 }
 
 void SetInterval::SetIntervalCallback(const FunctionCallbackInfo<Value> &args) {
@@ -73,7 +86,9 @@ void SetInterval::SetIntervalCallback(const FunctionCallbackInfo<Value> &args) {
         delete start;
     };
 
-    std::thread thread(func, key, (uint64_t) timeout, start);
+    std::thread
+            thread(func, key, (uint64_t)
+            timeout, start);
     thread.detach();
     start->store(true);
     args.GetReturnValue().Set((double) key);
@@ -82,7 +97,7 @@ void SetInterval::SetIntervalCallback(const FunctionCallbackInfo<Value> &args) {
 void SetInterval::ClearIntervalCallback(const FunctionCallbackInfo<Value> &args) {
     Isolate *isolate = args.GetIsolate();
     if (!args[0]->IsNumber()) {
-        assert(false);
+        return;
     }
 
     Local<Context> context = isolate->GetCurrentContext();
@@ -91,22 +106,27 @@ void SetInterval::ClearIntervalCallback(const FunctionCallbackInfo<Value> &args)
         assert(false);
     }
 
-
     auto key = (uint64_t) value;
     auto it = CallbackHandlers::setIntervalCache_.find(key);
     if (it == CallbackHandlers::setIntervalCache_.end()) {
         return;
     }
 
-
     it->second.callback_.Reset();
     it->second.context_.Reset();
+    it->second.SetRemoved(true);
+
     CallbackHandlers::setIntervalCache_.erase(it);
 }
 
 bool SetInterval::Elapsed(const uint64_t key) {
     auto it = CallbackHandlers::setIntervalCache_.find(key);
     if (it == CallbackHandlers::setIntervalCache_.end()) {
+        return false;
+    }
+
+    if (it->second.GetRemoved()) {
+        CallbackHandlers::setIntervalCache_.erase(key);
         return false;
     }
 
@@ -133,6 +153,12 @@ bool SetInterval::Has(const uint64_t key) {
     if (it == CallbackHandlers::setIntervalCache_.end()) {
         return false;
     }
+
+    if (it->second.GetRemoved()) {
+        CallbackHandlers::setIntervalCache_.erase(key);
+        return false;
+    }
+
     return true;
 }
 

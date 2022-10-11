@@ -11,7 +11,8 @@
 		"forceLog": false,
 		"suppressCallJSMethodExceptions": false,
 		"enableLineBreakpoints": false,
-		"enableMultithreadedJavascript": true
+		"enableMultithreadedJavascript": true,
+		"enableTimers": true
 	},
 	"discardUncaughtJsExceptions": false
 }

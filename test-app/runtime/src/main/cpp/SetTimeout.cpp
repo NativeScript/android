@@ -4,6 +4,7 @@
 
 #include "SetTimeout.h"
 #include "Runtime.h"
+#include "Constants.h"
 
 using namespace v8;
 using namespace tns;
@@ -18,6 +19,19 @@ void SetTimeout::Init(Isolate *isolate, Local<ObjectTemplate> globalTemplate) {
                                                                              ClearTimeoutCallback);
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__clearTimeout"),
                         clearTimeoutFuncTemplate);
+
+    if (Constants::USE_EXPERIMENTAL_TIMERS) {
+        auto attr = static_cast<v8::PropertyAttribute>(v8::PropertyAttribute::DontDelete |
+                                                       v8::PropertyAttribute::ReadOnly |
+                                                       v8::PropertyAttribute::DontEnum);
+
+        globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "setTimeout"),
+                            setTimeoutFuncTemplate, attr);
+
+        globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "clearTimeout"),
+                            clearTimeoutFuncTemplate, attr);
+    }
+
 }
 
 void SetTimeout::SetTimeoutCallback(const FunctionCallbackInfo<Value> &args) {
@@ -76,7 +90,7 @@ void SetTimeout::SetTimeoutCallback(const FunctionCallbackInfo<Value> &args) {
 void SetTimeout::ClearTimeoutCallback(const FunctionCallbackInfo<Value> &args) {
     Isolate *isolate = args.GetIsolate();
     if (!args[0]->IsNumber()) {
-        assert(false);
+        return;
     }
 
     Local<Context> context = isolate->GetCurrentContext();
@@ -91,14 +105,22 @@ void SetTimeout::ClearTimeoutCallback(const FunctionCallbackInfo<Value> &args) {
         return;
     }
 
+    it->second.SetRemoved(true);
+
     it->second.callback_.Reset();
     it->second.context_.Reset();
+
     CallbackHandlers::setTimeoutCache_.erase(it);
 }
 
 void SetTimeout::Elapsed(const uint64_t key) {
     auto it = CallbackHandlers::setTimeoutCache_.find(key);
     if (it == CallbackHandlers::setTimeoutCache_.end()) {
+        return;
+    }
+
+    if(it->second.GetRemoved()){
+        CallbackHandlers::setTimeoutCache_.erase(key);
         return;
     }
 
@@ -123,6 +145,12 @@ bool SetTimeout::Has(const uint64_t key) {
     if (it == CallbackHandlers::setTimeoutCache_.end()) {
         return false;
     }
+
+    if(it->second.GetRemoved()){
+        CallbackHandlers::setTimeoutCache_.erase(key);
+        return false;
+    }
+
     return true;
 }
 

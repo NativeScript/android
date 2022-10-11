@@ -205,6 +205,9 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir, bool ve
 
     auto profilerOutputDirStr = ArgConverter::jstringToString(profilerOutputDir);
 
+    JniLocalRef timers(env->GetObjectArrayElement(args, 16));
+    Constants::USE_EXPERIMENTAL_TIMERS = (bool)timers;
+
     NativeScriptException::Init();
     m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr, maxLogcatObjectSize, forceLog);
 }
@@ -677,8 +680,13 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
        ALooper_acquire(m_mainLooper);
 
+        // try using 4MB
+        int ret = fcntl(m_mainLooper_fd[1], F_SETPIPE_SZ, 4 * (1024 * 1024));
+
         // try using 2MB
-        int ret = fcntl(m_mainLooper_fd[1], F_SETPIPE_SZ, 2 * (1024 * 1024));
+        if (ret != 0) {
+            ret = fcntl(m_mainLooper_fd[1], F_SETPIPE_SZ, 2 * (1024 * 1024));
+        }
 
         // try using 1MB
         if (ret != 0) {
@@ -718,8 +726,14 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
         ALooper_acquire(looper);
 
+        // try using 4MB
+        int ret = fcntl(looper_fd[1], F_SETPIPE_SZ, 4 * (1024 * 1024));
+
+
         // try using 2MB
-        int ret = fcntl(looper_fd[1], F_SETPIPE_SZ, 2 * (1024 * 1024));
+        if (ret != 0) {
+            ret = fcntl(looper_fd[1], F_SETPIPE_SZ, 2 * (1024 * 1024));
+        }
 
         // try using 1MB
         if (ret != 0) {
