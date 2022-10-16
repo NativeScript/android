@@ -779,17 +779,18 @@ task buildMetadata(type: BuildToolTask) {
         def selectedBuildType = project.ext.selectedBuildType
 
         rootProject.subprojects {
+
           def projectClassesDir = new File("$it.buildDir/intermediates/javac")
           def projectKotlinClassesDir = new File("$it.buildDir/tmp/kotlin-classes")
-          
-          assert projectClassesDir.exists()
 
-          def projectClassesSubDirs = projectClassesDir.listFiles()
-          for (File subDir : projectClassesSubDirs) {
-            if (!classesSubDirs.contains(subDir)) {
-              classesSubDirs.add(subDir)
+            if (projectClassesDir.exists()) {
+                def projectClassesSubDirs = projectClassesDir.listFiles()
+                for (File subDir : projectClassesSubDirs) {
+                    if (!classesSubDirs.contains(subDir)) {
+                        classesSubDirs.add(subDir)
+                    }
+                }
             }
-          }
 
           if (projectKotlinClassesDir.exists()) {
             def projectKotlinClassesSubDirs = projectKotlinClassesDir.listFiles();
