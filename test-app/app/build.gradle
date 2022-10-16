@@ -302,7 +302,7 @@ repositories {
             dirs pluginDependencies
         }
     }
-    
+
     mavenCentral()
 }
 
@@ -583,7 +583,7 @@ allprojects {
         def artifactType = Attribute.of('artifactType', String)
         android.applicationVariants.all { variant ->
             if (variant.buildType.name == buildType) {
-                variant.getCompileClasspath().each { fileDependency ->
+                variant.getCompileClasspath().each { fileDependency -> 
                     processJar(fileDependency, jars)
                 }
             }
@@ -772,12 +772,34 @@ task buildMetadata(type: BuildToolTask) {
     doFirst {
         // get compiled classes to pass to metadata generator
         // these need to be called after the classes have compiled
-        assert file(classesDir).exists()
-
         new File(getMergedAssetsOutputPath() + "/metadata").deleteDir()
 
-        def classesSubDirs = new File(classesDir).listFiles()
+        def classesSubDirs = []
+        def kotlinClassesSubDirs = []
         def selectedBuildType = project.ext.selectedBuildType
+
+        rootProject.subprojects {
+          def projectClassesDir = new File("$it.buildDir/intermediates/javac")
+          def projectKotlinClassesDir = new File("$it.buildDir/tmp/kotlin-classes")
+          
+          assert projectClassesDir.exists()
+
+          def projectClassesSubDirs = projectClassesDir.listFiles()
+          for (File subDir : projectClassesSubDirs) {
+            if (!classesSubDirs.contains(subDir)) {
+              classesSubDirs.add(subDir)
+            }
+          }
+
+          if (projectKotlinClassesDir.exists()) {
+            def projectKotlinClassesSubDirs = projectKotlinClassesDir.listFiles();
+            for (File subDir : projectKotlinClassesSubDirs) {
+              if (!kotlinClassesSubDirs.contains(subDir)) {
+                kotlinClassesSubDirs.add(subDir)
+              }
+            }
+          }
+        }
 
         def generatedClasses = new LinkedList<String>()
         for (File subDir : classesSubDirs) {
@@ -786,12 +808,9 @@ task buildMetadata(type: BuildToolTask) {
             }
         }
 
-        if (file(kotlinClassesDir).exists()) {
-            def kotlinClassesSubDirs = new File(kotlinClassesDir).listFiles()
-            for (File subDir : kotlinClassesSubDirs) {
-                if (subDir.getName() == selectedBuildType) {
-                    generatedClasses.add(subDir.getAbsolutePath())
-                }
+        for (File subDir : kotlinClassesSubDirs) {
+            if (subDir.getName() == selectedBuildType) {
+                generatedClasses.add(subDir.getAbsolutePath())
             }
         }
 
