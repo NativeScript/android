@@ -11,6 +11,7 @@
 #include "ModuleInternal.h"
 #include "MessageLoopTimer.h"
 #include "File.h"
+#include "Timers.h"
 #include <mutex>
 #include <android/looper.h>
 #include <fcntl.h>
@@ -93,6 +94,8 @@ class Runtime {
         ArrayBufferHelper m_arrayBufferHelper;
 
         WeakRef m_weakRef;
+
+        Timers m_timers;
 
         Profiler m_profiler;
 

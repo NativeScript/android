@@ -710,6 +710,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
 
+    m_timers.Init(isolate, globalTemplate);
+
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
 
     auto global = context->Global();
