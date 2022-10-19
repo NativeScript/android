@@ -1,6 +1,7 @@
 #include "Timers.h"
 #include "ArgConverter.h"
 #include "Runtime.h"
+#include "NativeScriptException.h"
 #include <android/looper.h>
 #include <unistd.h>
 #include <thread>
@@ -225,6 +226,8 @@ int Timers::PumpTimerLoopCallback(int fd, int events, void* data) {
             thiz->addTask(task);
         }
         auto context = task->context_.Get(isolate);
+        Context::Scope context_scope(context);
+        TryCatch tc(isolate);
         auto argc = task->args_.get() == nullptr ? 0 : task->args_->size();
         if(argc > 0) {
             Local<Value> argv[argc];
@@ -235,7 +238,12 @@ int Timers::PumpTimerLoopCallback(int fd, int events, void* data) {
         } else {
             task->callback_.Get(isolate)->Call(context, context->Global(), 0, nullptr);
         }
+
         thiz->nesting = 0;
+
+        if (tc.HasCaught()){
+            NativeScriptException(tc).ReThrowToJava();
+        }
 
 
     }
