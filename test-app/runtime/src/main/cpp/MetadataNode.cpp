@@ -2027,7 +2027,7 @@ Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& func
     TryCatch tc(isolate);
 
     Local<Script> script;
-    ScriptOrigin jsOrigin(ArgConverter::ConvertToV8String(isolate, origin));
+    ScriptOrigin jsOrigin(isolate, ArgConverter::ConvertToV8String(isolate, origin));
     auto maybeScript = Script::Compile(context, source, &jsOrigin).ToLocal(&script);
 
     if (tc.HasCaught()) {

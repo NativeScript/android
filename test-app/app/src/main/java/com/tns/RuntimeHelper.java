@@ -162,46 +162,46 @@ public final class RuntimeHelper {
                         appDir, classLoader, dexDir, dexThumb, appConfig, isDebuggable);
 
                 runtime = Runtime.initializeRuntimeWithConfiguration(config);
-                if (isDebuggable) {
-                    try {
-                        v8Inspector = new AndroidJsV8Inspector(context.getFilesDir().getAbsolutePath(), context.getPackageName());
-                        v8Inspector.start();
-
-                        // the following snippet is used as means to notify the VSCode extension
-                        // debugger that the debugger agent has started
-                        File debuggerStartedFile = new File("/data/local/tmp", context.getPackageName() + "-debugger-started");
-                        if (debuggerStartedFile.exists() && !debuggerStartedFile.isDirectory() && debuggerStartedFile.length() == 0) {
-                            java.io.FileWriter fileWriter = new java.io.FileWriter(debuggerStartedFile);
-                            fileWriter.write("started");
-                            fileWriter.close();
-                        }
-
-                        // check if --debug-brk flag has been set. If positive:
-                        // write to the file to invalidate the flag
-                        // inform the v8Inspector to pause the main thread
-                        File debugBreakFile = new File("/data/local/tmp", context.getPackageName() + "-debugbreak");
-                        boolean shouldBreak = false;
-                        if (debugBreakFile.exists() && !debugBreakFile.isDirectory() && debugBreakFile.length() == 0) {
-                            java.io.FileWriter fileWriter = new java.io.FileWriter(debugBreakFile);
-                            fileWriter.write("started");
-                            fileWriter.close();
-
-                            shouldBreak = true;
-                        }
-
-                        v8Inspector.waitForDebugger(shouldBreak);
-                    } catch (IOException e) {
-                        if (Util.isDebuggableApp(context)) {
-                            e.printStackTrace();
-                        }
-                    }
-
-                    // if app is in debuggable mode run livesync service
-                    // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
-                    initLiveSync(runtime, logger, context);
-
-                    waitForLiveSync(context);
-                }
+//                if (isDebuggable) {
+//                    try {
+//                        v8Inspector = new AndroidJsV8Inspector(context.getFilesDir().getAbsolutePath(), context.getPackageName());
+//                        v8Inspector.start();
+//
+//                        // the following snippet is used as means to notify the VSCode extension
+//                        // debugger that the debugger agent has started
+//                        File debuggerStartedFile = new File("/data/local/tmp", context.getPackageName() + "-debugger-started");
+//                        if (debuggerStartedFile.exists() && !debuggerStartedFile.isDirectory() && debuggerStartedFile.length() == 0) {
+//                            java.io.FileWriter fileWriter = new java.io.FileWriter(debuggerStartedFile);
+//                            fileWriter.write("started");
+//                            fileWriter.close();
+//                        }
+//
+//                        // check if --debug-brk flag has been set. If positive:
+//                        // write to the file to invalidate the flag
+//                        // inform the v8Inspector to pause the main thread
+//                        File debugBreakFile = new File("/data/local/tmp", context.getPackageName() + "-debugbreak");
+//                        boolean shouldBreak = false;
+//                        if (debugBreakFile.exists() && !debugBreakFile.isDirectory() && debugBreakFile.length() == 0) {
+//                            java.io.FileWriter fileWriter = new java.io.FileWriter(debugBreakFile);
+//                            fileWriter.write("started");
+//                            fileWriter.close();
+//
+//                            shouldBreak = true;
+//                        }
+//
+//                        v8Inspector.waitForDebugger(shouldBreak);
+//                    } catch (IOException e) {
+//                        if (Util.isDebuggableApp(context)) {
+//                            e.printStackTrace();
+//                        }
+//                    }
+//
+//                    // if app is in debuggable mode run livesync service
+//                    // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
+//                    initLiveSync(runtime, logger, context);
+//
+//                    waitForLiveSync(context);
+//                }
 
                 runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
 
