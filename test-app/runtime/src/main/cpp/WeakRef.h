@@ -12,6 +12,8 @@ class WeakRef {
 
         void Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate>& globalObjectTemplate, ObjectManager* objectManager);
 
+        void Init(v8::Isolate* isolate, v8::Local<v8::Context> context, v8::Local<v8::Object> globalObject, ObjectManager* objectManager);
+
     private:
         struct CallbackState {
             CallbackState(v8::Persistent<v8::Object>* _target, v8::Persistent<v8::Object>* _holder)

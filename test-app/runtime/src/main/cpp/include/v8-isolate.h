@@ -529,6 +529,8 @@ class V8_EXPORT Isolate {
     kWasmMultiValue = 110,
     kWasmExceptionHandling = 111,
     kInvalidatedMegaDOMProtector = 112,
+    kFunctionPrototypeArguments = 113,
+    kFunctionPrototypeCaller = 114,
 
     // If you add new values here, you'll also need to update Chromium's:
     // web_feature.mojom, use_counter_callback.cc, and enums.xml. V8 changes to
@@ -1635,7 +1637,7 @@ class V8_EXPORT Isolate {
    * sandbox, the host time zone has to be detected outside the sandbox before
    * calling DateTimeConfigurationChangeNotification function.
    */
-  enum class TimeZoneDetection { kSkip, kRedetect, kCustom };
+  enum class TimeZoneDetection { kSkip, kRedetect };
 
   /**
    * Notification that the embedder has changed the time zone, daylight savings
@@ -1648,8 +1650,7 @@ class V8_EXPORT Isolate {
    * the performance of date operations.
    */
   void DateTimeConfigurationChangeNotification(
-      TimeZoneDetection time_zone_detection = TimeZoneDetection::kSkip,
-      const char* custom_timezone_id = nullptr);
+      TimeZoneDetection time_zone_detection = TimeZoneDetection::kSkip);
 
   /**
    * Notification that the embedder has changed the locale. V8 keeps a cache of

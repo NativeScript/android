@@ -102,18 +102,17 @@ android {
 //                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}"
 
                 cppFlags "-std=c++14"
-                arguments "-DANDROID_STL=c++_shared", "V=1"
+                arguments "-DANDROID_STL=c++_shared", "-DANDROID_NDK_ROOT=${NDK_PATH}"
             }
         }
 
         ndk {
             minSdkVersion NS_DEFAULT_MIN_SDK_VERSION as int
-//            if (onlyX86) {
-//                abiFilters 'x86'
-//            } else {
-//                abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
-//            }
-            abiFilters 'x86_64'
+           if (onlyX86) {
+               abiFilters 'x86'
+           } else {
+               abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
+           }
         }
     }
 
@@ -125,7 +124,7 @@ android {
     }
     externalNativeBuild {
         cmake {
-            version "3.10.2"
+            // version "3.18.1"
             path "CMakeLists.txt"
         }
     }

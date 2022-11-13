@@ -998,10 +998,10 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
         wrappedCtorFunc->SetPrototype(context, baseCtorFunc);
     }
 
-    //cache "ctorFuncTemplate"
-    auto pft = new Persistent<FunctionTemplate>(isolate, ctorFuncTemplate);
-    CtorCacheData ctorCacheItem(pft, instanceMethodsCallbackData);
-    cache->CtorFuncCache.insert(make_pair(treeNode, ctorCacheItem));
+   //cache "ctorFuncTemplate"
+   auto pft = new Persistent<FunctionTemplate>(isolate, ctorFuncTemplate);
+   CtorCacheData ctorCacheItem(pft, instanceMethodsCallbackData);
+   cache->CtorFuncCache.insert(make_pair(treeNode, ctorCacheItem));
 
     SetInnerTypes(isolate, wrappedCtorFunc, treeNode);
 

@@ -704,13 +704,15 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     }
 #endif
 
-    m_weakRef.Init(isolate, globalTemplate, m_objectManager);
+//    m_weakRef.Init(isolate, globalTemplate, m_objectManager);
 
     SimpleProfiler::Init(isolate, globalTemplate);
 
     CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
 
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
+    m_weakRef.Init(isolate,context, context->Global(), m_objectManager);
+
     context->Enter();
 
     m_objectManager->Init(isolate);

@@ -19,6 +19,14 @@ void WeakRef::Init(v8::Isolate* isolate, Local<ObjectTemplate>& globalObjectTemp
     globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "WeakRef"), FunctionTemplate::New(isolate, ConstructorCallback, extData));
 }
 
+void WeakRef::Init(v8::Isolate* isolate, Local<v8::Context> context, Local<Object> globalObject, ObjectManager* objectManager) {
+    m_objectManager = objectManager;
+    auto extData = External::New(isolate, this);
+    auto propName = ArgConverter::ConvertToV8String(isolate, "WeakRef");
+    auto propValue = FunctionTemplate::New(isolate, ConstructorCallback, extData)->GetFunction(context).ToLocalChecked();
+    globalObject->Set(context, propName, propValue);
+}
+
 void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& args) {
     try {
         auto extData = args.Data().As<External>();

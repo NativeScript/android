@@ -23,7 +23,7 @@ describe("Test WebAssembly ", () => {
         0x00, 0xaa, 0x0b
     ]);
 
-    it("Handle compilation failures", done => {
+    xit("Handle compilation failures", done => {
         WebAssembly.compile(new Uint8Array([ 1, 2, 3, 4 ])).then(moduleInstance => {
             expect(true).toBe(false, "The success callback of the compilation promise was called");
             done();
@@ -34,7 +34,7 @@ describe("Test WebAssembly ", () => {
         });
     });
 
-	it("Compile and instantiate a WebAssembly module asynchronously", done => {
+	xit("Compile and instantiate a WebAssembly module asynchronously", done => {
         let importsObj = {
             env: {
                 logarithm: Math.log
@@ -59,7 +59,7 @@ describe("Test WebAssembly ", () => {
         });
 	});
 
-	it("Compile and instantiate a WebAssembly module inside a worker", done => {
+	xit("Compile and instantiate a WebAssembly module inside a worker", done => {
         let worker = new Worker("./testWebAssemblyWorker");
 
         worker.onmessage = msg => {

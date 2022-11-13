@@ -217,7 +217,7 @@ static_assert((kSandboxGuardRegionSize % kSandboxAlignment) == 0,
 // the virtual memory reservation for the sandbox fails, its size is currently
 // halved until either the reservation succeeds or the minimum size is reached.
 // A minimum of 32GB allows the 4GB pointer compression region as well as the
-// ArrayBuffer partition and two 10GB WASM memory cages to fit into the
+// ArrayBuffer partition and two 10GB Wasm memory cages to fit into the
 // sandbox. 32GB should also be the minimum possible size of the userspace
 // address space as there are some machine configurations with only 36 virtual
 // address bits.
@@ -293,20 +293,23 @@ static_assert((1 << (32 - kExternalPointerIndexShift)) ==
 // (the MSB) from the pointer at the same time.
 // Note: this scheme assumes a 48-bit address space and will likely break if
 // more virtual address bits are used.
+constexpr uint64_t kExternalPointerTagMask = 0xffff000000000000;
+constexpr uint64_t kExternalPointerTagShift = 48;
+#define MAKE_TAG(v) (static_cast<uint64_t>(v) << kExternalPointerTagShift)
 // clang-format off
 enum ExternalPointerTag : uint64_t {
-  kExternalPointerNullTag =         0b0000000000000000ULL << 48,
-  kExternalPointerFreeEntryTag =    0b0111111110000000ULL << 48,
-  kExternalStringResourceTag =      0b1000000011111111ULL << 48,
-  kExternalStringResourceDataTag =  0b1000000101111111ULL << 48,
-  kForeignForeignAddressTag =       0b1000000110111111ULL << 48,
-  kNativeContextMicrotaskQueueTag = 0b1000000111011111ULL << 48,
-  kEmbedderDataSlotPayloadTag =     0b1000000111101111ULL << 48,
-  kCodeEntryPointTag =              0b1000000111110111ULL << 48,
+  kExternalPointerNullTag =         MAKE_TAG(0b0000000000000000),
+  kExternalPointerFreeEntryTag =    MAKE_TAG(0b0111111110000000),
+  kExternalStringResourceTag =      MAKE_TAG(0b1000000011111111),
+  kExternalStringResourceDataTag =  MAKE_TAG(0b1000000101111111),
+  kForeignForeignAddressTag =       MAKE_TAG(0b1000000110111111),
+  kNativeContextMicrotaskQueueTag = MAKE_TAG(0b1000000111011111),
+  kEmbedderDataSlotPayloadTag =     MAKE_TAG(0b1000000111101111),
+  kCodeEntryPointTag =              MAKE_TAG(0b1000000111110111),
+  kExternalObjectValueTag =         MAKE_TAG(0b1000000111111011),
 };
 // clang-format on
-
-constexpr uint64_t kExternalPointerTagMask = 0xffff000000000000;
+#undef MAKE_TAG
 
 // Converts encoded external pointer to address.
 V8_EXPORT Address DecodeExternalPointerImpl(const Isolate* isolate,
@@ -362,8 +365,8 @@ class Internals {
 
   static const uint32_t kNumIsolateDataSlots = 4;
   static const int kStackGuardSize = 7 * kApiSystemPointerSize;
-  static const int kBuiltinTier0EntryTableSize = 13 * kApiSystemPointerSize;
-  static const int kBuiltinTier0TableSize = 13 * kApiSystemPointerSize;
+  static const int kBuiltinTier0EntryTableSize = 9 * kApiSystemPointerSize;
+  static const int kBuiltinTier0TableSize = 9 * kApiSystemPointerSize;
 
   // IsolateData layout guarantees.
   static const int kIsolateCageBaseOffset = 0;
