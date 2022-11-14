@@ -239,11 +239,17 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                     shared_ptr<BackingStore> store;
                     size_t offset = 0;
                     size_t length;
+                    uint8_t *data = nullptr;
                     if (jsObj->IsArrayBuffer())
                     {
                         auto array = jsObj.As<v8::ArrayBuffer>();
                         store = array->GetBackingStore();
                         length = array->ByteLength();
+                        data = static_cast<uint8_t *>(store->Data());
+
+                        if (data == nullptr) {
+                            data = static_cast<uint8_t *>(array->GetContents().Data());
+                        }
                     }
                     else if (jsObj->IsArrayBufferView())
                     {
@@ -252,6 +258,13 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                         length = array->ByteLength();
                         store = array->Buffer()->GetBackingStore();
                         bufferCastType = JsArgConverter::GetCastType(array);
+
+                        data = static_cast<uint8_t *>(store->Data()) + offset;
+
+                        if (data == nullptr) {
+                            data = static_cast<uint8_t *>(array->Buffer()->GetContents().Data()) +
+                                   offset;
+                        }
                     }
                     else
                     {
@@ -260,9 +273,16 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                         store = array->Buffer()->GetBackingStore();
                         length = array->ByteLength();
                         bufferCastType = JsArgConverter::GetCastType(array);
+
+                        data = static_cast<uint8_t *>(store->Data()) + offset;
+
+                        if (data == nullptr) {
+                            data = static_cast<uint8_t *>(array->Buffer()->GetContents().Data()) +
+                                   offset;
+                        }
+
                     }
 
-                    uint8_t * data = static_cast<uint8_t *>(store->Data()) + offset;
 
                     auto directBuffer = env.NewDirectByteBuffer(
                             data,
