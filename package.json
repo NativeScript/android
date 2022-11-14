@@ -15,7 +15,7 @@
     "gradleAndroid": "7.3.0",
     "ndk": "r21",
     "ndkApiLevel": "22",
-    "minSdk": "17",
+    "minSdk": "21",
     "compileSdk": "32",
     "buildTools": "32.0.0",
     "kotlin": "1.7.10"
