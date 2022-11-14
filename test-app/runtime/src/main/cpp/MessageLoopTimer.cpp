@@ -24,33 +24,33 @@ void MessageLoopTimer::Init(Local<Context> context) {
             // the v8::platform::PumpMessageLoop method at regular intervals.
             // https://github.com/NativeScript/android-runtime/issues/1558
 
-//            global.WebAssembly = new Proxy(WebAssembly, {
-//                get: (target, name) => {
-//                    let origMethod = target[name];
-//                    let proxyMethods = [
-//                        "compile",
-//                        "compileStreaming",
-//                        "instantiate",
-//                        "instantiateStreaming"
-//                    ];
-//
-//                    if (proxyMethods.indexOf(name) < 0) {
-//                        return origMethod;
-//                    }
-//
-//                    return function (...args) {
-//                        __messageLoopTimerStart();
-//                        let result = origMethod.apply(this, args);
-//                        return result.then(x => {
-//                            __messageLoopTimerStop();
-//                            return x;
-//                        }).catch(e => {
-//                            __messageLoopTimerStop();
-//                            throw e;
-//                        });
-//                    };
-//                }
-//            });
+            global.WebAssembly = new Proxy(WebAssembly, {
+                get: (target, name) => {
+                    let origMethod = target[name];
+                    let proxyMethods = [
+                        "compile",
+                        "compileStreaming",
+                        "instantiate",
+                        "instantiateStreaming"
+                    ];
+
+                    if (proxyMethods.indexOf(name) < 0) {
+                        return origMethod;
+                    }
+
+                    return function (...args) {
+                        __messageLoopTimerStart();
+                        let result = origMethod.apply(this, args);
+                        return result.then(x => {
+                            __messageLoopTimerStop();
+                            return x;
+                        }).catch(e => {
+                            __messageLoopTimerStop();
+                            throw e;
+                        });
+                    };
+                }
+            });
         })();
     )";
 

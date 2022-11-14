@@ -41,8 +41,8 @@ endif()
 #  MESSAGE(STATUS "## Using default linker")
 #endif ()
 
-add_library( v8_shared STATIC IMPORTED )
-set_target_properties( v8_shared PROPERTIES IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8android.so )
+#add_library( v8_shared STATIC IMPORTED )
+#set_target_properties( v8_shared PROPERTIES IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8android.so )
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/include_directories.html
 include_directories(
@@ -147,6 +147,7 @@ MESSAGE(STATUS "# CMAKE_CXX_FLAGS: " ${CMAKE_CXX_FLAGS})
 # Command info: https://cmake.org/cmake/help/v3.4/command/target_link_libraries.html
 # linking v8 and custom STL libraries to the runtime (NativeScript library)
 target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libzip.a)
+target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_monolith.a)
 
 if("${ANDROID_ABI}" MATCHES "armeabi-v7a$" OR "${ANDROID_ABI}" MATCHES "x86$")
     # On API Level 19 and lower we need to link with android_support
@@ -167,4 +168,4 @@ find_library(system-android android)
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/target_link_libraries.html
 # Specifies libraries CMake should link to your target library.
-target_link_libraries(NativeScript v8_shared ${system-log} ${system-z} ${system-android})
+target_link_libraries(NativeScript ${system-log} ${system-z} ${system-android})
