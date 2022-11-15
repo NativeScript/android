@@ -162,7 +162,7 @@ public final class RuntimeHelper {
                         appDir, classLoader, dexDir, dexThumb, appConfig, isDebuggable);
 
                 runtime = Runtime.initializeRuntimeWithConfiguration(config);
-//                if (isDebuggable) {
+                if (isDebuggable) {
 //                    try {
 //                        v8Inspector = new AndroidJsV8Inspector(context.getFilesDir().getAbsolutePath(), context.getPackageName());
 //                        v8Inspector.start();
@@ -198,10 +198,10 @@ public final class RuntimeHelper {
 //
 //                    // if app is in debuggable mode run livesync service
 //                    // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
-//                    initLiveSync(runtime, logger, context);
-//
-//                    waitForLiveSync(context);
-//                }
+                    initLiveSync(runtime, logger, context);
+
+                    waitForLiveSync(context);
+                }
 
                 runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
 

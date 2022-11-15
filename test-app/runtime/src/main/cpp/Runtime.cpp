@@ -711,15 +711,16 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
 
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
-    m_weakRef.Init(isolate,context, context->Global(), m_objectManager);
+
+    auto global = context->Global();
+
+    m_weakRef.Init(isolate,context, global, m_objectManager);
 
     context->Enter();
 
     m_objectManager->Init(isolate);
 
     m_module.Init(isolate, callingDir);
-
-    auto global = context->Global();
 
     Local<Value> gcFunc;
     global->Get(context, ArgConverter::ConvertToV8String(isolate, "gc")).ToLocal(&gcFunc);
