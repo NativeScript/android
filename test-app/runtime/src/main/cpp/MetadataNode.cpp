@@ -922,7 +922,6 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
 
     auto node = GetOrCreateInternal(treeNode);
 
-
     JEnv env;
     // if we already have an exception (which will be rethrown later)
     // then we don't want to ignore the next exception
@@ -2172,6 +2171,7 @@ void MetadataNode::SymbolHasInstanceCallback(const v8::FunctionCallbackInfo<v8::
     auto isolate = info.GetIsolate();
     auto context = isolate->GetCurrentContext();
     auto runtime = Runtime::GetRuntime(isolate);
+
     auto objectManager = runtime->GetObjectManager();
     auto obj = objectManager->GetJavaObjectByJsObject(arg->ToObject(context).ToLocalChecked());
 

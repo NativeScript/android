@@ -16,17 +16,20 @@ namespace tns {
     public:
 
         JSToJavaConverter(
+                v8::Isolate* isolate,
                 const v8::FunctionCallbackInfo<v8::Value> &args,
                 const std::string &methodSignature,
                 MetadataEntry *entry);
 
         JSToJavaConverter(
+                v8::Isolate* isolate,
                 const v8::FunctionCallbackInfo<v8::Value> &args,
                 const std::string &methodSignature,
                 MetadataEntry *entry,
                 const v8::Local<v8::Object> kotlinExtensionFunctionThis);
 
         JSToJavaConverter(
+                v8::Isolate* isolate,
                 const v8::FunctionCallbackInfo<v8::Value> &args,
                 const std::string &methodSignature);
 

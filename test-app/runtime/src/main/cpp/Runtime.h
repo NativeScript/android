@@ -29,6 +29,8 @@ class Runtime {
 
         static Runtime* GetRuntime(v8::Isolate* isolate);
 
+        static Runtime* GetRuntimeFromIsolateData(v8::Isolate* isolate);
+
         static ObjectManager* GetObjectManager(v8::Isolate* isolate);
 
         static void Init(JavaVM* vm, void* reserved);
@@ -117,7 +119,7 @@ class Runtime {
 
         static std::map<int, Runtime*> s_id2RuntimeCache;
 
-        static std::map<v8::Isolate*, Runtime*> s_isolate2RuntimesCache;
+        static std::unordered_map<v8::Isolate*, Runtime*> s_isolate2RuntimesCache;
 
         static JavaVM* s_jvm;
 

@@ -102,7 +102,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
             instance = env.NewObject(generatedJavaClass, mi.mid);
         } else {
             // resolve arguments before passing them on to the constructor
-            JSToJavaConverter argConverter(argWrapper.args, mi.signature);
+            JSToJavaConverter argConverter(isolate, argWrapper.args, mi.signature);
             auto ctorArgs = argConverter.ToArgs();
 
             instance = env.NewObjectA(generatedJavaClass, mi.mid, ctorArgs);
@@ -208,6 +208,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
     string *returnType = nullptr;
     auto retType = MethodReturnType::Unknown;
     MethodCache::CacheMethodInfo mi;
+
+    auto isolate = args.GetIsolate();
 
     if ((entry != nullptr) && entry->isResolved) {
         isStatic = entry->isStatic;
@@ -320,27 +322,20 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                     methodName.c_str());
     }
 
-    JSToJavaConverter *argConverter;
-
-    if (entry != nullptr && entry->isExtensionFunction) {
-        argConverter = new JSToJavaConverter(args, *sig, entry, caller);
-    } else {
-        argConverter = new JSToJavaConverter(args, *sig, entry);
-    }
+    JSToJavaConverter argConverter = (entry != nullptr && entry->isExtensionFunction)
+                                     ? JSToJavaConverter(isolate, args, *sig, entry, caller)
+                                     : JSToJavaConverter(isolate, args, *sig, entry);
 
 //    if (!argConverter->IsValid()) {
 //        JSToJavaConverter::Error err = argConverter->GetError();
 //        throw NativeScriptException(err.msg);
 //    }
 
-    auto isolate = args.GetIsolate();
-
     JniLocalRef callerJavaObject;
 
-    jvalue *javaArgs = argConverter->ToArgs();
+    jvalue *javaArgs = argConverter.ToArgs();
 
-
-    auto runtime = Runtime::GetRuntime(isolate);
+    auto runtime = Runtime::GetRuntimeFromIsolateData(isolate);
     auto objectManager = runtime->GetObjectManager();
 
     if (!isStatic) {
@@ -542,8 +537,6 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 //    if ((++adjustMemCount % 2) == 0) {
 //        AdjustAmountOfExternalAllocatedMemory(env, isolate);
 //    }
-
-    delete argConverter;
 }
 
 void CallbackHandlers::AdjustAmountOfExternalAllocatedMemory(JEnv &env, Isolate *isolate) {

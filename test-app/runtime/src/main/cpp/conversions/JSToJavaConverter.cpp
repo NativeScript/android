@@ -19,11 +19,12 @@ using namespace std;
 using namespace tns;
 
 JSToJavaConverter::JSToJavaConverter(
+        v8::Isolate* isolate,
         const FunctionCallbackInfo<v8::Value> &args,
         const string &methodSignature,
         MetadataEntry *entry)
         :
-        m_isolate(args.GetIsolate()),
+        m_isolate(isolate),
         m_methodSignature(methodSignature) {
     m_argsLen = args.Length();
 
@@ -39,10 +40,9 @@ JSToJavaConverter::JSToJavaConverter(
             std::vector<std::string> parsed = parser.Parse();
             m_tokens = new std::vector<std::string>();
             m_tokens->reserve(parsed.size());
-            for (std::string& p : parsed) {
+            for (std::string &p: parsed) {
                 m_tokens->push_back(p);
             }
-//            std::copy(parsed.begin(),  parsed.end(), m_tokens->begin());
         }
 
         for (int i = 0; i < m_argsLen; i++) {
@@ -52,12 +52,13 @@ JSToJavaConverter::JSToJavaConverter(
 }
 
 JSToJavaConverter::JSToJavaConverter(
+        v8::Isolate* isolate,
         const v8::FunctionCallbackInfo<Value> &args,
         const string &methodSignature,
         MetadataEntry *entry,
         const v8::Local<v8::Object> kotlinExtensionFunctionThis)
         :
-        m_isolate(args.GetIsolate()),
+        m_isolate(isolate),
         m_methodSignature(methodSignature) {
 
     int v8ProvidedArgumentsLength = args.Length();
@@ -75,7 +76,7 @@ JSToJavaConverter::JSToJavaConverter(
             auto parsed = parser.Parse();
             m_tokens = new std::vector<std::string>();
             m_tokens->reserve(parsed.size());
-            for (std::string& p : parsed) {
+            for (std::string &p: parsed) {
                 m_tokens->push_back(p);
             }
         }
@@ -89,10 +90,11 @@ JSToJavaConverter::JSToJavaConverter(
 }
 
 JSToJavaConverter::JSToJavaConverter(
+        v8::Isolate* isolate,
         const v8::FunctionCallbackInfo<Value> &args,
         const string &methodSignature)
         :
-        m_isolate(args.GetIsolate()),
+        m_isolate(isolate),
         m_methodSignature(methodSignature) {
     m_argsLen = args.Length();
 
@@ -100,7 +102,7 @@ JSToJavaConverter::JSToJavaConverter(
     auto parsed = parser.Parse();
     m_tokens = new std::vector<std::string>();
     m_tokens->reserve(parsed.size());
-    for (std::string& p : parsed) {
+    for (std::string &p: parsed) {
         m_tokens->push_back(p);
     }
 
@@ -110,26 +112,10 @@ JSToJavaConverter::JSToJavaConverter(
 }
 
 bool JSToJavaConverter::ConvertArg(const Local<Value> &arg, int index) {
-    const auto &typeSignature = m_tokens->at(index);
 
-    if (arg->IsArray() && typeSignature[0] == '[') {
-        return tns::ConvertJavaScriptArray(
-                m_isolate,
-                arg,
-                index,
-                m_tokens,
-                m_jniArgRefsState
-        );
-    } else if (arg->IsNumber() || arg->IsNumberObject()) {
+
+    if (arg->IsNumber() || arg->IsNumberObject()) {
         return tns::ConvertJavaScriptNumber(
-                m_isolate,
-                arg,
-                index,
-                m_tokens,
-                m_jniArgRefsState
-        );
-    } else if (arg->IsBoolean() || arg->IsBooleanObject()) {
-        return tns::ConvertJavaScriptBoolean(
                 m_isolate,
                 arg,
                 index,
@@ -140,6 +126,22 @@ bool JSToJavaConverter::ConvertArg(const Local<Value> &arg, int index) {
         return tns::ConvertJavaScriptString(
                 arg,
                 index,
+                m_jniArgRefsState
+        );
+    } else if (arg->IsBoolean() || arg->IsBooleanObject()) {
+        return tns::ConvertJavaScriptBoolean(
+                m_isolate,
+                arg,
+                index,
+                m_tokens,
+                m_jniArgRefsState
+        );
+    } else if (arg->IsArray() && m_tokens->at(index)[0] == '[') {
+        return tns::ConvertJavaScriptArray(
+                m_isolate,
+                arg,
+                index,
+                m_tokens,
                 m_jniArgRefsState
         );
     } else if (arg->IsObject()) {
@@ -155,10 +157,11 @@ bool JSToJavaConverter::ConvertArg(const Local<Value> &arg, int index) {
     } else if (arg->IsUndefined() || arg->IsNull()) {
         m_jniArgRefsState.SetConvertedObject(index, nullptr);
         return true;
-    } else {
-        m_jniArgRefsState.SetConvertedObject(index, nullptr);
-        return false;
     }
+
+    m_jniArgRefsState.SetConvertedObject(index, nullptr);
+    return false;
+
 }
 
 int JSToJavaConverter::Length() const {

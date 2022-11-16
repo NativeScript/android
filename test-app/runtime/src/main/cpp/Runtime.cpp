@@ -127,10 +127,20 @@ Runtime* Runtime::GetRuntime(int runtimeId) {
 }
 
 Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
-    auto itFound = s_isolate2RuntimesCache.find(isolate);
-    auto runtime = (itFound != s_isolate2RuntimesCache.end())
-                   ? itFound->second
-                   : nullptr;
+    auto runtime = s_isolate2RuntimesCache.at(isolate);
+
+    if (runtime == nullptr) {
+        stringstream ss;
+        ss << "Cannot find runtime for isolate: " << isolate;
+        throw NativeScriptException(ss.str());
+    }
+
+    return runtime;
+}
+
+Runtime* Runtime::GetRuntimeFromIsolateData(v8::Isolate* isolate) {
+    void* maybeRuntime = isolate->GetData((uint32_t)Runtime::IsolateData::RUNTIME);
+    auto runtime = static_cast<Runtime*>(maybeRuntime);
 
     if (runtime == nullptr) {
         stringstream ss;
@@ -142,18 +152,7 @@ Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
 }
 
 ObjectManager* Runtime::GetObjectManager(v8::Isolate* isolate) {
-    auto itFound = s_isolate2RuntimesCache.find(isolate);
-    auto runtime = (itFound != s_isolate2RuntimesCache.end())
-                   ? itFound->second
-                   : nullptr;
-
-    if (runtime == nullptr) {
-        stringstream ss;
-        ss << "Cannot find runtime for isolate: " << isolate;
-        throw NativeScriptException(ss.str());
-    }
-
-    return runtime->GetObjectManager();
+    return GetRuntime(isolate)->GetObjectManager();
 }
 
 Isolate* Runtime::GetIsolate() const {
@@ -606,7 +605,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     auto isolate = Isolate::New(create_params);
     isolateFrame.log("Isolate.New");
 
-    s_isolate2RuntimesCache.insert(make_pair(isolate, this));
+    s_isolate2RuntimesCache[isolate] = this;
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handleScope(isolate);
@@ -615,6 +614,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     // Sets a structure with v8 String constants on the isolate object at slot 1
     auto consts = new V8StringConstants::PerIsolateV8Constants(isolate);
+    isolate->SetData((uint32_t)Runtime::IsolateData::RUNTIME, this);
     isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, consts);
 
     V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
@@ -874,7 +874,7 @@ int Runtime::GetReader(){
 JavaVM* Runtime::s_jvm = nullptr;
 jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
-map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
+unordered_map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 bool Runtime::s_mainThreadInitialized = false;
 v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
