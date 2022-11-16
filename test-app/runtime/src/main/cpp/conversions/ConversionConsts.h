@@ -1,0 +1,10 @@
+//
+// Created by Vladimir Mutafov on 16.11.22.
+//
+
+#ifndef TEST_APP_CONVERSIONCONSTS_H
+#define TEST_APP_CONVERSIONCONSTS_H
+
+#define JAVA_METHOD_MAX_ARGS_LENGTH 255
+
+#endif //TEST_APP_CONVERSIONCONSTS_H

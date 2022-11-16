@@ -78,8 +78,7 @@ class ArgConverter {
         }
 
         inline static v8::Local<v8::String> ConvertToV8String(v8::Isolate* isolate, const std::string& s) {
-                v8::Local<v8::String> str =	v8::String::NewFromUtf8(isolate, s.c_str(), v8::NewStringType::kNormal, s.length()).ToLocalChecked();
-                return str;
+                return v8::String::NewFromUtf8(isolate, s.c_str(), v8::NewStringType::kNormal, s.length()).ToLocalChecked();
         }
 
         inline static v8::Local<v8::String> ConvertToV8String(v8::Isolate* isolate, const char* data, int length)  {

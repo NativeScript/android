@@ -115,6 +115,10 @@ add_library(
         src/main/cpp/com_tns_AssetExtractor.cpp
         src/main/cpp/com_tns_Runtime.cpp
         src/main/cpp/console/Console.cpp
+        src/main/cpp/conversions/JSToJavaConverter.cpp
+        src/main/cpp/conversions/objects/JSToJavaObjectsConverter.cpp
+        src/main/cpp/conversions/arrays/JSToJavaArraysConverter.cpp
+        src/main/cpp/conversions/primitives/JSToJavaPrimitivesConverter.cpp
 
         # V8 inspector source files will be included only in Release mode
         ${INSPECTOR_SOURCES}

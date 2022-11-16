@@ -3,7 +3,7 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
-#include "JsArgConverter.h"
+#include "./conversions/JSToJavaConverter.h"
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
 #include "v8-profiler.h"
@@ -102,7 +102,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
             instance = env.NewObject(generatedJavaClass, mi.mid);
         } else {
             // resolve arguments before passing them on to the constructor
-            JsArgConverter argConverter(argWrapper.args, mi.signature);
+            JSToJavaConverter argConverter(argWrapper.args, mi.signature);
             auto ctorArgs = argConverter.ToArgs();
 
             instance = env.NewObjectA(generatedJavaClass, mi.mid, ctorArgs);
@@ -320,18 +320,18 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                     methodName.c_str());
     }
 
-    JsArgConverter *argConverter;
+    JSToJavaConverter *argConverter;
 
     if (entry != nullptr && entry->isExtensionFunction) {
-        argConverter = new JsArgConverter(caller, args, *sig, entry);
+        argConverter = new JSToJavaConverter(args, *sig, entry, caller);
     } else {
-        argConverter = new JsArgConverter(args, false, *sig, entry);
+        argConverter = new JSToJavaConverter(args, *sig, entry);
     }
 
-    if (!argConverter->IsValid()) {
-        JsArgConverter::Error err = argConverter->GetError();
-        throw NativeScriptException(err.msg);
-    }
+//    if (!argConverter->IsValid()) {
+//        JSToJavaConverter::Error err = argConverter->GetError();
+//        throw NativeScriptException(err.msg);
+//    }
 
     auto isolate = args.GetIsolate();
 
