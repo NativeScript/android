@@ -21,7 +21,7 @@ bool tns::ConvertJavaScriptObject(
         const v8::Local<v8::Value> &arg,
         int index,
         std::string &methodSignature,
-        std::vector<std::string> &tokens,
+        std::vector<std::string> *tokens,
         JNIArgRefsState &jniArgRefsState
 ) {
     auto context = isolate->GetCurrentContext();
@@ -249,10 +249,10 @@ bool tns::ConvertFromCastFunctionObject(
         T value,
         int index,
         std::string &methodSignature,
-        std::vector<std::string> &tokens,
+        std::vector<std::string> *tokens,
         JNIArgRefsState &jniArgRefsState
 ) {
-    const auto &typeSignature = tokens.at(index);
+    const auto &typeSignature = tokens->at(index);
     const char typeSignaturePrefix = typeSignature[0];
 
     switch (typeSignaturePrefix) {

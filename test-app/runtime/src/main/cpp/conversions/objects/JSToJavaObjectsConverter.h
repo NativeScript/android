@@ -19,7 +19,7 @@ namespace tns {
             const v8::Local<v8::Value> &jsValue,
             int index,
             std::string &methodSignature,
-            std::vector<std::string> &tokens,
+            std::vector<std::string> *tokens,
             JNIArgRefsState &jniArgRefsState
     );
 
@@ -28,7 +28,7 @@ namespace tns {
             T value,
             int index,
             std::string &methodSignature,
-            std::vector<std::string> &tokens,
+            std::vector<std::string> *tokens,
             JNIArgRefsState &jniArgRefsState
     );
 }

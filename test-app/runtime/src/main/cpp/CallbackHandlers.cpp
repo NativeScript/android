@@ -537,11 +537,11 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
         }
     }
 
-    static uint32_t adjustMemCount = 0;
-
-    if ((++adjustMemCount % 2) == 0) {
-        AdjustAmountOfExternalAllocatedMemory(env, isolate);
-    }
+//    static uint32_t adjustMemCount = 0;
+//
+//    if ((++adjustMemCount % 2) == 0) {
+//        AdjustAmountOfExternalAllocatedMemory(env, isolate);
+//    }
 
     delete argConverter;
 }

@@ -20,7 +20,7 @@ bool tns::ConvertJavaScriptArray(
         v8::Isolate *isolate,
         const Local<Value> &arg,
         int index,
-        std::vector<std::string> &tokens,
+        std::vector<std::string> *tokens,
         JNIArgRefsState &jniArgRefsState
 ) {
     bool success = true;
@@ -31,7 +31,7 @@ bool tns::ConvertJavaScriptArray(
 
     jsize arrLength = jsArr->Length(); // java arrays size is max int32
 
-    const auto &arraySignature = tokens.at(index);
+    const auto &arraySignature = tokens->at(index);
     auto context = isolate->GetCurrentContext();
 
     std::string elementType = arraySignature.substr(1);

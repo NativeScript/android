@@ -20,12 +20,12 @@ bool tns::ConvertJavaScriptBoolean(
         v8::Isolate *isolate,
         const v8::Local<v8::Value> &jsValue,
         int index,
-        std::vector<std::string> &tokens,
+        std::vector<std::string> *tokens,
         JNIArgRefsState &jniArgRefsState
 ) {
     bool success;
 
-    const auto &typeSignature = tokens.at(index);
+    const auto &typeSignature = tokens->at(index);
     auto context = isolate->GetCurrentContext();
 
     if (typeSignature == "Z") {
@@ -59,7 +59,7 @@ bool tns::ConvertJavaScriptNumber(
         v8::Isolate *isolate,
         const v8::Local<v8::Value> &jsValue,
         int index,
-        std::vector<std::string> &tokens,
+        std::vector<std::string> *tokens,
         JNIArgRefsState &jniArgRefsState
 ) {
     bool success = true;
@@ -68,7 +68,7 @@ bool tns::ConvertJavaScriptNumber(
             0
     };
 
-    const auto &typeSignature = tokens.at(index);
+    const auto &typeSignature = tokens->at(index);
     auto context = isolate->GetCurrentContext();
 
     const char typePrefix = typeSignature[0];
@@ -115,8 +115,11 @@ bool tns::ConvertJavaScriptNumber(
     return success;
 }
 
-bool tns::ConvertJavaScriptString(const Local<v8::Value> &jsValue, int index,
-                                  tns::JNIArgRefsState &jniArgRefsState) {
+bool tns::ConvertJavaScriptString(
+        const Local<v8::Value> &jsValue,
+        int index,
+        tns::JNIArgRefsState &jniArgRefsState
+) {
     jstring stringObject = ArgConverter::ConvertToJavaString(jsValue);
     jniArgRefsState.SetConvertedObject(index, stringObject);
 

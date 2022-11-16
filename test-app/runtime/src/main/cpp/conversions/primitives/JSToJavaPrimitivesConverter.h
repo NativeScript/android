@@ -13,7 +13,7 @@ namespace tns {
             v8::Isolate *isolate,
             const v8::Local<v8::Value> &jsValue,
             int index,
-            std::vector<std::string> &tokens,
+            std::vector<std::string> *tokens,
             JNIArgRefsState &jniArgRefsState
     );
 
@@ -21,7 +21,7 @@ namespace tns {
             v8::Isolate *isolate,
             const v8::Local<v8::Value> &jsValue,
             int index,
-            std::vector<std::string> &tokens,
+            std::vector<std::string> *tokens,
             JNIArgRefsState &jniArgRefsState
     );
 

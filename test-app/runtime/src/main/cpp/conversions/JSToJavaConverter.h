@@ -42,7 +42,7 @@ namespace tns {
 
         v8::Isolate *m_isolate;
         std::string m_methodSignature;
-        std::vector<std::string> m_tokens;
+        std::vector<std::string> *m_tokens;
         int m_argsLen;
         JNIArgRefsState m_jniArgRefsState;
     };

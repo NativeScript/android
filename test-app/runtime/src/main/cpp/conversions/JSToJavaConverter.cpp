@@ -33,10 +33,16 @@ JSToJavaConverter::JSToJavaConverter(
                 JniSignatureParser parser(m_methodSignature);
                 entry->parsedSig = parser.Parse();
             }
-            m_tokens = entry->parsedSig;
+            m_tokens = &entry->parsedSig;
         } else {
             JniSignatureParser parser(m_methodSignature);
-            m_tokens = parser.Parse();
+            std::vector<std::string> parsed = parser.Parse();
+            m_tokens = new std::vector<std::string>();
+            m_tokens->reserve(parsed.size());
+            for (std::string& p : parsed) {
+                m_tokens->push_back(p);
+            }
+//            std::copy(parsed.begin(),  parsed.end(), m_tokens->begin());
         }
 
         for (int i = 0; i < m_argsLen; i++) {
@@ -63,10 +69,15 @@ JSToJavaConverter::JSToJavaConverter(
                 JniSignatureParser parser(m_methodSignature);
                 entry->parsedSig = parser.Parse();
             }
-            m_tokens = entry->parsedSig;
+            m_tokens = &entry->parsedSig;
         } else {
             JniSignatureParser parser(m_methodSignature);
-            m_tokens = parser.Parse();
+            auto parsed = parser.Parse();
+            m_tokens = new std::vector<std::string>();
+            m_tokens->reserve(parsed.size());
+            for (std::string& p : parsed) {
+                m_tokens->push_back(p);
+            }
         }
 
         ConvertArg(kotlinExtensionFunctionThis, 0);
@@ -86,7 +97,12 @@ JSToJavaConverter::JSToJavaConverter(
     m_argsLen = args.Length();
 
     JniSignatureParser parser(m_methodSignature);
-    m_tokens = parser.Parse();
+    auto parsed = parser.Parse();
+    m_tokens = new std::vector<std::string>();
+    m_tokens->reserve(parsed.size());
+    for (std::string& p : parsed) {
+        m_tokens->push_back(p);
+    }
 
     for (int i = 0; i < m_argsLen; i++) {
         ConvertArg(args[i], i);
@@ -94,7 +110,7 @@ JSToJavaConverter::JSToJavaConverter(
 }
 
 bool JSToJavaConverter::ConvertArg(const Local<Value> &arg, int index) {
-    const auto &typeSignature = m_tokens.at(index);
+    const auto &typeSignature = m_tokens->at(index);
 
     if (arg->IsArray() && typeSignature[0] == '[') {
         return tns::ConvertJavaScriptArray(
