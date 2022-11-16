@@ -506,66 +506,110 @@ bool JsArgConverter::ConvertJavaScriptArray(const Local<Array>& jsArr, int index
 
     JEnv env;
     switch (elementTypePrefix) {
-        case 'Z':
+        case 'Z': {
             arr = env.NewBooleanArray(arrLength);
+            jboolean bools[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                jboolean value = jsArr->Get(context, i).ToLocalChecked()->BooleanValue(m_isolate);
-                env.SetBooleanArrayRegion((jbooleanArray) arr, i, 1, &value);
+                bools[i] = jsArr
+                        ->Get(context, i)
+                        .ToLocalChecked()
+                        ->BooleanValue(m_isolate);
             }
+            env.SetBooleanArrayRegion((jbooleanArray) arr, 0, arrLength, bools);
             break;
-        case 'B':
+        }
+        case 'B': {
             arr = env.NewByteArray(arrLength);
+            jbyte bytes[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                jbyte value = jsArr->Get(context, i).ToLocalChecked()->Int32Value(context).ToChecked();
-                env.SetByteArrayRegion((jbyteArray) arr, i, 1, &value);
+                bytes[i] = jsArr
+                        ->Get(context, i)
+                        .ToLocalChecked()
+                        ->Int32Value(context)
+                        .ToChecked();
             }
+            env.SetByteArrayRegion((jbyteArray) arr, 0, arrLength, bytes);
             break;
-        case 'C':
+        }
+        case 'C': {
             arr = env.NewCharArray(arrLength);
+            jchar chars[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                String::Utf8Value utf8(m_isolate, jsArr->Get(context, i).ToLocalChecked()->ToString(context).ToLocalChecked());
-                JniLocalRef s(env.NewString((jchar*) *utf8, 1));
-                const char* singleChar = env.GetStringUTFChars(s, nullptr);
-                jchar value = *singleChar;
+                String::Utf8Value utf8(m_isolate, jsArr->Get(context, i).ToLocalChecked()->ToString(
+                        context).ToLocalChecked());
+                JniLocalRef s(env.NewString((jchar *) *utf8, 1));
+                const char *singleChar = env.GetStringUTFChars(s, nullptr);
+                chars[i] = *singleChar;
                 env.ReleaseStringUTFChars(s, singleChar);
-                env.SetCharArrayRegion((jcharArray) arr, i, 1, &value);
             }
+            env.SetCharArrayRegion((jcharArray) arr, 0, arrLength, chars);
             break;
-        case 'S':
+        }
+        case 'S': {
             arr = env.NewShortArray(arrLength);
+            jshort shorts[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                jshort value = jsArr->Get(context, i).ToLocalChecked()->Int32Value(context).ToChecked();
-                env.SetShortArrayRegion((jshortArray) arr, i, 1, &value);
+                shorts[i] = jsArr
+                        ->Get(context, i)
+                        .ToLocalChecked()
+                        ->Int32Value(context)
+                        .ToChecked();
             }
+            env.SetShortArrayRegion((jshortArray) arr, 0, arrLength, shorts);
             break;
-        case 'I':
+        }
+        case 'I': {
             arr = env.NewIntArray(arrLength);
+            jint ints[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                jint value = jsArr->Get(context, i).ToLocalChecked()->Int32Value(context).ToChecked();
-                env.SetIntArrayRegion((jintArray) arr, i, 1, &value);
+                ints[i] = jsArr
+                        ->Get(context, i)
+                        .ToLocalChecked()
+                        ->Int32Value(context)
+                        .ToChecked();
             }
+            env.SetIntArrayRegion((jintArray) arr, 0, arrLength, ints);
             break;
-        case 'J':
+        }
+        case 'J': {
             arr = env.NewLongArray(arrLength);
+            jlong longs[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                jlong value = jsArr->Get(context, i).ToLocalChecked()->NumberValue(context).ToChecked();
-                env.SetLongArrayRegion((jlongArray) arr, i, 1, &value);
+                longs[i] = jsArr
+                        ->Get(context, i)
+                        .ToLocalChecked()
+                        ->NumberValue(context)
+                        .ToChecked();
             }
+            env.SetLongArrayRegion((jlongArray) arr, 0, arrLength, longs);
             break;
-        case 'F':
+        }
+        case 'F': {
             arr = env.NewFloatArray(arrLength);
+            jfloat floats[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                jfloat value = jsArr->Get(context, i).ToLocalChecked()->NumberValue(context).ToChecked();
-                env.SetFloatArrayRegion((jfloatArray) arr, i, 1, &value);
+                floats[i] = jsArr
+                        ->Get(context, i)
+                        .ToLocalChecked()
+                        ->NumberValue(context)
+                        .ToChecked();
             }
+            env.SetFloatArrayRegion((jfloatArray) arr, 0, arrLength, floats);
             break;
-        case 'D':
+        }
+        case 'D': {
             arr = env.NewDoubleArray(arrLength);
+            jdouble doubles[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                jdouble value = jsArr->Get(context, i).ToLocalChecked()->NumberValue(context).ToChecked();
-                env.SetDoubleArrayRegion((jdoubleArray) arr, i, 1, &value);
+                doubles[i] = jsArr
+                        ->Get(context, i)
+                        .ToLocalChecked()
+                        ->NumberValue(context)
+                        .ToChecked();
             }
+            env.SetDoubleArrayRegion((jdoubleArray) arr, 0, arrLength, doubles);
             break;
+        }
         case 'L':
             strippedClassName = elementType.substr(1, elementType.length() - 2);
             elementClass = env.FindClass(strippedClassName);

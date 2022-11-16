@@ -3,7 +3,8 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
-#include "./conversions/JSToJavaConverter.h"
+//#include "./conversions/JSToJavaConverter.h"
+#include "JsArgConverter.h"
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
 #include "v8-profiler.h"
@@ -102,7 +103,8 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
             instance = env.NewObject(generatedJavaClass, mi.mid);
         } else {
             // resolve arguments before passing them on to the constructor
-            JSToJavaConverter argConverter(isolate, argWrapper.args, mi.signature);
+//            JSToJavaConverter argConverter(isolate, argWrapper.args, mi.signature);
+            JsArgConverter argConverter(argWrapper.args, mi.signature);
             auto ctorArgs = argConverter.ToArgs();
 
             instance = env.NewObjectA(generatedJavaClass, mi.mid, ctorArgs);
@@ -322,14 +324,19 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                     methodName.c_str());
     }
 
-    JSToJavaConverter argConverter = (entry != nullptr && entry->isExtensionFunction)
-                                     ? JSToJavaConverter(isolate, args, *sig, entry, caller)
-                                     : JSToJavaConverter(isolate, args, *sig, entry);
+//    JSToJavaConverter argConverter = (entry != nullptr && entry->isExtensionFunction)
+//                                     ? JSToJavaConverter(isolate, args, *sig, entry, caller)
+//                                     : JSToJavaConverter(isolate, args, *sig, entry);
 
-//    if (!argConverter->IsValid()) {
-//        JSToJavaConverter::Error err = argConverter->GetError();
-//        throw NativeScriptException(err.msg);
-//    }
+    JsArgConverter argConverter = (entry != nullptr && entry->isExtensionFunction)
+                                        ? JsArgConverter(caller, args, *sig, entry)
+                                        : JsArgConverter(args, false, *sig, entry);
+
+
+    if (!argConverter.IsValid()) {
+        JsArgConverter::Error err = argConverter.GetError();
+        throw NativeScriptException(err.msg);
+    }
 
     JniLocalRef callerJavaObject;
 
