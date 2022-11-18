@@ -187,7 +187,8 @@ void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
 void Console::errorCallback(const v8::FunctionCallbackInfo <v8::Value>& info) {
     try {
-        std::string log = buildLogString(info);
+        std::string log = "CONSOLE ERROR ";
+        log += buildLogString(info);
 
         sendToADBLogcat(log, ANDROID_LOG_ERROR);
         sendToDevToolsFrontEnd(info.GetIsolate(), log, "error");
@@ -206,7 +207,8 @@ void Console::errorCallback(const v8::FunctionCallbackInfo <v8::Value>& info) {
 
 void Console::infoCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     try {
-        std::string log = buildLogString(info);
+        std::string log = "CONSOLE INFO ";
+        log += buildLogString(info);
 
         sendToADBLogcat(log, ANDROID_LOG_INFO);
         sendToDevToolsFrontEnd(info.GetIsolate(), log, "info");
@@ -225,7 +227,8 @@ void Console::infoCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
 void Console::logCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     try {
-        std::string log = buildLogString(info);
+        std::string log = "CONSOLE LOG ";
+        log += buildLogString(info);
 
         sendToADBLogcat(log, ANDROID_LOG_INFO);
         sendToDevToolsFrontEnd(info.GetIsolate(), log, "info");
@@ -244,7 +247,8 @@ void Console::logCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
 void Console::warnCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     try {
-        std::string log = buildLogString(info);
+        std::string log = "CONSOLE WARN ";
+        log += buildLogString(info);
 
         sendToADBLogcat(log, ANDROID_LOG_WARN);
         sendToDevToolsFrontEnd(info.GetIsolate(), log, "warning");
@@ -491,7 +495,7 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
         double diffMilliseconds = diffMicroseconds / 1000.0;
 
         std::stringstream ss;
-        ss << label << ": " << std::fixed << std::setprecision(3) << diffMilliseconds << "ms" ;
+        ss << "CONSOLE TIME " << label << ": " << std::fixed << std::setprecision(3) << diffMilliseconds << "ms" ;
         std::string log = ss.str();
 
         __android_log_write(ANDROID_LOG_INFO, LOG_TAG, log.c_str());
