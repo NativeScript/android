@@ -92,9 +92,7 @@ void ArrayBufferHelper::CreateFromCallbackImpl(const FunctionCallbackInfo<Value>
         std::shared_ptr<v8::BackingStore> store = ArrayBuffer::NewBackingStore(
                 data,
                 size,
-                [](void* data, size_t length, void* deleter_data) {
-                    free(data);
-                },
+                [](void* data, size_t length, void* deleter_data) {},
                 data);
 
         arrayBuffer = ArrayBuffer::New(isolate, store);
@@ -116,14 +114,14 @@ void ArrayBufferHelper::CreateFromCallbackImpl(const FunctionCallbackInfo<Value>
 
         auto byteArrayElements = env.GetByteArrayElements(byteArray, 0);
 
-        void* data[bufferRemainingSize];
+        jbyte* data = new jbyte[bufferRemainingSize];
         memcpy(data, byteArrayElements, bufferRemainingSize);
 
         std::shared_ptr<v8::BackingStore> store = ArrayBuffer::NewBackingStore(
-                byteArrayElements,
+                data,
                 bufferRemainingSize,
                 [](void *data, size_t length, void *deleter_data) {
-                    free(data);
+                    delete[] ((jbyte*)data);
                 },
                 nullptr);
 
