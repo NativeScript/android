@@ -114,16 +114,21 @@ void ArrayBufferHelper::CreateFromCallbackImpl(const FunctionCallbackInfo<Value>
         jbyteArray byteArray = env.NewByteArray(bufferRemainingSize);
         env.CallObjectMethod(obj, m_getMethodID, byteArray, 0, bufferRemainingSize);
 
-        auto buffer = env.GetByteArrayElements(byteArray, 0);
+        auto byteArrayElements = env.GetByteArrayElements(byteArray, 0);
 
+        void* data[bufferRemainingSize];
+        memcpy(data, byteArrayElements, bufferRemainingSize);
 
-        std::shared_ptr<v8::BackingStore> store = ArrayBuffer::NewBackingStore(buffer, bufferRemainingSize,
-                                     [](void* data, size_t length, void* deleter_data) {
-                                         free(data);
-                                     },
-                                     buffer);
+        std::shared_ptr<v8::BackingStore> store = ArrayBuffer::NewBackingStore(
+                byteArrayElements,
+                bufferRemainingSize,
+                [](void *data, size_t length, void *deleter_data) {
+                    free(data);
+                },
+                nullptr);
 
         arrayBuffer = ArrayBuffer::New(isolate, store);
+        env.ReleaseByteArrayElements(byteArray, byteArrayElements, 0);
     }
 
     auto ctx = isolate->GetCurrentContext();
