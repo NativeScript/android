@@ -68,3 +68,4 @@ require("./tests/kotlin/access/testInternalLanguageFeaturesSupport");
 require("./tests/testPackagePrivate");
 require("./tests/kotlin/properties/testPropertiesSupport.js");
 require('./tests/testNativeTimers');
+require("./tests/console/logTests.js");
