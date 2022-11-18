@@ -1091,8 +1091,10 @@ CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo
                                            ArgConverter::ConvertToV8String(isolate, "workerId"),
                                            jsId);
 
-        Local<String> msg = tns::JsonStringifyObject(isolate, args[0], false);
         auto context = isolate->GetCurrentContext();
+        auto objToStringify = args[0]->ToObject(context).ToLocalChecked();
+        std::string msg = tns::JsonStringifyObject(isolate, objToStringify, false);
+
         // get worker's ID that is associated on the other side - in Java
         auto id = jsId->Int32Value(context).ToChecked();
 
@@ -1100,7 +1102,7 @@ CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo
         auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "sendMessageFromMainToWorker",
                                          "(ILjava/lang/String;)V");
 
-        auto jmsg = ArgConverter::ConvertToJavaString(msg);
+        jstring jmsg = env.NewStringUTF(msg.c_str());
         JniLocalRef jmsgRef(jmsg);
 
         env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id, (jstring) jmsgRef);
@@ -1190,13 +1192,15 @@ CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbackInfo
             return;
         }
 
-        Local<String> msg = tns::JsonStringifyObject(isolate, args[0], false);
+        auto context = isolate->GetCurrentContext();
+        auto objToStringify = args[0]->ToObject(context).ToLocalChecked();
+        std::string msg = tns::JsonStringifyObject(isolate, objToStringify, false);
 
         JEnv env;
         auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "sendMessageFromWorkerToMain",
                                          "(Ljava/lang/String;)V");
 
-        auto jmsg = ArgConverter::ConvertToJavaString(msg);
+        auto jmsg = env.NewStringUTF(msg.c_str());
         JniLocalRef jmsgRef(jmsg);
 
         env.CallStaticVoidMethod(RUNTIME_CLASS, mId, (jstring) jmsgRef);

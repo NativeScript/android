@@ -72,27 +72,24 @@ void Console::sendToDevToolsFrontEnd(v8::Isolate* isolate, const std::string& me
     }
 }
 
-const v8::Local<v8::String> transformJSObject(v8::Isolate* isolate, v8::Local<v8::Object> object) {
+std::string transformJSObject(v8::Isolate* isolate, v8::Local<v8::Object> object) {
     auto context = isolate->GetCurrentContext();
     auto objToString = object->ToString(context).ToLocalChecked();
-    v8::Local<v8::String> resultString;
+    auto objToCppString = ArgConverter::ConvertToString(objToString);
 
-    auto hasCustomToStringImplementation = ArgConverter::ConvertToString(objToString).find("[object Object]") == std::string::npos;
+    auto hasCustomToStringImplementation = objToCppString.find("[object Object]") == std::string::npos;
 
     if (hasCustomToStringImplementation) {
-        resultString = objToString;
+        return objToCppString;
     } else {
-        v8::HandleScope scope(isolate);
-        resultString = JsonStringifyObject(isolate, object);
+        return JsonStringifyObject(isolate, object);
     }
-
-    return resultString;
 }
 
-const v8::Local<v8::String> buildStringFromArg(v8::Isolate* isolate, const v8::Local<v8::Value>& val) {
-    v8::Local<v8::String> argString;
+std::string buildStringFromArg(v8::Isolate* isolate, const v8::Local<v8::Value>& val) {
     if (val->IsFunction()) {
-        val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
+        auto v8FunctionString = val->ToDetailString(isolate->GetCurrentContext()).ToLocalChecked();
+        return ArgConverter::ConvertToString(v8FunctionString);
     } else if (val->IsArray()) {
         auto context = isolate->GetCurrentContext();
         auto cachedSelf = val;
@@ -100,69 +97,57 @@ const v8::Local<v8::String> buildStringFromArg(v8::Isolate* isolate, const v8::L
         auto arrayEntryKeys = array->GetPropertyNames(isolate->GetCurrentContext()).ToLocalChecked();
 
         auto arrayLength = arrayEntryKeys->Length();
-
-        argString = ArgConverter::ConvertToV8String(isolate, "[");
+        std::string argString = "[";
 
         for (int i = 0; i < arrayLength; i++) {
             auto propertyName = arrayEntryKeys->Get(context, i).ToLocalChecked();
-
             auto propertyValue = array->Get(context, propertyName).ToLocalChecked();
 
             // avoid bottomless recursion with cyclic reference to the same array
             if (propertyValue->StrictEquals(cachedSelf)) {
-                argString = v8::String::Concat(isolate, argString, ArgConverter::ConvertToV8String(isolate, "[Circular]"));
+                argString.append("[Circular]");
                 continue;
             }
 
             auto objectString = buildStringFromArg(isolate, propertyValue);
-
-            argString = v8::String::Concat(isolate, argString, objectString);
+            argString.append(objectString);
 
             if (i != arrayLength - 1) {
-                argString = v8::String::Concat(isolate, argString, ArgConverter::ConvertToV8String(isolate, ", "));
+                argString.append(", ");
             }
         }
 
-        argString = v8::String::Concat(isolate, argString, ArgConverter::ConvertToV8String(isolate, "]"));
+        return argString.append("]");
     } else if (val->IsObject()) {
         v8::Local<v8::Object> obj = val.As<v8::Object>();
-
-        argString = transformJSObject(isolate, obj);
+        return transformJSObject(isolate, obj);
     } else {
-        val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
+        auto v8DefaultToString = val->ToDetailString(isolate->GetCurrentContext()).ToLocalChecked();
+        return ArgConverter::ConvertToString(v8DefaultToString);
     }
-
-    return argString;
 }
 
-const std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info, int startingIndex = 0) {
+std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info, int startingIndex = 0) {
     auto isolate = info.GetIsolate();
-
     v8::HandleScope scope(isolate);
-
     std::stringstream ss;
 
     auto argLen = info.Length();
     if (argLen) {
         for (int i = startingIndex; i < argLen; i++) {
-            v8::Local<v8::String> argString;
-
-            argString = buildStringFromArg(isolate, info[i]);
-
             // separate args with a space
             if (i != 0) {
                 ss << " ";
             }
-
-            ss << ArgConverter::ConvertToString(argString);
+            
+            std::string argString = buildStringFromArg(isolate, info[i]);
+            ss << argString;
         }
     } else {
         ss << std::endl;
     }
 
-    std::string stringResult = ss.str();
-
-    return stringResult;
+    return ss.str();
 }
 
 void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -170,7 +155,6 @@ void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
         auto isolate = info.GetIsolate();
 
         auto argLen = info.Length();
-        auto context = isolate->GetCurrentContext();
         auto expressionPasses = argLen && info[0]->BooleanValue(isolate);
 
         if (!expressionPasses) {
@@ -307,13 +291,11 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
                     if (propIsFunction) {
                         ss << "()";
                     } else if (propertyValue->IsArray()) {
-                        auto stringResult = buildStringFromArg(isolate, propertyValue);
-                        std::string jsonStringifiedArray = ArgConverter::ConvertToString(stringResult);
+                        std::string jsonStringifiedArray = buildStringFromArg(isolate, propertyValue);
                         ss << ": " << jsonStringifiedArray;
                     } else if (propertyValue->IsObject()) {
                         auto obj = propertyValue->ToObject(context).ToLocalChecked();
-                        auto objString = transformJSObject(isolate, obj);
-                        std::string jsonStringifiedObject = ArgConverter::ConvertToString(objString);
+                        auto jsonStringifiedObject = transformJSObject(isolate, obj);
                         // if object prints out as the error string for circular references, replace with #CR instead for brevity
                         if (jsonStringifiedObject.find("circular structure") != std::string::npos) {
                             jsonStringifiedObject = "#CR";
