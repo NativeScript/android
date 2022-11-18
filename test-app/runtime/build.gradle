@@ -87,9 +87,9 @@ android {
         externalNativeBuild {
             cmake {
 
-//                if (optimized) {
-//                    arguments.add("-DOPTIMIZED_BUILD=true")
-//                }
+                if (optimized) {
+                    arguments.add("-DOPTIMIZED_BUILD=true")
+                }
 //
 //                if (optimizedWithInspector) {
 //                    arguments.add("-DOPTIMIZED_WITH_INSPECTOR_BUILD=true")
