@@ -704,8 +704,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     }
 #endif
 
-//    m_weakRef.Init(isolate, globalTemplate, m_objectManager);
-
     SimpleProfiler::Init(isolate, globalTemplate);
 
     CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
@@ -715,8 +713,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
 
     auto global = context->Global();
-
-    m_weakRef.Init(isolate,context, global, m_objectManager);
 
     context->Enter();
 
@@ -732,6 +728,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "global"), global, readOnlyFlags);
     global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "__global"), global, readOnlyFlags);
+    m_weakRef.Init(isolate, context);
 
     // Do not set 'self' accessor to main thread JavaScript
     if (s_mainThreadInitialized) {
