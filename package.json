@@ -1,7 +1,7 @@
 {
   "name": "@nativescript/android",
   "description": "NativeScript Runtime for Android",
-  "version": "8.4.0-alpha.8",
+  "version": "8.4.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/NativeScript/android-runtime.git"
