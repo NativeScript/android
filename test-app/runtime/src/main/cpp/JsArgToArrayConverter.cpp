@@ -232,7 +232,6 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
         case CastType::None:
             obj = objectManager->GetJavaObjectByJsObject(jsObj);
 
-
             if (obj.IsNull() && (jsObj->IsTypedArray() || jsObj->IsArrayBuffer() || jsObj->IsArrayBufferView()))
                 {
 
@@ -240,34 +239,32 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                     shared_ptr<BackingStore> store;
                     size_t offset = 0;
                     size_t length;
-                    uint8_t * data = nullptr;
-                    auto link_with_data = false;
+                    uint8_t *data = nullptr;
                     if (jsObj->IsArrayBuffer())
                     {
                         auto array = jsObj.As<v8::ArrayBuffer>();
                         store = array->GetBackingStore();
                         length = array->ByteLength();
+                        data = static_cast<uint8_t *>(store->Data());
+
+                        if (data == nullptr) {
+                            data = static_cast<uint8_t *>(array->GetContents().Data());
+                        }
                     }
                     else if (jsObj->IsArrayBufferView())
                     {
                         auto array = jsObj.As<v8::ArrayBufferView>();
-
-                        if (!array->HasBuffer())
-                        {
-
-                            length = array->ByteLength();
-                            void *data_ = malloc(length);
-                            array->CopyContents(data_, length);
-                            data = (uint8_t *)data_;
-                            link_with_data = true;
-                        }
-                        else
-                        {
-                            length = array->ByteLength();
-                        }
                         offset = array->ByteOffset();
+                        length = array->ByteLength();
                         store = array->Buffer()->GetBackingStore();
                         bufferCastType = JsArgConverter::GetCastType(array);
+
+                        data = static_cast<uint8_t *>(store->Data()) + offset;
+
+                        if (data == nullptr) {
+                            data = static_cast<uint8_t *>(array->Buffer()->GetContents().Data()) +
+                                   offset;
+                        }
                     }
                     else
                     {
@@ -276,11 +273,16 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                         store = array->Buffer()->GetBackingStore();
                         length = array->ByteLength();
                         bufferCastType = JsArgConverter::GetCastType(array);
+
+                        data = static_cast<uint8_t *>(store->Data()) + offset;
+
+                        if (data == nullptr) {
+                            data = static_cast<uint8_t *>(array->Buffer()->GetContents().Data()) +
+                                   offset;
+                        }
+
                     }
 
-                    if(data == nullptr){
-                        data = static_cast<uint8_t *>(store->Data()) + offset;
-                    }
 
                     auto directBuffer = env.NewDirectByteBuffer(
                             data,
@@ -346,15 +348,9 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
 
                     int id = objectManager->GetOrCreateObjectId(buffer);
                     auto clazz = env.GetObjectClass(buffer);
-                    if (link_with_data) {
-                        objectManager->LinkWithExtraData(jsObj, id, clazz, data);
-                    } else {
-                        objectManager->Link(jsObj, id, clazz);
-                    }
-
+                    objectManager->Link(jsObj, id, clazz);
                     obj = objectManager->GetJavaObjectByJsObject(jsObj);
                 }
-
 
             V8GetPrivateValue(isolate, jsObj, V8StringConstants::GetNullNodeName(isolate), castValue);
 
