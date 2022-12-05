@@ -23,6 +23,6 @@
   "// this gradle key is here for backwards compatibility - we'll phase it out slowly...": "",
   "gradle": {
     "version": "7.5",
-    "android": "7.3"
+    "android": "7.3.0"
   }
 }
