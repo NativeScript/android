@@ -7,9 +7,9 @@
 class DesugaredInterfaceCompanionClassNameResolver {
 
 public:
-    std::string resolveD8InterfaceCompanionClassName(std::string interfaceName);
+    std::string resolveD8InterfaceCompanionClassName(const std::string& interfaceName);
 
-    std::string resolveBazelInterfaceCompanionClassName(std::string interfaceName);
+    std::string resolveBazelInterfaceCompanionClassName(const std::string& interfaceName);
 
 private:
     const std::string BAZEL_COMPANION_CLASS_SUFFIX = "$$CC";
