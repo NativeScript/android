@@ -865,11 +865,11 @@ JEnv::GetInterfaceStaticMethodIDAndJClass(const std::string &interfaceName,
                                           const std::string &methodName,
                                           const std::string &sig) {
 
-    auto companionClassNameResolver = new DesugaredInterfaceCompanionClassNameResolver();
+    DesugaredInterfaceCompanionClassNameResolver companionClassNameResolver;
     std::string possibleCalleeNames[] = {interfaceName,
-                                         companionClassNameResolver->resolveBazelInterfaceCompanionClassName(
+                                         companionClassNameResolver.resolveBazelInterfaceCompanionClassName(
                                                  interfaceName),
-                                         companionClassNameResolver->resolveD8InterfaceCompanionClassName(
+                                         companionClassNameResolver.resolveD8InterfaceCompanionClassName(
                                                  interfaceName)};
 
     for (std::string calleeName: possibleCalleeNames) {
