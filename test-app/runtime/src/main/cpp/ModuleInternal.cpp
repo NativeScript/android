@@ -507,6 +507,7 @@ void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::stri
     int length = cachedData->length;
     auto cachePath = path + ".cache";
     File::WriteBinary(cachePath, cachedData->data, length);
+    delete cachedData;
 }
 
 ModuleInternal::ModulePathKind ModuleInternal::GetModulePathKind(const std::string& path) {
