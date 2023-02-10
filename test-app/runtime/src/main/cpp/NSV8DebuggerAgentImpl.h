@@ -20,7 +20,9 @@ namespace v8_inspector {
                 Maybe<protocol::Debugger::Location> end, Maybe<bool> restrictToFunction,
                 std::unique_ptr<protocol::Array<protocol::Debugger::BreakLocation>> *
                 locations) override;
-        DISALLOW_COPY_AND_ASSIGN(NSV8DebuggerAgentImpl);
+
+        NSV8DebuggerAgentImpl(const NSV8DebuggerAgentImpl&) = delete;
+        NSV8DebuggerAgentImpl& operator=(const NSV8DebuggerAgentImpl&) = delete;
     private:
         tns::JEnv m_env;
         bool m_lineBreakpointsEnabled;

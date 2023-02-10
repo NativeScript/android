@@ -58,7 +58,8 @@ class CSSAgentImpl : public protocol::CSS::Backend {
         protocol::DictionaryValue* m_state;
         bool m_enabled;
 
-        DISALLOW_COPY_AND_ASSIGN(CSSAgentImpl);
+        CSSAgentImpl(const CSSAgentImpl&) = delete;
+        CSSAgentImpl& operator=(const CSSAgentImpl&) = delete;
 };
 }  // namespace tns
 

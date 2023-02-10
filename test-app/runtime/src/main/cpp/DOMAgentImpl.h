@@ -82,7 +82,8 @@ class DOMAgentImpl : public protocol::DOM::Backend {
 
         bool m_enabled;
 
-        DISALLOW_COPY_AND_ASSIGN(V8DOMAgentImpl);
+        DOMAgentImpl(const DOMAgentImpl&) = delete;
+        DOMAgentImpl& operator=(const DOMAgentImpl&) = delete;
 };
 } // namespace tns
 

@@ -71,7 +71,8 @@ namespace tns {
         protocol::DictionaryValue *m_state;
         bool m_enabled;
 
-        DISALLOW_COPY_AND_ASSIGN(V8OverlayAgentImpl);
+        OverlayAgentImpl(const OverlayAgentImpl&) = delete;
+        OverlayAgentImpl& operator=(const OverlayAgentImpl&) = delete;
     };
 
 }

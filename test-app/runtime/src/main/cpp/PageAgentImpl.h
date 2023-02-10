@@ -71,7 +71,8 @@ class PageAgentImpl : public protocol::Page::Backend {
         const std::string m_frameIdentifier;
         bool m_enabled;
 
-        DISALLOW_COPY_AND_ASSIGN(V8PageAgentImpl);
+        PageAgentImpl(const PageAgentImpl&) = delete;
+        PageAgentImpl& operator=(const PageAgentImpl&) = delete;
 };
 
 }

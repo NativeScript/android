@@ -67,7 +67,8 @@ class NetworkAgentImpl : public protocol::Network::Backend {
         protocol::DictionaryValue* m_state;
         bool m_enabled;
 
-        DISALLOW_COPY_AND_ASSIGN(V8NetworkAgentImpl);
+        NetworkAgentImpl(const NetworkAgentImpl&) = delete;
+        NetworkAgentImpl& operator=(const NetworkAgentImpl&) = delete;
 };
 }  // namespace tns
 
