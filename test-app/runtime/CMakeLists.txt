@@ -52,8 +52,6 @@ include_directories(
         src/main/cpp
         src/main/cpp/include
         src/main/cpp/v8_inspector
-        # This folder contains V8's built-in natives and snapshot blobs
-        src/main/libs/${ANDROID_ABI}/include
 )
 
 if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)

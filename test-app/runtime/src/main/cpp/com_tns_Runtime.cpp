@@ -288,15 +288,6 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_passExceptionToJsNative(JNIEnv* e
     }
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_clearStartupData(JNIEnv* env, jobject obj, jint runtimeId) {
-    auto runtime = TryGetRuntime(runtimeId);
-    if (runtime == nullptr) {
-        return;
-    }
-
-    runtime->ClearStartupData(env, obj);
-}
-
 extern "C" JNIEXPORT jint Java_com_tns_Runtime_getPointerSize(JNIEnv* env, jobject obj) {
     return sizeof(void*);
 }

@@ -112,19 +112,6 @@ public final class RuntimeHelper {
                         aE.extractAssets(context, "internal", outputDir, extractPolicy, removePreviouslyInstalledAssets);
                         aE.extractAssets(context, "metadata", outputDir, extractPolicy, false);
 
-                        boolean shouldExtractSnapshots = true;
-
-                        // will extract snapshot of the device appropriate architecture
-                        if (shouldExtractSnapshots) {
-                            if (logger.isEnabled()) {
-                                logger.write("Extracting snapshot blob");
-                            }
-
-                            @SuppressWarnings("deprecation")
-                            String cpu_abi = Build.CPU_ABI;
-                            aE.extractAssets(context, "snapshots/" + cpu_abi, outputDir, extractPolicy, removePreviouslyInstalledAssets);
-                        }
-
                         extractPolicy.setAssetsThumb(context);
                     } finally {
                         extractionFrame.close();
