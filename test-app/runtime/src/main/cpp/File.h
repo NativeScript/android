@@ -11,15 +11,6 @@
 #include <string>
 
 namespace tns {
-struct MemoryMappedFile final {
-    static MemoryMappedFile Open(const char* filePath);
-    MemoryMappedFile(void* memory, size_t size);
-    ~MemoryMappedFile();
-
-    void* memory = nullptr;
-    size_t size = 0;
-};
-
 class File {
     public:
         static const char* ReadText(const std::string& filePath, int& length, bool& isNew);
