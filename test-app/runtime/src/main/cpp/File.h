@@ -24,7 +24,6 @@ class File {
     public:
         static const char* ReadText(const std::string& filePath, int& length, bool& isNew);
         static std::string ReadText(const std::string& filePath);
-        static bool Exists(const std::string& filePath);
         static bool WriteBinary(const std::string& filePath, const void* inData, int length);
         static void* ReadBinary(const std::string& filePath, int& length);
     private:

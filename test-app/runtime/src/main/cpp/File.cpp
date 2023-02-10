@@ -14,10 +14,7 @@
 using namespace std;
 
 namespace tns {
-bool File::Exists(const string& path) {
-    std::ifstream infile(path.c_str());
-    return infile.good();
-}
+
 string File::ReadText(const string& filePath) {
     int len;
     bool isNew;
@@ -34,9 +31,6 @@ string File::ReadText(const string& filePath) {
 
 void* File::ReadBinary(const string& filePath, int& length) {
     length = 0;
-    if (!File::Exists(filePath)) {
-        return nullptr;
-    }
 
     auto file = fopen(filePath.c_str(), READ_BINARY);
     if (!file) {
