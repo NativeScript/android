@@ -4,9 +4,9 @@
 #include "Runtime.h"
 #include "NativeScriptException.h"
 
-#include <v8_inspector/src/inspector/v8-log-agent-impl.h>
 #include "ArgConverter.h"
 #include "DOMDomainCallbackHandlers.h"
+#include "LogAgentImpl.h"
 #include "NetworkDomainCallbackHandlers.h"
 
 using namespace std;

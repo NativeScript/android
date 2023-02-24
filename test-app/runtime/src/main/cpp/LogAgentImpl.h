@@ -9,22 +9,24 @@
 #include <Util.h>
 #include <chrono>
 
-
 namespace v8_inspector {
-
 class V8InspectorSessionImpl;
+}
+
+namespace tns {
 
 using v8_inspector::protocol::Maybe;
 using String = v8_inspector::String16;
 using v8_inspector::protocol::DispatchResponse;
+using v8_inspector::V8InspectorSessionImpl;
+namespace protocol = v8_inspector::protocol;
 
-
-class V8LogAgentImpl : public protocol::Log::Backend {
+class LogAgentImpl : public protocol::Log::Backend {
     public:
-        V8LogAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
-                       protocol::DictionaryValue* state);
+        LogAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
+                     protocol::DictionaryValue* state);
 
-        ~V8LogAgentImpl() override;
+        ~LogAgentImpl() override;
         DispatchResponse enable() override;
         DispatchResponse disable() override;
         DispatchResponse clear() override;
@@ -39,9 +41,9 @@ class V8LogAgentImpl : public protocol::Log::Backend {
         protocol::Log::Frontend m_frontend;
         bool m_enabled;
 
-        static V8LogAgentImpl* Instance;
+        static LogAgentImpl* Instance;
 };
 
-}
+}  // namespace tns
 
 #endif //V8_LOG_AGENT_IMPL_H

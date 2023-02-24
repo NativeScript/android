@@ -2,15 +2,13 @@
 // Created by pkanev on 6/5/2017.
 //
 
-#include <v8_inspector/src/inspector/utils/v8-inspector-common.h>
+#include "utils/InspectorCommon.h"
 #include <codecvt>
 #include <locale>
 #include <ArgConverter.h>
 #include <NativeScriptAssert.h>
 
-using tns::ArgConverter;
-
-namespace v8_inspector {
+namespace tns {
 namespace utils {
 v8::Local<v8::Object> Common::getGlobalInspectorObject(v8::Isolate* isolate) {
     auto context = isolate->GetCurrentContext();

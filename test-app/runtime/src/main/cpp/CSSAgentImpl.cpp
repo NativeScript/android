@@ -4,21 +4,20 @@
 
 #include <NativeScriptAssert.h>
 #include <v8_inspector/third_party/inspector_protocol/crdtp/json.h>
-#include <v8_inspector/src/inspector/utils/v8-inspector-common.h>
 #include <ArgConverter.h>
-#include "v8-css-agent-impl.h"
 
-namespace v8_inspector {
+#include "CSSAgentImpl.h"
+#include "utils/InspectorCommon.h"
 
-using tns::ArgConverter;
+namespace tns {
 
 namespace CSSAgentState {
 static const char cssEnabled[] = "cssEnabled";
 }
 
-V8CSSAgentImpl::V8CSSAgentImpl(V8InspectorSessionImpl* session,
-                               protocol::FrontendChannel* frontendChannel,
-                               protocol::DictionaryValue* state)
+CSSAgentImpl::CSSAgentImpl(V8InspectorSessionImpl* session,
+                           protocol::FrontendChannel* frontendChannel,
+                           protocol::DictionaryValue* state)
     : m_session(session),
       m_frontend(frontendChannel),
       m_state(state),
@@ -26,9 +25,9 @@ V8CSSAgentImpl::V8CSSAgentImpl(V8InspectorSessionImpl* session,
     Instance = this;
 }
 
-V8CSSAgentImpl::~V8CSSAgentImpl() { }
+CSSAgentImpl::~CSSAgentImpl() { }
 
-void V8CSSAgentImpl::enable(std::unique_ptr<EnableCallback> callback) {
+void CSSAgentImpl::enable(std::unique_ptr<EnableCallback> callback) {
     if (m_enabled) {
         callback->sendSuccess();
         return;
@@ -40,7 +39,7 @@ void V8CSSAgentImpl::enable(std::unique_ptr<EnableCallback> callback) {
     callback->sendSuccess();
 }
 
-DispatchResponse V8CSSAgentImpl::disable() {
+DispatchResponse CSSAgentImpl::disable() {
     if (!m_enabled) {
         return DispatchResponse::Success();
     }
@@ -53,7 +52,7 @@ DispatchResponse V8CSSAgentImpl::disable() {
 }
 
 // Not supported
-DispatchResponse V8CSSAgentImpl::getMatchedStylesForNode(int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle, Maybe<protocol::Array<protocol::CSS::RuleMatch>>* out_matchedCSSRules, Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>* out_pseudoElements, Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>* out_inherited, Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>* out_cssKeyframesRules) {
+DispatchResponse CSSAgentImpl::getMatchedStylesForNode(int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle, Maybe<protocol::Array<protocol::CSS::RuleMatch>>* out_matchedCSSRules, Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>* out_pseudoElements, Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>* out_inherited, Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>* out_cssKeyframesRules) {
     //// out_inlineStyle
 //        auto cssPropsArr = protocol::Array<protocol::CSS::CSSProperty>::create();
 //        auto shorthandPropArr = protocol::Array<protocol::CSS::ShorthandEntry>::create();
@@ -114,7 +113,7 @@ DispatchResponse V8CSSAgentImpl::getMatchedStylesForNode(int in_nodeId, Maybe<pr
     return DispatchResponse::Success();
 }
 
-DispatchResponse V8CSSAgentImpl::getInlineStylesForNode(int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle) {
+DispatchResponse CSSAgentImpl::getInlineStylesForNode(int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle) {
     //// out_inlineStyle
 //        auto cssPropsArr = protocol::Array<protocol::CSS::CSSProperty>::create();
 //        auto shorthandPropArr = protocol::Array<protocol::CSS::ShorthandEntry>::create();
@@ -137,7 +136,7 @@ DispatchResponse V8CSSAgentImpl::getInlineStylesForNode(int in_nodeId, Maybe<pro
     return DispatchResponse::Success();
 }
 
-DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>* out_computedStyle) {
+DispatchResponse CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>* out_computedStyle) {
     auto computedStylePropertyArr = std::make_unique<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>();
 
     std::string getComputedStylesForNodeString = "getComputedStylesForNode";
@@ -169,7 +168,7 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
 
             if (maybeResult.ToLocal(&outResult)) {
                 auto resultString = outResult->ToString(context).ToLocalChecked();
-                String16 resultProtocolString = toProtocolString(isolate, resultString);
+                v8_inspector::String16 resultProtocolString = v8_inspector::toProtocolString(isolate, resultString);
                 std::vector<uint8_t> cbor;
                 v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(resultProtocolString.characters16(), resultProtocolString.length()), &cbor);
                 std::unique_ptr<protocol::Value> resultJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
@@ -178,7 +177,7 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
 
                 std::vector<uint8_t> json;
                 v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
-                auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
+                auto errorSupportString = v8_inspector::String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
                 if (!errorSupportString.empty()) {
                     auto errorMessage = "Error while parsing CSSComputedStyleProperty object. ";
                     DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());
@@ -197,7 +196,7 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
     return DispatchResponse::Success();
 }
 
-DispatchResponse V8CSSAgentImpl::getPlatformFontsForNode(int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>>* out_fonts) {
+DispatchResponse CSSAgentImpl::getPlatformFontsForNode(int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>>* out_fonts) {
     auto fontsArr = std::make_unique<protocol::Array<protocol::CSS::PlatformFontUsage>>();
     auto defaultFont = "System Font";
     fontsArr->emplace_back(std::move(protocol::CSS::PlatformFontUsage::create()
@@ -210,71 +209,71 @@ DispatchResponse V8CSSAgentImpl::getPlatformFontsForNode(int in_nodeId, std::uni
     return DispatchResponse::Success();
 }
 
-DispatchResponse V8CSSAgentImpl::getStyleSheetText(const String& in_styleSheetId, String* out_text) {
+DispatchResponse CSSAgentImpl::getStyleSheetText(const String& in_styleSheetId, String* out_text) {
     *out_text = "";
 
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::addRule(const String& in_styleSheetId, const String& in_ruleText, std::unique_ptr<protocol::CSS::SourceRange> in_location, std::unique_ptr<protocol::CSS::CSSRule>* out_rule) {
+DispatchResponse CSSAgentImpl::addRule(const String& in_styleSheetId, const String& in_ruleText, std::unique_ptr<protocol::CSS::SourceRange> in_location, std::unique_ptr<protocol::CSS::CSSRule>* out_rule) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::collectClassNames(const String& in_styleSheetId, std::unique_ptr<protocol::Array<String>>* out_classNames) {
+DispatchResponse CSSAgentImpl::collectClassNames(const String& in_styleSheetId, std::unique_ptr<protocol::Array<String>>* out_classNames) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::createStyleSheet(const String& in_frameId, String* out_styleSheetId) {
+DispatchResponse CSSAgentImpl::createStyleSheet(const String& in_frameId, String* out_styleSheetId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::forcePseudoState(int in_nodeId, std::unique_ptr<protocol::Array<String>> in_forcedPseudoClasses) {
+DispatchResponse CSSAgentImpl::forcePseudoState(int in_nodeId, std::unique_ptr<protocol::Array<String>> in_forcedPseudoClasses) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::getBackgroundColors(int in_nodeId, Maybe<protocol::Array<String>>* out_backgroundColors, Maybe<String>* out_computedFontSize, Maybe<String>* out_computedFontWeight) {
+DispatchResponse CSSAgentImpl::getBackgroundColors(int in_nodeId, Maybe<protocol::Array<String>>* out_backgroundColors, Maybe<String>* out_computedFontSize, Maybe<String>* out_computedFontWeight) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::getMediaQueries(std::unique_ptr<protocol::Array<protocol::CSS::CSSMedia>>* out_medias) {
+DispatchResponse CSSAgentImpl::getMediaQueries(std::unique_ptr<protocol::Array<protocol::CSS::CSSMedia>>* out_medias) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::setEffectivePropertyValueForNode(int in_nodeId, const String& in_propertyName, const String& in_value) {
+DispatchResponse CSSAgentImpl::setEffectivePropertyValueForNode(int in_nodeId, const String& in_propertyName, const String& in_value) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::setKeyframeKey(const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_keyText, std::unique_ptr<protocol::CSS::Value>* out_keyText) {
+DispatchResponse CSSAgentImpl::setKeyframeKey(const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_keyText, std::unique_ptr<protocol::CSS::Value>* out_keyText) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::setMediaText(const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_text, std::unique_ptr<protocol::CSS::CSSMedia>* out_media) {
+DispatchResponse CSSAgentImpl::setMediaText(const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_text, std::unique_ptr<protocol::CSS::CSSMedia>* out_media) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::setRuleSelector(const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_selector, std::unique_ptr<protocol::CSS::SelectorList>* out_selectorList) {
+DispatchResponse CSSAgentImpl::setRuleSelector(const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_selector, std::unique_ptr<protocol::CSS::SelectorList>* out_selectorList) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::setStyleSheetText(const String& in_styleSheetId, const String& in_text, Maybe<String>* out_sourceMapURL) {
+DispatchResponse CSSAgentImpl::setStyleSheetText(const String& in_styleSheetId, const String& in_text, Maybe<String>* out_sourceMapURL) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::setStyleTexts(std::unique_ptr<protocol::Array<protocol::CSS::StyleDeclarationEdit>> in_edits, std::unique_ptr<protocol::Array<protocol::CSS::CSSStyle>>* out_styles) {
+DispatchResponse CSSAgentImpl::setStyleTexts(std::unique_ptr<protocol::Array<protocol::CSS::StyleDeclarationEdit>> in_edits, std::unique_ptr<protocol::Array<protocol::CSS::CSSStyle>>* out_styles) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::startRuleUsageTracking() {
+DispatchResponse CSSAgentImpl::startRuleUsageTracking() {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::stopRuleUsageTracking(std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_ruleUsage) {
+DispatchResponse CSSAgentImpl::stopRuleUsageTracking(std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_ruleUsage) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::takeCoverageDelta(std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_coverage) {
+DispatchResponse CSSAgentImpl::takeCoverageDelta(std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_coverage) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-V8CSSAgentImpl* V8CSSAgentImpl::Instance = 0;
-}
+CSSAgentImpl* CSSAgentImpl::Instance = 0;
+}  // namespace tns

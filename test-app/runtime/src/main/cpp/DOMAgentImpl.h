@@ -9,19 +9,23 @@
 #include <v8_inspector/src/inspector/protocol/Protocol.h>
 
 namespace v8_inspector {
-
 class V8InspectorSessionImpl;
+}
+
+namespace tns {
 
 using v8_inspector::protocol::Maybe;
 using String = v8_inspector::String16;
 using v8_inspector::protocol::DispatchResponse;
+using v8_inspector::V8InspectorSessionImpl;
+namespace protocol = v8_inspector::protocol;
 
-class V8DOMAgentImpl : public protocol::DOM::Backend {
+class DOMAgentImpl : public protocol::DOM::Backend {
     public:
-        V8DOMAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
-                       protocol::DictionaryValue* state);
+        DOMAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
+                     protocol::DictionaryValue* state);
 
-        ~V8DOMAgentImpl() override;
+        ~DOMAgentImpl() override;
 
         virtual DispatchResponse enable() override;
         virtual DispatchResponse disable() override;
@@ -68,7 +72,7 @@ class V8DOMAgentImpl : public protocol::DOM::Backend {
             return m_enabled;
         };
 
-        static V8DOMAgentImpl* Instance;
+        static DOMAgentImpl* Instance;
         protocol::DOM::Frontend m_frontend;
 
         static std::u16string AddBackendNodeIdProperty(v8::Isolate* isolate, v8::Local<v8::Value> jsonInput);
@@ -80,6 +84,6 @@ class V8DOMAgentImpl : public protocol::DOM::Backend {
 
         DISALLOW_COPY_AND_ASSIGN(V8DOMAgentImpl);
 };
-}
+} // namespace tns
 
 #endif //V8_DOM_AGENT_IMPL_H

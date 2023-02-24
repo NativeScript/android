@@ -9,20 +9,23 @@
 #include <v8_inspector/src/inspector/protocol/Protocol.h>
 
 namespace v8_inspector {
-
 class V8InspectorSessionImpl;
+}
 
+namespace tns {
+
+namespace protocol = v8_inspector::protocol;
 using v8_inspector::protocol::Maybe;
 using String = v8_inspector::String16;
 using protocol::DispatchResponse;
+using v8_inspector::V8InspectorSessionImpl;
 
-
-class V8CSSAgentImpl : public protocol::CSS::Backend {
+class CSSAgentImpl : public protocol::CSS::Backend {
     public:
-        V8CSSAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
-                       protocol::DictionaryValue* state);
+        CSSAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
+                     protocol::DictionaryValue* state);
 
-        ~V8CSSAgentImpl() override;
+        ~CSSAgentImpl() override;
 
         void enable(std::unique_ptr<EnableCallback> callback) override;
         DispatchResponse disable() override;
@@ -47,7 +50,7 @@ class V8CSSAgentImpl : public protocol::CSS::Backend {
         DispatchResponse stopRuleUsageTracking(std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_ruleUsage) override;
         DispatchResponse takeCoverageDelta(std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_coverage) override;
 
-        static V8CSSAgentImpl* Instance;
+        static CSSAgentImpl* Instance;
         protocol::CSS::Frontend m_frontend;
 
     private:
@@ -55,9 +58,9 @@ class V8CSSAgentImpl : public protocol::CSS::Backend {
         protocol::DictionaryValue* m_state;
         bool m_enabled;
 
-        DISALLOW_COPY_AND_ASSIGN(V8CSSAgentImpl);
+        DISALLOW_COPY_AND_ASSIGN(CSSAgentImpl);
 };
-}
+}  // namespace tns
 
 
 #endif //V8_CSS_AGENT_IMPL_H

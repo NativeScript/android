@@ -3,15 +3,20 @@
 //
 
 #include <sstream>
+
+#include <v8_inspector/src/inspector/protocol/Protocol.h>
+#include <v8_inspector/src/inspector/string-util.h>
+#include <v8_inspector/third_party/inspector_protocol/crdtp/error_support.h>
 #include <v8_inspector/third_party/inspector_protocol/crdtp/json.h>
 #include "NetworkDomainCallbackHandlers.h"
 #include "NativeScriptAssert.h"
+#include "utils/NetworkRequestData.h"
 
 using namespace tns;
 
 void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
-        auto networkAgentInstance = V8NetworkAgentImpl::Instance;
+        auto networkAgentInstance = NetworkAgentImpl::Instance;
         const std::string wrongParametersError = "Not all parameters are present in the object argument in the call to ResponseReceived! Required params: 'requestId', `timestamp`, `type`, `response`";
 
         if (!networkAgentInstance) {
@@ -66,12 +71,12 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
             throw NativeScriptException("`response` parameter not in the correct format.");
         }
 
-        const String16 responseJsonString = toProtocolString(isolate, responseJson);
+        const v8_inspector::String16 responseJsonString = v8_inspector::toProtocolString(isolate, responseJson);
         std::vector<uint8_t> cbor;
         v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(responseJsonString.characters16(), responseJsonString.length()), &cbor);
         std::unique_ptr<protocol::Value> protocolResponseJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
 
-        protocol::ErrorSupport errorSupport;
+        v8_crdtp::ErrorSupport errorSupport;
         auto protocolResponseObj = protocol::Network::Response::fromValue(protocolResponseJson.get(), &errorSupport);
 
         std::vector<uint8_t> json;
@@ -86,7 +91,7 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
         }
 
         auto requestIdString = ArgConverter::ConvertToString(requestId);
-        auto networkRequestData = new v8_inspector::utils::NetworkRequestData();
+        auto networkRequestData = new utils::NetworkRequestData();
         networkAgentInstance->m_responses.insert(std::make_pair(requestIdString, networkRequestData));
 
         auto id = ArgConverter::ConvertToV8String(isolate, FrameId);
@@ -114,7 +119,7 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
 
 void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
-        auto networkAgentInstance = V8NetworkAgentImpl::Instance;
+        auto networkAgentInstance = NetworkAgentImpl::Instance;
         const std::string wrongParametersError = "Not all parameters are present in the object argument in the call to RequestWillBeSent! Required params: 'requestId', `url`, `timestamp`, `type`, `request`, `timestamps`";
 
         if (!networkAgentInstance) {
@@ -217,7 +222,7 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
 
 void NetworkDomainCallbackHandlers::DataForRequestIdCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
-        auto networkAgentInstance = V8NetworkAgentImpl::Instance;
+        auto networkAgentInstance = NetworkAgentImpl::Instance;
         const std::string wrongParametersError = "Not all parameters are present in the object argument in the call to DataForRequestId! Required params: 'requestId', `data`, `hasTextContent`";
 
         if (!networkAgentInstance) {
@@ -256,7 +261,7 @@ void NetworkDomainCallbackHandlers::DataForRequestIdCallback(const v8::FunctionC
         if (it == responses.end()) {
             throw NativeScriptException("Response not found for requestId = " + requestIdString);
         } else {
-            v8_inspector::utils::NetworkRequestData* response = it->second;
+            utils::NetworkRequestData* response = it->second;
 
             response->setData(dataString);
 
@@ -277,7 +282,7 @@ void NetworkDomainCallbackHandlers::DataForRequestIdCallback(const v8::FunctionC
 
 void NetworkDomainCallbackHandlers::LoadingFinishedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
-        auto networkAgentInstance = V8NetworkAgentImpl::Instance;
+        auto networkAgentInstance = NetworkAgentImpl::Instance;
         const std::string wrongParametersError = "Not all parameters are present in the object argument in the call to LoadingFinished! Required params: 'requestId', `timeStamp`";
 
         if (!networkAgentInstance) {

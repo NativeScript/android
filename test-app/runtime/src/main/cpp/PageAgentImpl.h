@@ -12,18 +12,22 @@
 #include <v8_inspector/src/inspector/v8-inspector-session-impl.h>
 
 namespace v8_inspector {
-
 class V8InspectorSessionImpl;
+}
+
+namespace tns {
 
 using v8_inspector::protocol::Maybe;
 using String = v8_inspector::String16;
-using protocol::DispatchResponse;
+using v8_inspector::protocol::DispatchResponse;
+using v8_inspector::V8InspectorSessionImpl;
+namespace protocol = v8_inspector::protocol;
 
-class V8PageAgentImpl : public protocol::Page::Backend {
+class PageAgentImpl : public protocol::Page::Backend {
     public:
-        V8PageAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
-                        protocol::DictionaryValue* state);
-        ~V8PageAgentImpl() override;
+        PageAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
+                      protocol::DictionaryValue* state);
+        ~PageAgentImpl() override;
 
         DispatchResponse enable() override;
         DispatchResponse disable() override;

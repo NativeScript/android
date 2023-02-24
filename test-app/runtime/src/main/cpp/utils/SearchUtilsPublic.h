@@ -5,21 +5,26 @@
 #ifndef V8_SEARCH_UTILS_PUBLIC_H
 #define V8_SEARCH_UTILS_PUBLIC_H
 
-#include <v8_inspector/src/inspector/string-16.h>
+#include <v8_inspector/src/inspector/string-util.h>
 #include <v8_inspector/src/inspector/v8-regex.h>
 #include <v8_inspector/src/inspector/v8-inspector-session-impl.h>
 #include <v8_inspector/src/inspector/protocol/Debugger.h>
-#include "v8-page-resources.h"
 
-namespace v8_inspector {
+#include "PageResources.h"
+
+namespace tns {
 namespace utils {
 namespace ResourceContentSearchUtils {
+
+using v8_inspector::String16;
+using v8_inspector::V8Regex;
+
 // Implementation taken from v8_inspector/src/inspector/search-util
 String16 createSearchRegexSource(const String16& text) {
-    String16Builder result;
+    v8_inspector::String16Builder result;
 
     for (size_t i = 0; i < text.length(); i++) {
-        UChar c = text[i];
+        v8_inspector::UChar c = text[i];
         if (c == '[' || c == ']' || c == '(' || c == ')' || c == '{' || c == '}' ||
                 c == '+' || c == '-' || c == '*' || c == '.' || c == ',' || c == '?' ||
                 c == '\\' || c == '^' || c == '$' || c == '|') {
@@ -80,7 +85,7 @@ const V8Regex& regex, const String16& text) {
 }
 
 // Implementation taken from v8_inspector/src/inspector/search-util
-std::unique_ptr<V8Regex> createSearchRegex(V8InspectorImpl* inspector,
+std::unique_ptr<V8Regex> createSearchRegex(v8_inspector::V8InspectorImpl* inspector,
         const String16& query,
         bool caseSensitive, bool isRegex) {
     String16 regexSource = isRegex ? query : createSearchRegexSource(query);
@@ -99,11 +104,11 @@ std::unique_ptr<protocol::Debugger::SearchMatch> buildObjectForSearchMatch(
 
 // Implementation taken from v8_inspector/src/inspector/search-util
 std::vector<std::unique_ptr<protocol::Debugger::SearchMatch>>
-        searchInTextByLinesImpl(V8InspectorSession* session, const String16& text,
+        searchInTextByLinesImpl(v8_inspector::V8InspectorSession* session, const String16& text,
                                 const String16& query, const bool caseSensitive,
 const bool isRegex) {
     std::unique_ptr<V8Regex> regex = createSearchRegex(
-                                         static_cast<V8InspectorSessionImpl*>(session)->inspector(), query,
+                                         static_cast<v8_inspector::V8InspectorSessionImpl*>(session)->inspector(), query,
                                          caseSensitive, isRegex);
     std::vector<std::pair<int, String16>> matches =
                                            scriptRegexpMatchesByLines(*regex.get(), text);
@@ -116,6 +121,6 @@ const bool isRegex) {
 }
 }
 }
-}
+}  // namespace tns
 
 #endif //V8_SEARCH_UTILS_PUBLIC_H

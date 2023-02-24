@@ -4,19 +4,18 @@
 
 #include <NativeScriptAssert.h>
 #include <ArgConverter.h>
-#include <v8_inspector/src/inspector/utils/v8-inspector-common.h>
-#include "v8-log-agent-impl.h"
 
-namespace v8_inspector {
+#include "LogAgentImpl.h"
+#include "utils/InspectorCommon.h"
 
-using tns::ArgConverter;
+namespace tns {
 
 namespace LogAgentState {
 static const char logEnabled[] = "logEnabled";
 }
 
-V8LogAgentImpl::V8LogAgentImpl(V8InspectorSessionImpl* session, protocol::FrontendChannel* frontendChannel,
-                               protocol::DictionaryValue* state)
+LogAgentImpl::LogAgentImpl(V8InspectorSessionImpl* session, protocol::FrontendChannel* frontendChannel,
+                           protocol::DictionaryValue* state)
     : m_session(session),
       m_frontend(frontendChannel),
       m_state(state),
@@ -24,9 +23,9 @@ V8LogAgentImpl::V8LogAgentImpl(V8InspectorSessionImpl* session, protocol::Fronte
     Instance = this;
 }
 
-V8LogAgentImpl::~V8LogAgentImpl() { }
+LogAgentImpl::~LogAgentImpl() { }
 
-DispatchResponse V8LogAgentImpl::enable() {
+DispatchResponse LogAgentImpl::enable() {
     if (m_enabled) {
         return DispatchResponse::ServerError("Log Agent already enabled!");
     }
@@ -37,7 +36,7 @@ DispatchResponse V8LogAgentImpl::enable() {
     return DispatchResponse::Success();
 }
 
-DispatchResponse V8LogAgentImpl::disable() {
+DispatchResponse LogAgentImpl::disable() {
     if (!m_enabled) {
         return DispatchResponse::Success();
     }
@@ -49,20 +48,20 @@ DispatchResponse V8LogAgentImpl::disable() {
     return DispatchResponse::Success();
 }
 
-DispatchResponse V8LogAgentImpl::startViolationsReport(std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> in_config) {
+DispatchResponse LogAgentImpl::startViolationsReport(std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> in_config) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8LogAgentImpl::stopViolationsReport() {
+DispatchResponse LogAgentImpl::stopViolationsReport() {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8LogAgentImpl::clear() {
+DispatchResponse LogAgentImpl::clear() {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-void V8LogAgentImpl::EntryAdded(const std::string& text, std::string verbosityLevel, std::string url, int lineNumber) {
-    auto logAgentInstance = V8LogAgentImpl::Instance;
+void LogAgentImpl::EntryAdded(const std::string& text, std::string verbosityLevel, std::string url, int lineNumber) {
+    auto logAgentInstance = LogAgentImpl::Instance;
 
     if (!logAgentInstance) {
         return;
@@ -72,7 +71,7 @@ void V8LogAgentImpl::EntryAdded(const std::string& text, std::string verbosityLe
     double timestamp = nano.time_since_epoch().count();
 
     auto vector = utils::Common::toVector(text);
-    auto textString16 = String16(vector.data(), vector.size());
+    auto textString16 = protocol::String(vector.data(), vector.size());
 
     auto logEntry = protocol::Log::LogEntry::create()
                     .setSource(protocol::Log::LogEntry::SourceEnum::Javascript)
@@ -86,6 +85,6 @@ void V8LogAgentImpl::EntryAdded(const std::string& text, std::string verbosityLe
     logAgentInstance->m_frontend.entryAdded(std::move(logEntry));
 }
 
-V8LogAgentImpl* V8LogAgentImpl::Instance = nullptr;
+LogAgentImpl* LogAgentImpl::Instance = nullptr;
 }
 

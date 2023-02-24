@@ -2,18 +2,19 @@
 // Created by pkanev on 1/31/2017.
 //
 
-#include <v8_inspector/src/inspector/utils/v8-search-utils-public.h>
-#include <v8_inspector/src/inspector/utils/v8-inspector-common.h>
-#include "v8-page-agent-impl.h"
-#include "search-util.h"
+#include <src/inspector/search-util.h>
 
-namespace v8_inspector {
+#include "PageAgentImpl.h"
+#include "utils/SearchUtilsPublic.h"
+#include "utils/InspectorCommon.h"
+
+namespace tns {
 
 namespace PageAgentState {
 static const char pageEnabled[] = "pageEnabled";
 }
 
-V8PageAgentImpl::V8PageAgentImpl(
+PageAgentImpl::PageAgentImpl(
     V8InspectorSessionImpl* session, protocol::FrontendChannel* frontendChannel,
     protocol::DictionaryValue* state)
     : m_session(session),
@@ -23,11 +24,11 @@ V8PageAgentImpl::V8PageAgentImpl(
       m_frameIdentifier(""),
       m_frameUrl("file://") {}
 
-V8PageAgentImpl::~V8PageAgentImpl() {}
+PageAgentImpl::~PageAgentImpl() {}
 
 ////////////////
 
-DispatchResponse V8PageAgentImpl::enable() {
+DispatchResponse PageAgentImpl::enable() {
     if (m_enabled) {
         return DispatchResponse::Success();
     }
@@ -39,7 +40,7 @@ DispatchResponse V8PageAgentImpl::enable() {
     return DispatchResponse::Success();
 }
 
-DispatchResponse V8PageAgentImpl::disable() {
+DispatchResponse PageAgentImpl::disable() {
     if (!m_enabled) {
         return DispatchResponse::Success();
     }
@@ -51,19 +52,19 @@ DispatchResponse V8PageAgentImpl::disable() {
     return DispatchResponse::Success();
 }
 
-DispatchResponse V8PageAgentImpl::addScriptToEvaluateOnLoad(const String& in_scriptSource, String* out_identifier) {
+DispatchResponse PageAgentImpl::addScriptToEvaluateOnLoad(const String& in_scriptSource, String* out_identifier) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::removeScriptToEvaluateOnLoad(const String& in_identifier) {
+DispatchResponse PageAgentImpl::removeScriptToEvaluateOnLoad(const String& in_identifier) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::reload(Maybe<bool> in_ignoreCache, Maybe<String> in_scriptToEvaluateOnLoad) {
+DispatchResponse PageAgentImpl::reload(Maybe<bool> in_ignoreCache, Maybe<String> in_scriptToEvaluateOnLoad) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::getResourceTree(std::unique_ptr<protocol::Page::FrameResourceTree>* out_frameTree) {
+DispatchResponse PageAgentImpl::getResourceTree(std::unique_ptr<protocol::Page::FrameResourceTree>* out_frameTree) {
     std::unique_ptr<protocol::Page::Frame> frameObject = protocol::Page::Frame::create()
             .setId(m_frameIdentifier.c_str())
             .setLoaderId("NSLoaderIdentifier")
@@ -74,7 +75,7 @@ DispatchResponse V8PageAgentImpl::getResourceTree(std::unique_ptr<protocol::Page
 
     auto subresources = std::make_unique<protocol::Array<protocol::Page::FrameResource>>();
 
-    auto resources = v8_inspector::utils::PageResource::getPageResources();
+    auto resources = utils::PageResource::getPageResources();
 
     for (auto const& resource : resources) {
         auto pageResource = resource.second;
@@ -95,7 +96,7 @@ DispatchResponse V8PageAgentImpl::getResourceTree(std::unique_ptr<protocol::Page
     return DispatchResponse::Success();
 }
 
-void V8PageAgentImpl::getResourceContent(const String& in_frameId, const String& in_url, std::unique_ptr<GetResourceContentCallback> callback) {
+void PageAgentImpl::getResourceContent(const String& in_frameId, const String& in_url, std::unique_ptr<GetResourceContentCallback> callback) {
     if (in_url.utf8().compare(m_frameUrl) == 0) {
         auto content = "";
         auto base64Encoded = false;
@@ -104,7 +105,7 @@ void V8PageAgentImpl::getResourceContent(const String& in_frameId, const String&
         return;
     }
 
-    std::map<std::string, v8_inspector::utils::PageResource> cachedPageResources = utils::PageResource::s_cachedPageResources;
+    std::map<std::string, utils::PageResource> cachedPageResources = utils::PageResource::s_cachedPageResources;
     if (utils::PageResource::s_cachedPageResources.size() == 0) {
         cachedPageResources = utils::PageResource::getPageResources();
     }
@@ -119,7 +120,7 @@ void V8PageAgentImpl::getResourceContent(const String& in_frameId, const String&
 
     auto base64Encoded = !resource.hasTextContent();
 
-    auto errorString = new String16();
+    auto errorString = new v8_inspector::String16();
 
     auto content = resource.getContent(errorString);
 
@@ -131,11 +132,11 @@ void V8PageAgentImpl::getResourceContent(const String& in_frameId, const String&
     callback->sendSuccess(content, base64Encoded);
 }
 
-void V8PageAgentImpl::searchInResource(const String& in_frameId, const String& in_url, const String& in_query, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, std::unique_ptr<SearchInResourceCallback> callback) {
+void PageAgentImpl::searchInResource(const String& in_frameId, const String& in_url, const String& in_query, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, std::unique_ptr<SearchInResourceCallback> callback) {
     bool isRegex = in_isRegex.fromMaybe(false);
     bool isCaseSensitive = in_caseSensitive.fromMaybe(false);
 
-    std::map<std::string, v8_inspector::utils::PageResource> cachedPageResources = utils::PageResource::s_cachedPageResources;
+    std::map<std::string, utils::PageResource> cachedPageResources = utils::PageResource::s_cachedPageResources;
     if (utils::PageResource::s_cachedPageResources.size() == 0) {
         cachedPageResources = utils::PageResource::getPageResources();
     }
@@ -149,10 +150,10 @@ void V8PageAgentImpl::searchInResource(const String& in_frameId, const String& i
     }
 
     auto resource = it->second;
-    auto errorString = new String16();
+    auto errorString = new v8_inspector::String16();
     auto content = resource.getContent(errorString);
     if (errorString->isEmpty()) {
-        auto matches = v8_inspector::utils::ResourceContentSearchUtils::searchInTextByLinesImpl(m_session, content, in_query, isCaseSensitive, isRegex);
+        auto matches = utils::ResourceContentSearchUtils::searchInTextByLinesImpl(m_session, content, in_query, isCaseSensitive, isRegex);
         for (auto& match : matches) {
             result->emplace_back(std::move(match));
         }
@@ -164,7 +165,7 @@ void V8PageAgentImpl::searchInResource(const String& in_frameId, const String& i
     callback->sendFailure(DispatchResponse::ServerError(errorString->utf8()));
 }
 
-void V8PageAgentImpl::restore() {
+void PageAgentImpl::restore() {
     if (!m_state->booleanProperty(PageAgentState::pageEnabled, false)) {
         return;
     }
@@ -172,84 +173,84 @@ void V8PageAgentImpl::restore() {
     enable();
 }
 
-void V8PageAgentImpl::reset() {
+void PageAgentImpl::reset() {
 
 }
 
-DispatchResponse V8PageAgentImpl::setDocumentContent(const String& in_frameId, const String& in_html) {
+DispatchResponse PageAgentImpl::setDocumentContent(const String& in_frameId, const String& in_html) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::addScriptToEvaluateOnNewDocument(const String& in_source, Maybe<String> in_worldName, String* out_identifier) {
+DispatchResponse PageAgentImpl::addScriptToEvaluateOnNewDocument(const String& in_source, Maybe<String> in_worldName, String* out_identifier) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::createIsolatedWorld(const String& in_frameId, Maybe<String> in_worldName, Maybe<bool> in_grantUniveralAccess, int* out_executionContextId) {
+DispatchResponse PageAgentImpl::createIsolatedWorld(const String& in_frameId, Maybe<String> in_worldName, Maybe<bool> in_grantUniveralAccess, int* out_executionContextId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::getFrameTree(std::unique_ptr<protocol::Page::FrameTree>* out_frameTree) {
+DispatchResponse PageAgentImpl::getFrameTree(std::unique_ptr<protocol::Page::FrameTree>* out_frameTree) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::getLayoutMetrics(std::unique_ptr<protocol::Page::LayoutViewport>* out_layoutViewport, std::unique_ptr<protocol::Page::VisualViewport>* out_visualViewport, std::unique_ptr<protocol::DOM::Rect>* out_contentSize) {
+DispatchResponse PageAgentImpl::getLayoutMetrics(std::unique_ptr<protocol::Page::LayoutViewport>* out_layoutViewport, std::unique_ptr<protocol::Page::VisualViewport>* out_visualViewport, std::unique_ptr<protocol::DOM::Rect>* out_contentSize) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::removeScriptToEvaluateOnNewDocument(const String& in_identifier) {
+DispatchResponse PageAgentImpl::removeScriptToEvaluateOnNewDocument(const String& in_identifier) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::setAdBlockingEnabled(bool in_enabled) {
+DispatchResponse PageAgentImpl::setAdBlockingEnabled(bool in_enabled) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::setBypassCSP(bool in_enabled) {
+DispatchResponse PageAgentImpl::setBypassCSP(bool in_enabled) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::setFontFamilies(std::unique_ptr<protocol::Page::FontFamilies> in_fontFamilies) {
+DispatchResponse PageAgentImpl::setFontFamilies(std::unique_ptr<protocol::Page::FontFamilies> in_fontFamilies) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::setFontSizes(std::unique_ptr<protocol::Page::FontSizes> in_fontSizes) {
+DispatchResponse PageAgentImpl::setFontSizes(std::unique_ptr<protocol::Page::FontSizes> in_fontSizes) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::setLifecycleEventsEnabled(bool in_enabled) {
+DispatchResponse PageAgentImpl::setLifecycleEventsEnabled(bool in_enabled) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::startScreencast(Maybe<String> in_format, Maybe<int> in_quality, Maybe<int> in_maxWidth, Maybe<int> in_maxHeight, Maybe<int> in_everyNthFrame) {
+DispatchResponse PageAgentImpl::startScreencast(Maybe<String> in_format, Maybe<int> in_quality, Maybe<int> in_maxWidth, Maybe<int> in_maxHeight, Maybe<int> in_everyNthFrame) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::stopLoading() {
+DispatchResponse PageAgentImpl::stopLoading() {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::stopScreencast() {
+DispatchResponse PageAgentImpl::stopScreencast() {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::setProduceCompilationCache(bool in_enabled) {
+DispatchResponse PageAgentImpl::setProduceCompilationCache(bool in_enabled) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::addCompilationCache(const String& in_url, const protocol::Binary& in_data) {
+DispatchResponse PageAgentImpl::addCompilationCache(const String& in_url, const protocol::Binary& in_data) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::clearCompilationCache() {
+DispatchResponse PageAgentImpl::clearCompilationCache() {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::generateTestReport(const String& in_message, Maybe<String> in_group) {
+DispatchResponse PageAgentImpl::generateTestReport(const String& in_message, Maybe<String> in_group) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8PageAgentImpl::waitForDebugger() {
+DispatchResponse PageAgentImpl::waitForDebugger() {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-}
+} // namespace tns

@@ -11,11 +11,11 @@
 #include <JniLocalRef.h>
 #include <Util.h>
 #include "base64.h"
-#include "v8_inspector/src/inspector/utils/v8-page-resources.h"
+#include "PageResources.h"
 #include "JEnv.h"
 #include "ArgConverter.h"
 
-namespace v8_inspector {
+namespace tns {
 namespace utils {
 PageResource::PageResource(std::string filePath, std::string mimeType)
     : m_filePath(filePath),
@@ -25,8 +25,8 @@ PageResource::PageResource(std::string filePath, std::string mimeType)
     m_type = PageResource::resourceTypeByMimeType(m_mimeType);
 }
 
-std::map<std::string, v8_inspector::utils::PageResource> PageResource::getPageResources() {
-    auto result = std::map<std::string, v8_inspector::utils::PageResource>();
+std::map<std::string, PageResource> PageResource::getPageResources() {
+    auto result = std::map<std::string, PageResource>();
     tns::JEnv env;
     jclass inspectorClass = env.FindClass("com/tns/AndroidJsV8Inspector");
     assert(inspectorClass != nullptr);
@@ -62,7 +62,7 @@ std::map<std::string, v8_inspector::utils::PageResource> PageResource::getPageRe
     return result;
 }
 
-String16 PageResource::getContent(protocol::String* errorString) {
+v8_inspector::String16 PageResource::getContent(protocol::String* errorString) {
     if (m_content.empty()) {
         auto filePath = m_filePath;
         auto shouldEncode = !hasTextContent();
@@ -93,7 +93,7 @@ String16 PageResource::getContent(protocol::String* errorString) {
         free(buff);
     }
 
-    return String16((const uint16_t*) m_content.data());
+    return v8_inspector::String16((const uint16_t*) m_content.data());
 }
 
 const char* PageResource::resourceTypeByMimeType(std::string mimeType) {
@@ -124,6 +124,6 @@ std::map<std::string, const char*> PageResource::s_mimeTypeMap = {
     { "application/binary", v8_inspector::protocol::Network::ResourceTypeEnum::Other }
 };
 
-std::map<std::string, v8_inspector::utils::PageResource> PageResource::s_cachedPageResources;
+std::map<std::string, PageResource> PageResource::s_cachedPageResources;
 }
-}
+}  // namespace tns

@@ -9,7 +9,9 @@
 #include <v8_inspector/src/inspector/string-16.h>
 #include <v8_inspector/src/inspector/protocol/Protocol.h>
 
-namespace v8_inspector {
+namespace protocol = v8_inspector::protocol;
+
+namespace tns {
 namespace utils {
 class Common {
     public:

@@ -6,23 +6,26 @@
 #define V8_OVERLAY_AGENT_IMPL_H
 
 #include <v8_inspector/src/inspector/protocol/Overlay.h>
+#include <v8_inspector/src/inspector/protocol/Protocol.h>
 #include <Util.h>
 
 namespace v8_inspector {
-
     class V8InspectorSessionImpl;
+}
 
+namespace tns {
     using v8_inspector::protocol::Maybe;
     using String = v8_inspector::String16;
     using v8_inspector::protocol::DispatchResponse;
+    using v8_inspector::V8InspectorSessionImpl;
+    namespace protocol = v8_inspector::protocol;
 
-
-    class V8OverlayAgentImpl : public protocol::Overlay::Backend {
+    class OverlayAgentImpl : public protocol::Overlay::Backend {
     public:
-        V8OverlayAgentImpl(V8InspectorSessionImpl *, protocol::FrontendChannel *,
-                           protocol::DictionaryValue *state);
+        OverlayAgentImpl(V8InspectorSessionImpl *, protocol::FrontendChannel *,
+                         protocol::DictionaryValue *state);
 
-        ~V8OverlayAgentImpl() override;
+        ~OverlayAgentImpl() override;
         DispatchResponse enable() override;
         DispatchResponse disable() override;
         DispatchResponse setShowFPSCounter(bool in_show) override;

@@ -6,23 +6,28 @@
 #define V8_NETWORK_AGENT_IMPL_H
 
 #include <v8_inspector/src/inspector/protocol/Network.h>
-#include <v8_inspector/src/inspector/utils/v8-network-request-data.h>
 #include <map>
 #include <v8_inspector/src/inspector/protocol/Protocol.h>
 
-namespace v8_inspector {
+#include "utils/NetworkRequestData.h"
 
+namespace v8_inspector {
 class V8InspectorSessionImpl;
+}
+
+namespace tns {
 
 using v8_inspector::protocol::Maybe;
 using String = v8_inspector::String16;
 using v8_inspector::protocol::DispatchResponse;
+using v8_inspector::V8InspectorSessionImpl;
+namespace protocol = v8_inspector::protocol;
 
-class V8NetworkAgentImpl : public protocol::Network::Backend {
+class NetworkAgentImpl : public protocol::Network::Backend {
     public:
-        V8NetworkAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
-                           protocol::DictionaryValue* state);
-        ~V8NetworkAgentImpl() override;
+        NetworkAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
+                         protocol::DictionaryValue* state);
+        ~NetworkAgentImpl() override;
 
         DispatchResponse enable(Maybe<int> in_maxTotalBufferSize, Maybe<int> in_maxResourceBufferSize, Maybe<int> in_maxPostDataSize) override;
         DispatchResponse disable() override;
@@ -53,9 +58,9 @@ class V8NetworkAgentImpl : public protocol::Network::Backend {
             return m_enabled;
         };
 
-        static V8NetworkAgentImpl* Instance;
+        static NetworkAgentImpl* Instance;
         protocol::Network::Frontend m_frontend;
-        std::map<std::string, v8_inspector::utils::NetworkRequestData*> m_responses;
+        std::map<std::string, utils::NetworkRequestData*> m_responses;
 
     private:
         V8InspectorSessionImpl* m_session;
@@ -64,6 +69,6 @@ class V8NetworkAgentImpl : public protocol::Network::Backend {
 
         DISALLOW_COPY_AND_ASSIGN(V8NetworkAgentImpl);
 };
-}
+}  // namespace tns
 
 #endif //V8_NETWORK_AGENT_IMPL_H

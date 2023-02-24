@@ -3,24 +3,22 @@
 //
 
 #include <NativeScriptAssert.h>
-#include "v8-dom-agent-impl.h"
 #include <ArgConverter.h>
-#include <Runtime.h>
+#include <v8_inspector/src/inspector/protocol/Runtime.h>
 #include <v8_inspector/third_party/inspector_protocol/crdtp/json.h>
-#include <v8_inspector/src/inspector/utils/v8-inspector-common.h>
 
-namespace v8_inspector {
+#include "DOMAgentImpl.h"
+#include "utils/InspectorCommon.h"
 
-using tns::Runtime;
-using tns::ArgConverter;
+namespace tns {
 
 namespace DOMAgentState {
 static const char domEnabled[] = "domEnabled";
 }
 
-V8DOMAgentImpl::V8DOMAgentImpl(V8InspectorSessionImpl* session,
-                               protocol::FrontendChannel* frontendChannel,
-                               protocol::DictionaryValue* state)
+DOMAgentImpl::DOMAgentImpl(V8InspectorSessionImpl* session,
+                           protocol::FrontendChannel* frontendChannel,
+                           protocol::DictionaryValue* state)
     : m_session(session),
       m_frontend(frontendChannel),
       m_state(state),
@@ -28,9 +26,9 @@ V8DOMAgentImpl::V8DOMAgentImpl(V8InspectorSessionImpl* session,
     Instance = this;
 }
 
-V8DOMAgentImpl::~V8DOMAgentImpl() { }
+DOMAgentImpl::~DOMAgentImpl() { }
 
-DispatchResponse V8DOMAgentImpl::enable() {
+DispatchResponse DOMAgentImpl::enable() {
     if (m_enabled) {
         return DispatchResponse::Success();
     }
@@ -42,7 +40,7 @@ DispatchResponse V8DOMAgentImpl::enable() {
     return DispatchResponse::Success();
 }
 
-DispatchResponse V8DOMAgentImpl::disable() {
+DispatchResponse DOMAgentImpl::disable() {
     if (!m_enabled) {
         return DispatchResponse::Success();
     }
@@ -54,11 +52,11 @@ DispatchResponse V8DOMAgentImpl::disable() {
     return DispatchResponse::Success();
 }
 
-DispatchResponse V8DOMAgentImpl::getContentQuads(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, std::unique_ptr<protocol::Array<protocol::Array<double>>>* out_quads) {
+DispatchResponse DOMAgentImpl::getContentQuads(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, std::unique_ptr<protocol::Array<protocol::Array<double>>>* out_quads) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::DOM::Node>* out_root) {
+DispatchResponse DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::DOM::Node>* out_root) {
     std::unique_ptr<protocol::DOM::Node> defaultNode = protocol::DOM::Node::create()
             .setNodeId(0)
             .setBackendNodeId(0)
@@ -105,7 +103,7 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
                 }
 
                 auto resultUtf16Data = resultString.data();
-                String16 resultProtocolString = String16((const uint16_t*) resultUtf16Data);
+                v8_inspector::String16 resultProtocolString = v8_inspector::String16((const uint16_t*) resultUtf16Data);
                 std::vector<uint8_t> cbor;
                 v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(resultProtocolString.characters16(), resultProtocolString.length()), &cbor);
                 std::unique_ptr<protocol::Value> resultJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
@@ -114,7 +112,7 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
 
                 std::vector<uint8_t> json;
                 v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
-                auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
+                auto errorSupportString = v8_inspector::String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
                 if (!errorSupportString.empty()) {
                     auto errorMessage = "Error while parsing debug `DOM Node` object. ";
                     DEBUG_WRITE_FORCE("JS Error: %s, Error support: %s", errorMessage, errorSupportString.c_str());
@@ -134,7 +132,7 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
     return DispatchResponse::ServerError("Error getting DOM tree.");
 }
 
-DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
+DispatchResponse DOMAgentImpl::removeNode(int in_nodeId) {
     std::string removeNodeFunctionString = "removeNode";
 
     // TODO: Pete: Find a better way to get a hold of the isolate
@@ -167,11 +165,11 @@ DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
     return DispatchResponse::ServerError("Couldn't remove the selected DOMNode from the visual tree. Global Inspector object not found.");
 }
 
-DispatchResponse V8DOMAgentImpl::setAttributeValue(int in_nodeId, const String& in_name, const String& in_value) {
+DispatchResponse DOMAgentImpl::setAttributeValue(int in_nodeId, const String& in_name, const String& in_value) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::setAttributesAsText(int in_nodeId, const String& in_text, Maybe<String> in_name) {
+DispatchResponse DOMAgentImpl::setAttributesAsText(int in_nodeId, const String& in_text, Maybe<String> in_name) {
     // call modules' View class methods to modify view's attribute
     // TODO: Pete: Find a better way to get a hold of the isolate
     std::string setAttributeAsTextFunctionString = "setAttributeAsText";
@@ -209,23 +207,23 @@ DispatchResponse V8DOMAgentImpl::setAttributesAsText(int in_nodeId, const String
     return DispatchResponse::ServerError("Couldn't change selected DOM node's attribute. Global Inspector object not found.");
 }
 
-DispatchResponse V8DOMAgentImpl::removeAttribute(int in_nodeId, const String& in_name) {
+DispatchResponse DOMAgentImpl::removeAttribute(int in_nodeId, const String& in_name) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::performSearch(const String& in_query, Maybe<bool> in_includeUserAgentShadowDOM, String* out_searchId, int* out_resultCount) {
+DispatchResponse DOMAgentImpl::performSearch(const String& in_query, Maybe<bool> in_includeUserAgentShadowDOM, String* out_searchId, int* out_resultCount) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::getSearchResults(const String& in_searchId, int in_fromIndex, int in_toIndex, std::unique_ptr<protocol::Array<int>>* out_nodeIds) {
+DispatchResponse DOMAgentImpl::getSearchResults(const String& in_searchId, int in_fromIndex, int in_toIndex, std::unique_ptr<protocol::Array<int>>* out_nodeIds) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::discardSearchResults(const String& in_searchId) {
+DispatchResponse DOMAgentImpl::discardSearchResults(const String& in_searchId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::resolveNode(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectGroup, Maybe<int> in_executionContextId, std::unique_ptr<protocol::Runtime::RemoteObject>* out_object) {
+DispatchResponse DOMAgentImpl::resolveNode(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectGroup, Maybe<int> in_executionContextId, std::unique_ptr<protocol::Runtime::RemoteObject>* out_object) {
     auto resolvedNode = protocol::Runtime::RemoteObject::create()
                         .setType("View")
                         .build();
@@ -235,115 +233,115 @@ DispatchResponse V8DOMAgentImpl::resolveNode(Maybe<int> in_nodeId, Maybe<int> in
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::collectClassNamesFromSubtree(int in_nodeId, std::unique_ptr<protocol::Array<String>>* out_classNames) {
+DispatchResponse DOMAgentImpl::collectClassNamesFromSubtree(int in_nodeId, std::unique_ptr<protocol::Array<String>>* out_classNames) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::copyTo(int in_nodeId, int in_targetNodeId, Maybe<int> in_insertBeforeNodeId, int* out_nodeId) {
+DispatchResponse DOMAgentImpl::copyTo(int in_nodeId, int in_targetNodeId, Maybe<int> in_insertBeforeNodeId, int* out_nodeId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::describeNode(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::DOM::Node>* out_node) {
+DispatchResponse DOMAgentImpl::describeNode(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::DOM::Node>* out_node) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::focus(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId) {
+DispatchResponse DOMAgentImpl::focus(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::getAttributes(int in_nodeId, std::unique_ptr<protocol::Array<String>>* out_attributes) {
+DispatchResponse DOMAgentImpl::getAttributes(int in_nodeId, std::unique_ptr<protocol::Array<String>>* out_attributes) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::getBoxModel(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, std::unique_ptr<protocol::DOM::BoxModel>* out_model) {
+DispatchResponse DOMAgentImpl::getBoxModel(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, std::unique_ptr<protocol::DOM::BoxModel>* out_model) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::getFlattenedDocument(Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::Array<protocol::DOM::Node>>* out_nodes) {
+DispatchResponse DOMAgentImpl::getFlattenedDocument(Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::Array<protocol::DOM::Node>>* out_nodes) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::getNodeForLocation(int in_x, int in_y, Maybe<bool> in_includeUserAgentShadowDOM, int* out_backendNodeId, Maybe<int>* out_nodeId) {
+DispatchResponse DOMAgentImpl::getNodeForLocation(int in_x, int in_y, Maybe<bool> in_includeUserAgentShadowDOM, int* out_backendNodeId, Maybe<int>* out_nodeId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::getOuterHTML(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, String* out_outerHTML) {
+DispatchResponse DOMAgentImpl::getOuterHTML(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, String* out_outerHTML) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::getRelayoutBoundary(int in_nodeId, int* out_nodeId) {
+DispatchResponse DOMAgentImpl::getRelayoutBoundary(int in_nodeId, int* out_nodeId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::markUndoableState() {
+DispatchResponse DOMAgentImpl::markUndoableState() {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::moveTo(int in_nodeId, int in_targetNodeId, Maybe<int> in_insertBeforeNodeId, int* out_nodeId) {
+DispatchResponse DOMAgentImpl::moveTo(int in_nodeId, int in_targetNodeId, Maybe<int> in_insertBeforeNodeId, int* out_nodeId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::pushNodeByPathToFrontend(const String& in_path, int* out_nodeId) {
+DispatchResponse DOMAgentImpl::pushNodeByPathToFrontend(const String& in_path, int* out_nodeId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::pushNodesByBackendIdsToFrontend(std::unique_ptr<protocol::Array<int>> in_backendNodeIds, std::unique_ptr<protocol::Array<int>>* out_nodeIds) {
+DispatchResponse DOMAgentImpl::pushNodesByBackendIdsToFrontend(std::unique_ptr<protocol::Array<int>> in_backendNodeIds, std::unique_ptr<protocol::Array<int>>* out_nodeIds) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::querySelector(int in_nodeId, const String& in_selector, int* out_nodeId) {
+DispatchResponse DOMAgentImpl::querySelector(int in_nodeId, const String& in_selector, int* out_nodeId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::querySelectorAll(int in_nodeId, const String& in_selector, std::unique_ptr<protocol::Array<int>>* out_nodeIds) {
+DispatchResponse DOMAgentImpl::querySelectorAll(int in_nodeId, const String& in_selector, std::unique_ptr<protocol::Array<int>>* out_nodeIds) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::redo() {
+DispatchResponse DOMAgentImpl::redo() {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::requestChildNodes(int in_nodeId, Maybe<int> in_depth, Maybe<bool> in_pierce) {
+DispatchResponse DOMAgentImpl::requestChildNodes(int in_nodeId, Maybe<int> in_depth, Maybe<bool> in_pierce) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::requestNode(const String& in_objectId, int* out_nodeId) {
+DispatchResponse DOMAgentImpl::requestNode(const String& in_objectId, int* out_nodeId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::setFileInputFiles(std::unique_ptr<protocol::Array<String>> in_files, Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId) {
+DispatchResponse DOMAgentImpl::setFileInputFiles(std::unique_ptr<protocol::Array<String>> in_files, Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::getFileInfo(const String& in_objectId, String* out_path) {
+DispatchResponse DOMAgentImpl::getFileInfo(const String& in_objectId, String* out_path) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::setInspectedNode(int in_nodeId) {
+DispatchResponse DOMAgentImpl::setInspectedNode(int in_nodeId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::setNodeName(int in_nodeId, const String& in_name, int* out_nodeId) {
+DispatchResponse DOMAgentImpl::setNodeName(int in_nodeId, const String& in_name, int* out_nodeId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::setNodeValue(int in_nodeId, const String& in_value) {
+DispatchResponse DOMAgentImpl::setNodeValue(int in_nodeId, const String& in_value) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::setOuterHTML(int in_nodeId, const String& in_outerHTML) {
+DispatchResponse DOMAgentImpl::setOuterHTML(int in_nodeId, const String& in_outerHTML) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::undo() {
+DispatchResponse DOMAgentImpl::undo() {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::getFrameOwner(const String& in_frameId, int* out_backendNodeId, Maybe<int>* out_nodeId) {
+DispatchResponse DOMAgentImpl::getFrameOwner(const String& in_frameId, int* out_backendNodeId, Maybe<int>* out_nodeId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-std::u16string V8DOMAgentImpl::AddBackendNodeIdProperty(v8::Isolate* isolate, v8::Local<v8::Value> jsonInput) {
+std::u16string DOMAgentImpl::AddBackendNodeIdProperty(v8::Isolate* isolate, v8::Local<v8::Value> jsonInput) {
     auto scriptSource =
         "(function () {"
         "   function addBackendNodeId(node) {"
@@ -384,5 +382,5 @@ std::u16string V8DOMAgentImpl::AddBackendNodeIdProperty(v8::Isolate* isolate, v8
     return resultString;
 }
 
-V8DOMAgentImpl* V8DOMAgentImpl::Instance = 0;
-}
+DOMAgentImpl* DOMAgentImpl::Instance = 0;
+}  // namespace tns

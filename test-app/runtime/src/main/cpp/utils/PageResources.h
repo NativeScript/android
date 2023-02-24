@@ -6,10 +6,16 @@
 #define V8_PAGE_RESOURCES_H
 
 #include <map>
-#include <v8_inspector/src/inspector/protocol/Page.h>
+#include <string>
 
-namespace v8_inspector {
+#include <v8_inspector/src/inspector/protocol/Network.h>
+#include <v8_inspector/src/inspector/protocol/Page.h>
+#include <v8_inspector/src/inspector/protocol/Protocol.h>
+
+namespace tns {
 namespace utils {
+
+namespace protocol = v8_inspector::protocol;
 
 class PageResource {
     public:
@@ -33,14 +39,14 @@ class PageResource {
          * Get string representation of the resource (file) contents
          * String is base64-encoded if the resource's MIME type isn't a Document | Stylesheet | Script
          */
-        String16 getContent(protocol::String*);
+        v8_inspector::String16 getContent(protocol::String*);
 
         /*
          * Gets all file paths available in the application's files/app directory
          * Java returns an array of pairs containing the file url and its MIME type
          */
-        static std::map<std::string, v8_inspector::utils::PageResource> getPageResources();
-        static std::map<std::string, v8_inspector::utils::PageResource> s_cachedPageResources;
+        static std::map<std::string, PageResource> getPageResources();
+        static std::map<std::string, PageResource> s_cachedPageResources;
 
     private:
         std::string m_filePath;

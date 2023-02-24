@@ -5,9 +5,11 @@
 #ifndef V8_NETWORK_REQUEST_DATA_H
 #define V8_NETWORK_REQUEST_DATA_H
 
+#include <string>
+
 #include <v8_inspector/src/inspector/protocol/Network.h>
 
-namespace v8_inspector {
+namespace tns {
 namespace utils {
 
 class NetworkRequestData {

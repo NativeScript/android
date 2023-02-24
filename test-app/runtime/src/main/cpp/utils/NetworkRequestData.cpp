@@ -2,9 +2,9 @@
 // Created by pkanev on 3/10/2017.
 //
 
-#include "v8-network-request-data.h"
+#include "NetworkRequestData.h"
 
-namespace v8_inspector {
+namespace tns {
 namespace utils {
 NetworkRequestData::NetworkRequestData()
     : m_data(),
@@ -13,4 +13,4 @@ NetworkRequestData::NetworkRequestData(std::u16string data, bool hasTextContent)
     : m_data(data),
       m_hasTextContent(hasTextContent) { }
 }
-}
+} // namespace tns
