@@ -35,7 +35,6 @@
 #ifdef APPLICATION_IN_DEBUG
 #include "NetworkDomainCallbackHandlers.h"
 #include "JsV8InspectorClient.h"
-#include "v8_inspector/src/inspector/v8-inspector-platform.h"
 #endif
 
 using namespace v8;
@@ -467,18 +466,7 @@ void Runtime::ClearStartupData(JNIEnv* env, jobject obj) {
 }
 
 static void InitializeV8() {
-    Runtime::platform =
-#ifdef APPLICATION_IN_DEBUG
-        // The default V8 platform isn't Chrome DevTools compatible. The frontend uses the
-        // Runtime.evaluate protocol command with timeout flag for every execution in the console.
-        // The default platform doesn't implement executing delayed javascript code from a background
-        // thread. To avoid implementing a full blown scheduler, we use the default platform with a
-        // timeout=0 flag.
-        V8InspectorPlatform::CreateDefaultPlatform();
-#else
-        v8::platform::NewDefaultPlatform().release();
-#endif
-
+    Runtime::platform = v8::platform::NewDefaultPlatform().release();
     V8::InitializePlatform(Runtime::platform);
     V8::Initialize();
 }
