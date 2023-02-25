@@ -6,13 +6,13 @@
 #define V8_INSPECTOR_STRING_16_H_
 
 #include <stdint.h>
+
 #include <cctype>
 #include <climits>
 #include <cstring>
 #include <string>
 #include <vector>
 
-#include "../../third_party/inspector_protocol/crdtp/serializer_traits.h"
 #include "src/base/compiler-specific.h"
 
 namespace v8_inspector {
@@ -24,25 +24,27 @@ class String16 {
   static const size_t kNotFound = static_cast<size_t>(-1);
 
   String16() = default;
-  String16(const String16&) = default;
+  String16(const String16&) V8_NOEXCEPT = default;
   String16(String16&&) V8_NOEXCEPT = default;
   String16(const UChar* characters, size_t size);
-  V8_EXPORT String16(const UChar* characters);  // NOLINT(runtime/explicit)
-  String16(const char* characters);   // NOLINT(runtime/explicit)
+  V8_EXPORT String16(const UChar* characters);
+  V8_EXPORT String16(const char* characters);
   String16(const char* characters, size_t size);
   explicit String16(const std::basic_string<UChar>& impl);
   explicit String16(std::basic_string<UChar>&& impl);
 
-  String16& operator=(const String16&) = default;
+  String16& operator=(const String16&) V8_NOEXCEPT = default;
   String16& operator=(String16&&) V8_NOEXCEPT = default;
 
   static String16 fromInteger(int);
   static String16 fromInteger(size_t);
   static String16 fromInteger64(int64_t);
+  static String16 fromUInt64(uint64_t);
   static String16 fromDouble(double);
   static String16 fromDouble(double, int precision);
 
   int64_t toInteger64(bool* ok = nullptr) const;
+  uint64_t toUInt64(bool* ok = nullptr) const;
   int toInteger(bool* ok = nullptr) const;
   String16 stripWhiteSpace() const;
   const UChar* characters16() const { return m_impl.c_str(); }
@@ -70,7 +72,11 @@ class String16 {
   // Convenience methods.
   V8_EXPORT std::string utf8() const;
   V8_EXPORT static String16 fromUTF8(const char* stringStart, size_t length);
-  V8_EXPORT static String16 fromUTF16(const UChar* stringStart, size_t length);
+
+  // Instantiates a String16 in native endianness from UTF16 LE.
+  // On Big endian architectures, byte order needs to be flipped.
+  V8_EXPORT static String16 fromUTF16LE(const UChar* stringStart,
+                                        size_t length);
 
   std::size_t hash() const {
     if (!hash_code) {
@@ -124,6 +130,7 @@ class String16Builder {
   void appendNumber(size_t);
   void appendUnsignedAsHex(uint64_t);
   void appendUnsignedAsHex(uint32_t);
+  void appendUnsignedAsHex(uint8_t);
   String16 toString();
   void reserveCapacity(size_t);
 
@@ -160,14 +167,5 @@ struct hash<v8_inspector::String16> {
 }  // namespace std
 
 #endif  // !defined(__APPLE__) || defined(_LIBCPP_VERSION)
-
-// See third_party/inspector_protocol/crdtp/serializer_traits.h.
-namespace v8_crdtp {
-template <>
-struct SerializerTraits<v8_inspector::String16> {
-  static void Serialize(const v8_inspector::String16& str,
-                        std::vector<uint8_t>* out);
-};
-}  // namespace v8_crdtp
 
 #endif  // V8_INSPECTOR_STRING_16_H_
