@@ -37,8 +37,6 @@ class ObjectManager {
 
         void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID, jclass clazz);
 
-        void LinkWithExtraData(const v8::Local<v8::Object>& object, uint32_t javaObjectID, jclass clazz, void* data);
-
         void ReleaseNativeCounterpart(v8::Local<v8::Object>& object);
 
         bool CloneLink(const v8::Local<v8::Object>& src, const v8::Local<v8::Object>& dest);
@@ -167,14 +165,9 @@ class ObjectManager {
 
         static void JSObjectFinalizerStatic(const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
 
-        static void  JSObjectFinalizerStaticWithExtraData(const v8::WeakCallbackInfo<ObjectWeakCallbackState> &data);
-
-
         void JSObjectWeakCallback(v8::Isolate* isolate, ObjectWeakCallbackState* callbackState);
 
         void JSObjectFinalizer(v8::Isolate* isolate, ObjectWeakCallbackState* callbackState);
-
-        void JSObjectFinalizerWithExtraData(v8::Isolate* isolate, ObjectWeakCallbackState* callbackState);
 
         bool HasImplObject(v8::Isolate* isolate, const v8::Local<v8::Object>& obj);
 
