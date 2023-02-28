@@ -26,6 +26,7 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         void disconnect();
         void dispatchMessage(const std::string& message);
 
+        // Overrides of V8Inspector::Channel
         void sendResponse(int callId, std::unique_ptr<StringBuffer> message) override;
         void sendNotification(const std::unique_ptr<StringBuffer> message) override;
         void flushProtocolNotifications() override;
@@ -33,12 +34,11 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         static void sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void consoleLogCallback(v8::Isolate* isolate, const std::string& message, const std::string& logLevel);
 
+        // Overrides of V8InspectorClient
         void runMessageLoopOnPause(int context_group_id) override;
         void quitMessageLoopOnPause() override;
-        v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;
 
         static void attachInspectorCallbacks(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate>& globalObjectTemplate);
-        static void InspectorIsConnectedGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
         static bool inspectorIsConnected() {
             return JsV8InspectorClient::GetInstance()->isConnected_;
         }
@@ -46,11 +46,16 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
     private:
         JsV8InspectorClient(v8::Isolate* isolate);
 
+        // Override of V8InspectorClient
+        v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;
+
         void createInspectorSession();
         void doDispatchMessage(const std::string& message);
 
+        static void InspectorIsConnectedGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+
         static JsV8InspectorClient* instance;
-        static int contextGroupId;
+        static constexpr int contextGroupId = 1;
 
         v8::Isolate* isolate_;
         std::unique_ptr<V8Inspector> inspector_;

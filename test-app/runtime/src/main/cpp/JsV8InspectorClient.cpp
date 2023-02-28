@@ -279,4 +279,3 @@ void JsV8InspectorClient::InspectorIsConnectedGetterCallback(v8::Local<v8::Strin
 }
 
 JsV8InspectorClient* JsV8InspectorClient::instance = nullptr;
-int JsV8InspectorClient::contextGroupId = 1;
