@@ -55,7 +55,7 @@ void JsV8InspectorClient::scheduleBreak() {
     session_->schedulePauseOnNextStatement(v8_inspector::StringView(), v8_inspector::StringView());
 }
 
-void JsV8InspectorClient::createInspectorSession(v8::Isolate* isolate, const v8::Local<v8::Context>& context) {
+void JsV8InspectorClient::createInspectorSession() {
     session_ = inspector_->connect(JsV8InspectorClient::contextGroupId, this, v8_inspector::StringView());
 }
 
@@ -76,7 +76,7 @@ void JsV8InspectorClient::disconnect() {
     connection_ = nullptr;
     isConnected_ = false;
 
-    this->createInspectorSession(isolate_, JsV8InspectorClient::PersistentToLocal(isolate_, context_));
+    createInspectorSession();
 }
 
 
@@ -195,7 +195,7 @@ void JsV8InspectorClient::init() {
 
     context_.Reset(isolate_, context);
 
-    this->createInspectorSession(isolate_, context);
+    createInspectorSession();
 }
 
 JsV8InspectorClient* JsV8InspectorClient::GetInstance() {
