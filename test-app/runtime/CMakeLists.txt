@@ -63,6 +63,21 @@ else ()
 #    set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections")
 endif ()
 
+if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
+    # Debug builds will include the V8 inspector sources
+    add_definitions(-DAPPLICATION_IN_DEBUG)
+
+    set(
+        INSPECTOR_SOURCES
+
+        src/main/cpp/com_tns_AndroidJsV8Inspector.cpp
+        src/main/cpp/JsV8InspectorClient.cpp
+    )
+else ()
+    # When building in Release mode we do not include the V8 inspector sources
+    set(INSPECTOR_SOURCES)
+endif ()
+
 # Command info: https://cmake.org/cmake/help/v3.4/command/add_library.html
 # Creates(shared static) and names a library given relative sources
 # Gradle automatically packages shared libraries with your APK.
