@@ -16,9 +16,6 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
     public:
         static JsV8InspectorClient* GetInstance();
 
-        template <class TypeName>
-        static v8::Local<TypeName> PersistentToLocal(v8::Isolate* isolate, const v8::Persistent<TypeName>& persistent);
-
         void init();
         void connect(jobject connection);
         void scheduleBreak();

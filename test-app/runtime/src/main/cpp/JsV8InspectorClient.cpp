@@ -139,8 +139,7 @@ void JsV8InspectorClient::quitMessageLoopOnPause() {
 }
 
 v8::Local<v8::Context> JsV8InspectorClient::ensureDefaultContextInGroup(int contextGroupId) {
-    v8::Local<v8::Context> context = PersistentToLocal(isolate_, context_);
-    return context;
+    return context_.Get(isolate_);
 }
 
 void JsV8InspectorClient::doDispatchMessage(const std::string& message) {
@@ -170,25 +169,6 @@ void JsV8InspectorClient::sendNotification(std::unique_ptr<StringBuffer> message
 }
 
 void JsV8InspectorClient::flushProtocolNotifications() {
-}
-
-template<class TypeName>
-inline v8::Local<TypeName> StrongPersistentToLocal(const v8::Persistent<TypeName>& persistent) {
-    return *reinterpret_cast<v8::Local<TypeName> *>(const_cast<v8::Persistent<TypeName> *>(&persistent));
-}
-
-template<class TypeName>
-inline v8::Local<TypeName> WeakPersistentToLocal(v8::Isolate* isolate, const v8::Persistent<TypeName>& persistent) {
-    return v8::Local<TypeName>::New(isolate, persistent);
-}
-
-template<class TypeName>
-inline v8::Local<TypeName> JsV8InspectorClient::PersistentToLocal(v8::Isolate* isolate, const v8::Persistent<TypeName>& persistent) {
-    if (persistent.IsWeak()) {
-        return WeakPersistentToLocal(isolate, persistent);
-    } else {
-        return StrongPersistentToLocal(persistent);
-    }
 }
 
 void JsV8InspectorClient::init() {
