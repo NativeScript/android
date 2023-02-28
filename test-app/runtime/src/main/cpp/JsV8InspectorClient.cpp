@@ -73,11 +73,11 @@ void JsV8InspectorClient::scheduleBreak() {
     auto context = Runtime::GetRuntime(isolate_)->GetContext();
     Context::Scope context_scope(context);
 
-    session_->schedulePauseOnNextStatement(v8_inspector::StringView(), v8_inspector::StringView());
+    session_->schedulePauseOnNextStatement({}, {});
 }
 
 void JsV8InspectorClient::createInspectorSession() {
-    session_ = inspector_->connect(JsV8InspectorClient::contextGroupId, this, v8_inspector::StringView());
+    session_ = inspector_->connect(JsV8InspectorClient::contextGroupId, this, {});
 }
 
 void JsV8InspectorClient::disconnect() {
@@ -203,7 +203,7 @@ void JsV8InspectorClient::init() {
 
     inspector_ = V8Inspector::create(isolate_, this);
 
-    inspector_->contextCreated(v8_inspector::V8ContextInfo(context, JsV8InspectorClient::contextGroupId, v8_inspector::StringView()));
+    inspector_->contextCreated(v8_inspector::V8ContextInfo(context, JsV8InspectorClient::contextGroupId, {}));
 
     context_.Reset(isolate_, context);
 
