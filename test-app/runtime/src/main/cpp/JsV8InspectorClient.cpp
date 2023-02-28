@@ -87,7 +87,7 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     auto context = Runtime::GetRuntime(isolate_)->GetContext();
     Context::Scope context_scope(context);
 
-    doDispatchMessage(isolate_, message);
+    doDispatchMessage(message);
 }
 
 void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id) {
@@ -103,7 +103,7 @@ void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id) {
         JniLocalRef msg(env.CallStaticObjectMethod(inspectorClass_, getInspectorMessageMethod_, connection_));
         if (!msg.IsNull()) {
             auto inspectorMessage = ArgConverter::jstringToString(msg);
-            this->doDispatchMessage(isolate_, inspectorMessage);
+            doDispatchMessage(inspectorMessage);
         }
 
         while (v8::platform::PumpMessageLoop(Runtime::platform, isolate_)) {
@@ -122,7 +122,7 @@ v8::Local<v8::Context> JsV8InspectorClient::ensureDefaultContextInGroup(int cont
     return context;
 }
 
-void JsV8InspectorClient::doDispatchMessage(v8::Isolate* isolate, const std::string& message) {
+void JsV8InspectorClient::doDispatchMessage(const std::string& message) {
     if (session_ == nullptr) {
         return;
     }

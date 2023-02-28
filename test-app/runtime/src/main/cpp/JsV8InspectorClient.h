@@ -25,7 +25,6 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         void scheduleBreak();
         void disconnect();
         void dispatchMessage(const std::string& message);
-        void doDispatchMessage(v8::Isolate* isolate, const std::string& message);
 
         void sendResponse(int callId, std::unique_ptr<StringBuffer> message) override;
         void sendNotification(const std::unique_ptr<StringBuffer> message) override;
@@ -48,6 +47,7 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         JsV8InspectorClient(v8::Isolate* isolate);
 
         void createInspectorSession();
+        void doDispatchMessage(const std::string& message);
 
         static JsV8InspectorClient* instance;
         static int contextGroupId;
