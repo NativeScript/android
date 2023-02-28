@@ -8,7 +8,6 @@
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "v8-inspector.h"
 #include "src/inspector/protocol/Forward.h"
-#include "src/inspector/string-16.h"
 
 using namespace v8_inspector;
 

@@ -15,6 +15,27 @@ using namespace v8;
 
 using namespace v8_inspector;
 
+// Utility functions for converting between inspector StringView and UTF8 string
+
+static inline v8_inspector::StringView stringToStringView(const std::string &str) {
+    auto* chars = reinterpret_cast<const uint8_t*>(str.c_str());
+    return { chars, str.length() };
+}
+
+static inline std::string stringViewToString(v8::Isolate* isolate, const v8_inspector::StringView& stringView) {
+    int length = static_cast<int>(stringView.length());
+    if (!length) {
+        return "";
+    }
+    v8::Local<v8::String> message = (
+        stringView.is8Bit() ?
+            v8::String::NewFromOneByte(isolate, reinterpret_cast<const uint8_t*>(stringView.characters8()), v8::NewStringType::kNormal, length) :
+            v8::String::NewFromTwoByte(isolate, reinterpret_cast<const uint16_t*>(stringView.characters16()), v8::NewStringType::kNormal, length)
+    ) .ToLocalChecked();
+    v8::String::Utf8Value result(isolate, message);
+    return *result;
+}
+
 JsV8InspectorClient::JsV8InspectorClient(v8::Isolate* isolate)
     : isolate_(isolate),
       inspector_(nullptr),
@@ -127,8 +148,7 @@ void JsV8InspectorClient::doDispatchMessage(const std::string& message) {
         return;
     }
 
-    const v8_inspector::String16 msg = v8_inspector::String16::fromUTF8(message.c_str(), message.length());
-    v8_inspector::StringView message_view = toStringView(msg);
+    v8_inspector::StringView message_view = stringToStringView(message);
     session_->dispatchProtocolMessage(message_view);
 }
 
@@ -136,24 +156,16 @@ void JsV8InspectorClient::sendResponse(int callId, std::unique_ptr<StringBuffer>
     sendNotification(std::move(message));
 }
 
-static v8_inspector::String16 ToString16(const v8_inspector::StringView& string) {
-    if (string.is8Bit()) {
-        return v8_inspector::String16(reinterpret_cast<const char*>(string.characters8()), string.length());
-    }
-
-    return v8_inspector::String16(reinterpret_cast<const uint16_t*>(string.characters16()), string.length());
-}
-
 void JsV8InspectorClient::sendNotification(std::unique_ptr<StringBuffer> message) {
     if (connection_ == nullptr) {
         return;
     }
 
-    v8_inspector::String16 msg = ToString16(message->string());
+    const std::string msg = stringViewToString(isolate_, message->string());
 
     JEnv env;
     // TODO: Pete: Check if we can use a wide (utf 16) string here
-    JniLocalRef str(env.NewStringUTF(msg.utf8().c_str()));
+    JniLocalRef str(env.NewStringUTF(msg.c_str()));
     env.CallStaticVoidMethod(inspectorClass_, sendMethod_, connection_, (jstring) str);
 }
 
