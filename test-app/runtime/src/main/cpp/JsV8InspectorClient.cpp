@@ -252,41 +252,6 @@ void JsV8InspectorClient::consoleLogCallback(Isolate* isolate, const string& mes
     v8_inspector::V8LogAgentImpl::EntryAdded(message, logLevel, ArgConverter::ConvertToString(frame->GetScriptNameOrSourceURL()), frame->GetLineNumber());
 }
 
-void MessageHandler(v8::Local<v8::Message> message, v8::Local<v8::Value> exception) {
-//    v8::Isolate *isolate = v8::Isolate::GetCurrent();
-//    v8::Local<v8::Context> context = isolate->GetEnteredContext();
-//    if (context.IsEmpty()) return;
-//    v8_inspector::V8Inspector *inspector = InspectorClientImpl::InspectorFromContext(context);
-//
-//    v8::Local<v8::StackTrace> stack = message->GetStackTrace();
-//    int script_id = message->GetScriptOrigin().ScriptID()->Value();
-//    if (!stack.IsEmpty() && stack->GetFrameCount() > 0)
-//    {
-//        int top_script_id = stack->GetFrame(0)->GetScriptId();
-//        if (top_script_id == script_id) script_id = 0;
-//    }
-//    int line_number = message->GetLineNumber(context).FromMaybe(0);
-//    int column_number = 0;
-//    if (message->GetStartColumn(context).IsJust())
-//        column_number = message->GetStartColumn(context).FromJust() + 1;
-//
-//    v8_inspector::StringView detailed_message;
-//    v8_inspector::String16 message_text_string = ToString16(message->Get());
-//    v8_inspector::StringView message_text(message_text_string.characters16(),
-//                                          message_text_string.length());
-//    v8_inspector::String16 url_string;
-//    if (message->GetScriptOrigin().ResourceName()->IsString())
-//    {
-//        url_string =
-//                ToString16(message->GetScriptOrigin().ResourceName().As<v8::String>());
-//    }
-//    v8_inspector::StringView url(url_string.characters16(), url_string.length());
-//
-//    inspector->exceptionThrown(context, message_text, exception, detailed_message,
-//                               url, line_number, column_number,
-//                               inspector->createStackTrace(stack), script_id);
-}
-
 void JsV8InspectorClient::attachInspectorCallbacks(Isolate* isolate,
         Local<ObjectTemplate>& globalObjectTemplate) {
     v8::HandleScope scope(isolate);
