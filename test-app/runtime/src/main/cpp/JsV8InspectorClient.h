@@ -42,28 +42,27 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         static void attachInspectorCallbacks(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate>& globalObjectTemplate);
         static void InspectorIsConnectedGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
         static bool inspectorIsConnected() {
-            return JsV8InspectorClient::GetInstance()->isConnected;
+            return JsV8InspectorClient::GetInstance()->isConnected_;
         }
-
-        std::unique_ptr<V8Inspector> inspector_;
-        v8::Isolate* isolate_;
-        bool isConnected;
 
     private:
         JsV8InspectorClient(v8::Isolate* isolate);
 
         static JsV8InspectorClient* instance;
-        static jclass inspectorClass;
-        static jmethodID sendMethod;
-        static jmethodID getInspectorMessageMethod;
-        static jmethodID sendToDevToolsConsoleMethod;
         static int contextGroupId;
 
+        v8::Isolate* isolate_;
+        std::unique_ptr<V8Inspector> inspector_;
         v8::Persistent<v8::Context> context_;
         std::unique_ptr<V8InspectorSession> session_;
-        jobject connection;
-        bool running_nested_loop_;
-        bool terminated_;
+        jclass inspectorClass_;
+        jmethodID sendMethod_;
+        jmethodID getInspectorMessageMethod_;
+        jmethodID sendToDevToolsConsoleMethod_;
+        jobject connection_;
+        bool running_nested_loop_ : 1;
+        bool terminated_ : 1;
+        bool isConnected_ : 1;
 };
 }
 
