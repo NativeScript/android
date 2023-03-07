@@ -1,12 +1,17 @@
 #include "JsV8InspectorClient.h"
 #include <assert.h>
 #include <include/libplatform/libplatform.h>
+#include <src/inspector/v8-console-message.h>
+#include <src/inspector/v8-inspector-impl.h>
+#include <src/inspector/v8-inspector-session-impl.h>
+#include <src/inspector/v8-runtime-agent-impl.h>
+#include <src/inspector/v8-stack-trace-impl.h>
+
 #include "Runtime.h"
 #include "NativeScriptException.h"
 
 #include "ArgConverter.h"
 // #include "DOMDomainCallbackHandlers.h"
-// #include "LogAgentImpl.h"
 // #include "NetworkDomainCallbackHandlers.h"
 
 using namespace std;
@@ -232,17 +237,26 @@ void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<
     }
 }
 
-void JsV8InspectorClient::consoleLogCallback(Isolate* isolate, const string& message, const string& logLevel) {
+void JsV8InspectorClient::consoleLogCallback(Isolate* isolate, ConsoleAPIType method, const std::vector<v8::Local<v8::Value>>& args) {
     if (!inspectorIsConnected()) {
         return;
     }
 
-    auto stack = v8::StackTrace::CurrentStackTrace(isolate, 1, v8::StackTrace::StackTraceOptions::kDetailed);
+    // Note, here we access private V8 API
+    auto* impl = reinterpret_cast<v8_inspector::V8InspectorImpl*>(instance->inspector_.get());
+    auto* session = reinterpret_cast<v8_inspector::V8InspectorSessionImpl*>(instance->session_.get());
 
-    auto frame = stack->GetFrame(isolate, 0);
+    std::unique_ptr<V8StackTraceImpl> stack = impl->debugger()->captureStackTrace(false);
 
-    // will be no-op in non-debuggable builds
-    // v8_inspector::V8LogAgentImpl::EntryAdded(message, logLevel, ArgConverter::ConvertToString(frame->GetScriptNameOrSourceURL()), frame->GetLineNumber());
+    v8::Local<v8::Context> context = instance->context_.Get(instance->isolate_);
+    const int contextId = V8ContextInfo::executionContextId(context);
+
+    std::unique_ptr<v8_inspector::V8ConsoleMessage> msg =
+        v8_inspector::V8ConsoleMessage::createForConsoleAPI(
+            context, contextId, contextGroupId, impl, instance->currentTimeMS(),
+            method, args, String16{}, std::move(stack));
+
+    session->runtimeAgent()->messageAdded(msg.get());
 }
 
 void JsV8InspectorClient::attachInspectorCallbacks(Isolate* isolate,

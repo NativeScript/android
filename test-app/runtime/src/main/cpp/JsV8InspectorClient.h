@@ -2,12 +2,11 @@
 #define JSV8INSPECTORCLIENT_H_
 
 #include <string>
+#include <vector>
+#include <src/inspector/v8-console-message.h>
 #include "v8.h"
 #include "JEnv.h"
-#include "src/inspector/v8-inspector-impl.h"
-#include "src/inspector/v8-inspector-session-impl.h"
 #include "v8-inspector.h"
-#include "src/inspector/protocol/Forward.h"
 
 using namespace v8_inspector;
 
@@ -28,7 +27,7 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         void flushProtocolNotifications() override;
 
         static void sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-        static void consoleLogCallback(v8::Isolate* isolate, const std::string& message, const std::string& logLevel);
+        static void consoleLogCallback(v8::Isolate* isolate, ConsoleAPIType method, const std::vector<v8::Local<v8::Value>>& args);
 
         // Overrides of V8InspectorClient
         void runMessageLoopOnPause(int context_group_id) override;
