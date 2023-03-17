@@ -5,13 +5,18 @@
 #include <sstream>
 #include <ArgConverter.h>
 #include <NativeScriptAssert.h>
+
+#include <v8_inspector/src/inspector/protocol/Protocol.h>
+#include <v8_inspector/src/inspector/string-util.h>
+#include <v8_inspector/third_party/inspector_protocol/crdtp/error_support.h>
 #include <v8_inspector/third_party/inspector_protocol/crdtp/json.h>
+
 #include "DOMDomainCallbackHandlers.h"
 
 using namespace tns;
 
 void DOMDomainCallbackHandlers::DocumentUpdatedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
-    auto domAgentInstance = V8DOMAgentImpl::Instance;
+    auto domAgentInstance = DOMAgentImpl::Instance;
 
     if (!domAgentInstance) {
         return;
@@ -22,7 +27,7 @@ void DOMDomainCallbackHandlers::DocumentUpdatedCallback(const v8::FunctionCallba
 
 void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
-        auto domAgentInstance = V8DOMAgentImpl::Instance;
+        auto domAgentInstance = DOMAgentImpl::Instance;
 
         if (!domAgentInstance) {
             return;
@@ -41,14 +46,14 @@ void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCall
         auto lastId = args[1]->ToNumber(context).ToLocalChecked();
         auto node = args[2]->ToString(context).ToLocalChecked();
 
-        auto resultString = V8DOMAgentImpl::AddBackendNodeIdProperty(isolate, node);
+        auto resultString = DOMAgentImpl::AddBackendNodeIdProperty(isolate, node);
         auto nodeUtf16Data = resultString.data();
-        const String16& nodeString16 = String16((const uint16_t*) nodeUtf16Data);
+        const v8_inspector::String16& nodeString16 = v8_inspector::String16((const uint16_t*) nodeUtf16Data);
         std::vector<uint8_t> cbor;
         v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(nodeString16.characters16(), nodeString16.length()), &cbor);
         std::unique_ptr<protocol::Value> protocolNodeJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
 
-        protocol::ErrorSupport errorSupport;
+        v8_crdtp::ErrorSupport errorSupport;
         auto domNode = protocol::DOM::Node::fromValue(protocolNodeJson.get(), &errorSupport);
 
         std::vector<uint8_t> json;
@@ -76,7 +81,7 @@ void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCall
 
 void DOMDomainCallbackHandlers::ChildNodeRemovedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
-        auto domAgentInstance = V8DOMAgentImpl::Instance;
+        auto domAgentInstance = DOMAgentImpl::Instance;
 
         if (!domAgentInstance) {
             return;
@@ -110,7 +115,7 @@ void DOMDomainCallbackHandlers::ChildNodeRemovedCallback(const v8::FunctionCallb
 
 void DOMDomainCallbackHandlers::AttributeModifiedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
-        auto domAgentInstance = V8DOMAgentImpl::Instance;
+        auto domAgentInstance = DOMAgentImpl::Instance;
 
         if (!domAgentInstance) {
             return;
@@ -147,7 +152,7 @@ void DOMDomainCallbackHandlers::AttributeModifiedCallback(const v8::FunctionCall
 
 void DOMDomainCallbackHandlers::AttributeRemovedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
-        auto domAgentInstance = V8DOMAgentImpl::Instance;
+        auto domAgentInstance = DOMAgentImpl::Instance;
 
         if (!domAgentInstance) {
             return;

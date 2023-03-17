@@ -18,7 +18,7 @@ endif (CCACHE_FOUND AND (USE_CCACHE))
 # "-DANDROID_STL=c++_static" is just not enough for clang++ to find some libraries in the ndk
 MESSAGE(STATUS "## ANDROID_NDK_ROOT: " ${ANDROID_NDK_ROOT})
 
-set(COMMON_CMAKE_ARGUMENTS "-std=c++14 -Werror -Wno-unused-result -mstackrealign -fexceptions -fno-builtin-stpcpy -fno-rtti -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_ENABLE_REGEXP_INTERPRETER_THREADED_DISPATCH -DV8_EMBEDDED_BUILTINS")
+set(COMMON_CMAKE_ARGUMENTS "-std=c++17 -Werror -Wno-unused-result -mstackrealign -fexceptions -fno-builtin-stpcpy -fno-rtti -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_ENABLE_REGEXP_INTERPRETER_THREADED_DISPATCH -DV8_EMBEDDED_BUILTINS")
 
 if("${ANDROID_ABI}" MATCHES "arm64-v8a$" OR "${ANDROID_ABI}" MATCHES "x86_64$")
     # Enable pointer compression on 64 bit platforms
@@ -61,6 +61,21 @@ if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
 else ()
     set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -g")
 #    set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections")
+endif ()
+
+if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
+    # Debug builds will include the V8 inspector sources
+    add_definitions(-DAPPLICATION_IN_DEBUG)
+
+    set(
+        INSPECTOR_SOURCES
+
+        src/main/cpp/com_tns_AndroidJsV8Inspector.cpp
+        src/main/cpp/JsV8InspectorClient.cpp
+    )
+else ()
+    # When building in Release mode we do not include the V8 inspector sources
+    set(INSPECTOR_SOURCES)
 endif ()
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/add_library.html

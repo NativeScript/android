@@ -8,8 +8,8 @@
 
 #include <include/v8.h>
 #ifdef APPLICATION_IN_DEBUG
-#include <v8_inspector/src/inspector/v8-network-agent-impl.h>
 #include "JsV8InspectorClient.h"
+#include "NetworkAgentImpl.h"
 #endif
 #include "ArgConverter.h"
 #include "NativeScriptException.h"
