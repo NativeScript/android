@@ -17,6 +17,15 @@ MetadataReader::MetadataReader(uint32_t nodesLength, uint8_t* nodeData, uint32_t
     m_root = BuildTree();
 }
 
+// helper debug function when need to convert a metadata node to its full name
+//std::string toFullName(MetadataTreeNode* p) {
+//    std::string final = p->name;
+//    while((p = p->parent) && !p->name.empty()) {
+//        final.insert(0,p->name + ".");
+//    };
+//    return final;
+//}
+
 MetadataTreeNode* MetadataReader::BuildTree() {
     MetadataTreeNodeRawData* rootNodeData = reinterpret_cast<MetadataTreeNodeRawData*>(m_nodeData);
 
@@ -43,6 +52,13 @@ MetadataTreeNode* MetadataReader::BuildTree() {
             node->children = new vector<MetadataTreeNode*>;
             MetadataTreeNodeRawData* childNodeData = rootNodeData + curNodeData->firstChildId;
             while (true) {
+
+                uint16_t childNodeDataId = childNodeData - rootNodeData;
+                // node (and its next siblings) already visited, so we don't need to visit it again
+                if (m_v[childNodeDataId] != emptyNode) {
+                    break;
+                }
+
                 MetadataTreeNode* childNode = new MetadataTreeNode;
                 childNode->parent = node;
                 childNode->name = ReadName(childNodeData->offsetName);
@@ -50,13 +66,7 @@ MetadataTreeNode* MetadataReader::BuildTree() {
 
                 node->children->push_back(childNode);
 
-                uint16_t childNodeDataId = childNodeData - rootNodeData;
-
                 m_v[childNodeDataId] = childNode;
-
-                if (childNodeDataId == childNodeData->nextSiblingId) {
-                    break;
-                }
 
                 childNodeData = rootNodeData + childNodeData->nextSiblingId;
             }

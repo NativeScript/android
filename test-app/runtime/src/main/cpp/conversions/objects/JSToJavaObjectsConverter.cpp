@@ -212,12 +212,7 @@ bool tns::ConvertJavaScriptObject(
 
                 int id = objectManager->GetOrCreateObjectId(buffer);
                 auto clazz = env.GetObjectClass(buffer);
-
-                if (link_with_data) {
-                    objectManager->LinkWithExtraData(jsObject, id, clazz, data);
-                } else {
-                    objectManager->Link(jsObject, id, clazz);
-                }
+                objectManager->Link(jsObject, id, clazz);
 
                 obj = objectManager->GetJavaObjectByJsObject(jsObject);
             }
