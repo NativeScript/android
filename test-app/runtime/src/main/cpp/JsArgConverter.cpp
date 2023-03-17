@@ -253,37 +253,25 @@ bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
                     size_t offset = 0;
                     size_t length;
                     uint8_t *data = nullptr;
-                    auto link_with_data = false;
                     if (jsObject->IsArrayBuffer()) {
                         auto array = jsObject.As<v8::ArrayBuffer>();
                         store = array->GetBackingStore();
                         length = array->ByteLength();
+                        data = static_cast<uint8_t *>(store->Data());
                     } else if (jsObject->IsArrayBufferView()) {
                         auto array = jsObject.As<v8::ArrayBufferView>();
-
-                        if (!array->HasBuffer()) {
-
-                            length = array->ByteLength();
-                            void *data_ = malloc(length);
-                            array->CopyContents(data_, length);
-                            data = (uint8_t *) data_;
-                            link_with_data = true;
-                        } else {
-                            length = array->ByteLength();
-                        }
                         offset = array->ByteOffset();
+                        length = array->ByteLength();
                         store = array->Buffer()->GetBackingStore();
+                        data = static_cast<uint8_t *>(store->Data()) + offset;
                         bufferCastType = JsArgConverter::GetCastType(array);
                     } else {
                         auto array = jsObject.As<v8::TypedArray>();
                         offset = array->ByteOffset();
                         store = array->Buffer()->GetBackingStore();
                         length = array->ByteLength();
-                        bufferCastType = JsArgConverter::GetCastType(array);
-                    }
-
-                    if (data == nullptr) {
                         data = static_cast<uint8_t *>(store->Data()) + offset;
+                        bufferCastType = JsArgConverter::GetCastType(array);
                     }
 
                     auto directBuffer = env.NewDirectByteBuffer(
@@ -342,11 +330,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
                     int id = objectManager->GetOrCreateObjectId(buffer);
                     auto clazz = env.GetObjectClass(buffer);
 
-                    if (link_with_data) {
-                        objectManager->LinkWithExtraData(jsObject, id, clazz, data);
-                    } else {
-                        objectManager->Link(jsObject, id, clazz);
-                    }
+                    objectManager->Link(jsObject, id, clazz);
 
                     obj = objectManager->GetJavaObjectByJsObject(jsObject);
                 }

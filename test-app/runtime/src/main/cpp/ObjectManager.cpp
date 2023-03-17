@@ -266,41 +266,6 @@ void ObjectManager::Link(const Local<Object> &object, uint32_t javaObjectID, jcl
     m_idToObject.insert(make_pair(javaObjectID, objectHandle));
 }
 
-void ObjectManager::LinkWithExtraData(const v8::Local<v8::Object>& object, uint32_t javaObjectID, jclass clazz, void* data) {
-    if (!IsJsRuntimeObject(object)) {
-        string errMsg("Trying to link invalid 'this' to a Java object");
-        throw NativeScriptException(errMsg);
-    }
-
-    auto isolate = m_isolate;
-
-    DEBUG_WRITE("Linking js object: %d and java instance id: %d", object->GetIdentityHash(),
-                javaObjectID);
-
-    auto jsInstanceInfo = new JSInstanceInfo(false/*isJavaObjWeak*/, javaObjectID, clazz);
-
-    auto objectHandle = new Persistent<Object>(isolate, object);
-    auto state = new ObjectWeakCallbackState(this, jsInstanceInfo, objectHandle);
-
-    // subscribe for JS GC event
-    if (m_markingMode == JavaScriptMarkingMode::None) {
-        objectHandle->SetWeak(state, JSObjectFinalizerStatic, WeakCallbackType::kFinalizer);
-    } else {
-        objectHandle->SetWeak(state, JSObjectWeakCallbackStatic, WeakCallbackType::kFinalizer);
-    }
-
-    auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-
-    auto jsInfo = External::New(isolate, jsInstanceInfo);
-
-    //link
-    object->SetInternalField(jsInfoIdx, jsInfo);
-
-    V8SetPrivateValue(isolate, object,  String::NewFromUtf8(isolate,"object_with_extra_data").ToLocalChecked(), External::New(isolate, data));
-
-    m_idToObject.insert(make_pair(javaObjectID, objectHandle));
-}
-
 bool ObjectManager::CloneLink(const Local<Object> &src, const Local<Object> &dest) {
     auto jsInfo = GetJSInstanceInfo(src);
 
@@ -387,55 +352,6 @@ void ObjectManager::JSObjectFinalizer(Isolate *isolate, ObjectWeakCallbackState 
 }
 
 
-void ObjectManager::JSObjectFinalizerStaticWithExtraData(const WeakCallbackInfo<ObjectWeakCallbackState> &data) {
-    ObjectWeakCallbackState *callbackState = data.GetParameter();
-
-    ObjectManager *thisPtr = callbackState->thisPtr;
-
-    auto isolate = data.GetIsolate();
-
-    thisPtr->JSObjectFinalizerWithExtraData(isolate, callbackState);
-}
-
-void ObjectManager::JSObjectFinalizerWithExtraData(Isolate *isolate, ObjectWeakCallbackState *callbackState) {
-    HandleScope handleScope(m_isolate);
-    Persistent<Object> *po = callbackState->target;
-    auto jsInstanceInfo = GetJSInstanceInfoFromRuntimeObject(po->Get(m_isolate));
-
-    if (jsInstanceInfo == nullptr) {
-        po->Reset();
-        delete po;
-        delete callbackState;
-        return;
-    }
-
-    auto javaObjectID = jsInstanceInfo->JavaObjectID;
-    JEnv env;
-    jboolean isJavaInstanceAlive = env.CallBooleanMethod(m_javaRuntimeObject,
-                                                         MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID,
-                                                         javaObjectID);
-    if (isJavaInstanceAlive) {
-        // If the Java instance is alive, keep the JavaScript instance alive.
-        po->SetWeak(callbackState, JSObjectFinalizerStatic, WeakCallbackType::kFinalizer);
-    } else {
-        // If the Java instance is dead, this JavaScript instance can be let die.
-        delete jsInstanceInfo;
-        auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-        po->Get(m_isolate)->SetInternalField(jsInfoIdx, Undefined(m_isolate));
-        v8::Local<v8::Value> out;
-        V8GetPrivateValue(isolate, po->Get(m_isolate), String::NewFromUtf8(isolate,"object_with_extra_data").ToLocalChecked(), out);
-        V8SetPrivateValue(isolate, po->Get(m_isolate), String::NewFromUtf8(isolate,"object_with_extra_data").ToLocalChecked(), Undefined(m_isolate));
-        if(!out.IsEmpty() && out->IsExternal()) {
-           auto data = out.As<v8::External>()->Value();
-           free(data);
-        }
-        po->Reset();
-        m_idToObject.erase(javaObjectID);
-        delete po;
-        delete callbackState;
-    }
-}
-
 /*
  * When JS GC happens change state of the java counterpart to mirror state of JS object and REVIVE the JS object unconditionally
  * "Regular" js objects are pushed into the "regular objects" array
@@ -466,7 +382,7 @@ void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackSta
 
             if (hasImplObj) {
                 if (jsInstanceInfo->IsJavaObjectWeak) {
-                    m_implObjWeak.push_back(PersistentObjectIdPair(po, javaObjectID));
+                    m_implObjWeak.emplace_back(po, javaObjectID);
                 } else {
                     m_implObjStrong.insert(make_pair(javaObjectID, po));
                     jsInstanceInfo->IsJavaObjectWeak = true;
