@@ -115,9 +115,12 @@ describe('native timer', () => {
             expect(!!weakRef.get()).toBe(true);
             clearInterval(interval);
             clearTimeout(timeout);
-            gc();
-            expect(!!weakRef.get()).toBe(false);
-            done();
+            // use another timeout as native weakrefs can't be gced until we leave the isolate after being used once
+            setTimeout(() => {
+                gc();
+                expect(!!weakRef.get()).toBe(false);
+                done();
+            })
         }, 200);
     })
 });
