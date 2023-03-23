@@ -71,7 +71,9 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
         INSPECTOR_SOURCES
 
         src/main/cpp/com_tns_AndroidJsV8Inspector.cpp
+        src/main/cpp/DOMDomainCallbackHandlers.cpp
         src/main/cpp/JsV8InspectorClient.cpp
+        src/main/cpp/NetworkDomainCallbackHandlers.cpp
     )
 else ()
     # When building in Release mode we do not include the V8 inspector sources
