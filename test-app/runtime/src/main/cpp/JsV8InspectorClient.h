@@ -28,6 +28,7 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
 
         static void sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void consoleLogCallback(v8::Isolate* isolate, ConsoleAPIType method, const std::vector<v8::Local<v8::Value>>& args);
+        static void inspectorSendEventCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
         // Overrides of V8InspectorClient
         void runMessageLoopOnPause(int context_group_id) override;

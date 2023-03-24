@@ -205,6 +205,25 @@ JsV8InspectorClient* JsV8InspectorClient::GetInstance() {
     return instance;
 }
 
+void JsV8InspectorClient::inspectorSendEventCallback(const FunctionCallbackInfo<Value>& args) {
+    if ((instance == nullptr) || (instance->connection_ == nullptr)) {
+        return;
+    }
+    Isolate* isolate = args.GetIsolate();
+
+    Local<v8::String> arg = args[0].As<v8::String>();
+    std::string message = ArgConverter::ConvertToString(arg);
+
+    JEnv env;
+    // TODO: Pete: Check if we can use a wide (utf 16) string here
+    JniLocalRef str(env.NewStringUTF(message.c_str()));
+    env.CallStaticVoidMethod(instance->inspectorClass_, instance->sendMethod_, instance->connection_, (jstring) str);
+
+    // TODO: ios uses this method, but doesn't work on android
+    // so I'm just sending directly to the socket (which seems to work)
+    //instance->dispatchMessage(message);
+}
+
 void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     if ((instance == nullptr) || (instance->connection_ == nullptr)) {
         return;
@@ -280,6 +299,7 @@ void JsV8InspectorClient::attachInspectorCallbacks(Isolate* isolate,
     inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "attributeRemoved"), FunctionTemplate::New(isolate, DOMDomainCallbackHandlers::AttributeRemovedCallback));
 
     globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__inspector"), inspectorJSObject);
+    globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__inspectorSendEvent"), FunctionTemplate::New(isolate, JsV8InspectorClient::inspectorSendEventCallback));
 }
 
 void JsV8InspectorClient::InspectorIsConnectedGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
