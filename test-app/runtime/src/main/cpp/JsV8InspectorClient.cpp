@@ -114,6 +114,8 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     Context::Scope context_scope(context);
 
     doDispatchMessage(message);
+    // TODO: check why this is needed (it should trigger automatically when script depth is 0)
+    isolate_->PerformMicrotaskCheckpoint();
 }
 
 void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id) {
