@@ -7,19 +7,19 @@
 
 
 #include <include/v8.h>
-#ifdef APPLICATION_IN_DEBUG
-#include "JsV8InspectorClient.h"
-#include "NetworkAgentImpl.h"
-#endif
-#include "ArgConverter.h"
-#include "NativeScriptException.h"
+// #ifdef APPLICATION_IN_DEBUG
+// #include "JsV8InspectorClient.h"
+// #include "NetworkAgentImpl.h"
+// #endif
+// #include "ArgConverter.h"
+// #include "NativeScriptException.h"
 
 namespace tns {
 class NetworkDomainCallbackHandlers {
 
     public:
-        static const char* FrameId;
-        static const char* LoaderId;
+        // static const char* FrameId;
+        // static const char* LoaderId;
 
         /*
          * Fired when device is about to send HTTP request.
