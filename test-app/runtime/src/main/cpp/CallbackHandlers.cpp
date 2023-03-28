@@ -3,6 +3,7 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
+//#include "./conversions/JSToJavaConverter.h"
 #include "JsArgConverter.h"
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
@@ -102,6 +103,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
             instance = env.NewObject(generatedJavaClass, mi.mid);
         } else {
             // resolve arguments before passing them on to the constructor
+//            JSToJavaConverter argConverter(isolate, argWrapper.args, mi.signature);
             JsArgConverter argConverter(argWrapper.args, mi.signature);
             auto ctorArgs = argConverter.ToArgs();
 
@@ -208,6 +210,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
     string *returnType = nullptr;
     auto retType = MethodReturnType::Unknown;
     MethodCache::CacheMethodInfo mi;
+
+    auto isolate = args.GetIsolate();
 
     if ((entry != nullptr) && entry->isResolved) {
         isStatic = entry->isStatic;
@@ -320,27 +324,25 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                     methodName.c_str());
     }
 
-    JsArgConverter *argConverter;
+//    JSToJavaConverter argConverter = (entry != nullptr && entry->isExtensionFunction)
+//                                     ? JSToJavaConverter(isolate, args, *sig, entry, caller)
+//                                     : JSToJavaConverter(isolate, args, *sig, entry);
 
-    if (entry != nullptr && entry->isExtensionFunction) {
-        argConverter = new JsArgConverter(caller, args, *sig, entry);
-    } else {
-        argConverter = new JsArgConverter(args, false, *sig, entry);
-    }
+    JsArgConverter argConverter = (entry != nullptr && entry->isExtensionFunction)
+                                        ? JsArgConverter(caller, args, *sig, entry)
+                                        : JsArgConverter(args, false, *sig, entry);
 
-    if (!argConverter->IsValid()) {
-        JsArgConverter::Error err = argConverter->GetError();
+
+    if (!argConverter.IsValid()) {
+        JsArgConverter::Error err = argConverter.GetError();
         throw NativeScriptException(err.msg);
     }
 
-    auto isolate = args.GetIsolate();
-
     JniLocalRef callerJavaObject;
 
-    jvalue *javaArgs = argConverter->ToArgs();
+    jvalue *javaArgs = argConverter.ToArgs();
 
-
-    auto runtime = Runtime::GetRuntime(isolate);
+    auto runtime = Runtime::GetRuntimeFromIsolateData(isolate);
     auto objectManager = runtime->GetObjectManager();
 
     if (!isStatic) {
@@ -537,13 +539,11 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
         }
     }
 
-    static uint32_t adjustMemCount = 0;
-
-    if ((++adjustMemCount % 2) == 0) {
-        AdjustAmountOfExternalAllocatedMemory(env, isolate);
-    }
-
-    delete argConverter;
+//    static uint32_t adjustMemCount = 0;
+//
+//    if ((++adjustMemCount % 2) == 0) {
+//        AdjustAmountOfExternalAllocatedMemory(env, isolate);
+//    }
 }
 
 void CallbackHandlers::AdjustAmountOfExternalAllocatedMemory(JEnv &env, Isolate *isolate) {
@@ -1091,8 +1091,10 @@ CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo
                                            ArgConverter::ConvertToV8String(isolate, "workerId"),
                                            jsId);
 
-        Local<String> msg = tns::JsonStringifyObject(isolate, args[0], false);
         auto context = isolate->GetCurrentContext();
+        auto objToStringify = args[0]->ToObject(context).ToLocalChecked();
+        std::string msg = tns::JsonStringifyObject(isolate, objToStringify, false);
+
         // get worker's ID that is associated on the other side - in Java
         auto id = jsId->Int32Value(context).ToChecked();
 
@@ -1100,7 +1102,7 @@ CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo
         auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "sendMessageFromMainToWorker",
                                          "(ILjava/lang/String;)V");
 
-        auto jmsg = ArgConverter::ConvertToJavaString(msg);
+        jstring jmsg = env.NewStringUTF(msg.c_str());
         JniLocalRef jmsgRef(jmsg);
 
         env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id, (jstring) jmsgRef);
@@ -1190,13 +1192,15 @@ CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbackInfo
             return;
         }
 
-        Local<String> msg = tns::JsonStringifyObject(isolate, args[0], false);
+        auto context = isolate->GetCurrentContext();
+        auto objToStringify = args[0]->ToObject(context).ToLocalChecked();
+        std::string msg = tns::JsonStringifyObject(isolate, objToStringify, false);
 
         JEnv env;
         auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "sendMessageFromWorkerToMain",
                                          "(Ljava/lang/String;)V");
 
-        auto jmsg = ArgConverter::ConvertToJavaString(msg);
+        auto jmsg = env.NewStringUTF(msg.c_str());
         JniLocalRef jmsgRef(jmsg);
 
         env.CallStaticVoidMethod(RUNTIME_CLASS, mId, (jstring) jmsgRef);

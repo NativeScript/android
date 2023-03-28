@@ -53,8 +53,6 @@ class ObjectManager {
 
         v8::Local<v8::Object> GetEmptyObject(v8::Isolate* isolate);
 
-        static void MarkReachableArrayElements(v8::Local<v8::Object>& o, std::stack<v8::Local<v8::Value>>& s);
-
         enum class MetadataNodeKeys {
             JsInfo,
             CallSuper,
@@ -172,16 +170,6 @@ class ObjectManager {
         void JSObjectFinalizer(v8::Isolate* isolate, ObjectWeakCallbackState* callbackState);
 
         bool HasImplObject(v8::Isolate* isolate, const v8::Local<v8::Object>& obj);
-
-        void MarkReachableObjects(v8::Isolate* isolate, const v8::Local<v8::Object>& obj);
-
-        void OnGcStarted(v8::GCType type, v8::GCCallbackFlags flags);
-
-        void OnGcFinished(v8::GCType type, v8::GCCallbackFlags flags);
-
-        static void OnGcStartedStatic(v8::Isolate* isolate, v8::GCType type, v8::GCCallbackFlags flags);
-
-        static void OnGcFinishedStatic(v8::Isolate* isolate, v8::GCType type, v8::GCCallbackFlags flags);
 
         jweak GetJavaObjectByID(uint32_t javaObjectID);
 

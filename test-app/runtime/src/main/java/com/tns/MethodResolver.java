@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 class MethodResolver {
     private static Map<String, String> primitiveTypesSignature = new HashMap<String, String>();
@@ -98,11 +99,10 @@ class MethodResolver {
         return array + signature;
     }
 
-    static HashMap<Class<?>, MethodFinder> methodOverloadsForClass = new HashMap<Class<?>, MethodFinder>();
-    static ArrayList<Tuple<Method, Integer>> candidates = new ArrayList<Tuple<Method, Integer>>();
+    static ConcurrentHashMap<Class<?>, MethodFinder> methodOverloadsForClass = new ConcurrentHashMap<>();
 
     static String resolveMethodOverload(Class<?> clazz, String methodName, Object[] args) throws ClassNotFoundException {
-        candidates.clear();
+        ArrayList<Tuple<Method, Integer>> candidates = new ArrayList<Tuple<Method, Integer>>();
         int argLength = (args != null) ? args.length : 0;
 
         Class<?> c = clazz;

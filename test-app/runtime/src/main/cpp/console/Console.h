@@ -7,12 +7,15 @@
 
 #include <include/v8.h>
 #include <string>
+#include <vector>
 #include <ArgConverter.h>
 #include <android/log.h>
 
+#include <src/inspector/v8-console-message.h>
+
 namespace tns {
 
-typedef void (*ConsoleCallback)(v8::Isolate* isolate, const std::string& message, const std::string& logLevel);
+typedef void (*ConsoleCallback)(v8::Isolate* isolate, v8_inspector::ConsoleAPIType method, const std::vector<v8::Local<v8::Value>>& args);
 
 class Console {
     public:
@@ -31,16 +34,12 @@ class Console {
         static void onDisposeIsolate(v8::Isolate* isolate);
 
     private:
+        using ConsoleAPIType = v8_inspector::ConsoleAPIType;
+
         static int m_maxLogcatObjectSize;
-        static bool m_forceLog;
         static ConsoleCallback m_callback;
         static const char* LOG_TAG;
         static std::map<v8::Isolate*, std::map<std::string, double>> s_isolateToConsoleTimersMap;
-
-        static bool isApplicationInDebug;
-        static bool shouldLog() {
-            return m_forceLog || isApplicationInDebug;
-        }
 
         // heavily inspired by 'createBoundFunctionProperty' of V8's v8-console.h
         static void bindFunctionProperty(v8::Local<v8::Context> context,
@@ -60,7 +59,8 @@ class Console {
         }
 
         static void sendToADBLogcat(const std::string& log, android_LogPriority logPriority);
-        static void sendToDevToolsFrontEnd(v8::Isolate* isolate, const std::string& message, const std::string& logLevel);
+        static void sendToDevToolsFrontEnd(v8::Isolate* isolate, ConsoleAPIType method, const v8::FunctionCallbackInfo<v8::Value>& args);
+        static void sendToDevToolsFrontEnd(v8::Isolate* isolate, ConsoleAPIType method, const std::string& args);
 };
 
 }

@@ -922,7 +922,6 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
 
     auto node = GetOrCreateInternal(treeNode);
 
-
     JEnv env;
     // if we already have an exception (which will be rethrown later)
     // then we don't want to ignore the next exception
@@ -998,10 +997,10 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
         wrappedCtorFunc->SetPrototype(context, baseCtorFunc);
     }
 
-    //cache "ctorFuncTemplate"
-    auto pft = new Persistent<FunctionTemplate>(isolate, ctorFuncTemplate);
-    CtorCacheData ctorCacheItem(pft, instanceMethodsCallbackData);
-    cache->CtorFuncCache.insert(make_pair(treeNode, ctorCacheItem));
+   //cache "ctorFuncTemplate"
+   auto pft = new Persistent<FunctionTemplate>(isolate, ctorFuncTemplate);
+   CtorCacheData ctorCacheItem(pft, instanceMethodsCallbackData);
+   cache->CtorFuncCache.insert(make_pair(treeNode, ctorCacheItem));
 
     SetInnerTypes(isolate, wrappedCtorFunc, treeNode);
 
@@ -2027,7 +2026,7 @@ Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& func
     TryCatch tc(isolate);
 
     Local<Script> script;
-    ScriptOrigin jsOrigin(ArgConverter::ConvertToV8String(isolate, origin));
+    ScriptOrigin jsOrigin(isolate, ArgConverter::ConvertToV8String(isolate, origin));
     auto maybeScript = Script::Compile(context, source, &jsOrigin).ToLocal(&script);
 
     if (tc.HasCaught()) {
@@ -2172,6 +2171,7 @@ void MetadataNode::SymbolHasInstanceCallback(const v8::FunctionCallbackInfo<v8::
     auto isolate = info.GetIsolate();
     auto context = isolate->GetCurrentContext();
     auto runtime = Runtime::GetRuntime(isolate);
+
     auto objectManager = runtime->GetObjectManager();
     auto obj = objectManager->GetJavaObjectByJsObject(arg->ToObject(context).ToLocalChecked());
 

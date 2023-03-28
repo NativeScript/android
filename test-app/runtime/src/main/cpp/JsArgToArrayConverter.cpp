@@ -17,8 +17,10 @@ using namespace tns;
 /*
  * Converts a single JavaScript (V8) object to its respective Java representation
  */
-JsArgToArrayConverter::JsArgToArrayConverter(Local<Context> context, const v8::Local<Value>& arg, bool isImplementationObject, int classReturnType)
-    : m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(classReturnType) {
+JsArgToArrayConverter::JsArgToArrayConverter(Local<Context> context, const v8::Local<Value> &arg,
+                                             bool isImplementationObject, int classReturnType)
+        : m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()),
+          m_return_type(classReturnType) {
     if (!isImplementationObject) {
         m_argsLen = 1;
         m_argsAsObject = new jobject[m_argsLen];
@@ -31,8 +33,10 @@ JsArgToArrayConverter::JsArgToArrayConverter(Local<Context> context, const v8::L
 /*
  * Converts an array of JavaScript (V8) objects to a Java array of objects
  */
-JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject)
-    : m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(static_cast<int>(Type::Null)) {
+JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value> &args,
+                                             bool hasImplementationObject)
+        : m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()),
+          m_return_type(static_cast<int>(Type::Null)) {
     m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 2;
 
     bool success = true;
@@ -54,7 +58,7 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Valu
     m_isValid = success;
 }
 
-bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value>& arg, int index) {
+bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value> &arg, int index) {
     bool success = false;
     stringstream s;
 
@@ -66,7 +70,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
     if (arg.IsEmpty()) {
         s << "Cannot convert empty JavaScript object";
         success = false;
-    }else if (arg->IsInt32() && (returnType == Type::Int || returnType == Type::Null)) {
+    } else if (arg->IsInt32() && (returnType == Type::Int || returnType == Type::Null)) {
         jint value = arg->Int32Value(context).ToChecked();
         auto javaObject = JType::NewInt(env, value);
         SetConvertedObject(env, index, javaObject);
@@ -85,7 +89,8 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
             //if returnType is long it will cast to long
             //if there is no return type specified it will cast to int
             //because default return type is null (ref type)
-            if ((INT_MIN <= i) && (i <= INT_MAX) && (returnType == Type::Int || returnType == Type::Null)) {
+            if ((INT_MIN <= i) && (i <= INT_MAX) &&
+                (returnType == Type::Int || returnType == Type::Null)) {
                 obj = JType::NewInt(env, (jint) d);
             } else { /*isLong*/
                 obj = JType::NewLong(env, (jlong) d);
@@ -100,7 +105,8 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
             //if returnType is double it will cast to double
             //if there is no return type specified it will cast to float
             //because default return type is null (ref type)
-            if ((FLT_MIN <= d) && (d <= FLT_MAX) && (returnType == Type::Float || returnType == Type::Null)) {
+            if ((FLT_MIN <= d) && (d <= FLT_MAX) &&
+                (returnType == Type::Float || returnType == Type::Null)) {
                 obj = JType::NewFloat(env, (jfloat) d);
             } else {
                 /*isDouble*/
@@ -147,142 +153,130 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
         auto objectManager = runtime->GetObjectManager();
 
         switch (castType) {
-        case CastType::Char:
-            castValue = NumericCasts::GetCastValue(jsObj);
-            charValue = '\0';
-            if (castValue->IsString()) {
-                string str = ArgConverter::ConvertToString(castValue->ToString(context).ToLocalChecked());
-                charValue = (jchar) str[0];
-            }
-            javaObject = JType::NewChar(env, charValue);
-            SetConvertedObject(env, index, javaObject);
-            success = true;
-            break;
+            case CastType::Char:
+                castValue = NumericCasts::GetCastValue(jsObj);
+                charValue = '\0';
+                if (castValue->IsString()) {
+                    string str = ArgConverter::ConvertToString(
+                            castValue->ToString(context).ToLocalChecked());
+                    charValue = (jchar) str[0];
+                }
+                javaObject = JType::NewChar(env, charValue);
+                SetConvertedObject(env, index, javaObject);
+                success = true;
+                break;
 
-        case CastType::Byte:
-            castValue = NumericCasts::GetCastValue(jsObj);
-            byteValue = 0;
-            if (castValue->IsString()) {
-                string value = ArgConverter::ConvertToString(castValue->ToString(context).ToLocalChecked());
-                int byteArg = atoi(value.c_str());
-                byteValue = (jbyte) byteArg;
-            } else if (castValue->IsInt32()) {
-                int byteArg = castValue->ToInt32(context).ToLocalChecked()->Int32Value(context).ToChecked();
-                byteValue = (jbyte) byteArg;
-            }
-            javaObject = JType::NewByte(env, byteValue);
-            SetConvertedObject(env, index, javaObject);
-            success = true;
-            break;
+            case CastType::Byte:
+                castValue = NumericCasts::GetCastValue(jsObj);
+                byteValue = 0;
+                if (castValue->IsString()) {
+                    string value = ArgConverter::ConvertToString(
+                            castValue->ToString(context).ToLocalChecked());
+                    int byteArg = atoi(value.c_str());
+                    byteValue = (jbyte) byteArg;
+                } else if (castValue->IsInt32()) {
+                    int byteArg = castValue->ToInt32(context).ToLocalChecked()->Int32Value(
+                            context).ToChecked();
+                    byteValue = (jbyte) byteArg;
+                }
+                javaObject = JType::NewByte(env, byteValue);
+                SetConvertedObject(env, index, javaObject);
+                success = true;
+                break;
 
-        case CastType::Short:
-            castValue = NumericCasts::GetCastValue(jsObj);
-            shortValue = 0;
-            if (castValue->IsString()) {
-                string value = ArgConverter::ConvertToString(castValue->ToString(context).ToLocalChecked());
-                int shortArg = atoi(value.c_str());
-                shortValue = (jshort) shortArg;
-            } else if (castValue->IsInt32()) {
-                jlong shortArg = castValue->ToInt32(context).ToLocalChecked()->Int32Value(context).ToChecked();
-                shortValue = (jshort) shortArg;
-            }
-            javaObject = JType::NewShort(env, shortValue);
-            SetConvertedObject(env, index, javaObject);
-            success = true;
-            break;
+            case CastType::Short:
+                castValue = NumericCasts::GetCastValue(jsObj);
+                shortValue = 0;
+                if (castValue->IsString()) {
+                    string value = ArgConverter::ConvertToString(
+                            castValue->ToString(context).ToLocalChecked());
+                    int shortArg = atoi(value.c_str());
+                    shortValue = (jshort) shortArg;
+                } else if (castValue->IsInt32()) {
+                    jlong shortArg = castValue->ToInt32(context).ToLocalChecked()->Int32Value(
+                            context).ToChecked();
+                    shortValue = (jshort) shortArg;
+                }
+                javaObject = JType::NewShort(env, shortValue);
+                SetConvertedObject(env, index, javaObject);
+                success = true;
+                break;
 
-        case CastType::Long:
-            castValue = NumericCasts::GetCastValue(jsObj);
-            longValue = 0;
-            if (castValue->IsString()) {
-                auto strValue = ArgConverter::ConvertToString(castValue->ToString(context).ToLocalChecked());
-                longValue = atoll(strValue.c_str());
-            } else if (castValue->IsInt32()) {
-                longValue = castValue->ToInt32(context).ToLocalChecked()->Int32Value(context).ToChecked();
-            }
-            javaObject = JType::NewLong(env, longValue);
-            SetConvertedObject(env, index, javaObject);
-            success = true;
-            break;
+            case CastType::Long:
+                castValue = NumericCasts::GetCastValue(jsObj);
+                longValue = 0;
+                if (castValue->IsString()) {
+                    auto strValue = ArgConverter::ConvertToString(
+                            castValue->ToString(context).ToLocalChecked());
+                    longValue = atoll(strValue.c_str());
+                } else if (castValue->IsInt32()) {
+                    longValue = castValue->ToInt32(context).ToLocalChecked()->Int32Value(
+                            context).ToChecked();
+                }
+                javaObject = JType::NewLong(env, longValue);
+                SetConvertedObject(env, index, javaObject);
+                success = true;
+                break;
 
-        case CastType::Float:
-            castValue = NumericCasts::GetCastValue(jsObj);
-            floatValue = 0;
-            if (castValue->IsNumber()) {
-                double floatArg = castValue->ToNumber(context).ToLocalChecked()->NumberValue(context).ToChecked();
-                floatValue = (jfloat) floatArg;
-            }
-            javaObject = JType::NewFloat(env, floatValue);
-            SetConvertedObject(env, index, javaObject);
-            success = true;
-            break;
+            case CastType::Float:
+                castValue = NumericCasts::GetCastValue(jsObj);
+                floatValue = 0;
+                if (castValue->IsNumber()) {
+                    double floatArg = castValue->ToNumber(context).ToLocalChecked()->NumberValue(
+                            context).ToChecked();
+                    floatValue = (jfloat) floatArg;
+                }
+                javaObject = JType::NewFloat(env, floatValue);
+                SetConvertedObject(env, index, javaObject);
+                success = true;
+                break;
 
-        case CastType::Double:
-            castValue = NumericCasts::GetCastValue(jsObj);
-            doubleValue = 0;
-            if (castValue->IsNumber()) {
-                double doubleArg = castValue->ToNumber(context).ToLocalChecked()->NumberValue(context).ToChecked();
-                doubleValue = (jdouble) doubleArg;
-            }
-            javaObject = JType::NewDouble(env, doubleValue);
-            SetConvertedObject(env, index, javaObject);
-            success = true;
-            break;
+            case CastType::Double:
+                castValue = NumericCasts::GetCastValue(jsObj);
+                doubleValue = 0;
+                if (castValue->IsNumber()) {
+                    double doubleArg = castValue->ToNumber(context).ToLocalChecked()->NumberValue(
+                            context).ToChecked();
+                    doubleValue = (jdouble) doubleArg;
+                }
+                javaObject = JType::NewDouble(env, doubleValue);
+                SetConvertedObject(env, index, javaObject);
+                success = true;
+                break;
 
-        case CastType::None:
-            obj = objectManager->GetJavaObjectByJsObject(jsObj);
+            case CastType::None:
+                obj = objectManager->GetJavaObjectByJsObject(jsObj);
 
-            if (obj.IsNull() && (jsObj->IsTypedArray() || jsObj->IsArrayBuffer() || jsObj->IsArrayBufferView()))
-                {
+
+                if (obj.IsNull() && (jsObj->IsTypedArray() || jsObj->IsArrayBuffer() ||
+                                     jsObj->IsArrayBufferView())) {
 
                     BufferCastType bufferCastType = tns::BufferCastType::Byte;
                     shared_ptr<BackingStore> store;
                     size_t offset = 0;
                     size_t length;
                     uint8_t *data = nullptr;
-                    if (jsObj->IsArrayBuffer())
-                    {
+                    if (jsObj->IsArrayBuffer()) {
                         auto array = jsObj.As<v8::ArrayBuffer>();
                         store = array->GetBackingStore();
                         length = array->ByteLength();
                         data = static_cast<uint8_t *>(store->Data());
-
-                        if (data == nullptr) {
-                            data = static_cast<uint8_t *>(array->GetContents().Data());
-                        }
-                    }
-                    else if (jsObj->IsArrayBufferView())
-                    {
+                    } else if (jsObj->IsArrayBufferView()) {
                         auto array = jsObj.As<v8::ArrayBufferView>();
+
                         offset = array->ByteOffset();
                         length = array->ByteLength();
                         store = array->Buffer()->GetBackingStore();
                         bufferCastType = JsArgConverter::GetCastType(array);
-
                         data = static_cast<uint8_t *>(store->Data()) + offset;
-
-                        if (data == nullptr) {
-                            data = static_cast<uint8_t *>(array->Buffer()->GetContents().Data()) +
-                                   offset;
-                        }
-                    }
-                    else
-                    {
+                    } else {
                         auto array = jsObj.As<v8::TypedArray>();
                         offset = array->ByteOffset();
                         store = array->Buffer()->GetBackingStore();
                         length = array->ByteLength();
                         bufferCastType = JsArgConverter::GetCastType(array);
-
                         data = static_cast<uint8_t *>(store->Data()) + offset;
-
-                        if (data == nullptr) {
-                            data = static_cast<uint8_t *>(array->Buffer()->GetContents().Data()) +
-                                   offset;
-                        }
-
                     }
-
 
                     auto directBuffer = env.NewDirectByteBuffer(
                             data,
@@ -295,52 +289,43 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
 
                     auto byteOrderClazz = env.FindClass("java/nio/ByteOrder");
 
-                    auto byteOrderEnumId = env.GetStaticMethodID(byteOrderClazz, "nativeOrder", "()Ljava/nio/ByteOrder;");
+                    auto byteOrderEnumId = env.GetStaticMethodID(byteOrderClazz, "nativeOrder",
+                                                                 "()Ljava/nio/ByteOrder;");
 
-                    auto nativeByteOrder = env.CallStaticObjectMethodA(byteOrderClazz, byteOrderEnumId,
+                    auto nativeByteOrder = env.CallStaticObjectMethodA(byteOrderClazz,
+                                                                       byteOrderEnumId,
                                                                        nullptr);
 
                     directBuffer = env.CallObjectMethod(directBuffer, byteOrderId, nativeByteOrder);
 
                     jobject buffer;
 
-                    if (bufferCastType == BufferCastType::Short)
-                    {
+                    if (bufferCastType == BufferCastType::Short) {
 
                         auto id = env.GetMethodID(directBufferClazz, "asShortBuffer",
                                                   "()Ljava/nio/ShortBuffer;");
                         buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    }
-                    else if (bufferCastType == BufferCastType::Int)
-                    {
+                    } else if (bufferCastType == BufferCastType::Int) {
 
                         auto id = env.GetMethodID(directBufferClazz, "asIntBuffer",
                                                   "()Ljava/nio/IntBuffer;");
                         buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    }
-                    else if (bufferCastType == BufferCastType::Long)
-                    {
+                    } else if (bufferCastType == BufferCastType::Long) {
 
                         auto id = env.GetMethodID(directBufferClazz, "asLongBuffer",
                                                   "()Ljava/nio/LongBuffer;");
                         buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    }
-                    else if (bufferCastType == BufferCastType::Float)
-                    {
+                    } else if (bufferCastType == BufferCastType::Float) {
 
                         auto id = env.GetMethodID(directBufferClazz, "asFloatBuffer",
                                                   "()Ljava/nio/FloatBuffer;");
                         buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    }
-                    else if (bufferCastType == BufferCastType::Double)
-                    {
+                    } else if (bufferCastType == BufferCastType::Double) {
 
                         auto id = env.GetMethodID(directBufferClazz, "asDoubleBuffer",
                                                   "()Ljava/nio/DoubleBuffer;");
                         buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    }
-                    else
-                    {
+                    } else {
                         buffer = directBuffer;
                     }
 
@@ -349,50 +334,55 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                     int id = objectManager->GetOrCreateObjectId(buffer);
                     auto clazz = env.GetObjectClass(buffer);
                     objectManager->Link(jsObj, id, clazz);
+
                     obj = objectManager->GetJavaObjectByJsObject(jsObj);
                 }
 
-            V8GetPrivateValue(isolate, jsObj, V8StringConstants::GetNullNodeName(isolate), castValue);
 
-            if (!castValue.IsEmpty()) {
-                auto node = reinterpret_cast<MetadataNode*>(castValue.As<External>()->Value());
+                V8GetPrivateValue(isolate, jsObj, V8StringConstants::GetNullNodeName(isolate),
+                                  castValue);
 
-                if (node == nullptr) {
-                    s << "Cannot get type of the null argument at index " << index;
-                    success = false;
-                    break;
+                if (!castValue.IsEmpty()) {
+                    auto node = reinterpret_cast<MetadataNode *>(castValue.As<External>()->Value());
+
+                    if (node == nullptr) {
+                        s << "Cannot get type of the null argument at index " << index;
+                        success = false;
+                        break;
+                    }
+
+                    auto type = node->GetName();
+                    auto nullObjName = "com/tns/NullObject";
+                    auto nullObjCtorSig = "(Ljava/lang/Class;)V";
+
+                    jclass nullClazz = env.FindClass(nullObjName);
+                    jmethodID ctor = env.GetMethodID(nullClazz, "<init>", nullObjCtorSig);
+                    jclass clazzToNull = env.FindClass(type.c_str());
+                    jobject nullObjType = env.NewObject(nullClazz, ctor, clazzToNull);
+
+                    if (nullObjType != nullptr) {
+                        SetConvertedObject(env, index, nullObjType, false);
+                    } else {
+                        SetConvertedObject(env, index, nullptr);
+                    }
+
+                    success = true;
+                    return success;
                 }
 
-                auto type = node->GetName();
-                auto nullObjName = "com/tns/NullObject";
-                auto nullObjCtorSig = "(Ljava/lang/Class;)V";
-
-                jclass nullClazz = env.FindClass(nullObjName);
-                jmethodID ctor = env.GetMethodID(nullClazz, "<init>", nullObjCtorSig);
-                jclass clazzToNull = env.FindClass(type.c_str());
-                jobject nullObjType = env.NewObject(nullClazz, ctor, clazzToNull);
-
-                if (nullObjType != nullptr) {
-                    SetConvertedObject(env, index, nullObjType, false);
+                success = !obj.IsNull();
+                if (success) {
+                    SetConvertedObject(env, index, obj.Move(), obj.IsGlobal());
                 } else {
-                    SetConvertedObject(env, index, nullptr);
+                    String::Utf8Value jsObjStr(isolate, jsObj);
+                    s << "Cannot marshal JavaScript argument "
+                      << (*jsObjStr ? *jsObjStr : "<failed-to-string>") << " at index " << index
+                      << " to Java type.";
                 }
+                break;
 
-                success = true;
-                return success;
-            }
-
-            success = !obj.IsNull();
-            if (success) {
-                SetConvertedObject(env, index, obj.Move(), obj.IsGlobal());
-            } else {
-                String::Utf8Value jsObjStr(isolate, jsObj);
-                s << "Cannot marshal JavaScript argument " << (*jsObjStr ? *jsObjStr : "<failed-to-string>") << " at index " << index << " to Java type.";
-            }
-            break;
-
-        default:
-            throw NativeScriptException("Unsupported cast type");
+            default:
+                throw NativeScriptException("Unsupported cast type");
         }
     } else if (arg->IsUndefined() || arg->IsNull()) {
         SetConvertedObject(env, index, nullptr);
@@ -414,7 +404,7 @@ jobject JsArgToArrayConverter::GetConvertedArg() {
     return (m_argsLen > 0) ? m_argsAsObject[0] : nullptr;
 }
 
-void JsArgToArrayConverter::SetConvertedObject(JEnv& env, int index, jobject obj, bool isGlobal) {
+void JsArgToArrayConverter::SetConvertedObject(JEnv &env, int index, jobject obj, bool isGlobal) {
     m_argsAsObject[index] = obj;
     if ((obj != nullptr) && !isGlobal) {
         m_storedIndexes.push_back(index);
@@ -437,7 +427,8 @@ jobjectArray JsArgToArrayConverter::ToJavaArray() {
     if ((m_arr == nullptr) && (m_argsLen > 0)) {
         if (m_argsLen >= JsArgToArrayConverter::MAX_JAVA_PARAMS_COUNT) {
             stringstream ss;
-            ss << "You are trying to override more than the MAX_JAVA_PARAMS_COUNT: " << JsArgToArrayConverter::MAX_JAVA_PARAMS_COUNT;
+            ss << "You are trying to override more than the MAX_JAVA_PARAMS_COUNT: "
+               << JsArgToArrayConverter::MAX_JAVA_PARAMS_COUNT;
             throw NativeScriptException(ss.str());
         }
 
@@ -447,7 +438,9 @@ jobjectArray JsArgToArrayConverter::ToJavaArray() {
             JsArgToArrayConverter::JAVA_LANG_OBJECT_CLASS = env.FindClass("java/lang/Object");
         }
 
-        JniLocalRef tmpArr(env.NewObjectArray(m_argsLen, JsArgToArrayConverter::JAVA_LANG_OBJECT_CLASS, nullptr));
+        JniLocalRef tmpArr(
+                env.NewObjectArray(m_argsLen, JsArgToArrayConverter::JAVA_LANG_OBJECT_CLASS,
+                                   nullptr));
         m_arr = (jobjectArray) env.NewGlobalRef(tmpArr);
 
         for (int i = 0; i < m_argsLen; i++) {

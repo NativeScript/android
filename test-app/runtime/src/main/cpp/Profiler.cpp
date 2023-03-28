@@ -1,6 +1,5 @@
 #include "Profiler.h"
 #include "ArgConverter.h"
-#include "prof.h"
 #include "NativeScriptException.h"
 #include <sstream>
 

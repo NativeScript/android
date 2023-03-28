@@ -11,6 +11,7 @@
 #include "ModuleInternal.h"
 #include "MessageLoopTimer.h"
 #include "File.h"
+#include "Timers.h"
 #include <mutex>
 #include <android/looper.h>
 #include <fcntl.h>
@@ -28,6 +29,8 @@ class Runtime {
         static Runtime* GetRuntime(int runtimeId);
 
         static Runtime* GetRuntime(v8::Isolate* isolate);
+
+        static Runtime* GetRuntimeFromIsolateData(v8::Isolate* isolate);
 
         static ObjectManager* GetObjectManager(v8::Isolate* isolate);
 
@@ -92,6 +95,8 @@ class Runtime {
 
         WeakRef m_weakRef;
 
+        Timers m_timers;
+
         Profiler m_profiler;
 
         MessageLoopTimer* m_loopTimer;
@@ -117,7 +122,7 @@ class Runtime {
 
         static std::map<int, Runtime*> s_id2RuntimeCache;
 
-        static std::map<v8::Isolate*, Runtime*> s_isolate2RuntimesCache;
+        static std::unordered_map<v8::Isolate*, Runtime*> s_isolate2RuntimesCache;
 
         static JavaVM* s_jvm;
 

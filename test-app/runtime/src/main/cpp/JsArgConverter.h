@@ -9,16 +9,16 @@
 
 namespace tns {
 
-enum class BufferCastType {
-    Byte,
-    Short,
-    Int,
-    Long,
-    Float,
-    Double
-};
+    enum class BufferCastType {
+        Byte,
+        Short,
+        Int,
+        Long,
+        Float,
+        Double
+    };
 
-class JsArgConverter {
+    class JsArgConverter {
     public:
 
         JsArgConverter(const v8::Local<v8::Object>& caller, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& methodSignature, MetadataEntry* entry);
@@ -41,14 +41,14 @@ class JsArgConverter {
 
         struct Error {
             Error() :
-                index(-1), msg(std::string()) {
+                    index(-1), msg(std::string()) {
             }
 
             int index;
             std::string msg;
         };
 
-    static BufferCastType GetCastType(const v8::Local<v8::ArrayBufferView>& view);
+        static BufferCastType GetCastType(const v8::Local<v8::ArrayBufferView>& view);
 
     private:
 
@@ -74,15 +74,15 @@ class JsArgConverter {
         bool m_isValid;
 
         jvalue m_args[255];
+        int m_args_refs[255];
+        int m_args_refs_size = 0;
 
         std::string m_methodSignature;
 
         std::vector<std::string> m_tokens;
 
-        std::vector<int> m_storedObjects;
-
         Error m_error;
-};
+    };
 }
 
 #endif /* JSARGCONVERTER_H_ */

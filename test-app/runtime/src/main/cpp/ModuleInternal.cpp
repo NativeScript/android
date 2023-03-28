@@ -389,7 +389,7 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, c
     auto cacheData = TryLoadScriptCache(path);
 
     auto fullRequiredModulePathWithSchema = ArgConverter::ConvertToV8String(isolate, "file://" + path);
-    ScriptOrigin origin(fullRequiredModulePathWithSchema);
+    ScriptOrigin origin(isolate, fullRequiredModulePathWithSchema);
     ScriptCompiler::Source source(scriptText, origin, cacheData);
     ScriptCompiler::CompileOptions option = ScriptCompiler::kNoCompileOptions;
 

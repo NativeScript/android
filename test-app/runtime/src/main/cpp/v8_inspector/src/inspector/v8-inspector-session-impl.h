@@ -26,12 +26,6 @@ class V8HeapProfilerAgentImpl;
 class V8ProfilerAgentImpl;
 class V8RuntimeAgentImpl;
 class V8SchemaAgentImpl;
-class V8PageAgentImpl;
-class V8NetworkAgentImpl;
-class V8DOMAgentImpl;
-class V8CSSAgentImpl;
-class V8OverlayAgentImpl;
-class V8LogAgentImpl;
 
 using protocol::Response;
 
@@ -44,50 +38,20 @@ class V8InspectorSessionImpl : public V8InspectorSession,
                                                         V8Inspector::Channel*,
                                                         StringView state);
   ~V8InspectorSessionImpl() override;
+  V8InspectorSessionImpl(const V8InspectorSessionImpl&) = delete;
+  V8InspectorSessionImpl& operator=(const V8InspectorSessionImpl&) = delete;
 
-        V8InspectorImpl* inspector() const {
-            return m_inspector;
-        }
-        V8ConsoleAgentImpl* consoleAgent() {
-            return m_consoleAgent.get();
-        }
-        V8DebuggerAgentImpl* debuggerAgent() {
-            return m_debuggerAgent.get();
-        }
-        V8SchemaAgentImpl* schemaAgent() {
-            return m_schemaAgent.get();
-        }
-        V8ProfilerAgentImpl* profilerAgent() {
-            return m_profilerAgent.get();
-        }
-        V8RuntimeAgentImpl* runtimeAgent() {
-            return m_runtimeAgent.get();
-        }
-        V8PageAgentImpl* pageAgent() {
-            return m_pageAgent.get();
-        }
-        V8NetworkAgentImpl* networkAgent() {
-            return m_networkAgent.get();
-        }
-        V8DOMAgentImpl* domAgent() {
-            return m_domAgent.get();
-        }
-        V8CSSAgentImpl* cssAgent() {
-            return m_cssAgent.get();
-        }
-        V8OverlayAgentImpl* overlayAgent() {
-            return m_overlayAgent.get();
-        }
-        V8LogAgentImpl* logAgent() {
-            return m_logAgent.get();
-        }
+  V8InspectorImpl* inspector() const { return m_inspector; }
+  V8ConsoleAgentImpl* consoleAgent() { return m_consoleAgent.get(); }
+  V8DebuggerAgentImpl* debuggerAgent() { return m_debuggerAgent.get(); }
+  V8SchemaAgentImpl* schemaAgent() { return m_schemaAgent.get(); }
+  V8ProfilerAgentImpl* profilerAgent() { return m_profilerAgent.get(); }
+  V8RuntimeAgentImpl* runtimeAgent() { return m_runtimeAgent.get(); }
+  int contextGroupId() const { return m_contextGroupId; }
+  int sessionId() const { return m_sessionId; }
 
-        int contextGroupId() const {
-            return m_contextGroupId;
-        }
-        int sessionId() const {
-            return m_sessionId;
-        }
+  std::unique_ptr<V8InspectorSession::CommandLineAPIScope>
+  initializeCommandLineAPIScope(int executionContextId) override;
 
   Response findInjectedScript(int contextId, InjectedScript*&);
   Response findInjectedScript(RemoteObjectIdBase*, InjectedScript*&);
@@ -134,7 +98,7 @@ class V8InspectorSessionImpl : public V8InspectorSession,
   V8InspectorSession::Inspectable* inspectedObject(unsigned num);
   static const unsigned kInspectedObjectBufferSize = 5;
 
-  void triggerPreciseCoverageDeltaUpdate(StringView occassion) override;
+  void triggerPreciseCoverageDeltaUpdate(StringView occasion) override;
 
  private:
   V8InspectorSessionImpl(V8InspectorImpl*, int contextGroupId, int sessionId,
@@ -167,17 +131,9 @@ class V8InspectorSessionImpl : public V8InspectorSession,
   std::unique_ptr<V8ProfilerAgentImpl> m_profilerAgent;
   std::unique_ptr<V8ConsoleAgentImpl> m_consoleAgent;
   std::unique_ptr<V8SchemaAgentImpl> m_schemaAgent;
-  std::unique_ptr<V8PageAgentImpl> m_pageAgent;
-  std::unique_ptr<V8NetworkAgentImpl> m_networkAgent;
-  std::unique_ptr<V8DOMAgentImpl> m_domAgent;
-  std::unique_ptr<V8CSSAgentImpl> m_cssAgent;
-  std::unique_ptr<V8OverlayAgentImpl> m_overlayAgent;
-  std::unique_ptr<V8LogAgentImpl> m_logAgent;
   std::vector<std::unique_ptr<V8InspectorSession::Inspectable>>
       m_inspectedObjects;
   bool use_binary_protocol_ = false;
-
-  DISALLOW_COPY_AND_ASSIGN(V8InspectorSessionImpl);
 };
 
 }  // namespace v8_inspector

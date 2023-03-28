@@ -15,7 +15,6 @@
 #include "SimpleAllocator.h"
 #include "ModuleInternal.h"
 #include "NativeScriptException.h"
-#include "V8NativeScriptExtension.h"
 #include "Runtime.h"
 #include "ArrayHelper.h"
 #include "include/libplatform/libplatform.h"
@@ -25,7 +24,6 @@
 #include <mutex>
 #include <dlfcn.h>
 #include <console/Console.h>
-#include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
 #include "ManualInstrumentation.h"
 #include <snapshot_blob.h>
@@ -35,8 +33,8 @@
 #include "File.h"
 
 #ifdef APPLICATION_IN_DEBUG
+// #include "NetworkDomainCallbackHandlers.h"
 #include "JsV8InspectorClient.h"
-#include "v8_inspector/src/inspector/v8-inspector-platform.h"
 #endif
 
 using namespace v8;
@@ -128,10 +126,20 @@ Runtime* Runtime::GetRuntime(int runtimeId) {
 }
 
 Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
-    auto itFound = s_isolate2RuntimesCache.find(isolate);
-    auto runtime = (itFound != s_isolate2RuntimesCache.end())
-                   ? itFound->second
-                   : nullptr;
+    auto runtime = s_isolate2RuntimesCache.at(isolate);
+
+    if (runtime == nullptr) {
+        stringstream ss;
+        ss << "Cannot find runtime for isolate: " << isolate;
+        throw NativeScriptException(ss.str());
+    }
+
+    return runtime;
+}
+
+Runtime* Runtime::GetRuntimeFromIsolateData(v8::Isolate* isolate) {
+    void* maybeRuntime = isolate->GetData((uint32_t)Runtime::IsolateData::RUNTIME);
+    auto runtime = static_cast<Runtime*>(maybeRuntime);
 
     if (runtime == nullptr) {
         stringstream ss;
@@ -143,18 +151,7 @@ Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
 }
 
 ObjectManager* Runtime::GetObjectManager(v8::Isolate* isolate) {
-    auto itFound = s_isolate2RuntimesCache.find(isolate);
-    auto runtime = (itFound != s_isolate2RuntimesCache.end())
-                   ? itFound->second
-                   : nullptr;
-
-    if (runtime == nullptr) {
-        stringstream ss;
-        ss << "Cannot find runtime for isolate: " << isolate;
-        throw NativeScriptException(ss.str());
-    }
-
-    return runtime->GetObjectManager();
+    return GetRuntime(isolate)->GetObjectManager();
 }
 
 Isolate* Runtime::GetIsolate() const {
@@ -279,7 +276,7 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
     TryCatch tc(isolate);
 
     Local<Script> script;
-    ScriptOrigin origin(ArgConverter::ConvertToV8String(isolate, filename));
+    ScriptOrigin origin(isolate, ArgConverter::ConvertToV8String(isolate, filename));
     auto maybeScript = Script::Compile(context, source, &origin).ToLocal(&script);
 
     if (tc.HasCaught()) {
@@ -469,18 +466,7 @@ void Runtime::ClearStartupData(JNIEnv* env, jobject obj) {
 }
 
 static void InitializeV8() {
-    Runtime::platform =
-#ifdef APPLICATION_IN_DEBUG
-        // The default V8 platform isn't Chrome DevTools compatible. The frontend uses the
-        // Runtime.evaluate protocol command with timeout flag for every execution in the console.
-        // The default platform doesn't implement executing delayed javascript code from a background
-        // thread. To avoid implementing a full blown scheduler, we use the default platform with a
-        // timeout=0 flag.
-        V8InspectorPlatform::CreateDefaultPlatform();
-#else
-        v8::platform::NewDefaultPlatform().release();
-#endif
-
+    Runtime::platform = v8::platform::NewDefaultPlatform().release();
     V8::InitializePlatform(Runtime::platform);
     V8::Initialize();
 }
@@ -555,8 +541,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         } else if (!saveSnapshot) {
             throw NativeScriptException("No snapshot file found at: " + snapshotPath);
         } else {
-            // This should be executed before V8::Initialize, which calls it with false.
-            NativeScriptExtension::CpuFeaturesProbe(true);
             InitializeV8();
             didInitializeV8 = true;
 
@@ -609,7 +593,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     auto isolate = Isolate::New(create_params);
     isolateFrame.log("Isolate.New");
 
-    s_isolate2RuntimesCache.insert(make_pair(isolate, this));
+    s_isolate2RuntimesCache[isolate] = this;
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handleScope(isolate);
@@ -618,6 +602,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     // Sets a structure with v8 String constants on the isolate object at slot 1
     auto consts = new V8StringConstants::PerIsolateV8Constants(isolate);
+    isolate->SetData((uint32_t)Runtime::IsolateData::RUNTIME, this);
     isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, consts);
 
     V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
@@ -707,20 +692,21 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     }
 #endif
 
-    m_weakRef.Init(isolate, globalTemplate, m_objectManager);
-
     SimpleProfiler::Init(isolate, globalTemplate);
 
     CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
 
+    m_timers.Init(isolate, globalTemplate);
+
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
+
+    auto global = context->Global();
+
     context->Enter();
 
     m_objectManager->Init(isolate);
 
     m_module.Init(isolate, callingDir);
-
-    auto global = context->Global();
 
     Local<Value> gcFunc;
     global->Get(context, ArgConverter::ConvertToV8String(isolate, "gc")).ToLocal(&gcFunc);
@@ -730,6 +716,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "global"), global, readOnlyFlags);
     global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "__global"), global, readOnlyFlags);
+    m_weakRef.Init(isolate, context);
 
     // Do not set 'self' accessor to main thread JavaScript
     if (s_mainThreadInitialized) {
@@ -826,7 +813,7 @@ bool Runtime::RunExtraCode(Isolate* isolate, Local<Context> context, const char*
         return false;
     }
     Local<v8::String> resource_name = v8::String::NewFromUtf8(isolate, name, NewStringType::kNormal).ToLocalChecked();
-    ScriptOrigin origin(resource_name);
+    ScriptOrigin origin(isolate, resource_name);
     ScriptCompiler::Source source(source_string, origin);
     Local<Script> script;
     if (!ScriptCompiler::Compile(context, &source).ToLocal(&script)) {
@@ -845,7 +832,7 @@ bool Runtime::RunExtraCode(Isolate* isolate, Local<Context> context, const char*
                           *v8::String::Utf8Value(isolate, try_catch.Exception()));
         return false;
     }
-    CHECK(!try_catch.HasCaught());
+//    CHECK(!try_catch.HasCaught());
     return true;
 }
 
@@ -874,7 +861,7 @@ int Runtime::GetReader(){
 JavaVM* Runtime::s_jvm = nullptr;
 jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
-map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
+unordered_map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 bool Runtime::s_mainThreadInitialized = false;
 v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
