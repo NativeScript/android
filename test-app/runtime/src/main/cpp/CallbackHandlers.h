@@ -305,6 +305,11 @@ namespace tns {
                       context_(isolate, context){
             }
 
+            ~CacheEntry() {
+                context_.Reset();
+                callback_.Reset();
+            }
+
             v8::Isolate* isolate_;
             v8::Global<v8::Function> callback_;
             v8::Global<v8::Context> context_;
@@ -321,6 +326,11 @@ namespace tns {
                       callback_(isolate,callback),
                       context_(isolate, context)
                       {
+            }
+
+            ~FrameCallbackCacheEntry() {
+                context_.Reset();
+                callback_.Reset();
             }
 
             v8::Isolate *isolate_;
@@ -341,8 +351,6 @@ namespace tns {
                 if (data != nullptr) {
                     auto entry = static_cast<FrameCallbackCacheEntry *>(data);
                     if (entry->removed) {
-                        entry->context_.Reset();
-                        entry->callback_.Reset();
                         frameCallbackCache_.erase(entry->id);  // invalidates *entry
                         return;
                     }
@@ -365,8 +373,6 @@ namespace tns {
                         // TODO
                     }
 
-                    entry->context_.Reset();
-                    entry->callback_.Reset();
                     frameCallbackCache_.erase(entry->id);  // invalidates *entry
 
                     if(tc.HasCaught()){

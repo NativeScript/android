@@ -671,8 +671,11 @@ void CallbackHandlers::RunOnMainThreadCallback(const FunctionCallbackInfo<v8::Va
 
     uint64_t key = ++count_;
     Local<v8::Function> callback = args[0].As<v8::Function>();
-    CacheEntry entry(isolate, callback, context);
-    cache_.emplace(key, std::move(entry));
+
+    bool inserted;
+    std::tie(std::ignore, inserted) = cache_.try_emplace(key, isolate, callback, context);
+    assert(inserted && "Main thread callback ID should not be duplicated");
+
     auto value = Callback(key);
     auto size = sizeof(Callback);
     auto wrote = write(Runtime::GetWriter(),&value , size);
@@ -718,8 +721,6 @@ void CallbackHandlers::RemoveKey(const uint64_t key) {
         return;
     }
 
-    it->second.callback_.Reset();
-    it->second.context_.Reset();
     cache_.erase(it);
 }
 
@@ -1589,16 +1590,12 @@ void CallbackHandlers::TerminateWorkerThread(Isolate *isolate) {
 void CallbackHandlers::RemoveIsolateEntries(v8::Isolate *isolate) {
     for (auto &item: cache_) {
         if (item.second.isolate_ == isolate) {
-            item.second.callback_.Reset();
-            item.second.context_.Reset();
             cache_.erase(item.first);
         }
     }
 
     for (auto &item: frameCallbackCache_) {
         if (item.second.isolate_ == isolate) {
-            item.second.callback_.Reset();
-            item.second.context_.Reset();
             frameCallbackCache_.erase(item.first);
         }
     }
@@ -1668,12 +1665,12 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
 
         V8SetPrivateValue(isolate, func, idKey, v8::Number::New(isolate, (double) key));
 
-        FrameCallbackCacheEntry entry (isolate, callback, context);
-        entry.id = key;
+        robin_hood::unordered_map<uint64_t, FrameCallbackCacheEntry>::iterator val;
+        bool inserted;
+        std::tie(val, inserted) = frameCallbackCache_.try_emplace(key, isolate, callback, context);
+        assert(inserted && "Frame callback ID should not be duplicated");
 
-        frameCallbackCache_.emplace(key, std::move(entry));
-
-        auto val = frameCallbackCache_.find(key);
+        val->second.id = key;
 
         PostCallback(args, &val->second, context);
     }
