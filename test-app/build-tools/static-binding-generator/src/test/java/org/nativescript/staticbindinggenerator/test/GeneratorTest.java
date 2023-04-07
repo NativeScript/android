@@ -100,7 +100,7 @@ public class GeneratorTest {
         Class<?> ComplexClass = InMemoryJavaCompiler.compile(binding.getClassname(), sourceCode.toString(), options);
 
         Assert.assertNotNull(ComplexClass);
-        Assert.assertEquals(5, ComplexClass.getInterfaces().length); // 4 + 1 (hashcodeprovider)
+        Assert.assertEquals(3, ComplexClass.getInterfaces().length); // 2 + 1 (hashcodeprovider)
     }
 
     @Test

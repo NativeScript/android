@@ -53,12 +53,12 @@ public class DataRowTest {
         Assert.assertEquals(row.getJsFilename(), "app.js");
 
         String[] methods = row.getMethods();
-        Assert.assertEquals(9, methods.length);
+        Assert.assertEquals(6, methods.length);
 
         String[] interfaces = row.getInterfaces();
-        Assert.assertEquals(4, interfaces.length);
+        Assert.assertEquals(2, interfaces.length);
 
-        Assert.assertEquals(interfaces[0], "java.util.jar.Pack200.Unpacker");
-        Assert.assertEquals(interfaces[2], "java.util.Observer");
+        Assert.assertEquals(interfaces[0], "java.util.Formattable");
+        Assert.assertEquals(interfaces[1], "java.util.Observer");
     }
 }
