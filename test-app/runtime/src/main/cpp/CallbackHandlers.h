@@ -284,8 +284,6 @@ namespace tns {
             jobject _runtime;
         };
 
-        static void RemoveKey(const uint64_t key);
-
         static std::atomic_int64_t count_;
 
 

@@ -706,22 +706,13 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
 
     if (!cb->Call(context, context->Global(), 0, nullptr).ToLocal(&result)) {}
 
+    cache_.erase(it);
+
     if(tc.HasCaught()){
         throw NativeScriptException(tc);
     }
 
-    RemoveKey(key);
-
     return 1;
-}
-
-void CallbackHandlers::RemoveKey(const uint64_t key) {
-    auto it = cache_.find(key);
-    if (it == cache_.end()) {
-        return;
-    }
-
-    cache_.erase(it);
 }
 
 void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
@@ -1650,12 +1641,10 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
 
         if (success && pId->IsNumber()){
             auto id = pId->IntegerValue(context).FromMaybe(0);
-            if(frameCallbackCache_.contains(id)){
-                auto cb = frameCallbackCache_.find(id);
-                if(cb != frameCallbackCache_.end()){
-                    cb->second.removed = false;
-                    PostCallback(args, &cb->second, context);
-                }
+            auto cb = frameCallbackCache_.find(id);
+            if (cb != frameCallbackCache_.end()) {
+                cb->second.removed = false;
+                PostCallback(args, &cb->second, context);
                 return;
             }
         }
@@ -1696,8 +1685,8 @@ void CallbackHandlers::RemoveFrameCallback(const FunctionCallbackInfo<v8::Value>
 
         if (success && pId->IsNumber()){
             auto id = pId->IntegerValue(context).FromMaybe(0);
-            if(frameCallbackCache_.contains(id)){
-                auto cb = frameCallbackCache_.find(id);
+            auto cb = frameCallbackCache_.find(id);
+            if (cb != frameCallbackCache_.end()) {
                 cb->second.removed = true;
             }
         }
