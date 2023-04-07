@@ -326,7 +326,7 @@ namespace tns {
             v8::Isolate *isolate_;
             v8::Global<v8::Function> callback_;
             v8::Global<v8::Context> context_;
-            bool removed;
+            bool removed = false;
             uint64_t id;
 
             AChoreographer_frameCallback frameCallback_ = [](long ts, void *data) {
