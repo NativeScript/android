@@ -99,7 +99,7 @@ Note: You might need to run the Android Studio from the command line in order to
   ``Note: Keep in mind the device or emulator needs to have an sdcard mounted.``
 * Run command
 ```Shell
-gradlew runtest
+gradlew runtests
 ```
 ## Contribute
 We love PRs! Check out the [contributing guidelines](CONTRIBUTING.md). If you want to contribute, but you are not sure where to start - look for [issues labeled `help wanted`](https://github.com/NativeScript/android-runtime/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22).
