@@ -362,15 +362,11 @@ namespace tns {
                     v8::Context::Scope context_scope(context);
 
                     v8::Local<v8::Function> cb = entry->callback_.Get(isolate);
-                    v8::Local<v8::Value> result;
-
                     v8::Local<v8::Value> args[1] = {v8::Number::New(isolate, ts)};
 
                     v8::TryCatch tc(isolate);
 
-                    if (!cb->Call(context, context->Global(), 1, args).ToLocal(&result)) {
-                        // TODO
-                    }
+                    cb->Call(context, context->Global(), 1, args);  // ignore JS return value
 
                     frameCallbackCache_.erase(entry->id);  // invalidates *entry
 

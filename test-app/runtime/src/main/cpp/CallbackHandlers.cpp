@@ -700,11 +700,10 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
     auto context = it->second.context_.Get(isolate);
     Context::Scope context_scope(context);
     Local<v8::Function> cb = it->second.callback_.Get(isolate);
-    Local<Value> result;
 
     v8::TryCatch tc(isolate);
 
-    if (!cb->Call(context, context->Global(), 0, nullptr).ToLocal(&result)) {}
+    cb->Call(context, context->Global(), 0, nullptr);  // ignore JS return value
 
     cache_.erase(it);
 
