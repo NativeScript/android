@@ -23,16 +23,12 @@ import java.util.List;
 
 public class GeneratorTest {
     private static String dependenciesDir;
-    private static String runtimePath;
 
     @BeforeClass
     public static void setUp() {
         URL u = com.tns.Runtime.class.getResource('/' + com.tns.Runtime.class.getName().replace('.', '/') + ".class");
         try {
             dependenciesDir = new File(u.toURI()).getParentFile().getParentFile().getParentFile().getAbsolutePath();
-            File runtimePathDir = new File(System.getProperty("java.home"), "lib/rt.jar");
-            Assert.assertTrue(runtimePathDir.exists());
-            runtimePath = runtimePathDir.getAbsolutePath();
         } catch (URISyntaxException e) {
             e.printStackTrace();
             Assert.fail();
@@ -46,9 +42,9 @@ public class GeneratorTest {
 
         File outputDir = null;
         List<DataRow> libs = new ArrayList<>();
-        libs.add(new DataRow(runtimePath));
         Generator generator = new Generator(outputDir, libs);
         Binding binding = generator.generateBinding(dataRow);
+        Assert.assertNotNull(binding);
 
         StringBuffer sourceCode = new StringBuffer();
         sourceCode.append(binding.getContent());
@@ -65,19 +61,16 @@ public class GeneratorTest {
         URL u = MyInterface.class.getResource('/' + MyInterface.class.getName().replace('.', '/') + ".class");
         File f = new File(u.toURI()).getParentFile().getParentFile().getParentFile();
 
-        File rt = new File(System.getProperty("java.home"), "lib/rt.jar");
-        Assert.assertTrue(rt.exists());
-
         String s = IOUtils.toString(this.getClass().getResource("datarow-classctor.txt"), "UTF-8");
         List<String> lines = IOUtils.readLines(new StringReader(s));
         DataRow dataRow = new DataRow(lines.get(0));
 
         File outputDir = null;
         List<DataRow> libs = new ArrayList<>();
-        libs.add(new DataRow(rt.getAbsolutePath()));
         libs.add(new DataRow(f.getAbsolutePath()));
         Generator generator = new Generator(outputDir, libs);
         Binding binding = generator.generateBinding(dataRow);
+        Assert.assertNotNull(binding);
 
         StringBuffer sourceCode = new StringBuffer();
         sourceCode.append(binding.getContent());
@@ -96,9 +89,9 @@ public class GeneratorTest {
 
         File outputDir = null;
         List<DataRow> libs = new ArrayList<>();
-        libs.add(new DataRow(runtimePath));
         Generator generator = new Generator(outputDir, libs);
         Binding binding = generator.generateBinding(dataRow);
+        Assert.assertNotNull(binding);
 
         StringBuffer sourceCode = new StringBuffer();
         sourceCode.append(binding.getContent());
@@ -122,10 +115,10 @@ public class GeneratorTest {
 
         File outputDir = null;
         List<DataRow> libs = new ArrayList<>();
-        libs.add(new DataRow(runtimePath));
         libs.add(new DataRow(f.getAbsolutePath()));
         Generator generator = new Generator(outputDir, libs);
         Binding binding = generator.generateBinding(dataRow);
+        Assert.assertNotNull(binding);
 
         StringBuffer sourceCode = new StringBuffer();
         sourceCode.append(binding.getContent());
@@ -149,10 +142,10 @@ public class GeneratorTest {
 
         File outputDir = null;
         List<DataRow> libs = new ArrayList<>();
-        libs.add(new DataRow(runtimePath));
         libs.add(new DataRow(f.getAbsolutePath()));
         Generator generator = new Generator(outputDir, libs);
         Binding binding = generator.generateBinding(dataRow);
+        Assert.assertNotNull(binding);
 
         StringBuffer sourceCode = new StringBuffer();
         sourceCode.append(binding.getContent());
