@@ -341,6 +341,9 @@ namespace tns {
                 if (data != nullptr) {
                     auto entry = static_cast<FrameCallbackCacheEntry *>(data);
                     if (entry->removed) {
+                        entry->context_.Reset();
+                        entry->callback_.Reset();
+                        frameCallbackCache_.erase(entry->id);  // invalidates *entry
                         return;
                     }
                     v8::Isolate *isolate = entry->isolate_;
@@ -361,6 +364,10 @@ namespace tns {
                     if (!cb->Call(context, context->Global(), 1, args).ToLocal(&result)) {
                         // TODO
                     }
+
+                    entry->context_.Reset();
+                    entry->callback_.Reset();
+                    frameCallbackCache_.erase(entry->id);  // invalidates *entry
 
                     if(tc.HasCaught()){
                         throw NativeScriptException(tc);

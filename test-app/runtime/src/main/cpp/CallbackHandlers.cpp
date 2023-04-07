@@ -1671,20 +1671,6 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
         FrameCallbackCacheEntry entry (isolate, callback, context);
         entry.id = key;
 
-        auto finalCallback = [](const v8::WeakCallbackInfo<FrameCallbackCacheEntry> &data) {
-            auto value = data.GetParameter();
-            for (auto &item: frameCallbackCache_) {
-                if (item.second.id == value->id) {
-                    item.second.context_.Reset();
-                    item.second.callback_.Reset();
-                    frameCallbackCache_.erase(item.first);
-                    break;
-                }
-            }
-        };
-
-        entry.callback_.SetWeak(&entry, finalCallback, v8::WeakCallbackType::kFinalizer);
-
         frameCallbackCache_.emplace(key, std::move(entry));
 
         auto val = frameCallbackCache_.find(key);
