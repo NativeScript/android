@@ -1667,10 +1667,8 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
 
         robin_hood::unordered_map<uint64_t, FrameCallbackCacheEntry>::iterator val;
         bool inserted;
-        std::tie(val, inserted) = frameCallbackCache_.try_emplace(key, isolate, callback, context);
+        std::tie(val, inserted) = frameCallbackCache_.try_emplace(key, isolate, callback, context, key);
         assert(inserted && "Frame callback ID should not be duplicated");
-
-        val->second.id = key;
 
         PostCallback(args, &val->second, context);
     }

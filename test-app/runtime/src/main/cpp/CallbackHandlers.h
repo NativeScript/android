@@ -321,11 +321,12 @@ namespace tns {
         static std::atomic_uint64_t frameCallbackCount_;
 
         struct FrameCallbackCacheEntry {
-            FrameCallbackCacheEntry(v8::Isolate *isolate, v8::Local<v8::Function> callback, v8::Local<v8::Context> context)
-                    : isolate_(isolate),
-                      callback_(isolate,callback),
-                      context_(isolate, context)
-                      {
+            FrameCallbackCacheEntry(v8::Isolate *isolate, v8::Local<v8::Function> callback,
+                                    v8::Local<v8::Context> context, uint64_t aId)
+                : isolate_(isolate),
+                  callback_(isolate, callback),
+                  context_(isolate, context),
+                  id(aId) {
             }
 
             ~FrameCallbackCacheEntry() {
