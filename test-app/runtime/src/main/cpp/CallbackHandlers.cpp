@@ -826,10 +826,10 @@ void CallbackHandlers::EnableVerboseLoggingMethodCallback(
         const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
         auto isolate = args.GetIsolate();
-        auto runtume = Runtime::GetRuntime(isolate);
+        auto runtime = Runtime::GetRuntime(isolate);
         tns::LogEnabled = true;
         JEnv env;
-        env.CallVoidMethod(runtume->GetJavaRuntime(), ENABLE_VERBOSE_LOGGING_METHOD_ID);
+        env.CallVoidMethod(runtime->GetJavaRuntime(), ENABLE_VERBOSE_LOGGING_METHOD_ID);
     } catch (NativeScriptException &e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -847,10 +847,10 @@ void CallbackHandlers::DisableVerboseLoggingMethodCallback(
         const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
         auto isolate = args.GetIsolate();
-        auto runtume = Runtime::GetRuntime(isolate);
+        auto runtime = Runtime::GetRuntime(isolate);
         tns::LogEnabled = false;
         JEnv env;
-        env.CallVoidMethod(runtume->GetJavaRuntime(), DISABLE_VERBOSE_LOGGING_METHOD_ID);
+        env.CallVoidMethod(runtime->GetJavaRuntime(), DISABLE_VERBOSE_LOGGING_METHOD_ID);
     } catch (NativeScriptException &e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
