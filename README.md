@@ -60,6 +60,18 @@ Note: You might need to run the Android Studio from the command line in order to
 
 ## How to Build
 
+* Install dependencies from NPM:
+
+  ```Shell
+  cd test-app/build-tools/jsparser
+  npm install
+  ```
+
+* Set environment variables:
+  - `JAVA_HOME` such that `$JAVA_HOME/bin/java` points to your Java executable
+  - `ANDROID_HOME` pointing to where you have installed the Android SDK
+  - `ANDROID_NDK_HOME` pointing to the version of the Android NDK needed for this version of NativeScript
+
 * Run command 
 
   Windows: 
