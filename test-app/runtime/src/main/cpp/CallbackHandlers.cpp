@@ -667,13 +667,11 @@ void CallbackHandlers::RunOnMainThreadCallback(const FunctionCallbackInfo<v8::Va
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
-    Local<Context> context = isolate->GetCurrentContext();
-
     uint64_t key = ++count_;
     Local<v8::Function> callback = args[0].As<v8::Function>();
 
     bool inserted;
-    std::tie(std::ignore, inserted) = cache_.try_emplace(key, isolate, callback, context);
+    std::tie(std::ignore, inserted) = cache_.try_emplace(key, isolate, callback);
     assert(inserted && "Main thread callback ID should not be duplicated");
 
     auto value = Callback(key);
@@ -697,9 +695,9 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
-    auto context = it->second.context_.Get(isolate);
-    Context::Scope context_scope(context);
     Local<v8::Function> cb = it->second.callback_.Get(isolate);
+    v8::Local<v8::Context> context = cb->GetCreationContextChecked();
+    Context::Scope context_scope(context);
 
     v8::TryCatch tc(isolate);
 
@@ -1655,7 +1653,7 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
 
         robin_hood::unordered_map<uint64_t, FrameCallbackCacheEntry>::iterator val;
         bool inserted;
-        std::tie(val, inserted) = frameCallbackCache_.try_emplace(key, isolate, callback, context, key);
+        std::tie(val, inserted) = frameCallbackCache_.try_emplace(key, isolate, callback, key);
         assert(inserted && "Frame callback ID should not be duplicated");
 
         PostCallback(args, &val->second, context);
