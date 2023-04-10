@@ -40,7 +40,6 @@ namespace tns {
             args_.reset();
             isolate_ = nullptr;
             queued_ = false;
-            disposed = true;
         }
 
         int nestingLevel_ = 0;
@@ -59,7 +58,6 @@ namespace tns {
         double dueTime_ = -1;
         double startTime_ = -1;
         int id_;
-        bool disposed = false;
     };
 
     struct TimerReference {
@@ -109,11 +107,6 @@ namespace tns {
         void removeTask(const std::shared_ptr<TimerTask> &task);
 
         void removeTask(const int &taskId);
-
-        inline bool IsScheduled(const int &id) {
-            auto it = timerMap_.find(id);
-            return it != timerMap_.end();
-        }
 
         v8::Isolate *isolate_ = nullptr;
         ALooper *looper_;
