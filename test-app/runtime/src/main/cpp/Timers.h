@@ -20,7 +20,7 @@ namespace tns {
                          bool repeats,
                          const std::shared_ptr<std::vector<std::shared_ptr<v8::Persistent<v8::Value>>>> &args,
                          int id, double startTime)
-                : isolate_(isolate), context_(isolate, context), callback_(isolate, callback),
+                : isolate_(isolate), callback_(isolate, callback),
                   frequency_(frequency), repeats_(repeats), args_(args), id_(id),
                   startTime_(startTime) {
 
@@ -36,7 +36,6 @@ namespace tns {
         }
 
         inline void Unschedule() {
-            context_.Reset();
             callback_.Reset();
             args_.reset();
             isolate_ = nullptr;
@@ -46,7 +45,6 @@ namespace tns {
 
         int nestingLevel_ = 0;
         v8::Isolate *isolate_;
-        v8::Persistent<v8::Context> context_;
         v8::Persistent<v8::Function> callback_;
         std::shared_ptr<std::vector<std::shared_ptr<v8::Persistent<v8::Value>>>> args_;
         bool repeats_ = false;

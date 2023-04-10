@@ -297,20 +297,17 @@ namespace tns {
 
 
         struct CacheEntry {
-            CacheEntry(v8::Isolate* isolate, v8::Local<v8::Function> callback, v8::Local<v8::Context> context)
+            CacheEntry(v8::Isolate* isolate, v8::Local<v8::Function> callback)
                     : isolate_(isolate),
-                      callback_(isolate, callback),
-                      context_(isolate, context){
+                      callback_(isolate, callback) {
             }
 
             ~CacheEntry() {
-                context_.Reset();
                 callback_.Reset();
             }
 
             v8::Isolate* isolate_;
             v8::Global<v8::Function> callback_;
-            v8::Global<v8::Context> context_;
         };
 
         static robin_hood::unordered_map<uint64_t, CacheEntry> cache_;
@@ -319,22 +316,18 @@ namespace tns {
         static std::atomic_uint64_t frameCallbackCount_;
 
         struct FrameCallbackCacheEntry {
-            FrameCallbackCacheEntry(v8::Isolate *isolate, v8::Local<v8::Function> callback,
-                                    v8::Local<v8::Context> context, uint64_t aId)
+            FrameCallbackCacheEntry(v8::Isolate *isolate, v8::Local<v8::Function> callback, uint64_t aId)
                 : isolate_(isolate),
                   callback_(isolate, callback),
-                  context_(isolate, context),
                   id(aId) {
             }
 
             ~FrameCallbackCacheEntry() {
-                context_.Reset();
                 callback_.Reset();
             }
 
             v8::Isolate *isolate_;
             v8::Global<v8::Function> callback_;
-            v8::Global<v8::Context> context_;
             bool removed = false;
             uint64_t id;
 
@@ -358,10 +351,10 @@ namespace tns {
                     v8::Locker locker(isolate);
                     v8::Isolate::Scope isolate_scope(isolate);
                     v8::HandleScope handle_scope(isolate);
-                    auto context = entry->context_.Get(isolate);
+                    v8::Local<v8::Function> cb = entry->callback_.Get(isolate);
+                    v8::Local<v8::Context> context = cb->GetCreationContextChecked();
                     v8::Context::Scope context_scope(context);
 
-                    v8::Local<v8::Function> cb = entry->callback_.Get(isolate);
                     v8::Local<v8::Value> args[1] = {v8::Number::New(isolate, ts)};
 
                     v8::TryCatch tc(isolate);

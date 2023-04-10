@@ -293,7 +293,8 @@ int Timers::PumpTimerLoopCallback(int fd, int events, void *data) {
             task->startTime_ = task->dueTime_;
             thiz->addTask(task);
         }
-        auto context = task->context_.Get(isolate);
+        v8::Local<v8::Function> cb = task->callback_.Get(isolate);
+        v8::Local<v8::Context> context = cb->GetCreationContextChecked();
         Context::Scope context_scope(context);
         TryCatch tc(isolate);
         auto argc = task->args_.get() == nullptr ? 0 : task->args_->size();
@@ -302,9 +303,9 @@ int Timers::PumpTimerLoopCallback(int fd, int events, void *data) {
             for (int i = 0; i < argc; i++) {
                 argv[i] = task->args_->at(i)->Get(isolate);
             }
-            task->callback_.Get(isolate)->Call(context, context->Global(), argc, argv);
+            cb->Call(context, context->Global(), argc, argv);
         } else {
-            task->callback_.Get(isolate)->Call(context, context->Global(), 0, nullptr);
+            cb->Call(context, context->Global(), 0, nullptr);
         }
         // task is not queued, so it's either a setTimeout or a cleared setInterval
         // ensure we remove it
