@@ -188,7 +188,8 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir, bool ve
     // read config options passed from Java
     // Indices correspond to positions in the com.tns.AppConfig.KnownKeys enum
     JniLocalRef v8Flags(env->GetObjectArrayElement(args, 0));
-    Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
+    std::string v8FlagsString = ArgConverter::jstringToString(v8Flags);
+    V8::SetFlagsFromString(v8FlagsString.c_str(), v8FlagsString.size());
     JniLocalRef cacheCode(env->GetObjectArrayElement(args, 1));
     Constants::V8_CACHE_COMPILED_CODE = (bool) cacheCode;
     JniLocalRef profilerOutputDir(env->GetObjectArrayElement(args, 2));
@@ -479,7 +480,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     isolate->SetData((uint32_t)Runtime::IsolateData::RUNTIME, this);
     isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, consts);
 
-    V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
     isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
 
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
