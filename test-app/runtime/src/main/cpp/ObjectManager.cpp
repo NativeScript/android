@@ -144,13 +144,13 @@ bool ObjectManager::IsJsRuntimeObject(const v8::Local<v8::Object> &object) {
     return internalFieldCount == count;
 }
 
-jweak ObjectManager::GetJavaObjectByID(uint32_t javaObjectID) {
+jweak ObjectManager::GetJavaObjectByID(jint javaObjectID) {
     jweak obj = m_cache(javaObjectID);
 
     return obj;
 }
 
-jobject ObjectManager::GetJavaObjectByIDImpl(uint32_t javaObjectID) {
+jobject ObjectManager::GetJavaObjectByIDImpl(jint javaObjectID) {
     JEnv env;
     jobject object = env.CallObjectMethod(m_javaRuntimeObject, GET_JAVAOBJECT_BY_ID_METHOD_ID,
                                             javaObjectID);
@@ -175,7 +175,7 @@ void ObjectManager::SetJavaClass(const Local<Object> &instance, jclass clazz) {
     jsInfo->ObjectClazz = clazz;
 }
 
-int ObjectManager::GetOrCreateObjectId(jobject object) {
+jint ObjectManager::GetOrCreateObjectId(jobject object) {
     JEnv env;
     jint javaObjectID = env.CallIntMethod(m_javaRuntimeObject,
                                             GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID, object);
@@ -183,7 +183,7 @@ int ObjectManager::GetOrCreateObjectId(jobject object) {
     return javaObjectID;
 }
 
-Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID) {
+Local<Object> ObjectManager::GetJsObjectByJavaObject(jint javaObjectID) {
     auto isolate = m_isolate;
     EscapableHandleScope handleScope(isolate);
 
@@ -233,7 +233,7 @@ ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const string &typeName, 
 /* *
  * Link the JavaScript object and it's java counterpart with an ID
  */
-void ObjectManager::Link(const Local<Object> &object, uint32_t javaObjectID, jclass clazz) {
+void ObjectManager::Link(const Local<Object> &object, jint javaObjectID, jclass clazz) {
     if (!IsJsRuntimeObject(object)) {
         string errMsg("Trying to link invalid 'this' to a Java object");
         throw NativeScriptException(errMsg);
@@ -407,15 +407,15 @@ void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackSta
     po->SetWeak(callbackState, JSObjectWeakCallbackStatic, WeakCallbackType::kFinalizer);
 }
 
-int ObjectManager::GenerateNewObjectID() {
-    const int one = 1;
-    int oldValue = __sync_fetch_and_add(&m_currentObjectId, one);
+jint ObjectManager::GenerateNewObjectID() {
+    const jint one = 1;
+    jint oldValue = __sync_fetch_and_add(&m_currentObjectId, one);
 
     return oldValue;
 }
 
 void ObjectManager::ReleaseJSInstance(Persistent<Object> *po, JSInstanceInfo *jsInstanceInfo) {
-    int javaObjectID = jsInstanceInfo->JavaObjectID;
+    jint javaObjectID = jsInstanceInfo->JavaObjectID;
 
     auto it = m_idToObject.find(javaObjectID);
 
@@ -495,7 +495,7 @@ bool ObjectManager::HasImplObject(Isolate *isolate, const Local<Object> &obj) {
     return hasImplObj;
 }
 
-jweak ObjectManager::NewWeakGlobalRefCallback(const int &javaObjectID, void *state) {
+jweak ObjectManager::NewWeakGlobalRefCallback(const jint &javaObjectID, void *state) {
     auto objManager = reinterpret_cast<ObjectManager *>(state);
 
     JniLocalRef obj(objManager->GetJavaObjectByIDImpl(javaObjectID));
