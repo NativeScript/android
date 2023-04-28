@@ -27,15 +27,15 @@ class ObjectManager {
         jclass GetJavaClass(const v8::Local<v8::Object>& instance);
 
         void SetJavaClass(const v8::Local<v8::Object>& instance, jclass clazz);
-        int GetOrCreateObjectId(jobject object);
+        jint GetOrCreateObjectId(jobject object);
 
-        v8::Local<v8::Object> GetJsObjectByJavaObject(int javaObjectID);
+        v8::Local<v8::Object> GetJsObjectByJavaObject(jint javaObjectID);
 
         v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName);
 
         v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName, jobject instance);
 
-        void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID, jclass clazz);
+        void Link(const v8::Local<v8::Object>& object, jint javaObjectID, jclass clazz);
 
         void ReleaseNativeCounterpart(v8::Local<v8::Object>& object);
 
@@ -47,7 +47,7 @@ class ObjectManager {
 
         std::string GetClassName(jclass clazz);
 
-        int GenerateNewObjectID();
+        jint GenerateNewObjectID();
 
         void SetInstanceIsolate(v8::Isolate* isolate);
 
@@ -81,12 +81,12 @@ class ObjectManager {
 
         struct JSInstanceInfo {
             public:
-                JSInstanceInfo(bool isJavaObjectWeak, uint32_t javaObjectID, jclass claz)
+                JSInstanceInfo(bool isJavaObjectWeak, jint javaObjectID, jclass claz)
                     :IsJavaObjectWeak(isJavaObjectWeak), JavaObjectID(javaObjectID), ObjectClazz(claz) {
                 }
 
                 bool IsJavaObjectWeak;
-                uint32_t JavaObjectID;
+                jint JavaObjectID;
                 jclass ObjectClazz;
         };
 
@@ -121,7 +121,7 @@ class ObjectManager {
                     m_IDs.clear();
                 }
 
-                void insert(v8::Persistent<v8::Object>* po, int javaObjectId) {
+                void insert(v8::Persistent<v8::Object>* po, jint javaObjectId) {
                     m_POs.insert(po);
                     m_IDs.insert(javaObjectId);
                 }
@@ -131,16 +131,16 @@ class ObjectManager {
                 }
 
                 std::set<v8::Persistent<v8::Object>*> m_POs;
-                std::set<int> m_IDs;
+                std::set<jint> m_IDs;
         };
 
         struct PersistentObjectIdPair {
-            PersistentObjectIdPair(v8::Persistent<v8::Object>* _po, int _javaObjectId)
+            PersistentObjectIdPair(v8::Persistent<v8::Object>* _po, jint _javaObjectId)
                 :
                 po(_po), javaObjectId(_javaObjectId) {
             }
             v8::Persistent<v8::Object>* po;
-            int javaObjectId;
+            jint javaObjectId;
         };
 
 
@@ -171,9 +171,9 @@ class ObjectManager {
 
         bool HasImplObject(v8::Isolate* isolate, const v8::Local<v8::Object>& obj);
 
-        jweak GetJavaObjectByID(uint32_t javaObjectID);
+        jweak GetJavaObjectByID(jint javaObjectID);
 
-        jobject GetJavaObjectByIDImpl(uint32_t javaObjectID);
+        jobject GetJavaObjectByIDImpl(jint javaObjectID);
 
         static jweak NewWeakGlobalRefCallback(const int& javaObjectID, void* state);
 
@@ -189,19 +189,19 @@ class ObjectManager {
 
         std::stack<GarbageCollectionInfo> m_markedForGC;
 
-        std::unordered_map<int, v8::Persistent<v8::Object>*> m_idToObject;
+        std::unordered_map<jint, v8::Persistent<v8::Object>*> m_idToObject;
 
         PersistentObjectIdSet m_released;
 
         std::set<unsigned long> m_visited;
 
-        LRUCache<int, jweak> m_cache;
+        LRUCache<jint, jweak> m_cache;
 
         std::set<v8::Persistent<v8::Object>*> m_visitedPOs;
         std::vector<PersistentObjectIdPair> m_implObjWeak;
-        std::unordered_map<int, v8::Persistent<v8::Object>*> m_implObjStrong;
+        std::unordered_map<jint, v8::Persistent<v8::Object>*> m_implObjStrong;
 
-        volatile int m_currentObjectId;
+        volatile jint m_currentObjectId;
 
         DirectBuffer m_buff;
 

@@ -269,7 +269,7 @@ namespace tns {
         static FieldAccessor fieldAccessor;
 
         struct JavaObjectIdScope {
-            JavaObjectIdScope(JEnv &env, jfieldID fieldId, jobject runtime, int javaObjectId)
+            JavaObjectIdScope(JEnv &env, jfieldID fieldId, jobject runtime, jint javaObjectId)
                     : _env(env), _fieldID(fieldId), _runtime(runtime) {
                 _env.SetIntField(_runtime, _fieldID, javaObjectId);
             }
