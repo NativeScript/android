@@ -84,7 +84,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
                                              implementationObject,
                                              isInterface);
 
-    int javaObjectID = objectManager->GenerateNewObjectID();
+    jint javaObjectID = objectManager->GenerateNewObjectID();
 
     objectManager->Link(jsObject, javaObjectID, nullptr);
 

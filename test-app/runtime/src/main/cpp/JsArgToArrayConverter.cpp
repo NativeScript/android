@@ -331,7 +331,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
 
                     buffer = env.NewGlobalRef(buffer);
 
-                    int id = objectManager->GetOrCreateObjectId(buffer);
+                    jint id = objectManager->GetOrCreateObjectId(buffer);
                     auto clazz = env.GetObjectClass(buffer);
                     objectManager->Link(jsObj, id, clazz);
 

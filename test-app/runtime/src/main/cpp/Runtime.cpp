@@ -364,9 +364,7 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj, jobject javaObje
 }
 
 jint Runtime::GenerateNewObjectId(JNIEnv* env, jobject obj) {
-    int objectId = m_objectManager->GenerateNewObjectID();
-
-    return objectId;
+    return m_objectManager->GenerateNewObjectID();
 }
 
 void Runtime::AdjustAmountOfExternalAllocatedMemory() {
