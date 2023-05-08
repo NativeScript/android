@@ -18,7 +18,6 @@ using namespace tns;
 
 ObjectManager::ObjectManager(jobject javaRuntimeObject) :
         m_javaRuntimeObject(javaRuntimeObject),
-        m_numberOfGC(0),
         m_currentObjectId(0),
         m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this) {
 
@@ -35,10 +34,6 @@ ObjectManager::ObjectManager(jobject javaRuntimeObject) :
                                                                "(Ljava/lang/Object;)I");
     assert(GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID != nullptr);
 
-    MAKE_INSTANCE_WEAK_BATCH_METHOD_ID = env.GetMethodID(runtimeClass, "makeInstanceWeak",
-                                                           "(Ljava/nio/ByteBuffer;IZ)V");
-    assert(MAKE_INSTANCE_WEAK_BATCH_METHOD_ID != nullptr);
-
     MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID = env.GetMethodID(runtimeClass,
                                                                         "makeInstanceWeakAndCheckIfAlive",
                                                                         "(I)Z");
@@ -48,15 +43,10 @@ ObjectManager::ObjectManager(jobject javaRuntimeObject) :
                                                           "(I)V");
     assert(RELEASE_NATIVE_INSTANCE_METHOD_ID != nullptr);
 
-    CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID = env.GetMethodID(runtimeClass,
-                                                               "checkWeakObjectAreAlive",
-                                                               "(Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;I)V");
-    assert(CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID != nullptr);
+    jclass javaLangClass = env.FindClass("java/lang/Class");
+    assert(javaLangClass != nullptr);
 
-    JAVA_LANG_CLASS = env.FindClass("java/lang/Class");
-    assert(JAVA_LANG_CLASS != nullptr);
-
-    GET_NAME_METHOD_ID = env.GetMethodID(JAVA_LANG_CLASS, "getName", "()Ljava/lang/String;");
+    GET_NAME_METHOD_ID = env.GetMethodID(javaLangClass, "getName", "()Ljava/lang/String;");
     assert(GET_NAME_METHOD_ID != nullptr);
 
     auto useGlobalRefsMethodID = env.GetStaticMethodID(runtimeClass, "useGlobalRefs", "()Z");
@@ -104,7 +94,6 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(const Local<Object> &object) 
 }
 
 ObjectManager::JSInstanceInfo *ObjectManager::GetJSInstanceInfo(const Local<Object> &object) {
-    JSInstanceInfo *jsInstanceInfo = nullptr;
     if (IsJsRuntimeObject(object)) {
         return GetJSInstanceInfoFromRuntimeObject(object);
     }
@@ -157,24 +146,6 @@ jobject ObjectManager::GetJavaObjectByIDImpl(jint javaObjectID) {
     return object;
 }
 
-void ObjectManager::UpdateCache(int objectID, jobject obj) {
-    m_cache.update(objectID, obj);
-}
-
-jclass ObjectManager::GetJavaClass(const Local<Object> &instance) {
-    DEBUG_WRITE("GetClass called");
-
-    JSInstanceInfo *jsInfo = GetJSInstanceInfo(instance);
-    jclass clazz = jsInfo->ObjectClazz;
-
-    return clazz;
-}
-
-void ObjectManager::SetJavaClass(const Local<Object> &instance, jclass clazz) {
-    JSInstanceInfo *jsInfo = GetJSInstanceInfo(instance);
-    jsInfo->ObjectClazz = clazz;
-}
-
 jint ObjectManager::GetOrCreateObjectId(jobject object) {
     JEnv env;
     jint javaObjectID = env.CallIntMethod(m_javaRuntimeObject,
@@ -222,9 +193,7 @@ ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const string &typeName, 
     auto jsWrapper = node->CreateJSWrapper(isolate, this);
 
     if (!jsWrapper.IsEmpty()) {
-        JEnv env;
-        auto claz = env.FindClass(className);
-        Link(jsWrapper, javaObjectID, claz);
+        Link(jsWrapper, javaObjectID);
     }
     return jsWrapper;
 }
@@ -233,7 +202,7 @@ ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const string &typeName, 
 /* *
  * Link the JavaScript object and it's java counterpart with an ID
  */
-void ObjectManager::Link(const Local<Object> &object, jint javaObjectID, jclass clazz) {
+void ObjectManager::Link(const Local<Object> &object, jint javaObjectID) {
     if (!IsJsRuntimeObject(object)) {
         string errMsg("Trying to link invalid 'this' to a Java object");
         throw NativeScriptException(errMsg);
@@ -244,10 +213,10 @@ void ObjectManager::Link(const Local<Object> &object, jint javaObjectID, jclass 
     DEBUG_WRITE("Linking js object: %d and java instance id: %d", object->GetIdentityHash(),
                 javaObjectID);
 
-    auto jsInstanceInfo = new JSInstanceInfo(false/*isJavaObjWeak*/, javaObjectID, clazz);
+    auto jsInstanceInfo = new JSInstanceInfo(false/*isJavaObjWeak*/, javaObjectID);
 
     auto objectHandle = new Persistent<Object>(isolate, object);
-    auto state = new ObjectWeakCallbackState(this, jsInstanceInfo, objectHandle);
+    auto state = new ObjectWeakCallbackState(this, objectHandle);
 
     // subscribe for JS GC event
     if (m_markingMode == JavaScriptMarkingMode::None) {
@@ -382,9 +351,7 @@ void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackSta
             DEBUG_WRITE("JSObjectWeakCallback objectId: %d, hasImplObj=%d", javaObjectID, hasImplObj);
 
             if (hasImplObj) {
-                if (jsInstanceInfo->IsJavaObjectWeak) {
-                    m_implObjWeak.emplace_back(po, javaObjectID);
-                } else {
+                if (!jsInstanceInfo->IsJavaObjectWeak) {
                     m_implObjStrong.insert(make_pair(javaObjectID, po));
                     jsInstanceInfo->IsJavaObjectWeak = true;
                 }
@@ -394,7 +361,7 @@ void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackSta
                     // to the V8 GC is done only on the markSweepCompact phase. The JSObjectWeakCallback
                     // however is still triggered in other V8 GC phases (scavenger for example). This
                     // creates a problem that there is no 'top' on the m_markedForGC stack.
-                    GarbageCollectionInfo gcInfo(++m_numberOfGC);
+                    GarbageCollectionInfo gcInfo;
                     gcInfo.markedForGC.push_back(po);
                     m_markedForGC.push(gcInfo);
                 } else {
@@ -413,79 +380,6 @@ jint ObjectManager::GenerateNewObjectID() {
     jint oldValue = __sync_fetch_and_add(&m_currentObjectId, one);
 
     return oldValue;
-}
-
-void ObjectManager::ReleaseJSInstance(Persistent<Object> *po, JSInstanceInfo *jsInstanceInfo) {
-    jint javaObjectID = jsInstanceInfo->JavaObjectID;
-
-    auto it = m_idToObject.find(javaObjectID);
-
-    if (it == m_idToObject.end()) {
-        stringstream ss;
-        ss << "(InternalError): Js object with id: " << javaObjectID << " not found";
-        throw NativeScriptException(ss.str());
-    }
-
-    assert(po == it->second);
-
-    m_idToObject.erase(it);
-    m_released.insert(po, javaObjectID);
-    po->Reset();
-
-    delete po;
-    delete jsInstanceInfo;
-
-    DEBUG_WRITE("ReleaseJSObject instance disposed. id:%d", javaObjectID);
-}
-
-/*
- * The "regular" JS objects added on ObjectManager::JSObjectWeakCallback are dealt with(released) here.
- * */
-void ObjectManager::ReleaseRegularObjects() {
-    TNSPERF();
-
-    HandleScope handleScope(m_isolate);
-
-    auto propName = String::NewFromUtf8(m_isolate, "t::gcNum",
-                                        NewStringType::kNormal).ToLocalChecked();
-
-    auto &topGCInfo = m_markedForGC.top();
-    auto &marked = topGCInfo.markedForGC;
-    int numberOfGC = topGCInfo.numberOfGC;
-
-    for (auto po : marked) {
-        if (m_released.contains(po)) {
-            continue;
-        }
-
-        auto obj = Local<Object>::New(m_isolate, *po);
-
-        assert(!obj.IsEmpty());
-
-        Local<Value> gcNum;
-        V8GetPrivateValue(m_isolate, obj, propName, gcNum);
-
-        bool isReachableFromImplementationObject = false;
-
-        if (!gcNum.IsEmpty() && gcNum->IsNumber()) {
-            double objGcNum = gcNum.As<Number>()->Value();
-
-            // done so we can release only java objects from this GC stack and pass all objects that will be released in parent GC stacks
-            isReachableFromImplementationObject = objGcNum >= numberOfGC;
-        }
-
-        JSInstanceInfo *jsInstanceInfo = GetJSInstanceInfo(obj);
-
-        if (!isReachableFromImplementationObject) {
-            if (!jsInstanceInfo->IsJavaObjectWeak) {
-                jsInstanceInfo->IsJavaObjectWeak = true;
-
-                ReleaseJSInstance(po, jsInstanceInfo);
-            }
-        }
-    }
-
-    marked.clear();
 }
 
 bool ObjectManager::HasImplObject(Isolate *isolate, const Local<Object> &obj) {
@@ -507,9 +401,7 @@ jweak ObjectManager::NewWeakGlobalRefCallback(const jint &javaObjectID, void *st
     return weakRef;
 }
 
-void ObjectManager::DeleteWeakGlobalRefCallback(const jweak &object, void *state) {
-    auto objManager = reinterpret_cast<ObjectManager *>(state);
-
+void ObjectManager::DeleteWeakGlobalRefCallback(const jweak &object, [[maybe_unused]] void *state) {
     JEnv env;
     env.DeleteWeakGlobalRef(object);
 }

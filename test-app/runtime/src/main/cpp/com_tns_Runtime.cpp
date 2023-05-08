@@ -155,7 +155,7 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_runScript(JNIEnv* _env, jobjec
     return result;
 }
 
-extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _env, jobject obj, jint runtimeId, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs) {
+extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _env, jobject obj, jint runtimeId, jint javaObjectID, jstring methodName, jint retType, jobjectArray packagedArgs) {
     jobject result = nullptr;
 
     auto runtime = TryGetRuntime(runtimeId);
@@ -171,7 +171,7 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _en
     v8::Context::Scope context_scope(context);
 
     try {
-        result = runtime->CallJSMethodNative(_env, obj, javaObjectID, methodName, retType, isConstructor, packagedArgs);
+        result = runtime->CallJSMethodNative(_env, obj, javaObjectID, methodName, retType, packagedArgs);
     } catch (NativeScriptException& e) {
         e.ReThrowToJava();
     } catch (std::exception e) {
@@ -200,7 +200,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv* _e
     v8::Context::Scope context_scope(context);
 
     try {
-        runtime->CreateJSInstanceNative(_env, obj, javaObject, javaObjectID, className);
+        runtime->CreateJSInstanceNative(obj, javaObject, javaObjectID, className);
     } catch (NativeScriptException& e) {
         e.ReThrowToJava();
     } catch (std::exception e) {
