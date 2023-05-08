@@ -273,8 +273,9 @@ bool ObjectManager::CloneLink(const Local<Object> &src, const Local<Object> &des
 
     if (success) {
         auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-        auto jsInfo = src->GetInternalField(jsInfoIdx);
-        dest->SetInternalField(jsInfoIdx, jsInfo);
+        // fetches the JSInstanceInfo again, but allows reusing the same v8::External
+        Local<Value> jsInfoExternal = src->GetInternalField(jsInfoIdx);
+        dest->SetInternalField(jsInfoIdx, jsInfoExternal);
     }
 
     return success;
