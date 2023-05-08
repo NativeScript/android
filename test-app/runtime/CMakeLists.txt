@@ -96,7 +96,6 @@ add_library(
         src/main/cpp/AssetExtractor.cpp
         src/main/cpp/CallbackHandlers.cpp
         src/main/cpp/Constants.cpp
-        src/main/cpp/DirectBuffer.cpp
         src/main/cpp/FieldAccessor.cpp
         src/main/cpp/File.cpp
         src/main/cpp/IsolateDisposer.cpp
