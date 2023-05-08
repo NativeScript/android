@@ -334,15 +334,6 @@ public class Runtime {
         }
     }
 
-    @RuntimeCallable
-    public int getMarkingModeOrdinal() {
-        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
-            return staticConfiguration.appConfig.getMarkingMode().ordinal();
-        } else {
-            return ((MarkingMode) AppConfig.KnownKeys.MarkingMode.getDefaultValue()).ordinal();
-        }
-    }
-
     public static boolean isInitialized() {
         Runtime runtime = Runtime.getCurrentRuntime();
         return (runtime != null) ? runtime.isInitializedImpl() : false;

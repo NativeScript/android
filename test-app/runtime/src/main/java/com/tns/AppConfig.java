@@ -14,7 +14,6 @@ class AppConfig {
         MemoryCheckInterval("memoryCheckInterval", 0),
         FreeMemoryRatio("freeMemoryRatio", 0.0),
         Profiling("profiling", ""),
-        MarkingMode("markingMode", com.tns.MarkingMode.none),
         HandleTimeZoneChanges("handleTimeZoneChanges", false),
         MaxLogcatObjectSize("maxLogcatObjectSize", 1024),
         ForceLog("forceLog", false),
@@ -80,18 +79,6 @@ class AppConfig {
                     if (androidObject.has(KnownKeys.FreeMemoryRatio.getName())) {
                         values[KnownKeys.FreeMemoryRatio.ordinal()] = androidObject.getDouble(KnownKeys.FreeMemoryRatio.getName());
                     }
-                    if (androidObject.has(KnownKeys.MarkingMode.getName())) {
-                        try {
-                            String markingModeString = androidObject.getString(KnownKeys.MarkingMode.getName());
-                            MarkingMode markingMode = MarkingMode.valueOf(markingModeString);
-                            values[KnownKeys.MarkingMode.ordinal()] = markingMode;
-                        } catch (Exception e) {
-                            Log.e("JS", String.format("Failed to parse marking mode: %s. The default %s will be used!", e.getMessage(), ((MarkingMode)KnownKeys.MarkingMode.getDefaultValue()).name()));
-                            if (com.tns.Runtime.isDebuggable()) {
-                                e.printStackTrace();
-                            }
-                        }
-                    }
                     if (androidObject.has(KnownKeys.HandleTimeZoneChanges.getName())) {
                         values[KnownKeys.HandleTimeZoneChanges.ordinal()] = androidObject.getBoolean(KnownKeys.HandleTimeZoneChanges.getName());
                     }
@@ -142,10 +129,6 @@ class AppConfig {
 
     public String getProfilingMode() {
         return (String)values[KnownKeys.Profiling.ordinal()];
-    }
-
-    public MarkingMode getMarkingMode() {
-        return (MarkingMode)values[KnownKeys.MarkingMode.ordinal()];
     }
 
     public boolean handleTimeZoneChanges() {

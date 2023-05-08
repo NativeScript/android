@@ -54,11 +54,6 @@ ObjectManager::ObjectManager(jobject javaRuntimeObject) :
 
     auto useGlobalRefs = env.CallStaticBooleanMethod(runtimeClass, useGlobalRefsMethodID);
     m_useGlobalRefs = useGlobalRefs == JNI_TRUE;
-
-    auto getMarkingModeOrdinalMethodID = env.GetMethodID(runtimeClass, "getMarkingModeOrdinal",
-                                                           "()I");
-    jint markingMode = env.CallIntMethod(m_javaRuntimeObject, getMarkingModeOrdinalMethodID);
-    m_markingMode = static_cast<JavaScriptMarkingMode>(markingMode);
 }
 
 void ObjectManager::SetInstanceIsolate(Isolate *isolate) {
@@ -213,17 +208,13 @@ void ObjectManager::Link(const Local<Object> &object, jint javaObjectID) {
     DEBUG_WRITE("Linking js object: %d and java instance id: %d", object->GetIdentityHash(),
                 javaObjectID);
 
-    auto jsInstanceInfo = new JSInstanceInfo(false/*isJavaObjWeak*/, javaObjectID);
+    auto jsInstanceInfo = new JSInstanceInfo(javaObjectID);
 
     auto objectHandle = new Persistent<Object>(isolate, object);
     auto state = new ObjectWeakCallbackState(this, objectHandle);
 
     // subscribe for JS GC event
-    if (m_markingMode == JavaScriptMarkingMode::None) {
-        objectHandle->SetWeak(state, JSObjectFinalizerStatic, WeakCallbackType::kFinalizer);
-    } else {
-        objectHandle->SetWeak(state, JSObjectWeakCallbackStatic, WeakCallbackType::kFinalizer);
-    }
+    objectHandle->SetWeak(state, JSObjectFinalizerStatic, WeakCallbackType::kFinalizer);
 
     auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
 
@@ -268,17 +259,6 @@ string ObjectManager::GetClassName(jclass clazz) {
     return className;
 }
 
-void
-ObjectManager::JSObjectWeakCallbackStatic(const WeakCallbackInfo<ObjectWeakCallbackState> &data) {
-    ObjectWeakCallbackState *callbackState = data.GetParameter();
-
-    ObjectManager *thisPtr = callbackState->thisPtr;
-
-    auto isolate = data.GetIsolate();
-
-    thisPtr->JSObjectWeakCallback(isolate, callbackState);
-}
-
 void ObjectManager::JSObjectFinalizerStatic(const WeakCallbackInfo<ObjectWeakCallbackState> &data) {
     ObjectWeakCallbackState *callbackState = data.GetParameter();
 
@@ -321,73 +301,11 @@ void ObjectManager::JSObjectFinalizer(Isolate *isolate, ObjectWeakCallbackState 
     }
 }
 
-
-/*
- * When JS GC happens change state of the java counterpart to mirror state of JS object and REVIVE the JS object unconditionally
- * "Regular" js objects are pushed into the "regular objects" array
- * "Callback" js objects (ones that have implementation object) are pushed into two "special objects" array:
- * 		-ones called for the first time which are originally strong in java
- * 		-ones called for the second or next time which are already weak in java too
- *	These objects are categorized by "regular" and "callback" and saved in different arrays for performance optimizations during GC
- * */
-void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackState *callbackState) {
-    HandleScope handleScope(isolate);
-
-    Persistent<Object> *po = callbackState->target;
-
-    auto itFound = m_visitedPOs.find(po);
-
-    if (itFound == m_visitedPOs.end()) {
-        m_visitedPOs.insert(po);
-
-        auto obj = Local<Object>::New(isolate, *po);
-        JSInstanceInfo *jsInstanceInfo = GetJSInstanceInfo(obj);
-
-        if(jsInstanceInfo != nullptr){
-            int javaObjectID = jsInstanceInfo->JavaObjectID;
-
-            bool hasImplObj = HasImplObject(isolate, obj);
-
-            DEBUG_WRITE("JSObjectWeakCallback objectId: %d, hasImplObj=%d", javaObjectID, hasImplObj);
-
-            if (hasImplObj) {
-                if (!jsInstanceInfo->IsJavaObjectWeak) {
-                    m_implObjStrong.insert(make_pair(javaObjectID, po));
-                    jsInstanceInfo->IsJavaObjectWeak = true;
-                }
-            } else {
-                if(m_markedForGC.empty()){
-                    // Emulates the behavior in the OnGcStarted callback. Тhis is necessary as the hooking
-                    // to the V8 GC is done only on the markSweepCompact phase. The JSObjectWeakCallback
-                    // however is still triggered in other V8 GC phases (scavenger for example). This
-                    // creates a problem that there is no 'top' on the m_markedForGC stack.
-                    GarbageCollectionInfo gcInfo;
-                    gcInfo.markedForGC.push_back(po);
-                    m_markedForGC.push(gcInfo);
-                } else {
-                    auto &topGCInfo = m_markedForGC.top();
-                    topGCInfo.markedForGC.push_back(po);
-                }
-            }
-        }
-    }
-
-    po->SetWeak(callbackState, JSObjectWeakCallbackStatic, WeakCallbackType::kFinalizer);
-}
-
 jint ObjectManager::GenerateNewObjectID() {
     const jint one = 1;
     jint oldValue = __sync_fetch_and_add(&m_currentObjectId, one);
 
     return oldValue;
-}
-
-bool ObjectManager::HasImplObject(Isolate *isolate, const Local<Object> &obj) {
-    auto implObject = MetadataNode::GetImplementationObject(isolate, obj);
-
-    bool hasImplObj = !implObject.IsEmpty();
-
-    return hasImplObj;
 }
 
 jweak ObjectManager::NewWeakGlobalRefCallback(const jint &javaObjectID, void *state) {
@@ -442,8 +360,4 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object> &object) {
     delete jsInstanceInfo;
     auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
     object->SetInternalField(jsInfoIdx, Undefined(m_isolate));
-}
-
-ObjectManager::JavaScriptMarkingMode ObjectManager::GetMarkingMode() {
-    return this->m_markingMode;
 }
