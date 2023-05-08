@@ -52,8 +52,8 @@ class Runtime {
         void RunModule(JNIEnv* _env, jobject obj, jstring scriptFile);
         void RunWorker(jstring scriptFile);
         jobject RunScript(JNIEnv* _env, jobject obj, jstring scriptFile);
-        jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs);
-        void CreateJSInstanceNative(JNIEnv* _env, jobject obj, jobject javaObject, jint javaObjectID, jstring className);
+        jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jobjectArray packagedArgs);
+        void CreateJSInstanceNative(jobject obj, jobject javaObject, jint javaObjectID, jstring className);
         jint GenerateNewObjectId(JNIEnv* env, jobject obj);
         void AdjustAmountOfExternalAllocatedMemory();
         bool NotifyGC(JNIEnv* env, jobject obj);

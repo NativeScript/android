@@ -86,7 +86,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
     jint javaObjectID = objectManager->GenerateNewObjectID();
 
-    objectManager->Link(jsObject, javaObjectID, nullptr);
+    objectManager->Link(jsObject, javaObjectID);
 
     // resolve constructor
     auto mi = MethodCache::ResolveConstructorSignature(argWrapper, fullClassName,
@@ -118,10 +118,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     JniLocalRef localInstance(instance);
     success = !localInstance.IsNull();
 
-    if (success) {
-        jclass instanceClass = env.FindClass(fullClassName);
-        objectManager->SetJavaClass(jsObject, instanceClass);
-    } else {
+    if (!success) {
         DEBUG_WRITE_FORCE("RegisterInstance failed with null new instance class: %s",
                           fullClassName.c_str());
     }

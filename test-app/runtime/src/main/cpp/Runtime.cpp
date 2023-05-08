@@ -296,7 +296,7 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
     return res;
 }
 
-jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs) {
+jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jobjectArray packagedArgs) {
     SET_PROFILER_FRAME();
 
     auto isolate = m_isolate;
@@ -314,12 +314,6 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID
         throw NativeScriptException(ss.str());
     }
 
-    if (isConstructor) {
-        DEBUG_WRITE("CallJSMethodNative: Updating linked instance with its real class");
-        jclass instanceClass = env.GetObjectClass(obj);
-        m_objectManager->SetJavaClass(jsObject, instanceClass);
-    }
-
     DEBUG_WRITE("CallJSMethodNative called jsObject=%d", jsObject->GetIdentityHash());
 
     string method_name = ArgConverter::jstringToString(methodName);
@@ -330,14 +324,12 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID
     return javaObject;
 }
 
-void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj, jobject javaObject, jint javaObjectID, jstring className) {
+void Runtime::CreateJSInstanceNative(jobject obj, jobject javaObject, jint javaObjectID, jstring className) {
     SET_PROFILER_FRAME();
 
     DEBUG_WRITE("createJSInstanceNative called");
 
     auto isolate = m_isolate;
-
-    JEnv env(_env);
 
     string existingClassName = ArgConverter::jstringToString(className);
     string jniName = Util::ConvertFromCanonicalToJniName(existingClassName);
@@ -359,8 +351,7 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj, jobject javaObje
     }
     DEBUG_WRITE("createJSInstanceNative: implementationObject :%d", implementationObject->GetIdentityHash());
 
-    jclass clazz = env.FindClass(jniName);
-    m_objectManager->Link(jsInstance, javaObjectID, clazz);
+    m_objectManager->Link(jsInstance, javaObjectID);
 }
 
 jint Runtime::GenerateNewObjectId(JNIEnv* env, jobject obj) {
