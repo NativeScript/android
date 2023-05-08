@@ -53,33 +53,14 @@ class ObjectManager {
             END
         };
 
-        /**
-         * Memory management modes. Keep the members in sync with the java/com/tns/MarkingMode.
-         */
-        enum JavaScriptMarkingMode {
-            /**
-             * For JavaScript instances with implementation objects that were marked for collection,
-             * MarkReachableObjects will scan the whole graph of reachable objects and keep strong reference to
-             * the Java instances of implementation objects.
-             */
-            Full,
-            /**
-             * Fully suppress the MarkReachableObjects.
-             */
-            None
-        };
-
-        JavaScriptMarkingMode GetMarkingMode();
-
     private:
 
         struct JSInstanceInfo {
             public:
-                JSInstanceInfo(bool isJavaObjectWeak, jint javaObjectID)
-                    : IsJavaObjectWeak(isJavaObjectWeak), JavaObjectID(javaObjectID) {
+                JSInstanceInfo(jint javaObjectID)
+                    : JavaObjectID(javaObjectID) {
                 }
 
-                bool IsJavaObjectWeak;
                 jint JavaObjectID;
         };
 
@@ -92,25 +73,14 @@ class ObjectManager {
             v8::Persistent<v8::Object>* target;
         };
 
-        struct GarbageCollectionInfo {
-            std::vector<v8::Persistent<v8::Object>*> markedForGC;
-        };
-
         JSInstanceInfo* GetJSInstanceInfo(const v8::Local<v8::Object>& object);
 
         JSInstanceInfo* GetJSInstanceInfoFromRuntimeObject(const v8::Local<v8::Object>& object);
 
         v8::Local<v8::Object> CreateJSWrapperHelper(jint javaObjectID, const std::string& typeName, jclass clazz);
 
-        static void JSObjectWeakCallbackStatic(const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
-
         static void JSObjectFinalizerStatic(const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
-
-        void JSObjectWeakCallback(v8::Isolate* isolate, ObjectWeakCallbackState* callbackState);
-
         void JSObjectFinalizer(v8::Isolate* isolate, ObjectWeakCallbackState* callbackState);
-
-        bool HasImplObject(v8::Isolate* isolate, const v8::Local<v8::Object>& obj);
 
         jweak GetJavaObjectByID(jint javaObjectID);
 
@@ -126,20 +96,13 @@ class ObjectManager {
 
         v8::Isolate* m_isolate;
 
-        std::stack<GarbageCollectionInfo> m_markedForGC;
-
         std::unordered_map<jint, v8::Persistent<v8::Object>*> m_idToObject;
 
         LRUCache<jint, jweak> m_cache;
 
-        std::set<v8::Persistent<v8::Object>*> m_visitedPOs;
-        std::unordered_map<jint, v8::Persistent<v8::Object>*> m_implObjStrong;
-
         volatile jint m_currentObjectId;
 
         bool m_useGlobalRefs;
-
-        JavaScriptMarkingMode m_markingMode;
 
         jmethodID GET_NAME_METHOD_ID;
 
