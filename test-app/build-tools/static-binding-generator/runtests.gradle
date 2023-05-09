@@ -58,16 +58,7 @@ jar {
     duplicatesStrategy = 'include'
 }
 
-task copyJar(dependsOn: 'jar') {
-    doFirst {
-        def source = file("$projectDir/build/libs/static-binding-generator.jar").toPath()
-        print source.toFile().exists()
-        def dest = file("$projectDir/../static-binding-generator.jar").toPath()
-        Files.copy(source, dest, StandardCopyOption.REPLACE_EXISTING)
-    }
-}
-
-task prepareInputFiles(dependsOn: 'copyJar') {
+task prepareInputFiles {
     doFirst {
         inputFile.write(appRoot)
         outputFile.write(generatedJavaClassesRoot.toString())
@@ -77,7 +68,7 @@ task prepareInputFiles(dependsOn: 'copyJar') {
 }
 
 task runSbg(type: JavaExec, dependsOn: 'prepareInputFiles') {
-    classpath = files('../static-binding-generator.jar', '../')
+    classpath = files('build/libs/static-binding-generator.jar', '../')
     workingDir = "../"
     main = "org.nativescript.staticbindinggenerator.Main"
 }

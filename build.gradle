@@ -261,11 +261,11 @@ task copyFilesToProjectTemeplate {
             into "$DIST_FRAMEWORK_PATH/app/src/main/java/com/tns/internal"
         }
         copy {
-            from "$BUILD_TOOLS_PATH/static-binding-generator.jar"
+            from "$BUILD_TOOLS_PATH/static-binding-generator/build/libs/static-binding-generator.jar"
             into "$DIST_FRAMEWORK_PATH/build-tools"
         }
         copy {
-            from "$BUILD_TOOLS_PATH/dts-generator.jar"
+            from "$BUILD_TOOLS_PATH/android-dts-generator/build/libs/dts-generator.jar"
             into "$DIST_FRAMEWORK_PATH/build-tools"
         }
         copy {
@@ -273,7 +273,7 @@ task copyFilesToProjectTemeplate {
             into "$DIST_FRAMEWORK_PATH/build-tools/jsparser"
         }
         copy {
-            from "$BUILD_TOOLS_PATH/android-metadata-generator.jar"
+            from "$BUILD_TOOLS_PATH/android-metadata-generator/build/libs/android-metadata-generator.jar"
             into "$DIST_FRAMEWORK_PATH/build-tools"
         }
         copy {
