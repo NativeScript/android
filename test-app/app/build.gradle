@@ -190,6 +190,8 @@ def setAppIdentifier = { ->
 }
 
 android {
+    namespace "com.tns.testapplication"
+
     applyBeforePluginGradleConfiguration()
 
     if (enableKotlin) {

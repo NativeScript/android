@@ -49,6 +49,7 @@ if(!hasNdkDirectory){
 println "Runtime using NDK_PATH: " + NDK_PATH
 
 android {
+    namespace "com.tns.android_runtime"
 
     compileSdkVersion NS_DEFAULT_COMPILE_SDK_VERSION as int
     buildToolsVersion NS_DEFAULT_BUILD_TOOLS_VERSION as String
