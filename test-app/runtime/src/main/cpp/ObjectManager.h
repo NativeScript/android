@@ -102,8 +102,6 @@ class ObjectManager {
 
         volatile jint m_currentObjectId;
 
-        bool m_useGlobalRefs;
-
         jmethodID GET_NAME_METHOD_ID;
 
         jmethodID GET_JAVAOBJECT_BY_ID_METHOD_ID;

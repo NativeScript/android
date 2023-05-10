@@ -1332,13 +1332,6 @@ public class Runtime {
         return arr;
     }
 
-    @RuntimeCallable
-    private static boolean useGlobalRefs() {
-        int JELLY_BEAN = 16;
-        boolean useGlobalRefs = android.os.Build.VERSION.SDK_INT >= JELLY_BEAN;
-        return useGlobalRefs;
-    }
-
     /*
         ======================================================================
         ======================================================================
