@@ -48,12 +48,6 @@ ObjectManager::ObjectManager(jobject javaRuntimeObject) :
 
     GET_NAME_METHOD_ID = env.GetMethodID(javaLangClass, "getName", "()Ljava/lang/String;");
     assert(GET_NAME_METHOD_ID != nullptr);
-
-    auto useGlobalRefsMethodID = env.GetStaticMethodID(runtimeClass, "useGlobalRefs", "()Z");
-    assert(useGlobalRefsMethodID != nullptr);
-
-    auto useGlobalRefs = env.CallStaticBooleanMethod(runtimeClass, useGlobalRefsMethodID);
-    m_useGlobalRefs = useGlobalRefs == JNI_TRUE;
 }
 
 void ObjectManager::SetInstanceIsolate(Isolate *isolate) {
@@ -74,15 +68,8 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(const Local<Object> &object) 
     JSInstanceInfo *jsInstanceInfo = GetJSInstanceInfo(object);
 
     if (jsInstanceInfo != nullptr) {
-        if (m_useGlobalRefs) {
-            JniLocalRef javaObject(GetJavaObjectByID(jsInstanceInfo->JavaObjectID), true);
-            return javaObject;
-        } else {
-            JEnv env;
-            JniLocalRef javaObject(
-                    env.NewLocalRef(GetJavaObjectByID(jsInstanceInfo->JavaObjectID)));
-            return javaObject;
-        }
+        JniLocalRef javaObject(GetJavaObjectByID(jsInstanceInfo->JavaObjectID), true);
+        return javaObject;
     }
 
     return JniLocalRef();
