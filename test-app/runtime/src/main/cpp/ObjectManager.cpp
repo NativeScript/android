@@ -16,7 +16,8 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-ObjectManager::ObjectManager(jobject javaRuntimeObject) :
+ObjectManager::ObjectManager(v8::Isolate* isolate, jobject javaRuntimeObject) :
+        m_isolate(isolate),
         m_javaRuntimeObject(javaRuntimeObject),
         m_currentObjectId(0),
         m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this) {
@@ -48,10 +49,7 @@ ObjectManager::ObjectManager(jobject javaRuntimeObject) :
 
     GET_NAME_METHOD_ID = env.GetMethodID(javaLangClass, "getName", "()Ljava/lang/String;");
     assert(GET_NAME_METHOD_ID != nullptr);
-}
 
-void ObjectManager::Init(Isolate *isolate) {
-    m_isolate = isolate;
     auto jsWrapperFuncTemplate = FunctionTemplate::New(isolate, JSWrapperConstructorCallback);
     jsWrapperFuncTemplate->InstanceTemplate()->SetInternalFieldCount(
             static_cast<int>(MetadataNodeKeys::END));

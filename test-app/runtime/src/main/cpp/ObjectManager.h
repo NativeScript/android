@@ -15,9 +15,7 @@
 namespace tns {
 class ObjectManager {
     public:
-        ObjectManager(jobject javaRuntimeObject);
-
-        void Init(v8::Isolate* isolate);
+        ObjectManager(v8::Isolate* isolate, jobject javaRuntimeObject);
 
         JniLocalRef GetJavaObjectByJsObject(const v8::Local<v8::Object>& object);
 
