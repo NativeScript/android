@@ -50,11 +50,8 @@ ObjectManager::ObjectManager(jobject javaRuntimeObject) :
     assert(GET_NAME_METHOD_ID != nullptr);
 }
 
-void ObjectManager::SetInstanceIsolate(Isolate *isolate) {
-    m_isolate = isolate;
-}
-
 void ObjectManager::Init(Isolate *isolate) {
+    m_isolate = isolate;
     auto jsWrapperFuncTemplate = FunctionTemplate::New(isolate, JSWrapperConstructorCallback);
     jsWrapperFuncTemplate->InstanceTemplate()->SetInternalFieldCount(
             static_cast<int>(MetadataNodeKeys::END));

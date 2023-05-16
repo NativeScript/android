@@ -473,8 +473,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     Isolate::Scope isolate_scope(isolate);
     HandleScope handleScope(isolate);
 
-    m_objectManager->SetInstanceIsolate(isolate);
-
     // Sets a structure with v8 String constants on the isolate object at slot 1
     auto consts = new V8StringConstants::PerIsolateV8Constants(isolate);
     isolate->SetData((uint32_t)Runtime::IsolateData::RUNTIME, this);
