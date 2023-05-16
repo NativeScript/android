@@ -94,9 +94,8 @@ int Runtime::GetAndroidVersion() {
 }
 
 Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
-    : m_id(id), m_isolate(nullptr), m_lastUsedMemory(0), m_gcFunc(nullptr), m_runGC(false) {
+    : m_id(id), m_isolate(nullptr), m_objectManager(nullptr), m_lastUsedMemory(0), m_gcFunc(nullptr), m_runGC(false) {
     m_runtime = env->NewGlobalRef(runtime);
-    m_objectManager = new ObjectManager(m_runtime);
     m_loopTimer = new MessageLoopTimer();
     s_id2RuntimeCache.insert(make_pair(id, this));
 
@@ -162,7 +161,8 @@ jobject Runtime::GetJavaRuntime() const {
 }
 
 ObjectManager* Runtime::GetObjectManager() const {
-    return m_objectManager;
+    assert(m_objectManager && "ObjectManager is only available after Runtime is initialized");
+    return m_objectManager.get();
 }
 
 void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog) {
@@ -201,7 +201,6 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir, bool ve
 }
 
 Runtime::~Runtime() {
-    delete this->m_objectManager;
     delete this->m_loopTimer;
     CallbackHandlers::RemoveIsolateEntries(m_isolate);
     if (m_isMainThread) {
@@ -338,7 +337,7 @@ void Runtime::CreateJSInstanceNative(jobject obj, jobject javaObject, jint javaO
 
     auto proxyClassName = m_objectManager->GetClassName(javaObject);
     DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
-    jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager, proxyClassName);
+    jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager.get(), proxyClassName);
 
     if (jsInstance.IsEmpty()) {
         throw NativeScriptException(string("Failed to create JavaScript extend wrapper for class '" + proxyClassName + "'"));
@@ -576,7 +575,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     v8::Context::Scope contextScope{context};
 
-    m_objectManager->Init(isolate);
+    m_objectManager = std::make_unique<ObjectManager>(isolate, m_runtime);
 
     m_module.Init(isolate, callingDir);
 
@@ -624,7 +623,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     ArrayHelper::Init(context);
 
-    m_arrayBufferHelper.CreateConvertFunctions(context, global, m_objectManager);
+    m_arrayBufferHelper.CreateConvertFunctions(context, global, m_objectManager.get());
 
     m_loopTimer->Init(context);
 

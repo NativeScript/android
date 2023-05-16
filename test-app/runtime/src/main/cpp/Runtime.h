@@ -86,7 +86,7 @@ class Runtime {
         jobject m_runtime;
         v8::Isolate* m_isolate;
 
-        ObjectManager* m_objectManager;
+        std::unique_ptr<ObjectManager> m_objectManager;
 
         ModuleInternal m_module;
 
