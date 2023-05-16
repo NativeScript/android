@@ -671,8 +671,11 @@ void CallbackHandlers::RunOnMainThreadCallback(const FunctionCallbackInfo<v8::Va
 
     uint64_t key = ++count_;
     Local<v8::Function> callback = args[0].As<v8::Function>();
-    CacheEntry entry(isolate, callback, context);
-    cache_.emplace(key, std::move(entry));
+
+    bool inserted;
+    std::tie(std::ignore, inserted) = cache_.try_emplace(key, isolate, callback, context);
+    assert(inserted && "Main thread callback ID should not be duplicated");
+
     auto value = Callback(key);
     auto size = sizeof(Callback);
     auto wrote = write(Runtime::GetWriter(),&value , size);
@@ -697,30 +700,18 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
     auto context = it->second.context_.Get(isolate);
     Context::Scope context_scope(context);
     Local<v8::Function> cb = it->second.callback_.Get(isolate);
-    Local<Value> result;
 
     v8::TryCatch tc(isolate);
 
-    if (!cb->Call(context, context->Global(), 0, nullptr).ToLocal(&result)) {}
+    cb->Call(context, context->Global(), 0, nullptr);  // ignore JS return value
+
+    cache_.erase(it);
 
     if(tc.HasCaught()){
         throw NativeScriptException(tc);
     }
 
-    RemoveKey(key);
-
     return 1;
-}
-
-void CallbackHandlers::RemoveKey(const uint64_t key) {
-    auto it = cache_.find(key);
-    if (it == cache_.end()) {
-        return;
-    }
-
-    it->second.callback_.Reset();
-    it->second.context_.Reset();
-    cache_.erase(it);
 }
 
 void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
@@ -834,10 +825,10 @@ void CallbackHandlers::EnableVerboseLoggingMethodCallback(
         const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
         auto isolate = args.GetIsolate();
-        auto runtume = Runtime::GetRuntime(isolate);
+        auto runtime = Runtime::GetRuntime(isolate);
         tns::LogEnabled = true;
         JEnv env;
-        env.CallVoidMethod(runtume->GetJavaRuntime(), ENABLE_VERBOSE_LOGGING_METHOD_ID);
+        env.CallVoidMethod(runtime->GetJavaRuntime(), ENABLE_VERBOSE_LOGGING_METHOD_ID);
     } catch (NativeScriptException &e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -855,10 +846,10 @@ void CallbackHandlers::DisableVerboseLoggingMethodCallback(
         const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
         auto isolate = args.GetIsolate();
-        auto runtume = Runtime::GetRuntime(isolate);
+        auto runtime = Runtime::GetRuntime(isolate);
         tns::LogEnabled = false;
         JEnv env;
-        env.CallVoidMethod(runtume->GetJavaRuntime(), DISABLE_VERBOSE_LOGGING_METHOD_ID);
+        env.CallVoidMethod(runtime->GetJavaRuntime(), DISABLE_VERBOSE_LOGGING_METHOD_ID);
     } catch (NativeScriptException &e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -1589,16 +1580,12 @@ void CallbackHandlers::TerminateWorkerThread(Isolate *isolate) {
 void CallbackHandlers::RemoveIsolateEntries(v8::Isolate *isolate) {
     for (auto &item: cache_) {
         if (item.second.isolate_ == isolate) {
-            item.second.callback_.Reset();
-            item.second.context_.Reset();
             cache_.erase(item.first);
         }
     }
 
     for (auto &item: frameCallbackCache_) {
         if (item.second.isolate_ == isolate) {
-            item.second.callback_.Reset();
-            item.second.context_.Reset();
             frameCallbackCache_.erase(item.first);
         }
     }
@@ -1653,12 +1640,10 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
 
         if (success && pId->IsNumber()){
             auto id = pId->IntegerValue(context).FromMaybe(0);
-            if(frameCallbackCache_.contains(id)){
-                auto cb = frameCallbackCache_.find(id);
-                if(cb != frameCallbackCache_.end()){
-                    cb->second.removed = false;
-                    PostCallback(args, &cb->second, context);
-                }
+            auto cb = frameCallbackCache_.find(id);
+            if (cb != frameCallbackCache_.end()) {
+                cb->second.removed = false;
+                PostCallback(args, &cb->second, context);
                 return;
             }
         }
@@ -1668,26 +1653,10 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
 
         V8SetPrivateValue(isolate, func, idKey, v8::Number::New(isolate, (double) key));
 
-        FrameCallbackCacheEntry entry (isolate, callback, context);
-        entry.id = key;
-
-        auto finalCallback = [](const v8::WeakCallbackInfo<FrameCallbackCacheEntry> &data) {
-            auto value = data.GetParameter();
-            for (auto &item: frameCallbackCache_) {
-                if (item.second.id == value->id) {
-                    item.second.context_.Reset();
-                    item.second.callback_.Reset();
-                    frameCallbackCache_.erase(item.first);
-                    break;
-                }
-            }
-        };
-
-        entry.callback_.SetWeak(&entry, finalCallback, v8::WeakCallbackType::kFinalizer);
-
-        frameCallbackCache_.emplace(key, std::move(entry));
-
-        auto val = frameCallbackCache_.find(key);
+        robin_hood::unordered_map<uint64_t, FrameCallbackCacheEntry>::iterator val;
+        bool inserted;
+        std::tie(val, inserted) = frameCallbackCache_.try_emplace(key, isolate, callback, context, key);
+        assert(inserted && "Frame callback ID should not be duplicated");
 
         PostCallback(args, &val->second, context);
     }
@@ -1715,8 +1684,8 @@ void CallbackHandlers::RemoveFrameCallback(const FunctionCallbackInfo<v8::Value>
 
         if (success && pId->IsNumber()){
             auto id = pId->IntegerValue(context).FromMaybe(0);
-            if(frameCallbackCache_.contains(id)){
-                auto cb = frameCallbackCache_.find(id);
+            auto cb = frameCallbackCache_.find(id);
+            if (cb != frameCallbackCache_.end()) {
                 cb->second.removed = true;
             }
         }

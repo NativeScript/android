@@ -18,8 +18,6 @@ void Profiler::Init(Isolate* isolate, const Local<Object>& globalObj, const stri
     globalObj->Set(context, ArgConverter::ConvertToV8String(isolate, "__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback, extData)->GetFunction(context).ToLocalChecked());
     globalObj->Set(context, ArgConverter::ConvertToV8String(isolate, "__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback, extData)->GetFunction(context).ToLocalChecked());
     globalObj->Set(context, ArgConverter::ConvertToV8String(isolate, "__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback, extData)->GetFunction(context).ToLocalChecked());
-    globalObj->Set(context, ArgConverter::ConvertToV8String(isolate, "__startNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StartNDKProfilerCallback, extData)->GetFunction(context).ToLocalChecked());
-    globalObj->Set(context, ArgConverter::ConvertToV8String(isolate, "__stopNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StopNDKProfilerCallback, extData)->GetFunction(context).ToLocalChecked());
 }
 
 void Profiler::StartCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -193,56 +191,6 @@ bool Profiler::Write(CpuProfile* cpuProfile) {
     fclose(fp);
 
     return true;
-}
-
-void Profiler::StartNDKProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
-    try {
-        auto isolate = args.GetIsolate();
-        auto extData = args.Data().As<External>();
-        auto thiz = static_cast<Profiler*>(extData->Value());
-        thiz->StartNDKProfiler();
-    } catch (NativeScriptException& e) {
-        e.ReThrowToV8();
-    } catch (std::exception e) {
-        stringstream ss;
-        ss << "Error: c++ exception: " << e.what() << endl;
-        NativeScriptException nsEx(ss.str());
-        nsEx.ReThrowToV8();
-    } catch (...) {
-        NativeScriptException nsEx(std::string("Error: c++ exception!"));
-        nsEx.ReThrowToV8();
-    }
-}
-
-void Profiler::StopNDKProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
-    try {
-        auto isolate = args.GetIsolate();
-        auto extData = args.Data().As<External>();
-        auto thiz = static_cast<Profiler*>(extData->Value());
-        thiz->StopNDKProfiler();
-    } catch (NativeScriptException& e) {
-        e.ReThrowToV8();
-    } catch (std::exception e) {
-        stringstream ss;
-        ss << "Error: c++ exception: " << e.what() << endl;
-        NativeScriptException nsEx(ss.str());
-        nsEx.ReThrowToV8();
-    } catch (...) {
-        NativeScriptException nsEx(std::string("Error: c++ exception!"));
-        nsEx.ReThrowToV8();
-    }
-}
-
-void Profiler::StartNDKProfiler() {
-#ifdef NDK_PROFILER_ENABLED
-    monstartup("libNativeScript.so");
-#endif
-}
-
-void Profiler::StopNDKProfiler() {
-#ifdef NDK_PROFILER_ENABLED
-    moncleanup();
-#endif
 }
 
 class FileOutputStream: public OutputStream {
