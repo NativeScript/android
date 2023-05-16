@@ -4,15 +4,14 @@ import java.nio.file.StandardCopyOption
 apply plugin: 'application'
 apply plugin: 'java-library'
 
-// todo: check if still needed
-// if(!project.hasProperty("loadedProjectDeps")){
-//     Properties projectDeps = new Properties()
-//     projectDeps.load(new FileInputStream("$project.rootDir/gradle.properties"))
-//     projectDeps.each { prop ->
-//         project.ext.set(prop.key, prop.value)
-//     }
-//     project.ext.loadedProjectDeps = true
-// }
+if (!project.hasProperty("loadedProjectDeps")) {
+    Properties projectDeps = new Properties()
+    projectDeps.load(new FileInputStream("$project.rootDir/../../gradle.properties"))
+    projectDeps.each { prop ->
+        project.ext.set(prop.key, prop.value)
+    }
+    project.ext.loadedProjectDeps = true
+}
 
 defaultTasks 'runSbg'
 

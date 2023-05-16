@@ -5,6 +5,7 @@ import com.google.googlejavaformat.java.FormatterException;
 
 import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.classfile.Method;
+import org.nativescript.staticbindinggenerator.SystemClass;
 import org.nativescript.staticbindinggenerator.files.FileSystemHelper;
 import org.nativescript.staticbindinggenerator.files.impl.ClassesCollection;
 import org.nativescript.staticbindinggenerator.files.impl.FileSystemHelperImpl;
@@ -548,6 +549,10 @@ public class Generator {
         JavaClass clazz = classes.get(BcelNamingUtil.resolveClassName(className));
 
         if (clazz == null) {
+            if (className.startsWith("java.")) {
+                return SystemClass.get(className);
+            }
+
             throw new RuntimeException("Class not found " + className);
         }
 

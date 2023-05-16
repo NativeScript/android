@@ -44,7 +44,7 @@ describe("parser/js_parser tests", function () {
             execGradle(input, generatedJavaClassesRoot, function (error, stdout, stderr) {
                 if (error) {
                     console.error(`exec error: ${error}`);
-                    return;
+                    return done.fail(error);
                 }
 
                 logExecResult(stdout, stderr);
@@ -92,7 +92,7 @@ describe("parser/js_parser tests", function () {
             execGradle(input, generatedJavaClassesRoot, function (error, stdout, stderr) {
                 if (error) {
                     console.error(`exec error: ${error}`);
-                    return;
+                    return done.fail(error);
                 }
 
                 logExecResult(stdout, stderr);
@@ -128,7 +128,7 @@ describe("parser/js_parser tests", function () {
             execGradle(input, generatedJavaClassesRoot, function (error, stdout, stderr) {
                 if (error) {
                     console.error(`exec error: ${error}`);
-                    return;
+                    return done.fail(error);
                 }
 
                 logExecResult(stdout, stderr)
@@ -152,7 +152,7 @@ describe("parser/js_parser tests", function () {
             execGradle(input, generatedJavaClassesRoot, function (error, stdout, stderr) {
                 if (error) {
                     console.error(`exec error: ${error}`);
-                    return;
+                    return done.fail(error);
                 }
 
                 logExecResult(stdout, stderr)
@@ -176,7 +176,7 @@ describe("parser/js_parser tests", function () {
             execGradle(input, generatedJavaClassesRoot, function (error, stdout, stderr) {
                 if (error) {
                     console.error(`exec error: ${error}`);
-                    return;
+                    return done.fail(error);
                 }
 
                 logExecResult(stdout, stderr)
@@ -220,7 +220,7 @@ describe("parser/js_parser tests", function () {
             execGradle(input, generatedJavaClassesRoot, function (error, stdout, stderr) {
                 if (error) {
                     console.error(`exec error: ${error}`);
-                    return;
+                    return done.fail(error);
                 }
 
                 logExecResult(stdout, stderr)
@@ -256,7 +256,7 @@ describe("parser/js_parser tests", function () {
             execGradle(input, generatedJavaClassesRoot, function (error, stdout, stderr) {
                 if (error) {
                     console.error(`exec error: ${error}`);
-                    return;
+                    return done.fail(error);
                 }
 
                 logExecResult(stdout, stderr)
@@ -288,7 +288,7 @@ describe("parser/js_parser tests", function () {
             execGradle(input, generatedJavaClassesRoot, function (error, stdout, stderr) {
                 if (error) {
                     console.error(`exec error: ${error}`);
-                    return;
+                    return done.fail(error);
                 }
                 logExecResult(stdout, stderr)
 
