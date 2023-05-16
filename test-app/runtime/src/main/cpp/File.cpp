@@ -14,10 +14,7 @@
 using namespace std;
 
 namespace tns {
-bool File::Exists(const string& path) {
-    std::ifstream infile(path.c_str());
-    return infile.good();
-}
+
 string File::ReadText(const string& filePath) {
     int len;
     bool isNew;
@@ -34,9 +31,6 @@ string File::ReadText(const string& filePath) {
 
 void* File::ReadBinary(const string& filePath, int& length) {
     length = 0;
-    if (!File::Exists(filePath)) {
-        return nullptr;
-    }
 
     auto file = fopen(filePath.c_str(), READ_BINARY);
     if (!file) {
@@ -87,34 +81,6 @@ const char* File::ReadText(const string& filePath, int& charLength, bool& isNew)
     fclose(file);
 
     return Buffer;
-}
-
-MemoryMappedFile MemoryMappedFile::Open(const char* filePath) {
-    void* memory = nullptr;
-    int length = 0;
-    if (FILE* file = fopen(filePath, "r+")) {
-        if (fseek(file, 0, SEEK_END) == 0) {
-            length = ftell(file);
-            if (length >= 0) {
-                memory = mmap(NULL, length, PROT_READ, MAP_SHARED, fileno(file), 0);
-                if (memory == MAP_FAILED) {
-                    memory = nullptr;
-                }
-            }
-        }
-        fclose(file);
-    }
-    return MemoryMappedFile(memory, length);
-}
-
-MemoryMappedFile::MemoryMappedFile(void* memory, size_t size)
-    :
-    memory(memory), size(size) {
-}
-
-MemoryMappedFile::~MemoryMappedFile() {
-    int result = munmap(this->memory, this->size);
-    assert(result == 0);
 }
 
 char* File::Buffer = new char[BUFFER_SIZE];

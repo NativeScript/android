@@ -9,8 +9,6 @@ class AppConfig {
     protected enum KnownKeys {
         V8FlagsKey("v8Flags", "--expose_gc"),
         CodeCacheKey("codeCache", false),
-        HeapSnapshotScriptKey("heapSnapshotScript", ""),
-        SnapshotFile("snapshot.blob", ""),
         ProfilerOutputDirKey("profilerOutputDir", ""),
         GcThrottleTime("gcThrottleTime", 0),
         MemoryCheckInterval("memoryCheckInterval", 0),
@@ -41,7 +39,6 @@ class AppConfig {
     }
 
     private final static String AndroidKey = "android";
-    private final static String HeapSnapshotBlobKey = "heapSnapshotBlob";
 
     private final Object[] values;
 
@@ -70,22 +67,6 @@ class AppConfig {
                     }
                     if (androidObject.has(KnownKeys.CodeCacheKey.getName())) {
                         values[KnownKeys.CodeCacheKey.ordinal()] = androidObject.getBoolean(KnownKeys.CodeCacheKey.getName());
-                    }
-                    if (androidObject.has(KnownKeys.HeapSnapshotScriptKey.getName())) {
-                        String value = androidObject.getString(KnownKeys.HeapSnapshotScriptKey.getName());
-                        values[KnownKeys.HeapSnapshotScriptKey.ordinal()] = FileSystem.resolveRelativePath(appDir.getPath(), value, appDir + "/app/");
-                    }
-                    if (androidObject.has(HeapSnapshotBlobKey)) {
-                        String value = androidObject.getString(HeapSnapshotBlobKey);
-                        String path = FileSystem.resolveRelativePath(appDir.getPath(), value, appDir + "/app/");
-                        File dir = new File(path);
-                        if (dir.exists() && dir.isDirectory()) {
-                            // this path is expected to be a directory, containing three sub-directories: armeabi-v7a, x86 and arm64-v8a
-                            @SuppressWarnings("deprecation")
-                            String cpu_abi = Build.CPU_ABI;
-                            path = path + "/" + cpu_abi + "/" + KnownKeys.SnapshotFile.getName();
-                            values[KnownKeys.SnapshotFile.ordinal()] = path;
-                        }
                     }
                     if (androidObject.has(KnownKeys.ProfilerOutputDirKey.getName())) {
                         values[KnownKeys.ProfilerOutputDirKey.ordinal()] = androidObject.getString(KnownKeys.ProfilerOutputDirKey.getName());

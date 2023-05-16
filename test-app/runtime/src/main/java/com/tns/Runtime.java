@@ -60,8 +60,6 @@ public class Runtime {
 
     private native void passExceptionToJsNative(int runtimeId, Throwable ex, String message, String fullStackTrace, String jsStackTrace, boolean isDiscarded);
 
-    private native void clearStartupData(int runtimeId);
-
     private static native int getCurrentRuntimeId();
 
     public static native int getPointerSize();
@@ -641,8 +639,6 @@ public class Runtime {
 
             initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName, appConfig.getAsArray(),
                     callingJsDir, appConfig.getMaxLogcatObjectSize(), forceConsoleLog);
-
-            //clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
 
             if (logger.isEnabled()) {
                 Date d = new Date();
@@ -1562,9 +1558,5 @@ public class Runtime {
 
         // TODO: Pete: Should we treat the message with higher priority?
         currentRuntime.mainThreadHandler.sendMessage(msg);
-    }
-
-    public void clearStartupData() {
-        clearStartupData(getRuntimeId());
     }
 }
