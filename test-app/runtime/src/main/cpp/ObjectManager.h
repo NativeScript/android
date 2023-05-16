@@ -43,8 +43,6 @@ class ObjectManager {
 
         jint GenerateNewObjectID();
 
-        void SetInstanceIsolate(v8::Isolate* isolate);
-
         v8::Local<v8::Object> GetEmptyObject(v8::Isolate* isolate);
 
         enum class MetadataNodeKeys {
