@@ -1,6 +1,7 @@
 #include "JsV8InspectorClient.h"
 #include <assert.h>
-#include <include/libplatform/libplatform.h>
+
+#include <cppgc/default-platform.h>
 #include <src/inspector/v8-console-message.h>
 #include <src/inspector/v8-inspector-impl.h>
 #include <src/inspector/v8-inspector-session-impl.h>
@@ -134,7 +135,7 @@ void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id) {
             doDispatchMessage(inspectorMessage);
         }
 
-        while (v8::platform::PumpMessageLoop(Runtime::platform, isolate_)) {
+        while (v8::platform::PumpMessageLoop(Runtime::platform->GetV8Platform(), isolate_)) {
         }
     }
     terminated_ = false;

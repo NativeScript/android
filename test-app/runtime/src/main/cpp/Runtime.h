@@ -1,6 +1,8 @@
 #ifndef RUNTIME_H_
 #define RUNTIME_H_
 
+#include <memory>
+
 #include "v8.h"
 #include "JniLocalRef.h"
 #include "ObjectManager.h"
@@ -15,6 +17,10 @@
 #include <mutex>
 #include <android/looper.h>
 #include <fcntl.h>
+
+namespace cppgc {
+class DefaultPlatform;
+}
 
 namespace tns {
 class Runtime {
@@ -69,7 +75,7 @@ class Runtime {
 
         v8::Local<v8::Context> GetContext();
 
-        static v8::Platform* platform;
+        static std::shared_ptr<cppgc::DefaultPlatform> platform;
 
         std::string ReadFileText(const std::string& filePath);
 

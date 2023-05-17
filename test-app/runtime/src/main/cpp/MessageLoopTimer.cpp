@@ -3,7 +3,9 @@
 #include <unistd.h>
 #include <cerrno>
 #include <thread>
-#include "include/libplatform/libplatform.h"
+
+#include <cppgc/default-platform.h>
+
 #include "NativeScriptAssert.h"
 #include "ArgConverter.h"
 #include "Runtime.h"
@@ -128,7 +130,7 @@ int MessageLoopTimer::PumpMessageLoopCallback(int fd, int events, void* data) {
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
 
-    while (v8::platform::PumpMessageLoop(Runtime::platform, isolate)) {
+    while (v8::platform::PumpMessageLoop(Runtime::platform->GetV8Platform(), isolate)) {
         isolate->PerformMicrotaskCheckpoint();
     }
 
