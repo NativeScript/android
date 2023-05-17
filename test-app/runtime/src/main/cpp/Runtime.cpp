@@ -28,7 +28,12 @@
 #include "ManualInstrumentation.h"
 #include "IsolateDisposer.h"
 #include <unistd.h>
+
+#include <memory>
 #include <thread>
+
+#include <cppgc/default-platform.h>
+
 #include "File.h"
 
 #ifdef APPLICATION_IN_DEBUG
@@ -446,8 +451,8 @@ void Runtime::PassUncaughtExceptionFromWorkerToMainHandler(Local<v8::String> mes
 }
 
 static void InitializeV8() {
-    Runtime::platform = v8::platform::NewDefaultPlatform().release();
-    V8::InitializePlatform(Runtime::platform);
+    Runtime::platform = std::make_shared<cppgc::DefaultPlatform>();
+    V8::InitializePlatform(Runtime::platform->GetV8Platform());
     V8::Initialize();
 }
 
@@ -682,7 +687,7 @@ jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
 unordered_map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 bool Runtime::s_mainThreadInitialized = false;
-v8::Platform* Runtime::platform = nullptr;
+std::shared_ptr<cppgc::DefaultPlatform> Runtime::platform;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 ALooper* Runtime::m_mainLooper = nullptr;
 int Runtime::m_mainLooper_fd[2];
