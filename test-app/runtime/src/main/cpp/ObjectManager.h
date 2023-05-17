@@ -33,8 +33,6 @@ class ObjectManager {
 
         bool CloneLink(const v8::Local<v8::Object>& src, const v8::Local<v8::Object>& dest);
 
-        bool IsJsRuntimeObject(const v8::Local<v8::Object>& object);
-
         std::string GetClassName(jobject javaObject);
 
         std::string GetClassName(jclass clazz);
@@ -87,6 +85,8 @@ class ObjectManager {
         static void DeleteWeakGlobalRefCallback(const jweak& object, void* state);
 
         static void JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+
+        static bool IsJsRuntimeObject(const v8::Local<v8::Object>& object);
 
         jobject m_javaRuntimeObject;
 
