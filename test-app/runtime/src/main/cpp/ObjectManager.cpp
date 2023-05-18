@@ -50,12 +50,9 @@ ObjectManager::ObjectManager(v8::Isolate* isolate, jobject javaRuntimeObject) :
     GET_NAME_METHOD_ID = env.GetMethodID(javaLangClass, "getName", "()Ljava/lang/String;");
     assert(GET_NAME_METHOD_ID != nullptr);
 
-    auto jsWrapperFuncTemplate = FunctionTemplate::New(isolate, JSWrapperConstructorCallback);
-    jsWrapperFuncTemplate->InstanceTemplate()->SetInternalFieldCount(
-            static_cast<int>(MetadataNodeKeys::END));
-    auto context = isolate->GetCurrentContext();
-    auto jsWrapperFunc = jsWrapperFuncTemplate->GetFunction(context).ToLocalChecked();
-    m_poJsWrapperFunc = new Persistent<Function>(isolate, jsWrapperFunc);
+    Local<ObjectTemplate> tmpl = ObjectTemplate::New(m_isolate);
+    tmpl->SetInternalFieldCount(static_cast<int>(MetadataNodeKeys::END));
+    m_wrapperObjectTemplate.Reset(m_isolate, tmpl);
 }
 
 
@@ -307,16 +304,8 @@ void ObjectManager::DeleteWeakGlobalRefCallback(const jweak &object, [[maybe_unu
 }
 
 Local<Object> ObjectManager::GetEmptyObject(Isolate *isolate) {
-    auto emptyObjCtorFunc = Local<Function>::New(isolate, *m_poJsWrapperFunc);
     auto context = Runtime::GetRuntime(isolate)->GetContext();
-    auto val = emptyObjCtorFunc->CallAsConstructor(context, 0, nullptr);
-    if (val.IsEmpty()) {
-        return Local<Object>();
-    }
-    auto localVal = val.ToLocalChecked();
-    assert(localVal->IsObject());
-    auto obj = localVal.As<Object>();
-    return obj;
+    return m_wrapperObjectTemplate.Get(isolate)->NewInstance(context).ToLocalChecked();
 }
 
 void ObjectManager::JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<v8::Value> &info) {
