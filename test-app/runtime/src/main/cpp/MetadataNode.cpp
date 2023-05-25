@@ -1053,7 +1053,6 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     // insert isolate-specific persistent function handle
     node->m_poCtorCachePerIsolate.insert({isolate, new Persistent<Function>(isolate, wrappedCtorFunc)});
     if (!baseCtorFunc.IsEmpty()) {
-        auto context = isolate->GetCurrentContext();
         wrappedCtorFunc->SetPrototype(context, baseCtorFunc);
     }
 
