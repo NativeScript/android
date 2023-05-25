@@ -293,7 +293,7 @@ extern "C" JNIEXPORT jint Java_com_tns_Runtime_getPointerSize(JNIEnv* env, jobje
 }
 
 extern "C" JNIEXPORT jint Java_com_tns_Runtime_getCurrentRuntimeId(JNIEnv* _env, jobject obj) {
-    Isolate* isolate = Isolate::GetCurrent();
+    Isolate* isolate = Isolate::TryGetCurrent();
     if (isolate == nullptr) {
         return -1;
     }
