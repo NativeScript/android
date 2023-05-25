@@ -588,7 +588,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     auto global = context->Global();
 
-    context->Enter();
+    v8::Context::Scope contextScope{context};
 
     m_objectManager->Init(isolate);
 
