@@ -570,40 +570,25 @@ CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &imple
     vector<jstring> interfacesToImplement;
     auto isolate = implementationObject->GetIsolate();
     auto context = implementationObject->CreationContext();
-    auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
-    for (int i = 0; i < propNames->Length(); i++) {
-        auto name = propNames->Get(context, i).ToLocalChecked().As<String>();
-        auto prop = implementationObject->Get(context, name).ToLocalChecked();
+    Local<String> interfacesName = String::NewFromUtf8Literal(isolate, "interfaces");
+    Local<Value> prop;
+    if (implementationObject->Get(context, interfacesName).ToLocal(&prop) && !prop.IsEmpty() && prop->IsArray()) {
+        auto interfacesArr = prop->ToObject(context).ToLocalChecked();
 
-        bool arrFound = !prop.IsEmpty() && prop->IsArray();
+        Local<String> lengthName = String::NewFromUtf8Literal(isolate, "length");
+        unsigned length = interfacesArr->Get(context,lengthName).ToLocalChecked()
+            ->Uint32Value(context).ToChecked();
 
-        if (arrFound) {
-            v8::String::Utf8Value propName(isolate, name);
-            std::string arrNameC = std::string(*propName);
-            if (arrNameC == "interfaces") {
-                auto interfacesArr = prop->ToObject(context).ToLocalChecked();
+        for (int j = 0; j < length; j++) {
+            auto element = interfacesArr->Get(context, j).ToLocalChecked();
 
-                int length = interfacesArr->Get(
-                        context,
-                        v8::String::NewFromUtf8(isolate,
-                                                "length").ToLocalChecked()).ToLocalChecked()->ToObject(
-                        context).ToLocalChecked()->Uint32Value(
-                        context).ToChecked();
+            if (element->IsFunction()) {
+                auto node = MetadataNode::GetTypeMetadataName(isolate, element);
 
-                if (length > 0) {
-                    for (int j = 0; j < length; j++) {
-                        auto element = interfacesArr->Get(context, j).ToLocalChecked();
+                node = Util::ReplaceAll(node, std::string("/"), std::string("."));
 
-                        if (element->IsFunction()) {
-                            auto node = MetadataNode::GetTypeMetadataName(isolate, element);
-
-                            node = Util::ReplaceAll(node, std::string("/"), std::string("."));
-
-                            jstring value = env.NewStringUTF(node.c_str());
-                            interfacesToImplement.push_back(value);
-                        }
-                    }
-                }
+                jstring value = env.NewStringUTF(node.c_str());
+                interfacesToImplement.push_back(value);
             }
         }
     }
