@@ -634,6 +634,10 @@ CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object> &implementat
     auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(context, i).ToLocalChecked().As<String>();
+        if (name->StringEquals(V8StringConstants::GetSuper(isolate))) {
+            continue;
+        }
+        
         auto method = implementationObject->Get(context, name).ToLocalChecked();
 
         bool methodFound = !method.IsEmpty() && method->IsFunction();
