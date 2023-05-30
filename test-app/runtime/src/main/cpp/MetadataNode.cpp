@@ -671,9 +671,9 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
 
 MetadataNode::MethodCallbackData *MetadataNode::tryGetExtensionMethodCallbackData(
         std::unordered_map<std::string, MethodCallbackData *> collectedMethodCallbackDatas,
-        std::string lookupName) {
+        const std::string& lookupName) {
 
-    if (collectedMethodCallbackDatas.size() < 1) {
+    if (collectedMethodCallbackDatas.empty()) {
         return nullptr;
     }
 

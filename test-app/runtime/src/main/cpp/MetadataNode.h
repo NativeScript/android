@@ -97,7 +97,7 @@ class MetadataNode {
                 MetadataTreeNode* treeNode);
         static MethodCallbackData* tryGetExtensionMethodCallbackData(
                 std::unordered_map<std::string, MethodCallbackData*> collectedMethodCallbackDatas,
-                std::string lookupName);
+                const std::string& lookupName);
         void SetInstanceFieldsFromStaticMetadata(
                 v8::Isolate* isolate, PrototypeTemplateFiller& protoFiller,
                 MetadataTreeNode* treeNode);
