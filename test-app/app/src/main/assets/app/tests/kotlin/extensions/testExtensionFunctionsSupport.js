@@ -116,4 +116,27 @@ describe("Tests Kotlin extension functions support", function () {
         expect(hasException).toBe(false);
     });
 
+    describe("Kotlin extension functions that shadow Java functions", function () {
+        let handler;
+        beforeEach(function () {
+           handler = new android.os.Handler(android.os.Looper.getMainLooper());
+        });
+
+        it("should call the Java function", function (done) {
+            const run = jasmine.createSpy("java.lang.Runnable.run").and.callFake(function () {
+                done();
+            });
+            const javaRunnable = new java.lang.Runnable({run});
+            handler.postAtTime(javaRunnable, 1);
+        })
+
+        it("should call the Kotlin function", function (done) {
+            const invoke = jasmine.createSpy("kotlin.jvm.functions.Function0.invoke").and.callFake(function () {
+                done();
+            });
+            const cancelToken = new java.lang.Object();
+            const kotlinFunc = new kotlin.jvm.functions.Function0({invoke});
+            handler.postAtTime(1, cancelToken, kotlinFunc);
+        })
+    });
 });
