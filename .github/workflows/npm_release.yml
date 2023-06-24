@@ -65,13 +65,15 @@ jobs:
           NPM_TAG=$(node ./scripts/get-npm-tag.js)
           echo NPM_VERSION=$NPM_VERSION >> $GITHUB_OUTPUT
           echo NPM_TAG=$NPM_TAG >> $GITHUB_OUTPUT
-      - name: Create Emulator
-        run: |
-          echo no | android create avd --force -n $EMULATOR_NAME-$EMULATOR_API_LEVEL -t android-$EMULATOR_API_LEVEL --abi $ANDROID_ABI -c 12M
-          emulator -avd $EMULATOR_NAME-$EMULATOR_API_LEVEL -no-skin -no-audio -no-window &
-          android-wait-for-emulator
-          ./gradlew runSbgTests --stacktrace && ./gradlew runtestsAndVerifyResults -PnoCCache --stacktrace
-          adb -e logcat -d
+      - name: SBG tests
+        run: /gradlew runSbgTests --stacktrace
+      - name: Run unit tests
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: $ANDROID_API
+          target: google_apis
+          arch: x86_64
+          script: ./gradlew runtestsAndVerifyResults -PnoCCache --stacktrace
       # - name: Upload npm package artifact
       #   uses: actions/upload-artifact@v3
       #   with:
