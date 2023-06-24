@@ -71,6 +71,7 @@ jobs:
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
           api-level: ${{env.ANDROID_API}}
+          target: google_apis
           script: ./gradlew runtestsAndVerifyResults -PnoCCache --stacktrace
       # - name: Upload npm package artifact
       #   uses: actions/upload-artifact@v3
