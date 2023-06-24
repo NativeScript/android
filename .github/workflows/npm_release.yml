@@ -1,0 +1,189 @@
+on:
+  push:
+    branches:
+      - "wip/ci-test"
+    # tags:
+    #   - "v*"
+
+env:
+  NPM_TAG: "next"
+  EMULATOR_NAME: "runtime-emu"
+  NDK_VERSION: r21b
+  ANDROID_API: 29
+  ANDROID_ABI: armeabi-v7a
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    outputs:
+      npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
+      npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: true
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          registry-url: "https://registry.npmjs.org"
+      - uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+      - name: Setup NDK
+        run:
+          echo "y" | sdkmanager "cmake;3.6.4111459"
+          wget https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux-x86_64.zip
+          chmod +x android-ndk-$NDK_VERSION-linux-x86_64.zip
+          unzip -q android-ndk-$NDK_VERSION-linux-x86_64.zip
+          rm -rf android-ndk-$NDK_VERSION-linux-x86_64.zip
+          export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
+          echo ANDROID_NDK_HOME=${ANDROID_NDK_HOME} >> $GITHUB_ENV
+          echo ${ANDROID_NDK_HOME} >> $GITHUB_PATH
+      - name: Install Dependencies
+        run: |
+          npm install
+          npm install --prefix ./test-app/tools
+      - name: Get Current Version
+        run: |
+          NPM_VERSION=$(node -e "console.log(require('./package.json').version);")
+          echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
+      - name: Bump version for dev release
+        if: ${{ !contains(github.ref, 'refs/tags/') }}
+        run: |
+          NPM_VERSION=$(node ./scripts/get-next-version.js)
+          echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
+          npm version $NPM_VERSION --no-git-tag-version
+      - name: Output NPM Version and tag
+        id: npm_version_output
+        run: |
+          NPM_TAG=$(node ./scripts/get-npm-tag.js)
+          echo NPM_VERSION=$NPM_VERSION >> $GITHUB_OUTPUT
+          echo NPM_TAG=$NPM_TAG >> $GITHUB_OUTPUT
+      - name: Create Emulator
+        run: |
+          echo no | android create avd --force -n $EMULATOR_NAME-$EMULATOR_API_LEVEL -t android-$EMULATOR_API_LEVEL --abi $ANDROID_ABI -c 12M
+          emulator -avd $EMULATOR_NAME-$EMULATOR_API_LEVEL -no-skin -no-audio -no-window &
+          android-wait-for-emulator
+          ./gradlew runSbgTests --stacktrace && ./gradlew runtestsAndVerifyResults -PnoCCache --stacktrace
+          adb -e logcat -d
+      # - name: Upload npm package artifact
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: npm-package
+      #     path: dist/nativescript-ios-${{env.NPM_VERSION}}.tgz
+      # - name: Upload dSYMs artifact
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: NativeScript-dSYMs
+      #     path: dist/dSYMs
+  # test:
+  #   name: Test
+  #   runs-on: macos-12
+  #   needs: build
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - name: LLVM cache
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: ./llvm
+  #         key: ${{ hashFiles('download_llvm.sh') }}
+  #     - uses: actions/setup-node@v3
+  #       with:
+  #         node-version: 18
+  #     - name: Install Python
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: "3"
+  #     - name: Install Dependencies
+  #       run: |
+  #         npm install
+  #         python3 -m pip install --upgrade pip six
+  #         brew install cmake
+  #         [ ! -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
+  #         brew install chargepoint/xcparse/xcparse
+  #         npm install -g @edusperoni/junit-cli-report-viewer verify-junit-xml
+  #     - name: Prepare
+  #       run: npm run setup-ci
+  #     - name: Xcode Tests
+  #       uses: nick-fields/retry@v2
+  #       # try to run the tests with xcpretty. If it fails then try again without xcpretty twice for better log output
+  #       # the xcode tests are a bit flaky and they should never fail on this step, as this step only collects the JS test results as junit xml
+  #       with:
+  #         timeout_minutes: 20
+  #         max_attempts: 3
+  #         command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $HOME/test_results -destination platform\=iOS\ Simulator,OS\=16.2,name\=iPhone\ 14\ Pro\ Max build test | xcpretty
+  #         on_retry_command: rm -rf $HOME/test_results*
+  #         new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $HOME/test_results -destination platform\=iOS\ Simulator,OS\=16.2,name\=iPhone\ 14\ Pro\ Max build test
+  #     - name: Validate Test Results
+  #       run: |
+  #         xcparse attachments $HOME/test_results.xcresult $HOME/test-out
+  #         find $HOME/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
+  #         find $HOME/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
+  # publish:
+  #   runs-on: ubuntu-latest
+  #   needs:
+  #     - build
+  #     - test
+  #   permissions:
+  #    contents: read
+  #    id-token: write
+  #   env:
+  #     NPM_VERSION: ${{needs.build.outputs.npm_version}}
+  #     NPM_TAG: ${{needs.build.outputs.npm_tag}}
+  #   steps:
+  #     - uses: actions/setup-node@v3
+  #       with:
+  #         node-version: 18
+  #         registry-url: 'https://registry.npmjs.org'
+  #     - uses: actions/download-artifact@v3
+  #       with:
+  #         name: npm-package
+  #         path: dist
+  #     - name: Publish package
+  #       run: |
+  #         echo "Publishing @nativescript/ios@$NPM_VERSION to NPM with tag $NPM_TAG..."
+  #         npm publish ./dist/nativescript-ios-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --provenance
+  #       env:
+  #         NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+  # github-release:
+  #   runs-on: ubuntu-latest
+  #   # only runs on tagged commits
+  #   if: ${{ contains(github.ref, 'refs/tags/') }}
+  #   permissions:
+  #     contents: write
+  #   needs:
+  #     - build
+  #     - test
+  #   env:
+  #     NPM_VERSION: ${{needs.build.outputs.npm_version}}
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         fetch-depth: 0
+  #     - uses: actions/setup-node@v3
+  #       with:
+  #         node-version: 18
+  #     - name: Setup
+  #       run: npm install
+  #     - uses: actions/download-artifact@v3
+  #       with:
+  #         name: npm-package
+  #         path: dist
+  #     - uses: actions/download-artifact@v3
+  #       with:
+  #         name: NativeScript-dSYMs
+  #         path: dist
+  #     - name: Zip dSYMs
+  #       working-directory: dist/dSYMs
+  #       run: find . -maxdepth 1 -name '*.dSYM' -print | xargs -I@ zip -r @.zip @
+  #     - name: Partial Changelog
+  #       run: npx conventional-changelog -p angular -r2 > body.md
+  #     - uses: ncipollo/release-action@v1
+  #       with:
+  #         artifacts: "dist/nativescript-ios-*.tgz,dist/dSYMs/*.zip"
+  #         bodyFile: "body.md"

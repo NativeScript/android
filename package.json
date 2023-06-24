@@ -24,5 +24,10 @@
   "gradle": {
     "version": "7.5",
     "android": "7.3."
+  },
+  "devDependencies": {
+    "conventional-changelog-cli": "^2.1.1",
+    "dayjs": "^1.11.7",
+    "semver": "^7.5.0"
   }
 }
