@@ -72,6 +72,7 @@ jobs:
         with:
           api-level: ${{env.ANDROID_API}}
           target: google_apis
+          arch: ${{env.ANDROID_ABI}}
           script: ./gradlew runtestsAndVerifyResults -PnoCCache --stacktrace
       # - name: Upload npm package artifact
       #   uses: actions/upload-artifact@v3
