@@ -66,7 +66,7 @@ jobs:
           echo NPM_VERSION=$NPM_VERSION >> $GITHUB_OUTPUT
           echo NPM_TAG=$NPM_TAG >> $GITHUB_OUTPUT
       - name: SBG tests
-        run: /gradlew runSbgTests --stacktrace
+        run: ./gradlew runSbgTests --stacktrace
       - name: Run unit tests
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
