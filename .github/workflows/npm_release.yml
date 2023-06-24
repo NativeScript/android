@@ -11,6 +11,7 @@ env:
   NDK_VERSION: r21b
   ANDROID_API: 32
   ANDROID_ABI: x86_64
+  NDK_ARCH: darwin-x86_64
 
 
 jobs:
@@ -41,7 +42,7 @@ jobs:
       - name: Setup NDK
         run: |
           echo "y" | sdkmanager "cmake;3.6.4111459"
-          wget https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux-x86_64.zip
+          wget https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           chmod +x android-ndk-$NDK_VERSION-linux-x86_64.zip
           unzip -q android-ndk-$NDK_VERSION-linux-x86_64.zip
           rm -rf android-ndk-$NDK_VERSION-linux-x86_64.zip
