@@ -9,7 +9,7 @@ env:
   NPM_TAG: "next"
   EMULATOR_NAME: "runtime-emu"
   NDK_VERSION: r21b
-  ANDROID_API: 29
+  ANDROID_API: 32
   ANDROID_ABI: x86_64
 
 
