@@ -16,7 +16,7 @@ env:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: macos-12
     outputs:
       npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
@@ -35,6 +35,9 @@ jobs:
           java-version: "17"
       - name: Setup Android SDK
         uses: android-actions/setup-android@v2
+      - name: Homebrew dependencies
+        run: |
+          brew install wget
       - name: Setup NDK
         run: |
           echo "y" | sdkmanager "cmake;3.6.4111459"
@@ -73,7 +76,6 @@ jobs:
           api-level: ${{env.ANDROID_API}}
           target: google_apis
           arch: ${{env.ANDROID_ABI}}
-          emulator-boot-timeout: 1200
           script: ./gradlew runtestsAndVerifyResults -PnoCCache --stacktrace
       # - name: Upload npm package artifact
       #   uses: actions/upload-artifact@v3
