@@ -56,11 +56,10 @@ task runAdbAsRoot(type: Exec) {
 
         if (isWinOs) {
             commandLine "cmd", "/c", "adb", "-e", "root"
-            commandLine "cmd", "/c", "adb", "-e", "root"
         } else {
             commandLine "adb", "-e", "root"
-            commandLine "adb", "-e", "root"
         }
+        sleep(10 * 1000) // wait 10s to make sure adb properly restarts, otherwise error: closed might happen on next command
     }
 }
 

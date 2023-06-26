@@ -48,6 +48,7 @@ jobs:
           rm -rf android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
           echo ANDROID_NDK_HOME=${ANDROID_NDK_HOME} >> $GITHUB_ENV
+          echo ANDROID_NDK=${ANDROID_NDK_HOME} >> $GITHUB_ENV
           echo ${ANDROID_NDK_HOME} >> $GITHUB_PATH
       - name: Install Dependencies
         run: |
