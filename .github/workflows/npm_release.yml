@@ -9,7 +9,7 @@ env:
   NPM_TAG: "next"
   EMULATOR_NAME: "runtime-emu"
   NDK_VERSION: r21b
-  ANDROID_API: 32
+  ANDROID_API: 33
   ANDROID_ABI: x86_64
   NDK_ARCH: darwin-x86_64
 
@@ -17,7 +17,7 @@ env:
 jobs:
   build:
     name: Build
-    runs-on: macos-12
+    runs-on: macos-latest
     outputs:
       npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
@@ -79,7 +79,7 @@ jobs:
           path: dist/nativescript-android-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
   test:
     name: Test
-    runs-on: macos-12
+    runs-on: macos-latest
     needs: build
     steps:
       - uses: actions/checkout@v3
