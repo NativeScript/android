@@ -52,11 +52,13 @@ task installApk(type: Exec) {
 
 task runAdbAsRoot(type: Exec) {
     doFirst {
-        println "Removing previous android_unit_test_results.xml"
+        println "Running adb as root"
 
         if (isWinOs) {
             commandLine "cmd", "/c", "adb", "-e", "root"
+            commandLine "cmd", "/c", "adb", "-e", "root"
         } else {
+            commandLine "adb", "-e", "root"
             commandLine "adb", "-e", "root"
         }
     }
