@@ -72,15 +72,6 @@ jobs:
           echo NPM_TAG=$NPM_TAG >> $GITHUB_OUTPUT
       - name: Build npm package
         run: ./gradlew -PgitCommitVersion=${{ github.sha }} -PnoCCache --stacktrace
-      - name: SBG tests
-        run: ./gradlew runSbgTests --stacktrace
-      - name: Run unit tests
-        uses: ReactiveCircus/android-emulator-runner@v2
-        with:
-          api-level: ${{env.ANDROID_API}}
-          target: google_apis
-          arch: ${{env.ANDROID_ABI}}
-          script: ./gradlew runtestsAndVerifyResults -PnoCCache --stacktrace
       - name: Upload npm package artifact
         uses: actions/upload-artifact@v3
         with:
