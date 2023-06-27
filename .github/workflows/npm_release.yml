@@ -9,7 +9,7 @@ env:
   NPM_TAG: "next"
   EMULATOR_NAME: "runtime-emu"
   NDK_VERSION: r21b
-  ANDROID_API: 33
+  ANDROID_API: 29
   ANDROID_ABI: x86_64
   NDK_ARCH: darwin-x86_64
 
@@ -121,7 +121,7 @@ jobs:
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
           api-level: ${{env.ANDROID_API}}
-          target: google_apis
+          #target: google_apis
           arch: ${{env.ANDROID_ABI}}
           script: ./gradlew runtestsAndVerifyResults --stacktrace
   # publish:
