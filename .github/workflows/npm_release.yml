@@ -148,8 +148,7 @@ jobs:
       - name: Publish package
         run: |
           echo "Publishing @nativescript/android@$NPM_VERSION to NPM with tag $NPM_TAG..."
-          ls ./dist/nativescript-android-${{env.NPM_VERSION}}.tgz
-        # npm publish ./dist/nativescript-android-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --provenance
+          npm publish ./dist/nativescript-android-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
   github-release:
