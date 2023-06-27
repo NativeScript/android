@@ -147,9 +147,9 @@ jobs:
           path: dist
       - name: Publish package
         run: |
-          echo "Publishing @nativescript/ios@$NPM_VERSION to NPM with tag $NPM_TAG..."
-          ls ./dist/nativescript-ios-${{env.NPM_VERSION}}.tgz
-        # npm publish ./dist/nativescript-ios-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --provenance
+          echo "Publishing @nativescript/android@$NPM_VERSION to NPM with tag $NPM_TAG..."
+          ls ./dist/nativescript-android-${{env.NPM_VERSION}}.tgz
+        # npm publish ./dist/nativescript-android-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
   github-release:
@@ -176,16 +176,9 @@ jobs:
         with:
           name: npm-package
           path: dist
-      - uses: actions/download-artifact@v3
-        with:
-          name: NativeScript-dSYMs
-          path: dist
-      - name: Zip dSYMs
-        working-directory: dist/dSYMs
-        run: find . -maxdepth 1 -name '*.dSYM' -print | xargs -I@ zip -r @.zip @
       - name: Partial Changelog
         run: npx conventional-changelog -p angular -r2 > body.md
       - uses: ncipollo/release-action@v1
         with:
-          artifacts: "dist/nativescript-ios-*.tgz,dist/dSYMs/*.zip"
+          artifacts: "dist/nativescript-android-*.tgz"
           bodyFile: "body.md"
