@@ -1,3 +1,139 @@
+# [8.5.0](https://github.com/NativeScript/android/compare/v8.4.0...v8.5.0) (2023-06-27)
+
+
+### Bug Fixes
+
+* add semicolon after console type ([32259a9](https://github.com/NativeScript/android/commit/32259a90607bdd282d855c3701c7b7c2b203439d))
+* always log console messages and uncomment live sync ([c0f5514](https://github.com/NativeScript/android/commit/c0f5514686decc111d8b2e2f93c434141788f298))
+* Compile as C++17 ([221a9c2](https://github.com/NativeScript/android/commit/221a9c2c3747c2698238841ea56cf4d837206c20))
+* Correctly initialize context in inspector client init() ([0bc0480](https://github.com/NativeScript/android/commit/0bc0480035d01c681765a01b794b48db003be050))
+* drain microtasks after devtools message ([4834a2b](https://github.com/NativeScript/android/commit/4834a2b8e3d979323753d1da265ad1faaabbd655))
+* Implement console.log inspector with Runtime protocol ([2c4337b](https://github.com/NativeScript/android/commit/2c4337bf5b7c2c00bbcd5b34da1e8c08478fd37a))
+* memcpy array data for non-direct java bytebuffers ([#1740](https://github.com/NativeScript/android/issues/1740)) ([1c0214a](https://github.com/NativeScript/android/commit/1c0214a4785d425dc83f9612169fad7f70a28d41))
+* multi threading on MethodResolver ([bc8bc52](https://github.com/NativeScript/android/commit/bc8bc5253ff8abecf97bf98462d21fda15757a6a))
+* possible infinite loop and memory leak in metadata reader ([#1749](https://github.com/NativeScript/android/issues/1749)) ([c2c8aa8](https://github.com/NativeScript/android/commit/c2c8aa8a5f81c10aee293e14af797e5d1e3fbb4c))
+* Re-enable inspector code ([f357ce6](https://github.com/NativeScript/android/commit/f357ce6b9836be109ea5717ba0c09ee01a3f9876))
+* refactor console.log implementation a bit ([#1741](https://github.com/NativeScript/android/issues/1741)) ([d3c52cb](https://github.com/NativeScript/android/commit/d3c52cbaae8620d1ba1ed43d61da6df6f9df0f9c))
+* remove free of non-owned jni buffer ([81806b3](https://github.com/NativeScript/android/commit/81806b399f42a981a0cf54ab8a4be5712333e938))
+* Remove use of DISALLOW_COPY_AND_ASSIGN macro in inspector ([6da1a6b](https://github.com/NativeScript/android/commit/6da1a6bba0d9808568e8d6ae68fb0c71c6271ff1))
+* Remove use of V8InspectorPlatform ([1f2b202](https://github.com/NativeScript/android/commit/1f2b202263207de2045bafad5afedf786da788e1))
+* Restore DOM and Network callback handlers ([35689a7](https://github.com/NativeScript/android/commit/35689a7462ea86a760705c949dea6f4de4192cf8))
+* uncomment abifilters ([f5a5434](https://github.com/NativeScript/android/commit/f5a5434f41d764352de89133d2068b109bd3a54c))
+* update js arg conversions ([0640fce](https://github.com/NativeScript/android/commit/0640fcee3bd5429a637f3811fd7f8b4dc8ddf508))
+* use min sdk 17 ([2f2358c](https://github.com/NativeScript/android/commit/2f2358c0daf4c476110367432889740c18b49694))
+
+
+### Features
+
+* add console message type prefixes ([9a10e2b](https://github.com/NativeScript/android/commit/9a10e2b89410c6757bceba705a902060f37d97a1))
+* initial support for __inspectorSendEvent ([233b7c3](https://github.com/NativeScript/android/commit/233b7c39c2910e01adc261c4d0d3ddc1d92ef9d6))
+* native timer polyfills ([#1733](https://github.com/NativeScript/android/issues/1733)) ([3415e5c](https://github.com/NativeScript/android/commit/3415e5c515b3d73360a87f4f7aec03c44bd2c63c))
+* remove old WeakRef polyfill ([97d7465](https://github.com/NativeScript/android/commit/97d7465ca46df7240c4887fffb3167e469179a7a))
+* update all archs to use v8 10.3.22 ([a68b057](https://github.com/NativeScript/android/commit/a68b057da208338a83a620e64c0f4fecd90cff59))
+* use v8 static ([ee8a521](https://github.com/NativeScript/android/commit/ee8a5213a54d40046993ee61ac652842ccacfbe4))
+
+
+### Performance Improvements
+
+* refactor arrays marshaling ([84e7ddb](https://github.com/NativeScript/android/commit/84e7ddbe7fd503a3a5f11eed55246138068ca28f))
+* remove instantiations and cache runtime in isolate ([f23c1bb](https://github.com/NativeScript/android/commit/f23c1bb5b61c2fcaf7c6961450055bfd4fa4d385))
+* update old args converter with array marshaling optimizations and use this converter again tempporarily ([b5218c9](https://github.com/NativeScript/android/commit/b5218c9f5dce1e7c603887f4c9b65f3bd5284aa8))
+* use vector pointers for passing parsed method signatures ([aa623b7](https://github.com/NativeScript/android/commit/aa623b795ef38fb023cdef60d15641b8d8bf0338))
+
+
+
+# [8.4.0](https://github.com/NativeScript/android/compare/v8.3.0...v8.4.0) (2022-11-30)
+
+
+### Bug Fixes
+
+* don't assert for sub projects ([b5efdbc](https://github.com/NativeScript/android/commit/b5efdbc5ea11a7f5c73703ddae7485c4782bd8d7))
+* handle missing child classes when querying native classes ([#1718](https://github.com/NativeScript/android/issues/1718)) ([c238166](https://github.com/NativeScript/android/commit/c238166af3ce5205b65f2d79a23cfb963c3d60f9))
+* JvmField annotated fields ([#1726](https://github.com/NativeScript/android/issues/1726)) ([59da1cb](https://github.com/NativeScript/android/commit/59da1cbc8db888833fc24ea207b7d2f9195985b8)), closes [#1604](https://github.com/NativeScript/android/issues/1604)
+* JvmName annotation & Kotlin building from App Resources ([1ba30be](https://github.com/NativeScript/android/commit/1ba30becfed7ba775412d722912a5e4db8c51e51)), closes [#1682](https://github.com/NativeScript/android/issues/1682)
+* null data ([3b4a56d](https://github.com/NativeScript/android/commit/3b4a56df86f36a7738cc0089195d20239ce67273))
+* RunOnMainThreadCallback & PostFrameCallback ([#1721](https://github.com/NativeScript/android/issues/1721)) ([1ccd033](https://github.com/NativeScript/android/commit/1ccd033194d498b7614f16cc5d9cdcfb6a414f44))
+* typed array handling ([#1738](https://github.com/NativeScript/android/issues/1738)) ([00509ee](https://github.com/NativeScript/android/commit/00509eec6b929353a313530932f00757a3ccadb6))
+* typedarray & raf ([#1729](https://github.com/NativeScript/android/issues/1729)) ([796b9b1](https://github.com/NativeScript/android/commit/796b9b1fbba1e4cc81cb2098035ea38b3620a983))
+
+
+### Features
+
+* add class name to native objects ([#1723](https://github.com/NativeScript/android/issues/1723)) ([0c601ae](https://github.com/NativeScript/android/commit/0c601ae4680dcb6bea95f3292f6b0c3b9c1baeb1))
+* settings.gradle plugin ([#1731](https://github.com/NativeScript/android/issues/1731)) ([1759ecd](https://github.com/NativeScript/android/commit/1759ecd4071ccbeb60ea129af46e7f019c7523fe))
+* upgrade libzip to 1.9.2 ([#1724](https://github.com/NativeScript/android/issues/1724)) ([1dfd38f](https://github.com/NativeScript/android/commit/1dfd38ff0ea3a98b6d35f6f7c53f10ac1a788770))
+
+
+
+# [8.3.0](https://github.com/NativeScript/android/compare/v8.2.4...v8.3.0) (2022-07-14)
+
+
+### Bug Fixes
+
+* apply before-plugins before checking versions ([0df7362](https://github.com/NativeScript/android/commit/0df73625b72adb2fd654091f74e527dd61e3029b))
+* Set package version before preReleaseBuild ([12acd7f](https://github.com/NativeScript/android/commit/12acd7f3c1a265c0d8cddef8cb936825d2af7877))
+
+
+### Features
+
+* runOnMain, postFrameCallback & removeFrameCallback ([#1713](https://github.com/NativeScript/android/issues/1713)) ([bdd0313](https://github.com/NativeScript/android/commit/bdd031317c15d5e7eaa0dfeab2ef599b4eeddc4c))
+
+
+
+## [8.2.3](https://github.com/NativeScript/android/compare/v8.2.2...v8.2.3) (2022-06-01)
+
+
+### Bug Fixes
+
+* direct boot should not crash/ANR ([d2b18d7](https://github.com/NativeScript/android/commit/d2b18d7a8e23af6b27a8e2281e43bf72d715af66))
+
+
+
+## [8.2.2](https://github.com/NativeScript/android/compare/v8.2.1...v8.2.2) (2022-03-09)
+
+
+### Bug Fixes
+
+* app freezing on splash screen ([a61d3c1](https://github.com/NativeScript/android/commit/a61d3c1932ca11b67c88bc1b9a0eb97c9847ee19))
+
+
+
+## [8.2.1](https://github.com/NativeScript/android/compare/v8.2.0...v8.2.1) (2022-03-08)
+
+
+### Bug Fixes
+
+* add back gradle key in package json for the time being ([af925d5](https://github.com/NativeScript/android/commit/af925d50990820c9ca92a9a1a869518dbfd43fad))
+
+
+
+# [8.2.0](https://github.com/NativeScript/android/compare/v7.0.1...v8.2.0) (2022-03-08)
+
+
+### Bug Fixes
+
+* **chrome-devtools:** Elements tab ([e935a61](https://github.com/NativeScript/android/commit/e935a61de5043ae2febd76b34963bcaba7049791)), closes [#1641](https://github.com/NativeScript/android/issues/1641) [#1640](https://github.com/NativeScript/android/issues/1640)
+* ensure buildMetadata is done before R8  ([01ad92e](https://github.com/NativeScript/android/commit/01ad92e53d6fcd6448b89004e1d49a66dd2b3254))
+* js -> buffer handling ([b49801c](https://github.com/NativeScript/android/commit/b49801cb7df3acd65ecb0a7e688afe2a25be908e))
+* load `before-plugins.gradle` in build.gradle to allow to override `androidBuildToolsVersion` and other vars ([d926dd4](https://github.com/NativeScript/android/commit/d926dd4340539ee9223ab9090ab20dd3c253af2a))
+* loop ([95ba9f5](https://github.com/NativeScript/android/commit/95ba9f5bd382cbffef2469fca632b69729c5837c))
+* material lib as debugImplementation ([c6946fe](https://github.com/NativeScript/android/commit/c6946fe6633ebb851fec35c19c2a64632628396e))
+* pending intent api31 flags ([d8781fd](https://github.com/NativeScript/android/commit/d8781fdcbffcf44d49d2df1055421eeecf8316ea))
+* update to jsparser ([ea1517c](https://github.com/NativeScript/android/commit/ea1517cbcd3b62037440c42fdcedf54eb2bee035))
+* **workers:** invalidate cached isolates on dispose ([#1704](https://github.com/NativeScript/android/issues/1704)) ([67e9daf](https://github.com/NativeScript/android/commit/67e9daf709722b608ef1fb6110d5b708f1819c41))
+
+
+### Features
+
+* commonGradleProperties ([77585ad](https://github.com/NativeScript/android/commit/77585ad58cceba74d8df69e5838b9f80dc947b49))
+* expose `PerformMicrotaskCheckpoint` ([4b58570](https://github.com/NativeScript/android/commit/4b58570fa3c43fc0a0ab73790030a414412f7c19))
+* log used androidX lib versions ([#1651](https://github.com/NativeScript/android/issues/1651)) ([528c46f](https://github.com/NativeScript/android/commit/528c46f99dd00859ba38c2671b7a5372d34f6a63))
+* make console.time use 3 decimals ([7d9f90b](https://github.com/NativeScript/android/commit/7d9f90bd6c45c9f1fd94904e6b17dd028fff1a11))
+* support passing typedArrays as nio buffers ([38230e5](https://github.com/NativeScript/android/commit/38230e5b282cf5ad04d3d655cf0671bc7e576a19))
+* working gradle7 ([501f884](https://github.com/NativeScript/android/commit/501f884120d6a884a4e2bb6d4d60312aa7efacff))
+
+
+
 7.0.1
 ==
 

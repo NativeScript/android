@@ -66,9 +66,9 @@ Local<Function> GetSmartJSONStringifyFunction(Isolate* isolate) {
     return smartStringifyPersistentFunction->Get(isolate);
 }
 
-Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value, bool handleCircularReferences) {
+std::string tns::JsonStringifyObject(Isolate* isolate, v8::Local<v8::Object> value, bool handleCircularReferences) {
     if (value.IsEmpty()) {
-        return String::Empty(isolate);
+        return "";
     }
 
     auto context = isolate->GetCurrentContext();
@@ -80,11 +80,14 @@ Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value
                 v8::Local<v8::Value> resultValue;
                 v8::TryCatch tc(isolate);
 
-                Local<Value> args[] = { value->ToObject(context).ToLocalChecked() };
-                auto success = smartJSONStringifyFunction->Call(context, Undefined(isolate), 1, args).ToLocal(&resultValue);
+                Local<Value> args[] = { value };
+                auto success = smartJSONStringifyFunction
+                        ->Call(context, Undefined(isolate), 1, args)
+                        .ToLocal(&resultValue);
 
                 if (success && !tc.HasCaught()) {
-                    return resultValue->ToString(context).ToLocalChecked();
+                    auto res = resultValue.As<v8::String>();
+                    return ArgConverter::ConvertToString(res);
                 }
             }
         }
@@ -92,13 +95,13 @@ Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value
 
     v8::Local<v8::String> resultString;
     v8::TryCatch tc(isolate);
-    auto success = v8::JSON::Stringify(context, value->ToObject(context).ToLocalChecked()).ToLocal(&resultString);
+    auto success = v8::JSON::Stringify(context, value).ToLocal(&resultString);
 
     if (!success && tc.HasCaught()) {
         throw NativeScriptException(tc);
     }
 
-    return resultString;
+    return ArgConverter::ConvertToString(resultString);
 }
 
 bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<String>& propName, Local<Value>& out) {

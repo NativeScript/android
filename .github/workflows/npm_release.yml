@@ -1,0 +1,183 @@
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+env:
+  NPM_TAG: "next"
+  EMULATOR_NAME: "runtime-emu"
+  NDK_VERSION: r21b
+  ANDROID_API: 29
+  ANDROID_ABI: x86_64
+  NDK_ARCH: darwin-x86_64
+
+
+jobs:
+  build:
+    name: Build
+    runs-on: macos-latest
+    outputs:
+      npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
+      npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: true
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          registry-url: "https://registry.npmjs.org"
+      - uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: gradle
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+      - name: Homebrew dependencies
+        run: |
+          brew install wget
+      - name: Setup NDK
+        run: |
+          echo "y" | sdkmanager "cmake;3.6.4111459"
+          wget https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-$NDK_ARCH.zip
+          chmod +x android-ndk-$NDK_VERSION-$NDK_ARCH.zip
+          unzip -q android-ndk-$NDK_VERSION-$NDK_ARCH.zip
+          rm -rf android-ndk-$NDK_VERSION-$NDK_ARCH.zip
+          export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
+          echo ANDROID_NDK_HOME=${ANDROID_NDK_HOME} >> $GITHUB_ENV
+          echo ANDROID_NDK=${ANDROID_NDK_HOME} >> $GITHUB_ENV
+          echo ${ANDROID_NDK_HOME} >> $GITHUB_PATH
+      - name: Install Dependencies
+        run: |
+          npm install
+          npm install --prefix ./test-app/tools
+      - name: Get Current Version
+        run: |
+          NPM_VERSION=$(node -e "console.log(require('./package.json').version);")
+          echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
+      - name: Bump version for dev release
+        if: ${{ !contains(github.ref, 'refs/tags/') }}
+        run: |
+          NPM_VERSION=$(node ./scripts/get-next-version.js)
+          echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
+          npm version $NPM_VERSION --no-git-tag-version
+      - name: Output NPM Version and tag
+        id: npm_version_output
+        run: |
+          NPM_TAG=$(node ./scripts/get-npm-tag.js)
+          echo NPM_VERSION=$NPM_VERSION >> $GITHUB_OUTPUT
+          echo NPM_TAG=$NPM_TAG >> $GITHUB_OUTPUT
+      - name: Build npm package
+        run: ./gradlew -PgitCommitVersion=${{ github.sha }} -PnoCCache --stacktrace
+      - name: Upload npm package artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: npm-package
+          path: dist/nativescript-android-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
+  test:
+    name: Test
+    runs-on: macos-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          registry-url: "https://registry.npmjs.org"
+      - uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: gradle
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+      - name: Homebrew dependencies
+        run: |
+          brew install wget
+      - name: Setup NDK
+        run: |
+          echo "y" | sdkmanager "cmake;3.6.4111459"
+          wget https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-$NDK_ARCH.zip
+          chmod +x android-ndk-$NDK_VERSION-$NDK_ARCH.zip
+          unzip -q android-ndk-$NDK_VERSION-$NDK_ARCH.zip
+          rm -rf android-ndk-$NDK_VERSION-$NDK_ARCH.zip
+          export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
+          echo ANDROID_NDK_HOME=${ANDROID_NDK_HOME} >> $GITHUB_ENV
+          echo ANDROID_NDK=${ANDROID_NDK_HOME} >> $GITHUB_ENV
+          echo ${ANDROID_NDK_HOME} >> $GITHUB_PATH
+      - name: Install Dependencies
+        run: |
+          npm install
+          npm install --prefix ./test-app/tools
+      - name: SBG tests
+        run: ./gradlew runSbgTests --stacktrace
+      - name: Run unit tests
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: ${{env.ANDROID_API}}
+          # this is needed on API 30+
+          #target: google_apis
+          arch: ${{env.ANDROID_ABI}}
+          script: ./gradlew runtestsAndVerifyResults --stacktrace
+  publish:
+    runs-on: ubuntu-latest
+    needs:
+      - build
+      - test
+    permissions:
+     contents: read
+     id-token: write
+    env:
+      NPM_VERSION: ${{needs.build.outputs.npm_version}}
+      NPM_TAG: ${{needs.build.outputs.npm_tag}}
+    steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          registry-url: 'https://registry.npmjs.org'
+      - uses: actions/download-artifact@v3
+        with:
+          name: npm-package
+          path: dist
+      - name: Publish package
+        run: |
+          echo "Publishing @nativescript/android@$NPM_VERSION to NPM with tag $NPM_TAG..."
+          npm publish ./dist/nativescript-android-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+  github-release:
+    runs-on: ubuntu-latest
+    # only runs on tagged commits
+    if: ${{ contains(github.ref, 'refs/tags/') }}
+    permissions:
+      contents: write
+    needs:
+      - build
+      - test
+    env:
+      NPM_VERSION: ${{needs.build.outputs.npm_version}}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Setup
+        run: npm install
+      - uses: actions/download-artifact@v3
+        with:
+          name: npm-package
+          path: dist
+      - name: Partial Changelog
+        run: npx conventional-changelog -p angular -r2 > body.md
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: "dist/nativescript-android-*.tgz"
+          bodyFile: "body.md"

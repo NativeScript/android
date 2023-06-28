@@ -2,6 +2,7 @@ package org.nativescript.staticbindinggenerator.generating.parsing.methods.impl;
 
 import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.classfile.Method;
+import org.nativescript.staticbindinggenerator.SystemClass;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericHierarchyView;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.JavaMethod;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.ReifiedJavaMethod;
@@ -62,6 +63,10 @@ class JavaClassUtils {
         JavaClass javaClass = classesCache.get(name);
 
         if (javaClass == null) {
+            if (name.startsWith("java.")) {
+                return SystemClass.get(name);
+            }
+
             throw new RuntimeException("Class not found: " + name);
         }
 

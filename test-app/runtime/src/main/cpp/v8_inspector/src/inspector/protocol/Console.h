@@ -15,18 +15,14 @@
 namespace v8_inspector {
 namespace protocol {
 namespace Console {
+class ConsoleMessage;
 
 // ------------- Forward and enum declarations.
-class ConsoleMessage;
-class MessageAddedNotification;
 
 // ------------- Type and builder declarations.
 
-class  ConsoleMessage : public Serializable{
-    PROTOCOL_DISALLOW_COPY(ConsoleMessage);
+class  ConsoleMessage : public ::v8_crdtp::ProtocolObject<ConsoleMessage> {
 public:
-    static std::unique_ptr<ConsoleMessage> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~ConsoleMessage() override { }
 
     struct  SourceEnum {
@@ -71,10 +67,6 @@ public:
     bool hasColumn() { return m_column.isJust(); }
     int getColumn(int defaultValue) { return m_column.isJust() ? m_column.fromJust() : defaultValue; }
     void setColumn(int value) { m_column = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<ConsoleMessage> clone() const;
 
     template<int STATE>
     class ConsoleMessageBuilder {
@@ -150,6 +142,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     ConsoleMessage()
     {
     }
@@ -160,68 +154,6 @@ private:
     Maybe<String> m_url;
     Maybe<int> m_line;
     Maybe<int> m_column;
-};
-
-
-class  MessageAddedNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(MessageAddedNotification);
-public:
-    static std::unique_ptr<MessageAddedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~MessageAddedNotification() override { }
-
-    protocol::Console::ConsoleMessage* getMessage() { return m_message.get(); }
-    void setMessage(std::unique_ptr<protocol::Console::ConsoleMessage> value) { m_message = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<MessageAddedNotification> clone() const;
-
-    template<int STATE>
-    class MessageAddedNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            MessageSet = 1 << 1,
-            AllFieldsSet = (MessageSet | 0)};
-
-
-        MessageAddedNotificationBuilder<STATE | MessageSet>& setMessage(std::unique_ptr<protocol::Console::ConsoleMessage> value)
-        {
-            static_assert(!(STATE & MessageSet), "property message should not be set yet");
-            m_result->setMessage(std::move(value));
-            return castState<MessageSet>();
-        }
-
-        std::unique_ptr<MessageAddedNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class MessageAddedNotification;
-        MessageAddedNotificationBuilder() : m_result(new MessageAddedNotification()) { }
-
-        template<int STEP> MessageAddedNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<MessageAddedNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Console::MessageAddedNotification> m_result;
-    };
-
-    static MessageAddedNotificationBuilder<0> create()
-    {
-        return MessageAddedNotificationBuilder<0>();
-    }
-
-private:
-    MessageAddedNotification()
-    {
-    }
-
-    std::unique_ptr<protocol::Console::ConsoleMessage> m_message;
 };
 
 

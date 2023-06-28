@@ -1,6 +1,7 @@
 package org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.impl;
 
 import org.apache.bcel.classfile.JavaClass;
+import org.nativescript.staticbindinggenerator.SystemClass;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.ClassHierarchyParser;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.HierarchyView;
 import org.nativescript.staticbindinggenerator.naming.BcelNamingUtil;
@@ -67,6 +68,10 @@ public class ClassHierarchyParserImpl implements ClassHierarchyParser {
         JavaClass clazz = classesCache.get(BcelNamingUtil.resolveClassName(name));
 
         if (clazz == null) {
+            if (name.startsWith("java.")) {
+                return SystemClass.get(name);
+            }
+
             throw new RuntimeException("Class not found: " + name);
         }
 

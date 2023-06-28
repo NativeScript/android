@@ -18,8 +18,8 @@ import com.telerik.metadata.security.classes.SecuredClassRepository
 import kotlinx.metadata.Flag
 import kotlinx.metadata.KmClass
 import kotlinx.metadata.KmProperty
-import kotlinx.metadata.jvm.KotlinClassHeader
 import kotlinx.metadata.jvm.KotlinClassMetadata
+import kotlinx.metadata.jvm.Metadata
 import kotlinx.metadata.jvm.getterSignature
 import kotlinx.metadata.jvm.setterSignature
 import org.apache.bcel.classfile.JavaClass
@@ -253,7 +253,7 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
 
     private val metadataParser = BytecodeClassMetadataParser()
     internal val kotlinMetadata: KotlinClassMetadata? by lazy {
-        val kotlinClassHeader = KotlinClassHeader(
+        val metadata = Metadata(
                 metadataAnnotation.kind,
                 metadataAnnotation.metadataVersion,
                 metadataAnnotation.data1,
@@ -262,7 +262,7 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
                 metadataAnnotation.packageName,
                 metadataAnnotation.extraInt)
 
-        KotlinClassMetadata.read(kotlinClassHeader)
+        KotlinClassMetadata.read(metadata)
     }
 
 

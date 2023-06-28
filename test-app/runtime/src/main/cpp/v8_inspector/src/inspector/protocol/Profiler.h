@@ -16,8 +16,6 @@
 namespace v8_inspector {
 namespace protocol {
 namespace Profiler {
-
-// ------------- Forward and enum declarations.
 class ProfileNode;
 class Profile;
 class PositionTickInfo;
@@ -27,18 +25,13 @@ class ScriptCoverage;
 class TypeObject;
 class TypeProfileEntry;
 class ScriptTypeProfile;
-class CounterInfo;
-class ConsoleProfileFinishedNotification;
-class ConsoleProfileStartedNotification;
-class PreciseCoverageDeltaUpdateNotification;
+
+// ------------- Forward and enum declarations.
 
 // ------------- Type and builder declarations.
 
-class  ProfileNode : public Serializable{
-    PROTOCOL_DISALLOW_COPY(ProfileNode);
+class  ProfileNode : public ::v8_crdtp::ProtocolObject<ProfileNode> {
 public:
-    static std::unique_ptr<ProfileNode> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~ProfileNode() override { }
 
     int getId() { return m_id; }
@@ -62,10 +55,6 @@ public:
     bool hasPositionTicks() { return m_positionTicks.isJust(); }
     protocol::Array<protocol::Profiler::PositionTickInfo>* getPositionTicks(protocol::Array<protocol::Profiler::PositionTickInfo>* defaultValue) { return m_positionTicks.isJust() ? m_positionTicks.fromJust() : defaultValue; }
     void setPositionTicks(std::unique_ptr<protocol::Array<protocol::Profiler::PositionTickInfo>> value) { m_positionTicks = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<ProfileNode> clone() const;
 
     template<int STATE>
     class ProfileNodeBuilder {
@@ -139,6 +128,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     ProfileNode()
     {
           m_id = 0;
@@ -153,11 +144,8 @@ private:
 };
 
 
-class  Profile : public Serializable{
-    PROTOCOL_DISALLOW_COPY(Profile);
+class  Profile : public ::v8_crdtp::ProtocolObject<Profile> {
 public:
-    static std::unique_ptr<Profile> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~Profile() override { }
 
     protocol::Array<protocol::Profiler::ProfileNode>* getNodes() { return m_nodes.get(); }
@@ -176,10 +164,6 @@ public:
     bool hasTimeDeltas() { return m_timeDeltas.isJust(); }
     protocol::Array<int>* getTimeDeltas(protocol::Array<int>* defaultValue) { return m_timeDeltas.isJust() ? m_timeDeltas.fromJust() : defaultValue; }
     void setTimeDeltas(std::unique_ptr<protocol::Array<int>> value) { m_timeDeltas = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<Profile> clone() const;
 
     template<int STATE>
     class ProfileBuilder {
@@ -249,6 +233,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     Profile()
     {
           m_startTime = 0;
@@ -263,11 +249,8 @@ private:
 };
 
 
-class  PositionTickInfo : public Serializable{
-    PROTOCOL_DISALLOW_COPY(PositionTickInfo);
+class  PositionTickInfo : public ::v8_crdtp::ProtocolObject<PositionTickInfo> {
 public:
-    static std::unique_ptr<PositionTickInfo> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~PositionTickInfo() override { }
 
     int getLine() { return m_line; }
@@ -275,10 +258,6 @@ public:
 
     int getTicks() { return m_ticks; }
     void setTicks(int value) { m_ticks = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<PositionTickInfo> clone() const;
 
     template<int STATE>
     class PositionTickInfoBuilder {
@@ -328,6 +307,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     PositionTickInfo()
     {
           m_line = 0;
@@ -339,11 +320,8 @@ private:
 };
 
 
-class  CoverageRange : public Serializable{
-    PROTOCOL_DISALLOW_COPY(CoverageRange);
+class  CoverageRange : public ::v8_crdtp::ProtocolObject<CoverageRange> {
 public:
-    static std::unique_ptr<CoverageRange> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~CoverageRange() override { }
 
     int getStartOffset() { return m_startOffset; }
@@ -354,10 +332,6 @@ public:
 
     int getCount() { return m_count; }
     void setCount(int value) { m_count = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<CoverageRange> clone() const;
 
     template<int STATE>
     class CoverageRangeBuilder {
@@ -415,6 +389,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     CoverageRange()
     {
           m_startOffset = 0;
@@ -428,11 +404,8 @@ private:
 };
 
 
-class  FunctionCoverage : public Serializable{
-    PROTOCOL_DISALLOW_COPY(FunctionCoverage);
+class  FunctionCoverage : public ::v8_crdtp::ProtocolObject<FunctionCoverage> {
 public:
-    static std::unique_ptr<FunctionCoverage> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~FunctionCoverage() override { }
 
     String getFunctionName() { return m_functionName; }
@@ -443,10 +416,6 @@ public:
 
     bool getIsBlockCoverage() { return m_isBlockCoverage; }
     void setIsBlockCoverage(bool value) { m_isBlockCoverage = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<FunctionCoverage> clone() const;
 
     template<int STATE>
     class FunctionCoverageBuilder {
@@ -504,6 +473,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     FunctionCoverage()
     {
           m_isBlockCoverage = false;
@@ -515,11 +486,8 @@ private:
 };
 
 
-class  ScriptCoverage : public Serializable{
-    PROTOCOL_DISALLOW_COPY(ScriptCoverage);
+class  ScriptCoverage : public ::v8_crdtp::ProtocolObject<ScriptCoverage> {
 public:
-    static std::unique_ptr<ScriptCoverage> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~ScriptCoverage() override { }
 
     String getScriptId() { return m_scriptId; }
@@ -530,10 +498,6 @@ public:
 
     protocol::Array<protocol::Profiler::FunctionCoverage>* getFunctions() { return m_functions.get(); }
     void setFunctions(std::unique_ptr<protocol::Array<protocol::Profiler::FunctionCoverage>> value) { m_functions = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<ScriptCoverage> clone() const;
 
     template<int STATE>
     class ScriptCoverageBuilder {
@@ -591,6 +555,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     ScriptCoverage()
     {
     }
@@ -601,19 +567,12 @@ private:
 };
 
 
-class  TypeObject : public Serializable{
-    PROTOCOL_DISALLOW_COPY(TypeObject);
+class  TypeObject : public ::v8_crdtp::ProtocolObject<TypeObject> {
 public:
-    static std::unique_ptr<TypeObject> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~TypeObject() override { }
 
     String getName() { return m_name; }
     void setName(const String& value) { m_name = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<TypeObject> clone() const;
 
     template<int STATE>
     class TypeObjectBuilder {
@@ -655,6 +614,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     TypeObject()
     {
     }
@@ -663,11 +624,8 @@ private:
 };
 
 
-class  TypeProfileEntry : public Serializable{
-    PROTOCOL_DISALLOW_COPY(TypeProfileEntry);
+class  TypeProfileEntry : public ::v8_crdtp::ProtocolObject<TypeProfileEntry> {
 public:
-    static std::unique_ptr<TypeProfileEntry> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~TypeProfileEntry() override { }
 
     int getOffset() { return m_offset; }
@@ -675,10 +633,6 @@ public:
 
     protocol::Array<protocol::Profiler::TypeObject>* getTypes() { return m_types.get(); }
     void setTypes(std::unique_ptr<protocol::Array<protocol::Profiler::TypeObject>> value) { m_types = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<TypeProfileEntry> clone() const;
 
     template<int STATE>
     class TypeProfileEntryBuilder {
@@ -728,6 +682,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     TypeProfileEntry()
     {
           m_offset = 0;
@@ -738,11 +694,8 @@ private:
 };
 
 
-class  ScriptTypeProfile : public Serializable{
-    PROTOCOL_DISALLOW_COPY(ScriptTypeProfile);
+class  ScriptTypeProfile : public ::v8_crdtp::ProtocolObject<ScriptTypeProfile> {
 public:
-    static std::unique_ptr<ScriptTypeProfile> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~ScriptTypeProfile() override { }
 
     String getScriptId() { return m_scriptId; }
@@ -753,10 +706,6 @@ public:
 
     protocol::Array<protocol::Profiler::TypeProfileEntry>* getEntries() { return m_entries.get(); }
     void setEntries(std::unique_ptr<protocol::Array<protocol::Profiler::TypeProfileEntry>> value) { m_entries = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<ScriptTypeProfile> clone() const;
 
     template<int STATE>
     class ScriptTypeProfileBuilder {
@@ -814,6 +763,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     ScriptTypeProfile()
     {
     }
@@ -821,350 +772,6 @@ private:
     String m_scriptId;
     String m_url;
     std::unique_ptr<protocol::Array<protocol::Profiler::TypeProfileEntry>> m_entries;
-};
-
-
-class  CounterInfo : public Serializable{
-    PROTOCOL_DISALLOW_COPY(CounterInfo);
-public:
-    static std::unique_ptr<CounterInfo> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~CounterInfo() override { }
-
-    String getName() { return m_name; }
-    void setName(const String& value) { m_name = value; }
-
-    int getValue() { return m_value; }
-    void setValue(int value) { m_value = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<CounterInfo> clone() const;
-
-    template<int STATE>
-    class CounterInfoBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            NameSet = 1 << 1,
-            ValueSet = 1 << 2,
-            AllFieldsSet = (NameSet | ValueSet | 0)};
-
-
-        CounterInfoBuilder<STATE | NameSet>& setName(const String& value)
-        {
-            static_assert(!(STATE & NameSet), "property name should not be set yet");
-            m_result->setName(value);
-            return castState<NameSet>();
-        }
-
-        CounterInfoBuilder<STATE | ValueSet>& setValue(int value)
-        {
-            static_assert(!(STATE & ValueSet), "property value should not be set yet");
-            m_result->setValue(value);
-            return castState<ValueSet>();
-        }
-
-        std::unique_ptr<CounterInfo> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class CounterInfo;
-        CounterInfoBuilder() : m_result(new CounterInfo()) { }
-
-        template<int STEP> CounterInfoBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<CounterInfoBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Profiler::CounterInfo> m_result;
-    };
-
-    static CounterInfoBuilder<0> create()
-    {
-        return CounterInfoBuilder<0>();
-    }
-
-private:
-    CounterInfo()
-    {
-          m_value = 0;
-    }
-
-    String m_name;
-    int m_value;
-};
-
-
-class  ConsoleProfileFinishedNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(ConsoleProfileFinishedNotification);
-public:
-    static std::unique_ptr<ConsoleProfileFinishedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~ConsoleProfileFinishedNotification() override { }
-
-    String getId() { return m_id; }
-    void setId(const String& value) { m_id = value; }
-
-    protocol::Debugger::Location* getLocation() { return m_location.get(); }
-    void setLocation(std::unique_ptr<protocol::Debugger::Location> value) { m_location = std::move(value); }
-
-    protocol::Profiler::Profile* getProfile() { return m_profile.get(); }
-    void setProfile(std::unique_ptr<protocol::Profiler::Profile> value) { m_profile = std::move(value); }
-
-    bool hasTitle() { return m_title.isJust(); }
-    String getTitle(const String& defaultValue) { return m_title.isJust() ? m_title.fromJust() : defaultValue; }
-    void setTitle(const String& value) { m_title = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<ConsoleProfileFinishedNotification> clone() const;
-
-    template<int STATE>
-    class ConsoleProfileFinishedNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            IdSet = 1 << 1,
-            LocationSet = 1 << 2,
-            ProfileSet = 1 << 3,
-            AllFieldsSet = (IdSet | LocationSet | ProfileSet | 0)};
-
-
-        ConsoleProfileFinishedNotificationBuilder<STATE | IdSet>& setId(const String& value)
-        {
-            static_assert(!(STATE & IdSet), "property id should not be set yet");
-            m_result->setId(value);
-            return castState<IdSet>();
-        }
-
-        ConsoleProfileFinishedNotificationBuilder<STATE | LocationSet>& setLocation(std::unique_ptr<protocol::Debugger::Location> value)
-        {
-            static_assert(!(STATE & LocationSet), "property location should not be set yet");
-            m_result->setLocation(std::move(value));
-            return castState<LocationSet>();
-        }
-
-        ConsoleProfileFinishedNotificationBuilder<STATE | ProfileSet>& setProfile(std::unique_ptr<protocol::Profiler::Profile> value)
-        {
-            static_assert(!(STATE & ProfileSet), "property profile should not be set yet");
-            m_result->setProfile(std::move(value));
-            return castState<ProfileSet>();
-        }
-
-        ConsoleProfileFinishedNotificationBuilder<STATE>& setTitle(const String& value)
-        {
-            m_result->setTitle(value);
-            return *this;
-        }
-
-        std::unique_ptr<ConsoleProfileFinishedNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class ConsoleProfileFinishedNotification;
-        ConsoleProfileFinishedNotificationBuilder() : m_result(new ConsoleProfileFinishedNotification()) { }
-
-        template<int STEP> ConsoleProfileFinishedNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<ConsoleProfileFinishedNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Profiler::ConsoleProfileFinishedNotification> m_result;
-    };
-
-    static ConsoleProfileFinishedNotificationBuilder<0> create()
-    {
-        return ConsoleProfileFinishedNotificationBuilder<0>();
-    }
-
-private:
-    ConsoleProfileFinishedNotification()
-    {
-    }
-
-    String m_id;
-    std::unique_ptr<protocol::Debugger::Location> m_location;
-    std::unique_ptr<protocol::Profiler::Profile> m_profile;
-    Maybe<String> m_title;
-};
-
-
-class  ConsoleProfileStartedNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(ConsoleProfileStartedNotification);
-public:
-    static std::unique_ptr<ConsoleProfileStartedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~ConsoleProfileStartedNotification() override { }
-
-    String getId() { return m_id; }
-    void setId(const String& value) { m_id = value; }
-
-    protocol::Debugger::Location* getLocation() { return m_location.get(); }
-    void setLocation(std::unique_ptr<protocol::Debugger::Location> value) { m_location = std::move(value); }
-
-    bool hasTitle() { return m_title.isJust(); }
-    String getTitle(const String& defaultValue) { return m_title.isJust() ? m_title.fromJust() : defaultValue; }
-    void setTitle(const String& value) { m_title = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<ConsoleProfileStartedNotification> clone() const;
-
-    template<int STATE>
-    class ConsoleProfileStartedNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            IdSet = 1 << 1,
-            LocationSet = 1 << 2,
-            AllFieldsSet = (IdSet | LocationSet | 0)};
-
-
-        ConsoleProfileStartedNotificationBuilder<STATE | IdSet>& setId(const String& value)
-        {
-            static_assert(!(STATE & IdSet), "property id should not be set yet");
-            m_result->setId(value);
-            return castState<IdSet>();
-        }
-
-        ConsoleProfileStartedNotificationBuilder<STATE | LocationSet>& setLocation(std::unique_ptr<protocol::Debugger::Location> value)
-        {
-            static_assert(!(STATE & LocationSet), "property location should not be set yet");
-            m_result->setLocation(std::move(value));
-            return castState<LocationSet>();
-        }
-
-        ConsoleProfileStartedNotificationBuilder<STATE>& setTitle(const String& value)
-        {
-            m_result->setTitle(value);
-            return *this;
-        }
-
-        std::unique_ptr<ConsoleProfileStartedNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class ConsoleProfileStartedNotification;
-        ConsoleProfileStartedNotificationBuilder() : m_result(new ConsoleProfileStartedNotification()) { }
-
-        template<int STEP> ConsoleProfileStartedNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<ConsoleProfileStartedNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Profiler::ConsoleProfileStartedNotification> m_result;
-    };
-
-    static ConsoleProfileStartedNotificationBuilder<0> create()
-    {
-        return ConsoleProfileStartedNotificationBuilder<0>();
-    }
-
-private:
-    ConsoleProfileStartedNotification()
-    {
-    }
-
-    String m_id;
-    std::unique_ptr<protocol::Debugger::Location> m_location;
-    Maybe<String> m_title;
-};
-
-
-class  PreciseCoverageDeltaUpdateNotification : public Serializable{
-    PROTOCOL_DISALLOW_COPY(PreciseCoverageDeltaUpdateNotification);
-public:
-    static std::unique_ptr<PreciseCoverageDeltaUpdateNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-    ~PreciseCoverageDeltaUpdateNotification() override { }
-
-    double getTimestamp() { return m_timestamp; }
-    void setTimestamp(double value) { m_timestamp = value; }
-
-    String getOccassion() { return m_occassion; }
-    void setOccassion(const String& value) { m_occassion = value; }
-
-    protocol::Array<protocol::Profiler::ScriptCoverage>* getResult() { return m_result.get(); }
-    void setResult(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> value) { m_result = std::move(value); }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<PreciseCoverageDeltaUpdateNotification> clone() const;
-
-    template<int STATE>
-    class PreciseCoverageDeltaUpdateNotificationBuilder {
-    public:
-        enum {
-            NoFieldsSet = 0,
-            TimestampSet = 1 << 1,
-            OccassionSet = 1 << 2,
-            ResultSet = 1 << 3,
-            AllFieldsSet = (TimestampSet | OccassionSet | ResultSet | 0)};
-
-
-        PreciseCoverageDeltaUpdateNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
-        {
-            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
-            m_result->setTimestamp(value);
-            return castState<TimestampSet>();
-        }
-
-        PreciseCoverageDeltaUpdateNotificationBuilder<STATE | OccassionSet>& setOccassion(const String& value)
-        {
-            static_assert(!(STATE & OccassionSet), "property occassion should not be set yet");
-            m_result->setOccassion(value);
-            return castState<OccassionSet>();
-        }
-
-        PreciseCoverageDeltaUpdateNotificationBuilder<STATE | ResultSet>& setResult(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> value)
-        {
-            static_assert(!(STATE & ResultSet), "property result should not be set yet");
-            m_result->setResult(std::move(value));
-            return castState<ResultSet>();
-        }
-
-        std::unique_ptr<PreciseCoverageDeltaUpdateNotification> build()
-        {
-            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-            return std::move(m_result);
-        }
-
-    private:
-        friend class PreciseCoverageDeltaUpdateNotification;
-        PreciseCoverageDeltaUpdateNotificationBuilder() : m_result(new PreciseCoverageDeltaUpdateNotification()) { }
-
-        template<int STEP> PreciseCoverageDeltaUpdateNotificationBuilder<STATE | STEP>& castState()
-        {
-            return *reinterpret_cast<PreciseCoverageDeltaUpdateNotificationBuilder<STATE | STEP>*>(this);
-        }
-
-        std::unique_ptr<protocol::Profiler::PreciseCoverageDeltaUpdateNotification> m_result;
-    };
-
-    static PreciseCoverageDeltaUpdateNotificationBuilder<0> create()
-    {
-        return PreciseCoverageDeltaUpdateNotificationBuilder<0>();
-    }
-
-private:
-    PreciseCoverageDeltaUpdateNotification()
-    {
-          m_timestamp = 0;
-    }
-
-    double m_timestamp;
-    String m_occassion;
-    std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> m_result;
 };
 
 
@@ -1186,9 +793,6 @@ public:
     virtual DispatchResponse stopTypeProfile() = 0;
     virtual DispatchResponse takePreciseCoverage(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>>* out_result, double* out_timestamp) = 0;
     virtual DispatchResponse takeTypeProfile(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptTypeProfile>>* out_result) = 0;
-    virtual DispatchResponse enableRuntimeCallStats() = 0;
-    virtual DispatchResponse disableRuntimeCallStats() = 0;
-    virtual DispatchResponse getRuntimeCallStats(std::unique_ptr<protocol::Array<protocol::Profiler::CounterInfo>>* out_result) = 0;
 
 };
 
@@ -1199,7 +803,7 @@ public:
   explicit Frontend(FrontendChannel* frontend_channel) : frontend_channel_(frontend_channel) {}
     void consoleProfileFinished(const String& id, std::unique_ptr<protocol::Debugger::Location> location, std::unique_ptr<protocol::Profiler::Profile> profile, Maybe<String> title = Maybe<String>());
     void consoleProfileStarted(const String& id, std::unique_ptr<protocol::Debugger::Location> location, Maybe<String> title = Maybe<String>());
-    void preciseCoverageDeltaUpdate(double timestamp, const String& occassion, std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> result);
+    void preciseCoverageDeltaUpdate(double timestamp, const String& occasion, std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> result);
 
   void flush();
   void sendRawNotification(std::unique_ptr<Serializable>);

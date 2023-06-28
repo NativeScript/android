@@ -483,23 +483,86 @@ void MetadataNode::SuperAccessorGetterCallback(Local<Name> property, const Prope
     }
 }
 
-std::vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembers(Isolate* isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode* treeNode) {
+class MetadataNode::PrototypeTemplateFiller {
+public:
+    explicit PrototypeTemplateFiller(Local<ObjectTemplate> protoTemplate)
+        : m_protoTemplate(protoTemplate) {}
+
+    void FillPrototypeMethod(Isolate *isolate, const std::string& name,
+                             MethodCallbackData* methodInfo) {
+        if (m_addedNames.count(name) != 0) {
+            DEBUG_WRITE("Not defining method prototype.%s which has already been added", name.c_str());
+            return;
+        }
+
+        Local<External> funcData = External::New(isolate, methodInfo);
+        Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, MetadataNode::MethodCallback, funcData);
+        Local<String> nameString = ArgConverter::ConvertToV8String(isolate, name);
+        m_protoTemplate->Set(nameString, funcTemplate);
+        m_addedNames.insert(name);
+    }
+
+    void FillPrototypeField(Isolate* isolate, const std::string& name, FieldCallbackData* fieldInfo,
+                            AccessControl access = AccessControl::DEFAULT) {
+        if (m_addedNames.count(name) != 0) {
+            DEBUG_WRITE("Not defining field prototype.%s which already exists", name.c_str());
+            return;
+        }
+
+        Local<External> fieldData = External::New(isolate, fieldInfo);
+        Local<Name> nameString = ArgConverter::ConvertToV8String(isolate, name);
+        m_protoTemplate->SetAccessor(nameString, MetadataNode::FieldAccessorGetterCallback,
+                                     MetadataNode::FieldAccessorSetterCallback, fieldData, access,
+                                     PropertyAttribute::DontDelete);
+        m_addedNames.insert(name);
+    }
+
+    void FillPrototypeProperty(Isolate* isolate, const std::string& name,
+                               PropertyCallbackData* propertyInfo) {
+        if (m_addedNames.count(name) != 0) {
+            DEBUG_WRITE("Not defining property prototype.%s which already exists", name.c_str());
+            return;
+        }
+
+        Local<External> propertyData = External::New(isolate, propertyInfo);
+        Local<Name> nameString = ArgConverter::ConvertToV8String(isolate, name);
+        m_protoTemplate->SetAccessor(nameString, MetadataNode::PropertyAccessorGetterCallback,
+                                     MetadataNode::PropertyAccessorSetterCallback, propertyData,
+                                     AccessControl::DEFAULT, PropertyAttribute::DontDelete);
+        m_addedNames.insert(name);
+    }
+
+private:
+    Local<ObjectTemplate> m_protoTemplate;
+    std::unordered_set<std::string> m_addedNames;
+};
+
+std::vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembers(
+        Isolate* isolate, Local<FunctionTemplate>& ctorFuncTemplate,
+        PrototypeTemplateFiller& protoFiller,
+        vector<MethodCallbackData*>& instanceMethodsCallbackData,
+        const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData,
+        MetadataTreeNode* treeNode) {
     auto hasCustomMetadata = treeNode->metadata != nullptr;
 
     if (hasCustomMetadata) {
-        return SetInstanceMembersFromRuntimeMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
-    } else {
-        SetInstanceFieldsFromStaticMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
-        return SetInstanceMethodsFromStaticMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
+        return SetInstanceMembersFromRuntimeMetadata(
+            isolate, protoFiller, instanceMethodsCallbackData,
+            baseInstanceMethodsCallbackData, treeNode);
     }
+
+    SetInstanceFieldsFromStaticMetadata(isolate, protoFiller, treeNode);
+    return SetInstanceMethodsFromStaticMetadata(
+        isolate, ctorFuncTemplate, protoFiller, instanceMethodsCallbackData,
+        baseInstanceMethodsCallbackData, treeNode);
 }
 
-vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromStaticMetadata(Isolate *isolate,
-                                                   Local<FunctionTemplate> &ctorFuncTemplate,
-                                                   Local<ObjectTemplate> &prototypeTemplate,
-                                                   vector<MethodCallbackData *> &instanceMethodsCallbackData,
-                                                   const vector<MethodCallbackData *> &baseInstanceMethodsCallbackData,
-                                                   MetadataTreeNode *treeNode) {
+vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromStaticMetadata(
+        Isolate *isolate, Local<FunctionTemplate> &ctorFuncTemplate,
+        PrototypeTemplateFiller& protoFiller,
+        vector<MethodCallbackData *> &instanceMethodsCallbackData,
+        const vector<MethodCallbackData *> &baseInstanceMethodsCallbackData,
+        MetadataTreeNode *treeNode) {
     SET_PROFILER_FRAME();
 
     std::vector<MethodCallbackData *> instanceMethodData;
@@ -520,7 +583,6 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
     MethodCallbackData *callbackData = nullptr;
 
     auto context = isolate->GetCurrentContext();
-    auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
 
     std::unordered_map<std::string, MethodCallbackData *> collectedExtensionMethodDatas;
 
@@ -535,10 +597,7 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
                                                              entry.name);
             if (callbackData == nullptr) {
                 callbackData = new MethodCallbackData(this);
-                auto funcData = External::New(isolate, callbackData);
-                auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
-                auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
-                prototypeTemplate->Set(funcName, funcTemplate);
+                protoFiller.FillPrototypeMethod(isolate, entry.name, callbackData);
 
                 lastMethodName = entry.name;
                 std::pair<std::string, MethodCallbackData *> p(entry.name, callbackData);
@@ -581,13 +640,11 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
                 callbackData->parent = *itFound;
             }
 
-            auto funcData = External::New(isolate, callbackData);
-            auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
-
-            auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
-
             if (s_profilerEnabled) {
+                Local<External> funcData = External::New(isolate, callbackData);
+                Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
                 auto func = funcTemplate->GetFunction(context).ToLocalChecked();
+                std::string origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
                 Local<Function> wrapperFunc = Wrap(isolate, func, entry.name, origin,
                                                    false /* isCtorFunc */);
                 Local<Function> ctorFunc = ctorFuncTemplate->GetFunction(context).ToLocalChecked();
@@ -595,11 +652,12 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
                 ctorFunc->Get(context,
                               ArgConverter::ConvertToV8String(isolate, "prototype")).ToLocal(
                         &protoVal);
+                Local<String> funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
                 if (!protoVal.IsEmpty() && !protoVal->IsUndefined() && !protoVal->IsNull()) {
                     protoVal.As<Object>()->Set(context, funcName, wrapperFunc);
                 }
             } else {
-                prototypeTemplate->Set(funcName, funcTemplate);
+                protoFiller.FillPrototypeMethod(isolate, entry.name, callbackData);
             }
 
             lastMethodName = entry.name;
@@ -628,7 +686,8 @@ MetadataNode::MethodCallbackData *MetadataNode::tryGetExtensionMethodCallbackDat
     return nullptr;
 }
 
-void MetadataNode::SetInstanceFieldsFromStaticMetadata(Isolate* isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode* treeNode) {
+void MetadataNode::SetInstanceFieldsFromStaticMetadata(
+        Isolate* isolate, PrototypeTemplateFiller& prototypeTemplate, MetadataTreeNode* treeNode) {
     SET_PROFILER_FRAME();
 
     Local<Function> ctorFunction;
@@ -665,12 +724,9 @@ void MetadataNode::SetInstanceFieldsFromStaticMetadata(Isolate* isolate, Local<F
     curPtr += sizeof(uint16_t);
     for (auto i = 0; i < instanceFieldCout; i++) {
         auto entry = s_metadataReader.ReadInstanceFieldEntry(&curPtr);
-
-        auto fieldName = ArgConverter::ConvertToV8String(isolate, entry.name);
         auto fieldInfo = new FieldCallbackData(entry);
         fieldInfo->declaringType = curType;
-        auto fieldData = External::New(isolate, fieldInfo);
-        prototypeTemplate->SetAccessor(fieldName, FieldAccessorGetterCallback, FieldAccessorSetterCallback, fieldData, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
+        prototypeTemplate.FillPrototypeField(isolate, entry.name, fieldInfo);
     }
 
     auto kotlinPropertiesCount = *reinterpret_cast<uint16_t*>(curPtr);
@@ -699,12 +755,15 @@ void MetadataNode::SetInstanceFieldsFromStaticMetadata(Isolate* isolate, Local<F
         }
 
         auto propertyInfo = new PropertyCallbackData(propertyName, getterMethodName, setterMethodName);
-        auto propertyData = External::New(isolate, propertyInfo);
-        prototypeTemplate->SetAccessor(ArgConverter::ConvertToV8String(isolate, propertyName), PropertyAccessorGetterCallback, PropertyAccessorSetterCallback, propertyData, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
+        prototypeTemplate.FillPrototypeProperty(isolate, propertyName, propertyInfo);
     }
 }
 
-vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembersFromRuntimeMetadata(Isolate* isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode* treeNode) {
+vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembersFromRuntimeMetadata(
+        Isolate* isolate, PrototypeTemplateFiller& protoFiller,
+        vector<MethodCallbackData*>& instanceMethodsCallbackData,
+        const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData,
+        MetadataTreeNode* treeNode) {
     SET_PROFILER_FRAME();
 
     assert(treeNode->metadata != nullptr);
@@ -757,18 +816,14 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembersFromRu
                     callbackData->parent = *itFound;
                 }
 
-                auto funcData = External::New(isolate, callbackData);
-                auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
-                auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
-                prototypeTemplate->Set(funcName, funcTemplate);
+                protoFiller.FillPrototypeMethod(isolate, entry.name, callbackData);
                 lastMethodName = entry.name;
             }
             callbackData->candidates.push_back(entry);
         } else if (chKind == 'F') {
-            auto fieldName = ArgConverter::ConvertToV8String(isolate, entry.name);
-            auto fieldData = External::New(isolate, new FieldCallbackData(entry));
+            auto* fieldInfo = new FieldCallbackData(entry);
             auto access = entry.isFinal ? AccessControl::ALL_CAN_READ : AccessControl::DEFAULT;
-            prototypeTemplate->SetAccessor(fieldName, FieldAccessorGetterCallback, FieldAccessorSetterCallback, fieldData, access, PropertyAttribute::DontDelete);
+            protoFiller.FillPrototypeField(isolate, entry.name, fieldInfo, access);
         }
     }
     return instanceMethodData;
@@ -922,7 +977,6 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
 
     auto node = GetOrCreateInternal(treeNode);
 
-
     JEnv env;
     // if we already have an exception (which will be rethrown later)
     // then we don't want to ignore the next exception
@@ -975,11 +1029,13 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
         break;
     }
 
-    auto prototypeTemplate = ctorFuncTemplate->PrototypeTemplate();
+    PrototypeTemplateFiller protoFiller{ctorFuncTemplate->PrototypeTemplate()};
 
-    auto instanceMethodData = node->SetInstanceMembers(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
+    auto instanceMethodData = node->SetInstanceMembers(
+            isolate, ctorFuncTemplate, protoFiller, instanceMethodsCallbackData,
+            baseInstanceMethodsCallbackData, treeNode);
     if (!skippedBaseTypes.empty()) {
-        node->SetMissingBaseMethods(isolate, skippedBaseTypes, instanceMethodData, prototypeTemplate);
+        node->SetMissingBaseMethods(isolate, skippedBaseTypes, instanceMethodData, protoFiller);
     }
 
     auto context = isolate->GetCurrentContext();
@@ -998,10 +1054,10 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
         wrappedCtorFunc->SetPrototype(context, baseCtorFunc);
     }
 
-    //cache "ctorFuncTemplate"
-    auto pft = new Persistent<FunctionTemplate>(isolate, ctorFuncTemplate);
-    CtorCacheData ctorCacheItem(pft, instanceMethodsCallbackData);
-    cache->CtorFuncCache.insert(make_pair(treeNode, ctorCacheItem));
+   //cache "ctorFuncTemplate"
+   auto pft = new Persistent<FunctionTemplate>(isolate, ctorFuncTemplate);
+   CtorCacheData ctorCacheItem(pft, instanceMethodsCallbackData);
+   cache->CtorFuncCache.insert(make_pair(treeNode, ctorCacheItem));
 
     SetInnerTypes(isolate, wrappedCtorFunc, treeNode);
 
@@ -2027,7 +2083,7 @@ Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& func
     TryCatch tc(isolate);
 
     Local<Script> script;
-    ScriptOrigin jsOrigin(ArgConverter::ConvertToV8String(isolate, origin));
+    ScriptOrigin jsOrigin(isolate, ArgConverter::ConvertToV8String(isolate, origin));
     auto maybeScript = Script::Compile(context, source, &jsOrigin).ToLocal(&script);
 
     if (tc.HasCaught()) {
@@ -2076,7 +2132,10 @@ bool MetadataNode::CheckClassHierarchy(JEnv& env, jclass currentClass, MetadataT
  * This method handles scenrios like Bundle/BaseBundle class hierarchy change in API level 21.
  * See https://github.com/NativeScript/android-runtime/issues/628
  */
-void MetadataNode::SetMissingBaseMethods(Isolate* isolate, const vector<MetadataTreeNode*>& skippedBaseTypes, const vector<MethodCallbackData*>& instanceMethodData, Local<ObjectTemplate>& prototypeTemplate) {
+void MetadataNode::SetMissingBaseMethods(
+        Isolate* isolate, const vector<MetadataTreeNode*>& skippedBaseTypes,
+        const vector<MethodCallbackData*>& instanceMethodData,
+        PrototypeTemplateFiller& protoFiller) {
     for (auto treeNode: skippedBaseTypes) {
         uint8_t* curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
 
@@ -2112,11 +2171,7 @@ void MetadataNode::SetMissingBaseMethods(Isolate* isolate, const vector<Metadata
 
             if (callbackData == nullptr) {
                 callbackData = new MethodCallbackData(this);
-
-                auto funcData = External::New(isolate, callbackData);
-                auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
-                auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
-                prototypeTemplate->Set(funcName, funcTemplate);
+                protoFiller.FillPrototypeMethod(isolate, entry.name, callbackData);
             }
 
             bool foundSameSig = false;
@@ -2172,6 +2227,7 @@ void MetadataNode::SymbolHasInstanceCallback(const v8::FunctionCallbackInfo<v8::
     auto isolate = info.GetIsolate();
     auto context = isolate->GetCurrentContext();
     auto runtime = Runtime::GetRuntime(isolate);
+
     auto objectManager = runtime->GetObjectManager();
     auto obj = objectManager->GetJavaObjectByJsObject(arg->ToObject(context).ToLocalChecked());
 

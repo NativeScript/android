@@ -11,6 +11,7 @@
 #include "ModuleInternal.h"
 #include "MessageLoopTimer.h"
 #include "File.h"
+#include "Timers.h"
 #include <mutex>
 #include <android/looper.h>
 #include <fcntl.h>
@@ -28,6 +29,8 @@ class Runtime {
         static Runtime* GetRuntime(int runtimeId);
 
         static Runtime* GetRuntime(v8::Isolate* isolate);
+
+        static Runtime* GetRuntimeFromIsolateData(v8::Isolate* isolate);
 
         static ObjectManager* GetObjectManager(v8::Isolate* isolate);
 
@@ -57,7 +60,6 @@ class Runtime {
         bool TryCallGC();
         void PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring message, jstring fullStackTrace, jstring jsStackTrace, jboolean isDiscarded);
         void PassUncaughtExceptionFromWorkerToMainHandler(v8::Local<v8::String> message, v8::Local<v8::String> stackTrace, v8::Local<v8::String> filename, int lineno);
-        void ClearStartupData(JNIEnv* env, jobject obj);
         void DestroyRuntime();
 
         void Lock();
@@ -92,12 +94,11 @@ class Runtime {
 
         WeakRef m_weakRef;
 
+        Timers m_timers;
+
         Profiler m_profiler;
 
         MessageLoopTimer* m_loopTimer;
-
-        v8::StartupData* m_startupData = nullptr;
-        MemoryMappedFile* m_heapSnapshotBlob = nullptr;
 
         int64_t m_lastUsedMemory;
 
@@ -110,14 +111,12 @@ class Runtime {
 
         v8::Isolate* PrepareV8Runtime(const std::string& filesPath, const std::string& nativeLibsDir, const std::string& packageName, bool isDebuggable, const std::string& callingDir, const std::string& profilerOutputDir, const int maxLogcatObjectSize, const bool forceLog);
         jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
-        static v8::StartupData CreateSnapshotDataBlob(const char* embedded_source);
-        static bool RunExtraCode(v8::Isolate* isolate, v8::Local<v8::Context> context, const char* utf8_source, const char* name);
         static int GetAndroidVersion();
         static int m_androidVersion;
 
         static std::map<int, Runtime*> s_id2RuntimeCache;
 
-        static std::map<v8::Isolate*, Runtime*> s_isolate2RuntimesCache;
+        static std::unordered_map<v8::Isolate*, Runtime*> s_isolate2RuntimesCache;
 
         static JavaVM* s_jvm;
 

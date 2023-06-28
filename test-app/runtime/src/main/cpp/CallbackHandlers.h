@@ -284,8 +284,6 @@ namespace tns {
             jobject _runtime;
         };
 
-        static void RemoveKey(const uint64_t key);
-
         static std::atomic_int64_t count_;
 
 
@@ -299,15 +297,17 @@ namespace tns {
 
 
         struct CacheEntry {
-            CacheEntry(v8::Isolate* isolate, v8::Local<v8::Function> callback, v8::Local<v8::Context> context)
+            CacheEntry(v8::Isolate* isolate, v8::Local<v8::Function> callback)
                     : isolate_(isolate),
-                      callback_(isolate, callback),
-                      context_(isolate, context){
+                      callback_(isolate, callback) {
+            }
+
+            ~CacheEntry() {
+                callback_.Reset();
             }
 
             v8::Isolate* isolate_;
             v8::Global<v8::Function> callback_;
-            v8::Global<v8::Context> context_;
         };
 
         static robin_hood::unordered_map<uint64_t, CacheEntry> cache_;
@@ -316,17 +316,19 @@ namespace tns {
         static std::atomic_uint64_t frameCallbackCount_;
 
         struct FrameCallbackCacheEntry {
-            FrameCallbackCacheEntry(v8::Isolate *isolate, v8::Local<v8::Function> callback, v8::Local<v8::Context> context)
-                    : isolate_(isolate),
-                      callback_(isolate,callback),
-                      context_(isolate, context)
-                      {
+            FrameCallbackCacheEntry(v8::Isolate *isolate, v8::Local<v8::Function> callback, uint64_t aId)
+                : isolate_(isolate),
+                  callback_(isolate, callback),
+                  id(aId) {
+            }
+
+            ~FrameCallbackCacheEntry() {
+                callback_.Reset();
             }
 
             v8::Isolate *isolate_;
             v8::Global<v8::Function> callback_;
-            v8::Global<v8::Context> context_;
-            bool removed;
+            bool removed = false;
             uint64_t id;
 
             AChoreographer_frameCallback frameCallback_ = [](long ts, void *data) {
@@ -341,6 +343,7 @@ namespace tns {
                 if (data != nullptr) {
                     auto entry = static_cast<FrameCallbackCacheEntry *>(data);
                     if (entry->removed) {
+                        frameCallbackCache_.erase(entry->id);  // invalidates *entry
                         return;
                     }
                     v8::Isolate *isolate = entry->isolate_;
@@ -348,19 +351,17 @@ namespace tns {
                     v8::Locker locker(isolate);
                     v8::Isolate::Scope isolate_scope(isolate);
                     v8::HandleScope handle_scope(isolate);
-                    auto context = entry->context_.Get(isolate);
-                    v8::Context::Scope context_scope(context);
-
                     v8::Local<v8::Function> cb = entry->callback_.Get(isolate);
-                    v8::Local<v8::Value> result;
+                    v8::Local<v8::Context> context = cb->GetCreationContextChecked();
+                    v8::Context::Scope context_scope(context);
 
                     v8::Local<v8::Value> args[1] = {v8::Number::New(isolate, ts)};
 
                     v8::TryCatch tc(isolate);
 
-                    if (!cb->Call(context, context->Global(), 1, args).ToLocal(&result)) {
-                        // TODO
-                    }
+                    cb->Call(context, context->Global(), 1, args);  // ignore JS return value
+
+                    frameCallbackCache_.erase(entry->id);  // invalidates *entry
 
                     if(tc.HasCaught()){
                         throw NativeScriptException(tc);

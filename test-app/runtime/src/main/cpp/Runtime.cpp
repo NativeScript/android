@@ -15,7 +15,6 @@
 #include "SimpleAllocator.h"
 #include "ModuleInternal.h"
 #include "NativeScriptException.h"
-#include "V8NativeScriptExtension.h"
 #include "Runtime.h"
 #include "ArrayHelper.h"
 #include "include/libplatform/libplatform.h"
@@ -25,18 +24,16 @@
 #include <mutex>
 #include <dlfcn.h>
 #include <console/Console.h>
-#include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
 #include "ManualInstrumentation.h"
-#include <snapshot_blob.h>
 #include "IsolateDisposer.h"
 #include <unistd.h>
 #include <thread>
 #include "File.h"
 
 #ifdef APPLICATION_IN_DEBUG
+// #include "NetworkDomainCallbackHandlers.h"
 #include "JsV8InspectorClient.h"
-#include "v8_inspector/src/inspector/v8-inspector-platform.h"
 #endif
 
 using namespace v8;
@@ -128,10 +125,20 @@ Runtime* Runtime::GetRuntime(int runtimeId) {
 }
 
 Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
-    auto itFound = s_isolate2RuntimesCache.find(isolate);
-    auto runtime = (itFound != s_isolate2RuntimesCache.end())
-                   ? itFound->second
-                   : nullptr;
+    auto runtime = s_isolate2RuntimesCache.at(isolate);
+
+    if (runtime == nullptr) {
+        stringstream ss;
+        ss << "Cannot find runtime for isolate: " << isolate;
+        throw NativeScriptException(ss.str());
+    }
+
+    return runtime;
+}
+
+Runtime* Runtime::GetRuntimeFromIsolateData(v8::Isolate* isolate) {
+    void* maybeRuntime = isolate->GetData((uint32_t)Runtime::IsolateData::RUNTIME);
+    auto runtime = static_cast<Runtime*>(maybeRuntime);
 
     if (runtime == nullptr) {
         stringstream ss;
@@ -143,18 +150,7 @@ Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
 }
 
 ObjectManager* Runtime::GetObjectManager(v8::Isolate* isolate) {
-    auto itFound = s_isolate2RuntimesCache.find(isolate);
-    auto runtime = (itFound != s_isolate2RuntimesCache.end())
-                   ? itFound->second
-                   : nullptr;
-
-    if (runtime == nullptr) {
-        stringstream ss;
-        ss << "Cannot find runtime for isolate: " << isolate;
-        throw NativeScriptException(ss.str());
-    }
-
-    return runtime->GetObjectManager();
+    return GetRuntime(isolate)->GetObjectManager();
 }
 
 Isolate* Runtime::GetIsolate() const {
@@ -189,15 +185,12 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir, bool ve
 
     Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
     // read config options passed from Java
+    // Indices correspond to positions in the com.tns.AppConfig.KnownKeys enum
     JniLocalRef v8Flags(env->GetObjectArrayElement(args, 0));
     Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
     JniLocalRef cacheCode(env->GetObjectArrayElement(args, 1));
     Constants::V8_CACHE_COMPILED_CODE = (bool) cacheCode;
-    JniLocalRef snapshotScript(env->GetObjectArrayElement(args, 2));
-    Constants::V8_HEAP_SNAPSHOT_SCRIPT = ArgConverter::jstringToString(snapshotScript);
-    JniLocalRef snapshotBlob(env->GetObjectArrayElement(args, 3));
-    Constants::V8_HEAP_SNAPSHOT_BLOB = ArgConverter::jstringToString(snapshotBlob);
-    JniLocalRef profilerOutputDir(env->GetObjectArrayElement(args, 4));
+    JniLocalRef profilerOutputDir(env->GetObjectArrayElement(args, 2));
 
     DEBUG_WRITE("Initializing Telerik NativeScript");
 
@@ -210,8 +203,6 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir, bool ve
 Runtime::~Runtime() {
     delete this->m_objectManager;
     delete this->m_loopTimer;
-    delete this->m_heapSnapshotBlob;
-    delete this->m_startupData;
     CallbackHandlers::RemoveIsolateEntries(m_isolate);
     if (m_isMainThread) {
         if (m_mainLooper_fd[0] != -1) {
@@ -279,7 +270,7 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
     TryCatch tc(isolate);
 
     Local<Script> script;
-    ScriptOrigin origin(ArgConverter::ConvertToV8String(isolate, filename));
+    ScriptOrigin origin(isolate, ArgConverter::ConvertToV8String(isolate, filename));
     auto maybeScript = Script::Compile(context, source, &origin).ToLocal(&script);
 
     if (tc.HasCaught()) {
@@ -463,24 +454,8 @@ void Runtime::PassUncaughtExceptionFromWorkerToMainHandler(Local<v8::String> mes
     env.CallStaticVoidMethod(runtimeClass, mId, (jstring) jMsgLocal, (jstring) jfileNameLocal, (jstring) stTrace, lineno);
 }
 
-void Runtime::ClearStartupData(JNIEnv* env, jobject obj) {
-    delete m_heapSnapshotBlob;
-    delete m_startupData;
-}
-
 static void InitializeV8() {
-    Runtime::platform =
-#ifdef APPLICATION_IN_DEBUG
-        // The default V8 platform isn't Chrome DevTools compatible. The frontend uses the
-        // Runtime.evaluate protocol command with timeout flag for every execution in the console.
-        // The default platform doesn't implement executing delayed javascript code from a background
-        // thread. To avoid implementing a full blown scheduler, we use the default platform with a
-        // timeout=0 flag.
-        V8InspectorPlatform::CreateDefaultPlatform();
-#else
-        v8::platform::NewDefaultPlatform().release();
-#endif
-
+    Runtime::platform = v8::platform::NewDefaultPlatform().release();
     V8::InitializePlatform(Runtime::platform);
     V8::Initialize();
 }
@@ -489,119 +464,14 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     tns::instrumentation::Frame frame("Runtime.PrepareV8Runtime");
 
     Isolate::CreateParams create_params;
-    bool didInitializeV8 = false;
 
     create_params.array_buffer_allocator = &g_allocator;
-
-    m_startupData = new StartupData();
-
-    void* snapshotPtr = nullptr;
-    string snapshotPath;
-    bool snapshotPathExists = false;
-
-    // If device isn't running on Sdk 17
-    if (m_androidVersion != 17) {
-        snapshotPath = "libsnapshot.so";
-    } else {
-        // If device is running on android Sdk 17
-        // dlopen reads relative path to dynamic libraries or reads from folder different than the nativeLibsDirs on the android device
-        snapshotPath = nativeLibDir + "/libsnapshot.so";
-    }
-
-    snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
-    if (snapshotPtr == nullptr) {
-        auto ignoredSearchValue = string("library \"" + snapshotPath + "\" not found");
-        auto currentError = dlerror();
-        std::string stringError(currentError);
-        if (stringError.find(ignoredSearchValue) == std::string::npos) {
-            DEBUG_WRITE_FORCE("Failed to load snapshot: %s", currentError);
-        }
-    }
-
-    bool isCustomSnapshotFound = false;
-    if (snapshotPtr) {
-        m_startupData->data = static_cast<const char*>(dlsym(snapshotPtr, "TNSSnapshot_blob"));
-        m_startupData->raw_size = *static_cast<const unsigned int*>(dlsym(snapshotPtr, "TNSSnapshot_blob_len"));
-        V8::SetSnapshotDataBlob(m_startupData);
-        isCustomSnapshotFound = true;
-        DEBUG_WRITE_FORCE("Snapshot library read %p (%dB).", m_startupData->data, m_startupData->raw_size);
-    } else if (!Constants::V8_HEAP_SNAPSHOT_BLOB.empty() || !Constants::V8_HEAP_SNAPSHOT_SCRIPT.empty()) {
-        DEBUG_WRITE_FORCE("Snapshot enabled.");
-
-        bool saveSnapshot = true;
-        // we have a precompiled snapshot blob provided - try to load it directly
-        if (!Constants::V8_HEAP_SNAPSHOT_BLOB.empty()) {
-            snapshotPath = Constants::V8_HEAP_SNAPSHOT_BLOB;
-            snapshotPathExists = File::Exists(snapshotPath);
-            saveSnapshot = false;
-        } else {
-            std::string oldSnapshotBlobPath = filesPath + "/internal/snapshot.blob";
-            std::string snapshotBlobPath = filesPath + "/internal/TNSSnapshot.blob";
-
-            bool oldSnapshotExists = File::Exists(oldSnapshotBlobPath);
-            bool snapshotExists = File::Exists(snapshotBlobPath);
-
-            snapshotPathExists = oldSnapshotExists || snapshotExists;
-            snapshotPath = oldSnapshotExists ? oldSnapshotBlobPath : snapshotBlobPath;
-        }
-
-        if (snapshotPathExists) {
-            m_heapSnapshotBlob = new MemoryMappedFile(MemoryMappedFile::Open(snapshotPath.c_str()));
-            m_startupData->data = static_cast<const char*>(m_heapSnapshotBlob->memory);
-            m_startupData->raw_size = m_heapSnapshotBlob->size;
-            V8::SetSnapshotDataBlob(m_startupData);
-            isCustomSnapshotFound = true;
-            DEBUG_WRITE_FORCE("Snapshot read %s (%zuB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
-        } else if (!saveSnapshot) {
-            throw NativeScriptException("No snapshot file found at: " + snapshotPath);
-        } else {
-            // This should be executed before V8::Initialize, which calls it with false.
-            NativeScriptExtension::CpuFeaturesProbe(true);
-            InitializeV8();
-            didInitializeV8 = true;
-
-            string customScript;
-
-            // check for custom script to include in the snapshot
-            if (!Constants::V8_HEAP_SNAPSHOT_SCRIPT.empty() && File::Exists(Constants::V8_HEAP_SNAPSHOT_SCRIPT)) {
-                customScript = ReadFileText(Constants::V8_HEAP_SNAPSHOT_SCRIPT);
-            }
-
-            DEBUG_WRITE_FORCE("Creating heap snapshot");
-            *m_startupData = Runtime::CreateSnapshotDataBlob(customScript.c_str());
-
-            if (m_startupData->raw_size == 0) {
-                DEBUG_WRITE_FORCE("Failed to create heap snapshot.");
-            } else {
-                bool writeSuccess = File::WriteBinary(snapshotPath, m_startupData->data, m_startupData->raw_size);
-
-                if (!writeSuccess) {
-                    DEBUG_WRITE_FORCE("Failed to save created snapshot.");
-                } else {
-                    DEBUG_WRITE_FORCE("Saved snapshot of %s (%zuB) in %s (%dB)",
-                                      Constants::V8_HEAP_SNAPSHOT_SCRIPT.c_str(), customScript.size(),
-                                      snapshotPath.c_str(), m_startupData->raw_size);
-                }
-            }
-
-            V8::SetSnapshotDataBlob(m_startupData);
-            isCustomSnapshotFound = true;
-        }
-    }
-
-    if (!isCustomSnapshotFound) {
-        // Load V8's built-in snapshot
-        auto* snapshotBlobStartupData = new StartupData();
-        snapshotBlobStartupData->data = reinterpret_cast<const char*>(&snapshot_blob_bin[0]);
-        snapshotBlobStartupData->raw_size = snapshot_blob_bin_len;
-        V8::SetSnapshotDataBlob(snapshotBlobStartupData);
-    }
 
     /*
      * Setup the V8Platform only once per process - once for the application lifetime
      * Don't execute again if main thread has already been initialized
      */
-    if (!didInitializeV8 && !s_mainThreadInitialized) {
+    if (!s_mainThreadInitialized) {
         InitializeV8();
     }
 
@@ -609,7 +479,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     auto isolate = Isolate::New(create_params);
     isolateFrame.log("Isolate.New");
 
-    s_isolate2RuntimesCache.insert(make_pair(isolate, this));
+    s_isolate2RuntimesCache[isolate] = this;
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handleScope(isolate);
@@ -618,6 +488,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     // Sets a structure with v8 String constants on the isolate object at slot 1
     auto consts = new V8StringConstants::PerIsolateV8Constants(isolate);
+    isolate->SetData((uint32_t)Runtime::IsolateData::RUNTIME, this);
     isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, consts);
 
     V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
@@ -707,20 +578,21 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     }
 #endif
 
-    m_weakRef.Init(isolate, globalTemplate, m_objectManager);
-
     SimpleProfiler::Init(isolate, globalTemplate);
 
     CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
 
+    m_timers.Init(isolate, globalTemplate);
+
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
-    context->Enter();
+
+    auto global = context->Global();
+
+    v8::Context::Scope contextScope{context};
 
     m_objectManager->Init(isolate);
 
     m_module.Init(isolate, callingDir);
-
-    auto global = context->Global();
 
     Local<Value> gcFunc;
     global->Get(context, ArgConverter::ConvertToV8String(isolate, "gc")).ToLocal(&gcFunc);
@@ -730,6 +602,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "global"), global, readOnlyFlags);
     global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "__global"), global, readOnlyFlags);
+    m_weakRef.Init(isolate, context);
 
     // Do not set 'self' accessor to main thread JavaScript
     if (s_mainThreadInitialized) {
@@ -795,60 +668,6 @@ void Runtime::SetManualInstrumentationMode(jstring mode) {
     }
 }
 
-StartupData Runtime::CreateSnapshotDataBlob(const char* embedded_source) {
-    // Create a new isolate and a new context from scratch, optionally run
-    // a script to embed, and serialize to create a snapshot blob.
-    StartupData result = {nullptr, 0};
-    {
-        SnapshotCreator snapshot_creator;
-        Isolate* isolate = snapshot_creator.GetIsolate();
-        {
-            HandleScope scope(isolate);
-            Local<Context> context = Context::New(isolate);
-            if (embedded_source != nullptr &&
-                    !Runtime::RunExtraCode(isolate, context, embedded_source, "<embedded>")) {
-                return result;
-            }
-            snapshot_creator.SetDefaultContext(context);
-        }
-        result = snapshot_creator.CreateBlob(
-                     SnapshotCreator::FunctionCodeHandling::kClear);
-    }
-
-    return result;
-}
-
-bool Runtime::RunExtraCode(Isolate* isolate, Local<Context> context, const char* utf8_source, const char* name) {
-    Context::Scope context_scope(context);
-    TryCatch try_catch(isolate);
-    Local<v8::String> source_string;
-    if (!v8::String::NewFromUtf8(isolate, utf8_source, NewStringType::kNormal).ToLocal(&source_string)) {
-        return false;
-    }
-    Local<v8::String> resource_name = v8::String::NewFromUtf8(isolate, name, NewStringType::kNormal).ToLocalChecked();
-    ScriptOrigin origin(resource_name);
-    ScriptCompiler::Source source(source_string, origin);
-    Local<Script> script;
-    if (!ScriptCompiler::Compile(context, &source).ToLocal(&script)) {
-        DEBUG_WRITE_FORCE("# Script compile failed in %s@%d:%d\n%s\n",
-                          *v8::String::Utf8Value(isolate, try_catch.Message()->GetScriptResourceName()),
-                          try_catch.Message()->GetLineNumber(context).FromJust(),
-                          try_catch.Message()->GetStartColumn(context).FromJust(),
-                          *v8::String::Utf8Value(isolate, try_catch.Exception()));
-        return false;
-    }
-    if (script->Run(context).IsEmpty()) {
-        DEBUG_WRITE_FORCE("# Script run failed in %s@%d:%d\n%s\n",
-                          *v8::String::Utf8Value(isolate, try_catch.Message()->GetScriptResourceName()),
-                          try_catch.Message()->GetLineNumber(context).FromJust(),
-                          try_catch.Message()->GetStartColumn(context).FromJust(),
-                          *v8::String::Utf8Value(isolate, try_catch.Exception()));
-        return false;
-    }
-    CHECK(!try_catch.HasCaught());
-    return true;
-}
-
 void Runtime::DestroyRuntime() {
     s_id2RuntimeCache.erase(m_id);
     s_isolate2RuntimesCache.erase(m_isolate);
@@ -874,7 +693,7 @@ int Runtime::GetReader(){
 JavaVM* Runtime::s_jvm = nullptr;
 jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
-map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
+unordered_map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 bool Runtime::s_mainThreadInitialized = false;
 v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();

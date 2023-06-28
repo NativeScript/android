@@ -9,8 +9,12 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <string>
+#include <vector>
 #include <V8GlobalHelpers.h>
 #include <NativeScriptException.h>
+
+#include "ArgConverter.h"
 #include "Console.h"
 
 namespace tns {
@@ -18,7 +22,6 @@ namespace tns {
 v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, ConsoleCallback callback, const int maxLogcatObjectSize, const bool forceLog) {
     m_callback = callback;
     m_maxLogcatObjectSize = maxLogcatObjectSize;
-    m_forceLog = forceLog;
     v8::Context::Scope contextScope(context);
     v8::Isolate* isolate = context->GetIsolate();
 
@@ -67,33 +70,47 @@ void Console::sendToADBLogcat(const std::string& message, android_LogPriority lo
     }
 }
 
-void Console::sendToDevToolsFrontEnd(v8::Isolate* isolate, const std::string& message, const std::string& logLevel) {
-    if (m_callback != nullptr) {
-        m_callback(isolate, message, logLevel);
+void Console::sendToDevToolsFrontEnd(v8::Isolate* isolate, ConsoleAPIType method, const v8::FunctionCallbackInfo<v8::Value>& args) {
+    if (!m_callback) {
+        return;
     }
+
+    std::vector<v8::Local<v8::Value>> arg_vector;
+    unsigned nargs = args.Length();
+    arg_vector.reserve(nargs);
+    for (unsigned ix = 0; ix < nargs; ix++)
+        arg_vector.push_back(args[ix]);
+
+    m_callback(isolate, method, arg_vector);
 }
 
-const v8::Local<v8::String> transformJSObject(v8::Isolate* isolate, v8::Local<v8::Object> object) {
+void Console::sendToDevToolsFrontEnd(v8::Isolate* isolate, ConsoleAPIType method, const std::string& message) {
+    if (!m_callback) {
+        return;
+    }
+
+    std::vector<v8::Local<v8::Value>> args{ArgConverter::ConvertToV8String(isolate, message)};
+    m_callback(isolate, method, args);
+}
+
+std::string transformJSObject(v8::Isolate* isolate, v8::Local<v8::Object> object) {
     auto context = isolate->GetCurrentContext();
     auto objToString = object->ToString(context).ToLocalChecked();
-    v8::Local<v8::String> resultString;
+    auto objToCppString = ArgConverter::ConvertToString(objToString);
 
-    auto hasCustomToStringImplementation = ArgConverter::ConvertToString(objToString).find("[object Object]") == std::string::npos;
+    auto hasCustomToStringImplementation = objToCppString.find("[object Object]") == std::string::npos;
 
     if (hasCustomToStringImplementation) {
-        resultString = objToString;
+        return objToCppString;
     } else {
-        v8::HandleScope scope(isolate);
-        resultString = JsonStringifyObject(isolate, object);
+        return JsonStringifyObject(isolate, object);
     }
-
-    return resultString;
 }
 
-const v8::Local<v8::String> buildStringFromArg(v8::Isolate* isolate, const v8::Local<v8::Value>& val) {
-    v8::Local<v8::String> argString;
+std::string buildStringFromArg(v8::Isolate* isolate, const v8::Local<v8::Value>& val) {
     if (val->IsFunction()) {
-        val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
+        auto v8FunctionString = val->ToDetailString(isolate->GetCurrentContext()).ToLocalChecked();
+        return ArgConverter::ConvertToString(v8FunctionString);
     } else if (val->IsArray()) {
         auto context = isolate->GetCurrentContext();
         auto cachedSelf = val;
@@ -101,80 +118,64 @@ const v8::Local<v8::String> buildStringFromArg(v8::Isolate* isolate, const v8::L
         auto arrayEntryKeys = array->GetPropertyNames(isolate->GetCurrentContext()).ToLocalChecked();
 
         auto arrayLength = arrayEntryKeys->Length();
-
-        argString = ArgConverter::ConvertToV8String(isolate, "[");
+        std::string argString = "[";
 
         for (int i = 0; i < arrayLength; i++) {
             auto propertyName = arrayEntryKeys->Get(context, i).ToLocalChecked();
-
             auto propertyValue = array->Get(context, propertyName).ToLocalChecked();
 
             // avoid bottomless recursion with cyclic reference to the same array
             if (propertyValue->StrictEquals(cachedSelf)) {
-                argString = v8::String::Concat(isolate, argString, ArgConverter::ConvertToV8String(isolate, "[Circular]"));
+                argString.append("[Circular]");
                 continue;
             }
 
             auto objectString = buildStringFromArg(isolate, propertyValue);
-
-            argString = v8::String::Concat(isolate, argString, objectString);
+            argString.append(objectString);
 
             if (i != arrayLength - 1) {
-                argString = v8::String::Concat(isolate, argString, ArgConverter::ConvertToV8String(isolate, ", "));
+                argString.append(", ");
             }
         }
 
-        argString = v8::String::Concat(isolate, argString, ArgConverter::ConvertToV8String(isolate, "]"));
+        return argString.append("]");
     } else if (val->IsObject()) {
         v8::Local<v8::Object> obj = val.As<v8::Object>();
-
-        argString = transformJSObject(isolate, obj);
+        return transformJSObject(isolate, obj);
     } else {
-        val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
+        auto v8DefaultToString = val->ToDetailString(isolate->GetCurrentContext()).ToLocalChecked();
+        return ArgConverter::ConvertToString(v8DefaultToString);
     }
-
-    return argString;
 }
 
-const std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info, int startingIndex = 0) {
+std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info, int startingIndex = 0) {
     auto isolate = info.GetIsolate();
-
     v8::HandleScope scope(isolate);
-
     std::stringstream ss;
 
     auto argLen = info.Length();
     if (argLen) {
         for (int i = startingIndex; i < argLen; i++) {
-            v8::Local<v8::String> argString;
-
-            argString = buildStringFromArg(isolate, info[i]);
-
             // separate args with a space
             if (i != 0) {
                 ss << " ";
             }
-
-            ss << ArgConverter::ConvertToString(argString);
+            
+            std::string argString = buildStringFromArg(isolate, info[i]);
+            ss << argString;
         }
     } else {
         ss << std::endl;
     }
 
-    std::string stringResult = ss.str();
-
-    return stringResult;
+    return ss.str();
 }
 
 void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
-    if (!shouldLog()) {
-        return;
-    }
     try {
         auto isolate = info.GetIsolate();
 
         auto argLen = info.Length();
-        auto context = isolate->GetCurrentContext();
         auto expressionPasses = argLen && info[0]->BooleanValue(isolate);
 
         if (!expressionPasses) {
@@ -190,7 +191,7 @@ void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
             std::string log = assertionError.str();
             sendToADBLogcat(log, ANDROID_LOG_ERROR);
-            sendToDevToolsFrontEnd(isolate, log, "error");
+            sendToDevToolsFrontEnd(isolate, ConsoleAPIType::kAssert, info);
         }
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -206,14 +207,12 @@ void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::errorCallback(const v8::FunctionCallbackInfo <v8::Value>& info) {
-    if (!shouldLog()) {
-        return;
-    }
     try {
-        std::string log = buildLogString(info);
+        std::string log = "CONSOLE ERROR: ";
+        log += buildLogString(info);
 
         sendToADBLogcat(log, ANDROID_LOG_ERROR);
-        sendToDevToolsFrontEnd(info.GetIsolate(), log, "error");
+        sendToDevToolsFrontEnd(info.GetIsolate(), ConsoleAPIType::kError, info);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -228,14 +227,12 @@ void Console::errorCallback(const v8::FunctionCallbackInfo <v8::Value>& info) {
 }
 
 void Console::infoCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
-    if (!shouldLog()) {
-        return;
-    }
     try {
-        std::string log = buildLogString(info);
+        std::string log = "CONSOLE INFO: ";
+        log += buildLogString(info);
 
         sendToADBLogcat(log, ANDROID_LOG_INFO);
-        sendToDevToolsFrontEnd(info.GetIsolate(), log, "info");
+        sendToDevToolsFrontEnd(info.GetIsolate(), ConsoleAPIType::kInfo, info);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -250,14 +247,12 @@ void Console::infoCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::logCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
-    if (!shouldLog()) {
-        return;
-    }
     try {
-        std::string log = buildLogString(info);
+        std::string log = "CONSOLE LOG: ";
+        log += buildLogString(info);
 
         sendToADBLogcat(log, ANDROID_LOG_INFO);
-        sendToDevToolsFrontEnd(info.GetIsolate(), log, "info");
+        sendToDevToolsFrontEnd(info.GetIsolate(), ConsoleAPIType::kLog, info);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -272,14 +267,12 @@ void Console::logCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::warnCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
-    if (!shouldLog()) {
-        return;
-    }
     try {
-        std::string log = buildLogString(info);
+        std::string log = "CONSOLE WARN: ";
+        log += buildLogString(info);
 
         sendToADBLogcat(log, ANDROID_LOG_WARN);
-        sendToDevToolsFrontEnd(info.GetIsolate(), log, "warning");
+        sendToDevToolsFrontEnd(info.GetIsolate(), ConsoleAPIType::kWarning, info);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -294,9 +287,6 @@ void Console::warnCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
-    if (!shouldLog()) {
-        return;
-    }
     try {
         auto isolate = info.GetIsolate();
         auto context = isolate->GetCurrentContext();
@@ -326,13 +316,11 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
                     if (propIsFunction) {
                         ss << "()";
                     } else if (propertyValue->IsArray()) {
-                        auto stringResult = buildStringFromArg(isolate, propertyValue);
-                        std::string jsonStringifiedArray = ArgConverter::ConvertToString(stringResult);
+                        std::string jsonStringifiedArray = buildStringFromArg(isolate, propertyValue);
                         ss << ": " << jsonStringifiedArray;
                     } else if (propertyValue->IsObject()) {
                         auto obj = propertyValue->ToObject(context).ToLocalChecked();
-                        auto objString = transformJSObject(isolate, obj);
-                        std::string jsonStringifiedObject = ArgConverter::ConvertToString(objString);
+                        auto jsonStringifiedObject = transformJSObject(isolate, obj);
                         // if object prints out as the error string for circular references, replace with #CR instead for brevity
                         if (jsonStringifiedObject.find("circular structure") != std::string::npos) {
                             jsonStringifiedObject = "#CR";
@@ -358,7 +346,7 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
         std::string log = ss.str();
 
         sendToADBLogcat(log, ANDROID_LOG_INFO);
-        sendToDevToolsFrontEnd(isolate, log, "info");
+        sendToDevToolsFrontEnd(isolate, ConsoleAPIType::kDir, info);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -411,9 +399,6 @@ const std::string buildStacktraceFrameMessage(v8::Local<v8::StackFrame> frame) {
 }
 
 void Console::traceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
-    if (!shouldLog()) {
-        return;
-    }
     try {
         auto isolate = info.GetIsolate();
         std::stringstream ss;
@@ -442,7 +427,7 @@ void Console::traceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
         std::string log = ss.str();
         __android_log_write(ANDROID_LOG_ERROR, LOG_TAG, log.c_str());
-        sendToDevToolsFrontEnd(isolate, log, "error");
+        sendToDevToolsFrontEnd(isolate, ConsoleAPIType::kTrace, info);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -457,9 +442,6 @@ void Console::traceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::timeCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
-    if (!shouldLog()) {
-        return;
-    }
     try {
         auto isolate = info.GetIsolate();
 
@@ -496,9 +478,6 @@ void Console::timeCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
-    if (!shouldLog()) {
-        return;
-    }
     try {
         auto isolate = info.GetIsolate();
 
@@ -522,7 +501,7 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
             std::string warning = std::string("No such label '" + label + "' for console.timeEnd()");
 
             __android_log_write(ANDROID_LOG_WARN, LOG_TAG, warning.c_str());
-            sendToDevToolsFrontEnd(isolate, warning, "warning");
+            sendToDevToolsFrontEnd(isolate, ConsoleAPIType::kWarning, warning);
 
             return;
         }
@@ -537,11 +516,11 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
         double diffMilliseconds = diffMicroseconds / 1000.0;
 
         std::stringstream ss;
-        ss << label << ": " << std::fixed << std::setprecision(3) << diffMilliseconds << "ms" ;
+        ss << "CONSOLE TIME: " << label << ": " << std::fixed << std::setprecision(3) << diffMilliseconds << "ms" ;
         std::string log = ss.str();
 
         __android_log_write(ANDROID_LOG_INFO, LOG_TAG, log.c_str());
-        sendToDevToolsFrontEnd(isolate, log, "info");
+        sendToDevToolsFrontEnd(isolate, ConsoleAPIType::kTimeEnd, log);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -563,11 +542,4 @@ const char* Console::LOG_TAG = "JS";
 std::map<v8::Isolate*, std::map<std::string, double>> Console::s_isolateToConsoleTimersMap;
 ConsoleCallback Console::m_callback = nullptr;
 int Console::m_maxLogcatObjectSize;
-bool Console::m_forceLog;
-
-#ifdef APPLICATION_IN_DEBUG
-bool Console::isApplicationInDebug = true;
-#else
-bool Console::isApplicationInDebug = false;
-#endif
 }

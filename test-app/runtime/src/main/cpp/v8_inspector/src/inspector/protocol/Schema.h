@@ -15,17 +15,15 @@
 namespace v8_inspector {
 namespace protocol {
 namespace Schema {
+class Domain;
 
 // ------------- Forward and enum declarations.
-class Domain;
 
 // ------------- Type and builder declarations.
 
-class  Domain : public Serializable, public API::Domain{
-    PROTOCOL_DISALLOW_COPY(Domain);
+class  Domain : public ::v8_crdtp::ProtocolObject<Domain>,
+    public API::Domain {
 public:
-    static std::unique_ptr<Domain> fromValue(protocol::Value* value, ErrorSupport* errors);
-
     ~Domain() override { }
 
     String getName() { return m_name; }
@@ -33,10 +31,6 @@ public:
 
     String getVersion() { return m_version; }
     void setVersion(const String& value) { m_version = value; }
-
-    std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override;
-    std::unique_ptr<Domain> clone() const;
 
     template<int STATE>
     class DomainBuilder {
@@ -86,6 +80,8 @@ public:
     }
 
 private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
     Domain()
     {
     }

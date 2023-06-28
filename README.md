@@ -60,6 +60,18 @@ Note: You might need to run the Android Studio from the command line in order to
 
 ## How to Build
 
+* Install dependencies from NPM:
+
+  ```Shell
+  cd test-app/build-tools/jsparser
+  npm install
+  ```
+
+* Set environment variables:
+  - `JAVA_HOME` such that `$JAVA_HOME/bin/java` points to your Java executable
+  - `ANDROID_HOME` pointing to where you have installed the Android SDK
+  - `ANDROID_NDK_HOME` pointing to the version of the Android NDK needed for this version of NativeScript
+
 * Run command 
 
   Windows: 
@@ -87,8 +99,27 @@ Note: You might need to run the Android Studio from the command line in order to
   ``Note: Keep in mind the device or emulator needs to have an sdcard mounted.``
 * Run command
 ```Shell
-gradlew runtest
+gradlew runtests
 ```
+
+## How to Connect the Inspector
+
+* Install dependencies: run command
+```Shell
+cd test-app
+npm install
+```
+* Run the test app in Android Studio, or manually in the emulator.
+* Run command
+```Shell
+npx ns debug android --start
+```
+  (If you instead have the `nativescript` NPM module installed globally,
+  you can omit the `npm install` and the `npx` prefix.)
+* This will print out a URL, such as
+  `devtools://devtools/bundled/inspector.html?ws=localhost:40000`.
+  Open this URL in Chrome or Chromium.
+
 ## Contribute
 We love PRs! Check out the [contributing guidelines](CONTRIBUTING.md). If you want to contribute, but you are not sure where to start - look for [issues labeled `help wanted`](https://github.com/NativeScript/android-runtime/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22).
 

@@ -238,7 +238,7 @@ string NativeScriptException::GetFullMessage(const TryCatch& tc, const string& j
     auto ex = tc.Exception();
 
     v8::Isolate* isolate = v8::Isolate::GetCurrent();
-    v8::Local<v8::Context> context = isolate->GetEnteredContext();
+    v8::Local<v8::Context> context = isolate->GetEnteredOrMicrotaskContext();
 
     auto message = tc.Message();
 
@@ -319,7 +319,7 @@ string NativeScriptException::GetErrorMessage(const Local<Message>& message, Loc
     auto mes = ArgConverter::ConvertToString(message_text_string);
 
     v8::Isolate* isolate = v8::Isolate::GetCurrent();
-    v8::Local<v8::Context> context = isolate->GetEnteredContext();
+    v8::Local<v8::Context> context = isolate->GetEnteredOrMicrotaskContext();
 
     //get whole error message from previous stack
     stringstream ss;

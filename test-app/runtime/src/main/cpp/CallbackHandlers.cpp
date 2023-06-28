@@ -3,6 +3,7 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
+//#include "./conversions/JSToJavaConverter.h"
 #include "JsArgConverter.h"
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
@@ -102,6 +103,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
             instance = env.NewObject(generatedJavaClass, mi.mid);
         } else {
             // resolve arguments before passing them on to the constructor
+//            JSToJavaConverter argConverter(isolate, argWrapper.args, mi.signature);
             JsArgConverter argConverter(argWrapper.args, mi.signature);
             auto ctorArgs = argConverter.ToArgs();
 
@@ -208,6 +210,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
     string *returnType = nullptr;
     auto retType = MethodReturnType::Unknown;
     MethodCache::CacheMethodInfo mi;
+
+    auto isolate = args.GetIsolate();
 
     if ((entry != nullptr) && entry->isResolved) {
         isStatic = entry->isStatic;
@@ -320,27 +324,25 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                     methodName.c_str());
     }
 
-    JsArgConverter *argConverter;
+//    JSToJavaConverter argConverter = (entry != nullptr && entry->isExtensionFunction)
+//                                     ? JSToJavaConverter(isolate, args, *sig, entry, caller)
+//                                     : JSToJavaConverter(isolate, args, *sig, entry);
 
-    if (entry != nullptr && entry->isExtensionFunction) {
-        argConverter = new JsArgConverter(caller, args, *sig, entry);
-    } else {
-        argConverter = new JsArgConverter(args, false, *sig, entry);
-    }
+    JsArgConverter argConverter = (entry != nullptr && entry->isExtensionFunction)
+                                        ? JsArgConverter(caller, args, *sig, entry)
+                                        : JsArgConverter(args, false, *sig, entry);
 
-    if (!argConverter->IsValid()) {
-        JsArgConverter::Error err = argConverter->GetError();
+
+    if (!argConverter.IsValid()) {
+        JsArgConverter::Error err = argConverter.GetError();
         throw NativeScriptException(err.msg);
     }
 
-    auto isolate = args.GetIsolate();
-
     JniLocalRef callerJavaObject;
 
-    jvalue *javaArgs = argConverter->ToArgs();
+    jvalue *javaArgs = argConverter.ToArgs();
 
-
-    auto runtime = Runtime::GetRuntime(isolate);
+    auto runtime = Runtime::GetRuntimeFromIsolateData(isolate);
     auto objectManager = runtime->GetObjectManager();
 
     if (!isStatic) {
@@ -537,13 +539,11 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
         }
     }
 
-    static uint32_t adjustMemCount = 0;
-
-    if ((++adjustMemCount % 2) == 0) {
-        AdjustAmountOfExternalAllocatedMemory(env, isolate);
-    }
-
-    delete argConverter;
+//    static uint32_t adjustMemCount = 0;
+//
+//    if ((++adjustMemCount % 2) == 0) {
+//        AdjustAmountOfExternalAllocatedMemory(env, isolate);
+//    }
 }
 
 void CallbackHandlers::AdjustAmountOfExternalAllocatedMemory(JEnv &env, Isolate *isolate) {
@@ -570,40 +570,25 @@ CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &imple
     vector<jstring> interfacesToImplement;
     auto isolate = implementationObject->GetIsolate();
     auto context = implementationObject->CreationContext();
-    auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
-    for (int i = 0; i < propNames->Length(); i++) {
-        auto name = propNames->Get(context, i).ToLocalChecked().As<String>();
-        auto prop = implementationObject->Get(context, name).ToLocalChecked();
+    Local<String> interfacesName = String::NewFromUtf8Literal(isolate, "interfaces");
+    Local<Value> prop;
+    if (implementationObject->Get(context, interfacesName).ToLocal(&prop) && !prop.IsEmpty() && prop->IsArray()) {
+        auto interfacesArr = prop->ToObject(context).ToLocalChecked();
 
-        bool arrFound = !prop.IsEmpty() && prop->IsArray();
+        Local<String> lengthName = String::NewFromUtf8Literal(isolate, "length");
+        unsigned length = interfacesArr->Get(context,lengthName).ToLocalChecked()
+            ->Uint32Value(context).ToChecked();
 
-        if (arrFound) {
-            v8::String::Utf8Value propName(isolate, name);
-            std::string arrNameC = std::string(*propName);
-            if (arrNameC == "interfaces") {
-                auto interfacesArr = prop->ToObject(context).ToLocalChecked();
+        for (int j = 0; j < length; j++) {
+            auto element = interfacesArr->Get(context, j).ToLocalChecked();
 
-                int length = interfacesArr->Get(
-                        context,
-                        v8::String::NewFromUtf8(isolate,
-                                                "length").ToLocalChecked()).ToLocalChecked()->ToObject(
-                        context).ToLocalChecked()->Uint32Value(
-                        context).ToChecked();
+            if (element->IsFunction()) {
+                auto node = MetadataNode::GetTypeMetadataName(isolate, element);
 
-                if (length > 0) {
-                    for (int j = 0; j < length; j++) {
-                        auto element = interfacesArr->Get(context, j).ToLocalChecked();
+                node = Util::ReplaceAll(node, std::string("/"), std::string("."));
 
-                        if (element->IsFunction()) {
-                            auto node = MetadataNode::GetTypeMetadataName(isolate, element);
-
-                            node = Util::ReplaceAll(node, std::string("/"), std::string("."));
-
-                            jstring value = env.NewStringUTF(node.c_str());
-                            interfacesToImplement.push_back(value);
-                        }
-                    }
-                }
+                jstring value = env.NewStringUTF(node.c_str());
+                interfacesToImplement.push_back(value);
             }
         }
     }
@@ -634,6 +619,10 @@ CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object> &implementat
     auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(context, i).ToLocalChecked().As<String>();
+        if (name->StringEquals(V8StringConstants::GetSuper(isolate))) {
+            continue;
+        }
+        
         auto method = implementationObject->Get(context, name).ToLocalChecked();
 
         bool methodFound = !method.IsEmpty() && method->IsFunction();
@@ -667,12 +656,13 @@ void CallbackHandlers::RunOnMainThreadCallback(const FunctionCallbackInfo<v8::Va
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
-    Local<Context> context = isolate->GetCurrentContext();
-
     uint64_t key = ++count_;
     Local<v8::Function> callback = args[0].As<v8::Function>();
-    CacheEntry entry(isolate, callback, context);
-    cache_.emplace(key, std::move(entry));
+
+    bool inserted;
+    std::tie(std::ignore, inserted) = cache_.try_emplace(key, isolate, callback);
+    assert(inserted && "Main thread callback ID should not be duplicated");
+
     auto value = Callback(key);
     auto size = sizeof(Callback);
     auto wrote = write(Runtime::GetWriter(),&value , size);
@@ -694,33 +684,21 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
-    auto context = it->second.context_.Get(isolate);
-    Context::Scope context_scope(context);
     Local<v8::Function> cb = it->second.callback_.Get(isolate);
-    Local<Value> result;
+    v8::Local<v8::Context> context = cb->GetCreationContextChecked();
+    Context::Scope context_scope(context);
 
     v8::TryCatch tc(isolate);
 
-    if (!cb->Call(context, context->Global(), 0, nullptr).ToLocal(&result)) {}
+    cb->Call(context, context->Global(), 0, nullptr);  // ignore JS return value
+
+    cache_.erase(it);
 
     if(tc.HasCaught()){
         throw NativeScriptException(tc);
     }
 
-    RemoveKey(key);
-
     return 1;
-}
-
-void CallbackHandlers::RemoveKey(const uint64_t key) {
-    auto it = cache_.find(key);
-    if (it == cache_.end()) {
-        return;
-    }
-
-    it->second.callback_.Reset();
-    it->second.context_.Reset();
-    cache_.erase(it);
 }
 
 void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
@@ -834,10 +812,10 @@ void CallbackHandlers::EnableVerboseLoggingMethodCallback(
         const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
         auto isolate = args.GetIsolate();
-        auto runtume = Runtime::GetRuntime(isolate);
+        auto runtime = Runtime::GetRuntime(isolate);
         tns::LogEnabled = true;
         JEnv env;
-        env.CallVoidMethod(runtume->GetJavaRuntime(), ENABLE_VERBOSE_LOGGING_METHOD_ID);
+        env.CallVoidMethod(runtime->GetJavaRuntime(), ENABLE_VERBOSE_LOGGING_METHOD_ID);
     } catch (NativeScriptException &e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -855,10 +833,10 @@ void CallbackHandlers::DisableVerboseLoggingMethodCallback(
         const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
         auto isolate = args.GetIsolate();
-        auto runtume = Runtime::GetRuntime(isolate);
+        auto runtime = Runtime::GetRuntime(isolate);
         tns::LogEnabled = false;
         JEnv env;
-        env.CallVoidMethod(runtume->GetJavaRuntime(), DISABLE_VERBOSE_LOGGING_METHOD_ID);
+        env.CallVoidMethod(runtime->GetJavaRuntime(), DISABLE_VERBOSE_LOGGING_METHOD_ID);
     } catch (NativeScriptException &e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -1091,8 +1069,10 @@ CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo
                                            ArgConverter::ConvertToV8String(isolate, "workerId"),
                                            jsId);
 
-        Local<String> msg = tns::JsonStringifyObject(isolate, args[0], false);
         auto context = isolate->GetCurrentContext();
+        auto objToStringify = args[0]->ToObject(context).ToLocalChecked();
+        std::string msg = tns::JsonStringifyObject(isolate, objToStringify, false);
+
         // get worker's ID that is associated on the other side - in Java
         auto id = jsId->Int32Value(context).ToChecked();
 
@@ -1100,7 +1080,7 @@ CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo
         auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "sendMessageFromMainToWorker",
                                          "(ILjava/lang/String;)V");
 
-        auto jmsg = ArgConverter::ConvertToJavaString(msg);
+        jstring jmsg = env.NewStringUTF(msg.c_str());
         JniLocalRef jmsgRef(jmsg);
 
         env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id, (jstring) jmsgRef);
@@ -1190,13 +1170,15 @@ CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbackInfo
             return;
         }
 
-        Local<String> msg = tns::JsonStringifyObject(isolate, args[0], false);
+        auto context = isolate->GetCurrentContext();
+        auto objToStringify = args[0]->ToObject(context).ToLocalChecked();
+        std::string msg = tns::JsonStringifyObject(isolate, objToStringify, false);
 
         JEnv env;
         auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "sendMessageFromWorkerToMain",
                                          "(Ljava/lang/String;)V");
 
-        auto jmsg = ArgConverter::ConvertToJavaString(msg);
+        auto jmsg = env.NewStringUTF(msg.c_str());
         JniLocalRef jmsgRef(jmsg);
 
         env.CallStaticVoidMethod(RUNTIME_CLASS, mId, (jstring) jmsgRef);
@@ -1585,16 +1567,12 @@ void CallbackHandlers::TerminateWorkerThread(Isolate *isolate) {
 void CallbackHandlers::RemoveIsolateEntries(v8::Isolate *isolate) {
     for (auto &item: cache_) {
         if (item.second.isolate_ == isolate) {
-            item.second.callback_.Reset();
-            item.second.context_.Reset();
             cache_.erase(item.first);
         }
     }
 
     for (auto &item: frameCallbackCache_) {
         if (item.second.isolate_ == isolate) {
-            item.second.callback_.Reset();
-            item.second.context_.Reset();
             frameCallbackCache_.erase(item.first);
         }
     }
@@ -1649,12 +1627,10 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
 
         if (success && pId->IsNumber()){
             auto id = pId->IntegerValue(context).FromMaybe(0);
-            if(frameCallbackCache_.contains(id)){
-                auto cb = frameCallbackCache_.find(id);
-                if(cb != frameCallbackCache_.end()){
-                    cb->second.removed = false;
-                    PostCallback(args, &cb->second, context);
-                }
+            auto cb = frameCallbackCache_.find(id);
+            if (cb != frameCallbackCache_.end()) {
+                cb->second.removed = false;
+                PostCallback(args, &cb->second, context);
                 return;
             }
         }
@@ -1664,26 +1640,10 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
 
         V8SetPrivateValue(isolate, func, idKey, v8::Number::New(isolate, (double) key));
 
-        FrameCallbackCacheEntry entry (isolate, callback, context);
-        entry.id = key;
-
-        auto finalCallback = [](const v8::WeakCallbackInfo<FrameCallbackCacheEntry> &data) {
-            auto value = data.GetParameter();
-            for (auto &item: frameCallbackCache_) {
-                if (item.second.id == value->id) {
-                    item.second.context_.Reset();
-                    item.second.callback_.Reset();
-                    frameCallbackCache_.erase(item.first);
-                    break;
-                }
-            }
-        };
-
-        entry.callback_.SetWeak(&entry, finalCallback, v8::WeakCallbackType::kFinalizer);
-
-        frameCallbackCache_.emplace(key, std::move(entry));
-
-        auto val = frameCallbackCache_.find(key);
+        robin_hood::unordered_map<uint64_t, FrameCallbackCacheEntry>::iterator val;
+        bool inserted;
+        std::tie(val, inserted) = frameCallbackCache_.try_emplace(key, isolate, callback, key);
+        assert(inserted && "Frame callback ID should not be duplicated");
 
         PostCallback(args, &val->second, context);
     }
@@ -1711,8 +1671,8 @@ void CallbackHandlers::RemoveFrameCallback(const FunctionCallbackInfo<v8::Value>
 
         if (success && pId->IsNumber()){
             auto id = pId->IntegerValue(context).FromMaybe(0);
-            if(frameCallbackCache_.contains(id)){
-                auto cb = frameCallbackCache_.find(id);
+            auto cb = frameCallbackCache_.find(id);
+            if (cb != frameCallbackCache_.end()) {
                 cb->second.removed = true;
             }
         }

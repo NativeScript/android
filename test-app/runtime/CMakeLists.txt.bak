@@ -1,0 +1,113 @@
+# documentation: https://d.android.com/studio/projects/add-native-code.html
+
+# Command info: https://cmake.org/cmake/help/v3.4/command/cmake_minimum_required.html
+cmake_minimum_required(VERSION 3.10.2)
+
+project(NativeScriptAndroidRuntime)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wno-unused-result -DV8_COMPRESS_POINTERS -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_USE_SNAPSHOT=false -DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
+
+add_library( v8_base STATIC IMPORTED )
+set_target_properties( v8_base PROPERTIES IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8android.so )
+
+# Command info: https://cmake.org/cmake/help/v3.4/command/include_directories.html
+include_directories(
+    src/main/cpp
+    src/main/cpp/include
+    src/main/cpp/v8_inspector
+    # This folder contains V8's built-in natives and snapshot blobs
+    src/main/libs/${ANDROID_ABI}/include
+)
+
+set(CMAKE_CXX_FLAGS "-g")
+
+# TODO: remove hardcoded cpp files below
+#file(GLOB SOURCES "src/*.h")
+#add_library(native-lib SHARED ${SOURCES})
+
+add_library(
+    NativeScript
+
+    SHARED
+
+    src/main/cpp/ArgConverter.cpp
+    src/main/cpp/ArrayBufferHelper.cpp
+    src/main/cpp/ArrayElementAccessor.cpp
+    src/main/cpp/ArrayHelper.cpp
+    src/main/cpp/AssetExtractor.cpp
+    src/main/cpp/CallbackHandlers.cpp
+    src/main/cpp/Constants.cpp
+    src/main/cpp/DirectBuffer.cpp
+    src/main/cpp/FieldAccessor.cpp
+    src/main/cpp/File.cpp
+    src/main/cpp/IsolateDisposer.cpp
+    src/main/cpp/JEnv.cpp
+    src/main/cpp/DesugaredInterfaceCompanionClassNameResolver.cpp
+    src/main/cpp/JType.cpp
+    src/main/cpp/JniSignatureParser.cpp
+    src/main/cpp/JsArgConverter.cpp
+    src/main/cpp/JsArgToArrayConverter.cpp
+    src/main/cpp/JSONObjectHelper.cpp
+    src/main/cpp/Logger.cpp
+    src/main/cpp/ManualInstrumentation.cpp
+    src/main/cpp/MessageLoopTimer.cpp
+    src/main/cpp/MetadataMethodInfo.cpp
+    src/main/cpp/MetadataNode.cpp
+    src/main/cpp/MetadataReader.cpp
+    src/main/cpp/MetadataTreeNode.cpp
+    src/main/cpp/MethodCache.cpp
+    src/main/cpp/ModuleInternal.cpp
+    src/main/cpp/NativeScriptException.cpp
+    src/main/cpp/NumericCasts.cpp
+    src/main/cpp/ObjectManager.cpp
+    src/main/cpp/Profiler.cpp
+    src/main/cpp/ReadWriteLock.cpp
+    src/main/cpp/Runtime.cpp
+    src/main/cpp/SimpleAllocator.cpp
+    src/main/cpp/SimpleProfiler.cpp
+    src/main/cpp/Util.cpp
+    src/main/cpp/V8GlobalHelpers.cpp
+    src/main/cpp/V8StringConstants.cpp
+    src/main/cpp/WeakRef.cpp
+    src/main/cpp/com_tns_AssetExtractor.cpp
+    src/main/cpp/com_tns_Runtime.cpp
+    src/main/cpp/console/Console.cpp
+)
+
+target_include_directories( NativeScript PRIVATE ${CMAKE_SOURCE_DIR}/src/main/cpp/include )
+
+set(NATIVES_BLOB_INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/include)
+
+set_target_properties(
+    NativeScript
+    PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition -Wl,--exclude-libs=ALL -Wl,--gc-sections
+    INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
+)
+
+
+#find_library(system-log log)
+#find_library(system-z z)
+#find_library(system-android android)
+#target_link_libraries(NativeScript ${system-log} ${system-z} ${system-android})
+
+MESSAGE(WARNING "# PROJECT_SOURCE_DIR: " ${PROJECT_SOURCE_DIR})
+target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libzip.a)
+target_link_libraries(NativeScript D:\\Work\\nativescript\\android-runtime\\test-app\\runtime\\src\\main\\libs\\x86_64\\libzip.a)
+
+
+find_library( # Sets the name of the path variable.
+        log-lib
+
+        # Specifies the name of the NDK library that
+        # you want CMake to locate.
+        log )
+
+target_link_libraries( # Specifies the target library.
+        NativeScript
+        v8_base
+        # Links the target library to the log library
+        # included in the NDK.
+        ${log-lib} )
+
+find_library(system-android android)
+target_link_libraries(NativeScript ${system-android})

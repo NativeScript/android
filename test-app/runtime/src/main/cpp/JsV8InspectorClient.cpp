@@ -1,10 +1,15 @@
 #include "JsV8InspectorClient.h"
 #include <assert.h>
 #include <include/libplatform/libplatform.h>
+#include <src/inspector/v8-console-message.h>
+#include <src/inspector/v8-inspector-impl.h>
+#include <src/inspector/v8-inspector-session-impl.h>
+#include <src/inspector/v8-runtime-agent-impl.h>
+#include <src/inspector/v8-stack-trace-impl.h>
+
 #include "Runtime.h"
 #include "NativeScriptException.h"
 
-#include <v8_inspector/src/inspector/v8-log-agent-impl.h>
 #include "ArgConverter.h"
 #include "DOMDomainCallbackHandlers.h"
 #include "NetworkDomainCallbackHandlers.h"
@@ -15,33 +20,55 @@ using namespace v8;
 
 using namespace v8_inspector;
 
+// Utility functions for converting between inspector StringView and UTF8 string
+
+static inline v8_inspector::StringView stringToStringView(const std::string &str) {
+    auto* chars = reinterpret_cast<const uint8_t*>(str.c_str());
+    return { chars, str.length() };
+}
+
+static inline std::string stringViewToString(v8::Isolate* isolate, const v8_inspector::StringView& stringView) {
+    int length = static_cast<int>(stringView.length());
+    if (!length) {
+        return "";
+    }
+    v8::Local<v8::String> message = (
+        stringView.is8Bit() ?
+            v8::String::NewFromOneByte(isolate, reinterpret_cast<const uint8_t*>(stringView.characters8()), v8::NewStringType::kNormal, length) :
+            v8::String::NewFromTwoByte(isolate, reinterpret_cast<const uint16_t*>(stringView.characters16()), v8::NewStringType::kNormal, length)
+    ) .ToLocalChecked();
+    v8::String::Utf8Value result(isolate, message);
+    return *result;
+}
+
 JsV8InspectorClient::JsV8InspectorClient(v8::Isolate* isolate)
     : isolate_(isolate),
       inspector_(nullptr),
       session_(nullptr),
-      connection(nullptr),
+      connection_(nullptr),
       context_(),
+      terminated_(true),
       running_nested_loop_(false),
-      isConnected(false) {
+      isConnected_(false) {
     JEnv env;
 
-    inspectorClass = env.FindClass("com/tns/AndroidJsV8Inspector");
-    assert(inspectorClass != nullptr);
+    inspectorClass_ = env.FindClass("com/tns/AndroidJsV8Inspector");
+    assert(inspectorClass_ != nullptr);
 
-    sendMethod = env.GetStaticMethodID(inspectorClass, "send", "(Ljava/lang/Object;Ljava/lang/String;)V");
-    assert(sendMethod != nullptr);
+    sendMethod_ = env.GetStaticMethodID(inspectorClass_, "send", "(Ljava/lang/Object;Ljava/lang/String;)V");
+    assert(sendMethod_ != nullptr);
 
-    sendToDevToolsConsoleMethod = env.GetStaticMethodID(inspectorClass, "sendToDevToolsConsole", "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)V");
-    assert(sendToDevToolsConsoleMethod != nullptr);
+    sendToDevToolsConsoleMethod_ = env.GetStaticMethodID(inspectorClass_, "sendToDevToolsConsole", "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)V");
+    assert(sendToDevToolsConsoleMethod_ != nullptr);
 
-    getInspectorMessageMethod = env.GetStaticMethodID(inspectorClass, "getInspectorMessage", "(Ljava/lang/Object;)Ljava/lang/String;");
-    assert(getInspectorMessageMethod != nullptr);
+    getInspectorMessageMethod_ = env.GetStaticMethodID(inspectorClass_, "getInspectorMessage", "(Ljava/lang/Object;)Ljava/lang/String;");
+    assert(getInspectorMessageMethod_ != nullptr);
 }
 
 void JsV8InspectorClient::connect(jobject connection) {
     JEnv env;
-    this->connection = env.NewGlobalRef(connection);
-    this->isConnected = true;
+    connection_ = env.NewGlobalRef(connection);
+    isConnected_ = true;
 }
 
 void JsV8InspectorClient::scheduleBreak() {
@@ -51,15 +78,15 @@ void JsV8InspectorClient::scheduleBreak() {
     auto context = Runtime::GetRuntime(isolate_)->GetContext();
     Context::Scope context_scope(context);
 
-    this->session_->schedulePauseOnNextStatement(v8_inspector::StringView(), v8_inspector::StringView());
+    session_->schedulePauseOnNextStatement({}, {});
 }
 
-void JsV8InspectorClient::createInspectorSession(v8::Isolate* isolate, const v8::Local<v8::Context>& context) {
-    session_ = inspector_->connect(JsV8InspectorClient::contextGroupId, this, v8_inspector::StringView());
+void JsV8InspectorClient::createInspectorSession() {
+    session_ = inspector_->connect(JsV8InspectorClient::contextGroupId, this, {});
 }
 
 void JsV8InspectorClient::disconnect() {
-    if (this->connection == nullptr) {
+    if (connection_ == nullptr) {
         return;
     }
 
@@ -71,11 +98,11 @@ void JsV8InspectorClient::disconnect() {
     session_.reset();
 
     JEnv env;
-    env.DeleteGlobalRef(this->connection);
-    this->connection = nullptr;
-    this->isConnected = false;
+    env.DeleteGlobalRef(connection_);
+    connection_ = nullptr;
+    isConnected_ = false;
 
-    this->createInspectorSession(isolate_, JsV8InspectorClient::PersistentToLocal(isolate_, context_));
+    createInspectorSession();
 }
 
 
@@ -86,7 +113,9 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     auto context = Runtime::GetRuntime(isolate_)->GetContext();
     Context::Scope context_scope(context);
 
-    this->doDispatchMessage(isolate_, message);
+    doDispatchMessage(message);
+    // TODO: check why this is needed (it should trigger automatically when script depth is 0)
+    isolate_->PerformMicrotaskCheckpoint();
 }
 
 void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id) {
@@ -99,10 +128,10 @@ void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id) {
     terminated_ = false;
     running_nested_loop_ = true;
     while (!terminated_) {
-        JniLocalRef msg(env.CallStaticObjectMethod(inspectorClass, getInspectorMessageMethod, this->connection));
+        JniLocalRef msg(env.CallStaticObjectMethod(inspectorClass_, getInspectorMessageMethod_, connection_));
         if (!msg.IsNull()) {
             auto inspectorMessage = ArgConverter::jstringToString(msg);
-            this->doDispatchMessage(this->isolate_, inspectorMessage);
+            doDispatchMessage(inspectorMessage);
         }
 
         while (v8::platform::PumpMessageLoop(Runtime::platform, isolate_)) {
@@ -117,17 +146,15 @@ void JsV8InspectorClient::quitMessageLoopOnPause() {
 }
 
 v8::Local<v8::Context> JsV8InspectorClient::ensureDefaultContextInGroup(int contextGroupId) {
-    v8::Local<v8::Context> context = PersistentToLocal(isolate_, context_);
-    return context;
+    return context_.Get(isolate_);
 }
 
-void JsV8InspectorClient::doDispatchMessage(v8::Isolate* isolate, const std::string& message) {
+void JsV8InspectorClient::doDispatchMessage(const std::string& message) {
     if (session_ == nullptr) {
         return;
     }
 
-    const v8_inspector::String16 msg = v8_inspector::String16::fromUTF8(message.c_str(), message.length());
-    v8_inspector::StringView message_view = toStringView(msg);
+    v8_inspector::StringView message_view = stringToStringView(message);
     session_->dispatchProtocolMessage(message_view);
 }
 
@@ -135,47 +162,20 @@ void JsV8InspectorClient::sendResponse(int callId, std::unique_ptr<StringBuffer>
     sendNotification(std::move(message));
 }
 
-static v8_inspector::String16 ToString16(const v8_inspector::StringView& string) {
-    if (string.is8Bit()) {
-        return v8_inspector::String16(reinterpret_cast<const char*>(string.characters8()), string.length());
-    }
-
-    return v8_inspector::String16(reinterpret_cast<const uint16_t*>(string.characters16()), string.length());
-}
-
 void JsV8InspectorClient::sendNotification(std::unique_ptr<StringBuffer> message) {
-    if (inspectorClass == nullptr || this->connection == nullptr) {
+    if (connection_ == nullptr) {
         return;
     }
 
-    v8_inspector::String16 msg = ToString16(message->string());
+    const std::string msg = stringViewToString(isolate_, message->string());
 
     JEnv env;
     // TODO: Pete: Check if we can use a wide (utf 16) string here
-    JniLocalRef str(env.NewStringUTF(msg.utf8().c_str()));
-    env.CallStaticVoidMethod(inspectorClass, sendMethod, this->connection, (jstring) str);
+    JniLocalRef str(env.NewStringUTF(msg.c_str()));
+    env.CallStaticVoidMethod(inspectorClass_, sendMethod_, connection_, (jstring) str);
 }
 
 void JsV8InspectorClient::flushProtocolNotifications() {
-}
-
-template<class TypeName>
-inline v8::Local<TypeName> StrongPersistentToLocal(const v8::Persistent<TypeName>& persistent) {
-    return *reinterpret_cast<v8::Local<TypeName> *>(const_cast<v8::Persistent<TypeName> *>(&persistent));
-}
-
-template<class TypeName>
-inline v8::Local<TypeName> WeakPersistentToLocal(v8::Isolate* isolate, const v8::Persistent<TypeName>& persistent) {
-    return v8::Local<TypeName>::New(isolate, persistent);
-}
-
-template<class TypeName>
-inline v8::Local<TypeName> JsV8InspectorClient::PersistentToLocal(v8::Isolate* isolate, const v8::Persistent<TypeName>& persistent) {
-    if (persistent.IsWeak()) {
-        return WeakPersistentToLocal(isolate, persistent);
-    } else {
-        return StrongPersistentToLocal(persistent);
-    }
 }
 
 void JsV8InspectorClient::init() {
@@ -190,12 +190,11 @@ void JsV8InspectorClient::init() {
 
     inspector_ = V8Inspector::create(isolate_, this);
 
-    inspector_->contextCreated(v8_inspector::V8ContextInfo(context, JsV8InspectorClient::contextGroupId, v8_inspector::StringView()));
+    inspector_->contextCreated(v8_inspector::V8ContextInfo(context, JsV8InspectorClient::contextGroupId, {}));
 
-    v8::Persistent<v8::Context> persistentContext(context->GetIsolate(), JsV8InspectorClient::PersistentToLocal(isolate_, context_));
-    context_.Reset(isolate_, persistentContext);
+    context_.Reset(isolate_, context);
 
-    this->createInspectorSession(isolate_, context);
+    createInspectorSession();
 }
 
 JsV8InspectorClient* JsV8InspectorClient::GetInstance() {
@@ -206,8 +205,27 @@ JsV8InspectorClient* JsV8InspectorClient::GetInstance() {
     return instance;
 }
 
+void JsV8InspectorClient::inspectorSendEventCallback(const FunctionCallbackInfo<Value>& args) {
+    if ((instance == nullptr) || (instance->connection_ == nullptr)) {
+        return;
+    }
+    Isolate* isolate = args.GetIsolate();
+
+    Local<v8::String> arg = args[0].As<v8::String>();
+    std::string message = ArgConverter::ConvertToString(arg);
+
+    JEnv env;
+    // TODO: Pete: Check if we can use a wide (utf 16) string here
+    JniLocalRef str(env.NewStringUTF(message.c_str()));
+    env.CallStaticVoidMethod(instance->inspectorClass_, instance->sendMethod_, instance->connection_, (jstring) str);
+
+    // TODO: ios uses this method, but doesn't work on android
+    // so I'm just sending directly to the socket (which seems to work)
+    //instance->dispatchMessage(message);
+}
+
 void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
-    if ((instance == nullptr) || (instance->connection == nullptr)) {
+    if ((instance == nullptr) || (instance->connection_ == nullptr)) {
         return;
     }
 
@@ -225,7 +243,7 @@ void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<
             JEnv env;
             JniLocalRef str(env.NewStringUTF(message.c_str()));
             JniLocalRef lev(env.NewStringUTF(level.c_str()));
-            env.CallStaticVoidMethod(inspectorClass, sendToDevToolsConsoleMethod, instance->connection, (jstring) str, (jstring)lev);
+            env.CallStaticVoidMethod(instance->inspectorClass_, instance->sendToDevToolsConsoleMethod_, instance->connection_, (jstring) str, (jstring)lev);
         }
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -240,52 +258,26 @@ void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<
     }
 }
 
-void JsV8InspectorClient::consoleLogCallback(Isolate* isolate, const string& message, const string& logLevel) {
+void JsV8InspectorClient::consoleLogCallback(Isolate* isolate, ConsoleAPIType method, const std::vector<v8::Local<v8::Value>>& args) {
     if (!inspectorIsConnected()) {
         return;
     }
 
-    auto stack = v8::StackTrace::CurrentStackTrace(isolate, 1, v8::StackTrace::StackTraceOptions::kDetailed);
+    // Note, here we access private V8 API
+    auto* impl = reinterpret_cast<v8_inspector::V8InspectorImpl*>(instance->inspector_.get());
+    auto* session = reinterpret_cast<v8_inspector::V8InspectorSessionImpl*>(instance->session_.get());
 
-    auto frame = stack->GetFrame(isolate, 0);
+    std::unique_ptr<V8StackTraceImpl> stack = impl->debugger()->captureStackTrace(false);
 
-    // will be no-op in non-debuggable builds
-    v8_inspector::V8LogAgentImpl::EntryAdded(message, logLevel, ArgConverter::ConvertToString(frame->GetScriptNameOrSourceURL()), frame->GetLineNumber());
-}
+    v8::Local<v8::Context> context = instance->context_.Get(instance->isolate_);
+    const int contextId = V8ContextInfo::executionContextId(context);
 
-void MessageHandler(v8::Local<v8::Message> message, v8::Local<v8::Value> exception) {
-//    v8::Isolate *isolate = v8::Isolate::GetCurrent();
-//    v8::Local<v8::Context> context = isolate->GetEnteredContext();
-//    if (context.IsEmpty()) return;
-//    v8_inspector::V8Inspector *inspector = InspectorClientImpl::InspectorFromContext(context);
-//
-//    v8::Local<v8::StackTrace> stack = message->GetStackTrace();
-//    int script_id = message->GetScriptOrigin().ScriptID()->Value();
-//    if (!stack.IsEmpty() && stack->GetFrameCount() > 0)
-//    {
-//        int top_script_id = stack->GetFrame(0)->GetScriptId();
-//        if (top_script_id == script_id) script_id = 0;
-//    }
-//    int line_number = message->GetLineNumber(context).FromMaybe(0);
-//    int column_number = 0;
-//    if (message->GetStartColumn(context).IsJust())
-//        column_number = message->GetStartColumn(context).FromJust() + 1;
-//
-//    v8_inspector::StringView detailed_message;
-//    v8_inspector::String16 message_text_string = ToString16(message->Get());
-//    v8_inspector::StringView message_text(message_text_string.characters16(),
-//                                          message_text_string.length());
-//    v8_inspector::String16 url_string;
-//    if (message->GetScriptOrigin().ResourceName()->IsString())
-//    {
-//        url_string =
-//                ToString16(message->GetScriptOrigin().ResourceName().As<v8::String>());
-//    }
-//    v8_inspector::StringView url(url_string.characters16(), url_string.length());
-//
-//    inspector->exceptionThrown(context, message_text, exception, detailed_message,
-//                               url, line_number, column_number,
-//                               inspector->createStackTrace(stack), script_id);
+    std::unique_ptr<v8_inspector::V8ConsoleMessage> msg =
+        v8_inspector::V8ConsoleMessage::createForConsoleAPI(
+            context, contextId, contextGroupId, impl, instance->currentTimeMS(),
+            method, args, String16{}, std::move(stack));
+
+    session->runtimeAgent()->messageAdded(msg.get());
 }
 
 void JsV8InspectorClient::attachInspectorCallbacks(Isolate* isolate,
@@ -307,15 +299,11 @@ void JsV8InspectorClient::attachInspectorCallbacks(Isolate* isolate,
     inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "attributeRemoved"), FunctionTemplate::New(isolate, DOMDomainCallbackHandlers::AttributeRemovedCallback));
 
     globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__inspector"), inspectorJSObject);
+    globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__inspectorSendEvent"), FunctionTemplate::New(isolate, JsV8InspectorClient::inspectorSendEventCallback));
 }
 
 void JsV8InspectorClient::InspectorIsConnectedGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
-    info.GetReturnValue().Set(JsV8InspectorClient::GetInstance()->isConnected);
+    info.GetReturnValue().Set(JsV8InspectorClient::GetInstance()->isConnected_);
 }
 
 JsV8InspectorClient* JsV8InspectorClient::instance = nullptr;
-jclass JsV8InspectorClient::inspectorClass = nullptr;
-jmethodID JsV8InspectorClient::sendMethod = nullptr;
-jmethodID JsV8InspectorClient::sendToDevToolsConsoleMethod = nullptr;
-jmethodID JsV8InspectorClient::getInspectorMessageMethod = nullptr;
-int JsV8InspectorClient::contextGroupId = 1;

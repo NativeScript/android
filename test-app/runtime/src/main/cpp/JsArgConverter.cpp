@@ -58,7 +58,6 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
     m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 1;
 
     if (m_argsLen > 0) {
-        m_storedObjects.reserve(m_argsLen);
         if ((entry != nullptr) && (entry->isResolved)) {
             if (entry->parsedSig.empty()) {
                 JniSignatureParser parser(m_methodSignature);
@@ -89,13 +88,8 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
     JniSignatureParser parser(m_methodSignature);
     m_tokens = parser.Parse();
 
-    if (m_argsLen > 0) {
-        m_storedObjects.reserve(m_argsLen);
-    }
-
     for (int i = 0; i < m_argsLen; i++) {
         m_isValid = ConvertArg(args[i], i);
-
 
         if (!m_isValid) {
             break;
@@ -170,14 +164,6 @@ bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
         auto objectManager = runtime->GetObjectManager();
 
         JEnv env;
-
-
-        auto isSupportSig = typeSignature == "Ljava/nio/ByteBuffer;" ||
-                            typeSignature == "Ljava/nio/ShortBuffer;" ||
-                            typeSignature == "Ljava/nio/IntBuffer;" ||
-                            typeSignature == "Ljava/nio/LongBuffer;" ||
-                            typeSignature == "Ljava/nio/FloatBuffer;" ||
-                            typeSignature == "Ljava/nio/DoubleBuffer;";
 
         switch (castType) {
             case CastType::Char:
@@ -272,40 +258,20 @@ bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
                         store = array->GetBackingStore();
                         length = array->ByteLength();
                         data = static_cast<uint8_t *>(store->Data());
-
-                        if (data == nullptr) {
-                            data = static_cast<uint8_t *>(array->GetContents().Data());
-                        }
-
-
                     } else if (jsObject->IsArrayBufferView()) {
                         auto array = jsObject.As<v8::ArrayBufferView>();
                         offset = array->ByteOffset();
                         length = array->ByteLength();
                         store = array->Buffer()->GetBackingStore();
                         data = static_cast<uint8_t *>(store->Data()) + offset;
-
-                        if (data == nullptr) {
-                            data = static_cast<uint8_t *>(array->Buffer()->GetContents().Data()) +
-                                   offset;
-                        }
-
                         bufferCastType = JsArgConverter::GetCastType(array);
                     } else {
                         auto array = jsObject.As<v8::TypedArray>();
                         offset = array->ByteOffset();
                         store = array->Buffer()->GetBackingStore();
                         length = array->ByteLength();
-
                         data = static_cast<uint8_t *>(store->Data()) + offset;
-
-                        if (data == nullptr) {
-                            data = static_cast<uint8_t *>(array->Buffer()->GetContents().Data()) +
-                                   offset;
-                        }
-
                         bufferCastType = JsArgConverter::GetCastType(array);
-
                     }
 
                     auto directBuffer = env.NewDirectByteBuffer(
@@ -411,7 +377,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
 void JsArgConverter::SetConvertedObject(int index, jobject obj, bool isGlobal) {
     m_args[index].l = obj;
     if ((obj != nullptr) && !isGlobal) {
-        m_storedObjects.push_back(index);
+        m_args_refs[m_args_refs_size++] = index;
     }
 }
 
@@ -529,73 +495,110 @@ bool JsArgConverter::ConvertJavaScriptArray(const Local<Array> &jsArr, int index
 
     JEnv env;
     switch (elementTypePrefix) {
-        case 'Z':
+        case 'Z': {
             arr = env.NewBooleanArray(arrLength);
+            jboolean bools[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                jboolean value = jsArr->Get(context, i).ToLocalChecked()->BooleanValue(m_isolate);
-                env.SetBooleanArrayRegion((jbooleanArray) arr, i, 1, &value);
+                bools[i] = jsArr
+                        ->Get(context, i)
+                        .ToLocalChecked()
+                        ->BooleanValue(m_isolate);
             }
+            env.SetBooleanArrayRegion((jbooleanArray) arr, 0, arrLength, bools);
             break;
-        case 'B':
+        }
+        case 'B': {
             arr = env.NewByteArray(arrLength);
+            jbyte bytes[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                jbyte value = jsArr->Get(context, i).ToLocalChecked()->Int32Value(
-                        context).ToChecked();
-                env.SetByteArrayRegion((jbyteArray) arr, i, 1, &value);
+                bytes[i] = jsArr
+                        ->Get(context, i)
+                        .ToLocalChecked()
+                        ->Int32Value(context)
+                        .ToChecked();
             }
+            env.SetByteArrayRegion((jbyteArray) arr, 0, arrLength, bytes);
             break;
-        case 'C':
+        }
+        case 'C': {
             arr = env.NewCharArray(arrLength);
+            jchar chars[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
                 String::Utf8Value utf8(m_isolate, jsArr->Get(context, i).ToLocalChecked()->ToString(
                         context).ToLocalChecked());
                 JniLocalRef s(env.NewString((jchar *) *utf8, 1));
                 const char *singleChar = env.GetStringUTFChars(s, nullptr);
-                jchar value = *singleChar;
+                chars[i] = *singleChar;
                 env.ReleaseStringUTFChars(s, singleChar);
-                env.SetCharArrayRegion((jcharArray) arr, i, 1, &value);
             }
+            env.SetCharArrayRegion((jcharArray) arr, 0, arrLength, chars);
             break;
-        case 'S':
+        }
+        case 'S': {
             arr = env.NewShortArray(arrLength);
+            jshort shorts[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                jshort value = jsArr->Get(context, i).ToLocalChecked()->Int32Value(
-                        context).ToChecked();
-                env.SetShortArrayRegion((jshortArray) arr, i, 1, &value);
+                shorts[i] = jsArr
+                        ->Get(context, i)
+                        .ToLocalChecked()
+                        ->Int32Value(context)
+                        .ToChecked();
             }
+            env.SetShortArrayRegion((jshortArray) arr, 0, arrLength, shorts);
             break;
-        case 'I':
+        }
+        case 'I': {
             arr = env.NewIntArray(arrLength);
+            jint ints[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                jint value = jsArr->Get(context, i).ToLocalChecked()->Int32Value(
-                        context).ToChecked();
-                env.SetIntArrayRegion((jintArray) arr, i, 1, &value);
+                ints[i] = jsArr
+                        ->Get(context, i)
+                        .ToLocalChecked()
+                        ->Int32Value(context)
+                        .ToChecked();
             }
+            env.SetIntArrayRegion((jintArray) arr, 0, arrLength, ints);
             break;
-        case 'J':
+        }
+        case 'J': {
             arr = env.NewLongArray(arrLength);
+            jlong longs[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                jlong value = jsArr->Get(context, i).ToLocalChecked()->NumberValue(
-                        context).ToChecked();
-                env.SetLongArrayRegion((jlongArray) arr, i, 1, &value);
+                longs[i] = jsArr
+                        ->Get(context, i)
+                        .ToLocalChecked()
+                        ->NumberValue(context)
+                        .ToChecked();
             }
+            env.SetLongArrayRegion((jlongArray) arr, 0, arrLength, longs);
             break;
-        case 'F':
+        }
+        case 'F': {
             arr = env.NewFloatArray(arrLength);
+            jfloat floats[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                jfloat value = jsArr->Get(context, i).ToLocalChecked()->NumberValue(
-                        context).ToChecked();
-                env.SetFloatArrayRegion((jfloatArray) arr, i, 1, &value);
+                floats[i] = jsArr
+                        ->Get(context, i)
+                        .ToLocalChecked()
+                        ->NumberValue(context)
+                        .ToChecked();
             }
+            env.SetFloatArrayRegion((jfloatArray) arr, 0, arrLength, floats);
             break;
-        case 'D':
+        }
+        case 'D': {
             arr = env.NewDoubleArray(arrLength);
+            jdouble doubles[arrLength];
             for (jsize i = 0; i < arrLength; i++) {
-                jdouble value = jsArr->Get(context, i).ToLocalChecked()->NumberValue(
-                        context).ToChecked();
-                env.SetDoubleArrayRegion((jdoubleArray) arr, i, 1, &value);
+                doubles[i] = jsArr
+                        ->Get(context, i)
+                        .ToLocalChecked()
+                        ->NumberValue(context)
+                        .ToChecked();
             }
+            env.SetDoubleArrayRegion((jdoubleArray) arr, 0, arrLength, doubles);
             break;
+        }
         case 'L':
             strippedClassName = elementType.substr(1, elementType.length() - 2);
             elementClass = env.FindClass(strippedClassName);
@@ -685,10 +688,11 @@ JsArgConverter::Error JsArgConverter::GetError() const {
 JsArgConverter::~JsArgConverter() {
     if (m_argsLen > 0) {
         JEnv env;
-        int length = m_storedObjects.size();
-        for (int i = 0; i < length; i++) {
-            int index = m_storedObjects[i];
-            env.DeleteLocalRef(m_args[index].l);
+        for (int i = 0; i < m_args_refs_size; i++) {
+            int index = m_args_refs[i];
+            if (index != -1) {
+                env.DeleteLocalRef(m_args[index].l);
+            }
         }
     }
 }
