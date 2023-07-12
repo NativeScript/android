@@ -285,6 +285,8 @@ public class Runtime {
     public static String getJSStackTrace(Throwable ex) {
         if (ex instanceof NativeScriptException) {
             return ((NativeScriptException) ex).getIncomingStackTrace();
+        } else if(ex.getCause() instanceof NativeScriptException) {
+            return ((NativeScriptException) ex.getCause()).getIncomingStackTrace();
         } else {
             return null;
         }
