@@ -114,13 +114,14 @@ jobs:
       - name: SBG tests
         run: ./gradlew runSbgTests --stacktrace
       - name: Run unit tests
-        uses: ReactiveCircus/android-emulator-runner@v2
-        with:
-          force-avd-creation: false
-          disable-animations: false
-          emulator-options: -noaudio -no-boot-anim -camera-back none
-          api-level: ${{env.ANDROID_API}}
-          # this is needed on API 30+
-          #target: google_apis
-          arch: ${{env.ANDROID_ABI}}
-          script: ./gradlew runtestsAndVerifyResults --stacktrace
+        run: ./gradlew runtestsAndVerifyResults --stacktrace
+#         uses: ReactiveCircus/android-emulator-runner@v2
+#         with:
+#           force-avd-creation: false
+#           disable-animations: false
+#           emulator-options: -noaudio -no-boot-anim -camera-back none
+#           api-level: ${{env.ANDROID_API}}
+#           # this is needed on API 30+
+#           #target: google_apis
+#           arch: ${{env.ANDROID_ABI}}
+#           script: ./gradlew runtestsAndVerifyResults --stacktrace
