@@ -76,7 +76,7 @@ jobs:
           path: dist/nativescript-android-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
   test:
     name: Test
-    runs-on: macos-latest
+    runs-on: self-hosted
     needs: build
     steps:
       - uses: actions/checkout@v3
