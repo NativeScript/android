@@ -1,39 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-                xmlns:tools="http://schemas.android.com/tools"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                xmlns:app="http://schemas.android.com/apk/res-auto"
-                tools:context="com.tns.ErrorReportActivity"
-                android:theme="@style/Widget.AppCompat.Light.ActionBar">
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:background="@color/gray"
+    tools:context="com.tns.ErrorReportActivity"
+    android:theme="@style/Widget.AppCompat.Light.ActionBar">
 
-    <androidx.appcompat.widget.Toolbar
-        android:id="@+id/toolbar"
+
+    <TextView
+        android:id="@+id/errorException"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:minHeight="?attr/actionBarSize"/>
+        android:text=""
+        android:background="@color/red"
+        android:textSize="17sp"
+        android:paddingLeft="16dp"
+        android:textColor="@color/white"
+        android:paddingVertical="10dp"
+        android:paddingRight="16dp" />
 
-    <androidx.viewpager.widget.ViewPager
-        android:id="@+id/pager"
-        android:layout_width="match_parent"
-        android:layout_height="fill_parent"
-        android:layout_below="@+id/toolbar"
-        android:scrollbarAlwaysDrawVerticalTrack="false">
+    <RelativeLayout
+        android:layout_below="@id/errorException"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
 
-    </androidx.viewpager.widget.ViewPager>
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="?attr/actionBarSize" />
 
-    <com.google.android.material.tabs.TabLayout
-        android:id="@+id/tabLayout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="?attr/colorPrimary"
-        android:minHeight="?attr/actionBarSize"
-        app:tabIndicatorColor="@color/nativescript_blue"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentStart="true"
-        android:scrollbarStyle="insideOverlay"
-        android:scrollbars="vertical"
-        tools:tabBackground="@android:color/darker_gray"
-        android:scrollbarAlwaysDrawVerticalTrack="false"
-        />
+        <androidx.viewpager.widget.ViewPager
+            android:id="@+id/pager"
+            android:layout_width="match_parent"
+            android:layout_height="fill_parent"
+            android:layout_below="@+id/toolbar"
+            android:scrollbarAlwaysDrawVerticalTrack="false">
+
+        </androidx.viewpager.widget.ViewPager>
+
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/tabLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/gray"
+            android:minHeight="?attr/actionBarSize"
+            app:tabIndicatorColor="@color/nativescript_blue"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentStart="true"
+            android:scrollbarStyle="insideOverlay"
+            android:scrollbars="vertical"
+            tools:tabBackground="@color/gray_color"
+            android:scrollbarAlwaysDrawVerticalTrack="false" />
+    </RelativeLayout>
+
 </RelativeLayout>
