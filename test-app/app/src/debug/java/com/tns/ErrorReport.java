@@ -15,7 +15,6 @@ import java.util.Date;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
 import android.content.ClipData;
