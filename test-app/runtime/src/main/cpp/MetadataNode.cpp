@@ -945,6 +945,9 @@ void MetadataNode::SetInnerTypes(Isolate* isolate, Local<Function>& ctorFunction
             }
             auto innerTypeCtorFunc = Local<Function>::New(isolate, *GetOrCreateInternal(curChild)->GetPersistentConstructorFunction(isolate));
             auto innerTypeName = ArgConverter::ConvertToV8String(isolate, curChild->name);
+            // TODO: remove this once we solve https://github.com/NativeScript/android/pull/1771
+            // this avoids a crash, but the companion object is still unaccessible
+            TryCatch tc(isolate);
             ctorFunction->Set(context, innerTypeName, innerTypeCtorFunc);
         }
     }
