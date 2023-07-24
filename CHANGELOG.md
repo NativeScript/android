@@ -1,3 +1,120 @@
+## [8.5.1](https://github.com/NativeScript/android/compare/v8.5.0...v8.5.1) (2023-07-24)
+
+
+### Bug Fixes
+
+* Avoid setting the same property on an ObjectTemplate twice ([9e610c8](https://github.com/NativeScript/android/commit/9e610c8b61a721c04b0a7b8f5167f5b070c5419f))
+* Don't access `super` property on implementation object ([d8b8bc0](https://github.com/NativeScript/android/commit/d8b8bc02cf51de021855bb6a39ccd39ce1287304))
+* Don't iterate properties in GetImplementedInterfaces ([9dfae65](https://github.com/NativeScript/android/commit/9dfae6589caad31ee50a5946e7369f12505cd955))
+* intermediary fix for https://github.com/NativeScript/android/pull/1771 ([32c7abb](https://github.com/NativeScript/android/commit/32c7abb3418b20d1ac2d80c18c5e25a402937628))
+* Leave context after Runtime::PrepareV8Runtime() ([cd1d285](https://github.com/NativeScript/android/commit/cd1d2850e5c28d89339a90d783db1f1623957be7))
+* memory leak on accessing static interface methods ([88ce2d8](https://github.com/NativeScript/android/commit/88ce2d8b2c2ccf5568d1b95f0bf9df47179f658a))
+* memory leak on saving code cache ([6d416a1](https://github.com/NativeScript/android/commit/6d416a11e5b304d8ac2bfb4c48931a22e353df72))
+* Update common-runtime-tests-app ([c8db3ca](https://github.com/NativeScript/android/commit/c8db3cab6b3e3ddd41ab94adb8edac46a704cbe9))
+* update legacy android version in package.json ([#1744](https://github.com/NativeScript/android/issues/1744)) ([b4ad8e5](https://github.com/NativeScript/android/commit/b4ad8e541ff211055dc5197c7e0b350b6666771f))
+* Use Isolate::TryGetCurrent() ([afe026a](https://github.com/NativeScript/android/commit/afe026a29f3e9a1a5e533e4c66fd013f5f7f163c))
+
+
+* Remove weak callback from __postFrameCallback cache (#1755) ([ff1b979](https://github.com/NativeScript/android/commit/ff1b97975c7fdcd6b2acfb6153ba635d4f420eff)), closes [#1755](https://github.com/NativeScript/android/issues/1755)
+
+
+### Features
+
+* add support for kotlin 1.8 ([#1765](https://github.com/NativeScript/android/issues/1765)) ([1a928e4](https://github.com/NativeScript/android/commit/1a928e47e733b1d4ba2bb83b4f541e1cac835155))
+
+
+### Performance Improvements
+
+* avoid unnecessary string copying when calling static properties of interfaces ([8b53d02](https://github.com/NativeScript/android/commit/8b53d022315d4a7fa9d617f431e0364030942d24))
+
+
+### BREAKING CHANGES
+
+* __startNDKProfiler() and __stopNDKProfiler() global
+bindings no longer available.
+
+The NDK profiler was not functional, since nothing in the build process
+defined the NDK_PROFILER_ENABLED preprocessor symbol. The start and stop
+functions were already no-ops.
+
+* chore: Remove outdated comment
+
+RunMicrotasks no longer exists, it's already been replaced in the code
+with PerformMicrotaskCheckpoint.
+
+* chore: Use unique_ptr for NewBackingStore in byte buffers
+
+V8 doc: https://docs.google.com/document/d/1sTc_jRL87Fu175Holm5SV0kajkseGl2r8ifGY76G35k/edit
+
+The V8 usage examples show unique_ptr here; it probably doesn't matter
+much, but we don't need the backing store after creating the ArrayBuffer,
+and I believe shared_ptr is slightly more overhead than unique_ptr.
+
+For convenience, replace the manual empty deleter for direct buffers with
+v8::BackingStore::EmptyDeleter.
+
+* chore: Remove weak finalizer callback from __postFrameCallback()
+
+Weak finalizer callbacks are going away in V8 11.x, so we have to remove
+this one. Luckily, a finalizer callback is not necessary - it's never
+needed to prevent the frame callback from being collected.
+
+However, a weak callback is not necessary in the first place. We can just
+clean up the cache entry after the callback is executed, since it is only
+executed once.
+
+Note that the call to erase() destructs the FrameCallbackCacheEntry
+instance, making `entry` a dangling pointer, so don't use it after the
+erase(). There's probably a safer way to do this, although the way that
+first occurred to me (pass the key to the callback instead of the entry,
+and then use std::unordered_map::extract()) is not available on
+robin_hood::unordered_map.
+
+* fix: Make sure frame callbacks are not ignored
+
+There was a bug where __postFrameCallback() would not always cause the
+callback to be called. Without initializing `removed`, sometimes it would
+have a nonzero value, so the callback would be ignored.
+
+* chore: Clear callback caches' persistent handles in destructor
+
+Clearing the persistent handles in the destructor makes it a bit easier to
+deal with the cache entry's lifetime: they are cleared whenever the entry
+is removed from the cache.
+
+We do this for both the main thread callback cache and the frame callback
+cache.
+
+Adding a destructor makes the cache entries non-movable. But the only
+place where they were moved was when inserting them into the cache anyway.
+We can use C++17's try_emplace() method to insert them without having to
+move them.
+
+* chore: Construct FrameCallbackCacheEntry with ID
+
+This avoids the situation of forgetting to add an ID to the cache entry.
+
+* chore: Improve usage of unordered_map APIs in CallbackHandlers
+
+This fixes a few places where we can avoid double lookups:
+
+- In RunOnMainThreadFdCallback, we already have a valid iterator, so no
+  need to look up the same key again in RemoveKey (this is the only usage
+  of RemoveKey, so we can remove it.) (Additionally, we probably want to
+  remove the cache entry before throwing a NativeScript exception.)
+
+- In PostFrameCallback and RemoveFrameCallback, we should not do
+  contains() immediately followed by find().
+
+* chore: Fix runtime typo
+
+* chore: Ignore main thread and frame callback return values
+
+We don't do anything with the return value from these callbacks, so it's
+OK to ignore them and not convert them to a local handle.
+
+
+
 # [8.5.0](https://github.com/NativeScript/android/compare/v8.4.0...v8.5.0) (2023-06-27)
 
 
