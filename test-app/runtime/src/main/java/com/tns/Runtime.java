@@ -283,11 +283,14 @@ public class Runtime {
     }
 
     public static String getJSStackTrace(Throwable ex) {
-        if (ex instanceof NativeScriptException) {
-            return ((NativeScriptException) ex).getIncomingStackTrace();
-        } else {
-            return null;
+        Throwable cause = ex;
+        while(cause != null) {
+            if(cause instanceof NativeScriptException) {
+                return ((NativeScriptException) cause).getIncomingStackTrace();
+            }
+            cause = cause.getCause();
         }
+        return null;
     }
 
     public static String getStackTraceErrorMessage(Throwable ex) {
