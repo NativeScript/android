@@ -287,10 +287,6 @@ Local<Object> ObjectManager::GetEmptyObject(Isolate *isolate) {
     return m_wrapperObjectTemplate.Get(isolate)->NewInstance(context).ToLocalChecked();
 }
 
-void ObjectManager::JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<v8::Value> &info) {
-    assert(info.IsConstructCall());
-}
-
 void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object> &object) {
 
     if(!object->IsObject()){
