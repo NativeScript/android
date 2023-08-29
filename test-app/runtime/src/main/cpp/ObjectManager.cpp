@@ -47,9 +47,6 @@ ObjectManager::ObjectManager(v8::Isolate* isolate, jobject javaRuntimeObject) :
     jclass javaLangClass = env.FindClass("java/lang/Class");
     assert(javaLangClass != nullptr);
 
-    GET_NAME_METHOD_ID = env.GetMethodID(javaLangClass, "getName", "()Ljava/lang/String;");
-    assert(GET_NAME_METHOD_ID != nullptr);
-
     Local<ObjectTemplate> tmpl = ObjectTemplate::New(m_isolate);
     tmpl->SetInternalFieldCount(static_cast<int>(MetadataNodeKeys::END));
     m_wrapperObjectTemplate.Reset(m_isolate, tmpl);
@@ -160,7 +157,7 @@ Local<Object>
 ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const string &typeName, jclass clazz) {
     auto isolate = m_isolate;
 
-    auto className = (clazz != nullptr) ? GetClassName(clazz) : typeName;
+    std::string className{clazz != nullptr ? JEnv{}.GetClassName(clazz) : typeName};
 
     auto node = MetadataNode::GetOrCreate(className);
 
@@ -218,24 +215,6 @@ bool ObjectManager::CloneLink(const Local<Object> &src, const Local<Object> &des
     }
 
     return success;
-}
-
-string ObjectManager::GetClassName(jobject javaObject) {
-    JEnv env;
-    JniLocalRef objectClass(env.GetObjectClass(javaObject));
-
-    return GetClassName((jclass) objectClass);
-}
-
-string ObjectManager::GetClassName(jclass clazz) {
-    JEnv env;
-    JniLocalRef javaCanonicalName(env.CallObjectMethod(clazz, GET_NAME_METHOD_ID));
-
-    string className = ArgConverter::jstringToString(javaCanonicalName);
-
-    std::replace(className.begin(), className.end(), '.', '/');
-
-    return className;
 }
 
 void ObjectManager::JSObjectFinalizerStatic(const WeakCallbackInfo<ObjectWeakCallbackState> &data) {

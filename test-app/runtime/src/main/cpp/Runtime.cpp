@@ -335,7 +335,8 @@ void Runtime::CreateJSInstanceNative(jobject obj, jobject javaObject, jint javaO
     Local<Object> jsInstance;
     Local<Object> implementationObject;
 
-    auto proxyClassName = m_objectManager->GetClassName(javaObject);
+    JEnv env;
+    std::string proxyClassName{env.GetClassName(javaObject)};
     DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
     jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager.get(), proxyClassName);
 
@@ -404,7 +405,8 @@ void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable excep
     auto nativeExceptionObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID);
 
     if (nativeExceptionObject.IsEmpty()) {
-        string className = m_objectManager->GetClassName((jobject) exception);
+        JEnv java{env};
+        string className{java.GetClassName((jobject) exception)};
         //create proxy object that wraps the java err
         nativeExceptionObject = m_objectManager->CreateJSWrapper(javaObjectID, className);
         if (nativeExceptionObject.IsEmpty()) {

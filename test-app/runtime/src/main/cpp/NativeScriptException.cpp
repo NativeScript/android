@@ -75,8 +75,7 @@ void NativeScriptException::ReThrowToJava() {
 
 
     if (!m_javaException.IsNull()) {
-        auto objectManager = Runtime::GetObjectManager(isolate);
-        auto excClassName = objectManager->GetClassName((jobject) m_javaException);
+        std::string excClassName{env.GetClassName((jobject) m_javaException)};
         if (excClassName == "com/tns/NativeScriptException") {
             ex = m_javaException;
         } else {
@@ -103,8 +102,7 @@ void NativeScriptException::ReThrowToJava() {
         if (ex == nullptr) {
             ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring) msg, (jstring)stackTrace, reinterpret_cast<jlong>(m_javascriptException)));
         } else {
-            auto objectManager = Runtime::GetObjectManager(isolate);
-            auto excClassName = objectManager->GetClassName(ex);
+            std::string excClassName{env.GetClassName(ex)};
             if (excClassName != "com/tns/NativeScriptException") {
                 ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_THROWABLE_WITH_STACK_CTOR_ID, (jstring) msg, (jstring)stackTrace, ex));
             }
@@ -187,9 +185,8 @@ Local<Value> NativeScriptException::WrapJavaToJsException() {
     JEnv env;
 
     auto isolate = Isolate::GetCurrent();
-    auto objectManager = Runtime::GetObjectManager(isolate);
 
-    string excClassName = objectManager->GetClassName((jobject) m_javaException);
+    string excClassName{env.GetClassName((jobject) m_javaException)};
     if (excClassName == "com/tns/NativeScriptException") {
         jfieldID fieldID = env.GetFieldID(env.GetObjectClass(m_javaException), "jsValueAddress", "J");
         jlong addr = env.GetLongField(m_javaException, fieldID);
@@ -223,7 +220,7 @@ Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& e
     auto nativeExceptionObject = objectManager->GetJsObjectByJavaObject(javaObjectID);
 
     if (nativeExceptionObject.IsEmpty()) {
-        string className = objectManager->GetClassName((jobject) exc);
+        string className{env.GetClassName((jobject) exc)};
         nativeExceptionObject = objectManager->CreateJSWrapper(javaObjectID, className);
     }
 

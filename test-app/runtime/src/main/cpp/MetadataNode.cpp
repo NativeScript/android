@@ -1690,7 +1690,8 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
         bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
         auto clazz = CallbackHandlers::ResolveClass(isolate, baseClassName, fullClassName, implementationObject, isInterface);
-        auto fullExtendedName = CallbackHandlers::ResolveClassName(isolate, clazz);
+        JEnv env;
+        std::string fullExtendedName{env.GetClassName(clazz)};
         DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
 
         auto cachedData = GetCachedExtendedClassData(isolate, fullExtendedName);
