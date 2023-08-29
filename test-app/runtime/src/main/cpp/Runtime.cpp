@@ -177,6 +177,7 @@ void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, 
 
 void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog) {
     LogEnabled = verboseLoggingEnabled;
+    NativeScriptException::Init();
 
     auto filesRoot = ArgConverter::jstringToString(filesPath);
     auto nativeLibDirStr = ArgConverter::jstringToString(nativeLibDir);
@@ -196,7 +197,6 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir, bool ve
 
     auto profilerOutputDirStr = ArgConverter::jstringToString(profilerOutputDir);
 
-    NativeScriptException::Init();
     m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr, maxLogcatObjectSize, forceLog);
 }
 
