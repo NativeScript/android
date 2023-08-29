@@ -162,14 +162,6 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &baseClassN
     return globalRefToGeneratedClass;
 }
 
-// Called by ExtendMethodCallback when extending a class
-string CallbackHandlers::ResolveClassName(Isolate *isolate, jclass &clazz) {
-    auto runtime = Runtime::GetRuntime(isolate);
-    auto objectManager = runtime->GetObjectManager();
-    auto className = objectManager->GetClassName(clazz);
-    return className;
-}
-
 Local<Value> CallbackHandlers::GetArrayElement(Local<Context> context, const Local<Object> &array,
                                                uint32_t index, const string &arraySignature) {
     return arrayElementAccessor.GetArrayElement(context, array, index, arraySignature);

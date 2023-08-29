@@ -190,7 +190,7 @@ Local<Value> ArrayElementAccessor::ConvertToJsValue(Isolate* isolate, ObjectMana
                     if (elementSignature[0] == '[') {
                         className = Util::JniClassPathToCanonicalName(elementSignature);
                     } else {
-                        className = objectManager->GetClassName(*(jobject*) value);
+                        className = env.GetClassName(*(jobject*) value);
                     }
 
                     jsValue = objectManager->CreateJSWrapper(javaObjectID, className);

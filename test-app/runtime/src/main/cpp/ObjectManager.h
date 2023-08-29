@@ -33,10 +33,6 @@ class ObjectManager {
 
         bool CloneLink(const v8::Local<v8::Object>& src, const v8::Local<v8::Object>& dest);
 
-        std::string GetClassName(jobject javaObject);
-
-        std::string GetClassName(jclass clazz);
-
         jint GenerateNewObjectID();
 
         v8::Local<v8::Object> GetEmptyObject(v8::Isolate* isolate);
@@ -97,8 +93,6 @@ class ObjectManager {
         LRUCache<jint, jweak> m_cache;
 
         volatile jint m_currentObjectId;
-
-        jmethodID GET_NAME_METHOD_ID;
 
         jmethodID GET_JAVAOBJECT_BY_ID_METHOD_ID;
 

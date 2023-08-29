@@ -828,12 +828,29 @@ void JEnv::Init(JavaVM *jvm) {
     GET_CACHED_CLASS_METHOD_ID = env.GetStaticMethodID(RUNTIME_CLASS, "getCachedClass",
                                                        "(Ljava/lang/String;)Ljava/lang/Class;");
     assert(GET_CACHED_CLASS_METHOD_ID != nullptr);
+    jclass javaLangClass = env.FindClass("java/lang/Class");
+    assert(javaLangClass != nullptr);
+    GET_NAME_METHOD_ID = env.GetMethodID(javaLangClass, "getName", "()Ljava/lang/String;");
+    assert(GET_NAME_METHOD_ID != nullptr);
 }
 
 jclass JEnv::GetObjectClass(jobject obj) {
     jclass jcl = m_env->GetObjectClass(obj);
     CheckForJavaException();
     return jcl;
+}
+
+std::string JEnv::GetClassName(jclass cls) {
+    JniLocalRef javaCanonicalName{CallObjectMethod(cls, GET_NAME_METHOD_ID)};
+
+    jboolean unused = JNI_FALSE;
+    const char* chars = GetStringUTFChars(jstring{javaCanonicalName}, &unused);
+    std::string className{chars};
+    ReleaseStringUTFChars(jstring{javaCanonicalName}, chars);
+
+    std::replace(className.begin(), className.end(), '.', '/');
+
+    return className;
 }
 
 jsize JEnv::GetArrayLength(jarray array) {
@@ -859,6 +876,7 @@ map<string, jclass> JEnv::s_classCache;
 map<string, jthrowable> JEnv::s_missingClasses;
 jclass JEnv::RUNTIME_CLASS = nullptr;
 jmethodID JEnv::GET_CACHED_CLASS_METHOD_ID = nullptr;
+jmethodID JEnv::GET_NAME_METHOD_ID = nullptr;
 
 std::pair<jmethodID, jclass>
 JEnv::GetInterfaceStaticMethodIDAndJClass(const std::string &interfaceName,

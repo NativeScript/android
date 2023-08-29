@@ -48,8 +48,6 @@ namespace tns {
                                    const v8::Local<v8::Object> &implementationObject,
                                    bool isInterface);
 
-        static std::string ResolveClassName(v8::Isolate *isolate, jclass &clazz);
-
         static v8::Local<v8::Value>
         GetArrayElement(v8::Local<v8::Context> context, const v8::Local<v8::Object> &array, uint32_t index,
                         const std::string &arraySignature);
