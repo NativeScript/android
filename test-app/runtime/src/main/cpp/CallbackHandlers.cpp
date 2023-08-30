@@ -687,12 +687,12 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
     Local<v8::Function> cb = it->second.callback_.Get(isolate);
     v8::Local<v8::Context> context = cb->GetCreationContextChecked();
     Context::Scope context_scope(context);
+    // erase the it here as we're already done with its values and the callback might invalidate the iterator
+    cache_.erase(it);
 
     v8::TryCatch tc(isolate);
 
     cb->Call(context, context->Global(), 0, nullptr);  // ignore JS return value
-
-    cache_.erase(it);
 
     if(tc.HasCaught()){
         throw NativeScriptException(tc);
