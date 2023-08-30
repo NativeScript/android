@@ -2038,7 +2038,7 @@ void MetadataNode::EnableProfiler(bool enableProfiler) {
     s_profilerEnabled = enableProfiler;
 }
 
-bool MetadataNode::IsJavascriptKeyword(std::string word) {
+bool MetadataNode::IsJavascriptKeyword(const std::string& word) {
     static set<string> keywords{
         "abstract", "arguments", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue", "debugger", "default", "delete", "do",
         "double", "else", "enum", "eval", "export", "extends", "false", "final", "finally", "float", "for", "function", "goto", "if", "implements",

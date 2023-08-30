@@ -74,7 +74,7 @@ class MetadataNode {
 
         MetadataNode(MetadataTreeNode* treeNode);
 
-        static bool IsJavascriptKeyword(std::string word);
+        static bool IsJavascriptKeyword(const std::string& word);
         v8::Local<v8::Object> CreatePackageObject(v8::Isolate* isolate);
 
         v8::Local<v8::Function> GetConstructorFunction(v8::Isolate* isolate);
