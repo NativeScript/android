@@ -146,13 +146,13 @@ if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
     set_target_properties(
             NativeScript
             PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition -Wl,--exclude-libs=ALL -Wl,--gc-sections
-            INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
+            INTERFACE_INCLUDE_DIRECTORIES ${NATIVES_BLOB_INCLUDE_DIRECTORIES}
     )
 else ()
     set_target_properties(
             NativeScript
             PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition
-            INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
+            INTERFACE_INCLUDE_DIRECTORIES ${NATIVES_BLOB_INCLUDE_DIRECTORIES}
     )
 endif ()
 
