@@ -1,3 +1,13 @@
+## [8.5.2](https://github.com/NativeScript/android/compare/v8.5.1...v8.5.2) (2023-08-31)
+
+
+### Bug Fixes
+
+* __runOnMainThread erase iterator before it can be invalidated ([e811484](https://github.com/NativeScript/android/commit/e81148409046957fceb07b14394baa5bc055286d))
+* pull js stack trace from wrapped NativeScriptExceptions ([#1774](https://github.com/NativeScript/android/issues/1774)) ([52b7fa2](https://github.com/NativeScript/android/commit/52b7fa242cb4582701dcebf97aa0f6e0400bcb1a))
+
+
+
 ## [8.5.1](https://github.com/NativeScript/android/compare/v8.5.0...v8.5.1) (2023-07-24)
 
 
