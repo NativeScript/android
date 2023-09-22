@@ -1,3 +1,12 @@
+## [8.5.3](https://github.com/NativeScript/android/compare/v8.5.2...v8.5.3) (2023-09-22)
+
+
+### Bug Fixes
+
+* resolve __postFrameCallback crash on re-scheduling ([6a533ce](https://github.com/NativeScript/android/commit/6a533ce58b22b163d888c51f203be2ef3aa98347))
+
+
+
 ## [8.5.2](https://github.com/NativeScript/android/compare/v8.5.1...v8.5.2) (2023-08-31)
 
 
