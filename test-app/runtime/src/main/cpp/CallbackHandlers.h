@@ -328,8 +328,20 @@ namespace tns {
 
             v8::Isolate *isolate_;
             v8::Global<v8::Function> callback_;
-            bool removed = false;
             uint64_t id;
+
+            bool isScheduled() {
+                return scheduled;
+            }
+
+            void markScheduled() {
+                scheduled = true;
+                removed = false;
+            }
+            void markRemoved() {
+                // we can never unschedule a callback, so we just mark it as removed
+                removed = true;
+            }
 
             AChoreographer_frameCallback frameCallback_ = [](long ts, void *data) {
                 execute((double)ts, data);
@@ -342,7 +354,7 @@ namespace tns {
             static void execute(double ts, void *data){
                 if (data != nullptr) {
                     auto entry = static_cast<FrameCallbackCacheEntry *>(data);
-                    if (entry->removed) {
+                    if (entry->shouldRemoveBeforeCall()) {
                         frameCallbackCache_.erase(entry->id);  // invalidates *entry
                         return;
                     }
@@ -354,6 +366,8 @@ namespace tns {
                     v8::Local<v8::Function> cb = entry->callback_.Get(isolate);
                     v8::Local<v8::Context> context = cb->GetCreationContextChecked();
                     v8::Context::Scope context_scope(context);
+                    // we're running the callback now, so it's not scheduled anymore
+                    entry->markUnscheduled();
 
                     v8::Local<v8::Value> args[1] = {v8::Number::New(isolate, ts)};
 
@@ -361,13 +375,32 @@ namespace tns {
 
                     cb->Call(context, context->Global(), 1, args);  // ignore JS return value
 
-                    frameCallbackCache_.erase(entry->id);  // invalidates *entry
+                    // check if we should remove it (it should be both unscheduled and removed)
+                    if (entry->shouldRemoveAfterCall()) {
+                        frameCallbackCache_.erase(entry->id);  // invalidates *entry
+                    }
+
 
                     if(tc.HasCaught()){
                         throw NativeScriptException(tc);
                     }
 
                 }
+            }
+            private:
+            bool removed = false;
+            bool scheduled = false;
+            void markUnscheduled() {
+                scheduled = false;
+                removed = true;
+            }
+
+            bool shouldRemoveBeforeCall() {
+                return removed;
+            }
+            
+            bool shouldRemoveAfterCall() {
+                return !scheduled && removed;
             }
 
         };

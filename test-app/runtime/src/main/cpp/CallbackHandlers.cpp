@@ -1609,7 +1609,6 @@ void CallbackHandlers::PostCallback(const FunctionCallbackInfo<v8::Value> &args,
 void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &args) {
     if (android_get_device_api_level() >= 24) {
         InitChoreographer();
-        assert(args[0]->IsFunction());
         Isolate *isolate = args.GetIsolate();
 
         v8::Locker locker(isolate);
@@ -1617,6 +1616,11 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
         HandleScope handle_scope(isolate);
         auto context = isolate->GetCurrentContext();
         Context::Scope context_scope(context);
+
+        if (args.Length() < 1 || !args[0]->IsFunction()) {
+            isolate->ThrowException(v8::Exception::TypeError(v8::String::NewFromUtf8Literal(isolate, "Frame callback argument is not a function")));
+            return;
+        }
 
         auto func = args[0].As<Function>();
 
@@ -1629,8 +1633,13 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
             auto id = pId->IntegerValue(context).FromMaybe(0);
             auto cb = frameCallbackCache_.find(id);
             if (cb != frameCallbackCache_.end()) {
-                cb->second.removed = false;
-                PostCallback(args, &cb->second, context);
+                // check if it's already scheduled first, we don't want to schedule it twice
+                bool shouldReschedule = !cb->second.isScheduled();
+                // always mark as scheduled, as that will also mark it as not removed anymore
+                cb->second.markScheduled();
+                if (shouldReschedule) {
+                    PostCallback(args, &cb->second, context);
+                }
                 return;
             }
         }
@@ -1645,6 +1654,7 @@ void CallbackHandlers::PostFrameCallback(const FunctionCallbackInfo<v8::Value> &
         std::tie(val, inserted) = frameCallbackCache_.try_emplace(key, isolate, callback, key);
         assert(inserted && "Frame callback ID should not be duplicated");
 
+        val->second.markScheduled();
         PostCallback(args, &val->second, context);
     }
 }
@@ -1653,15 +1663,17 @@ void CallbackHandlers::RemoveFrameCallback(const FunctionCallbackInfo<v8::Value>
 
     if (android_get_device_api_level() >= 24) {
         InitChoreographer();
-        assert(args[0]->IsFunction());
         Isolate *isolate = args.GetIsolate();
-
         v8::Locker locker(isolate);
         Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);
         auto context = isolate->GetCurrentContext();
         Context::Scope context_scope(context);
 
+        if (args.Length() < 1 || !args[0]->IsFunction()) {
+            isolate->ThrowException(v8::Exception::TypeError(v8::String::NewFromUtf8Literal(isolate, "Frame callback argument is not a function")));
+            return;
+        }
         auto func = args[0].As<Function>();
 
         auto idKey = ArgConverter::ConvertToV8String(isolate, "_postFrameCallbackId");
@@ -1673,7 +1685,7 @@ void CallbackHandlers::RemoveFrameCallback(const FunctionCallbackInfo<v8::Value>
             auto id = pId->IntegerValue(context).FromMaybe(0);
             auto cb = frameCallbackCache_.find(id);
             if (cb != frameCallbackCache_.end()) {
-                cb->second.removed = true;
+                cb->second.markRemoved();
             }
         }
 
