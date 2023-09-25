@@ -190,6 +190,8 @@ def setAppIdentifier = { ->
 }
 
 android {
+    namespace "com.tns.testapplication"
+
     applyBeforePluginGradleConfiguration()
 
     if (enableKotlin) {
@@ -499,7 +501,7 @@ task runSbg(type: BuildToolTask) {
     inputs.dir(extractedDependenciesDir)
 
     workingDir "$BUILD_TOOLS_PATH"
-    main "-jar"
+    mainClass = "-jar"
 
     def paramz = new ArrayList<String>()
     paramz.add("static-binding-generator.jar")
@@ -767,7 +769,7 @@ task buildMetadata(type: BuildToolTask) {
     outputs.files("$METADATA_OUT_PATH/treeNodeStream.dat", "$METADATA_OUT_PATH/treeStringsStream.dat", "$METADATA_OUT_PATH/treeValueStream.dat")
 
     workingDir "$BUILD_TOOLS_PATH"
-    main "-jar"
+    mainClass = "-jar"
 
     doFirst {
         // get compiled classes to pass to metadata generator
@@ -862,7 +864,7 @@ task generateTypescriptDefinitions(type: BuildToolTask) {
     def includeDirs = ["com.android.support", "/platforms/" + android.compileSdkVersion]
 
     workingDir "$BUILD_TOOLS_PATH"
-    main "-jar"
+    mainClass = "-jar"
 
     doFirst {
         delete "$TYPINGS_PATH"
