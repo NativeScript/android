@@ -155,6 +155,7 @@ public class DexFactory {
             out.closeEntry();
             out.close();
         }
+        jarFile.setReadOnly();
 
         Class<?> result;
         DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexDir.getAbsolutePath(), null, classLoader);
