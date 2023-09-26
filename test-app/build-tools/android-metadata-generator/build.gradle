@@ -93,13 +93,3 @@ jar {
 
     duplicatesStrategy = 'include'
 }
-
-task copyJarToBuildTools (type: Copy) {
-	from "$projectDir/build/libs/android-metadata-generator.jar"
-	into "$projectDir/../"
-}
-
-jar.finalizedBy(copyJarToBuildTools)
-
-
-

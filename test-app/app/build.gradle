@@ -504,7 +504,7 @@ task runSbg(type: BuildToolTask) {
     mainClass = "-jar"
 
     def paramz = new ArrayList<String>()
-    paramz.add("static-binding-generator.jar")
+    paramz.add("static-binding-generator/build/libs/static-binding-generator.jar")
 
     if (failOnCompilationWarningsEnabled()) {
         paramz.add("-show-deprecation-warnings")
@@ -841,7 +841,7 @@ task buildMetadata(type: BuildToolTask) {
         setOutputs outLogger
 
         def paramz = new ArrayList<String>()
-        paramz.add("android-metadata-generator.jar")
+        paramz.add("android-metadata-generator/build/libs/android-metadata-generator.jar")
 
         if(enableAnalytics){
             paramz.add("analyticsFilePath=$analyticsFilePath")

@@ -33,16 +33,7 @@ dependencies {
 }
 
 compileJava {
-    if (!findProject(':dts-generator').is(null)) {
-        dependsOn ':dts-generator:copyJarToBuildTools'
-    }
     options.compilerArgs << "-Xlint:all" << "-Xlint:-options" << "-Werror"
-}
-
-task copyJarToBuildTools (type: Copy) {
-    inputs.file("$projectDir/build/libs/static-binding-generator.jar")
-    from "$projectDir/build/libs/static-binding-generator.jar"
-    into "$projectDir/../"
 }
 
 jar {
@@ -72,5 +63,3 @@ jar {
 
     duplicatesStrategy = 'include'
 }
-
-jar.finalizedBy(copyJarToBuildTools)
