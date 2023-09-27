@@ -1,3 +1,12 @@
+## [8.5.4](https://github.com/NativeScript/android/compare/v8.5.3...v8.5.4) (2023-09-27)
+
+
+### Bug Fixes
+
+* make jar files readonly prior to loading ([#1790](https://github.com/NativeScript/android/issues/1790)) ([14a932a](https://github.com/NativeScript/android/commit/14a932ad2d62c94f2f4e139125835da760dcdd58))
+
+
+
 ## [8.5.3](https://github.com/NativeScript/android/compare/v8.5.2...v8.5.3) (2023-09-22)
 
 
