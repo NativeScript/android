@@ -3,7 +3,7 @@ on:
     branches:
       - main
     tags:
-      - 'v*'
+      - "v*"
 
 env:
   NPM_TAG: "next"
@@ -12,7 +12,6 @@ env:
   ANDROID_API: 29
   ANDROID_ABI: x86_64
   NDK_ARCH: darwin-x86_64
-
 
 jobs:
   build:
@@ -131,8 +130,8 @@ jobs:
       - build
       - test
     permissions:
-     contents: read
-     id-token: write
+      contents: read
+      id-token: write
     env:
       NPM_VERSION: ${{needs.build.outputs.npm_version}}
       NPM_TAG: ${{needs.build.outputs.npm_tag}}
@@ -140,7 +139,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
       - uses: actions/download-artifact@v3
         with:
           name: npm-package
@@ -181,3 +180,4 @@ jobs:
         with:
           artifacts: "dist/nativescript-android-*.tgz"
           bodyFile: "body.md"
+          prerelease: ${{needs.build.outputs.npm_tag != 'latest'}}
