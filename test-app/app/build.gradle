@@ -492,7 +492,9 @@ tasks.whenTaskAdded({ DefaultTask currentTask ->
 
 task runSbg(type: BuildToolTask) {
     dependsOn "collectAllJars"
+    def rootPath = "";
     if (!findProject(':static-binding-generator').is(null)) {
+        rootPath = Paths.get(project(':static-binding-generator').projectDir.path, "build/libs").toString()
         dependsOn ':static-binding-generator:jar'
     }
 
@@ -504,7 +506,7 @@ task runSbg(type: BuildToolTask) {
     mainClass = "-jar"
 
     def paramz = new ArrayList<String>()
-    paramz.add("static-binding-generator/build/libs/static-binding-generator.jar")
+    paramz.add(Paths.get(rootPath,"static-binding-generator.jar"))
 
     if (failOnCompilationWarningsEnabled()) {
         paramz.add("-show-deprecation-warnings")
@@ -737,7 +739,9 @@ def listf(String directoryName, ArrayList<File> store) {
 }
 
 task buildMetadata(type: BuildToolTask) {
+    def rootPath = "";
     if (!findProject(':android-metadata-generator').is(null)) {
+        rootPath = Paths.get(project(':android-metadata-generator').projectDir.path, "build/libs").toString()
         dependsOn ':android-metadata-generator:jar'
     }
 
@@ -841,7 +845,7 @@ task buildMetadata(type: BuildToolTask) {
         setOutputs outLogger
 
         def paramz = new ArrayList<String>()
-        paramz.add("android-metadata-generator/build/libs/android-metadata-generator.jar")
+        paramz.add(Paths.get(rootPath, "android-metadata-generator.jar"))
 
         if(enableAnalytics){
             paramz.add("analyticsFilePath=$analyticsFilePath")
