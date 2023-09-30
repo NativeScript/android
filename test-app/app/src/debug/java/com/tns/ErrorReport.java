@@ -415,13 +415,21 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 
             int errorExceptionViewId = activity.getResources().getIdentifier("errorException", "id", activity.getPackageName());
             TextView errorExceptionView = (TextView) activity.findViewById(errorExceptionViewId);
+            errorExceptionView.setMovementMethod(new ScrollingMovementMethod());
 
             int errorStackTraceViewId = container.getContext().getResources().getIdentifier("errorStacktrace", "id", container.getContext().getPackageName());
             TextView errorStackTraceView = (TextView) view.findViewById(errorStackTraceViewId);
 
             String[] exceptionParts = exceptionMsg.split("StackTrace:");
             String error = exceptionParts[0];
-            String trace = exceptionParts.length > 1 ? exceptionParts[1] : null;
+            String trace = "";
+
+            if (exceptionParts.length > 1) {
+                for (int i=0;i < exceptionParts.length;i++) {
+                    if (i == 0) continue;
+                    trace += exceptionParts[i];
+                }
+            }
 
             errorExceptionView.setText(error.trim());
 

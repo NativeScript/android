@@ -15,8 +15,11 @@
         android:layout_height="wrap_content"
         android:text=""
         android:background="@color/red"
-        android:textSize="17sp"
+        android:textSize="16sp"
         android:paddingLeft="16dp"
+        android:textIsSelectable="true"
+        android:maxHeight="200dp"
+        android:scrollbars="vertical"
         android:textColor="@color/white"
         android:paddingVertical="10dp"
         android:paddingRight="16dp" />
