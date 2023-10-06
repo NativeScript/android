@@ -19,13 +19,17 @@ import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import com.google.android.material.tabs.TabLayout;
+
+import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
@@ -33,7 +37,15 @@ import androidx.fragment.app.FragmentStatePagerAdapter;
 import androidx.viewpager.widget.ViewPager;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+
+import android.text.SpannableString;
+import android.text.SpannableStringBuilder;
+import android.text.method.LinkMovementMethod;
 import android.text.method.ScrollingMovementMethod;
+import android.text.style.AbsoluteSizeSpan;
+import android.text.style.ClickableSpan;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -41,7 +53,6 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
-
 
 class ErrorReport implements TabLayout.OnTabSelectedListener {
     public static final String ERROR_FILE_NAME = "hasError";
@@ -349,26 +360,96 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
         }
     }
 
-    public static class ExceptionTab extends Fragment {
+
+       public static class ExceptionTab extends Fragment {
+
+        public SpannableStringBuilder getStyledStacktrace(String trace) {
+            if (trace == null) return null;
+            String[] traceLines = trace.trim().split("\n");
+            SpannableStringBuilder builder = new SpannableStringBuilder();
+            boolean firstLine = true;
+            for (String line: traceLines) {
+                if (firstLine) {
+                    firstLine = false;
+                } else {
+                    builder.append("\n");
+                    builder.append("\n");
+                }
+
+                String[] nameAndPath = line.trim().split("\\(");
+                SpannableString nameSpan = new SpannableString(nameAndPath[0]);
+                nameSpan.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), 0, nameAndPath[0].length(), 0);
+                builder.append(nameSpan);
+
+                builder.append("  ");
+                if (nameAndPath.length > 1) {
+                    SpannableString pathSpan = new SpannableString("(" + nameAndPath[1]);
+                    pathSpan.setSpan(new AbsoluteSizeSpan(13, true),0, nameAndPath[1].length() + 1, 0);
+                    pathSpan.setSpan(new ClickableSpan() {
+                        @Override
+                        public void onClick(@NonNull View widget) {
+                            Log.d("JS", line.trim());
+                        }
+                    }, 0,nameAndPath[1].length() + 1, 0);
+                    pathSpan.setSpan(new ForegroundColorSpan(Color.GRAY),0, nameAndPath[1].length() + 1, 0);
+
+                    builder.append(pathSpan);
+                }
+            }
+            return builder;
+        }
+
+           public static void restartApp(Context context) {
+               PackageManager packageManager = context.getPackageManager();
+               Intent intent = packageManager.getLaunchIntentForPackage(context.getPackageName());
+               ComponentName componentName = intent.getComponent();
+               Intent mainIntent = Intent.makeRestartActivityTask(componentName);
+               context.startActivity(mainIntent);
+               java.lang.Runtime.getRuntime().exit(0);
+           }
+
         @Override
         public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
             int exceptionTabId = container.getContext().getResources().getIdentifier("exception_tab", "layout", container.getContext().getPackageName());
             View view = inflater.inflate(exceptionTabId, container, false);
 
-            int txtViewId = container.getContext().getResources().getIdentifier("txtErrorMsg", "id", container.getContext().getPackageName());
-            TextView txtErrorMsg = (TextView) view.findViewById(txtViewId);
-            txtErrorMsg.setText(exceptionMsg);
-            txtErrorMsg.setMovementMethod(new ScrollingMovementMethod());
+            int errorExceptionViewId = activity.getResources().getIdentifier("errorException", "id", activity.getPackageName());
+            TextView errorExceptionView = (TextView) activity.findViewById(errorExceptionViewId);
+            errorExceptionView.setMovementMethod(new ScrollingMovementMethod());
+
+            int errorStackTraceViewId = container.getContext().getResources().getIdentifier("errorStacktrace", "id", container.getContext().getPackageName());
+            TextView errorStackTraceView = (TextView) view.findViewById(errorStackTraceViewId);
+
+            String[] exceptionParts = exceptionMsg.split("StackTrace:");
+            String error = exceptionParts[0];
+            String trace = "";
+
+            if (exceptionParts.length > 1) {
+                for (int i=0;i < exceptionParts.length;i++) {
+                    if (i == 0) continue;
+                    trace += exceptionParts[i];
+                }
+            }
+
+            errorExceptionView.setText(error.trim());
+
+            errorStackTraceView.setText(trace != null ? getStyledStacktrace(trace) : "", TextView.BufferType.SPANNABLE);
+            errorStackTraceView.setMovementMethod(new ScrollingMovementMethod());
+            errorStackTraceView.setMovementMethod(LinkMovementMethod.getInstance());
+            errorStackTraceView.setEnabled(true);
 
             int btnCopyExceptionId = container.getContext().getResources().getIdentifier("btnCopyException", "id", container.getContext().getPackageName());
             Button copyToClipboard = (Button) view.findViewById(btnCopyExceptionId);
-            copyToClipboard.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
-                    ClipData clip = ClipData.newPlainText("nsError", exceptionMsg);
-                    clipboard.setPrimaryClip(clip);
-                }
+
+            int btnRestartAppId = container.getContext().getResources().getIdentifier("btnRestartApp", "id", container.getContext().getPackageName());
+            Button restartApp = (Button) view.findViewById(btnRestartAppId);
+            restartApp.setOnClickListener(v -> {
+                restartApp(getContext().getApplicationContext());
+            });
+            copyToClipboard.setOnClickListener(v -> {
+                ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+                ClipData clip = ClipData.newPlainText("nsError", exceptionMsg);
+                clipboard.setPrimaryClip(clip);
             });
 
             return view;
