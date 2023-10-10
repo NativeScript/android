@@ -250,12 +250,6 @@ task copyFilesToProjectTemeplate {
             into "$DIST_FRAMEWORK_PATH/app/src/main/assets/internal"
         }
         copy {
-            from "$TEST_APP_PATH/app/src/main/res/drawable"
-            include "button.xml"
-            include "button_accented.xml"
-            into "$DIST_FRAMEWORK_PATH/app/src/main/res/drawable"
-        }
-        copy {
             from "$TEST_APP_PATH/app/src/main/java/com/tns/"
             include "*.java"
             exclude "NativeScriptApplication.java"
