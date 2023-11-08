@@ -3,29 +3,35 @@
 #include "NativeScriptException.h"
 #include "CallbackHandlers.h"
 #include <sstream>
-
+#include "com_tns_AssetExtractor.h"
+#include "com_tns_AndroidJsV8Inspector.h"
 using namespace std;
 using namespace tns;
 
-JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
-    try {
-        Runtime::Init(vm, reserved);
-    } catch (NativeScriptException& e) {
-        e.ReThrowToJava();
-    } catch (std::exception e) {
-        stringstream ss;
-        ss << "Error: c++ exception: " << e.what() << endl;
-        NativeScriptException nsEx(ss.str());
-        nsEx.ReThrowToJava();
-    } catch (...) {
-        NativeScriptException nsEx(std::string("Error: c++ exception!"));
-        nsEx.ReThrowToJava();
+#define ANDROID_O 26
+
+int getApiVersion(JNIEnv *env) {
+    jint sdkInt = -1;
+    bool success = true;
+    jclass versionClass = env->FindClass("android/os/Build$VERSION");
+
+    if (versionClass == nullptr) {
+        success = false;
     }
 
-    return JNI_VERSION_1_6;
+    jfieldID sdkIntFieldID;
+    if (success) {
+        success = ((sdkIntFieldID = env->GetStaticFieldID(versionClass, "SDK_INT", "I")) != nullptr);
+    }
+
+    if (success) {
+        sdkInt = env->GetStaticIntField(versionClass, sdkIntFieldID);
+    }
+
+    return sdkInt;
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_SetManualInstrumentationMode(JNIEnv* _env, jobject obj, jstring mode) {
+static JNICALL void SetManualInstrumentationMode(JNIEnv* _env, jclass _clazz, jstring mode) {
     try {
         Runtime::SetManualInstrumentationMode(mode);
     } catch (...) {
@@ -34,7 +40,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_SetManualInstrumentationMode(JNIE
     }
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_initNativeScript(JNIEnv* _env, jobject obj, jint runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, jint maxLogcatObjectSize, jboolean forceLog) {
+static JNICALL void initNativeScript(JNIEnv* _env, jobject obj, jint runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, jint maxLogcatObjectSize, jboolean forceLog) {
     try {
         Runtime::Init(_env, obj, runtimeId, filesPath, nativeLibDir, verboseLoggingEnabled, isDebuggable, packageName, args, callingDir, maxLogcatObjectSize, forceLog);
     } catch (NativeScriptException& e) {
@@ -68,7 +74,7 @@ Runtime* TryGetRuntime(int runtimeId) {
     return runtime;
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_runModule(JNIEnv* _env, jobject obj, jint runtimeId, jstring scriptFile) {
+static JNICALL void runModule(JNIEnv* _env, jobject obj, jint runtimeId, jstring scriptFile) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
         return;
@@ -96,7 +102,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_runModule(JNIEnv* _env, jobject o
     }
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_runWorker(JNIEnv* _env, jobject obj, jint runtimeId, jstring scriptFile) {
+static  JNICALL void runWorker(JNIEnv* _env, jobject obj, jint runtimeId, jstring scriptFile) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
         return;
@@ -124,7 +130,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_runWorker(JNIEnv* _env, jobject o
     }
 }
 
-extern "C" JNIEXPORT jobject Java_com_tns_Runtime_runScript(JNIEnv* _env, jobject obj, jint runtimeId, jstring scriptFile) {
+static JNICALL jobject runScript(JNIEnv* _env, jobject obj, jint runtimeId, jstring scriptFile) {
     jobject result = nullptr;
 
     auto runtime = TryGetRuntime(runtimeId);
@@ -155,7 +161,7 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_runScript(JNIEnv* _env, jobjec
     return result;
 }
 
-extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _env, jobject obj, jint runtimeId, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs) {
+static JNICALL jobject callJSMethodNative(JNIEnv* _env, jobject obj, jint runtimeId, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs) {
     jobject result = nullptr;
 
     auto runtime = TryGetRuntime(runtimeId);
@@ -186,7 +192,7 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _en
     return result;
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv* _env, jobject obj, jint runtimeId, jobject javaObject, jint javaObjectID, jstring className) {
+static JNICALL void createJSInstanceNative(JNIEnv* _env, jobject obj, jint runtimeId, jobject javaObject, jint javaObjectID, jstring className) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
         return;
@@ -214,7 +220,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv* _e
     }
 }
 
-extern "C" JNIEXPORT jint Java_com_tns_Runtime_generateNewObjectId(JNIEnv* env, jobject obj, jint runtimeId) {
+static JNICALL jint generateNewObjectId(JNIEnv* env, jobject obj, jint runtimeId) {
     try {
         auto runtime = TryGetRuntime(runtimeId);
         if (runtime == nullptr) {
@@ -236,7 +242,8 @@ extern "C" JNIEXPORT jint Java_com_tns_Runtime_generateNewObjectId(JNIEnv* env, 
     return 0;
 }
 
-extern "C" JNIEXPORT jboolean Java_com_tns_Runtime_notifyGc(JNIEnv* env, jobject obj, jint runtimeId) {
+
+static JNICALL jboolean notifyGc(JNIEnv* env, jobject obj, jint runtimeId) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
         return JNI_FALSE;
@@ -246,21 +253,21 @@ extern "C" JNIEXPORT jboolean Java_com_tns_Runtime_notifyGc(JNIEnv* env, jobject
     return success;
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_lock(JNIEnv* env, jobject obj, jint runtimeId) {
+static JNICALL void rtLock(JNIEnv* env, jobject obj, jint runtimeId) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime != nullptr) {
         runtime->Lock();
     }
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_unlock(JNIEnv* env, jobject obj, jint runtimeId) {
+static JNICALL void rtUnlock(JNIEnv* env, jobject obj, jint runtimeId) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime != nullptr) {
         runtime->Unlock();
     }
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_passExceptionToJsNative(JNIEnv* env, jobject obj, jint runtimeId, jthrowable exception, jstring message, jstring fullStackTrace, jstring jsStackTrace, jboolean isDiscarded) {
+static JNICALL void passExceptionToJsNative(JNIEnv* env, jobject obj, jint runtimeId, jthrowable exception, jstring message, jstring fullStackTrace, jstring jsStackTrace, jboolean isDiscarded) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
         return;
@@ -288,11 +295,11 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_passExceptionToJsNative(JNIEnv* e
     }
 }
 
-extern "C" JNIEXPORT jint Java_com_tns_Runtime_getPointerSize(JNIEnv* env, jobject obj) {
+static JNICALL jint getPointerSize(JNIEnv* env, jobject obj) {
     return sizeof(void*);
 }
 
-extern "C" JNIEXPORT jint Java_com_tns_Runtime_getCurrentRuntimeId(JNIEnv* _env, jobject obj) {
+static JNICALL jint getCurrentRuntimeId(JNIEnv* _env, jobject obj) {
     Isolate* isolate = Isolate::TryGetCurrent();
     if (isolate == nullptr) {
         return -1;
@@ -303,7 +310,7 @@ extern "C" JNIEXPORT jint Java_com_tns_Runtime_getCurrentRuntimeId(JNIEnv* _env,
     return id;
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerGlobalOnMessageCallback(JNIEnv* env, jobject obj, jint runtimeId, jstring msg) {
+static JNICALL void WorkerGlobalOnMessageCallback(JNIEnv* env, jobject obj, jint runtimeId, jstring msg) {
     // Worker Thread runtime
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
@@ -321,7 +328,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerGlobalOnMessageCallback(JNI
     CallbackHandlers::WorkerGlobalOnMessageCallback(isolate, msg);
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerObjectOnMessageCallback(JNIEnv* env, jobject obj, jint runtimeId, jint workerId, jstring msg) {
+static JNICALL void WorkerObjectOnMessageCallback(JNIEnv* env, jobject obj, jint runtimeId, jint workerId, jstring msg) {
     // Main Thread runtime
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
@@ -339,7 +346,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerObjectOnMessageCallback(JNI
     CallbackHandlers::WorkerObjectOnMessageCallback(isolate, workerId, msg);
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_TerminateWorkerCallback(JNIEnv* env, jobject obj, jint runtimeId) {
+static JNICALL void TerminateWorkerCallback(JNIEnv* env, jobject obj, jint runtimeId) {
     // Worker Thread runtime
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
@@ -363,7 +370,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_TerminateWorkerCallback(JNIEnv* e
     delete runtime;
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_ClearWorkerPersistent(JNIEnv* env, jobject obj, jint runtimeId, jint workerId) {
+static JNICALL void ClearWorkerPersistent(JNIEnv* env, jobject obj, jint runtimeId, jint workerId) {
     // Worker Thread runtime
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
@@ -381,7 +388,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_ClearWorkerPersistent(JNIEnv* env
     CallbackHandlers::ClearWorkerPersistent(workerId);
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain(JNIEnv* env, jobject obj, jint runtimeId, jint workerId, jstring message, jstring stackTrace, jstring filename, jint lineno, jstring threadName) {
+static JNICALL void CallWorkerObjectOnErrorHandleMain(JNIEnv* env, jobject obj, jint runtimeId, jint workerId, jstring message, jstring stackTrace, jstring filename, jint lineno, jstring threadName) {
     // Main Thread runtime
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
@@ -402,7 +409,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain
     }
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_ResetDateTimeConfigurationCache(JNIEnv* _env, jobject obj, jint runtimeId) {
+static JNICALL void ResetDateTimeConfigurationCache(JNIEnv* _env, jobject obj, jint runtimeId) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
         return;
@@ -410,4 +417,195 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_ResetDateTimeConfigurationCache(J
 
     auto isolate = runtime->GetIsolate();
     isolate->DateTimeConfigurationChangeNotification(Isolate::TimeZoneDetection::kRedetect);
+}
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
+    try {
+
+        JNIEnv *env;
+        if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
+            return JNI_ERR;
+        }
+
+        int apiVersion = getApiVersion(env);
+
+        if (apiVersion == -1) {
+            __android_log_write(ANDROID_LOG_ERROR, "JS", "Could not get Android API version!");
+            return JNI_ERR;
+        }
+
+        jint result;
+
+
+
+
+        if (apiVersion >= ANDROID_O) {
+            // Redirect func_bangJni to fastNativeFunc since !bang JNI is not supported anymore
+            JNINativeMethod methodsInternal[] = {
+                    { "SetManualInstrumentationMode", "(Ljava/lang/String;)V", (void *) SetManualInstrumentationMode },
+                    { "initNativeScript", "(ILjava/lang/String;Ljava/lang/String;ZZLjava/lang/String;[Ljava/lang/Object;Ljava/lang/String;IZ)V", (void *) initNativeScript },
+                    { "runModule", "(ILjava/lang/String;)V", (void *) runModule },
+                    { "runWorker", "(ILjava/lang/String;)V", (void *) runWorker },
+                    { "runScript", "(ILjava/lang/String;)Ljava/lang/Object;", (void *) runScript },
+                    { "callJSMethodNative", "(IILjava/lang/String;IZ[Ljava/lang/Object;)Ljava/lang/Object;", (void *) callJSMethodNative },
+                    { "createJSInstanceNative", "(ILjava/lang/Object;ILjava/lang/String;)V", (void *) createJSInstanceNative },
+                    { "generateNewObjectId", "(I)I", (void *) generateNewObjectId },
+                    { "notifyGc", "(I)Z", (void *) notifyGc },
+                    { "lock", "(I)V", (void *) rtLock },
+                    { "unlock", "(I)V", (void *) rtUnlock },
+                    { "passExceptionToJsNative", "(ILjava/lang/Throwable;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V", (void *) passExceptionToJsNative },
+                    { "getPointerSize", "()I", (void *) getPointerSize },
+                    { "getCurrentRuntimeId", "()I", (void *) getCurrentRuntimeId },
+                    { "WorkerGlobalOnMessageCallback", "(ILjava/lang/String;)V", (void *) WorkerGlobalOnMessageCallback },
+                    { "WorkerObjectOnMessageCallback", "(IILjava/lang/String;)V", (void *) WorkerObjectOnMessageCallback },
+                    { "TerminateWorkerCallback", "(I)V", (void *) TerminateWorkerCallback },
+                    { "ClearWorkerPersistent", "(II)V", (void *) ClearWorkerPersistent },
+                    { "CallWorkerObjectOnErrorHandleMain", "(IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)V", (void *) CallWorkerObjectOnErrorHandleMain },
+                    { "ResetDateTimeConfigurationCache", "(I)V", (void *) ResetDateTimeConfigurationCache },
+            };
+
+
+            result = env->RegisterNatives(
+                    env->FindClass("com/tns/Runtime"),
+                    methodsInternal,
+                    sizeof(methodsInternal) / sizeof(JNINativeMethod));
+
+
+            if (result != JNI_OK) {
+                __android_log_print(ANDROID_LOG_ERROR, "JS", "Error code %d when registering native functions!",
+                                    result);
+                return JNI_ERR;
+            }
+
+
+            JNINativeMethod assetMethodsInternal[] = {
+                    { "extractAssets", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V", (void *) extractAssets }
+            };
+
+            result = env->RegisterNatives(
+                    env->FindClass("com/tns/AssetExtractor"),
+                    assetMethodsInternal,
+                    sizeof(assetMethodsInternal) / sizeof(JNINativeMethod));
+
+
+
+            if (result != JNI_OK) {
+                __android_log_print(ANDROID_LOG_ERROR, "JS", "Error code %d when registering native functions!",
+                                    result);
+                return JNI_ERR;
+            }
+
+
+            JNINativeMethod inspectorMethodsInternal[] = {
+                    { "init", "()V", (void *) initCritical },
+                    { "connect", "(Ljava/lang/Object;)V", (void *) connect },
+                    { "scheduleBreak", "()V", (void *) scheduleBreakCritical },
+                    { "disconnect", "()V", (void *) disconnectCritical },
+                    { "dispatchMessage", "(Ljava/lang/String;)V", (void *) dispatchMessage }
+            };
+
+            result = env->RegisterNatives(
+                    env->FindClass("com/tns/AndroidJsV8Inspector"),
+                    inspectorMethodsInternal,
+                    sizeof(inspectorMethodsInternal) / sizeof(JNINativeMethod));
+
+
+        }
+        else {
+            // Redirect CriticalNative function to !bang JNI function (need JNIEnv and jclass on Android 7-)
+            // !bang JNI notation used to demonstrate faster calls on Android 7-
+            JNINativeMethod methodsInternal[] = {
+                    { "SetManualInstrumentationMode", "!(Ljava/lang/String;)V", (void *) SetManualInstrumentationMode },
+                    { "initNativeScript", "!(ILjava/lang/String;Ljava/lang/String;ZZLjava/lang/String;[Ljava/lang/Object;Ljava/lang/String;IZ)V", (void *) initNativeScript },
+                    { "runModule", "!(ILjava/lang/String;)V", (void *) runModule },
+                    { "runWorker", "!(ILjava/lang/String;)V", (void *) runWorker },
+                    { "runScript", "!(ILjava/lang/String;)Ljava/lang/Object;", (void *) runScript },
+                    { "callJSMethodNative", "!(IILjava/lang/String;IZ[Ljava/lang/Object;)Ljava/lang/Object;", (void *) callJSMethodNative },
+                    { "createJSInstanceNative", "!(ILjava/lang/Object;ILjava/lang/String;)V", (void *) createJSInstanceNative },
+                    { "generateNewObjectId", "!(I)I", (void *) generateNewObjectId },
+                    { "notifyGc", "!(I)Z", (void *) notifyGc },
+                    { "lock", "!(I)V", (void *) rtLock },
+                    { "unlock", "!(I)V", (void *) rtUnlock },
+                    { "passExceptionToJsNative", "!(ILjava/lang/Throwable;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V", (void *) passExceptionToJsNative },
+                    { "getPointerSize", "!()I", (void *) getPointerSize },
+                    { "getCurrentRuntimeId", "!()I", (void *) getCurrentRuntimeId },
+                    { "WorkerGlobalOnMessageCallback", "!(ILjava/lang/String;)V", (void *) WorkerGlobalOnMessageCallback },
+                    { "WorkerObjectOnMessageCallback", "!(IILjava/lang/String;)V", (void *) WorkerObjectOnMessageCallback },
+                    { "TerminateWorkerCallback", "!(I)V", (void *) TerminateWorkerCallback },
+                    { "ClearWorkerPersistent", "!(II)V", (void *) ClearWorkerPersistent },
+                    { "CallWorkerObjectOnErrorHandleMain", "!(IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)V", (void *) CallWorkerObjectOnErrorHandleMain },
+                    { "ResetDateTimeConfigurationCache", "!(I)V", (void *) ResetDateTimeConfigurationCache },
+            };
+
+
+
+
+            result = env->RegisterNatives(
+                    env->FindClass("com/tns/Runtime"),
+                    methodsInternal,
+                    sizeof(methodsInternal) / sizeof(JNINativeMethod));
+
+
+
+
+            if (result != JNI_OK) {
+                __android_log_print(ANDROID_LOG_ERROR, "JS", "Error code %d when registering native functions!",
+                                    result);
+                return JNI_ERR;
+            }
+
+
+            JNINativeMethod assetMethodsInternal[] = {
+                    { "extractAssets", "!(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V", (void *) extractAssets }
+            };
+
+            result = env->RegisterNatives(
+                    env->FindClass("com/tns/AssetExtractor"),
+                    assetMethodsInternal,
+                    sizeof(assetMethodsInternal) / sizeof(JNINativeMethod));
+
+
+            if (result != JNI_OK) {
+                __android_log_print(ANDROID_LOG_ERROR, "JS", "Error code %d when registering native functions!",
+                                    result);
+                return JNI_ERR;
+            }
+
+
+            JNINativeMethod inspectorMethodsInternal[] = {
+                    { "init", "!()V", (void *) init },
+                    { "connect", "!(Ljava/lang/Object;)V", (void *) connect },
+                    { "scheduleBreak", "!()V", (void *) scheduleBreak },
+                    { "disconnect", "!()V", (void *) disconnect },
+                    { "dispatchMessage", "!(Ljava/lang/String;)V", (void *) dispatchMessage }
+            };
+
+            result = env->RegisterNatives(
+                    env->FindClass("com/tns/AndroidJsV8Inspector"),
+                    inspectorMethodsInternal,
+                    sizeof(inspectorMethodsInternal) / sizeof(JNINativeMethod));
+
+        }
+
+        if (result != JNI_OK) {
+            __android_log_print(ANDROID_LOG_ERROR, "JS", "Error code %d when registering native functions!",
+                                result);
+            return JNI_ERR;
+        }
+
+
+        Runtime::Init(vm, reserved);
+    } catch (NativeScriptException& e) {
+        e.ReThrowToJava();
+    } catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToJava();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToJava();
+    }
+
+    return JNI_VERSION_1_6;
 }

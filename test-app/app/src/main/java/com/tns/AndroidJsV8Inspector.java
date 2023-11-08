@@ -19,6 +19,8 @@ import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import dalvik.annotation.optimization.CriticalNative;
+import dalvik.annotation.optimization.FastNative;
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoWSD;
 
@@ -27,14 +29,19 @@ class AndroidJsV8Inspector {
     private static String ApplicationDir;
     private String packageName;
 
+    @CriticalNative
     protected native final void init();
 
+    @FastNative
     protected native final void connect(Object connection);
 
+    @CriticalNative
     private native void scheduleBreak();
 
+    @CriticalNative
     protected static native void disconnect();
 
+    @FastNative
     protected native final void dispatchMessage(String message);
 
     private Handler mainHandler;

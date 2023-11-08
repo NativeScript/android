@@ -36,46 +36,69 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import dalvik.annotation.optimization.CriticalNative;
+import dalvik.annotation.optimization.FastNative;
+
 public class Runtime {
+    @FastNative
     private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName,
                                          Object[] v8Options, String callingDir, int maxLogcatObjectSize, boolean forceLog);
 
+    @FastNative
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
 
+    @FastNative
     private native void runWorker(int runtimeId, String filePath) throws NativeScriptException;
 
+    @FastNative
     private native Object runScript(int runtimeId, String filePath) throws NativeScriptException;
 
+    @FastNative
     private native Object callJSMethodNative(int runtimeId, int javaObjectID, String methodName, int retType, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
 
+    @FastNative
     private native void createJSInstanceNative(int runtimeId, Object javaObject, int javaObjectID, String canonicalName);
 
+    @FastNative
     private native int generateNewObjectId(int runtimeId);
 
+    @FastNative
     private native boolean notifyGc(int runtimeId);
 
+    @FastNative
     private native void lock(int runtimeId);
 
+    @FastNative
     private native void unlock(int runtimeId);
 
+    @FastNative
     private native void passExceptionToJsNative(int runtimeId, Throwable ex, String message, String fullStackTrace, String jsStackTrace, boolean isDiscarded);
 
+    @FastNative
     private static native int getCurrentRuntimeId();
 
+    @FastNative
     public static native int getPointerSize();
 
+    @FastNative
     public static native void SetManualInstrumentationMode(String mode);
 
+    @FastNative
     private static native void WorkerGlobalOnMessageCallback(int runtimeId, String message);
 
+    @FastNative
     private static native void WorkerObjectOnMessageCallback(int runtimeId, int workerId, String message);
 
+    @FastNative
     private static native void TerminateWorkerCallback(int runtimeId);
 
+    @FastNative
     private static native void ClearWorkerPersistent(int runtimeId, int workerId);
 
+    @FastNative
     private static native void CallWorkerObjectOnErrorHandleMain(int runtimeId, int workerId, String message, String stackTrace, String filename, int lineno, String threadName) throws NativeScriptException;
 
+    @FastNative
     private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
     void passUncaughtExceptionToJs(Throwable ex, String message, String fullStackTrace, String jsStackTrace) {
