@@ -97,7 +97,7 @@ MetadataNode* MetadataNode::GetOrCreate(const string& className) {
 
         node = GetOrCreateInternal(treeNode);
 
-        s_name2NodeCache.insert(make_pair(className, node));
+        s_name2NodeCache.emplace(className, node);
     } else {
         node = it->second;
     }
@@ -115,7 +115,7 @@ MetadataNode* MetadataNode::GetOrCreateInternal(MetadataTreeNode* treeNode) {
     } else {
         result = new MetadataNode(treeNode);
 
-        s_treeNode2NodeCache.insert(make_pair(treeNode, result));
+        s_treeNode2NodeCache.emplace(treeNode, result);
     }
 
     return result;
@@ -131,7 +131,7 @@ MetadataTreeNode* MetadataNode::GetOrCreateTreeNodeByName(const string& classNam
     } else {
         result = s_metadataReader.GetOrCreateTreeNodeByName(className);
 
-        s_name2TreeNodeCache.insert(make_pair(className, result));
+        s_name2TreeNodeCache.emplace(className, result);
     }
 
     return result;
@@ -993,7 +993,7 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
         ctorFuncTemplate.Clear();
         auto pft = new Persistent<FunctionTemplate>(isolate, ctorFuncTemplate);
         CtorCacheData ctorCacheItem(pft, instanceMethodsCallbackData);
-        cache->CtorFuncCache.insert(make_pair(treeNode, ctorCacheItem));
+        cache->CtorFuncCache.emplace(treeNode, ctorCacheItem);
         return ctorFuncTemplate;
     }
 
@@ -1060,7 +1060,7 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
    //cache "ctorFuncTemplate"
    auto pft = new Persistent<FunctionTemplate>(isolate, ctorFuncTemplate);
    CtorCacheData ctorCacheItem(pft, instanceMethodsCallbackData);
-   cache->CtorFuncCache.insert(make_pair(treeNode, ctorCacheItem));
+   cache->CtorFuncCache.emplace(treeNode, ctorCacheItem);
 
     SetInnerTypes(isolate, wrappedCtorFunc, treeNode);
 
@@ -1735,11 +1735,11 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         SetTypeMetadata(isolate, extendFunc, new TypeMetadata(fullExtendedName));
         info.GetReturnValue().Set(extendFunc);
 
-        s_name2NodeCache.insert(make_pair(fullExtendedName, node));
+        s_name2NodeCache.emplace(fullExtendedName, node);
 
         ExtendedClassCacheData cacheData(extendFunc, fullExtendedName, node);
         auto cache = GetMetadataNodeCache(isolate);
-        cache->ExtendedCtorFuncCache.insert(make_pair(fullExtendedName, cacheData));
+        cache->ExtendedCtorFuncCache.emplace(fullExtendedName, cacheData);
 
         if (frame.check()) {
             frame.log("Extending: " + node->m_name);
@@ -2027,7 +2027,7 @@ MetadataNode::MetadataNodeCache* MetadataNode::GetMetadataNodeCache(Isolate* iso
     auto itFound = s_metadata_node_cache.find(isolate);
     if (itFound == s_metadata_node_cache.end()) {
         cache = new MetadataNodeCache;
-        s_metadata_node_cache.insert(make_pair(isolate, cache));
+        s_metadata_node_cache.emplace(isolate, cache);
     } else {
         cache = itFound->second;
     }
@@ -2293,10 +2293,10 @@ void MetadataNode::onDisposeIsolate(Isolate* isolate) {
 
 string MetadataNode::TNS_PREFIX = "com/tns/gen/";
 MetadataReader MetadataNode::s_metadataReader;
-std::map<std::string, MetadataNode*> MetadataNode::s_name2NodeCache;
-std::map<std::string, MetadataTreeNode*> MetadataNode::s_name2TreeNodeCache;
-std::map<MetadataTreeNode*, MetadataNode*> MetadataNode::s_treeNode2NodeCache;
-map<Isolate*, MetadataNode::MetadataNodeCache*> MetadataNode::s_metadata_node_cache;
+robin_hood::unordered_map<std::string, MetadataNode*> MetadataNode::s_name2NodeCache;
+robin_hood::unordered_map<std::string, MetadataTreeNode*> MetadataNode::s_name2TreeNodeCache;
+robin_hood::unordered_map<MetadataTreeNode*, MetadataNode*> MetadataNode::s_treeNode2NodeCache;
+robin_hood::unordered_map<Isolate*, MetadataNode::MetadataNodeCache*> MetadataNode::s_metadata_node_cache;
 bool MetadataNode::s_profilerEnabled = false;
-std::map<Isolate*, Persistent<ObjectTemplate>*> MetadataNode::s_arrayObjectTemplates;
+robin_hood::unordered_map<Isolate*, Persistent<ObjectTemplate>*> MetadataNode::s_arrayObjectTemplates;
 

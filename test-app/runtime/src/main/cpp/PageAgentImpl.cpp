@@ -105,7 +105,7 @@ void PageAgentImpl::getResourceContent(const String& in_frameId, const String& i
         return;
     }
 
-    std::map<std::string, utils::PageResource> cachedPageResources = utils::PageResource::s_cachedPageResources;
+    robin_hood::unordered_map<std::string, utils::PageResource> cachedPageResources = utils::PageResource::s_cachedPageResources;
     if (utils::PageResource::s_cachedPageResources.size() == 0) {
         cachedPageResources = utils::PageResource::getPageResources();
     }
@@ -136,7 +136,7 @@ void PageAgentImpl::searchInResource(const String& in_frameId, const String& in_
     bool isRegex = in_isRegex.fromMaybe(false);
     bool isCaseSensitive = in_caseSensitive.fromMaybe(false);
 
-    std::map<std::string, utils::PageResource> cachedPageResources = utils::PageResource::s_cachedPageResources;
+    robin_hood::unordered_map<std::string, utils::PageResource> cachedPageResources = utils::PageResource::s_cachedPageResources;
     if (utils::PageResource::s_cachedPageResources.size() == 0) {
         cachedPageResources = utils::PageResource::getPageResources();
     }

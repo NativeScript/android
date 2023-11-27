@@ -6,6 +6,7 @@
 #include "ObjectManager.h"
 #include "condition_variable"
 #include "thread"
+#include "robin_hood.h"
 
 namespace tns {
     /**
@@ -113,7 +114,7 @@ namespace tns {
         int currentTimerId = 0;
         int nesting = 0;
         // stores the map of timer tasks
-        std::map<int, std::shared_ptr<TimerTask>> timerMap_;
+        robin_hood::unordered_map<int, std::shared_ptr<TimerTask>> timerMap_;
         std::vector<std::shared_ptr<TimerReference>> sortedTimers_;
         // sets are faster than vector iteration
         // so we use this to avoid redundant isolate locks and we don't care about the

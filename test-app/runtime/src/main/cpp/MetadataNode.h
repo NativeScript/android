@@ -170,18 +170,18 @@ class MetadataNode {
                                    PrototypeTemplateFiller& protoFiller);
 
         MetadataTreeNode* m_treeNode;
-        std::map<v8::Isolate*, v8::Persistent<v8::Function>*> m_poCtorCachePerIsolate;
+        robin_hood::unordered_map<v8::Isolate*, v8::Persistent<v8::Function>*> m_poCtorCachePerIsolate;
         std::string m_name;
         std::string m_implType;
         bool m_isArray;
 
         static std::string TNS_PREFIX;
         static MetadataReader s_metadataReader;
-        static std::map<std::string, MetadataNode*> s_name2NodeCache;
-        static std::map<std::string, MetadataTreeNode*> s_name2TreeNodeCache;
-        static std::map<MetadataTreeNode*, MetadataNode*> s_treeNode2NodeCache;
-        static std::map<v8::Isolate*, MetadataNodeCache*> s_metadata_node_cache;
-        static std::map<v8::Isolate*, v8::Persistent<v8::ObjectTemplate>*> s_arrayObjectTemplates;
+        static robin_hood::unordered_map<std::string, MetadataNode*> s_name2NodeCache;
+        static robin_hood::unordered_map<std::string, MetadataTreeNode*> s_name2TreeNodeCache;
+        static robin_hood::unordered_map<MetadataTreeNode*, MetadataNode*> s_treeNode2NodeCache;
+        static robin_hood::unordered_map<v8::Isolate*, MetadataNodeCache*> s_metadata_node_cache;
+        static robin_hood::unordered_map<v8::Isolate*, v8::Persistent<v8::ObjectTemplate>*> s_arrayObjectTemplates;
         static bool s_profilerEnabled;
 
         struct MethodCallbackData {
@@ -263,9 +263,9 @@ class MetadataNode {
         struct MetadataNodeCache {
             v8::Persistent<v8::String>* MetadataKey;
 
-            std::map<MetadataTreeNode*, CtorCacheData> CtorFuncCache;
+            robin_hood::unordered_map<MetadataTreeNode*, CtorCacheData> CtorFuncCache;
 
-            std::map<std::string, MetadataNode::ExtendedClassCacheData> ExtendedCtorFuncCache;
+            robin_hood::unordered_map<std::string, MetadataNode::ExtendedClassCacheData> ExtendedCtorFuncCache;
         };
 };
 }

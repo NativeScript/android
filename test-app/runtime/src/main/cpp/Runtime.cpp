@@ -98,7 +98,7 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
     m_runtime = env->NewGlobalRef(runtime);
     m_objectManager = new ObjectManager(m_runtime);
     m_loopTimer = new MessageLoopTimer();
-    s_id2RuntimeCache.insert(make_pair(id, this));
+    s_id2RuntimeCache.emplace(id, this);
 
     if (GET_USED_MEMORY_METHOD_ID == nullptr) {
         auto RUNTIME_CLASS = env->FindClass("com/tns/Runtime");
@@ -692,8 +692,8 @@ int Runtime::GetReader(){
 
 JavaVM* Runtime::s_jvm = nullptr;
 jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
-map<int, Runtime*> Runtime::s_id2RuntimeCache;
-unordered_map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
+robin_hood::unordered_map<int, Runtime*> Runtime::s_id2RuntimeCache;
+robin_hood::unordered_map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 bool Runtime::s_mainThreadInitialized = false;
 v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();

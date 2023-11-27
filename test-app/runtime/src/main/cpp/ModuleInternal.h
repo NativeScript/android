@@ -39,9 +39,24 @@ class ModuleInternal {
 
         static int MODULE_PROLOGUE_LENGTH;
     private:
-        enum class ModulePathKind;
+        enum class ModulePathKind {
+            Global,
+            Relative,
+            Absolute
+        };
 
-        struct ModuleCacheEntry;
+        struct ModuleCacheEntry {
+            ModuleCacheEntry(v8::Persistent<v8::Object>* _obj)
+                    : obj(_obj), isData(false) {
+            }
+
+            ModuleCacheEntry(v8::Persistent<v8::Object>* _obj, bool _isData)
+                    : obj(_obj), isData(_isData) {
+            }
+
+            bool isData;
+            v8::Persistent<v8::Object>* obj;
+        };
 
         static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -75,15 +90,15 @@ class ModuleInternal {
         v8::Isolate* m_isolate;
         v8::Persistent<v8::Function>* m_requireFunction;
         v8::Persistent<v8::Function>* m_requireFactoryFunction;
-        std::map<std::string, v8::Persistent<v8::Function>*> m_requireCache;
-        std::map<std::string, ModuleCacheEntry> m_loadedModules;
+        robin_hood::unordered_map<std::string, v8::Persistent<v8::Function>*> m_requireCache;
+        robin_hood::unordered_map<std::string, ModuleCacheEntry> m_loadedModules;
 
         class TempModule {
             public:
                 TempModule(ModuleInternal* module, const std::string& modulePath, const std::string& cacheKey, v8::Persistent<v8::Object>* poModuleObj)
                     :m_module(module), m_dispose(true), m_modulePath(modulePath), m_cacheKey(cacheKey), m_poModuleObj(poModuleObj) {
-                    m_module->m_loadedModules.insert(make_pair(m_modulePath, ModuleCacheEntry(m_poModuleObj)));
-                    m_module->m_loadedModules.insert(make_pair(m_cacheKey, ModuleCacheEntry(m_poModuleObj)));
+                    m_module->m_loadedModules.emplace(m_modulePath, ModuleCacheEntry(m_poModuleObj));
+                    m_module->m_loadedModules.emplace(m_cacheKey, ModuleCacheEntry(m_poModuleObj));
                 }
 
                 ~TempModule() {
@@ -105,24 +120,6 @@ class ModuleInternal {
                 v8::Persistent<v8::Object>* m_poModuleObj;
         };
 
-        struct ModuleCacheEntry {
-            ModuleCacheEntry(v8::Persistent<v8::Object>* _obj)
-                : obj(_obj), isData(false) {
-            }
-
-            ModuleCacheEntry(v8::Persistent<v8::Object>* _obj, bool _isData)
-                : obj(_obj), isData(_isData) {
-            }
-
-            bool isData;
-            v8::Persistent<v8::Object>* obj;
-        };
-
-        enum class ModulePathKind {
-            Global,
-            Relative,
-            Absolute
-        };
 };
 }
 

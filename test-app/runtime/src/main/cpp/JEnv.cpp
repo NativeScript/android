@@ -769,7 +769,7 @@ jclass JEnv::CheckForClassInCache(const string &className) {
 
 jclass JEnv::InsertClassIntoCache(const string &className, jclass &tmp) {
     auto global_class = reinterpret_cast<jclass>(m_env->NewGlobalRef(tmp));
-    s_classCache.insert(make_pair(className, global_class));
+    s_classCache.emplace(className, global_class);
     m_env->DeleteLocalRef(tmp);
 
     return global_class;
@@ -788,7 +788,7 @@ jthrowable JEnv::CheckForClassMissingCache(const string &className) {
 
 jthrowable JEnv::InsertClassIntoMissingCache(const string &className,const jthrowable &tmp) {
     auto throwable = reinterpret_cast<jthrowable>(m_env->NewGlobalRef(tmp));
-    s_missingClasses.insert(make_pair(className, throwable));
+    s_missingClasses.emplace(className, throwable);
     m_env->DeleteLocalRef(tmp);
 
     return throwable;
@@ -855,8 +855,8 @@ void JEnv::CheckForJavaException() {
 }
 
 JavaVM *JEnv::s_jvm = nullptr;
-map<string, jclass> JEnv::s_classCache;
-map<string, jthrowable> JEnv::s_missingClasses;
+robin_hood::unordered_map<string, jclass> JEnv::s_classCache;
+robin_hood::unordered_map<string, jthrowable> JEnv::s_missingClasses;
 jclass JEnv::RUNTIME_CLASS = nullptr;
 jmethodID JEnv::GET_CACHED_CLASS_METHOD_ID = nullptr;
 
