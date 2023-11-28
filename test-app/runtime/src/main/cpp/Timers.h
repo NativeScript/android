@@ -76,6 +76,8 @@ namespace tns {
          */
         void Init(v8::Isolate *isolate, v8::Local<v8::ObjectTemplate> &globalObjectTemplate);
 
+        static void InitStatic(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalObjectTemplate);
+
         /**
          * Disposes the timers. This will clear all references and stop all thread.
          * MUST be called in the same thread Init was called

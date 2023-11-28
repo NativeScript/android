@@ -30,6 +30,7 @@
 #include <unistd.h>
 #include <thread>
 #include "File.h"
+#include "ModuleBinding.h"
 
 #ifdef APPLICATION_IN_DEBUG
 // #include "NetworkDomainCallbackHandlers.h"
@@ -500,6 +501,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     auto globalFunctionTemplate = FunctionTemplate::New(isolate);
     globalFunctionTemplate->SetClassName(ArgConverter::ConvertToV8String(isolate, "NativeScriptGlobalObject"));
+    tns::binding::CreateInternalBindingTemplates(isolate, globalFunctionTemplate);
     auto globalTemplate = ObjectTemplate::New(isolate, globalFunctionTemplate);
 
     const auto readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
@@ -581,8 +583,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     SimpleProfiler::Init(isolate, globalTemplate);
 
     CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
-
-    m_timers.Init(isolate, globalTemplate);
 
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
 
