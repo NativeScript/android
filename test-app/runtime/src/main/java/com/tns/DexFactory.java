@@ -339,6 +339,11 @@ public class DexFactory {
                     continue;
                 }
 
+                if (!filename.endsWith(".dex") && !filename.endsWith(".jar") && !filename.endsWith(".jar.cur.prof") && !filename.endsWith(".odex")) {
+                    logger.write("Not purging unexpected file type " + purgeCandidate.getAbsolutePath());
+                    continue;
+                }
+
                 if (!purgeCandidate.delete()) {
                     logger.write("Error purging cached proxy file: " + purgeCandidate.getAbsolutePath());
                 }

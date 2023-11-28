@@ -1,6 +1,8 @@
 #ifndef RUNTIME_H_
 #define RUNTIME_H_
 
+#include <memory>
+
 #include "v8.h"
 #include "JniLocalRef.h"
 #include "ObjectManager.h"
@@ -15,6 +17,10 @@
 #include <mutex>
 #include <android/looper.h>
 #include <fcntl.h>
+
+namespace cppgc {
+class DefaultPlatform;
+}
 
 namespace tns {
 class Runtime {
@@ -52,8 +58,8 @@ class Runtime {
         void RunModule(JNIEnv* _env, jobject obj, jstring scriptFile);
         void RunWorker(jstring scriptFile);
         jobject RunScript(JNIEnv* _env, jobject obj, jstring scriptFile);
-        jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs);
-        void CreateJSInstanceNative(JNIEnv* _env, jobject obj, jobject javaObject, jint javaObjectID, jstring className);
+        jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jobjectArray packagedArgs);
+        void CreateJSInstanceNative(jobject obj, jobject javaObject, jint javaObjectID, jstring className);
         jint GenerateNewObjectId(JNIEnv* env, jobject obj);
         void AdjustAmountOfExternalAllocatedMemory();
         bool NotifyGC(JNIEnv* env, jobject obj);
@@ -69,7 +75,7 @@ class Runtime {
 
         v8::Local<v8::Context> GetContext();
 
-        static v8::Platform* platform;
+        static std::shared_ptr<cppgc::DefaultPlatform> platform;
 
         std::string ReadFileText(const std::string& filePath);
 
@@ -86,7 +92,7 @@ class Runtime {
         jobject m_runtime;
         v8::Isolate* m_isolate;
 
-        ObjectManager* m_objectManager;
+        std::unique_ptr<ObjectManager> m_objectManager;
 
         ModuleInternal m_module;
 

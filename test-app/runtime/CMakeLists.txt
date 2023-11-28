@@ -96,7 +96,6 @@ add_library(
         src/main/cpp/AssetExtractor.cpp
         src/main/cpp/CallbackHandlers.cpp
         src/main/cpp/Constants.cpp
-        src/main/cpp/DirectBuffer.cpp
         src/main/cpp/FieldAccessor.cpp
         src/main/cpp/File.cpp
         src/main/cpp/IsolateDisposer.cpp
@@ -147,13 +146,13 @@ if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
     set_target_properties(
             NativeScript
             PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition -Wl,--exclude-libs=ALL -Wl,--gc-sections
-            INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
+            INTERFACE_INCLUDE_DIRECTORIES ${NATIVES_BLOB_INCLUDE_DIRECTORIES}
     )
 else ()
     set_target_properties(
             NativeScript
             PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition
-            INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
+            INTERFACE_INCLUDE_DIRECTORIES ${NATIVES_BLOB_INCLUDE_DIRECTORIES}
     )
 endif ()
 

@@ -671,9 +671,9 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
 
 MetadataNode::MethodCallbackData *MetadataNode::tryGetExtensionMethodCallbackData(
         std::unordered_map<std::string, MethodCallbackData *> collectedMethodCallbackDatas,
-        std::string lookupName) {
+        const std::string& lookupName) {
 
-    if (collectedMethodCallbackDatas.size() < 1) {
+    if (collectedMethodCallbackDatas.empty()) {
         return nullptr;
     }
 
@@ -1053,7 +1053,6 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     // insert isolate-specific persistent function handle
     node->m_poCtorCachePerIsolate.insert({isolate, new Persistent<Function>(isolate, wrappedCtorFunc)});
     if (!baseCtorFunc.IsEmpty()) {
-        auto context = isolate->GetCurrentContext();
         wrappedCtorFunc->SetPrototype(context, baseCtorFunc);
     }
 
@@ -1398,7 +1397,7 @@ Local<Object> MetadataNode::GetImplementationObject(Isolate* isolate, const Loca
         return implementationObject;
     }
 
-    auto context = object->CreationContext();
+    Local<Context> context = object->GetCreationContextChecked();
     if (object->HasOwnProperty(context, V8StringConstants::GetIsPrototypeImplementationObject(isolate)).ToChecked()) {
         auto v8Prototype = V8StringConstants::GetPrototype(isolate);
         auto maybeHasOwnProperty = object->HasOwnProperty(context, v8Prototype);
@@ -1690,7 +1689,8 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
         bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
         auto clazz = CallbackHandlers::ResolveClass(isolate, baseClassName, fullClassName, implementationObject, isInterface);
-        auto fullExtendedName = CallbackHandlers::ResolveClassName(isolate, clazz);
+        JEnv env;
+        std::string fullExtendedName{env.GetClassName(clazz)};
         DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
 
         auto cachedData = GetCachedExtendedClassData(isolate, fullExtendedName);
@@ -2038,18 +2038,13 @@ void MetadataNode::EnableProfiler(bool enableProfiler) {
     s_profilerEnabled = enableProfiler;
 }
 
-bool MetadataNode::IsJavascriptKeyword(std::string word) {
-    static set<string> keywords;
-
-    if (keywords.empty()) {
-        string kw[] { "abstract", "arguments", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue", "debugger", "default", "delete", "do",
-                      "double", "else", "enum", "eval", "export", "extends", "false", "final", "finally", "float", "for", "function", "goto", "if", "implements",
-                      "import", "in", "instanceof", "int", "interface", "let", "long", "native", "new", "null", "package", "private", "protected", "public", "return",
-                      "short", "static", "super", "switch", "synchronized", "this", "throw", "throws", "transient", "true", "try", "typeof", "var", "void", "volatile", "while", "with", "yield"
-                    };
-
-        keywords = set<string>(kw, kw + sizeof(kw)/sizeof(kw[0]));
-    }
+bool MetadataNode::IsJavascriptKeyword(const std::string& word) {
+    static set<string> keywords{
+        "abstract", "arguments", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue", "debugger", "default", "delete", "do",
+        "double", "else", "enum", "eval", "export", "extends", "false", "final", "finally", "float", "for", "function", "goto", "if", "implements",
+        "import", "in", "instanceof", "int", "interface", "let", "long", "native", "new", "null", "package", "private", "protected", "public", "return",
+        "short", "static", "super", "switch", "synchronized", "this", "throw", "throws", "transient", "true", "try", "typeof", "var", "void", "volatile", "while", "with", "yield"
+    };
 
     return keywords.find(word) != keywords.end();
 }

@@ -28,7 +28,12 @@
 #include "ManualInstrumentation.h"
 #include "IsolateDisposer.h"
 #include <unistd.h>
+
+#include <memory>
 #include <thread>
+
+#include <cppgc/default-platform.h>
+
 #include "File.h"
 
 #ifdef APPLICATION_IN_DEBUG
@@ -94,9 +99,8 @@ int Runtime::GetAndroidVersion() {
 }
 
 Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
-    : m_id(id), m_isolate(nullptr), m_lastUsedMemory(0), m_gcFunc(nullptr), m_runGC(false) {
+    : m_id(id), m_isolate(nullptr), m_objectManager(nullptr), m_lastUsedMemory(0), m_gcFunc(nullptr), m_runGC(false) {
     m_runtime = env->NewGlobalRef(runtime);
-    m_objectManager = new ObjectManager(m_runtime);
     m_loopTimer = new MessageLoopTimer();
     s_id2RuntimeCache.insert(make_pair(id, this));
 
@@ -162,7 +166,8 @@ jobject Runtime::GetJavaRuntime() const {
 }
 
 ObjectManager* Runtime::GetObjectManager() const {
-    return m_objectManager;
+    assert(m_objectManager && "ObjectManager is only available after Runtime is initialized");
+    return m_objectManager.get();
 }
 
 void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog) {
@@ -177,6 +182,7 @@ void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, 
 
 void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog) {
     LogEnabled = verboseLoggingEnabled;
+    NativeScriptException::Init();
 
     auto filesRoot = ArgConverter::jstringToString(filesPath);
     auto nativeLibDirStr = ArgConverter::jstringToString(nativeLibDir);
@@ -187,7 +193,8 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir, bool ve
     // read config options passed from Java
     // Indices correspond to positions in the com.tns.AppConfig.KnownKeys enum
     JniLocalRef v8Flags(env->GetObjectArrayElement(args, 0));
-    Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
+    std::string v8FlagsString = ArgConverter::jstringToString(v8Flags);
+    V8::SetFlagsFromString(v8FlagsString.c_str(), v8FlagsString.size());
     JniLocalRef cacheCode(env->GetObjectArrayElement(args, 1));
     Constants::V8_CACHE_COMPILED_CODE = (bool) cacheCode;
     JniLocalRef profilerOutputDir(env->GetObjectArrayElement(args, 2));
@@ -196,12 +203,10 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir, bool ve
 
     auto profilerOutputDirStr = ArgConverter::jstringToString(profilerOutputDir);
 
-    NativeScriptException::Init();
     m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr, maxLogcatObjectSize, forceLog);
 }
 
 Runtime::~Runtime() {
-    delete this->m_objectManager;
     delete this->m_loopTimer;
     CallbackHandlers::RemoveIsolateEntries(m_isolate);
     if (m_isMainThread) {
@@ -296,7 +301,7 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
     return res;
 }
 
-jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs) {
+jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jobjectArray packagedArgs) {
     SET_PROFILER_FRAME();
 
     auto isolate = m_isolate;
@@ -314,12 +319,6 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID
         throw NativeScriptException(ss.str());
     }
 
-    if (isConstructor) {
-        DEBUG_WRITE("CallJSMethodNative: Updating linked instance with its real class");
-        jclass instanceClass = env.GetObjectClass(obj);
-        m_objectManager->SetJavaClass(jsObject, instanceClass);
-    }
-
     DEBUG_WRITE("CallJSMethodNative called jsObject=%d", jsObject->GetIdentityHash());
 
     string method_name = ArgConverter::jstringToString(methodName);
@@ -330,23 +329,22 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID
     return javaObject;
 }
 
-void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj, jobject javaObject, jint javaObjectID, jstring className) {
+void Runtime::CreateJSInstanceNative(jobject obj, jobject javaObject, jint javaObjectID, jstring className) {
     SET_PROFILER_FRAME();
 
     DEBUG_WRITE("createJSInstanceNative called");
 
     auto isolate = m_isolate;
 
-    JEnv env(_env);
-
     string existingClassName = ArgConverter::jstringToString(className);
     string jniName = Util::ConvertFromCanonicalToJniName(existingClassName);
     Local<Object> jsInstance;
     Local<Object> implementationObject;
 
-    auto proxyClassName = m_objectManager->GetClassName(javaObject);
+    JEnv env;
+    std::string proxyClassName{env.GetClassName(javaObject)};
     DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
-    jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager, proxyClassName);
+    jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager.get(), proxyClassName);
 
     if (jsInstance.IsEmpty()) {
         throw NativeScriptException(string("Failed to create JavaScript extend wrapper for class '" + proxyClassName + "'"));
@@ -359,14 +357,11 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj, jobject javaObje
     }
     DEBUG_WRITE("createJSInstanceNative: implementationObject :%d", implementationObject->GetIdentityHash());
 
-    jclass clazz = env.FindClass(jniName);
-    m_objectManager->Link(jsInstance, javaObjectID, clazz);
+    m_objectManager->Link(jsInstance, javaObjectID);
 }
 
 jint Runtime::GenerateNewObjectId(JNIEnv* env, jobject obj) {
-    int objectId = m_objectManager->GenerateNewObjectID();
-
-    return objectId;
+    return m_objectManager->GenerateNewObjectID();
 }
 
 void Runtime::AdjustAmountOfExternalAllocatedMemory() {
@@ -416,7 +411,8 @@ void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable excep
     auto nativeExceptionObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID);
 
     if (nativeExceptionObject.IsEmpty()) {
-        string className = m_objectManager->GetClassName((jobject) exception);
+        JEnv java{env};
+        string className{java.GetClassName((jobject) exception)};
         //create proxy object that wraps the java err
         nativeExceptionObject = m_objectManager->CreateJSWrapper(javaObjectID, className);
         if (nativeExceptionObject.IsEmpty()) {
@@ -455,8 +451,8 @@ void Runtime::PassUncaughtExceptionFromWorkerToMainHandler(Local<v8::String> mes
 }
 
 static void InitializeV8() {
-    Runtime::platform = v8::platform::NewDefaultPlatform().release();
-    V8::InitializePlatform(Runtime::platform);
+    Runtime::platform = std::make_shared<cppgc::DefaultPlatform>();
+    V8::InitializePlatform(Runtime::platform->GetV8Platform());
     V8::Initialize();
 }
 
@@ -484,14 +480,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     Isolate::Scope isolate_scope(isolate);
     HandleScope handleScope(isolate);
 
-    m_objectManager->SetInstanceIsolate(isolate);
-
     // Sets a structure with v8 String constants on the isolate object at slot 1
     auto consts = new V8StringConstants::PerIsolateV8Constants(isolate);
     isolate->SetData((uint32_t)Runtime::IsolateData::RUNTIME, this);
     isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, consts);
 
-    V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
     isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
 
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
@@ -513,7 +506,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runtimeVersion"), ArgConverter::ConvertToV8String(isolate, NATIVE_SCRIPT_RUNTIME_VERSION), readOnlyFlags);
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__time"), FunctionTemplate::New(isolate, CallbackHandlers::TimeCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__releaseNativeCounterpart"), FunctionTemplate::New(isolate, CallbackHandlers::ReleaseNativeCounterpartCallback));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__markingMode"), Number::New(isolate, m_objectManager->GetMarkingMode()), readOnlyFlags);
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runOnMainThread"), FunctionTemplate::New(isolate, CallbackHandlers::RunOnMainThreadCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__postFrameCallback"), FunctionTemplate::New(isolate, CallbackHandlers::PostFrameCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__removeFrameCallback"), FunctionTemplate::New(isolate, CallbackHandlers::RemoveFrameCallback));
@@ -590,7 +582,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     v8::Context::Scope contextScope{context};
 
-    m_objectManager->Init(isolate);
+    m_objectManager = std::make_unique<ObjectManager>(isolate, m_runtime);
 
     m_module.Init(isolate, callingDir);
 
@@ -638,7 +630,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     ArrayHelper::Init(context);
 
-    m_arrayBufferHelper.CreateConvertFunctions(context, global, m_objectManager);
+    m_arrayBufferHelper.CreateConvertFunctions(context, global, m_objectManager.get());
 
     m_loopTimer->Init(context);
 
@@ -695,7 +687,7 @@ jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
 unordered_map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 bool Runtime::s_mainThreadInitialized = false;
-v8::Platform* Runtime::platform = nullptr;
+std::shared_ptr<cppgc::DefaultPlatform> Runtime::platform;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 ALooper* Runtime::m_mainLooper = nullptr;
 int Runtime::m_mainLooper_fd[2];

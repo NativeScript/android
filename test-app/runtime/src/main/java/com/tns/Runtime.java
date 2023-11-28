@@ -46,7 +46,7 @@ public class Runtime {
 
     private native Object runScript(int runtimeId, String filePath) throws NativeScriptException;
 
-    private native Object callJSMethodNative(int runtimeId, int javaObjectID, String methodName, int retType, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
+    private native Object callJSMethodNative(int runtimeId, int javaObjectID, String methodName, int retType, Object... packagedArgs) throws NativeScriptException;
 
     private native void createJSInstanceNative(int runtimeId, Object javaObject, int javaObjectID, String canonicalName);
 
@@ -331,15 +331,6 @@ public class Runtime {
             return staticConfiguration.appConfig.getLineBreakpointsEnabled();
         } else {
             return ((boolean) AppConfig.KnownKeys.EnableLineBreakpoins.getDefaultValue());
-        }
-    }
-
-    @RuntimeCallable
-    public int getMarkingModeOrdinal() {
-        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
-            return staticConfiguration.appConfig.getMarkingMode().ordinal();
-        } else {
-            return ((MarkingMode) AppConfig.KnownKeys.MarkingMode.getDefaultValue()).ordinal();
         }
     }
 
@@ -969,30 +960,6 @@ public class Runtime {
         }
     }
 
-    private void makeInstanceWeak(int javaObjectID, boolean keepAsWeak) {
-        if (logger.isEnabled()) {
-            logger.write("makeInstanceWeak instance " + javaObjectID + " keepAsWeak=" + keepAsWeak);
-        }
-        Object instance = strongInstances.get(javaObjectID);
-
-        if (keepAsWeak) {
-            weakJavaObjectToID.put(instance, Integer.valueOf(javaObjectID));
-            weakInstances.put(javaObjectID, new WeakReference<Object>(instance));
-        }
-
-        strongInstances.remove(javaObjectID);
-        strongJavaObjectToID.remove(instance);
-    }
-
-    @RuntimeCallable
-    private void makeInstanceWeak(ByteBuffer buff, int length, boolean keepAsWeak) {
-        buff.position(0);
-        for (int i = 0; i < length; i++) {
-            int javaObjectId = buff.getInt();
-            makeInstanceWeak(javaObjectId, keepAsWeak);
-        }
-    }
-
     @RuntimeCallable
     private boolean makeInstanceWeakAndCheckIfAlive(int javaObjectID) {
         if (logger.isEnabled()) {
@@ -1022,34 +989,6 @@ public class Runtime {
             weakInstances.put(javaObjectID, new WeakReference<Object>(instance));
 
             return true;
-        }
-    }
-
-    @RuntimeCallable
-    private void checkWeakObjectAreAlive(ByteBuffer input, ByteBuffer output, int length) {
-        input.position(0);
-        output.position(0);
-        for (int i = 0; i < length; i++) {
-            int javaObjectId = input.getInt();
-
-            WeakReference<Object> weakRef = weakInstances.get(javaObjectId);
-
-            int isReleased;
-
-            if (weakRef != null) {
-                Object instance = weakRef.get();
-
-                if (instance == null) {
-                    isReleased = 1;
-                    weakInstances.remove(javaObjectId);
-                } else {
-                    isReleased = 0;
-                }
-            } else {
-                isReleased = (strongInstances.get(javaObjectId) == null) ? 1 : 0;
-            }
-
-            output.putInt(isReleased);
         }
     }
 
@@ -1298,7 +1237,7 @@ public class Runtime {
         if (enableMultithreadedJavascript || isWorkThread) {
             Object[] packagedArgs = packageArgs(tmpArgs);
             try {
-                ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
+                ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, packagedArgs);
             } catch (NativeScriptException e) {
                 if (discardUncaughtJsExceptions) {
                     String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
@@ -1311,15 +1250,13 @@ public class Runtime {
         } else {
             final Object[] arr = new Object[2];
 
-            final boolean isCtor = isConstructor;
-
             Runnable r = new Runnable() {
                 @Override
                 public void run() {
                     synchronized (this) {
                         try {
                             final Object[] packagedArgs = packageArgs(tmpArgs);
-                            arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs);
+                            arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, packagedArgs);
                         } catch (NativeScriptException e) {
                             if (discardUncaughtJsExceptions) {
                                 String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
@@ -1396,13 +1333,6 @@ public class Runtime {
         Object arr = Array.newInstance(clazz, size);
 
         return arr;
-    }
-
-    @RuntimeCallable
-    private static boolean useGlobalRefs() {
-        int JELLY_BEAN = 16;
-        boolean useGlobalRefs = android.os.Build.VERSION.SDK_INT >= JELLY_BEAN;
-        return useGlobalRefs;
     }
 
     /*

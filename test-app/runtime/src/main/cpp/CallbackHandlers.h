@@ -48,8 +48,6 @@ namespace tns {
                                    const v8::Local<v8::Object> &implementationObject,
                                    bool isInterface);
 
-        static std::string ResolveClassName(v8::Isolate *isolate, jclass &clazz);
-
         static v8::Local<v8::Value>
         GetArrayElement(v8::Local<v8::Context> context, const v8::Local<v8::Object> &array, uint32_t index,
                         const std::string &arraySignature);
@@ -269,7 +267,7 @@ namespace tns {
         static FieldAccessor fieldAccessor;
 
         struct JavaObjectIdScope {
-            JavaObjectIdScope(JEnv &env, jfieldID fieldId, jobject runtime, int javaObjectId)
+            JavaObjectIdScope(JEnv &env, jfieldID fieldId, jobject runtime, jint javaObjectId)
                     : _env(env), _fieldID(fieldId), _runtime(runtime) {
                 _env.SetIntField(_runtime, _fieldID, javaObjectId);
             }

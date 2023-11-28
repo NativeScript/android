@@ -40,7 +40,6 @@ require("./tests/discardedExceptionsTest");
 require("./tests/dispatchCallbacksOnUiThreadTests");
 require("./tests/stringConversionTests");
 require("./tests/testsForTypescript");
-require("./tests/testGC");
 require("./tests/testsMemoryManagement");
 require("./tests/testFieldGetSet");
 require("./tests/extendedClassesTests");

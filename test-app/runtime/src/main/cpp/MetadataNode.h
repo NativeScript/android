@@ -74,14 +74,14 @@ class MetadataNode {
 
         MetadataNode(MetadataTreeNode* treeNode);
 
-        static bool IsJavascriptKeyword(std::string word);
+        static bool IsJavascriptKeyword(const std::string& word);
         v8::Local<v8::Object> CreatePackageObject(v8::Isolate* isolate);
 
         v8::Local<v8::Function> GetConstructorFunction(v8::Isolate* isolate);
         v8::Local<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate* isolate, MetadataTreeNode* treeNode);
         v8::Local<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate* isolate, MetadataTreeNode* treeNode, std::vector<MethodCallbackData*>& instanceMethodsCallbackData);
         v8::Persistent<v8::Function>* GetPersistentConstructorFunction(v8::Isolate* isolate);
-        v8::Local<v8::ObjectTemplate> GetOrCreateArrayObjectTemplate(v8::Isolate* isolate);
+        static v8::Local<v8::ObjectTemplate> GetOrCreateArrayObjectTemplate(v8::Isolate* isolate);
 
         std::vector<MethodCallbackData*> SetInstanceMembers(
                 v8::Isolate* isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate,
@@ -95,9 +95,9 @@ class MetadataNode {
                 std::vector<MethodCallbackData*>& instanceMethodsCallbackData,
                 const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData,
                 MetadataTreeNode* treeNode);
-        MethodCallbackData* tryGetExtensionMethodCallbackData(
+        static MethodCallbackData* tryGetExtensionMethodCallbackData(
                 std::unordered_map<std::string, MethodCallbackData*> collectedMethodCallbackDatas,
-                std::string lookupName);
+                const std::string& lookupName);
         void SetInstanceFieldsFromStaticMetadata(
                 v8::Isolate* isolate, PrototypeTemplateFiller& protoFiller,
                 MetadataTreeNode* treeNode);
@@ -107,7 +107,7 @@ class MetadataNode {
                 const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData,
                 MetadataTreeNode* treeNode);
         void SetStaticMembers(v8::Isolate* isolate, v8::Local<v8::Function>& ctorFunction, MetadataTreeNode* treeNode);
-        void SetInnerTypes(v8::Isolate* isolate, v8::Local<v8::Function>& ctorFunction, MetadataTreeNode* treeNode);
+        static void SetInnerTypes(v8::Isolate* isolate, v8::Local<v8::Function>& ctorFunction, MetadataTreeNode* treeNode);
 
         static void BuildMetadata(uint32_t nodesLength, uint8_t* nodeData, uint32_t nameLength, uint8_t* nameData, uint32_t valueLength, uint8_t* valueData);
 
@@ -161,7 +161,7 @@ class MetadataNode {
         static void SymbolHasInstanceCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static std::string GetJniClassName(MetadataEntry entry);
 
-        v8::Local<v8::Function> Wrap(v8::Isolate* isolate, const v8::Local<v8::Function>& function, const std::string& name, const std::string& origin, bool isCtorFunc);
+        static v8::Local<v8::Function> Wrap(v8::Isolate* isolate, const v8::Local<v8::Function>& function, const std::string& name, const std::string& origin, bool isCtorFunc);
 
         bool CheckClassHierarchy(JEnv& env, jclass currentClass, MetadataTreeNode* curentTreeNode, MetadataTreeNode* baseTreeNode, std::vector<MetadataTreeNode*>& skippedBaseTypes);
         void SetMissingBaseMethods(v8::Isolate* isolate,

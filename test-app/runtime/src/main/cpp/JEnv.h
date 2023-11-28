@@ -17,6 +17,8 @@ class JEnv {
         operator JNIEnv* () const;
 
         jclass GetObjectClass(jobject obj);
+        std::string GetClassName(jclass cls);
+        std::string GetClassName(jobject obj) { return GetClassName(GetObjectClass(obj)); }
 
         jsize GetArrayLength(jarray array);
 
@@ -341,6 +343,7 @@ class JEnv {
         static jclass RUNTIME_CLASS;
 
         static jmethodID GET_CACHED_CLASS_METHOD_ID;
+        static jmethodID GET_NAME_METHOD_ID;
 
         static std::map<std::string, jclass> s_classCache;
         static std::map<std::string, jthrowable> s_missingClasses;

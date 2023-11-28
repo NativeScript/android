@@ -84,9 +84,9 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
                                              implementationObject,
                                              isInterface);
 
-    int javaObjectID = objectManager->GenerateNewObjectID();
+    jint javaObjectID = objectManager->GenerateNewObjectID();
 
-    objectManager->Link(jsObject, javaObjectID, nullptr);
+    objectManager->Link(jsObject, javaObjectID);
 
     // resolve constructor
     auto mi = MethodCache::ResolveConstructorSignature(argWrapper, fullClassName,
@@ -118,10 +118,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     JniLocalRef localInstance(instance);
     success = !localInstance.IsNull();
 
-    if (success) {
-        jclass instanceClass = env.FindClass(fullClassName);
-        objectManager->SetJavaClass(jsObject, instanceClass);
-    } else {
+    if (!success) {
         DEBUG_WRITE_FORCE("RegisterInstance failed with null new instance class: %s",
                           fullClassName.c_str());
     }
@@ -163,14 +160,6 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &baseClassN
     }
 
     return globalRefToGeneratedClass;
-}
-
-// Called by ExtendMethodCallback when extending a class
-string CallbackHandlers::ResolveClassName(Isolate *isolate, jclass &clazz) {
-    auto runtime = Runtime::GetRuntime(isolate);
-    auto objectManager = runtime->GetObjectManager();
-    auto className = objectManager->GetClassName(clazz);
-    return className;
 }
 
 Local<Value> CallbackHandlers::GetArrayElement(Local<Context> context, const Local<Object> &array,
@@ -569,7 +558,7 @@ CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &imple
 
     vector<jstring> interfacesToImplement;
     auto isolate = implementationObject->GetIsolate();
-    auto context = implementationObject->CreationContext();
+    Local<Context> context = implementationObject->GetCreationContextChecked();
     Local<String> interfacesName = String::NewFromUtf8Literal(isolate, "interfaces");
     Local<Value> prop;
     if (implementationObject->Get(context, interfacesName).ToLocal(&prop) && !prop.IsEmpty() && prop->IsArray()) {
@@ -615,7 +604,7 @@ CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object> &implementat
 
     vector<jstring> methodNames;
     auto isolate = implementationObject->GetIsolate();
-    auto context = implementationObject->CreationContext();
+    Local<Context> context = implementationObject->GetCreationContextChecked();
     auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(context, i).ToLocalChecked().As<String>();
