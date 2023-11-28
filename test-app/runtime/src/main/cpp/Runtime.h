@@ -114,9 +114,9 @@ class Runtime {
         static int GetAndroidVersion();
         static int m_androidVersion;
 
-        static std::map<int, Runtime*> s_id2RuntimeCache;
+        static robin_hood::unordered_map<int, Runtime*> s_id2RuntimeCache;
 
-        static std::unordered_map<v8::Isolate*, Runtime*> s_isolate2RuntimesCache;
+        static robin_hood::unordered_map<v8::Isolate*, Runtime*> s_isolate2RuntimesCache;
 
         static JavaVM* s_jvm;
 

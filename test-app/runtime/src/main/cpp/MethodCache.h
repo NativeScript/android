@@ -59,7 +59,7 @@ class MethodCache {
          *  Used for caching the resolved constructor or method signature.
          * The encoded signature has template: <className>.S/I.<methodName>.<argsCount>.<arg1class>.<...>
          */
-        static std::map<std::string, CacheMethodInfo> s_mthod_ctor_signature_cache;
+        static robin_hood::unordered_map<std::string, CacheMethodInfo> s_mthod_ctor_signature_cache;
 };
 }
 

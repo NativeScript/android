@@ -124,7 +124,7 @@ class ArgConverter {
          * "s_type_long_operations_cache" used to keep function
          * dealing with operations concerning java long -> javascript number.
          */
-        static std::map<v8::Isolate*, TypeLongOperationsCache*> s_type_long_operations_cache;
+        static robin_hood::unordered_map<v8::Isolate*, TypeLongOperationsCache*> s_type_long_operations_cache;
 };
 }
 

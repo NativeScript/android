@@ -18,6 +18,7 @@
 #include <errno.h>
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
+#include "Runtime.h"
 
 namespace tns {
     class CallbackHandlers {
@@ -27,7 +28,7 @@ namespace tns {
          * Stores persistent handles of all 'Worker' objects initialized on the main thread
          * Note: No isolates different than that of the main thread should access this map
          */
-        static std::map<int, v8::Persistent<v8::Object> *> id2WorkerMap;
+        static robin_hood::unordered_map<int, v8::Persistent<v8::Object> *> id2WorkerMap;
 
         static int nextWorkerId;
 
@@ -364,7 +365,8 @@ namespace tns {
                     v8::Isolate::Scope isolate_scope(isolate);
                     v8::HandleScope handle_scope(isolate);
                     v8::Local<v8::Function> cb = entry->callback_.Get(isolate);
-                    v8::Local<v8::Context> context = cb->GetCreationContextChecked();
+                    Runtime* runtime = Runtime::GetRuntime(isolate);
+                    v8::Local<v8::Context> context = runtime->GetContext();
                     v8::Context::Scope context_scope(context);
                     // we're running the callback now, so it's not scheduled anymore
                     entry->markUnscheduled();

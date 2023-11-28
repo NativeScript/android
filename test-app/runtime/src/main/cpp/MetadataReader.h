@@ -6,6 +6,7 @@
 #include <map>
 #include <string>
 #include <assert.h>
+#include "robin_hood.h"
 namespace tns {
 typedef std::vector<std::string> (*GetTypeMetadataCallback)(const std::string& classname, int index);
 
@@ -186,7 +187,7 @@ class MetadataReader {
         std::vector<MetadataTreeNode*> m_v;
         GetTypeMetadataCallback m_getTypeMetadataCallback;
 
-        std::map<MetadataTreeNode*, std::string> m_typeNameCache;
+        robin_hood::unordered_map<MetadataTreeNode*, std::string> m_typeNameCache;
 };
 }
 

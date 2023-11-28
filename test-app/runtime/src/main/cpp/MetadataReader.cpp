@@ -178,7 +178,7 @@ string MetadataReader::ReadTypeName(MetadataTreeNode* treeNode) {
     } else {
         name = ReadTypeNameInternal(treeNode);
 
-        m_typeNameCache.insert(make_pair(treeNode, name));
+        m_typeNameCache.emplace(treeNode, name);
     }
 
     return name;

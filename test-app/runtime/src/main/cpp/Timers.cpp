@@ -294,7 +294,8 @@ int Timers::PumpTimerLoopCallback(int fd, int events, void *data) {
             thiz->addTask(task);
         }
         v8::Local<v8::Function> cb = task->callback_.Get(isolate);
-        v8::Local<v8::Context> context = cb->GetCreationContextChecked();
+        Runtime* runtime = Runtime::GetRuntime(isolate);
+        v8::Local<v8::Context> context = runtime->GetContext();
         Context::Scope context_scope(context);
         TryCatch tc(isolate);
         auto argc = task->args_.get() == nullptr ? 0 : task->args_->size();

@@ -132,7 +132,7 @@ Local<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const strin
 
         auto poFunc = new Persistent<Function>(isolate, requireFunc);
 
-        m_requireCache.insert(make_pair(dirName, poFunc));
+        m_requireCache.emplace(dirName, poFunc);
     }
 
     return requireFunc;
@@ -446,7 +446,7 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
 
     auto poObj = new Persistent<Object>(isolate, json);
 
-    m_loadedModules.insert(make_pair(path, ModuleCacheEntry(poObj, true /* isData */)));
+    m_loadedModules.emplace(path, ModuleCacheEntry(poObj, true /* isData */));
 
     return json;
 }
