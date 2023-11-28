@@ -6,6 +6,7 @@
 #include <map>
 #include <string>
 #include <assert.h>
+#include "robin_hood.h"
 namespace tns {
 typedef std::vector<std::string> (*GetTypeMetadataCallback)(const std::string& classname, int index);
 
