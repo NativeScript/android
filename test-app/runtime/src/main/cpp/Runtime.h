@@ -94,8 +94,6 @@ class Runtime {
 
         WeakRef m_weakRef;
 
-        Timers m_timers;
-
         Profiler m_profiler;
 
         MessageLoopTimer* m_loopTimer;

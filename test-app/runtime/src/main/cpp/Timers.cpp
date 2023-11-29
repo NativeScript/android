@@ -5,6 +5,9 @@
 #include <android/looper.h>
 #include <unistd.h>
 #include <thread>
+#include "ModuleBinding.h"
+#include "IsolateDisposer.h"
+#include "Util.h"
 
 
 /**
@@ -15,7 +18,6 @@
  * ALL changes and scheduling of a TimerTask MUST be done when locked in an isolate to ensure consistency
  */
 
-using namespace tns;
 using namespace v8;
 
 // Takes a value and transform into a positive number
@@ -43,22 +45,18 @@ static double now_ms() {
     return 1000.0 * res.tv_sec + (double) res.tv_nsec / 1e6;
 }
 
+namespace tns {
+
+
+
 
 void Timers::Init(v8::Isolate *isolate, v8::Local<v8::ObjectTemplate> &globalObjectTemplate) {
     isolate_ = isolate;
     // TODO: remove the __ns__ prefix once this is validated
-    globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__ns__setTimeout"),
-                              FunctionTemplate::New(isolate, SetTimeoutCallback,
-                                                    External::New(isolate, this)));
-    globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__ns__setInterval"),
-                              FunctionTemplate::New(isolate, SetIntervalCallback,
-                                                    External::New(isolate, this)));
-    globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__ns__clearTimeout"),
-                              FunctionTemplate::New(isolate, ClearTimer,
-                                                    External::New(isolate, this)));
-    globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__ns__clearInterval"),
-                              FunctionTemplate::New(isolate, ClearTimer,
-                                                    External::New(isolate, this)));
+    SetMethod(isolate, globalObjectTemplate, "__ns__setTimeout", SetTimeoutCallback, External::New(isolate, this));
+    SetMethod(isolate, globalObjectTemplate, "__ns__setInterval", SetIntervalCallback, External::New(isolate, this));
+    SetMethod(isolate, globalObjectTemplate, "__ns__clearTimeout", ClearTimer, External::New(isolate, this));
+    SetMethod(isolate, globalObjectTemplate, "__ns__clearInterval", ClearTimer, External::New(isolate, this));
     auto res = pipe(fd_);
     assert(res != -1);
     res = fcntl(fd_[1], F_SETFL, O_NONBLOCK);
@@ -325,3 +323,13 @@ int Timers::PumpTimerLoopCallback(int fd, int events, void *data) {
     thiz->bufferFull.notify_one();
     return 1;
 }
+
+void Timers::InitStatic(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalObjectTemplate) {
+   auto timers = new Timers();
+   timers->Init(isolate, globalObjectTemplate);
+   registerIsolateBoundObject(isolate, timers);
+}
+
+};
+
+NODE_BINDING_PER_ISOLATE_INIT_OBJ(timers, tns::Timers::InitStatic);
