@@ -148,7 +148,7 @@ public final class RuntimeHelper {
                 StaticConfiguration config = new StaticConfiguration(logger, appName, nativeLibDir, rootDir,
                         appDir, classLoader, dexDir, dexThumb, appConfig, isDebuggable);
 
-                runtime = Runtime.initializeRuntimeWithConfiguration(config);
+                runtime = Runtime.initializeRuntimeWithConfiguration(config, appDir.toString());
                 if (isDebuggable) {
                     try {
                         v8Inspector = new AndroidJsV8Inspector(context.getFilesDir().getAbsolutePath(), context.getPackageName());
@@ -190,7 +190,7 @@ public final class RuntimeHelper {
                     waitForLiveSync(context);
                 }
 
-                runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
+//                runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
 
                 File javaClassesModule = new File(appDir, "app/tns-java-classes.js");
                 if (javaClassesModule.exists()) {

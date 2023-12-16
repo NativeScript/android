@@ -445,13 +445,15 @@ public class Runtime {
         private ThreadScheduler mainThreadScheduler;
         private String filePath;
         private String callingJsDir;
+        private String appDir;
 
-        public WorkerThread(String name, Integer workerId, ThreadScheduler mainThreadScheduler, String callingJsDir) {
+        public WorkerThread(String name, Integer workerId, ThreadScheduler mainThreadScheduler, String callingJsDir, String appDir) {
             super("W" + workerId + ": " + name);
             this.filePath = name;
             this.workerId = workerId;
             this.mainThreadScheduler = mainThreadScheduler;
             this.callingJsDir = callingJsDir;
+            this.appDir = appDir;
         }
 
         public void startRuntime() {
@@ -470,7 +472,7 @@ public class Runtime {
                         staticConfiguration.logger.write("Worker (id=" + workerId + ")'s Runtime is initializing!");
                     }
 
-                    Runtime runtime = initRuntime(dynamicConfiguration);
+                    Runtime runtime = initRuntime(dynamicConfiguration, appDir);
 
                     if (staticConfiguration.logger.isEnabled()) {
                         staticConfiguration.logger.write("Worker (id=" + workerId + ")'s Runtime initialized!");
@@ -575,11 +577,11 @@ public class Runtime {
         This method initializes the runtime and should always be called first and through the main thread
         in order to set static configuration that all following workers can use
      */
-    public static Runtime initializeRuntimeWithConfiguration(StaticConfiguration config) {
+    public static Runtime initializeRuntimeWithConfiguration(StaticConfiguration config, String appDir) {
         staticConfiguration = config;
         WorkThreadScheduler mainThreadScheduler = new WorkThreadScheduler(new MainThreadHandler(Looper.myLooper()));
         DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(0, mainThreadScheduler, null);
-        Runtime runtime = initRuntime(dynamicConfiguration);
+        Runtime runtime = initRuntime(dynamicConfiguration, appDir);
         return runtime;
     }
 
@@ -591,9 +593,10 @@ public class Runtime {
     public static void initWorker(String jsFileName, String callingJsDir, int id) {
         // This method will always be called from the Main thread
         Runtime runtime = Runtime.getCurrentRuntime();
-        ThreadScheduler mainThreadScheduler = runtime.getDynamicConfig().myThreadScheduler;
 
-        WorkerThread worker = new WorkerThread(jsFileName, id, mainThreadScheduler, callingJsDir);
+        ThreadScheduler mainThreadScheduler = runtime.getDynamicConfig().myThreadScheduler;
+        String appDir = runtime.config.appDir.toString();
+        WorkerThread worker = new WorkerThread(jsFileName, id, mainThreadScheduler, callingJsDir, appDir);
         worker.start();
         worker.startRuntime();
     }
@@ -602,9 +605,10 @@ public class Runtime {
         This method deals with initializing the runtime with given configuration
         Does it for both workers and for the main thread
      */
-    private static Runtime initRuntime(DynamicConfiguration dynamicConfiguration) {
+    private static Runtime initRuntime(DynamicConfiguration dynamicConfiguration, String appDir) {
         Runtime runtime = new Runtime(staticConfiguration, dynamicConfiguration);
         runtime.init();
+        runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
 
         return runtime;
     }
