@@ -62,7 +62,7 @@ var MyActivity = (function (_super) {
 
 	};
 	MyActivity = __decorate([
-		JavaProxy("com.tns.NativeScriptActivity")
+		JavaProxy("com.tns.TestNativeScriptActivity")
 	], MyActivity);
 	return MyActivity;
 })(android.app.Activity);

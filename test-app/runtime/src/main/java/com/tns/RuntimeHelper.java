@@ -68,6 +68,8 @@ public final class RuntimeHelper {
             ManualInstrumentation.Frame loadLibraryFrame = ManualInstrumentation.start("loadLibrary NativeScript");
             try {
                 System.loadLibrary("NativeScript");
+            } catch (Exception e) {
+                throw e;
             } finally {
                 loadLibraryFrame.close();
             }
