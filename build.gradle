@@ -261,6 +261,10 @@ task copyFilesToProjectTemeplate {
             into "$DIST_FRAMEWORK_PATH/app/src/main/java/com/tns/internal"
         }
         copy {
+            from "$TEST_APP_PATH/app/src/main/java/com/tns/embedding"
+            into "$DIST_FRAMEWORK_PATH/app/src/main/java/com/tns/embedding"
+        }
+        copy {
             from "$BUILD_TOOLS_PATH/static-binding-generator/build/libs/static-binding-generator.jar"
             into "$DIST_FRAMEWORK_PATH/build-tools"
         }
@@ -293,6 +297,10 @@ task copyFilesToProjectTemeplate {
         }
         copy {
             from "$TEST_APP_PATH/app/build.gradle"
+            into "$DIST_FRAMEWORK_PATH/app"
+        }
+        copy {
+            from "$TEST_APP_PATH/app/nativescript.gradle"
             into "$DIST_FRAMEWORK_PATH/app"
         }
         copy {
