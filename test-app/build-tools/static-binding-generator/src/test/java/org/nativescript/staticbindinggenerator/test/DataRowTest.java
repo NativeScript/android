@@ -37,7 +37,7 @@ public class DataRowTest {
         Assert.assertEquals(row.getColumn(), "");
         Assert.assertEquals(row.getNewClassName(), "");
         Assert.assertEquals(row.getMethods()[0], "toString");
-        Assert.assertEquals(row.getFilename(), "com.tns.NativeScriptActivity");
+        Assert.assertEquals(row.getFilename(), "com.tns.TestNativeScriptActivity");
         Assert.assertEquals(row.getJsFilename(), "MyActivity.js");
         Assert.assertEquals(row.getInterfaces()[0], "");
     }
