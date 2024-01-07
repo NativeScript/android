@@ -12,7 +12,7 @@
 		}
 	}
 
-	@JavaProxy("com.tns.NativeScriptActivity")
+	@JavaProxy("com.tns.TestNativeScriptActivity")
 	class MyActivity extends android.app.Activity
 	{
 		onCreate(bundle: android.os.Bundle)

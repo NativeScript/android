@@ -252,8 +252,8 @@ task copyFilesToProjectTemeplate {
         copy {
             from "$TEST_APP_PATH/app/src/main/java/com/tns/"
             include "*.java"
-            exclude "NativeScriptApplication.java"
-            exclude "NativeScriptActivity.java"
+            exclude "TestNativeScriptApplication.java"
+            exclude "TestNativeScriptActivity.java"
             into "$DIST_FRAMEWORK_PATH/app/src/main/java/com/tns"
         }
         copy {
