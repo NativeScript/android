@@ -1,7 +1,7 @@
 apply plugin: 'java-library'
 
-sourceCompatibility = JavaVersion.VERSION_1_8
-targetCompatibility = JavaVersion.VERSION_1_8
+sourceCompatibility = JavaVersion.VERSION_11
+targetCompatibility = JavaVersion.VERSION_11
 
 // todo: check if still needed
 // if(!project.hasProperty("loadedProjectDeps")){

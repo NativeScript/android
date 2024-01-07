@@ -685,7 +685,8 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     Local<v8::Function> cb = it->second.callback_.Get(isolate);
-    v8::Local<v8::Context> context = cb->GetCreationContextChecked();
+    Runtime* runtime = Runtime::GetRuntime(isolate);
+    v8::Local<v8::Context> context = runtime->GetContext();
     Context::Scope context_scope(context);
     // erase the it here as we're already done with its values and the callback might invalidate the iterator
     cache_.erase(it);
@@ -1025,7 +1026,7 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
 
         auto persistentWorker = new Persistent<Object>(isolate, thiz);
 
-        id2WorkerMap.insert(make_pair(workerId, persistentWorker));
+        id2WorkerMap.emplace(workerId, persistentWorker);
 
         DEBUG_WRITE("Called Worker constructor id=%d", workerId);
 
@@ -1740,7 +1741,7 @@ std::atomic_uint64_t CallbackHandlers::frameCallbackCount_ = {0};
 
 
 int CallbackHandlers::nextWorkerId = 0;
-std::map<int, Persistent<Object> *> CallbackHandlers::id2WorkerMap;
+robin_hood::unordered_map<int, Persistent<Object> *> CallbackHandlers::id2WorkerMap;
 
 short CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH = 100;
 jclass CallbackHandlers::RUNTIME_CLASS = nullptr;

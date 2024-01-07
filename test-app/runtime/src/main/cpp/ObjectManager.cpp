@@ -263,7 +263,7 @@ void ObjectManager::Link(const Local<Object> &object, uint32_t javaObjectID, jcl
     //link
     object->SetInternalField(jsInfoIdx, jsInfo);
 
-    m_idToObject.insert(make_pair(javaObjectID, objectHandle));
+    m_idToObject.emplace(javaObjectID, objectHandle);
 }
 
 bool ObjectManager::CloneLink(const Local<Object> &src, const Local<Object> &dest) {
@@ -384,7 +384,7 @@ void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackSta
                 if (jsInstanceInfo->IsJavaObjectWeak) {
                     m_implObjWeak.emplace_back(po, javaObjectID);
                 } else {
-                    m_implObjStrong.insert(make_pair(javaObjectID, po));
+                    m_implObjStrong.emplace(javaObjectID, po);
                     jsInstanceInfo->IsJavaObjectWeak = true;
                 }
             } else {

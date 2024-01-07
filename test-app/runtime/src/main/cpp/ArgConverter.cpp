@@ -200,7 +200,7 @@ ArgConverter::TypeLongOperationsCache* ArgConverter::GetTypeLongCache(v8::Isolat
     auto itFound = s_type_long_operations_cache.find(isolate);
     if (itFound == s_type_long_operations_cache.end()) {
         cache = new TypeLongOperationsCache;
-        s_type_long_operations_cache.insert(make_pair(isolate, cache));
+        s_type_long_operations_cache.emplace(isolate, cache);
     } else {
         cache = itFound->second;
     }
@@ -230,4 +230,4 @@ void ArgConverter::onDisposeIsolate(Isolate* isolate) {
     }
 }
 
-std::map<Isolate*, ArgConverter::TypeLongOperationsCache*> ArgConverter::s_type_long_operations_cache;
+robin_hood::unordered_map<Isolate*, ArgConverter::TypeLongOperationsCache*> ArgConverter::s_type_long_operations_cache;

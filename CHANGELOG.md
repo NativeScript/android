@@ -1,3 +1,39 @@
+## [8.6.2](https://github.com/NativeScript/android/compare/v8.6.1...v8.6.2) (2023-10-10)
+
+
+
+## [8.6.1](https://github.com/NativeScript/android/compare/v8.6.0...v8.6.1) (2023-10-10)
+
+
+### Bug Fixes
+
+* copy drawables ([4ff92cb](https://github.com/NativeScript/android/commit/4ff92cb32a954be4c3d32c302e301cef0a4b72a6))
+
+
+
+# [8.6.0](https://github.com/NativeScript/android/compare/v8.5.3...v8.6.0) (2023-10-06)
+
+
+### Bug Fixes
+
+* make jar files readonly prior to loading ([#1790](https://github.com/NativeScript/android/issues/1790)) ([2bcdaf0](https://github.com/NativeScript/android/commit/2bcdaf01fb850db4a982c22c2d792f9493a2a7fa))
+* only use project jar files if they are linked ([d23ca94](https://github.com/NativeScript/android/commit/d23ca94ba7c660b26224c57ba6f22085aa99f95c))
+* revert namespace change as to not break existing projects ([8b7b59d](https://github.com/NativeScript/android/commit/8b7b59d23d926b696bde3c1031cf3a842a24133d))
+
+
+### Features
+
+* improved error activity ui ([#1776](https://github.com/NativeScript/android/issues/1776)) ([ee3e354](https://github.com/NativeScript/android/commit/ee3e354f1bec89268daf93086aa6dd24898677b9))
+* upgrade client gradle version ([c778c0d](https://github.com/NativeScript/android/commit/c778c0d238c4ba44390f786ba06ab8e51ffb2c97))
+
+## [8.5.4](https://github.com/NativeScript/android/compare/v8.5.3...v8.5.4) (2023-09-27)
+
+
+### Bug Fixes
+
+* make jar files readonly prior to loading ([#1790](https://github.com/NativeScript/android/issues/1790)) ([14a932a](https://github.com/NativeScript/android/commit/14a932ad2d62c94f2f4e139125835da760dcdd58))
+
+
 ## [8.5.3](https://github.com/NativeScript/android/compare/v8.5.2...v8.5.3) (2023-09-22)
 
 

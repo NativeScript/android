@@ -2,7 +2,7 @@
 #define JENV_H_
 
 #include "jni.h"
-#include <map>
+#include "robin_hood.h"
 #include <string>
 
 namespace tns {
@@ -342,8 +342,8 @@ class JEnv {
 
         static jmethodID GET_CACHED_CLASS_METHOD_ID;
 
-        static std::map<std::string, jclass> s_classCache;
-        static std::map<std::string, jthrowable> s_missingClasses;
+        static robin_hood::unordered_map<std::string, jclass> s_classCache;
+        static robin_hood::unordered_map<std::string, jthrowable> s_missingClasses;
 };
 }
 

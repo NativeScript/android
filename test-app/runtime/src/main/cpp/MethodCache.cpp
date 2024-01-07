@@ -54,7 +54,7 @@ MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& c
                               :
                               env.GetMethodID(clazz, methodName, signature);
 
-            s_mthod_ctor_signature_cache.insert(make_pair(encoded_method_signature, method_info));
+            s_mthod_ctor_signature_cache.emplace(encoded_method_signature, method_info);
         }
     } else {
         method_info = (*it).second;
@@ -81,7 +81,7 @@ MethodCache::CacheMethodInfo MethodCache::ResolveConstructorSignature(const Args
             constructor_info.signature = signature;
             constructor_info.mid = env.GetMethodID(javaClass, "<init>", signature);
 
-            s_mthod_ctor_signature_cache.insert(make_pair(encoded_ctor_signature, constructor_info));
+            s_mthod_ctor_signature_cache.emplace(encoded_ctor_signature, constructor_info);
         }
     } else {
         constructor_info = (*it).second;
@@ -261,7 +261,7 @@ string MethodCache::ResolveConstructor(const FunctionCallbackInfo<Value>& args, 
     return resolvedSignature;
 }
 
-map<string, MethodCache::CacheMethodInfo> MethodCache::s_mthod_ctor_signature_cache;
+robin_hood::unordered_map<string, MethodCache::CacheMethodInfo> MethodCache::s_mthod_ctor_signature_cache;
 jclass MethodCache::RUNTIME_CLASS = nullptr;
 jmethodID MethodCache::RESOLVE_METHOD_OVERLOAD_METHOD_ID = nullptr;
 jmethodID MethodCache::RESOLVE_CONSTRUCTOR_SIGNATURE_ID = nullptr;

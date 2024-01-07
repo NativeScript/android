@@ -60,7 +60,7 @@ class NetworkAgentImpl : public protocol::Network::Backend {
 
         static NetworkAgentImpl* Instance;
         protocol::Network::Frontend m_frontend;
-        std::map<std::string, utils::NetworkRequestData*> m_responses;
+        robin_hood::unordered_map<std::string, utils::NetworkRequestData*> m_responses;
 
     private:
         V8InspectorSessionImpl* m_session;

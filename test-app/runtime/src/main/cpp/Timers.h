@@ -6,6 +6,7 @@
 #include "ObjectManager.h"
 #include "condition_variable"
 #include "thread"
+#include "robin_hood.h"
 
 namespace tns {
     /**
@@ -75,6 +76,8 @@ namespace tns {
          */
         void Init(v8::Isolate *isolate, v8::Local<v8::ObjectTemplate> &globalObjectTemplate);
 
+        static void InitStatic(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalObjectTemplate);
+
         /**
          * Disposes the timers. This will clear all references and stop all thread.
          * MUST be called in the same thread Init was called
@@ -113,7 +116,7 @@ namespace tns {
         int currentTimerId = 0;
         int nesting = 0;
         // stores the map of timer tasks
-        std::map<int, std::shared_ptr<TimerTask>> timerMap_;
+        robin_hood::unordered_map<int, std::shared_ptr<TimerTask>> timerMap_;
         std::vector<std::shared_ptr<TimerReference>> sortedTimers_;
         // sets are faster than vector iteration
         // so we use this to avoid redundant isolate locks and we don't care about the

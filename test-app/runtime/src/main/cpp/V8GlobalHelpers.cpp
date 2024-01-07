@@ -5,11 +5,12 @@
 #include "JEnv.h"
 #include "NativeScriptException.h"
 #include <sstream>
+#include "robin_hood.h"
 
 using namespace v8;
 using namespace std;
 
-static std::map<v8::Isolate*, v8::Persistent<v8::Function>*> isolateToPersistentSmartJSONStringify = std::map<v8::Isolate*, v8::Persistent<v8::Function>*>();
+static robin_hood::unordered_map<v8::Isolate*, v8::Persistent<v8::Function>*> isolateToPersistentSmartJSONStringify = robin_hood::unordered_map<v8::Isolate*, v8::Persistent<v8::Function>*>();
 
 Local<Function> GetSmartJSONStringifyFunction(Isolate* isolate) {
     auto it = isolateToPersistentSmartJSONStringify.find(isolate);
@@ -61,7 +62,7 @@ Local<Function> GetSmartJSONStringifyFunction(Isolate* isolate) {
 
     auto smartStringifyPersistentFunction = new Persistent<Function>(isolate, smartStringifyFunction);
 
-    isolateToPersistentSmartJSONStringify.insert(std::make_pair(isolate, smartStringifyPersistentFunction));
+    isolateToPersistentSmartJSONStringify.emplace(isolate, smartStringifyPersistentFunction);
 
     return smartStringifyPersistentFunction->Get(isolate);
 }
