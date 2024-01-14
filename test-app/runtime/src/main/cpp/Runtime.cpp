@@ -35,6 +35,9 @@
 #ifdef APPLICATION_IN_DEBUG
 // #include "NetworkDomainCallbackHandlers.h"
 #include "JsV8InspectorClient.h"
+#include "URLImpl.h"
+#include "URLSearchParamsImpl.h"
+
 #endif
 
 using namespace v8;
@@ -519,6 +522,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runOnMainThread"), FunctionTemplate::New(isolate, CallbackHandlers::RunOnMainThreadCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__postFrameCallback"), FunctionTemplate::New(isolate, CallbackHandlers::PostFrameCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__removeFrameCallback"), FunctionTemplate::New(isolate, CallbackHandlers::RemoveFrameCallback));
+    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URLImpl"), URLImpl::GetCtor(isolate));
+    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URLSearchParamsImpl"), URLSearchParamsImpl::GetCtor(isolate));
+
     /*
      * Attach `Worker` object constructor only to the main thread (isolate)'s global object
      * Workers should not be created from within other Workers, for now

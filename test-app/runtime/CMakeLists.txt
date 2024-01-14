@@ -52,6 +52,7 @@ include_directories(
         src/main/cpp
         src/main/cpp/include
         src/main/cpp/v8_inspector
+        src/main/cpp/ada
 )
 
 if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
@@ -137,6 +138,9 @@ add_library(
         src/main/cpp/conversions/objects/JSToJavaObjectsConverter.cpp
         src/main/cpp/conversions/arrays/JSToJavaArraysConverter.cpp
         src/main/cpp/conversions/primitives/JSToJavaPrimitivesConverter.cpp
+        src/main/cpp/ada/ada.cpp
+        src/main/cpp/URLImpl.cpp
+        src/main/cpp/URLSearchParamsImpl.cpp
 
         # V8 inspector source files will be included only in Release mode
         ${INSPECTOR_SOURCES}
