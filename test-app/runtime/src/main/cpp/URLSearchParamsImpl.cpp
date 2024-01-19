@@ -19,7 +19,7 @@ namespace tns {
 
     v8::Local<v8::FunctionTemplate> URLSearchParamsImpl::GetCtor(v8::Isolate *isolate) {
         v8::Local<v8::FunctionTemplate> ctorTmpl = v8::FunctionTemplate::New(isolate, Ctor);
-        ctorTmpl->SetClassName(ArgConverter::ConvertToV8String(isolate, "URLSearchParamsImpl"));
+        ctorTmpl->SetClassName(ArgConverter::ConvertToV8String(isolate, "URLSearchParams"));
 
         auto tmpl = ctorTmpl->InstanceTemplate();
         tmpl->SetInternalFieldCount(1);
@@ -93,7 +93,6 @@ namespace tns {
             params = ada::url_search_params(
                     ArgConverter::ConvertToString(value->ToString(context).ToLocalChecked()));
         }
-
 
         auto searchParams = new URLSearchParamsImpl(params);
 

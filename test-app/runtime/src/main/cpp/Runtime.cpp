@@ -31,13 +31,12 @@
 #include <thread>
 #include "File.h"
 #include "ModuleBinding.h"
+#include "URLImpl.h"
+#include "URLSearchParamsImpl.h"
 
 #ifdef APPLICATION_IN_DEBUG
 // #include "NetworkDomainCallbackHandlers.h"
 #include "JsV8InspectorClient.h"
-#include "URLImpl.h"
-#include "URLSearchParamsImpl.h"
-
 #endif
 
 using namespace v8;
@@ -522,8 +521,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runOnMainThread"), FunctionTemplate::New(isolate, CallbackHandlers::RunOnMainThreadCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__postFrameCallback"), FunctionTemplate::New(isolate, CallbackHandlers::PostFrameCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__removeFrameCallback"), FunctionTemplate::New(isolate, CallbackHandlers::RemoveFrameCallback));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URLImpl"), URLImpl::GetCtor(isolate));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URLSearchParamsImpl"), URLSearchParamsImpl::GetCtor(isolate));
+    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URL"), URLImpl::GetCtor(isolate));
+    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URLSearchParams"), URLSearchParamsImpl::GetCtor(isolate));
 
     /*
      * Attach `Worker` object constructor only to the main thread (isolate)'s global object
@@ -592,10 +591,85 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
 
+    auto blob_methods =
+            "const BLOB_STORE = new Map();\n"
+            "URL.createObjectURL = function (object, options = null) {\n"
+            "try {\n"
+            "if (object instanceof Blob || object instanceof File) {\n"
+            "const id = java.util.UUID.randomUUID().toString();\n"
+            "const ret = `blob:nativescript/${id}`;\n"
+            "BLOB_STORE.set(ret, {\n"
+            "blob: object,\n"
+            "type: object?.type,\n"
+            "ext: options?.ext,\n"
+            "});\n"
+            "return ret;\n"
+            "}\n"
+            "} catch (error) {\n"
+            "return null;\n"
+            "}\n"
+            "return null;\n"
+            "};\n"
+            "\n"
+            "URL.revokeObjectURL = function (url) {\n"
+            "BLOB_STORE.delete(url);\n"
+            "};\n"
+            "\n"
+            "const InternalAccessor = class {};\n"
+            "\n"
+            "InternalAccessor.getData = function (url) {\n"
+            "return BLOB_STORE.get(url);\n"
+            "};\n"
+            "\n"
+            "URL.InternalAccessor = InternalAccessor;\n"
+            "Object.defineProperty(URL.prototype, 'searchParams', {\n"
+            "get() {\n"
+            "if (this._searchParams == null) {\n"
+            "this._searchParams = new URLSearchParams(this.search);\n"
+            "Object.defineProperty(this._searchParams, '_url', {\n"
+            "enumerable: false,\n"
+            "writable: false,\n"
+            "value: this,\n"
+            "});\n"
+            "\n"
+            "this._searchParams._append = this._searchParams.append;\n"
+            "this._searchParams.append = function (name, value) {\n"
+            "this._append(name, value);\n"
+            "this._url.search = this.toString();\n"
+            "};\n"
+            "\n"
+            "this._searchParams._delete = this._searchParams.delete;\n"
+            "this._searchParams.delete = function (name) {\n"
+            "this._delete(name);\n"
+            "this._url.search = this.toString();\n"
+            "};\n"
+            "\n"
+            "this._searchParams._set = this._searchParams.set;\n"
+            "this._searchParams.set = function (name, value) {\n"
+            "this._set(name, value);\n"
+            "this._url.search = this.toString();\n"
+            "};\n"
+            "\n"
+            "this._searchParams._sort = this._searchParams.sort;\n"
+            "this._searchParams.sort = function () {\n"
+            "this._sort();\n"
+            "this._url.search = this.toString();\n"
+            "};\n"
+            "}\n"
+            "return this._searchParams;\n"
+            "},\n"
+            "});";
+
+
     auto global = context->Global();
 
     v8::Context::Scope contextScope{context};
 
+    v8::Local<v8::Script> script;
+    v8::Script::Compile(context, ArgConverter::ConvertToV8String(isolate, blob_methods)).ToLocal(&script);
+
+    v8::Local<v8::Value> out;
+    script->Run(context).ToLocal(&out);
     m_objectManager->Init(isolate);
 
     m_module.Init(isolate, callingDir);
