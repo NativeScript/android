@@ -1,9 +1,9 @@
-describe("Test URLImpl ", function () {
+describe("Test URL ", function () {
 
 it("Test invalid URL parsing", function(){
 var exceptionCaught = false;
   try {
-        const url = new URLImpl('');
+        const url = new URL('');
         }catch(e){
         exceptionCaught = true;
         }
@@ -13,7 +13,7 @@ var exceptionCaught = false;
 it("Test valid URL parsing", function(){
 var exceptionCaught = false;
   try {
-        const url = new URLImpl('https://google.com');
+        const url = new URL('https://google.com');
         }catch(e){
         exceptionCaught = true;
         }
@@ -23,7 +23,7 @@ var exceptionCaught = false;
 
 it("Test URL fields", function(){
 var exceptionCaught = false;
-  const url = new URLImpl('https://google.com');
+  const url = new URL('https://google.com');
   expect(url.protocol).toBe('https:');
   expect(url.hostname).toBe('google.com');
 });
