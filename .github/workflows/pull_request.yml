@@ -4,10 +4,10 @@ on:
 env:
   NPM_TAG: "pr"
   EMULATOR_NAME: "runtime-emu"
-  NDK_VERSION: r21b
+  NDK_VERSION: r23c
   ANDROID_API: 29
   ANDROID_ABI: x86_64
-  NDK_ARCH: darwin-x86_64
+  NDK_ARCH: darwin
 
 
 jobs:

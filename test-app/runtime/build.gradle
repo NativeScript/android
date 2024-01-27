@@ -67,7 +67,7 @@ android {
     if (hasNdkVersion) {
         ndkVersion ndkVersion
     } else {
-        ndkVersion "21.1.6352462"
+        ndkVersion "23.2.8568313"
         // ndkVersion "22.1.7171670"
     }
 
