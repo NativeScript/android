@@ -148,7 +148,7 @@ public final class RuntimeHelper {
                 StaticConfiguration config = new StaticConfiguration(logger, appName, nativeLibDir, rootDir,
                         appDir, classLoader, dexDir, dexThumb, appConfig, isDebuggable);
 
-                runtime = Runtime.initializeRuntimeWithConfiguration(config, appDir.toString());
+                runtime = Runtime.initializeRuntimeWithConfiguration(config);
                 if (isDebuggable) {
                     try {
                         v8Inspector = new AndroidJsV8Inspector(context.getFilesDir().getAbsolutePath(), context.getPackageName());

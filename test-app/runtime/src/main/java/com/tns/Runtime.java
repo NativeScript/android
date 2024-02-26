@@ -472,7 +472,7 @@ public class Runtime {
                         staticConfiguration.logger.write("Worker (id=" + workerId + ")'s Runtime is initializing!");
                     }
 
-                    Runtime runtime = initRuntime(dynamicConfiguration, appDir);
+                    Runtime runtime = initRuntime(dynamicConfiguration);
 
                     if (staticConfiguration.logger.isEnabled()) {
                         staticConfiguration.logger.write("Worker (id=" + workerId + ")'s Runtime initialized!");
@@ -577,11 +577,11 @@ public class Runtime {
         This method initializes the runtime and should always be called first and through the main thread
         in order to set static configuration that all following workers can use
      */
-    public static Runtime initializeRuntimeWithConfiguration(StaticConfiguration config, String appDir) {
+    public static Runtime initializeRuntimeWithConfiguration(StaticConfiguration config) {
         staticConfiguration = config;
         WorkThreadScheduler mainThreadScheduler = new WorkThreadScheduler(new MainThreadHandler(Looper.myLooper()));
         DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(0, mainThreadScheduler, null);
-        Runtime runtime = initRuntime(dynamicConfiguration, appDir);
+        Runtime runtime = initRuntime(dynamicConfiguration);
         return runtime;
     }
 
@@ -605,10 +605,10 @@ public class Runtime {
         This method deals with initializing the runtime with given configuration
         Does it for both workers and for the main thread
      */
-    private static Runtime initRuntime(DynamicConfiguration dynamicConfiguration, String appDir) {
+    private static Runtime initRuntime(DynamicConfiguration dynamicConfiguration) {
         Runtime runtime = new Runtime(staticConfiguration, dynamicConfiguration);
         runtime.init();
-        runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
+        runtime.runScript(new File(staticConfiguration.appDir, "internal/ts_helpers.js"));
 
         return runtime;
     }
