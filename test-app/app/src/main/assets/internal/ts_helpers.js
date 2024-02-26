@@ -170,6 +170,8 @@
 	Object.defineProperty(global, "__extends", { value: __extends });
 	Object.defineProperty(global, "__decorate", { value: __decorate });
 
-	global.JavaProxy = JavaProxy;
+	if (!global.__ns__worker) {
+		global.JavaProxy = JavaProxy;
+	}
 	global.Interfaces = Interfaces;
 })()

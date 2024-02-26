@@ -566,6 +566,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     else {
         m_isMainThread = false;
         auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalPostMessageCallback);
+        globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__ns__worker"), Boolean::New(isolate, true));
         globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate);
         auto closeFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalCloseCallback);
         globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "close"), closeFuncTemplate);
