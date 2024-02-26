@@ -445,15 +445,13 @@ public class Runtime {
         private ThreadScheduler mainThreadScheduler;
         private String filePath;
         private String callingJsDir;
-        private String appDir;
 
-        public WorkerThread(String name, Integer workerId, ThreadScheduler mainThreadScheduler, String callingJsDir, String appDir) {
+        public WorkerThread(String name, Integer workerId, ThreadScheduler mainThreadScheduler, String callingJsDir) {
             super("W" + workerId + ": " + name);
             this.filePath = name;
             this.workerId = workerId;
             this.mainThreadScheduler = mainThreadScheduler;
             this.callingJsDir = callingJsDir;
-            this.appDir = appDir;
         }
 
         public void startRuntime() {
@@ -593,10 +591,9 @@ public class Runtime {
     public static void initWorker(String jsFileName, String callingJsDir, int id) {
         // This method will always be called from the Main thread
         Runtime runtime = Runtime.getCurrentRuntime();
-
         ThreadScheduler mainThreadScheduler = runtime.getDynamicConfig().myThreadScheduler;
-        String appDir = runtime.config.appDir.toString();
-        WorkerThread worker = new WorkerThread(jsFileName, id, mainThreadScheduler, callingJsDir, appDir);
+
+        WorkerThread worker = new WorkerThread(jsFileName, id, mainThreadScheduler, callingJsDir);
         worker.start();
         worker.startRuntime();
     }
