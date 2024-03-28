@@ -31,6 +31,8 @@
 #include <thread>
 #include "File.h"
 #include "ModuleBinding.h"
+#include "URLImpl.h"
+#include "URLSearchParamsImpl.h"
 
 #ifdef APPLICATION_IN_DEBUG
 // #include "NetworkDomainCallbackHandlers.h"
@@ -519,6 +521,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runOnMainThread"), FunctionTemplate::New(isolate, CallbackHandlers::RunOnMainThreadCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__postFrameCallback"), FunctionTemplate::New(isolate, CallbackHandlers::PostFrameCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__removeFrameCallback"), FunctionTemplate::New(isolate, CallbackHandlers::RemoveFrameCallback));
+    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URL"), URLImpl::GetCtor(isolate));
+    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URLSearchParams"), URLSearchParamsImpl::GetCtor(isolate));
+
     /*
      * Attach `Worker` object constructor only to the main thread (isolate)'s global object
      * Workers should not be created from within other Workers, for now
@@ -586,10 +591,78 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
 
+    auto blob_methods = R"js(
+    const BLOB_STORE = new Map();
+    URL.createObjectURL = function (object, options = null) {
+        try {
+            if (object instanceof Blob || object instanceof File) {
+                const id = java.util.UUID.randomUUID().toString();
+                const ret = `blob:nativescript/${id}`;
+                BLOB_STORE.set(ret, {
+                    blob: object,
+                    type: object?.type,
+                    ext: options?.ext,
+                });
+                return ret;
+            }
+        } catch (error) {
+            return null;
+        }
+        return null;
+    };
+    URL.revokeObjectURL = function (url) {
+        BLOB_STORE.delete(url);
+    };
+    const InternalAccessor = class {};
+    InternalAccessor.getData = function (url) {
+        return BLOB_STORE.get(url);
+    };
+    URL.InternalAccessor = InternalAccessor;
+    Object.defineProperty(URL.prototype, 'searchParams', {
+        get() {
+            if (this._searchParams == null) {
+                this._searchParams = new URLSearchParams(this.search);
+                Object.defineProperty(this._searchParams, '_url', {
+                    enumerable: false,
+                    writable: false,
+                    value: this,
+                });
+                this._searchParams._append = this._searchParams.append;
+                this._searchParams.append = function (name, value) {
+                    this._append(name, value);
+                    this._url.search = this.toString();
+                };
+                this._searchParams._delete = this._searchParams.delete;
+                this._searchParams.delete = function (name) {
+                    this._delete(name);
+                    this._url.search = this.toString();
+                };
+                this._searchParams._set = this._searchParams.set;
+                this._searchParams.set = function (name, value) {
+                    this._set(name, value);
+                    this._url.search = this.toString();
+                };
+                this._searchParams._sort = this._searchParams.sort;
+                this._searchParams.sort = function () {
+                    this._sort();
+                    this._url.search = this.toString();
+                };
+            }
+            return this._searchParams;
+        },
+    });
+    )js";
+
+
     auto global = context->Global();
 
     v8::Context::Scope contextScope{context};
 
+    v8::Local<v8::Script> script;
+    v8::Script::Compile(context, ArgConverter::ConvertToV8String(isolate, blob_methods)).ToLocal(&script);
+
+    v8::Local<v8::Value> out;
+    script->Run(context).ToLocal(&out);
     m_objectManager->Init(isolate);
 
     m_module.Init(isolate, callingDir);
