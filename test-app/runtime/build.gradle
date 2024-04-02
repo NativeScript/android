@@ -21,6 +21,7 @@ if (useCCache) {
 }
 
 
+def defaultNdkVersion = "23.2.8568313"
 
 def hasNdkVersion = project.hasProperty("ndkVersion")
 if (hasNdkVersion) {
@@ -46,6 +47,15 @@ if(!hasNdkDirectory){
 } else {
     NDK_PATH = ndkDirectory
 }
+
+if(NDK_PATH == null || NDK_PATH == "null" || NDK_PATH == "") {
+    if(!hasNdkVersion){
+        NDK_PATH = "$System.env.ANDROID_HOME/ndk/${defaultNdkVersion}"
+    } else {
+        NDK_PATH = "$System.env.ANDROID_HOME/ndk/${ndkVersion}"
+    }
+}
+
 println "Runtime using NDK_PATH: " + NDK_PATH
 
 android {
@@ -67,8 +77,7 @@ android {
     if (hasNdkVersion) {
         ndkVersion ndkVersion
     } else {
-        ndkVersion "23.2.8568313"
-        // ndkVersion "22.1.7171670"
+        ndkVersion defaultNdkVersion
     }
 
     defaultConfig {
