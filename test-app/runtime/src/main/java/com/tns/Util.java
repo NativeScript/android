@@ -2,17 +2,16 @@ package com.tns;
 
 import java.io.*;
 
-import com.tns.internal.Plugin;
-
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Bundle;
-import android.util.Log;
 
 import androidx.core.content.pm.PackageInfoCompat;
+
+import com.tns.internal.Plugin;
 
 public final class Util {
     private Util() {

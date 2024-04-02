@@ -1,6 +1,7 @@
 package org.nativescript.staticbindinggenerator;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -11,8 +12,10 @@ import org.nativescript.staticbindinggenerator.system.process.impl.ProcessExecut
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -112,6 +115,10 @@ public class Main {
 
         List<DataRow> inputFile = Generator.getRows(SBG_INPUT_FILE);
         inputDir = new File(inputFile.get(0).getRow());
+        Path assetsInternalDirPath = inputDir.getParentFile().toPath().resolve("internal");
+        extractResource(assetsInternalDirPath.resolve("ts_helpers.js"), "ts_helpers.js");
+        extractResource(assetsInternalDirPath.resolve("livesync.js"), "livesync.js");
+
         webpackWorkersExcludePath = Paths.get(inputDir.getAbsolutePath(), "__worker-chunks.json").toString();
 
         if (!inputDir.exists() || !inputDir.isDirectory()) {
@@ -132,12 +139,48 @@ public class Main {
      * This output file should contain all the information needed to generate java counterparts to the traversed js classes.
      * */
     private static void runJsParser() {
-        String parserPath = Paths.get(System.getProperty("user.dir"), "jsparser", "js_parser.js").toString();
+        Path jsParserPath = Paths.get(System.getProperty("user.dir"), "jsparser", "js_parser.js");
+        extractResource(jsParserPath, "js_parser.js");
+        String parserPath = jsParserPath.toString();
         NodeJSProcess nodeJSProcess = new NodeJSProcessImpl(new ProcessExecutorImpl(), new EnvironmentVariablesReaderImpl());
         int exitCode = nodeJSProcess.runScript(parserPath);
 
         if (exitCode != 0) {
             System.exit(exitCode);
+        }
+    }
+
+    private static void extractResource(Path savePath, String resourceName) {
+        File jsParserFile = savePath.toFile();
+        if (!jsParserFile.exists()) {
+            try {
+                jsParserFile.getParentFile().mkdirs();
+                jsParserFile.createNewFile();
+                InputStream source = Main.class.getResourceAsStream("/" + resourceName);
+                if (source == null) {
+                    throw new RuntimeException(resourceName + " not found in resources");
+                }
+                FileUtils.copyInputStreamToFile(source, jsParserFile);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private static void maybeExtractJsParserSource(Path jsParserPath) {
+        File jsParserFile = jsParserPath.toFile();
+        if (!jsParserFile.exists()) {
+            try {
+                jsParserFile.getParentFile().mkdirs();
+                jsParserFile.createNewFile();
+                InputStream source = Main.class.getResourceAsStream("/js_parser.js");
+                if (source == null) {
+                    throw new RuntimeException("js_parser.js not found in resources");
+                }
+                FileUtils.copyInputStreamToFile(source, jsParserFile);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
