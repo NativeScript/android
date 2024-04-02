@@ -265,7 +265,7 @@ task copyFilesToProjectTemeplate {
             into "$DIST_FRAMEWORK_PATH/build-tools"
         }
         copy {
-            from "$BUILD_TOOLS_PATH/android-dts-generator/build/libs/dts-generator.jar"
+            from "$BUILD_TOOLS_PATH/android-dts-generator/dts-generator/build/libs/dts-generator.jar"
             into "$DIST_FRAMEWORK_PATH/build-tools"
         }
         copy {
