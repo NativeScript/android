@@ -50,6 +50,7 @@ class Runtime {
         ObjectManager* GetObjectManager() const;
 
         void RunModule(JNIEnv* _env, jobject obj, jstring scriptFile);
+        void RunModule(const char *moduleName);
         void RunWorker(jstring scriptFile);
         jobject RunScript(JNIEnv* _env, jobject obj, jstring scriptFile);
         jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs);

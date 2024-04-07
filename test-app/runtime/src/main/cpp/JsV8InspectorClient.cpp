@@ -11,8 +11,7 @@
 #include "NativeScriptException.h"
 
 #include "ArgConverter.h"
-#include "DOMDomainCallbackHandlers.h"
-#include "NetworkDomainCallbackHandlers.h"
+#include "Util.h"
 
 using namespace std;
 using namespace tns;
@@ -113,6 +112,79 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     auto context = Runtime::GetRuntime(isolate_)->GetContext();
     Context::Scope context_scope(context);
 
+    std::vector<uint16_t> vector = tns::Util::ToVector(message);
+    StringView messageView(vector.data(), vector.size());
+    bool success;
+
+    /*
+    // livesync uses the inspector socket for HMR/LiveSync...
+    if(message.find("Page.reload") != std::string::npos) {
+        success = tns::LiveSync(this->isolate_);
+        if (!success) {
+            NSLog(@"LiveSync failed");
+        }
+        // todo: should we return here, or is it OK to pass onto a possible Page.reload domain handler?
+    }
+    */
+
+
+    if(message.find("Tracing.start") != std::string::npos) {
+        tracing_agent_->start();
+
+        // echo back the request to notify frontend the action was a success
+        // todo: send an empty response for the incoming message id instead.
+        this->sendNotification(StringBuffer::create(messageView));
+        return;
+    }
+
+    if(message.find("Tracing.end") != std::string::npos) {
+        tracing_agent_->end();
+        std::string res = tracing_agent_->getLastTrace();
+        tracing_agent_->SendToDevtools(context, res);
+        return;
+    }
+
+
+    // parse incoming message as JSON
+    Local<Value> arg;
+    success = v8::JSON::Parse(context, tns::ArgConverter::ConvertToV8String(isolate_, message)).ToLocal(&arg);
+
+    // stop processing invalid messages
+    if(!success) {
+
+      //  NSLog(@"Inspector failed to parse incoming message: %s", message.c_str());
+        // ignore failures to parse.
+        return;
+    }
+
+
+
+
+    // Pass incoming message to a registerd domain handler if any
+    if(!arg.IsEmpty() && arg->IsObject()) {
+        Local<Object> domainDebugger;
+        Local<Object> argObject = arg.As<Object>();
+        Local<v8::Function> domainMethodFunc = tns::Util::GetDebuggerFunctionFromObject(context, argObject, domainDebugger);
+
+        Local<Value> result;
+        success = this->CallDomainHandlerFunction(context, domainMethodFunc, argObject, domainDebugger, result);
+
+        if(success) {
+            auto requestId = arg.As<Object>()->Get(context, tns::ArgConverter::ConvertToV8String(isolate_, "id")).ToLocalChecked();
+            auto returnString = GetReturnMessageFromDomainHandlerResult(result, requestId);
+
+            if(returnString.size() > 0) {
+                std::vector<uint16_t> vector_ = tns::Util::ToVector(returnString);
+                StringView messageView_(vector_.data(), vector_.size());
+                auto msg = StringBuffer::create(messageView_);
+                this->sendNotification(std::move(msg));
+            }
+            return;
+        }
+    }
+
+
+
     doDispatchMessage(message);
     // TODO: check why this is needed (it should trigger automatically when script depth is 0)
     isolate_->PerformMicrotaskCheckpoint();
@@ -195,6 +267,8 @@ void JsV8InspectorClient::init() {
     context_.Reset(isolate_, context);
 
     createInspectorSession();
+
+    tracing_agent_.reset(new tns::inspector::TracingAgentImpl());
 }
 
 JsV8InspectorClient* JsV8InspectorClient::GetInstance() {
@@ -214,14 +288,16 @@ void JsV8InspectorClient::inspectorSendEventCallback(const FunctionCallbackInfo<
     Local<v8::String> arg = args[0].As<v8::String>();
     std::string message = ArgConverter::ConvertToString(arg);
 
+    /*
     JEnv env;
     // TODO: Pete: Check if we can use a wide (utf 16) string here
     JniLocalRef str(env.NewStringUTF(message.c_str()));
     env.CallStaticVoidMethod(instance->inspectorClass_, instance->sendMethod_, instance->connection_, (jstring) str);
+    */
 
     // TODO: ios uses this method, but doesn't work on android
     // so I'm just sending directly to the socket (which seems to work)
-    //instance->dispatchMessage(message);
+    instance->dispatchMessage(message);
 }
 
 void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -280,30 +356,148 @@ void JsV8InspectorClient::consoleLogCallback(Isolate* isolate, ConsoleAPIType me
     session->runtimeAgent()->messageAdded(msg.get());
 }
 
-void JsV8InspectorClient::attachInspectorCallbacks(Isolate* isolate,
-        Local<ObjectTemplate>& globalObjectTemplate) {
-    v8::HandleScope scope(isolate);
+void JsV8InspectorClient::registerDomainDispatcherCallback(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+    std::string domain = tns::ArgConverter::ToString(isolate, args[0].As<v8::String>());
+    auto it = Domains.find(domain);
+    if (it == Domains.end()) {
+        Local<v8::Function> domainCtorFunc = args[1].As<v8::Function>();
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Value> ctorArgs[0];
+        Local<Value> domainInstance;
+        bool success = domainCtorFunc->CallAsConstructor(context, 0, ctorArgs).ToLocal(&domainInstance);
+        assert(success && domainInstance->IsObject());
 
-    auto inspectorJSObject = ObjectTemplate::New(isolate);
-
-    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "responseReceived"), FunctionTemplate::New(isolate, NetworkDomainCallbackHandlers::ResponseReceivedCallback));
-    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "requestWillBeSent"), FunctionTemplate::New(isolate, NetworkDomainCallbackHandlers::RequestWillBeSentCallback));
-    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "dataForRequestId"), FunctionTemplate::New(isolate, NetworkDomainCallbackHandlers::DataForRequestIdCallback));
-    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "loadingFinished"), FunctionTemplate::New(isolate, NetworkDomainCallbackHandlers::LoadingFinishedCallback));
-    inspectorJSObject->SetAccessor(ArgConverter::ConvertToV8String(isolate, "isConnected"), JsV8InspectorClient::InspectorIsConnectedGetterCallback);
-
-    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "documentUpdated"), FunctionTemplate::New(isolate, DOMDomainCallbackHandlers::DocumentUpdatedCallback));
-    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "childNodeInserted"), FunctionTemplate::New(isolate, DOMDomainCallbackHandlers::ChildNodeInsertedCallback));
-    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "childNodeRemoved"), FunctionTemplate::New(isolate, DOMDomainCallbackHandlers::ChildNodeRemovedCallback));
-    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "attributeModified"), FunctionTemplate::New(isolate, DOMDomainCallbackHandlers::AttributeModifiedCallback));
-    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "attributeRemoved"), FunctionTemplate::New(isolate, DOMDomainCallbackHandlers::AttributeRemovedCallback));
-
-    globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__inspector"), inspectorJSObject);
-    globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__inspectorSendEvent"), FunctionTemplate::New(isolate, JsV8InspectorClient::inspectorSendEventCallback));
+        Local<Object> domainObj = domainInstance.As<Object>();
+        Persistent<Object>* poDomainObj = new Persistent<Object>(isolate, domainObj);
+        Domains.emplace(domain, poDomainObj);
+    }
 }
+
+void JsV8InspectorClient::inspectorTimestampCallback(const FunctionCallbackInfo<Value>& args) {
+    double timestamp = std::chrono::seconds(std::chrono::seconds(std::time(NULL))).count();
+    args.GetReturnValue().Set(timestamp);
+}
+
+void JsV8InspectorClient::registerModules() {
+    Isolate* isolate = isolate_;
+    auto rt = Runtime::GetRuntime(isolate);
+    v8::Locker l(isolate);
+    v8::Isolate::Scope isolate_scope(isolate);
+    v8::HandleScope handleScope(isolate);
+    auto ctx = rt->GetContext();
+    v8::Context::Scope context_scope(ctx);
+
+    Local<Context> context = isolate->GetEnteredOrMicrotaskContext();
+    Local<Object> global = context->Global();
+    Local<Object> inspectorObject = Object::New(isolate);
+
+    assert(global->Set(context, ArgConverter::ConvertToV8String(isolate, "__inspector"), inspectorObject).FromMaybe(false));
+    Local<v8::Function> func;
+    bool success = v8::Function::New(context, registerDomainDispatcherCallback).ToLocal(&func);
+    assert(success && global->Set(context, ArgConverter::ConvertToV8String(isolate, "__registerDomainDispatcher"), func).FromMaybe(false));
+
+    Local<External> data = External::New(isolate, this);
+    success = v8::Function::New(context, inspectorSendEventCallback, data).ToLocal(&func);
+    assert(success && global->Set(context, ArgConverter::ConvertToV8String(isolate, "__inspectorSendEvent"), func).FromMaybe(false));
+
+    success = v8::Function::New(context, inspectorTimestampCallback).ToLocal(&func);
+    assert(success && global->Set(context, ArgConverter::ConvertToV8String(isolate, "__inspectorTimestamp"), func).FromMaybe(false));
+
+    TryCatch tc(isolate);
+    Runtime::GetRuntime(isolate)->RunModule("inspector_modules");
+
+}
+
 
 void JsV8InspectorClient::InspectorIsConnectedGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
     info.GetReturnValue().Set(JsV8InspectorClient::GetInstance()->isConnected_);
 }
 
 JsV8InspectorClient* JsV8InspectorClient::instance = nullptr;
+
+
+
+
+bool JsV8InspectorClient::CallDomainHandlerFunction(Local<Context> context, Local<Function> domainMethodFunc, const Local<Object>& arg, Local<Object>& domainDebugger, Local<Value>& result) {
+    if(domainMethodFunc.IsEmpty() || !domainMethodFunc->IsFunction()) {
+        return false;
+    }
+
+    bool success;
+    Isolate* isolate = this->isolate_;
+    TryCatch tc(isolate);
+
+    Local<Value> params;
+    success = arg.As<Object>()->Get(context, tns::ArgConverter::ConvertToV8String(isolate, "params")).ToLocal(&params);
+
+    if(!success) {
+        return false;
+    }
+
+    Local<Value> args[2] = { params, arg };
+    success = domainMethodFunc->Call(context, domainDebugger, 2, args).ToLocal(&result);
+
+    if (tc.HasCaught()) {
+        std::string error = tns::ArgConverter::ToString(isolate_, tc.Message()->Get());
+
+        // backwards compatibility
+        if(error.find("may be enabled at a time") != std::string::npos) {
+            // not returning false here because we are catching bogus errors from core...
+            // Uncaught Error: One XXX may be enabled at a time...
+            result = v8::Boolean::New(isolate, true);
+            return true;
+        }
+
+        // log any other errors - they are caught, but still make them visible to the user.
+       // tns::LogError(isolate, tc);
+
+        return false;
+    }
+
+    return success;
+}
+
+std::string JsV8InspectorClient::GetReturnMessageFromDomainHandlerResult(const Local<Value>& result, const Local<Value>& requestId) {
+    if(result.IsEmpty() || !(result->IsBoolean() || result->IsObject() || result->IsNullOrUndefined())) {
+        return "";
+    }
+
+    Isolate* isolate = this->isolate_;
+
+    if(!result->IsObject()) {
+        // if there return value is a "true" boolean or undefined/null we send back an "ack" response with an empty result object
+        if(result->IsNullOrUndefined() || result->BooleanValue(isolate_)) {
+            return "{ \"id\":" + tns::ArgConverter::ToString(isolate_, requestId) + ", \"result\": {} }";
+        }
+
+        return "";
+    }
+
+    v8::Local<Context> context = Runtime::GetRuntime(isolate_)->GetContext();
+    Local<Object> resObject = result.As<v8::Object>();
+    Local<Value> stringified;
+
+    bool success = true;
+    // already a { result: ... } object
+    if(resObject->Has(context, tns::ArgConverter::ToV8String(isolate, "result")).ToChecked()) {
+        success = JSON::Stringify(context, result).ToLocal(&stringified);
+    } else {
+        // backwards compatibility - we wrap the response in a new object with the { id, result } keys
+        // since the returned response only contained the result part.
+        Context::Scope context_scope(context);
+
+        Local<Object> newResObject = v8::Object::New(isolate);
+        success = success && newResObject->Set(context, tns::ArgConverter::ToV8String(isolate, "id"), requestId).ToChecked();
+        success = success && newResObject->Set(context, tns::ArgConverter::ToV8String(isolate, "result"), resObject).ToChecked();
+        success = success && JSON::Stringify(context, newResObject).ToLocal(&stringified);
+    }
+
+    if(!success) {
+        return "";
+    }
+
+    return tns::ArgConverter::ToString(isolate, stringified);
+}
+
+std::map<std::string, v8::Persistent<v8::Object>*> JsV8InspectorClient::Domains;

@@ -25,6 +25,37 @@ class Util {
         static std::u16string ConvertFromUtf8ToUtf16(const std::string& str);
 
        // static std::uint16_t* ConvertFromUtf8ToProtocolUtf16(const std::string& str);
+
+    static std::vector<uint16_t> ToVector(const std::string &value);
+
+    inline static std::string ToString(v8::Isolate *isolate, const v8::Local<v8::Value> &value) {
+        if (value.IsEmpty()) {
+            return std::string();
+        }
+
+        if (value->IsStringObject()) {
+            v8::Local<v8::String> obj = value.As<v8::StringObject>()->ValueOf();
+            return ToString(isolate, obj);
+        }
+
+        v8::String::Utf8Value result(isolate, value);
+
+        const char *val = *result;
+        if (val == nullptr) {
+            return std::string();
+        }
+
+        return std::string(*result, result.length());
+    }
+
+
+    static v8::Local<v8::Function> GetDebuggerFunctionFromObject(v8::Local<v8::Context> context,
+                                                                 const v8::Local<v8::Object> &object,
+                                                                 v8::Local<v8::Object> &domainDebugger);
+
+    static v8::Local<v8::Function>
+    GetDebuggerFunction(v8::Local<v8::Context> context, std::string domain,
+                        std::string functionName, v8::Local<v8::Object> &domainDebugger);
 };
 
 

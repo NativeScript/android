@@ -7,6 +7,7 @@
 #include "v8.h"
 #include "JEnv.h"
 #include "v8-inspector.h"
+#include "v8_inspector/ns-v8-tracing-agent-impl.h"
 
 using namespace v8_inspector;
 
@@ -21,6 +22,8 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         void disconnect();
         void dispatchMessage(const std::string& message);
 
+        void registerModules();
+
         // Overrides of V8Inspector::Channel
         void sendResponse(int callId, std::unique_ptr<StringBuffer> message) override;
         void sendNotification(const std::unique_ptr<StringBuffer> message) override;
@@ -29,6 +32,8 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         static void sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void consoleLogCallback(v8::Isolate* isolate, ConsoleAPIType method, const std::vector<v8::Local<v8::Value>>& args);
         static void inspectorSendEventCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+        static void registerDomainDispatcherCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+        static void inspectorTimestampCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
         // Overrides of V8InspectorClient
         void runMessageLoopOnPause(int context_group_id) override;
@@ -38,6 +43,8 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         static bool inspectorIsConnected() {
             return JsV8InspectorClient::GetInstance()->isConnected_;
         }
+
+        static std::map<std::string, v8::Persistent<v8::Object>*> Domains;
 
     private:
         JsV8InspectorClient(v8::Isolate* isolate);
@@ -53,6 +60,7 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         static JsV8InspectorClient* instance;
         static constexpr int contextGroupId = 1;
 
+        std::unique_ptr<tns::inspector::TracingAgentImpl> tracing_agent_;
         v8::Isolate* isolate_;
         std::unique_ptr<V8Inspector> inspector_;
         v8::Persistent<v8::Context> context_;
@@ -65,6 +73,15 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         bool running_nested_loop_ : 1;
         bool terminated_ : 1;
         bool isConnected_ : 1;
+
+
+    // {N} specific helpers
+    bool CallDomainHandlerFunction(v8::Local<v8::Context> context,
+                                   v8::Local<v8::Function> domainMethodFunc,
+                                   const v8::Local<v8::Object>& arg,
+                                   v8::Local<v8::Object>& domainDebugger,
+                                   v8::Local<v8::Value>& result);
+    std::string GetReturnMessageFromDomainHandlerResult(const v8::Local<v8::Value>& result, const v8::Local<v8::Value>& requestId);
 };
 }
 

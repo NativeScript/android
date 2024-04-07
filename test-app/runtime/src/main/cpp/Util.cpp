@@ -1,4 +1,5 @@
 #include "Util.h"
+#include "JsV8InspectorClient.h"
 #include <sstream>
 #include <iostream>
 #include <codecvt>
@@ -427,4 +428,53 @@ namespace tns {
             tmpl->SetClassName(name);
         that->Set(name, tmpl);
     }
+
+    std::vector<uint16_t> Util::ToVector(const std::string &value) {
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+        // FIXME: std::codecvt_utf8_utf16 is deprecated
+        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
+        std::u16string value16 = convert.from_bytes(value);
+
+        const uint16_t *begin = reinterpret_cast<uint16_t const *>(value16.data());
+        const uint16_t *end = reinterpret_cast<uint16_t const *>(value16.data() + value16.size());
+        std::vector<uint16_t> vector(begin, end);
+        return vector;
+    }
+
+
+    Local<v8::Function> Util::GetDebuggerFunction(Local<Context> context, std::string domain, std::string functionName, Local<Object>& domainDebugger) {
+        auto it = JsV8InspectorClient::Domains.find(domain);
+        if (it == JsV8InspectorClient::Domains.end()) {
+            return Local<v8::Function>();
+        }
+
+        Isolate* isolate = context->GetIsolate();
+        domainDebugger = it->second->Get(isolate);
+
+        Local<Value> value;
+        auto funcName = v8::String::NewFromUtf8(isolate, functionName.c_str(), v8::NewStringType::kNormal, (int)functionName.length()).ToLocalChecked();
+        bool success = domainDebugger->Get(context, funcName).ToLocal(&value);
+        if (success && !value.IsEmpty() && value->IsFunction()) {
+            return value.As<v8::Function>();
+        }
+
+        return Local<v8::Function>();
+    }
+
+    Local<v8::Function> Util::GetDebuggerFunctionFromObject(Local<Context> context, const Local<Object>& object, Local<Object>& domainDebugger) {
+        Isolate* isolate = context->GetIsolate();
+        auto methodKey = v8::String::NewFromUtf8(isolate, "method", v8::NewStringType::kNormal).ToLocalChecked();
+        auto method = object->Get(context, methodKey).ToLocalChecked();
+        auto methodString = ToString(isolate, method);
+        auto domainSeparatorIndex = methodString.find(".");
+        auto domain = methodString.substr(0, domainSeparatorIndex);
+        auto domainMethod = methodString.substr(domainSeparatorIndex + 1, methodString.size());
+
+        if(domain.size() > 0) {
+            return GetDebuggerFunction(context, domain, domainMethod, domainDebugger);
+        }
+
+        return Local<v8::Function>();
+    }
+
 };
