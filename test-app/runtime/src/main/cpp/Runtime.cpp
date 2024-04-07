@@ -201,6 +201,16 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir, bool ve
 
     NativeScriptException::Init();
     m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr, maxLogcatObjectSize, forceLog);
+
+#ifdef APPLICATION_IN_DEBUG
+    /*
+     * Attach __inspector object with function callbacks that report to the Chrome DevTools frontend
+     */
+    if (isDebuggable) {
+        JsV8InspectorClient::GetInstance()->registerModules();
+      //  JsV8InspectorClient::attachInspectorCallbacks(isolate, globalTemplate);
+    }
+#endif
 }
 
 Runtime::~Runtime() {
@@ -250,6 +260,12 @@ void Runtime::RunModule(JNIEnv* _env, jobject obj, jstring scriptFile) {
     auto context = this->GetContext();
     m_module.Load(context, filePath);
 }
+
+void Runtime::RunModule(const char *moduleName) {
+    auto context = this->GetContext();
+    m_module.Load(context, moduleName);
+}
+
 
 void Runtime::RunWorker(jstring scriptFile) {
     // TODO: Pete: Why do I crash here with a JNI error (accessing bad jni)
@@ -576,14 +592,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "close"), closeFuncTemplate);
     }
 
-#ifdef APPLICATION_IN_DEBUG
-    /*
-     * Attach __inspector object with function callbacks that report to the Chrome DevTools frontend
-     */
-    if (isDebuggable) {
-        JsV8InspectorClient::attachInspectorCallbacks(isolate, globalTemplate);
-    }
-#endif
 
     SimpleProfiler::Init(isolate, globalTemplate);
 
