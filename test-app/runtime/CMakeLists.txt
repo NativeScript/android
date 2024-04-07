@@ -72,6 +72,7 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
         src/main/cpp/com_tns_AndroidJsV8Inspector.cpp
         src/main/cpp/JsV8InspectorClient.cpp
         src/main/cpp/v8_inspector/ns-v8-tracing-agent-impl.cpp
+        src/main/cpp/v8_inspector/Utils.cpp
     )
 else ()
     # When building in Release mode we do not include the V8 inspector sources
