@@ -417,8 +417,6 @@ void JsV8InspectorClient::InspectorIsConnectedGetterCallback(v8::Local<v8::Strin
 JsV8InspectorClient* JsV8InspectorClient::instance = nullptr;
 
 
-
-
 bool JsV8InspectorClient::CallDomainHandlerFunction(Local<Context> context, Local<Function> domainMethodFunc, const Local<Object>& arg, Local<Object>& domainDebugger, Local<Value>& result) {
     if(domainMethodFunc.IsEmpty() || !domainMethodFunc->IsFunction()) {
         return false;

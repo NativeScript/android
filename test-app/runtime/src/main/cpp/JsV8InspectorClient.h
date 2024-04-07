@@ -39,7 +39,6 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         void runMessageLoopOnPause(int context_group_id) override;
         void quitMessageLoopOnPause() override;
 
-        static void attachInspectorCallbacks(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate>& globalObjectTemplate);
         static bool inspectorIsConnected() {
             return JsV8InspectorClient::GetInstance()->isConnected_;
         }
