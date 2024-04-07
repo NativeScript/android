@@ -12,12 +12,14 @@
 
 #include "ArgConverter.h"
 #include "Util.h"
+#include "Utils.h"
 
 using namespace std;
 using namespace tns;
 using namespace v8;
 
 using namespace v8_inspector;
+using namespace inspector;
 
 // Utility functions for converting between inspector StringView and UTF8 string
 
@@ -164,7 +166,7 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     if(!arg.IsEmpty() && arg->IsObject()) {
         Local<Object> domainDebugger;
         Local<Object> argObject = arg.As<Object>();
-        Local<v8::Function> domainMethodFunc = tns::Util::GetDebuggerFunctionFromObject(context, argObject, domainDebugger);
+        Local<v8::Function> domainMethodFunc = GetDebuggerFunctionFromObject(context, argObject, domainDebugger);
 
         Local<Value> result;
         success = this->CallDomainHandlerFunction(context, domainMethodFunc, argObject, domainDebugger, result);
