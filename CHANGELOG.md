@@ -1,3 +1,7 @@
+# [8.7.0](https://github.com/NativeScript/android/compare/v8.7.0-rc.3...v8.7.0) (2024-04-08)
+
+
+
 # [8.7.0-rc.3](https://github.com/NativeScript/android/compare/v8.6.2...v8.7.0-rc.3) (2024-04-08)
 
 
