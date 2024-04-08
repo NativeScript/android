@@ -9,6 +9,7 @@
 
 #include "Runtime.h"
 #include "NativeScriptException.h"
+#include "NativeScriptAssert.h"
 
 #include "ArgConverter.h"
 #include "Util.h"
@@ -271,6 +272,13 @@ void JsV8InspectorClient::init() {
     createInspectorSession();
 
     tracing_agent_.reset(new tns::inspector::TracingAgentImpl());
+
+    try {
+        this->registerModules();
+    } catch (NativeScriptException& e) {
+        // we don't want to throw if registering modules failed.
+        // e.ReThrowToV8();
+    }
 }
 
 JsV8InspectorClient* JsV8InspectorClient::GetInstance() {
@@ -290,12 +298,10 @@ void JsV8InspectorClient::inspectorSendEventCallback(const FunctionCallbackInfo<
     Local<v8::String> arg = args[0].As<v8::String>();
     std::string message = ArgConverter::ConvertToString(arg);
 
-    /*
     JEnv env;
     // TODO: Pete: Check if we can use a wide (utf 16) string here
     JniLocalRef str(env.NewStringUTF(message.c_str()));
     env.CallStaticVoidMethod(instance->inspectorClass_, instance->sendMethod_, instance->connection_, (jstring) str);
-    */
 
     // TODO: ios uses this method, but doesn't work on android
     // so I'm just sending directly to the socket (which seems to work)
@@ -382,6 +388,7 @@ void JsV8InspectorClient::inspectorTimestampCallback(const FunctionCallbackInfo<
 }
 
 void JsV8InspectorClient::registerModules() {
+    DEBUG_WRITE("Registering inspector modules");
     Isolate* isolate = isolate_;
     auto rt = Runtime::GetRuntime(isolate);
     v8::Locker l(isolate);
@@ -394,21 +401,38 @@ void JsV8InspectorClient::registerModules() {
     Local<Object> global = context->Global();
     Local<Object> inspectorObject = Object::New(isolate);
 
-    assert(global->Set(context, ArgConverter::ConvertToV8String(isolate, "__inspector"), inspectorObject).FromMaybe(false));
+    bool success;
     Local<v8::Function> func;
-    bool success = v8::Function::New(context, registerDomainDispatcherCallback).ToLocal(&func);
-    assert(success && global->Set(context, ArgConverter::ConvertToV8String(isolate, "__registerDomainDispatcher"), func).FromMaybe(false));
 
+    // __inspector
+    success = global->Set(context, ArgConverter::ConvertToV8String(isolate, "__inspector"), inspectorObject).FromMaybe(false);
+    assert(success);
+
+    // __registerDomainDispatcher
+    success = v8::Function::New(context, registerDomainDispatcherCallback).ToLocal(&func);
+    assert(success);
+    success = global->Set(context, ArgConverter::ConvertToV8String(isolate, "__registerDomainDispatcher"), func).FromMaybe(false);
+    assert(success);
+
+    // __inspectorSendEvent
     Local<External> data = External::New(isolate, this);
     success = v8::Function::New(context, inspectorSendEventCallback, data).ToLocal(&func);
-    assert(success && global->Set(context, ArgConverter::ConvertToV8String(isolate, "__inspectorSendEvent"), func).FromMaybe(false));
+    assert(success);
+    success = global->Set(context, ArgConverter::ConvertToV8String(isolate, "__inspectorSendEvent"), func).FromMaybe(false);
+    assert(success);
 
+    // __inspectorTimestamp
     success = v8::Function::New(context, inspectorTimestampCallback).ToLocal(&func);
-    assert(success && global->Set(context, ArgConverter::ConvertToV8String(isolate, "__inspectorTimestamp"), func).FromMaybe(false));
+    assert(success);
+    success = global->Set(context, ArgConverter::ConvertToV8String(isolate, "__inspectorTimestamp"), func).FromMaybe(false);
+    assert(success);
 
     TryCatch tc(isolate);
     Runtime::GetRuntime(isolate)->RunModule("inspector_modules");
 
+    if(tc.HasCaught()) {
+        throw NativeScriptException(tc, "Error loading inspector modules");
+    }
 }
 
 

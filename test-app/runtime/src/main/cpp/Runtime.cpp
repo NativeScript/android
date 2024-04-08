@@ -201,16 +201,6 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir, bool ve
 
     NativeScriptException::Init();
     m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr, maxLogcatObjectSize, forceLog);
-
-#ifdef APPLICATION_IN_DEBUG
-    /*
-     * Attach __inspector object with function callbacks that report to the Chrome DevTools frontend
-     */
-    if (isDebuggable) {
-        JsV8InspectorClient::GetInstance()->registerModules();
-      //  JsV8InspectorClient::attachInspectorCallbacks(isolate, globalTemplate);
-    }
-#endif
 }
 
 Runtime::~Runtime() {
@@ -660,7 +650,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         },
     });
     )js";
-
 
     auto global = context->Global();
 
