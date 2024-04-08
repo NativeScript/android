@@ -290,12 +290,10 @@ void JsV8InspectorClient::inspectorSendEventCallback(const FunctionCallbackInfo<
     Local<v8::String> arg = args[0].As<v8::String>();
     std::string message = ArgConverter::ConvertToString(arg);
 
-    /*
     JEnv env;
     // TODO: Pete: Check if we can use a wide (utf 16) string here
     JniLocalRef str(env.NewStringUTF(message.c_str()));
     env.CallStaticVoidMethod(instance->inspectorClass_, instance->sendMethod_, instance->connection_, (jstring) str);
-    */
 
     // TODO: ios uses this method, but doesn't work on android
     // so I'm just sending directly to the socket (which seems to work)
