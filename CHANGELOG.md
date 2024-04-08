@@ -1,3 +1,29 @@
+# [8.7.0-rc.3](https://github.com/NativeScript/android/compare/v8.6.2...v8.7.0-rc.3) (2024-04-08)
+
+
+### Bug Fixes
+
+* devtools namespace usage ([#1810](https://github.com/NativeScript/android/issues/1810)) ([5aaac57](https://github.com/NativeScript/android/commit/5aaac5788ff9abf1c043817e87c8e03eb61907c0))
+* dts-generator.jar path ([1120a32](https://github.com/NativeScript/android/commit/1120a3258d53f83b7b4dfe7e505234e2b0d6cd2b))
+* inspector and globals ([#1811](https://github.com/NativeScript/android/issues/1811)) ([79ebd18](https://github.com/NativeScript/android/commit/79ebd18f308cd86fa98784f14b5c3f5ac39d8c5f))
+
+
+### Features
+
+* bump ndk to r23c ([#1803](https://github.com/NativeScript/android/issues/1803)) ([3894959](https://github.com/NativeScript/android/commit/3894959e0b4fe31f61cfd9fa70d5e2b04a0f36ac))
+* devtools element/network inspectors ([#1808](https://github.com/NativeScript/android/issues/1808)) ([1470796](https://github.com/NativeScript/android/commit/1470796dc506f0d01e94fe117119dc217ff8c909))
+* migrate to faster maps and use runtime context ([#1793](https://github.com/NativeScript/android/issues/1793)) ([b248dc4](https://github.com/NativeScript/android/commit/b248dc4038d0c1a6af420447c713bc968431f97e))
+* update libzip to 1.10.1 ([#1805](https://github.com/NativeScript/android/issues/1805)) ([ee2e3e0](https://github.com/NativeScript/android/commit/ee2e3e0b87caf3cff4784f1464dd51b2923c6861))
+* use node module bindings like the iOS runtime ([#1795](https://github.com/NativeScript/android/issues/1795)) ([643958b](https://github.com/NativeScript/android/commit/643958b6a4c3698567edde3fd03052873b2644dc))
+* **WinterCG:** URL & URLSearchParams ([#1801](https://github.com/NativeScript/android/issues/1801)) ([4f3a0d7](https://github.com/NativeScript/android/commit/4f3a0d7f2de5f899779bd0fe9081390e6c4d24b2))
+
+
+### Reverts
+
+* Version.h changes ([9faa25d](https://github.com/NativeScript/android/commit/9faa25dda197d3da4f694ea59208309bb02e529c))
+
+
+
 ## [8.6.2](https://github.com/NativeScript/android/compare/v8.6.1...v8.6.2) (2023-10-10)
 
 
