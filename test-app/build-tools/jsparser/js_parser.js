@@ -194,6 +194,9 @@ function traverseAndAnalyseFilesDir(inputDir, err) {
 }
 
 function traverseFiles(filesToTraverse) {
+  if (filesToTraverse.length === 0) {
+    throw "no file was found in " + inputDir + ". Something must be wrong with the webpack build";
+  }
   for (let i = 0; i < filesToTraverse.length; i += 1) {
     const fp = filesToTraverse[i];
     logger.info("Visiting JavaScript file: " + fp);
