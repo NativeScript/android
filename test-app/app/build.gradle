@@ -185,6 +185,7 @@ def setAppIdentifier = { ->
         if (appIdentifier) {
             project.ext.nsApplicationIdentifier = appIdentifier
             android.defaultConfig.applicationId = appIdentifier
+            android.namespace = appIdentifier
         }
     }
 }
@@ -195,7 +196,7 @@ android {
 
     if (enableKotlin) {
         kotlinOptions {
-            jvmTarget = '1.8'
+            jvmTarget = '17'
         }
     }
 
@@ -217,8 +218,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     sourceSets.main {
@@ -247,6 +248,7 @@ android {
         }
     }
 
+    namespace "com.tns.testapplication"
     setAppIdentifier()
     applyPluginGradleConfigurations()
     applyAppGradleConfiguration()
@@ -457,33 +459,6 @@ if (failOnCompilationWarningsEnabled()) {
     }
 }
 
-tasks.whenTaskAdded({ DefaultTask currentTask ->
-    if (currentTask =~ /generate.+BuildConfig/) {
-        currentTask.finalizedBy(extractAllJars)
-        extractAllJars.finalizedBy(collectAllJars)
-    }
-    if (currentTask =~ /compile.+JavaWithJavac/) {
-        currentTask.dependsOn(runSbg)
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-
-    if (currentTask =~ /compile.+Kotlin.+/) {
-        currentTask.dependsOn(runSbg)
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /merge.*Assets/) {
-        currentTask.dependsOn(buildMetadata)
-    }
-    // ensure buildMetadata is done before R8 to allow custom proguard from metadata
-    if (currentTask =~ /minify.*WithR8/) {
-        currentTask.dependsOn(buildMetadata)
-    }
-    if (currentTask =~ /assemble.*Debug/ || currentTask =~ /assemble.*Release/) {
-        currentTask.finalizedBy("validateAppIdMatch")
-    }
-})
 
 ////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////// EXECUTUION PHASE /////////////////////////////////////
@@ -584,7 +559,7 @@ allprojects {
         def buildType = project.selectedBuildType
         def jars = []
         def artifactType = Attribute.of('artifactType', String)
-        android.applicationVariants.all { variant ->
+        android.applicationVariants.configureEach { variant ->
             if (variant.buildType.name == buildType) {
                 variant.getCompileClasspath().each { fileDependency -> 
                     processJar(fileDependency, jars)
@@ -604,7 +579,7 @@ def processJar(File jar, jars) {
         logger.debug("Creating dynamic task ${taskName}")
 
         // Add discovered jars as dependencies of cleanupAllJars.
-        // This is cruicial for cloud builds because they are different
+        // This is crucial for cloud builds because they are different
         // on each incremental build (as each time the gradle user home
         // directory is a randomly generated string)
         cleanupAllJars.inputs.files jar
@@ -746,6 +721,28 @@ task buildMetadata(type: BuildToolTask) {
 
     dependsOn copyMetadataFilters
 
+  /*  dependsOn ':app:mergeReleaseJniLibFolders'
+    dependsOn ':app:mergeReleaseNativeLibs'
+    dependsOn ':app:stripReleaseDebugSymbols'
+    dependsOn ':app:checkReleaseDuplicateClasses'
+  //  dependsOn ':app:dexBuilderRelease'
+    dependsOn ':app:desugarReleaseFileDependencies'
+    dependsOn ':app:mergeExtDexRelease'
+    dependsOn ':app:processReleaseJavaRes'
+    dependsOn ':app:mergeReleaseJavaResource'
+
+
+    dependsOn ':app:mergeDebugJniLibFolders'
+    dependsOn ':app:mergeDebugNativeLibs'
+    dependsOn ':app:stripDebugDebugSymbols'
+    dependsOn ':app:checkDebugDuplicateClasses'
+//    dependsOn ':app:dexBuilderDebug'
+    dependsOn ':app:desugarDebugFileDependencies'
+    dependsOn ':app:mergeExtDexDebug'
+    dependsOn ':app:processDebugJavaRes'
+    dependsOn ':app:mergeDebugJavaResource'
+    */
+
     // As some external gradle plugins can reorder the execution order of the tasks it may happen that buildMetadata is executed after merge{Debug/Release}Assets
     // in that case the metadata won't be included in the result apk and it will crash, so to avoid this we are adding the copyMetadata task which will manually copy
     // the metadata files in the merge assets folder and they will be added to the result apk
@@ -761,10 +758,12 @@ task buildMetadata(type: BuildToolTask) {
     // make MDG aware of whitelist.mdg and blacklist.mdg files
     inputs.files(project.fileTree(dir: "$rootDir", include: "**/*.mdg"))
 
-    def classesDir = "$buildDir/intermediates/javac"
-    inputs.dir(classesDir)
+    def classesDir = "${buildDir}/intermediates/javac"
+    if (file(classesDir).exists()) {
+        inputs.dir(classesDir)
+    }
 
-    def kotlinClassesDir = "$buildDir/tmp/kotlin-classes"
+    def kotlinClassesDir = "${buildDir}/tmp/kotlin-classes"
     if (file(kotlinClassesDir).exists()) {
         inputs.dir(kotlinClassesDir)
     }
@@ -931,7 +930,7 @@ task validateAppIdMatch {
         def lineSeparator = System.getProperty("line.separator")
 
         if (project.hasProperty("nsApplicationIdentifier") && !project.hasProperty("release")) {
-            if (project.nsApplicationIdentifier != android.defaultConfig.applicationId) {
+            if (project.nsApplicationIdentifier != android.defaultConfig.applicationId && android.namespace != appIdentifier) {
                 def errorMessage = "${lineSeparator}WARNING: The Application identifier is different from the one inside \"package.json\" file.$lineSeparator" +
                         "NativeScript CLI might not work properly.$lineSeparator" +
                         "Remove applicationId from app.gradle and update the \"nativescript.id\" in package.json.$lineSeparator" +
@@ -970,3 +969,157 @@ task cleanMdg(type: Delete) {
 
 cleanSbg.dependsOn(cleanMdg)
 clean.dependsOn(cleanSbg)
+
+
+tasks.configureEach({ DefaultTask currentTask ->
+   println "\t ~ [DEBUG][app] build.gradle - currentTask = ${currentTask.name}..."
+    if (currentTask =~ /generate.+BuildConfig/) {
+        currentTask.finalizedBy(extractAllJars)
+        extractAllJars.finalizedBy(collectAllJars)
+    }
+    if (currentTask =~ /compile.+JavaWithJavac/) {
+        currentTask.dependsOn(runSbg)
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /compile.+Kotlin.+/) {
+        currentTask.dependsOn(runSbg)
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /merge.*Assets/) {
+        currentTask.dependsOn(buildMetadata)
+    }
+    // ensure buildMetadata is done before R8 to allow custom proguard from metadata
+    if (currentTask =~ /minify.*WithR8/) {
+        currentTask.dependsOn(buildMetadata)
+    }
+    if (currentTask =~ /assemble.*Debug/ || currentTask =~ /assemble.*Release/) {
+        currentTask.finalizedBy("validateAppIdMatch")
+    }
+
+    if (currentTask =~ /process.+Resources/) {
+        cleanupAllJars.dependsOn(currentTask)
+    }
+
+    if (currentTask =~ /merge.+Shaders/) {
+        currentTask.dependsOn buildMetadata
+    }
+
+    if (currentTask =~ /mergeDex.+/) {
+        currentTask.dependsOn(buildMetadata)
+    }
+
+    if (currentTask =~ /dexBuilder.+/) {
+        currentTask.dependsOn(buildMetadata)
+    }
+
+    if (currentTask =~ /mergeExtDex.+/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /mergeLibDex.+/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /mergeProjectDex.+/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /merge.+NativeLibs/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /sync.+LibJars/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask.name == "extractProguardFiles") {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /generate.+LintVitalReportModel/) {
+        currentTask.dependsOn buildMetadata
+    }
+
+    if (currentTask =~ /lintVitalAnalyze.+/) {
+        currentTask.dependsOn(buildMetadata)
+    }
+
+    if (currentTask =~ /extract.+NativeSymbolTables/) {
+        currentTask.dependsOn(buildMetadata)
+    }
+
+    if (currentTask =~ /merge.+GlobalSynthetics/) {
+        currentTask.dependsOn(buildMetadata)
+    }
+
+    if (currentTask =~ /optimize.+Resources/) {
+        currentTask.dependsOn(buildMetadata)
+    }
+
+    if (currentTask =~ /buildCMake.*/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /configureCMake.*/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /validateSigning.*/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /generate.*LintReportModel/) {
+        currentTask.dependsOn(buildMetadata)
+    }
+
+    if (currentTask.name.contains(":runtime:configureCMakeRelWithDebInfo")) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /generate.*AndroidTestResValues/) {
+        currentTask.dependsOn(buildMetadata)
+    }
+
+    if (currentTask =~ /generate.*AndroidTestLintModel/) {
+        currentTask.dependsOn(buildMetadata)
+    }
+
+    if (currentTask =~ /generate.*UnitTestLintModel/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /generate.*UnitTestLintModel/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+
+    if (currentTask =~ /lintAnalyze.*UnitTest/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /process.*JavaRes/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /strip.*DebugSymbols/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /merge.*JavaResource/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask.name == ":runtime:lintAnalyzeDebugAndroidTest" || currentTask.name == ":runtime:lintAnalyzeReleaseAndroidTest") {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask.name == "lintAnalyzeDebug" || currentTask.name == "lintAnalyzeRelease") {
+        currentTask.dependsOn(buildMetadata)
+    }
+
+    if (currentTask =~ /bundle.*Resources/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+})

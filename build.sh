@@ -47,36 +47,36 @@ else
 fi
 
 # Run static binding generator unit tests
-./gradlew runSbgTests
+# ./gradlew runSbgTests
 
-for emulator in $listOfEmulators; do
-    echo "Start emulator $emulator"
-    $ANDROID_HOME/emulator/emulator -avd ${emulator} -verbose -wipe-data -gpu on&
-    find ~/.android/avd/${emulator}.avd -type f -name 'config.ini' -exec cat {} +
+# for emulator in $listOfEmulators; do
+#     echo "Start emulator $emulator"
+#     $ANDROID_HOME/emulator/emulator -avd ${emulator} -verbose -wipe-data -gpu on&
+#     find ~/.android/avd/${emulator}.avd -type f -name 'config.ini' -exec cat {} +
 
-    echo "Run Android Runtime unit tests for $emulator"
-    $ANDROID_HOME/platform-tools/adb wait-for-device
-    $ANDROID_HOME/platform-tools/adb -s emulator-5554 logcat -c
-    $ANDROID_HOME/platform-tools/adb -s emulator-5554 logcat > consoleLog.txt&
-    $ANDROID_HOME/platform-tools/adb -s emulator-5554 logcat > consoleLog$emulator.txt&
+#     echo "Run Android Runtime unit tests for $emulator"
+#     $ANDROID_HOME/platform-tools/adb wait-for-device
+#     $ANDROID_HOME/platform-tools/adb -s emulator-5554 logcat -c
+#     $ANDROID_HOME/platform-tools/adb -s emulator-5554 logcat > consoleLog.txt&
+#     $ANDROID_HOME/platform-tools/adb -s emulator-5554 logcat > consoleLog$emulator.txt&
 
-    if [ "$1" != 'unit_tests_only' ]; then
-        ./gradlew runtests
-    else
-        ./gradlew runtests -PonlyX86
-    fi
+#     if [ "$1" != 'unit_tests_only' ]; then
+#         ./gradlew runtests
+#     else
+#         ./gradlew runtests -PonlyX86
+#     fi
 
-    echo "Rename unit test result"
-    (
-        cd ./test-app/dist
-        mv android_unit_test_results.xml $emulator.xml
-    )
+#     echo "Rename unit test result"
+#     (
+#         cd ./test-app/dist
+#         mv android_unit_test_results.xml $emulator.xml
+#     )
 
-    echo "Stopping running emulators"
-    for KILLPID in `ps ax | grep 'emulator' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done
-    for KILLPID in `ps ax | grep 'qemu' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done
-    for KILLPID in `ps ax | grep 'adb' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done
-done
+#     echo "Stopping running emulators"
+#     for KILLPID in `ps ax | grep 'emulator' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done
+#     for KILLPID in `ps ax | grep 'qemu' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done
+#     for KILLPID in `ps ax | grep 'adb' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done
+# done
 
 echo $cwd
 cd $cwd

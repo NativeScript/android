@@ -3,10 +3,11 @@ package com.telerik.metadata.parsing.kotlin.metadata.bytecode
 import com.telerik.metadata.parsing.NativeClassDescriptor
 import com.telerik.metadata.parsing.kotlin.classes.KotlinClassDescriptor
 import com.telerik.metadata.parsing.kotlin.metadata.ClassMetadataParser
-import kotlinx.metadata.Flag
-import kotlinx.metadata.KmFunction
-import kotlinx.metadata.KmProperty
-import kotlinx.metadata.jvm.KotlinClassMetadata
+import kotlin.metadata.KmFunction
+import kotlin.metadata.KmProperty
+import kotlin.metadata.Visibility
+import kotlin.metadata.jvm.KotlinClassMetadata
+import kotlin.metadata.visibility
 import java.lang.reflect.Modifier
 import java.util.stream.Stream
 
@@ -19,7 +20,7 @@ class BytecodeClassMetadataParser : ClassMetadataParser {
 
         val kotlinMetadata = clazz.kotlinMetadata
         if (kotlinMetadata is KotlinClassMetadata.Class) {
-            val kmClass = kotlinMetadata.toKmClass()
+            val kmClass = kotlinMetadata.kmClass
             kmClass.companionObject
             val companion = kmClass.companionObject
             val fullCompanionName = clazz.className + "$" + companion
@@ -31,15 +32,15 @@ class BytecodeClassMetadataParser : ClassMetadataParser {
 
     override fun getKotlinProperties(kotlinMetadata: KotlinClassMetadata): Stream<KmProperty> {
         if (kotlinMetadata is KotlinClassMetadata.Class) {
-            val kmClass = kotlinMetadata.toKmClass()
+            val kmClass = kotlinMetadata.kmClass
             return kmClass.properties
                     .stream()
                     .filter {
-                        Flag.IS_PUBLIC(it.flags) || Flag.IS_PROTECTED(it.flags)
+                        it.visibility == Visibility.PUBLIC || it.visibility == Visibility.PROTECTED
                     }
                     .filter { p ->
-                        ((Modifier.isPublic(p.getterFlags) || Modifier.isProtected(p.getterFlags))
-                                && (Modifier.isPublic(p.setterFlags) || Modifier.isProtected(p.setterFlags))
+                        ((p.getter.visibility == Visibility.PUBLIC || p.getter.visibility == Visibility.PROTECTED)
+                                && (p.setter?.visibility == Visibility.PUBLIC || p.setter?.visibility == Visibility.PROTECTED)
                                 && !p.name.startsWith("is"))
                     }
         }
@@ -49,13 +50,13 @@ class BytecodeClassMetadataParser : ClassMetadataParser {
 
     override fun getKotlinExtensionFunctions(kotlinMetadata: KotlinClassMetadata): Stream<KmFunction> {
         if (kotlinMetadata is KotlinClassMetadata.Class) {
-            val kmClass = kotlinMetadata.toKmClass()
+            val kmClass = kotlinMetadata.kmClass
 
             return kmClass.functions
                     .stream()
                     .filter { isVisibleExtensionFunction(it) }
         } else if (kotlinMetadata is KotlinClassMetadata.FileFacade) {
-            val kmClass = kotlinMetadata.toKmPackage()
+            val kmClass = kotlinMetadata.kmPackage
 
             return kmClass.functions
                     .stream()

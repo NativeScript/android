@@ -36,11 +36,23 @@ compileJava {
     options.compilerArgs << "-Xlint:all" << "-Xlint:-options" << "-Werror"
 }
 
-jar {
 
-    configurations.implementation.setCanBeResolved(true)
-    configurations.runtimeOnly.setCanBeResolved(true)
-    configurations.api.setCanBeResolved(true)
+configurations.create("staticBindingGeneratorImplementation") {
+    extendsFrom configurations.implementation
+    setCanBeResolved(true)
+}
+
+configurations.create("staticBindingGeneratorRuntimeOnly") {
+    extendsFrom configurations.runtimeOnly
+    setCanBeResolved(true)
+}
+
+configurations.create("staticBindingGeneratorApi") {
+    extendsFrom configurations.api
+    setCanBeResolved(true)
+}
+
+jar {
 
     manifest {
         attributes("Manifest-Version": "1.0",
@@ -48,15 +60,15 @@ jar {
     }
     from {
 
-        configurations.implementation.collect {
+        configurations.staticBindingGeneratorImplementation.collect {
             it.isDirectory() ? it : zipTree(it)
         }
 
-        configurations.runtimeOnly.collect {
+        configurations.staticBindingGeneratorRuntimeOnly.collect {
             it.isDirectory() ? it : zipTree(it)
         }
 
-        configurations.api.collect {
+        configurations.staticBindingGeneratorApi.collect {
             it.isDirectory() ? it : zipTree(it)
         }
     }
