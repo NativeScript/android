@@ -61,8 +61,8 @@ println "Runtime using NDK_PATH: " + NDK_PATH
 android {
     namespace "com.tns.android_runtime"
 
-    compileSdkVersion NS_DEFAULT_COMPILE_SDK_VERSION as int
-    buildToolsVersion NS_DEFAULT_BUILD_TOOLS_VERSION as String
+    compileSdk NS_DEFAULT_COMPILE_SDK_VERSION as int
+    buildToolsVersion = NS_DEFAULT_BUILD_TOOLS_VERSION as String
 
     sourceSets {
         main {
@@ -143,8 +143,10 @@ android {
 
 allprojects {
     gradle.projectsEvaluated {
-        tasks.withType(JavaCompile) {
-            options.compilerArgs << "-Xlint:all" << "-Werror"
+        tasks.withType(JavaCompile).tap {
+            configureEach {
+                options.compilerArgs << "-Xlint:all" << "-Werror"
+            }
         }
     }
 }
@@ -161,7 +163,7 @@ def buildMetadata = tasks.findByPath(":app:buildMetadata")
 
 tasks.whenTaskAdded { task ->
     def taskName = task.getName()
-     println "\t ~ [DEBUG][runtime] build.gradle whenTaskAdded taskName = ${taskName}"
+     // println "\t ~ [DEBUG][runtime] build.gradle whenTaskAdded taskName = ${taskName}"
     if (taskName.contains("preReleaseBuild")) {
         setRuntimeCommit.dependsOn(setPackageVersion)
         task.dependsOn(setRuntimeCommit)
