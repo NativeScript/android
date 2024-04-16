@@ -1,8 +1,8 @@
 apply plugin: 'java'
 apply plugin: 'kotlin'
 
-sourceCompatibility = JavaVersion.VERSION_1_8
-targetCompatibility = JavaVersion.VERSION_1_8
+sourceCompatibility = JavaVersion.VERSION_17
+targetCompatibility = JavaVersion.VERSION_17
 
 // todo: check if still needed
 // if(!project.hasProperty("loadedProjectDeps")){
@@ -43,8 +43,13 @@ compileJava {
 compileJava.outputs.dir("$rootDir/dist/classes")
 
 compileKotlin {
-    kotlinOptions.allWarningsAsErrors = true
-    kotlinOptions.jvmTarget = "1.8"
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+
+    kotlinOptions {
+        jvmTarget = '17'
+        allWarningsAsErrors = true
+    }
 }
 
 repositories {
@@ -78,23 +83,41 @@ task copyNecessaryFiles {
     }
 }
 
+configurations.create("metadataGeneratorImplementation") {
+    extendsFrom configurations.implementation
+    setCanBeResolved(true)
+}
 
 configurations.create("metadataGeneratorApi") {
     extendsFrom configurations.api
     setCanBeResolved(true)
 }
 
+configurations.create("metadataGeneratorRuntimeOnly") {
+    extendsFrom configurations.runtimeOnly
+    setCanBeResolved(true)
+}
+
 jar {
-   // configurations.api.setCanBeResolved(true)
     manifest {
-        attributes("Manifest-Version": "2.0",
+        attributes("Manifest-Version": "3.0",
                 "Main-Class": "com.telerik.metadata.Generator")
     }
 
     from {
+        configurations.metadataGeneratorImplementation.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+
         configurations.metadataGeneratorApi.collect {
             it.isDirectory() ? it : zipTree(it)
         }
+
+        configurations.metadataGeneratorRuntimeOnly.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+
+        configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) }
     }
 
     duplicatesStrategy = 'include'
