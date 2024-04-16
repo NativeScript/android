@@ -20,9 +20,8 @@
 *            -PappResourcesPath=[app_resources_path]
 */
 
-
-import groovy.io.FileType
 import groovy.json.JsonSlurper
+import groovy.xml.XmlSlurper
 import org.apache.commons.io.FileUtils
 
 import javax.inject.Inject
@@ -30,26 +29,17 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
-
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
 
 import static org.gradle.internal.logging.text.StyledTextOutput.Style
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 
 apply plugin: "com.android.application"
 apply from: "gradle-helpers/BuildToolTask.gradle"
 apply from: "gradle-helpers/CustomExecutionLogger.gradle"
 apply from: "gradle-helpers/AnalyticsCollector.gradle"
-
-def enableKotlin = (project.hasProperty("useKotlin") && project.useKotlin == "true")
-
-if (enableKotlin) {
-    apply plugin: 'kotlin-android'
-    apply plugin: 'kotlin-parcelize'
-}
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-parcelize'
 
 def onlyX86 = project.hasProperty("onlyX86")
 if (onlyX86) {
@@ -86,7 +76,6 @@ def METADATA_JAVA_OUT = "mdg-java-out.txt"
 def pluginsJarLibraries = new LinkedList<String>()
 def allJarLibraries = new LinkedList<String>()
 
-def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "${ns_default_kotlin_version}" }
 def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : NS_DEFAULT_COMPILE_SDK_VERSION as int }
 def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : NS_DEFAULT_COMPILE_SDK_VERSION as int }
 def computeBuildToolsVersion = { ->
@@ -98,7 +87,7 @@ def enableVerboseMDG = project.gradle.startParameter.logLevel.name() == 'DEBUG'
 def analyticsFilePath = "$rootDir/analytics/build-statistics.json"
 def analyticsCollector = project.ext.AnalyticsCollector.withOutputPath(analyticsFilePath)
 if (enableAnalytics) {
-    analyticsCollector.markUseKotlinPropertyInApp(enableKotlin)
+    analyticsCollector.markUseKotlinPropertyInApp(true)
     analyticsCollector.writeAnalyticsFile()
 }
 
@@ -194,14 +183,12 @@ android {
 
     applyBeforePluginGradleConfiguration()
 
-    if (enableKotlin) {
-        kotlinOptions {
-            jvmTarget = '17'
-        }
+    kotlinOptions {
+        jvmTarget = '17'
     }
 
-    compileSdkVersion computeCompileSdkVersion()
-    buildToolsVersion computeBuildToolsVersion()
+    compileSdk computeCompileSdkVersion()
+    buildToolsVersion = computeBuildToolsVersion()
 
     defaultConfig {
         def manifest = new XmlSlurper().parse(file(android.sourceSets.main.manifest.srcFile))
@@ -254,12 +241,12 @@ android {
     applyAppGradleConfiguration()
 
     def initializeMergedAssetsOutputPath = { ->
-      android.applicationVariants.all { variant ->
+      android.applicationVariants.configureEach { variant ->
           if (variant.buildType.name == project.selectedBuildType) {
               def task
               if (variant.metaClass.respondsTo(variant, "getMergeAssetsProvider")) {
                   def provider = variant.getMergeAssetsProvider()
-                  task = provider.get();
+                  task = provider.get()
               } else {
                   // fallback for older android gradle plugin versions
                   task = variant.getMergeAssets()
@@ -267,7 +254,7 @@ android {
               for (File file : task.getOutputs().getFiles()) {
                   if (!file.getPath().contains("${File.separator}incremental${File.separator}")) {
                       project.ext.mergedAssetsOutputPath = file.getPath()
-                      break;
+                      break
                   }
               }
           }
@@ -397,18 +384,13 @@ dependencies {
         implementation project(':runtime')
     }
 
-    def kotlinVersion = computeKotlinVersion()
-    if (enableKotlin) {
-        implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
-    }
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////// CONFIGURATION PHASE //////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
-task addDependenciesFromNativeScriptPlugins {
+tasks.register('addDependenciesFromNativeScriptPlugins') {
     nativescriptDependencies.each { dep ->
         def aarFiles = fileTree(dir: file("$rootDir/${dep.directory}/$PLATFORMS_ANDROID"), include: ["**/*.aar"])
         aarFiles.each { aarFile ->
@@ -429,7 +411,7 @@ task addDependenciesFromNativeScriptPlugins {
     }
 }
 
-task addDependenciesFromAppResourcesLibraries {
+tasks.register('addDependenciesFromAppResourcesLibraries') {
     def appResourcesPath = getAppResourcesPath()
     def appResourcesLibraries = file("$appResourcesPath/Android/libs")
     if (appResourcesLibraries.exists()) {
@@ -453,7 +435,7 @@ task addDependenciesFromAppResourcesLibraries {
 }
 
 if (failOnCompilationWarningsEnabled()) {
-    tasks.withType(JavaCompile) {
+    tasks.withType(JavaCompile).configureEach {
         options.compilerArgs << '-Xlint:all' << "-Werror"
         options.deprecation = true
     }
@@ -461,12 +443,12 @@ if (failOnCompilationWarningsEnabled()) {
 
 
 ////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////// EXECUTUION PHASE /////////////////////////////////////
+///////////////////////////// EXECUTION PHASE /////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
-task runSbg(type: BuildToolTask) {
+tasks.register('runSbg', BuildToolTask) {
     dependsOn "collectAllJars"
-    def rootPath = "";
+    def rootPath = ""
     if (!findProject(':static-binding-generator').is(null)) {
         rootPath = Paths.get(project(':static-binding-generator').projectDir.path, "build/libs").toString()
         dependsOn ':static-binding-generator:jar'
@@ -480,7 +462,7 @@ task runSbg(type: BuildToolTask) {
     mainClass = "-jar"
 
     def paramz = new ArrayList<String>()
-    paramz.add(Paths.get(rootPath,"static-binding-generator.jar"))
+    paramz.add(Paths.get(rootPath, "static-binding-generator.jar"))
 
     if (failOnCompilationWarningsEnabled()) {
         paramz.add("-show-deprecation-warnings")
@@ -526,7 +508,7 @@ def explodeAar(File compileDependency, File outputDir) {
     }
 }
 
-def md5(String string) {
+static def md5(String string) {
     MessageDigest digest = MessageDigest.getInstance("MD5")
     digest.update(string.bytes)
     return new BigInteger(1, digest.digest()).toString(16).padLeft(32, '0')
@@ -561,7 +543,7 @@ allprojects {
         def artifactType = Attribute.of('artifactType', String)
         android.applicationVariants.configureEach { variant ->
             if (variant.buildType.name == buildType) {
-                variant.getCompileClasspath().each { fileDependency -> 
+                variant.getCompileClasspath(null).each { fileDependency ->
                     processJar(fileDependency, jars)
                 }
             }
@@ -609,7 +591,7 @@ def processJar(File jar, jars) {
     }
 }
 
-task cleanupAllJars {
+tasks.register('cleanupAllJars') {
     // We depend on the list of libs directories that might contain aar or jar files
     // and on the list of all discovered jars
     inputs.files(pluginDependencies)
@@ -634,7 +616,7 @@ task cleanupAllJars {
 
 
 // Placeholder task which depends on all dynamically generated extraction tasks
-task extractAllJars {
+tasks.register('extractAllJars') {
     dependsOn cleanupAllJars
     outputs.files extractAllJarsTimestamp
 
@@ -643,7 +625,7 @@ task extractAllJars {
     }
 }
 
-task collectAllJars {
+tasks.register('collectAllJars') {
     dependsOn extractAllJars
     description "gathers all paths to jar dependencies before building metadata with them"
 
@@ -681,27 +663,27 @@ task collectAllJars {
     }
 }
 
-task copyMetadataFilters(type: Copy) {
+tasks.register('copyMetadataFilters', Copy) {
     from "$rootDir/whitelist.mdg", "$rootDir/blacklist.mdg"
     into "$BUILD_TOOLS_PATH"
 }
 
-task copyMetadata {
+tasks.register('copyMetadata') {
     doLast {
         copy {
-          from "$projectDir/src/main/assets/metadata"
-          into getMergedAssetsOutputPath() + "/metadata"
+            from "$projectDir/src/main/assets/metadata"
+            into getMergedAssetsOutputPath() + "/metadata"
         }
     }
 }
 
 def listf(String directoryName, ArrayList<File> store) {
-    def directory = new File(directoryName);
+    def directory = new File(directoryName)
 
-    def resultList = new ArrayList<File>();
+    def resultList = new ArrayList<File>()
 
-    def fList = directory.listFiles();
-    resultList.addAll(Arrays.asList(fList));
+    def fList = directory.listFiles()
+    resultList.addAll(Arrays.asList(fList))
     for (File file : fList) {
         if (file.isFile()) {
             store.add(file)
@@ -712,36 +694,14 @@ def listf(String directoryName, ArrayList<File> store) {
     return resultList
 }
 
-task buildMetadata(type: BuildToolTask) {
-    def rootPath = "";
+tasks.register('buildMetadata', BuildToolTask) {
+    def rootPath = ""
     if (!findProject(':android-metadata-generator').is(null)) {
         rootPath = Paths.get(project(':android-metadata-generator').projectDir.path, "build/libs").toString()
         dependsOn ':android-metadata-generator:jar'
     }
 
     dependsOn copyMetadataFilters
-
-  /*  dependsOn ':app:mergeReleaseJniLibFolders'
-    dependsOn ':app:mergeReleaseNativeLibs'
-    dependsOn ':app:stripReleaseDebugSymbols'
-    dependsOn ':app:checkReleaseDuplicateClasses'
-  //  dependsOn ':app:dexBuilderRelease'
-    dependsOn ':app:desugarReleaseFileDependencies'
-    dependsOn ':app:mergeExtDexRelease'
-    dependsOn ':app:processReleaseJavaRes'
-    dependsOn ':app:mergeReleaseJavaResource'
-
-
-    dependsOn ':app:mergeDebugJniLibFolders'
-    dependsOn ':app:mergeDebugNativeLibs'
-    dependsOn ':app:stripDebugDebugSymbols'
-    dependsOn ':app:checkDebugDuplicateClasses'
-//    dependsOn ':app:dexBuilderDebug'
-    dependsOn ':app:desugarDebugFileDependencies'
-    dependsOn ':app:mergeExtDexDebug'
-    dependsOn ':app:processDebugJavaRes'
-    dependsOn ':app:mergeDebugJavaResource'
-    */
 
     // As some external gradle plugins can reorder the execution order of the tasks it may happen that buildMetadata is executed after merge{Debug/Release}Assets
     // in that case the metadata won't be included in the result apk and it will crash, so to avoid this we are adding the copyMetadata task which will manually copy
@@ -758,13 +718,13 @@ task buildMetadata(type: BuildToolTask) {
     // make MDG aware of whitelist.mdg and blacklist.mdg files
     inputs.files(project.fileTree(dir: "$rootDir", include: "**/*.mdg"))
 
-    def classesDir = "${buildDir}/intermediates/javac"
-    if (file(classesDir).exists()) {
+    def classesDir = layout.buildDirectory.dir("intermediates/javac").get().asFile
+    if (classesDir.exists()) {
         inputs.dir(classesDir)
     }
 
-    def kotlinClassesDir = "${buildDir}/tmp/kotlin-classes"
-    if (file(kotlinClassesDir).exists()) {
+    def kotlinClassesDir = layout.buildDirectory.dir("tmp/kotlin-classes").get().asFile
+    if (kotlinClassesDir.exists()) {
         inputs.dir(kotlinClassesDir)
     }
 
@@ -784,8 +744,8 @@ task buildMetadata(type: BuildToolTask) {
 
         rootProject.subprojects {
 
-          def projectClassesDir = new File("$it.buildDir/intermediates/javac")
-          def projectKotlinClassesDir = new File("$it.buildDir/tmp/kotlin-classes")
+            def projectClassesDir = it.layout.buildDirectory.dir("intermediates/javac").get().asFile
+            def projectKotlinClassesDir = it.layout.buildDirectory.dir("tmp/kotlin-classes").get().asFile
 
             if (projectClassesDir.exists()) {
                 def projectClassesSubDirs = projectClassesDir.listFiles()
@@ -796,14 +756,14 @@ task buildMetadata(type: BuildToolTask) {
                 }
             }
 
-          if (projectKotlinClassesDir.exists()) {
-            def projectKotlinClassesSubDirs = projectKotlinClassesDir.listFiles();
-            for (File subDir : projectKotlinClassesSubDirs) {
-              if (!kotlinClassesSubDirs.contains(subDir)) {
-                kotlinClassesSubDirs.add(subDir)
-              }
+            if (projectKotlinClassesDir.exists()) {
+                def projectKotlinClassesSubDirs = projectKotlinClassesDir.listFiles()
+                for (File subDir : projectKotlinClassesSubDirs) {
+                    if (!kotlinClassesSubDirs.contains(subDir)) {
+                        kotlinClassesSubDirs.add(subDir)
+                    }
+                }
             }
-          }
         }
 
         def generatedClasses = new LinkedList<String>()
@@ -820,7 +780,7 @@ task buildMetadata(type: BuildToolTask) {
         }
 
         def store = new ArrayList<File>()
-        for (String dir: generatedClasses){
+        for (String dir : generatedClasses) {
             listf(dir, store)
         }
 
@@ -845,11 +805,11 @@ task buildMetadata(type: BuildToolTask) {
         def paramz = new ArrayList<String>()
         paramz.add(Paths.get(rootPath, "android-metadata-generator.jar"))
 
-        if(enableAnalytics){
+        if (enableAnalytics) {
             paramz.add("analyticsFilePath=$analyticsFilePath")
         }
 
-        if(enableVerboseMDG){
+        if (enableVerboseMDG) {
             paramz.add("verbose")
         }
 
@@ -857,7 +817,7 @@ task buildMetadata(type: BuildToolTask) {
     }
 }
 
-task generateTypescriptDefinitions(type: BuildToolTask) {
+tasks.register('generateTypescriptDefinitions', BuildToolTask) {
     if (!findProject(':dts-generator').is(null)) {
         dependsOn ':dts-generator:jar'
     }
@@ -911,7 +871,7 @@ static def shouldIncludeDirForTypings(path, includeDirs) {
     return false
 }
 
-task copyTypings {
+tasks.register('copyTypings') {
     doLast {
         outLogger.withStyle(Style.Info).println "Copied generated typings to application root level. Make sure to import android.d.ts in reference.d.ts"
 
@@ -925,7 +885,7 @@ task copyTypings {
 copyTypings.onlyIf { generateTypescriptDefinitions.didWork }
 generateTypescriptDefinitions.finalizedBy(copyTypings)
 
-task validateAppIdMatch {
+tasks.register('validateAppIdMatch') {
     doLast {
         def lineSeparator = System.getProperty("line.separator")
 
@@ -948,7 +908,7 @@ task validateAppIdMatch {
 ////////////////////////////////////////////////////////////////////////////////////
 
 //////// custom clean ///////////
-task cleanSbg(type: Delete) {
+tasks.register('cleanSbg', Delete) {
     delete "$BUILD_TOOLS_PATH/$SBG_JS_PARSED_FILES",
             "$BUILD_TOOLS_PATH/$SBG_JAVA_DEPENDENCIES",
             "$BUILD_TOOLS_PATH/$SBG_INTERFACE_NAMES",
@@ -959,7 +919,7 @@ task cleanSbg(type: Delete) {
             "$OUTPUT_JAVA_DIR/com/tns/gen"
 }
 
-task cleanMdg(type: Delete) {
+tasks.register('cleanMdg', Delete) {
     delete "$BUILD_TOOLS_PATH/$MDG_OUTPUT_DIR",
             "$BUILD_TOOLS_PATH/whitelist.mdg",
             "$BUILD_TOOLS_PATH/blacklist.mdg",
@@ -972,7 +932,7 @@ clean.dependsOn(cleanSbg)
 
 
 tasks.configureEach({ DefaultTask currentTask ->
-   println "\t ~ [DEBUG][app] build.gradle - currentTask = ${currentTask.name}..."
+  // println "\t ~ [DEBUG][app] build.gradle - currentTask = ${currentTask.name}..."
     if (currentTask =~ /generate.+BuildConfig/) {
         currentTask.finalizedBy(extractAllJars)
         extractAllJars.finalizedBy(collectAllJars)
