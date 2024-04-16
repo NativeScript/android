@@ -390,7 +390,7 @@ dependencies {
 ///////////////////////////// CONFIGURATION PHASE //////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
-tasks.register('addDependenciesFromNativeScriptPlugins') {
+task 'addDependenciesFromNativeScriptPlugins' {
     nativescriptDependencies.each { dep ->
         def aarFiles = fileTree(dir: file("$rootDir/${dep.directory}/$PLATFORMS_ANDROID"), include: ["**/*.aar"])
         aarFiles.each { aarFile ->
@@ -411,7 +411,7 @@ tasks.register('addDependenciesFromNativeScriptPlugins') {
     }
 }
 
-tasks.register('addDependenciesFromAppResourcesLibraries') {
+task 'addDependenciesFromAppResourcesLibraries' {
     def appResourcesPath = getAppResourcesPath()
     def appResourcesLibraries = file("$appResourcesPath/Android/libs")
     if (appResourcesLibraries.exists()) {
@@ -446,7 +446,7 @@ if (failOnCompilationWarningsEnabled()) {
 ///////////////////////////// EXECUTION PHASE /////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
-tasks.register('runSbg', BuildToolTask) {
+task runSbg(type: BuildToolTask) {
     dependsOn "collectAllJars"
     def rootPath = ""
     if (!findProject(':static-binding-generator').is(null)) {
@@ -591,7 +591,7 @@ def processJar(File jar, jars) {
     }
 }
 
-tasks.register('cleanupAllJars') {
+task 'cleanupAllJars' {
     // We depend on the list of libs directories that might contain aar or jar files
     // and on the list of all discovered jars
     inputs.files(pluginDependencies)
@@ -616,7 +616,7 @@ tasks.register('cleanupAllJars') {
 
 
 // Placeholder task which depends on all dynamically generated extraction tasks
-tasks.register('extractAllJars') {
+task 'extractAllJars' {
     dependsOn cleanupAllJars
     outputs.files extractAllJarsTimestamp
 
@@ -625,7 +625,7 @@ tasks.register('extractAllJars') {
     }
 }
 
-tasks.register('collectAllJars') {
+task 'collectAllJars' {
     dependsOn extractAllJars
     description "gathers all paths to jar dependencies before building metadata with them"
 
@@ -663,12 +663,12 @@ tasks.register('collectAllJars') {
     }
 }
 
-tasks.register('copyMetadataFilters', Copy) {
+task copyMetadataFilters(type: Copy) {
     from "$rootDir/whitelist.mdg", "$rootDir/blacklist.mdg"
     into "$BUILD_TOOLS_PATH"
 }
 
-tasks.register('copyMetadata') {
+task 'copyMetadata' {
     doLast {
         copy {
             from "$projectDir/src/main/assets/metadata"
@@ -694,7 +694,7 @@ def listf(String directoryName, ArrayList<File> store) {
     return resultList
 }
 
-tasks.register('buildMetadata', BuildToolTask) {
+task buildMetadata(type: BuildToolTask) {
     def rootPath = ""
     if (!findProject(':android-metadata-generator').is(null)) {
         rootPath = Paths.get(project(':android-metadata-generator').projectDir.path, "build/libs").toString()
@@ -817,7 +817,7 @@ tasks.register('buildMetadata', BuildToolTask) {
     }
 }
 
-tasks.register('generateTypescriptDefinitions', BuildToolTask) {
+task generateTypescriptDefinitions(type: BuildToolTask) {
     if (!findProject(':dts-generator').is(null)) {
         dependsOn ':dts-generator:jar'
     }
@@ -871,7 +871,7 @@ static def shouldIncludeDirForTypings(path, includeDirs) {
     return false
 }
 
-tasks.register('copyTypings') {
+task 'copyTypings' {
     doLast {
         outLogger.withStyle(Style.Info).println "Copied generated typings to application root level. Make sure to import android.d.ts in reference.d.ts"
 
@@ -885,7 +885,7 @@ tasks.register('copyTypings') {
 copyTypings.onlyIf { generateTypescriptDefinitions.didWork }
 generateTypescriptDefinitions.finalizedBy(copyTypings)
 
-tasks.register('validateAppIdMatch') {
+task 'validateAppIdMatch' {
     doLast {
         def lineSeparator = System.getProperty("line.separator")
 
@@ -908,7 +908,7 @@ tasks.register('validateAppIdMatch') {
 ////////////////////////////////////////////////////////////////////////////////////
 
 //////// custom clean ///////////
-tasks.register('cleanSbg', Delete) {
+task cleanSbg(type: Delete) {
     delete "$BUILD_TOOLS_PATH/$SBG_JS_PARSED_FILES",
             "$BUILD_TOOLS_PATH/$SBG_JAVA_DEPENDENCIES",
             "$BUILD_TOOLS_PATH/$SBG_INTERFACE_NAMES",
@@ -919,7 +919,7 @@ tasks.register('cleanSbg', Delete) {
             "$OUTPUT_JAVA_DIR/com/tns/gen"
 }
 
-tasks.register('cleanMdg', Delete) {
+task cleanMdg(type: Delete) {
     delete "$BUILD_TOOLS_PATH/$MDG_OUTPUT_DIR",
             "$BUILD_TOOLS_PATH/whitelist.mdg",
             "$BUILD_TOOLS_PATH/blacklist.mdg",
@@ -963,15 +963,21 @@ tasks.configureEach({ DefaultTask currentTask ->
     }
 
     if (currentTask =~ /merge.+Shaders/) {
-        buildMetadata.finalizedBy(currentTask)
+        currentTask.dependsOn(runSbg)
+        currentTask.finalizedBy(buildMetadata)
     }
 
     if (currentTask =~ /mergeDex.+/) {
-        buildMetadata.finalizedBy(currentTask)
+        currentTask.dependsOn(runSbg)
+        currentTask.finalizedBy(buildMetadata)
     }
 
     if (currentTask =~ /dexBuilder.+/) {
-        buildMetadata.finalizedBy(currentTask)
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /extract.+NativeSymbolTables/) {
+        currentTask.finalizedBy(buildMetadata)
     }
 
     if (currentTask =~ /mergeExtDex.+/) {
@@ -1015,7 +1021,7 @@ tasks.configureEach({ DefaultTask currentTask ->
     }
 
     if (currentTask =~ /optimize.+Resources/) {
-        buildMetadata.finalizedBy(currentTask)
+        currentTask.finalizedBy(buildMetadata)
     }
 
     if (currentTask =~ /buildCMake.*/) {
@@ -1082,4 +1088,9 @@ tasks.configureEach({ DefaultTask currentTask ->
     if (currentTask =~ /bundle.*Resources/) {
         currentTask.finalizedBy(buildMetadata)
     }
+
+    if (currentTask =~ /compile.*ArtProfile/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
 })

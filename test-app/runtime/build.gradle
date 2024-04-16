@@ -162,7 +162,7 @@ dependencies {
 
 tasks.configureEach { task ->
     def taskName = task.getName()
-   //   println "\t ~ [DEBUG][runtime] build.gradle whenTaskAdded taskName = ${taskName}"
+    //   println "\t ~ [DEBUG][runtime] build.gradle whenTaskAdded taskName = ${taskName}"
     if (taskName.contains("preReleaseBuild")) {
         setRuntimeCommit.dependsOn(setPackageVersion)
         task.dependsOn(setRuntimeCommit)
@@ -227,13 +227,36 @@ tasks.configureEach { task ->
         task.finalizedBy(":app:buildMetadata")
     }
 
-    if (task =~ /lintAnalyze.+AndroidTest/ ) {
+    if (task =~ /lintAnalyze.+AndroidTest/) {
         task.finalizedBy(":app:buildMetadata")
     }
 
+    if (task =~ /compile.+UnitTestJavaWithJavac/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (task =~ /generate.+LintModel/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (task =~ /process.+Manifest/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (task =~ /merge.+Resources/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (task =~ /verify.+Resources/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (task =~ /test.+UnitTest/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
 }
 
-tasks.register('setPackageVersion') {
+task 'setPackageVersion' {
     onlyIf {
         project.hasProperty('packageVersion')
     }
@@ -248,7 +271,7 @@ tasks.register('setPackageVersion') {
     }
 }
 
-tasks.register('setRuntimeCommit') {
+task 'setRuntimeCommit' {
     onlyIf {
         project.hasProperty('gitCommitVersion')
     }
@@ -263,7 +286,7 @@ tasks.register('setRuntimeCommit') {
     }
 }
 
-tasks.register('revertVersionFile', Exec) {
+task revertVersionFile(type: Exec) {
     onlyIf {
         project.hasProperty('packageVersion') || project.hasProperty('gitCommitVersion')
     }
