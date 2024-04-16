@@ -18,7 +18,7 @@
     "minSdk": "17",
     "compileSdk": "34",
     "buildTools": "34.0.0",
-    "kotlin": "1.9.23"
+    "kotlin": "2.0.0-RC1"
   },
   "// this gradle key is here for backwards compatibility - we'll phase it out slowly...": "",
   "gradle": {
