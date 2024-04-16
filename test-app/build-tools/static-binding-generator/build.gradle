@@ -1,8 +1,5 @@
 apply plugin: 'java-library'
 
-sourceCompatibility = JavaVersion.VERSION_1_8
-targetCompatibility = JavaVersion.VERSION_1_8
-
 // todo: check if still needed
 // if(!project.hasProperty("loadedProjectDeps")){
 //     Properties projectDeps = new Properties()
@@ -34,6 +31,8 @@ dependencies {
 
 compileJava {
     options.compilerArgs << "-Xlint:all" << "-Xlint:-options" << "-Werror"
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 
@@ -55,7 +54,7 @@ configurations.create("staticBindingGeneratorApi") {
 jar {
 
     manifest {
-        attributes("Manifest-Version": "1.0",
+        attributes("Manifest-Version": "2.0",
                 "Main-Class": "org.nativescript.staticbindinggenerator.Main")
     }
     from {
