@@ -963,15 +963,15 @@ tasks.configureEach({ DefaultTask currentTask ->
     }
 
     if (currentTask =~ /merge.+Shaders/) {
-        currentTask.dependsOn buildMetadata
+        buildMetadata.finalizedBy(currentTask)
     }
 
     if (currentTask =~ /mergeDex.+/) {
-        currentTask.dependsOn(buildMetadata)
+        buildMetadata.finalizedBy(currentTask)
     }
 
     if (currentTask =~ /dexBuilder.+/) {
-        currentTask.dependsOn(buildMetadata)
+        buildMetadata.finalizedBy(currentTask)
     }
 
     if (currentTask =~ /mergeExtDex.+/) {
@@ -999,23 +999,23 @@ tasks.configureEach({ DefaultTask currentTask ->
     }
 
     if (currentTask =~ /generate.+LintVitalReportModel/) {
-        currentTask.dependsOn buildMetadata
+        buildMetadata.finalizedBy(currentTask)
     }
 
     if (currentTask =~ /lintVitalAnalyze.+/) {
-        currentTask.dependsOn(buildMetadata)
+        buildMetadata.finalizedBy(currentTask)
     }
 
     if (currentTask =~ /extract.+NativeSymbolTables/) {
-        currentTask.dependsOn(buildMetadata)
+        buildMetadata.finalizedBy(currentTask)
     }
 
     if (currentTask =~ /merge.+GlobalSynthetics/) {
-        currentTask.dependsOn(buildMetadata)
+        buildMetadata.finalizedBy(currentTask)
     }
 
     if (currentTask =~ /optimize.+Resources/) {
-        currentTask.dependsOn(buildMetadata)
+        buildMetadata.finalizedBy(currentTask)
     }
 
     if (currentTask =~ /buildCMake.*/) {
@@ -1031,7 +1031,7 @@ tasks.configureEach({ DefaultTask currentTask ->
     }
 
     if (currentTask =~ /generate.*LintReportModel/) {
-        currentTask.dependsOn(buildMetadata)
+        buildMetadata.finalizedBy(currentTask)
     }
 
     if (currentTask.name.contains(":runtime:configureCMakeRelWithDebInfo")) {
@@ -1039,11 +1039,11 @@ tasks.configureEach({ DefaultTask currentTask ->
     }
 
     if (currentTask =~ /generate.*AndroidTestResValues/) {
-        currentTask.dependsOn(buildMetadata)
+        buildMetadata.finalizedBy(currentTask)
     }
 
     if (currentTask =~ /generate.*AndroidTestLintModel/) {
-        currentTask.dependsOn(buildMetadata)
+        buildMetadata.finalizedBy(currentTask)
     }
 
     if (currentTask =~ /generate.*UnitTestLintModel/) {
@@ -1076,7 +1076,7 @@ tasks.configureEach({ DefaultTask currentTask ->
     }
 
     if (currentTask.name == "lintAnalyzeDebug" || currentTask.name == "lintAnalyzeRelease") {
-        currentTask.dependsOn(buildMetadata)
+        buildMetadata.finalizedBy(currentTask)
     }
 
     if (currentTask =~ /bundle.*Resources/) {

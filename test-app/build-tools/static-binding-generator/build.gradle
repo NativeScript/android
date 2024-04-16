@@ -35,6 +35,10 @@ compileJava {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
+configurations.create("staticBindingGeneratorTestImplementation") {
+    extendsFrom configurations.testImplementation
+    setCanBeResolved(true)
+}
 
 configurations.create("staticBindingGeneratorImplementation") {
     extendsFrom configurations.implementation
@@ -53,11 +57,17 @@ configurations.create("staticBindingGeneratorApi") {
 
 jar {
 
+    configurations.api.setCanBeResolved(true)
+
     manifest {
         attributes("Manifest-Version": "2.0",
                 "Main-Class": "org.nativescript.staticbindinggenerator.Main")
     }
     from {
+
+        configurations.staticBindingGeneratorTestImplementation.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
 
         configurations.staticBindingGeneratorImplementation.collect {
             it.isDirectory() ? it : zipTree(it)

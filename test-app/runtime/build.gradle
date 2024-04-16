@@ -159,11 +159,10 @@ dependencies {
     testImplementation "org.mockito:mockito-core:${ns_default_mockito_core_version}"
 }
 
-def buildMetadata = tasks.findByPath(":app:buildMetadata")
 
-tasks.whenTaskAdded { task ->
+tasks.configureEach { task ->
     def taskName = task.getName()
-     // println "\t ~ [DEBUG][runtime] build.gradle whenTaskAdded taskName = ${taskName}"
+   //   println "\t ~ [DEBUG][runtime] build.gradle whenTaskAdded taskName = ${taskName}"
     if (taskName.contains("preReleaseBuild")) {
         setRuntimeCommit.dependsOn(setPackageVersion)
         task.dependsOn(setRuntimeCommit)
@@ -184,80 +183,57 @@ tasks.whenTaskAdded { task ->
         task.dependsOn(":app:cleanupAllJars")
     }
 
-    if (taskName.contains("configureCMakeRelWithDebInfo")) {
-        if(buildMetadata != null){
-            buildMetadata.dependsOn task
-        }
+    if (task =~ /configureCMake.*/) {
+        task.finalizedBy(":app:buildMetadata")
     }
 
-    if (taskName.contains("buildCMakeRelWithDebInfo")) {
-        if(buildMetadata != null){
-            buildMetadata.dependsOn task
-        }
+    if (task =~ /buildCMake.*/) {
+        task.finalizedBy(":app:buildMetadata")
     }
 
     if (taskName.contains("syncReleaseLibJars") || taskName.contains("syncDebugLibJars")) {
-        if(buildMetadata != null){
-            buildMetadata.dependsOn task
-        }
+        task.finalizedBy(":app:buildMetadata")
     }
 
     if (taskName.contains("mergeReleaseJniLibFolders") || taskName.contains("mergeDebugJniLibFolders")) {
-        if(buildMetadata != null){
-            buildMetadata.dependsOn task
-        }
+        task.finalizedBy(":app:buildMetadata")
     }
 
     if (taskName.contains("mergeReleaseShaders") || taskName.contains("mergeDebugShaders")) {
-        if(buildMetadata != null){
-            buildMetadata.dependsOn task
-        }
+        task.finalizedBy(":app:buildMetadata")
     }
 
     if (taskName.contains("packageReleaseAssets") || taskName.contains("packageDebugAssets")) {
-        if(buildMetadata != null){
-            buildMetadata.dependsOn task
-        }
+        task.finalizedBy(":app:buildMetadata")
     }
 
     if (taskName.contains("copyReleaseJniLibsProjectOnly") || taskName.contains("copyDebugJniLibsProjectOnly")) {
-        if(buildMetadata != null){
-            buildMetadata.dependsOn task
-        }
+        task.finalizedBy(":app:buildMetadata")
     }
 
     if (taskName.contains("copyReleaseJniLibsProjectAndLocalJars") || taskName.contains("copyDebugJniLibsProjectAndLocalJars")) {
-        if(buildMetadata != null){
-            buildMetadata.dependsOn task
-        }
+        task.finalizedBy(":app:buildMetadata")
     }
-
 
     if (taskName.contains("generateReleaseLintVitalModel") || taskName.contains("generateDebugLintVitalModel")) {
-        if(buildMetadata != null){
-            buildMetadata.dependsOn task
-        }
+        task.finalizedBy(":app:buildMetadata")
     }
 
-
     if (taskName.contains("lintVitalAnalyzeRelease") || taskName.contains("lintVitalAnalyzeDebug")) {
-        if(buildMetadata != null){
-            buildMetadata.dependsOn task
-        }
+        task.finalizedBy(":app:buildMetadata")
     }
 
     if (task =~ /bundleLibRuntimeToDir.*/) {
-        if(buildMetadata != null){
-            task.finalizedBy(buildMetadata)
-        }
+        task.finalizedBy(":app:buildMetadata")
     }
 
-
-
+    if (task =~ /lintAnalyze.+AndroidTest/ ) {
+        task.finalizedBy(":app:buildMetadata")
+    }
 
 }
 
-task setPackageVersion {
+tasks.register('setPackageVersion') {
     onlyIf {
         project.hasProperty('packageVersion')
     }
@@ -272,7 +248,7 @@ task setPackageVersion {
     }
 }
 
-task setRuntimeCommit {
+tasks.register('setRuntimeCommit') {
     onlyIf {
         project.hasProperty('gitCommitVersion')
     }
@@ -287,7 +263,7 @@ task setRuntimeCommit {
     }
 }
 
-task revertVersionFile(type: Exec) {
+tasks.register('revertVersionFile', Exec) {
     onlyIf {
         project.hasProperty('packageVersion') || project.hasProperty('gitCommitVersion')
     }
