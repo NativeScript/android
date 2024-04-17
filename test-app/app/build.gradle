@@ -976,7 +976,7 @@ tasks.configureEach({ DefaultTask currentTask ->
     }
     // ensure buildMetadata is done before R8 to allow custom proguard from metadata
     if (currentTask =~ /minify.*WithR8/) {
-        currentTask.dependsOn(buildMetadata)
+        buildMetadata.finalizedBy(currentTask)
     }
     if (currentTask =~ /assemble.*Debug/ || currentTask =~ /assemble.*Release/) {
         currentTask.finalizedBy("validateAppIdMatch")
@@ -1109,4 +1109,7 @@ tasks.configureEach({ DefaultTask currentTask ->
         currentTask.mustRunAfter(buildMetadata)
     }
 
+    if (currentTask =~ /check.*DuplicateClasses/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
 })
