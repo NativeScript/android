@@ -179,9 +179,6 @@ tasks.configureEach { task ->
         task.finalizedBy createPackageConfigFileTask(taskName)
     }
 
-    if (taskName.contains("bundleLibCompileToJarDebug") || taskName.contains("bundleLibCompileToJarRelease")) {
-        task.dependsOn(":app:cleanupAllJars")
-    }
 
     if (task =~ /configureCMake.*/) {
         task.finalizedBy(":app:buildMetadata")

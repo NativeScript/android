@@ -1113,3 +1113,11 @@ tasks.configureEach({ DefaultTask currentTask ->
         currentTask.finalizedBy(buildMetadata)
     }
 })
+
+rootProject.subprojects.forEach {
+    it.tasks.configureEach({ DefaultTask currentTask ->
+        if (currentTask =~ /.+bundleLibCompileToJar.*/) {
+            currentTask.finalizedBy(cleanupAllJars)
+        }
+    })
+}
