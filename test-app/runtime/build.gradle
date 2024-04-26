@@ -179,7 +179,6 @@ tasks.configureEach { task ->
         task.finalizedBy createPackageConfigFileTask(taskName)
     }
 
-
     if (task =~ /configureCMake.*/) {
         task.finalizedBy(":app:buildMetadata")
     }
@@ -217,10 +216,6 @@ tasks.configureEach { task ->
     }
 
     if (taskName.contains("lintVitalAnalyzeRelease") || taskName.contains("lintVitalAnalyzeDebug")) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (task =~ /bundleLibRuntimeToDir.*/) {
         task.finalizedBy(":app:buildMetadata")
     }
 

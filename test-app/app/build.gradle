@@ -1112,12 +1112,52 @@ tasks.configureEach({ DefaultTask currentTask ->
     if (currentTask =~ /check.*DuplicateClasses/) {
         currentTask.finalizedBy(buildMetadata)
     }
+
+    if (currentTask =~ /check.*AarMetadata/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /create.*CompatibleScreenManifests/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /process.*Manifest/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /generate.*ResValues/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /merge.*Resources/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /package.*Resources/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /process.*Resources/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
+
+
+
+
 })
 
 rootProject.subprojects.forEach {
     it.tasks.configureEach({ DefaultTask currentTask ->
         if (currentTask =~ /.+bundleLibCompileToJar.*/) {
             currentTask.finalizedBy(cleanupAllJars)
+        }
+
+        if (currentTask =~ /bundleLibRuntimeToDir.*/) {
+            currentTask.finalizedBy(buildMetadata)
+        }
+  
+        if (currentTask =~ /compile.*LibraryResources/) {
+            currentTask.finalizedBy(buildMetadata)
         }
     })
 }
