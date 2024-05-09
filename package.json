@@ -1,7 +1,7 @@
 {
   "name": "@nativescript/android",
   "description": "NativeScript for Android using v8",
-  "version": "8.8.0-alpha.5",
+  "version": "8.8.0-alpha.6",
   "repository": {
     "type": "git",
     "url": "https://github.com/NativeScript/android.git"
@@ -18,7 +18,7 @@
     "minSdk": "17",
     "compileSdk": "34",
     "buildTools": "34.0.0",
-    "kotlin": "2.0.0-RC1"
+    "kotlin": "2.0.0-RC2"
   },
   "// this gradle key is here for backwards compatibility - we'll phase it out slowly...": "",
   "gradle": {
