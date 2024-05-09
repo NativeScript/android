@@ -963,12 +963,12 @@ tasks.configureEach({ DefaultTask currentTask ->
     }
     if (currentTask =~ /compile.+JavaWithJavac/) {
         currentTask.dependsOn(runSbg)
-        currentTask.finalizedBy(buildMetadata)
+        runSbg.finalizedBy(buildMetadata)
     }
 
     if (currentTask =~ /compile.+Kotlin.+/) {
         currentTask.dependsOn(runSbg)
-        currentTask.finalizedBy(buildMetadata)
+        runSbg.finalizedBy(buildMetadata)
     }
 
     if (currentTask =~ /merge.*Assets/) {
@@ -1141,8 +1141,13 @@ tasks.configureEach({ DefaultTask currentTask ->
         currentTask.finalizedBy(buildMetadata)
     }
 
+    if (currentTask =~ /desugar.*Dependencies/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
 
-
+    if (currentTask =~ /merge.*JniLibFolders/) {
+        currentTask.finalizedBy(buildMetadata)
+    }
 
 })
 
