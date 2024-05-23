@@ -963,12 +963,12 @@ tasks.configureEach({ DefaultTask currentTask ->
     }
     if (currentTask =~ /compile.+JavaWithJavac/) {
         currentTask.dependsOn(runSbg)
-        runSbg.finalizedBy(buildMetadata)
+        currentTask.finalizedBy(buildMetadata)
     }
 
     if (currentTask =~ /compile.+Kotlin.+/) {
         currentTask.dependsOn(runSbg)
-        runSbg.finalizedBy(buildMetadata)
+        currentTask.finalizedBy(buildMetadata)
     }
 
     if (currentTask =~ /merge.*Assets/) {
