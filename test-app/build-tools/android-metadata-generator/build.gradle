@@ -126,4 +126,5 @@ jar {
 def copyMetadataFilters = tasks.findByPath(":app:copyMetadataFilters")
 if (copyMetadataFilters != null) {
     compileJava.dependsOn(copyMetadataFilters)
+    compileKotlin.dependsOn(copyMetadataFilters)
 }

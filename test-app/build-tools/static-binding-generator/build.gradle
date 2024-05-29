@@ -84,3 +84,11 @@ jar {
 
     duplicatesStrategy = 'include'
 }
+
+def copyMetadataFilters = tasks.findByPath(":app:copyMetadataFilters")
+if (copyMetadataFilters != null) {
+    compileJava.dependsOn(copyMetadataFilters)
+    if (processTestResources) {
+        processTestResources.dependsOn(copyMetadataFilters)
+    }
+}

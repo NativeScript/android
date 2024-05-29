@@ -725,6 +725,92 @@ task buildMetadata(type: BuildToolTask) {
         dependsOn ':android-metadata-generator:jar'
     }
 
+
+
+    android.applicationVariants.all { variant ->
+        def buildTypeName = variant.buildType.name.capitalize()
+        def mergeShadersTaskName = "merge${buildTypeName}Shaders"
+        def mergeShadersTask = tasks.findByName(mergeShadersTaskName)
+
+        if (mergeShadersTask) {
+            dependsOn mergeShadersTask
+        }
+
+        def compileJavaWithJavacTaskName = "compile${buildTypeName}JavaWithJavac"
+        def compileJavaWithJavacTask = tasks.findByName(compileJavaWithJavacTaskName)
+
+
+        if (compileJavaWithJavacTask) {
+            dependsOn compileJavaWithJavacTask
+        }
+
+        def compileKotlinTaskName = "compile${buildTypeName}Kotlin"
+        def compileKotlinTask = tasks.findByName(compileKotlinTaskName)
+
+
+        if (compileKotlinTask) {
+            dependsOn compileKotlinTask
+        }
+
+
+        def mergeDexTaskName = "mergeDex${buildTypeName}"
+        def mergeDexTask = tasks.findByName(mergeDexTaskName)
+
+        if (mergeDexTask) {
+            dependsOn mergeDexTask
+        }
+
+        def checkDuplicateClassesTaskName = "check${buildTypeName}DuplicateClasses"
+        def checkDuplicateClassesTask = tasks.findByName(checkDuplicateClassesTaskName)
+
+        if (checkDuplicateClassesTask) {
+            dependsOn checkDuplicateClassesTask
+        }
+
+        def generateBuildConfigTaskName = "generate${buildTypeName}BuildConfig"
+        def generateBuildConfigTask = tasks.findByName(generateBuildConfigTaskName)
+
+        if (generateBuildConfigTask) {
+            dependsOn generateBuildConfigTask
+        }
+
+        def dexBuilderTaskName = "dexBuilder${buildTypeName}"
+        def dexBuilderTask = tasks.findByName(dexBuilderTaskName)
+
+        if (dexBuilderTask) {
+            dependsOn dexBuilderTask
+        }
+
+
+        def mergeExtDexTaskName = "mergeExtDex${buildTypeName}"
+        def mergeExtDexTask = tasks.findByName(mergeExtDexTaskName)
+
+        if (mergeExtDexTask) {
+            dependsOn mergeExtDexTask
+        }
+
+        def mergeLibDexTaskName = "mergeLibDex${buildTypeName}"
+        def mergeLibDexTask = tasks.findByName(mergeLibDexTaskName)
+
+        if (mergeLibDexTask) {
+            dependsOn mergeLibDexTask
+        }
+
+        def mergeProjectDexTaskName = "mergeProjectDex${buildTypeName}"
+        def mergeProjectDexTask = tasks.findByName(mergeProjectDexTaskName)
+
+        if (mergeProjectDexTask) {
+            dependsOn mergeProjectDexTask
+        }
+
+        def syncLibJarsTaskName = "sync${buildTypeName}LibJars"
+        def syncLibJarsTask = tasks.findByName(syncLibJarsTaskName)
+
+        if (syncLibJarsTask) {
+            dependsOn syncLibJarsTask
+        }
+    }
+
     dependsOn copyMetadataFilters
 
     // As some external gradle plugins can reorder the execution order of the tasks it may happen that buildMetadata is executed after merge{Debug/Release}Assets
@@ -955,26 +1041,33 @@ cleanSbg.dependsOn(cleanMdg)
 clean.dependsOn(cleanSbg)
 
 
+//dependsOn {
+//    pattern {
+//        include "merge*.Shaders" // Matches tasks starting with "merge" and ending with "Shaders"
+//    }
+//}
+
+
 tasks.configureEach({ DefaultTask currentTask ->
-  // println "\t ~ [DEBUG][app] build.gradle - currentTask = ${currentTask.name}..."
-    if (currentTask =~ /generate.+BuildConfig/) {
-        currentTask.finalizedBy(extractAllJars)
-        extractAllJars.finalizedBy(collectAllJars)
-    }
+   // println "\t ~ [DEBUG][app] build.gradle - currentTask = ${currentTask.name} ..."
+
     if (currentTask =~ /compile.+JavaWithJavac/) {
         currentTask.dependsOn(runSbg)
-        currentTask.finalizedBy(buildMetadata)
+    }
+
+    if (currentTask =~ /mergeDex.+/) {
+        currentTask.dependsOn(runSbg)
     }
 
     if (currentTask =~ /compile.+Kotlin.+/) {
         currentTask.dependsOn(runSbg)
-        currentTask.finalizedBy(buildMetadata)
     }
 
     if (currentTask =~ /merge.*Assets/) {
         currentTask.dependsOn(buildMetadata)
     }
-    // ensure buildMetadata is done before R8 to allow custom proguard from metadata
+
+//    // ensure buildMetadata is done before R8 to allow custom proguard from metadata
     if (currentTask =~ /minify.*WithR8/) {
         buildMetadata.finalizedBy(currentTask)
     }
@@ -984,44 +1077,6 @@ tasks.configureEach({ DefaultTask currentTask ->
 
     if (currentTask =~ /process.+Resources/) {
         cleanupAllJars.dependsOn(currentTask)
-    }
-
-    if (currentTask =~ /merge.+Shaders/) {
-        currentTask.dependsOn(runSbg)
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /mergeDex.+/) {
-        currentTask.dependsOn(runSbg)
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /dexBuilder.+/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /extract.+NativeSymbolTables/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /mergeExtDex.+/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /mergeLibDex.+/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /mergeProjectDex.+/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /merge.+NativeLibs/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /sync.+LibJars/) {
-        currentTask.finalizedBy(buildMetadata)
     }
 
     if (currentTask.name == "extractProguardFiles") {
@@ -1061,7 +1116,8 @@ tasks.configureEach({ DefaultTask currentTask ->
     }
 
     if (currentTask =~ /generate.*AndroidTestResValues/) {
-        buildMetadata.dependsOn(currentTask)
+      //  buildMetadata.dependsOn(currentTask)
+        currentTask.finalizedBy(buildMetadata)
     }
 
     if (currentTask =~ /generate.*AndroidTestLintModel/) {
