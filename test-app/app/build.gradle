@@ -79,7 +79,7 @@ def allJarLibraries = new LinkedList<String>()
 
 def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : NS_DEFAULT_COMPILE_SDK_VERSION as int }
 def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : NS_DEFAULT_COMPILE_SDK_VERSION as int }
-def computeMinSdkVersion = { -> project.hasProperty("minSdk") ? targetSdk : NS_DEFAULT_COMPILE_SDK_VERSION as int }
+def computeMinSdkVersion = { -> project.hasProperty("minSdk") ? minSdk : NS_DEFAULT_MIN_SDK_VERSION as int }
 def computeBuildToolsVersion = { ->
     project.hasProperty("buildToolsVersion") ? buildToolsVersion : NS_DEFAULT_BUILD_TOOLS_VERSION as String
 }
