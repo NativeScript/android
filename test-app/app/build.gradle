@@ -79,6 +79,7 @@ def allJarLibraries = new LinkedList<String>()
 
 def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : NS_DEFAULT_COMPILE_SDK_VERSION as int }
 def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : NS_DEFAULT_COMPILE_SDK_VERSION as int }
+def computeMinSdkVersion = { -> project.hasProperty("minSdk") ? targetSdk : NS_DEFAULT_COMPILE_SDK_VERSION as int }
 def computeBuildToolsVersion = { ->
     project.hasProperty("buildToolsVersion") ? buildToolsVersion : NS_DEFAULT_BUILD_TOOLS_VERSION as String
 }
@@ -217,7 +218,7 @@ android {
 
     defaultConfig {
         def manifest = new XmlSlurper().parse(file(android.sourceSets.main.manifest.srcFile))
-        def minSdkVer = manifest."uses-sdk"."@android:minSdkVersion".text() ?: NS_DEFAULT_MIN_SDK_VERSION
+        def minSdkVer = manifest."uses-sdk"."@android:minSdkVersion".text() ?: computeMinSdkVersion()
         minSdkVersion minSdkVer
         targetSdkVersion computeTargetSdkVersion()
         ndk {
@@ -809,6 +810,76 @@ task buildMetadata(type: BuildToolTask) {
         if (syncLibJarsTask) {
             dependsOn syncLibJarsTask
         }
+
+        def mergeJavaResourceTaskName = "merge${buildTypeName}JavaResource"
+        def mergeJavaResourceTask = tasks.findByName(mergeJavaResourceTaskName)
+
+        if (mergeJavaResourceTask) {
+            dependsOn mergeJavaResourceTask
+        }
+
+        def mergeJniLibFoldersTaskName = "merge${buildTypeName}JniLibFolders"
+        def mergeJniLibFoldersTask = tasks.findByName(mergeJniLibFoldersTaskName)
+
+        if (mergeJniLibFoldersTask) {
+            dependsOn mergeJniLibFoldersTask
+        }
+
+        def mergeNativeLibsTaskName = "merge${buildTypeName}NativeLibs"
+        def mergeNativeLibsTask = tasks.findByName(mergeNativeLibsTaskName)
+
+        if (mergeNativeLibsTask) {
+            dependsOn mergeNativeLibsTask
+        }
+
+        def stripDebugSymbolsTaskName = "strip${buildTypeName}DebugSymbols"
+        def stripDebugSymbolsTask = tasks.findByName(stripDebugSymbolsTaskName)
+
+        if (stripDebugSymbolsTask) {
+            dependsOn stripDebugSymbolsTask
+        }
+
+        def validateSigningTaskName = "validateSigning${buildTypeName}"
+        def validateSigningTask = tasks.findByName(validateSigningTaskName)
+
+        if (validateSigningTask) {
+            dependsOn validateSigningTask
+        }
+
+
+        def extractProguardFilesTaskName = "extractProguardFiles"
+        def extractProguardFilesTask = tasks.findByName(extractProguardFilesTaskName)
+
+        if (extractProguardFilesTask) {
+            dependsOn extractProguardFilesTask
+        }
+
+
+        def compileArtProfileTaskName = "compile${buildTypeName}ArtProfile"
+        def compileArtProfileTask = tasks.findByName(compileArtProfileTaskName)
+
+        if (compileArtProfileTask) {
+            dependsOn compileArtProfileTask
+        }
+
+
+        def extractNativeSymbolTablesTaskName = "extract${buildTypeName}NativeSymbolTables"
+        def extractNativeSymbolTablesTask = tasks.findByName(extractNativeSymbolTablesTaskName)
+
+        if (extractNativeSymbolTablesTask) {
+            dependsOn extractNativeSymbolTablesTask
+        }
+
+
+        def optimizeResourcesTaskName = "optimize${buildTypeName}Resources"
+        def optimizeResourcesTask = tasks.findByName(optimizeResourcesTaskName)
+
+        if (optimizeResourcesTask) {
+            dependsOn optimizeResourcesTask
+        }
+
+
+
     }
 
     dependsOn copyMetadataFilters
@@ -1079,131 +1150,131 @@ tasks.configureEach({ DefaultTask currentTask ->
         cleanupAllJars.dependsOn(currentTask)
     }
 
-    if (currentTask.name == "extractProguardFiles") {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
+//    if (currentTask.name == "extractProguardFiles") {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
     if (currentTask =~ /generate.+LintVitalReportModel/) {
-        currentTask.finalizedBy(buildMetadata)
+        currentTask.dependsOn(buildMetadata)
     }
 
     if (currentTask =~ /lintVitalAnalyze.+/) {
-        currentTask.mustRunAfter(buildMetadata)
+        currentTask.dependsOn(buildMetadata)
     }
-
-    if (currentTask =~ /merge.+GlobalSynthetics/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /optimize.+Resources/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /buildCMake.*/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /configureCMake.*/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /validateSigning.*/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /generate.*LintReportModel/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /generate.*AndroidTestResValues/) {
-      //  buildMetadata.dependsOn(currentTask)
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /generate.*AndroidTestLintModel/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /generate.*UnitTestLintModel/) {
-        buildMetadata.mustRunAfter(currentTask)
-    }
-
-    if (currentTask =~ /generate.*UnitTestLintModel/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-
-    if (currentTask =~ /lintAnalyze.*UnitTest/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /process.*JavaRes/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /strip.*DebugSymbols/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /merge.*JavaResource/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /lintAnalyze.*/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /lintAnalyze.*AndroidTest/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /bundle.*Resources/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /compile.*ArtProfile/) {
-        currentTask.mustRunAfter(buildMetadata)
-    }
-
-    if (currentTask =~ /check.*DuplicateClasses/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /check.*AarMetadata/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /create.*CompatibleScreenManifests/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /process.*Manifest/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /generate.*ResValues/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /merge.*Resources/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /package.*Resources/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /process.*Resources/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /desugar.*Dependencies/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
-
-    if (currentTask =~ /merge.*JniLibFolders/) {
-        currentTask.finalizedBy(buildMetadata)
-    }
+//
+//    if (currentTask =~ /merge.+GlobalSynthetics/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /optimize.+Resources/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /buildCMake.*/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /configureCMake.*/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /validateSigning.*/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /generate.*LintReportModel/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /generate.*AndroidTestResValues/) {
+//      //  buildMetadata.dependsOn(currentTask)
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /generate.*AndroidTestLintModel/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /generate.*UnitTestLintModel/) {
+//        buildMetadata.mustRunAfter(currentTask)
+//    }
+//
+//    if (currentTask =~ /generate.*UnitTestLintModel/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//
+//    if (currentTask =~ /lintAnalyze.*UnitTest/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /process.*JavaRes/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /strip.*DebugSymbols/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /merge.*JavaResource/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /lintAnalyze.*/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /lintAnalyze.*AndroidTest/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /bundle.*Resources/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /compile.*ArtProfile/) {
+//        currentTask.mustRunAfter(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /check.*DuplicateClasses/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /check.*AarMetadata/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /create.*CompatibleScreenManifests/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /process.*Manifest/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /generate.*ResValues/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /merge.*Resources/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /package.*Resources/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /process.*Resources/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /desugar.*Dependencies/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
+//
+//    if (currentTask =~ /merge.*JniLibFolders/) {
+//        currentTask.finalizedBy(buildMetadata)
+//    }
 
 })
 
