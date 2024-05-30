@@ -58,6 +58,18 @@ if (NDK_PATH == null || NDK_PATH == "null" || NDK_PATH == "") {
 
 println "Runtime using NDK_PATH: " + NDK_PATH
 
+base {
+    if (!optimized && !optimizedWithInspector) {
+        archivesName = "${base.archivesName.get()}-regular"
+    } else {
+        if (optimized) {
+            archivesName = "${base.archivesName.get()}-optimized"
+        } else if (optimizedWithInspector) {
+            archivesName = "${base.archivesName.get()}-optimized-with-inspector"
+        }
+    }
+}
+
 android {
     namespace "com.tns.android_runtime"
 
@@ -83,16 +95,6 @@ android {
     defaultConfig {
         minSdkVersion NS_DEFAULT_MIN_SDK_VERSION as int
         targetSdkVersion NS_DEFAULT_COMPILE_SDK_VERSION as int
-
-        if (!optimized && !optimizedWithInspector) {
-            project.archivesBaseName = "${archivesBaseName}-regular"
-        } else {
-            if (optimized) {
-                project.archivesBaseName = "${archivesBaseName}-optimized"
-            } else if (optimizedWithInspector) {
-                project.archivesBaseName = "${archivesBaseName}-optimized-with-inspector"
-            }
-        }
 
         externalNativeBuild {
             cmake {
