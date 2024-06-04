@@ -878,7 +878,12 @@ task buildMetadata(type: BuildToolTask) {
             dependsOn optimizeResourcesTask
         }
 
+        def bundleResourcesTaskName = "bundle${buildTypeName}Resources"
+        def bundleResourcesTask = tasks.findByName(bundleResourcesTaskName)
 
+        if (bundleResourcesTask) {
+            dependsOn bundleResourcesTask
+        }
 
     }
 
