@@ -190,7 +190,7 @@ public final class RuntimeHelper {
                     waitForLiveSync(context);
                 }
 
-                runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
+//                runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
 
                 File javaClassesModule = new File(appDir, "app/tns-java-classes.js");
                 if (javaClassesModule.exists()) {

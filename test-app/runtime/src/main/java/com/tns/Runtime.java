@@ -605,6 +605,7 @@ public class Runtime {
     private static Runtime initRuntime(DynamicConfiguration dynamicConfiguration) {
         Runtime runtime = new Runtime(staticConfiguration, dynamicConfiguration);
         runtime.init();
+        runtime.runScript(new File(staticConfiguration.appDir, "internal/ts_helpers.js"));
 
         return runtime;
     }
