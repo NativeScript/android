@@ -2,9 +2,9 @@ package com.telerik.metadata.parsing.kotlin.metadata
 
 import com.telerik.metadata.parsing.NativeClassDescriptor
 
-import kotlinx.metadata.KmFunction
-import kotlinx.metadata.KmProperty
-import kotlinx.metadata.jvm.KotlinClassMetadata
+import kotlin.metadata.KmFunction
+import kotlin.metadata.KmProperty
+import kotlin.metadata.jvm.KotlinClassMetadata
 import java.util.stream.Stream
 
 interface ClassMetadataParser {

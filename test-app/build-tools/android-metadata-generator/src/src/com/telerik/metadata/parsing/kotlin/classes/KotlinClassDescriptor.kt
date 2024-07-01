@@ -15,13 +15,14 @@ import com.telerik.metadata.parsing.kotlin.metadata.bytecode.BytecodeClassMetada
 import com.telerik.metadata.parsing.kotlin.methods.KotlinMethodDescriptor
 import com.telerik.metadata.parsing.kotlin.properties.KotlinPropertyDescriptor
 import com.telerik.metadata.security.classes.SecuredClassRepository
-import kotlinx.metadata.Flag
-import kotlinx.metadata.KmClass
-import kotlinx.metadata.KmProperty
-import kotlinx.metadata.jvm.KotlinClassMetadata
-import kotlinx.metadata.jvm.Metadata
-import kotlinx.metadata.jvm.getterSignature
-import kotlinx.metadata.jvm.setterSignature
+import kotlin.metadata.KmClass
+import kotlin.metadata.KmProperty
+import kotlin.metadata.Visibility
+import kotlin.metadata.jvm.KotlinClassMetadata
+import kotlin.metadata.jvm.Metadata
+import kotlin.metadata.jvm.getterSignature
+import kotlin.metadata.jvm.setterSignature
+import kotlin.metadata.visibility
 import org.apache.bcel.classfile.JavaClass
 import java.io.IOException
 import java.nio.file.Files
@@ -48,7 +49,7 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
         var kotlinMetadataProperties: Collection<KmProperty> = emptyList()
 
         if (meta is KotlinClassMetadata.Class) {
-            val metaClass = meta.toKmClass()
+            val metaClass = meta.kmClass
             kotlinMetadataProperties = metaClass.properties
 
             val possibleCompanionField = getCompanionFieldIfAny(nativeClass, metaClass)
@@ -68,9 +69,9 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
             }
 
         } else if (meta is KotlinClassMetadata.FileFacade) {
-            kotlinMetadataProperties = meta.toKmPackage().properties
+            kotlinMetadataProperties = meta.kmPackage.properties
         } else if (meta is KotlinClassMetadata.MultiFileClassPart) {
-            kotlinMetadataProperties = meta.toKmPackage().properties
+            kotlinMetadataProperties = meta.kmPackage.properties
         }
 
 
@@ -95,11 +96,11 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
                 if (field.name == prop.name) {
                     val kotlinField = KotlinJvmFieldDescriptor(
                             field = field,
-                            isPublic = Flag.IS_PUBLIC(prop.flags),
-                            isInternal = Flag.IS_INTERNAL(prop.flags),
-                            isProtected = Flag.IS_PROTECTED(prop.flags),
+                            isPublic = prop.visibility == Visibility.PUBLIC,
+                            isInternal = prop.visibility == Visibility.INTERNAL,
+                            isProtected = prop.visibility == Visibility.PROTECTED,
                             isPackagePrivate,
-                            isPrivate = Flag.IS_PRIVATE(prop.flags),
+                            isPrivate = prop.visibility == Visibility.PRIVATE,
                     )
 
                     kotlinFields.add(kotlinField)
@@ -191,13 +192,17 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
                     var getter: NativeMethodDescriptor? = null
                     val getterSignature = it.getterSignature
                     if (getterSignature != null) {
-                        getter = getMethodDescriptorWithSignature(getterSignature.name, getterSignature.desc)
+                        getter = getMethodDescriptorWithSignature(getterSignature.name,
+                            getterSignature.descriptor
+                        )
                     }
 
                     var setter: NativeMethodDescriptor? = null
                     val setterSignature = it.setterSignature
                     if (setterSignature != null) {
-                        setter = getMethodDescriptorWithSignature(setterSignature.name, setterSignature.desc)
+                        setter = getMethodDescriptorWithSignature(setterSignature.name,
+                            setterSignature.descriptor
+                        )
                     }
 
                     KotlinPropertyDescriptor(propertyName, getter, setter, duplicate)
@@ -225,28 +230,28 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
 
     override val isPublic by lazy {
         when (val metadata = kotlinMetadata) {
-            is KotlinClassMetadata.Class -> Flag.IS_PUBLIC(metadata.toKmClass().flags)
+            is KotlinClassMetadata.Class -> metadata.kmClass.visibility == Visibility.PUBLIC
             else -> clazz.isPublic
         }
     }
 
     override val isInternal by lazy {
         when (val metadata = kotlinMetadata) {
-            is KotlinClassMetadata.Class -> Flag.IS_INTERNAL(metadata.toKmClass().flags)
+            is KotlinClassMetadata.Class -> metadata.kmClass.visibility == Visibility.INTERNAL
             else -> false
         }
     }
 
     override val isProtected by lazy {
         when (val metadata = kotlinMetadata) {
-            is KotlinClassMetadata.Class -> Flag.IS_PROTECTED(metadata.toKmClass().flags)
+            is KotlinClassMetadata.Class -> metadata.kmClass.visibility == Visibility.PROTECTED
             else -> clazz.isProtected
         }
     }
 
     override val isPrivate by lazy {
         when (val metadata = kotlinMetadata) {
-            is KotlinClassMetadata.Class -> Flag.IS_PRIVATE(metadata.toKmClass().flags)
+            is KotlinClassMetadata.Class -> metadata.kmClass.visibility == Visibility.PRIVATE
             else -> clazz.isPrivate
         }
     }
@@ -262,7 +267,7 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
                 metadataAnnotation.packageName,
                 metadataAnnotation.extraInt)
 
-        KotlinClassMetadata.read(metadata)
+        KotlinClassMetadata.readStrict(metadata)
     }
 
 

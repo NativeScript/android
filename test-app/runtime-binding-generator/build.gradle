@@ -6,8 +6,10 @@ dependencies {
     testImplementation "junit:junit:${ns_default_junit_version}"
 }
 
-sourceCompatibility = JavaVersion.VERSION_1_7
-targetCompatibility = JavaVersion.VERSION_1_7
+java {
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
+}
 
 // Disable compilation tasks as these are compiled *with* the runtime and not separately
 compileJava.enabled = false

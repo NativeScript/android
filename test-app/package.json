@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "@nativescript/core": "~8.4.0",
-    "nativescript": "~8.4.0"
+    "@nativescript/core": "~8.7.0",
+    "nativescript": "~8.7.0"
   },
   "devDependencies": {}
 }
