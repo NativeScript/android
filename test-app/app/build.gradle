@@ -688,9 +688,13 @@ task 'collectAllJars' {
     }
 }
 
-task copyMetadataFilters(type: Copy) {
-    from "$rootDir/whitelist.mdg", "$rootDir/blacklist.mdg"
-    into "$BUILD_TOOLS_PATH"
+task copyMetadataFilters {
+    outputs.files("$BUILD_TOOLS_PATH/whitelist.mdg", "$BUILD_TOOLS_PATH/blacklist.mdg")
+    // use an explicit copy task here because the copy task itselfs marks the whole built-tools as an output!
+    copy {
+        from file("$rootDir/whitelist.mdg"), file("$rootDir/blacklist.mdg")
+        into "$BUILD_TOOLS_PATH"
+    }
 }
 
 task 'copyMetadata' {
@@ -902,7 +906,9 @@ task buildMetadata(type: BuildToolTask) {
     inputs.files("$MDG_JAVA_DEPENDENCIES")
 
     // make MDG aware of whitelist.mdg and blacklist.mdg files
-    inputs.files(project.fileTree(dir: "$rootDir", include: "**/*.mdg"))
+    // inputs.files(project.fileTree(dir: "$rootDir", include: "**/*.mdg"))
+    // use explicit inputs as the above makes the whole build-tools directory an input!
+    inputs.files("$BUILD_TOOLS_PATH/whitelist.mdg", "$BUILD_TOOLS_PATH/blacklist.mdg")
 
     def classesDir = layout.buildDirectory.dir("intermediates/javac").get().asFile
     if (classesDir.exists()) {
@@ -1005,9 +1011,6 @@ task buildMetadata(type: BuildToolTask) {
 
 task generateTypescriptDefinitions(type: BuildToolTask) {
     if (!findProject(':dts-generator').is(null)) {
-        // TODO: find out why this is needed. Running these tasks solo works fine, but when running the whole build, it fails.
-        tasks.findByPath(":dts-generator:compileJava").dependsOn(buildMetadata)
-        tasks.findByPath(":dts-generator:processResources").dependsOn(buildMetadata)
         dependsOn ':dts-generator:jar'
     }
 
