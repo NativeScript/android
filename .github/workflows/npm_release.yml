@@ -16,7 +16,7 @@ env:
 jobs:
   build:
     name: Build
-    runs-on: macos-latest
+    runs-on: macos-13
     outputs:
       npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
@@ -79,7 +79,7 @@ jobs:
           path: dist/nativescript-android-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
   test:
     name: Test
-    runs-on: macos-latest
+    runs-on: macos-13
     needs: build
     steps:
       - uses: actions/checkout@v3
