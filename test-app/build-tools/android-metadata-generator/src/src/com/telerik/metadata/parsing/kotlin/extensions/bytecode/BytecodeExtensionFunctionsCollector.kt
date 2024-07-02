@@ -7,7 +7,7 @@ import com.telerik.metadata.parsing.kotlin.extensions.KotlinExtensionFunctionDes
 import com.telerik.metadata.parsing.kotlin.extensions.ExtensionFunctionsCollector
 import com.telerik.metadata.parsing.kotlin.metadata.ClassMetadataParser
 import com.telerik.metadata.parsing.kotlin.methods.KotlinMethodDescriptor
-import kotlinx.metadata.jvm.signature
+import kotlin.metadata.jvm.signature
 import java.util.*
 
 class BytecodeExtensionFunctionsCollector(private val kotlinClassMetadataParser: ClassMetadataParser) : ExtensionFunctionsCollector {
@@ -24,7 +24,7 @@ class BytecodeExtensionFunctionsCollector(private val kotlinClassMetadataParser:
 
             if (signature != null) {
                 val functionName = signature.name
-                val functionSignature = signature.desc
+                val functionSignature = signature.descriptor
 
                 val extensionFunctionDescriptor: KotlinMethodDescriptor = Arrays
                         .stream(kotlinClassDescriptor.methods)

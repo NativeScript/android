@@ -1,8 +1,10 @@
 apply plugin: 'java'
 apply plugin: 'kotlin'
 
-sourceCompatibility = JavaVersion.VERSION_1_8
-targetCompatibility = JavaVersion.VERSION_1_8
+java {
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
+}
 
 // todo: check if still needed
 // if(!project.hasProperty("loadedProjectDeps")){
@@ -43,8 +45,10 @@ compileJava {
 compileJava.outputs.dir("$rootDir/dist/classes")
 
 compileKotlin {
-    kotlinOptions.allWarningsAsErrors = true
-    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions {
+        jvmTarget = '17'
+        allWarningsAsErrors = true
+    }
 }
 
 repositories {
@@ -57,7 +61,7 @@ dependencies {
 
     api "org.apache.bcel:bcel:${ns_default_bcel_version}"
     api "com.google.code.gson:gson:${ns_default_gson_version}"
-    api group: 'org.jetbrains.kotlinx', name: 'kotlinx-metadata-jvm', version: "${ns_default_kotlinx_metadata_jvm_version}"
+    api group: 'org.jetbrains.kotlin', name: 'kotlin-metadata-jvm', version: "${ns_default_kotlinx_metadata_jvm_version}"
     implementation files("./src/libs/dx.jar")
 
     testImplementation "junit:junit:${ns_default_junit_version}"
@@ -65,31 +69,61 @@ dependencies {
 }
 
 task copyNecessaryFiles {
-	doLast {
-		copy {
-			from "$rootDir/helpers"
-			into "$rootDir/dist/bin"
-		}
+    doLast {
+        copy {
+            from "$rootDir/helpers"
+            into "$rootDir/dist/bin"
+        }
 
-		copy {
-			from "$rootDir/package.json"
-			into "$rootDir/dist"
-		}
-	}
+        copy {
+            from "$rootDir/package.json"
+            into "$rootDir/dist"
+        }
+    }
+}
+
+configurations.create("metadataGeneratorImplementation") {
+    extendsFrom configurations.implementation
+    setCanBeResolved(true)
+}
+
+configurations.create("metadataGeneratorApi") {
+    extendsFrom configurations.api
+    setCanBeResolved(true)
+}
+
+configurations.create("metadataGeneratorRuntimeOnly") {
+    extendsFrom configurations.runtimeOnly
+    setCanBeResolved(true)
 }
 
 jar {
-    configurations.api.setCanBeResolved(true)
     manifest {
-        attributes("Manifest-Version": "2.0",
-                   "Main-Class": "com.telerik.metadata.Generator")
+        attributes("Manifest-Version": "3.0",
+                "Main-Class": "com.telerik.metadata.Generator")
     }
 
     from {
-        configurations.api.collect {
+        configurations.metadataGeneratorImplementation.collect {
             it.isDirectory() ? it : zipTree(it)
         }
+
+        configurations.metadataGeneratorApi.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+
+        configurations.metadataGeneratorRuntimeOnly.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+
+        configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) }
     }
 
     duplicatesStrategy = 'include'
+}
+
+def copyMetadataFilters = tasks.findByPath(":app:copyMetadataFilters")
+if (copyMetadataFilters != null) {
+    compileJava.dependsOn(copyMetadataFilters)
+    compileKotlin.dependsOn(copyMetadataFilters)
 }

@@ -1,8 +1,5 @@
 apply plugin: 'java-library'
 
-sourceCompatibility = JavaVersion.VERSION_1_8
-targetCompatibility = JavaVersion.VERSION_1_8
-
 // todo: check if still needed
 // if(!project.hasProperty("loadedProjectDeps")){
 //     Properties projectDeps = new Properties()
@@ -34,32 +31,62 @@ dependencies {
 
 compileJava {
     options.compilerArgs << "-Xlint:all" << "-Xlint:-options" << "-Werror"
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+configurations.create("staticBindingGeneratorTestImplementation") {
+    extendsFrom configurations.testImplementation
+    setCanBeResolved(true)
+}
+
+configurations.create("staticBindingGeneratorImplementation") {
+    extendsFrom configurations.implementation
+    setCanBeResolved(true)
+}
+
+configurations.create("staticBindingGeneratorRuntimeOnly") {
+    extendsFrom configurations.runtimeOnly
+    setCanBeResolved(true)
+}
+
+configurations.create("staticBindingGeneratorApi") {
+    extendsFrom configurations.api
+    setCanBeResolved(true)
 }
 
 jar {
 
-    configurations.implementation.setCanBeResolved(true)
-    configurations.runtimeOnly.setCanBeResolved(true)
-    configurations.api.setCanBeResolved(true)
-
     manifest {
-        attributes("Manifest-Version": "1.0",
+        attributes("Manifest-Version": "2.0",
                 "Main-Class": "org.nativescript.staticbindinggenerator.Main")
     }
     from {
 
-        configurations.implementation.collect {
+        configurations.staticBindingGeneratorTestImplementation.collect {
             it.isDirectory() ? it : zipTree(it)
         }
 
-        configurations.runtimeOnly.collect {
+        configurations.staticBindingGeneratorImplementation.collect {
             it.isDirectory() ? it : zipTree(it)
         }
 
-        configurations.api.collect {
+        configurations.staticBindingGeneratorRuntimeOnly.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+
+        configurations.staticBindingGeneratorApi.collect {
             it.isDirectory() ? it : zipTree(it)
         }
     }
 
     duplicatesStrategy = 'include'
+}
+
+def copyMetadataFilters = tasks.findByPath(":app:copyMetadataFilters")
+if (copyMetadataFilters != null) {
+    compileJava.dependsOn(copyMetadataFilters)
+    if (processTestResources) {
+        processTestResources.dependsOn(copyMetadataFilters)
+    }
 }

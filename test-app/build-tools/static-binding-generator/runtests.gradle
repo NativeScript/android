@@ -44,14 +44,20 @@ def outputFile = file('../sbg-output-file.txt')
 def javaDependenciesFile = file('../sbg-java-dependencies.txt')
 def interfaceNamesFile = file('../sbg-interface-names.txt')
 
+
+configurations.create("runTestsApi") {
+    extendsFrom configurations.api
+    setCanBeResolved(true)
+}
+
+
 jar {
-    configurations.api.setCanBeResolved(true)
     manifest {
         attributes("Manifest-Version": "1.0",
                 "Main-Class": "org.nativescript.staticbindinggenerator.Main")
     }
     from {
-        configurations.api.collect {
+        configurations.runTestsApi.collect {
             it.isDirectory() ? it : zipTree(it)
         }
     }
@@ -73,6 +79,6 @@ task runSbg(type: JavaExec, dependsOn: 'prepareInputFiles') {
     main = "org.nativescript.staticbindinggenerator.Main"
 }
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
