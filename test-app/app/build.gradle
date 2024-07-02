@@ -1005,6 +1005,9 @@ task buildMetadata(type: BuildToolTask) {
 
 task generateTypescriptDefinitions(type: BuildToolTask) {
     if (!findProject(':dts-generator').is(null)) {
+        // TODO: find out why this is needed. Running these tasks solo works fine, but when running the whole build, it fails.
+        tasks.findByPath(":dts-generator:compileJava").dependsOn(buildMetadata)
+        tasks.findByPath(":dts-generator:processResources").dependsOn(buildMetadata)
         dependsOn ':dts-generator:jar'
     }
 
