@@ -6,14 +6,14 @@ env:
   EMULATOR_NAME: "runtime-emu"
   NDK_VERSION: r23c
   ANDROID_API: 29
-  ANDROID_ABI: arm64-v8a
+  ANDROID_ABI: x86_64
   NDK_ARCH: darwin
 
 
 jobs:
   build:
     name: Build
-    runs-on: macos-14
+    runs-on: macos-13
     outputs:
       npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
@@ -76,7 +76,7 @@ jobs:
           path: dist/nativescript-android-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
   test:
     name: Test
-    runs-on: macos-14
+    runs-on: macos-13
     needs: build
     steps:
       - uses: actions/checkout@v3
