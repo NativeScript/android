@@ -199,12 +199,12 @@ dependencies {
     }
 
     implementation fileTree(include: ['*.jar'], dir: 'libs')
+    testImplementation "junit:junit:${ns_default_junit_version}"
+    testImplementation "org.mockito:mockito-core:${ns_default_mockito_core_version}"
     implementation "com.google.android.material:material:$androidXMaterialVersion"
     implementation "androidx.appcompat:appcompat:$androidXAppCompatVersion"
     implementation 'androidx.navigation:navigation-fragment-ktx:2.5.3'
     implementation 'androidx.navigation:navigation-ui-ktx:2.5.3'
-    testImplementation "junit:junit:${ns_default_junit_version}"
-    testImplementation "org.mockito:mockito-core:${ns_default_mockito_core_version}"
 }
 
 
