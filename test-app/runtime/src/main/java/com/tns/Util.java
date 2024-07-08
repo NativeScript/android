@@ -56,7 +56,7 @@ public final class Util {
 
         try {
             Class<?> liveSyncPluginClass = Class.forName(pluginClassName);
-            Plugin p = (Plugin) liveSyncPluginClass.newInstance();
+            Plugin p = (Plugin) liveSyncPluginClass.getDeclaredConstructor().newInstance();
             success = p.execute(context);
         } catch (Exception e) {
             if (Util.isDebuggableApp(context) && logger.isEnabled()) {
