@@ -1,3 +1,17 @@
+# [8.8.0](https://github.com/NativeScript/android/compare/v8.7.0...v8.8.0) (2024-07-09)
+
+
+### Bug Fixes
+
+* correctly load ts_helpers.js in workers ([#1798](https://github.com/NativeScript/android/issues/1798)) ([31f8501](https://github.com/NativeScript/android/commit/31f8501bb902815cfed8e1cd123fe8b6de2cb757))
+
+
+### Features
+
+* Kotlin 2 + Gradle 8+ ([#1812](https://github.com/NativeScript/android/issues/1812)) ([d4b7164](https://github.com/NativeScript/android/commit/d4b716427934ebb4387a04842561d5b5d0e1fa3d))
+
+
+
 # [8.7.0](https://github.com/NativeScript/android/compare/v8.7.0-rc.3...v8.7.0) (2024-04-08)
 
 
