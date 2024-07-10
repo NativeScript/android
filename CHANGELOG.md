@@ -1,3 +1,12 @@
+## [8.8.1](https://github.com/NativeScript/android/compare/v8.8.0...v8.8.1) (2024-07-10)
+
+
+### Features
+
+* Ada 2.9 ([#1814](https://github.com/NativeScript/android/issues/1814)) ([91accf9](https://github.com/NativeScript/android/commit/91accf9be1caf9ad2accb80bf9aca18efe4dd75a))
+
+
+
 # [8.8.0](https://github.com/NativeScript/android/compare/v8.7.0...v8.8.0) (2024-07-09)
 
 
