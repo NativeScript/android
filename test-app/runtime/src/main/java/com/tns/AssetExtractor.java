@@ -6,7 +6,10 @@ import java.io.IOException;
 import android.content.Context;
 import android.util.Log;
 
+import dalvik.annotation.optimization.FastNative;
+
 public class AssetExtractor {
+    @FastNative
     private native void extractAssets(String apkPath, String input, String outputDir, boolean checkForNewerFiles);
     private final Logger logger;
 
