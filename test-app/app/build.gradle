@@ -192,10 +192,13 @@ def computeNamespace = { ->
 
         def appIdentifier = ""
 
-        if (packageJsonMap && packageJsonMap.id) {
-            appIdentifier = packageJsonMap.id
+        if (packageJsonMap) {
+            if (packageJsonMap.android.id) {
+                appIdentifier = packageJsonMap.android.id
+            } else if (packageJsonMap.id) {
+                appIdentifier = packageJsonMap.id
+            }
         }
-
 
         if (appIdentifier) {
             return appIdentifier
