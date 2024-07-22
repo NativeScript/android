@@ -1,3 +1,12 @@
+## [8.8.2](https://github.com/NativeScript/android/compare/v8.8.1...v8.8.2) (2024-07-22)
+
+
+### Bug Fixes
+
+* config with multiple bundle ids ([#1816](https://github.com/NativeScript/android/issues/1816)) ([cdcfee2](https://github.com/NativeScript/android/commit/cdcfee266617472ac7f3ac59742b858ad093e46b))
+
+
+
 ## [8.8.1](https://github.com/NativeScript/android/compare/v8.8.0...v8.8.1) (2024-07-10)
 
 
