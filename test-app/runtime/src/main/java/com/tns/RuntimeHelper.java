@@ -8,7 +8,7 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Build;
-import android.preference.PreferenceManager;
+import androidx.preference.PreferenceManager;
 import android.util.Log;
 
 import java.io.File;
@@ -68,6 +68,8 @@ public final class RuntimeHelper {
             ManualInstrumentation.Frame loadLibraryFrame = ManualInstrumentation.start("loadLibrary NativeScript");
             try {
                 System.loadLibrary("NativeScript");
+            } catch (Exception e) {
+                throw e;
             } finally {
                 loadLibraryFrame.close();
             }

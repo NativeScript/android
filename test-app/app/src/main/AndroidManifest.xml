@@ -9,14 +9,14 @@
 
     <application
 	android:requestLegacyExternalStorage="true"
-        android:name="com.tns.NativeScriptApplication"
+        android:name="com.tns.TestNativeScriptApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name="com.tns.NativeScriptActivity" android:exported="true">
+        <activity android:name="com.tns.TestNativeScriptActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

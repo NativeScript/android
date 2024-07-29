@@ -32,9 +32,10 @@ import com.google.android.material.tabs.TabLayout;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentStatePagerAdapter;
-import androidx.viewpager.widget.ViewPager;
+import androidx.viewpager2.widget.ViewPager2;
+import androidx.viewpager2.adapter.FragmentStateAdapter;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
@@ -59,7 +60,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
     private static AppCompatActivity activity;
 
     private TabLayout tabLayout;
-    private ViewPager viewPager;
+    private ViewPager2 viewPager;
     private Context context;
 
     private static String exceptionMsg;
@@ -279,12 +280,12 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
         tabLayout.setTabGravity(TabLayout.GRAVITY_FILL);
         int pagerId = this.context.getResources().getIdentifier("pager", "id", this.context.getPackageName());
 
-        viewPager = (ViewPager) activity.findViewById(pagerId);
+        viewPager = (ViewPager2) activity.findViewById(pagerId);
 
-        Pager adapter = new Pager(activity.getSupportFragmentManager(), tabLayout.getTabCount());
+        Pager adapter = new Pager(activity, tabLayout.getTabCount());
 
         viewPager.setAdapter(adapter);
-        viewPager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+        viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
             public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
 
@@ -332,18 +333,18 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
         viewPager.setCurrentItem(tab.getPosition());
     }
 
-    private class Pager extends FragmentStatePagerAdapter {
+    private class Pager extends FragmentStateAdapter {
 
         int tabCount;
 
         @SuppressWarnings("deprecation")
-        public Pager(FragmentManager fm, int tabCount) {
+        public Pager(FragmentActivity fm, int tabCount) {
             super(fm);
             this.tabCount = tabCount;
         }
 
         @Override
-        public Fragment getItem(int position) {
+        public Fragment createFragment(int position) {
             switch (position) {
             case 0:
                 return new ExceptionTab();
@@ -355,7 +356,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
         }
 
         @Override
-        public int getCount() {
+        public int getItemCount() {
             return tabCount;
         }
     }
@@ -410,14 +411,14 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 
         @Override
         public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-            int exceptionTabId = container.getContext().getResources().getIdentifier("exception_tab", "layout", container.getContext().getPackageName());
+            int exceptionTabId = getContext().getResources().getIdentifier("exception_tab", "layout", getContext().getPackageName());
             View view = inflater.inflate(exceptionTabId, container, false);
 
             int errorExceptionViewId = activity.getResources().getIdentifier("errorException", "id", activity.getPackageName());
             TextView errorExceptionView = (TextView) activity.findViewById(errorExceptionViewId);
             errorExceptionView.setMovementMethod(new ScrollingMovementMethod());
 
-            int errorStackTraceViewId = container.getContext().getResources().getIdentifier("errorStacktrace", "id", container.getContext().getPackageName());
+            int errorStackTraceViewId = getContext().getResources().getIdentifier("errorStacktrace", "id", getContext().getPackageName());
             TextView errorStackTraceView = (TextView) view.findViewById(errorStackTraceViewId);
 
             String[] exceptionParts = exceptionMsg.split("StackTrace:");
@@ -438,10 +439,10 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
             errorStackTraceView.setMovementMethod(LinkMovementMethod.getInstance());
             errorStackTraceView.setEnabled(true);
 
-            int btnCopyExceptionId = container.getContext().getResources().getIdentifier("btnCopyException", "id", container.getContext().getPackageName());
+            int btnCopyExceptionId = getContext().getResources().getIdentifier("btnCopyException", "id", getContext().getPackageName());
             Button copyToClipboard = (Button) view.findViewById(btnCopyExceptionId);
 
-            int btnRestartAppId = container.getContext().getResources().getIdentifier("btnRestartApp", "id", container.getContext().getPackageName());
+            int btnRestartAppId = getContext().getResources().getIdentifier("btnRestartApp", "id", getContext().getPackageName());
             Button restartApp = (Button) view.findViewById(btnRestartAppId);
             restartApp.setOnClickListener(v -> {
                 restartApp(getContext().getApplicationContext());
@@ -459,10 +460,10 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
     public static class LogcatTab extends Fragment {
         @Override
         public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-            int logcatTabId = container.getContext().getResources().getIdentifier("logcat_tab", "layout", container.getContext().getPackageName());
+            int logcatTabId = getContext().getResources().getIdentifier("logcat_tab", "layout", getContext().getPackageName());
             View view = inflater.inflate(logcatTabId, container, false);
 
-            int textViewId = container.getContext().getResources().getIdentifier("logcatMsg", "id", container.getContext().getPackageName());
+            int textViewId = getContext().getResources().getIdentifier("logcatMsg", "id", getContext().getPackageName());
             TextView txtlogcatMsg = (TextView) view.findViewById(textViewId);
             txtlogcatMsg.setText(logcatMsg);
 
@@ -470,7 +471,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 
             final String logName = "Log-" + new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss").format(new Date());
 
-            int btnCopyLogcatId = container.getContext().getResources().getIdentifier("btnCopyLogcat", "id", container.getContext().getPackageName());
+            int btnCopyLogcatId = getContext().getResources().getIdentifier("btnCopyLogcat", "id", getContext().getPackageName());
             Button copyToClipboard = (Button) view.findViewById(btnCopyLogcatId);
             copyToClipboard.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -498,7 +499,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
                         } catch (Exception e) {
                             String err = "Could not write logcat report to sdcard. Make sure you have allowed access to external storage!";
                             Toast.makeText(activity, err, Toast.LENGTH_LONG).show();
-                            if (Util.isDebuggableApp(container.getContext())) {
+                            if (Util.isDebuggableApp(getContext())) {
                                 e.printStackTrace();
                             }
                         }
