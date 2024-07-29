@@ -182,6 +182,11 @@ if("${ANDROID_ABI}" MATCHES "armeabi-v7a$" OR "${ANDROID_ABI}" MATCHES "x86$")
     target_link_libraries(NativeScript ${ANDROID_NDK_ROOT}/sources/cxx-stl/llvm-libc++/libs/${ANDROID_ABI}/libandroid_support.a)
 endif()
 
+
+if("${ANDROID_ABI}" MATCHES "arm64-v8a$" OR "${ANDROID_ABI}" MATCHES "x86_64$")
+    target_link_options(NativeScript PRIVATE "-Wl,-z,max-page-size=16384")
+endif()
+
 # Command info: https://cmake.org/cmake/help/v3.4/command/find_library.html
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
