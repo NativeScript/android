@@ -8,7 +8,7 @@ on:
 env:
   NPM_TAG: "next"
   EMULATOR_NAME: "runtime-emu"
-  NDK_VERSION: r23c
+  NDK_VERSION: r27
   ANDROID_API: 29
   ANDROID_ABI: x86_64
   NDK_ARCH: darwin
