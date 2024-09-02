@@ -27,6 +27,8 @@ public class Generator {
     private static final String MDG_BLACKLIST = "blacklist.mdg";
     private static final String METADATA_JAVA_OUT = "mdg-java-out.txt";
 
+    private static boolean verbose_mode = false;
+
     /**
      * @param args arguments
      */
@@ -69,7 +71,13 @@ public class Generator {
             FileOutputStream oss = new FileOutputStream(new File(metadataOutputDir, "treeStringsStream.dat"));
             FileStreamWriter outStringsStream = new FileStreamWriter(oss);
 
-            new Writer(outNodeStream, outValueStream, outStringsStream).writeTree(root);
+            if (verbose_mode) {
+                FileOutputStream ods = new FileOutputStream(new File("metadata-debug.json"));
+                FileStreamWriter outDebugStream = new FileStreamWriter(ods);
+                new Writer(outNodeStream, outValueStream, outStringsStream, outDebugStream).writeTree(root);
+            } else {
+                new Writer(outNodeStream, outValueStream, outStringsStream).writeTree(root);
+            }
         } catch (Throwable ex) {
             System.err.println(String.format("Error executing Metadata Generator: %s", ex.getMessage()));
             ex.printStackTrace(System.out);
@@ -83,6 +91,7 @@ public class Generator {
                 String filePath = arg.replace(ANALYTICS_ARGUMENT_BEGINNING, "");
                 AnalyticsConfiguration.enableAnalytics(filePath);
             } else if (VERBOSE_FLAG_NAME.equals(arg)) {
+                verbose_mode = true;
                 MetadataFilterConsoleLogger.INSTANCE.setEnabled(true);
             } else if (SKIP_FLAG_NAME.equals(arg)) {
                 System.out.println("Skipping metadata generation: skip flag used.");

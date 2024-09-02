@@ -2,6 +2,7 @@
 #include "MetadataMethodInfo.h"
 #include "Util.h"
 #include <sstream>
+#include <android/log.h>
 
 using namespace std;
 using namespace tns;
@@ -54,19 +55,27 @@ MetadataTreeNode* MetadataReader::BuildTree() {
             while (true) {
 
                 uint16_t childNodeDataId = childNodeData - rootNodeData;
+
+                MetadataTreeNode* childNode;
                 // node (and its next siblings) already visited, so we don't need to visit it again
                 if (m_v[childNodeDataId] != emptyNode) {
+                    childNode = m_v[childNodeDataId];
+                    __android_log_print(ANDROID_LOG_ERROR, "TNS.error", "Consistency error in metadata. A child should never have been visited before its parent. Parent: %s Child: %s. Child metadata id: %u", node->name.c_str(), childNode->name.c_str(), childNodeDataId);
                     break;
+                } else {
+                    childNode = new MetadataTreeNode;
+                    childNode->name = ReadName(childNodeData->offsetName);
+                    childNode->offsetValue = childNodeData->offsetValue;
                 }
-
-                MetadataTreeNode* childNode = new MetadataTreeNode;
                 childNode->parent = node;
-                childNode->name = ReadName(childNodeData->offsetName);
-                childNode->offsetValue = childNodeData->offsetValue;
 
                 node->children->push_back(childNode);
 
                 m_v[childNodeDataId] = childNode;
+
+                if (childNodeDataId == childNodeData->nextSiblingId) {
+                    break;
+                }
 
                 childNodeData = rootNodeData + childNodeData->nextSiblingId;
             }
