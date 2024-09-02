@@ -1,5 +1,7 @@
 package com.telerik.metadata;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import com.telerik.metadata.TreeNode.FieldInfo;
 import com.telerik.metadata.TreeNode.MethodInfo;
 
@@ -10,6 +12,7 @@ import java.nio.IntBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,14 +21,20 @@ public class Writer {
     private final StreamWriter outNodeStream;
     private final StreamWriter outValueStream;
     private final StreamWriter outStringsStream;
+    private final StreamWriter outDebugStream;
 
     private int commonInterfacePrefixPosition;
 
     public Writer(StreamWriter outNodeStream, StreamWriter outValueStream,
                   StreamWriter outStringsStream) {
+        this(outNodeStream, outValueStream, outStringsStream, null);
+    }
+    public Writer(StreamWriter outNodeStream, StreamWriter outValueStream,
+                  StreamWriter outStringsStream, StreamWriter outDebugStream) {
         this.outNodeStream = outNodeStream;
         this.outValueStream = outValueStream;
         this.outStringsStream = outStringsStream;
+        this.outDebugStream = outDebugStream;
     }
 
     private final static byte[] writeUniqueName_lenBuff = new byte[2];
@@ -214,6 +223,10 @@ public class Writer {
         d.push(root);
         while (!d.isEmpty()) {
             TreeNode n = d.pollFirst();
+            if (Short.toUnsignedInt((short)(curId + 1)) < Short.toUnsignedInt(curId)) {
+                // we have overflowed our maximum (16 bit) metadata size
+                throw new Exception("Metadata is too big and has overflown our current limit, please report this issue");
+            }
             n.id = n.firstChildId = n.nextSiblingId = curId++;
 
             String name = n.getName();
@@ -351,7 +364,7 @@ public class Writer {
         while (!d.isEmpty()) {
             TreeNode n = d.pollFirst();
 
-            nodeData[0] = n.firstChildId + (n.nextSiblingId << 16);
+            nodeData[0] = (n.firstChildId & 0xFFFF) | (n.nextSiblingId << 16);
             nodeData[1] = n.offsetName;
             nodeData[2] = n.offsetValue;
 
@@ -364,5 +377,24 @@ public class Writer {
 
         outNodeStream.flush();
         outNodeStream.close();
+
+        if (outDebugStream != null) {
+            d.push(root);
+            JsonArray rootArray = new JsonArray();
+            while (!d.isEmpty()) {
+                TreeNode n = d.pollFirst();
+                JsonObject obj = new JsonObject();
+                obj.addProperty("id", Short.toUnsignedInt(n.id));
+                obj.addProperty("nextSiblingId", Short.toUnsignedInt(n.nextSiblingId));
+                obj.addProperty("firstChildId", Short.toUnsignedInt(n.firstChildId));
+                obj.addProperty("name", n.getName());
+                obj.addProperty("nodeType", n.nodeType);
+                rootArray.add(obj);
+                d.addAll(n.children);
+            }
+            outDebugStream.write(rootArray.toString().getBytes());
+            outDebugStream.flush();
+            outDebugStream.close();
+        }
     }
 }
