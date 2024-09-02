@@ -1,3 +1,12 @@
+## [8.8.3](https://github.com/NativeScript/android/compare/v8.8.2...v8.8.3) (2024-09-02)
+
+
+### Bug Fixes
+
+* generate correct metadata when overflowing signed short values ([#1821](https://github.com/NativeScript/android/issues/1821)) ([c9fac4b](https://github.com/NativeScript/android/commit/c9fac4b19a952d4df651d3d6a8b0fa9c50f7c7db))
+
+
+
 ## [8.8.2](https://github.com/NativeScript/android/compare/v8.8.1...v8.8.2) (2024-07-22)
 
 
