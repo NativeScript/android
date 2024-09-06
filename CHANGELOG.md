@@ -1,3 +1,12 @@
+## [8.8.4](https://github.com/NativeScript/android/compare/v8.8.3...v8.8.4) (2024-09-06)
+
+
+### Bug Fixes
+
+* ensure same mtime for js and code cache to prevent loading old code caches ([#1822](https://github.com/NativeScript/android/issues/1822)) ([3d6e101](https://github.com/NativeScript/android/commit/3d6e10115227ad556e5bbe1764217716ab5bdac7))
+
+
+
 ## [8.8.3](https://github.com/NativeScript/android/compare/v8.8.2...v8.8.3) (2024-09-02)
 
 
