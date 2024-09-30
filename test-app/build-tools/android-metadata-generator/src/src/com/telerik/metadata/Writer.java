@@ -305,7 +305,7 @@ public class Writer {
         outStringsStream.close();
         writeInt(0, outValueStream);
 
-        final int array_offset = 1000 * 1000 * 1000;
+        final int array_offset = Integer.MAX_VALUE; // 2147483647, which is half of uint32
 
         d.push(root);
         while (!d.isEmpty()) {
@@ -328,6 +328,10 @@ public class Writer {
                 throw new Exception("should not happen");
             }
 
+            if ((n.nodeType & TreeNode.Array) != TreeNode.Array && Integer.toUnsignedLong(n.offsetValue) >= Integer.toUnsignedLong(array_offset)) {
+                throw new Exception("Non-array metadata has overflown array space. Please report this issue.");
+            }
+
             d.addAll(n.children);
         }
 
@@ -339,7 +343,7 @@ public class Writer {
             TreeNode n = d.pollFirst();
 
             if (n.arrayElement != null) {
-                n.offsetValue = array_offset + n.arrayElement.id;
+                n.offsetValue = array_offset + Short.toUnsignedInt(n.arrayElement.id);
             }
 
             if (!n.children.isEmpty()) {
@@ -387,6 +391,8 @@ public class Writer {
                 obj.addProperty("id", Short.toUnsignedInt(n.id));
                 obj.addProperty("nextSiblingId", Short.toUnsignedInt(n.nextSiblingId));
                 obj.addProperty("firstChildId", Short.toUnsignedInt(n.firstChildId));
+                obj.addProperty("offsetName", Integer.toUnsignedLong(n.offsetName));
+                obj.addProperty("offsetValue", Integer.toUnsignedLong(n.offsetValue));
                 obj.addProperty("name", n.getName());
                 obj.addProperty("nodeType", n.nodeType);
                 rootArray.add(obj);
