@@ -1,3 +1,12 @@
+## [8.8.5](https://github.com/NativeScript/android/compare/v8.8.4...v8.8.5) (2024-09-30)
+
+
+### Bug Fixes
+
+* prevent metadata offset overflow into array space and convert shorts to uints before addition ([9cfc349](https://github.com/NativeScript/android/commit/9cfc3493017243948b043a51f68b7c7bcab1e6b9))
+
+
+
 ## [8.8.4](https://github.com/NativeScript/android/compare/v8.8.3...v8.8.4) (2024-09-06)
 
 
