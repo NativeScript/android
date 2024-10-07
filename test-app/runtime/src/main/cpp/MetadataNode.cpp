@@ -1453,7 +1453,7 @@ void MetadataNode::PackageGetterCallback(Local<Name> property, const PropertyCal
                     //        return true;
                     //    }
                     // });
-                    RegisterSymbolHasInstanceCallback(isolate, &child, cachedItem);
+                    RegisterSymbolHasInstanceCallback(isolate, child, cachedItem);
                 }
 
                 V8SetPrivateValue(isolate, thiz, strProperty, cachedItem);
@@ -2138,7 +2138,7 @@ void MetadataNode::SetMissingBaseMethods(
     }
 }
 
-void MetadataNode::RegisterSymbolHasInstanceCallback(Isolate* isolate, MetadataEntry* entry, Local<Value> interface) {
+void MetadataNode::RegisterSymbolHasInstanceCallback(Isolate* isolate, MetadataEntry& entry, Local<Value> interface) {
     if (interface->IsNullOrUndefined()) {
         return;
     }
@@ -2193,9 +2193,9 @@ void MetadataNode::SymbolHasInstanceCallback(const v8::FunctionCallbackInfo<v8::
     info.GetReturnValue().Set(isInstanceOf);
 }
 
-std::string MetadataNode::GetJniClassName(MetadataEntry* entry) {
+std::string MetadataNode::GetJniClassName(MetadataEntry& entry) {
     std::stack<string> s;
-    MetadataTreeNode* n = entry->treeNode;
+    MetadataTreeNode* n = entry.treeNode;
     while (n != nullptr && n->name != "") {
         s.push(n->name);
         n = n->parent;
