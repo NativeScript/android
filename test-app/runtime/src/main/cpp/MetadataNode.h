@@ -121,7 +121,7 @@ class MetadataNode {
 
         static MetadataTreeNode* GetOrCreateTreeNodeByName(const std::string& className);
 
-        static MetadataEntry GetChildMetadataForPackage(MetadataNode *node, std::string propName);
+        static MetadataEntry GetChildMetadataForPackage(MetadataNode *node, const std::string &propName);
 
         static MetadataNode* GetInstanceMetadata(v8::Isolate* isolate, const v8::Local<v8::Object>& value);
 

@@ -1802,7 +1802,7 @@ MetadataNode* MetadataNode::GetNodeFromHandle(const Local<Object>& value) {
     return node;
 }
 
-MetadataEntry MetadataNode::GetChildMetadataForPackage(MetadataNode *node, std::string propName) {
+MetadataEntry MetadataNode::GetChildMetadataForPackage(MetadataNode *node, const std::string &propName) {
     assert(node->m_treeNode->children != nullptr);
 
     MetadataEntry child(nullptr, NodeType::Class);
