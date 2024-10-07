@@ -219,7 +219,8 @@ namespace tns {
         }
 
     private:
-        static const uint32_t ARRAY_OFFSET = 1000000000;
+
+        static const uint32_t ARRAY_OFFSET = INT32_MAX; // 2147483647
 
         MetadataTreeNode *BuildTree();
 
