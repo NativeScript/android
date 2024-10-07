@@ -210,11 +210,11 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
     string *returnType = nullptr;
     auto retType = MethodReturnType::Unknown;
     MethodCache::CacheMethodInfo mi;
-    auto &entrySignature = entry->getSig();
 
     auto isolate = args.GetIsolate();
 
     if ((entry != nullptr) && entry->getIsResolved()) {
+        auto &entrySignature = entry->getSig();
         isStatic = entry->isStatic;
 
         if (entry->memberId == nullptr) {
