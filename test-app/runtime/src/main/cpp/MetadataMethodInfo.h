@@ -16,6 +16,23 @@ namespace tns {
                   sizeMeasured(false), nameOffset(0), resolvedData(0),
                   declaringNodeId(0){
         }
+        
+        MethodInfo(const MethodInfo& other) = default;
+
+        MethodInfo& operator=(const MethodInfo& other) {
+            if (this != &other) {
+                isStatic = other.isStatic;
+                m_pData = other.m_pData;
+                m_pStartData = other.m_pStartData;
+                m_signatureLength = other.m_signatureLength;
+                sizeMeasured = other.sizeMeasured;
+                nameOffset = other.nameOffset;
+                resolvedData = other.resolvedData;
+                declaringNodeId = other.declaringNodeId;
+                nodeIds = other.nodeIds;
+            }
+            return *this;
+        }
 
         std::string GetName();
 

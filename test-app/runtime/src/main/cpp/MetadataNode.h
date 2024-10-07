@@ -161,9 +161,9 @@ class MetadataNode {
         static bool GetExtendLocation(v8::Isolate* isolate, std::string& extendLocation, bool isTypeScriptExtend);
         static ExtendedClassCacheData GetCachedExtendedClassData(v8::Isolate* isolate, const std::string& proxyClassName);
 
-        static void RegisterSymbolHasInstanceCallback(v8::Isolate* isolate, MetadataEntry entry, v8::Local<v8::Value> interface);
+        static void RegisterSymbolHasInstanceCallback(v8::Isolate* isolate, MetadataEntry* entry, v8::Local<v8::Value> interface);
         static void SymbolHasInstanceCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
-        static std::string GetJniClassName(MetadataEntry entry);
+        static std::string GetJniClassName(MetadataEntry* entry);
 
         static v8::Local<v8::Function> Wrap(v8::Isolate* isolate, const v8::Local<v8::Function>& function, const std::string& name, const std::string& origin, bool isCtorFunc);
 
@@ -199,7 +199,7 @@ class MetadataNode {
                 node(_node), parent(nullptr), isSuper(false) {
             }
 
-            std::vector<MetadataEntry*> candidates;
+            std::vector<MetadataEntry> candidates;
             MetadataNode* node;
             MethodCallbackData* parent;
             bool isSuper;

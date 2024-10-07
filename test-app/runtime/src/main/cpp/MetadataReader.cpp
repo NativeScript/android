@@ -1,5 +1,6 @@
 #include "MetadataReader.h"
 #include "MetadataMethodInfo.h"
+#include <android/log.h>
 #include "Util.h"
 #include <sstream>
 
@@ -33,18 +34,18 @@ MetadataReader::MetadataReader(uint32_t nodesLength, uint8_t *nodeData, uint32_t
 //}
 
 MetadataTreeNode* MetadataReader::BuildTree() {
-    MetadataTreeNodeRawData *rootNodeData = reinterpret_cast<MetadataTreeNodeRawData *>(m_nodeData);
+    MetadataTreeNodeRawData* rootNodeData = reinterpret_cast<MetadataTreeNodeRawData*>(m_nodeData);
 
-    MetadataTreeNodeRawData *curNodeData = rootNodeData;
+    MetadataTreeNodeRawData* curNodeData = rootNodeData;
 
     int len = m_nodesLength / sizeof(MetadataTreeNodeRawData);
 
     m_v.resize(len + 1000);
-    MetadataTreeNode * emptyNode = nullptr;
+    MetadataTreeNode* emptyNode = nullptr;
     fill(m_v.begin(), m_v.end(), emptyNode);
 
     for (int i = 0; i < len; i++) {
-        MetadataTreeNode * node = GetNodeById(i);
+        MetadataTreeNode* node = GetNodeById(i);
         if (nullptr == node) {
             node = new MetadataTreeNode;
             node->name = ReadName(curNodeData->offsetName);
@@ -55,24 +56,32 @@ MetadataTreeNode* MetadataReader::BuildTree() {
         uint16_t curNodeDataId = curNodeData - rootNodeData;
 
         if (curNodeDataId != curNodeData->firstChildId) {
-            node->children = new vector<MetadataTreeNode *>;
-            MetadataTreeNodeRawData *childNodeData = rootNodeData + curNodeData->firstChildId;
+            node->children = new vector<MetadataTreeNode*>;
+            MetadataTreeNodeRawData* childNodeData = rootNodeData + curNodeData->firstChildId;
             while (true) {
 
                 uint16_t childNodeDataId = childNodeData - rootNodeData;
+
+                MetadataTreeNode* childNode;
                 // node (and its next siblings) already visited, so we don't need to visit it again
                 if (m_v[childNodeDataId] != emptyNode) {
+                    childNode = m_v[childNodeDataId];
+                    __android_log_print(ANDROID_LOG_ERROR, "TNS.error", "Consistency error in metadata. A child should never have been visited before its parent. Parent: %s Child: %s. Child metadata id: %u", node->name.c_str(), childNode->name.c_str(), childNodeDataId);
                     break;
+                } else {
+                    childNode = new MetadataTreeNode;
+                    childNode->name = ReadName(childNodeData->offsetName);
+                    childNode->offsetValue = childNodeData->offsetValue;
                 }
-
-                MetadataTreeNode * childNode = new MetadataTreeNode;
                 childNode->parent = node;
-                childNode->name = ReadName(childNodeData->offsetName);
-                childNode->offsetValue = childNodeData->offsetValue;
 
                 node->children->push_back(childNode);
 
                 m_v[childNodeDataId] = childNode;
+
+                if (childNodeDataId == childNodeData->nextSiblingId) {
+                    break;
+                }
 
                 childNodeData = rootNodeData + childNodeData->nextSiblingId;
             }
@@ -83,7 +92,6 @@ MetadataTreeNode* MetadataReader::BuildTree() {
 
     return GetNodeById(0);
 }
-
 
 MetadataTreeNode *MetadataReader::GetNodeById(uint16_t nodeId) {
     return m_v[nodeId];

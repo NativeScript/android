@@ -22,7 +22,7 @@ std::string &MetadataEntry::getName() {
     } else if (type == NodeType::StaticField) {
         name = reader->ReadName(sfi->nameOffset);
     } else if (type == NodeType::Method) {
-        name = mi->GetName();
+        name = mi.GetName();
     }
 
     return name;
@@ -38,9 +38,9 @@ std::string &MetadataEntry::getSig() {
     } else if (type == NodeType::StaticField) {
         sig = reader->ReadTypeName(sfi->nodeId);
     } else if (type == NodeType::Method) {
-        uint8_t sigLength = mi->GetSignatureLength();
+        uint8_t sigLength = mi.GetSignatureLength();
         if (sigLength > 0)
-            sig = mi->GetSignature();
+            sig = mi.GetSignature();
 
     }
 
@@ -53,7 +53,7 @@ std::string &MetadataEntry::getReturnType() {
     auto reader = MetadataNode::getMetadataReader();
 
     if (type == NodeType::Method) {
-        if (mi->GetSignatureLength() > 0) {
+        if (mi.GetSignatureLength() > 0) {
             returnType = MetadataReader::ParseReturnType(this->getSig());
         }
     } else {
@@ -68,7 +68,7 @@ MethodReturnType MetadataEntry::getRetType() {
     auto reader = MetadataNode::getMetadataReader();
 
     if (type == NodeType::Method && !this->getReturnType().empty()) {
-        retType = MetadataReader::GetReturnType(this->getReturnType());
+        retType = MetadataReader::GetReturnType(this->returnType);
     }
 
     retTypeParsed = true;
@@ -83,6 +83,8 @@ std::string &MetadataEntry::getDeclaringType() {
 
     if (type == NodeType::StaticField) {
         declaringType = reader->ReadTypeName(sfi->declaringType);
+    } else if (type == NodeType::Method && isStatic) {
+        declaringType = mi.GetDeclaringType();
     }
 
     return declaringType;
@@ -94,7 +96,7 @@ int MetadataEntry::getParamCount() {
     auto reader = MetadataNode::getMetadataReader();
 
     if (type == NodeType::Method) {
-        auto sigLength = mi->GetSignatureLength();
+        auto sigLength = mi.GetSignatureLength();
         if (sigLength > 0) {
             paramCount = sigLength - 1;
         } else {
@@ -124,7 +126,7 @@ bool MetadataEntry::getIsResolved() {
 
     auto reader = MetadataNode::getMetadataReader();
     if (type == NodeType::Method) {
-        isResolved = mi->CheckIsResolved() == 1;
+        isResolved = mi.CheckIsResolved() == 1;
     }
 
     isResolvedSet = true;
