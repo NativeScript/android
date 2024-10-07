@@ -114,7 +114,7 @@ android {
 //                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}"
 
                 cppFlags "-std=c++14"
-                arguments "-DANDROID_STL=c++_shared", "-DANDROID_NDK_ROOT=${NDK_PATH}"
+                arguments "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}"
             }
         }
 
