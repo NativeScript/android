@@ -21,18 +21,19 @@
 
         <Button
             android:id="@+id/btnCopyLogcat"
-            android:layout_height="wrap_content"
-            android:text="Copy to sdcard"
             android:layout_width="match_parent"
-            android:background="@drawable/button"
-            android:textColor="@android:color/white"
-            android:textAlignment="center"
-            android:paddingLeft="20dp"
-            android:paddingRight="20dp"
-            android:layout_marginRight="10dp"
-            android:layout_marginLeft="10dp"
+            android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
             android:layout_centerHorizontal="true"
+            android:layout_marginLeft="10dp"
+            android:layout_marginRight="10dp"
+            android:background="@drawable/button"
+            android:foreground="?android:attr/selectableItemBackground"
+            android:paddingLeft="20dp"
+            android:paddingRight="20dp"
+            android:text="Copy to sdcard"
+            android:textAlignment="center"
+            android:textColor="@android:color/white"
             tools:layout_width="match_parent" />
 
     </LinearLayout>

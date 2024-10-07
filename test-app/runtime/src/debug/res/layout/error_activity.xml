@@ -35,14 +35,14 @@
             android:layout_height="wrap_content"
             android:minHeight="?attr/actionBarSize" />
 
-        <androidx.viewpager.widget.ViewPager
+        <androidx.viewpager2.widget.ViewPager2
             android:id="@+id/pager"
             android:layout_width="match_parent"
             android:layout_height="fill_parent"
             android:layout_below="@+id/toolbar"
             android:scrollbarAlwaysDrawVerticalTrack="false">
 
-        </androidx.viewpager.widget.ViewPager>
+        </androidx.viewpager2.widget.ViewPager2>
 
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabLayout"

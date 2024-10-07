@@ -25,3 +25,5 @@ android-runtime.iml
 test-app/build-tools/*.log
 test-app/analytics/build-statistics.json
 package-lock.json
+test-app/build-tools/jsparser/tests/cases/*/internal/livesync.js
+test-app/build-tools/*.jar

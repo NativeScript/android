@@ -1,3 +1,10 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenLocal()
+    }
+}
+
 rootProject.name = "__PROJECT_NAME__"
 include ':app'//, ':runtime', ':runtime-binding-generator'
 
