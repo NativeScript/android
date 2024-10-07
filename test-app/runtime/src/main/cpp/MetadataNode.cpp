@@ -331,7 +331,7 @@ void MetadataNode::FieldAccessorGetterCallback(Local<Name> property, const Prope
 
         if ((!fieldCallbackMetadata.isStatic && thiz->StrictEquals(info.Holder()))
                 // check whether there's a declaring type to get the class from it
-                || (fieldCallbackMetadata.declaringType == "")) {
+                || (fieldCallbackMetadata.getDeclaringType() == "")) {
             info.GetReturnValue().SetUndefined();
             return;
         }
@@ -674,9 +674,10 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
     curPtr += sizeof(uint16_t);
     for (auto i = 0; i < instanceFieldCout; i++) {
         auto entry = MetadataReader::ReadInstanceFieldEntry(&curPtr);
+        auto fieldName = entry.getName();
         auto fieldInfo = new FieldCallbackData(entry);
         fieldInfo->metadata.declaringType = curType;
-        protoFiller.FillPrototypeField(isolate, entry.getName(), fieldInfo);
+        protoFiller.FillPrototypeField(isolate, fieldName, fieldInfo);
     }
 
     auto kotlinPropertiesCount = *reinterpret_cast<uint16_t*>(curPtr);
@@ -768,7 +769,6 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembersFromRu
 
         entry.name = name;
         entry.sig = signature;
-//        MetadataReader::FillReturnType(entry);
         entry.paramCount = paramCount;
         entry.isStatic = false;
 
@@ -1239,7 +1239,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
                         className = &c.getDeclaringType();
                     }
                     entry = &c;
-                    DEBUG_WRITE("MetaDataEntry Method %s's signature is: %s", entry->name.c_str(), entry->sig.c_str());
+                    DEBUG_WRITE("MetaDataEntry Method %s's signature is: %s", entry->name.c_str(), entry->getSig().c_str());
                     break;
                 }
             }

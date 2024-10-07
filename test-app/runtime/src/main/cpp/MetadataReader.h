@@ -163,11 +163,6 @@ namespace tns {
             return isPackage;
         }
 
-        //        inline static void FillReturnType(MetadataEntry* entry) {
-        //            entry->returnType = ParseReturnType(entry->getSig());
-        //            entry->retType = GetReturnType(entry->getReturnType());
-        //        }
-
         inline static std::string ParseReturnType(const std::string &signature) {
             int idx = signature.find(')');
             auto returnType = signature.substr(idx + 1);
