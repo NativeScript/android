@@ -19,8 +19,10 @@ Local<Value> FieldAccessor::GetJavaField(Isolate* isolate, const Local<Object>& 
 
     JniLocalRef targetJavaObject;
 
-    const auto& fieldTypeName = fieldData->signature;
-    auto isStatic = fieldData->isStatic;
+    auto fieldMetadata = fieldData->metadata;
+
+    const auto& fieldTypeName = fieldMetadata->getSig();
+    auto isStatic = fieldMetadata->isStatic;
 
     auto isPrimitiveType = fieldTypeName.size() == 1;
     auto isFieldArray = fieldTypeName[0] == '[';
@@ -35,11 +37,11 @@ Local<Value> FieldAccessor::GetJavaField(Isolate* isolate, const Local<Object>& 
                             ("L" + fieldTypeName + ";"));
 
         if (isStatic) {
-            fieldData->clazz = env.FindClass(fieldData->declaringType);
-            fieldData->fid = env.GetStaticFieldID(fieldData->clazz, fieldData->name, fieldJniSig);
+            fieldData->clazz = env.FindClass(fieldMetadata->getDeclaringType());
+            fieldData->fid = env.GetStaticFieldID(fieldData->clazz, fieldMetadata->name, fieldJniSig);
         } else {
-            fieldData->clazz = env.FindClass(fieldData->declaringType);
-            fieldData->fid = env.GetFieldID(fieldData->clazz, fieldData->name, fieldJniSig);
+            fieldData->clazz = env.FindClass(fieldMetadata->getDeclaringType());
+            fieldData->fid = env.GetFieldID(fieldData->clazz, fieldMetadata->name, fieldJniSig);
         }
     }
 
@@ -48,7 +50,7 @@ Local<Value> FieldAccessor::GetJavaField(Isolate* isolate, const Local<Object>& 
 
         if (targetJavaObject.IsNull()) {
             stringstream ss;
-            ss << "Cannot access property '" << fieldData->name.c_str() << "' because there is no corresponding Java object";
+            ss << "Cannot access property '" << fieldMetadata->name.c_str() << "' because there is no corresponding Java object";
             throw NativeScriptException(ss.str());
         }
     }
@@ -186,14 +188,17 @@ Local<Value> FieldAccessor::GetJavaField(Isolate* isolate, const Local<Object>& 
 void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, const Local<Value>& value, FieldCallbackData* fieldData) {
     JEnv env;
 
+    auto fieldMetadata = fieldData->metadata;
+
     HandleScope handleScope(isolate);
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
 
     JniLocalRef targetJavaObject;
 
-    const auto& fieldTypeName = fieldData->signature;
-    auto isStatic = fieldData->isStatic;
+    const auto& fieldTypeName = fieldMetadata->getSig();
+    auto isStatic = fieldMetadata->isStatic;
+
 
     auto isPrimitiveType = fieldTypeName.size() == 1;
     auto isFieldArray = fieldTypeName[0] == '[';
@@ -208,14 +213,14 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
                             ("L" + fieldTypeName + ";"));
 
         if (isStatic) {
-            fieldData->clazz = env.FindClass(fieldData->declaringType);
+            fieldData->clazz = env.FindClass(fieldMetadata->getDeclaringType());
             assert(fieldData->clazz != nullptr);
-            fieldData->fid = env.GetStaticFieldID(fieldData->clazz, fieldData->name, fieldJniSig);
+            fieldData->fid = env.GetStaticFieldID(fieldData->clazz, fieldMetadata->name, fieldJniSig);
             assert(fieldData->fid != nullptr);
         } else {
-            fieldData->clazz = env.FindClass(fieldData->declaringType);
+            fieldData->clazz = env.FindClass(fieldMetadata->getDeclaringType());
             assert(fieldData->clazz != nullptr);
-            fieldData->fid = env.GetFieldID(fieldData->clazz, fieldData->name, fieldJniSig);
+            fieldData->fid = env.GetFieldID(fieldData->clazz, fieldMetadata->name, fieldJniSig);
             assert(fieldData->fid != nullptr);
         }
     }
@@ -225,7 +230,7 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
 
         if (targetJavaObject.IsNull()) {
             stringstream ss;
-            ss << "Cannot access property '" << fieldData->name.c_str() << "' because there is no corresponding Java object";
+            ss << "Cannot access property '" << fieldMetadata->name.c_str() << "' because there is no corresponding Java object";
             throw NativeScriptException(ss.str());
         }
     }

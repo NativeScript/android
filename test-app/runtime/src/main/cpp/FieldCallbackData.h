@@ -5,25 +5,17 @@
 #include "MetadataEntry.h"
 
 namespace tns {
-struct FieldCallbackData {
-    FieldCallbackData(const MetadataEntry& metadata)
-        :
-        fid(nullptr), clazz(nullptr) {
-        name = metadata.name;
-        signature = metadata.sig;
-        declaringType = metadata.declaringType;
-        isStatic = metadata.isStatic;
-        isFinal = metadata.isFinal;
-    }
+    struct FieldCallbackData {
+        FieldCallbackData(MetadataEntry *metadata)
+                :
+                metadata(metadata), fid(nullptr), clazz(nullptr) {
 
-    std::string name;
-    std::string signature;
-    std::string declaringType;
-    bool isStatic;
-    bool isFinal;
-    jfieldID fid;
-    jclass clazz;
-};
+        }
+
+        MetadataEntry* metadata;
+        jfieldID fid;
+        jclass clazz;
+    };
 
 }
 
