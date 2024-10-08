@@ -59,7 +59,7 @@ namespace tns {
                 declaringType = other.declaringType;
                 paramCount = other.paramCount;
                 isFinal = other.isFinal;
-                isStatic = other.isResolved;
+                isResolved = other.isResolved;
                 isResolvedSet = other.isResolvedSet;
                 isFinalSet = other.isFinalSet;
             }
