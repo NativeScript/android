@@ -1984,7 +1984,7 @@ void MetadataNode::EnableProfiler(bool enableProfiler) {
     s_profilerEnabled = enableProfiler;
 }
 
-bool MetadataNode::IsJavascriptKeyword(std::string word) {
+bool MetadataNode::IsJavascriptKeyword(const std::string &word) {
     static set<string> keywords;
 
     if (keywords.empty()) {
