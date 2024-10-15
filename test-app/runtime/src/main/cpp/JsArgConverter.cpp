@@ -23,7 +23,7 @@ JsArgConverter::JsArgConverter(const Local<Object> &caller,
     m_argsLen = 1 + v8ProvidedArgumentsLength;
 
     if (m_argsLen > 0) {
-        if ((entry != nullptr) && (entry->isResolved)) {
+        if ((entry != nullptr) && (entry->getIsResolved())) {
             if (entry->parsedSig.empty()) {
                 JniSignatureParser parser(m_methodSignature);
                 entry->parsedSig = parser.Parse();
@@ -58,7 +58,7 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
     m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 1;
 
     if (m_argsLen > 0) {
-        if ((entry != nullptr) && (entry->isResolved)) {
+        if ((entry != nullptr) && (entry->getIsResolved())) {
             if (entry->parsedSig.empty()) {
                 JniSignatureParser parser(m_methodSignature);
                 entry->parsedSig = parser.Parse();

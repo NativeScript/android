@@ -7,78 +7,131 @@
 #include <string>
 #include <assert.h>
 #include "robin_hood.h"
+
 namespace tns {
-typedef std::vector<std::string> (*GetTypeMetadataCallback)(const std::string& classname, int index);
+    typedef std::vector<std::string> (*GetTypeMetadataCallback)(const std::string &classname,
+                                                                int index);
 
-class MethodInfo;
-
-class MetadataReader {
+    class MetadataReader {
     public:
         MetadataReader();
 
-        MetadataReader(uint32_t nodesLength, uint8_t* nodeData, uint32_t nameLength, uint8_t* nameData, uint32_t valueLength, uint8_t* valueData, GetTypeMetadataCallback getTypeMetadataCallack);
+        MetadataReader(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength,
+                       uint8_t *nameData, uint32_t valueLength, uint8_t *valueData,
+                       GetTypeMetadataCallback getTypeMetadataCallack);
 
-        MetadataEntry ReadInstanceMethodEntry(uint8_t** data);
+        inline static MetadataEntry ReadInstanceFieldEntry(uint8_t **data) {
+            MetadataEntry entry(nullptr, NodeType::Field);
+            entry.fi = *reinterpret_cast<FieldInfo **>(data);
+            entry.isStatic = false;
+            entry.isTypeMember = false;
 
-        MetadataEntry ReadStaticMethodEntry(uint8_t** data);
+            *data += sizeof(FieldInfo);
 
-        MetadataEntry ReadExtensionFunctionEntry(uint8_t** data);
+            return entry;
+        }
 
-        MetadataEntry ReadInstanceFieldEntry(uint8_t** data);
+        inline static MetadataEntry ReadStaticFieldEntry(uint8_t **data) {
+            MetadataEntry entry(nullptr, NodeType::StaticField);
+            entry.sfi = *reinterpret_cast<StaticFieldInfo **>(data);
+            entry.isStatic = true;
+            entry.isTypeMember = false;
 
-        MetadataEntry ReadStaticFieldEntry(uint8_t** data);
+            *data += sizeof(StaticFieldInfo);
 
-       inline std::string ReadTypeName(uint16_t nodeId){
-           MetadataTreeNode* treeNode = GetNodeById(nodeId);
+            return entry;
+        }
 
-           return ReadTypeName(treeNode);
-       }
+        inline static MetadataEntry ReadInstanceMethodEntry(uint8_t **data) {
+            MetadataEntry entry(nullptr, NodeType::Method);
+            entry.isTypeMember = true;
 
-       std::string ReadTypeName(MetadataTreeNode* treeNode);
+            entry.mi = MethodInfo(*data); // Assign MethodInfo object directly
+            *data += entry.mi.GetSizeOfReadMethodInfo();
 
-       inline std::string ReadName(uint32_t offset) {
-           uint16_t length = *reinterpret_cast<short*>(m_nameData + offset);
+            return entry;
+        }
 
-           std::string name(reinterpret_cast<char*>(m_nameData + offset + sizeof(uint16_t)), length);
+        inline static MetadataEntry ReadStaticMethodEntry(uint8_t **data) {
+            MetadataEntry entry(nullptr, NodeType::Method);
+            entry.isTypeMember = true;
 
-           return name;
-       }
+            entry.mi = MethodInfo(*data); // Assign MethodInfo object directly
+            entry.mi.isStatic = true;
+            entry.isStatic = true;
 
-       inline std::string ReadInterfaceImplementationTypeName(MetadataTreeNode* treeNode, bool& isPrefix) {
-           uint8_t* data = m_valueData + treeNode->offsetValue + sizeof(uint8_t) + sizeof(uint16_t);
+            *data += entry.mi.GetSizeOfReadMethodInfo();
 
-           isPrefix = *data == 1;
+            return entry;
+        }
 
-           uint32_t pos = *reinterpret_cast<uint32_t*>(data + sizeof(uint8_t));
+        inline static MetadataEntry ReadExtensionFunctionEntry(uint8_t **data) {
+            MetadataEntry entry(nullptr, NodeType::Method);
 
-           uint16_t len = *reinterpret_cast<uint16_t*>(m_nameData + pos);
+            entry.mi = MethodInfo(*data); // Assign MethodInfo object directly
+            entry.mi.isStatic = true;
+            entry.isExtensionFunction = true;
+            entry.isStatic = true;
 
-           char* ptr = reinterpret_cast<char*>(m_nameData + pos + sizeof(uint16_t));
+            *data += entry.mi.GetSizeOfReadMethodInfo();
 
-           std::string name(ptr, len);
+            return entry;
+        }
 
-           assert(name.length() == len);
+        inline std::string ReadTypeName(uint16_t nodeId) {
+            MetadataTreeNode *treeNode = GetNodeById(nodeId);
 
-           return name;
-       }
+            return ReadTypeName(treeNode);
+        }
 
-        uint8_t* GetValueData() const;
+        std::string ReadTypeName(MetadataTreeNode *treeNode);
 
-        uint8_t GetNodeType(MetadataTreeNode* treeNode);
+        inline std::string ReadName(uint32_t offset) {
+            uint16_t length = *reinterpret_cast<short *>(m_nameData + offset);
 
-        uint16_t GetNodeId(MetadataTreeNode* treeNode);
+            std::string name(reinterpret_cast<char *>(m_nameData + offset + sizeof(uint16_t)),
+                             length);
 
-        MetadataTreeNode* GetRoot() const;
+            return name;
+        }
 
-        MetadataTreeNode* GetOrCreateTreeNodeByName(const std::string& className);
+        inline std::string
+        ReadInterfaceImplementationTypeName(MetadataTreeNode *treeNode, bool &isPrefix) {
+            uint8_t *data =
+                    m_valueData + treeNode->offsetValue + sizeof(uint8_t) + sizeof(uint16_t);
 
-        MetadataTreeNode* GetBaseClassNode(MetadataTreeNode* treeNode);
+            isPrefix = *data == 1;
 
-        MetadataTreeNode* GetNodeById(uint16_t nodeId);
+            uint32_t pos = *reinterpret_cast<uint32_t *>(data + sizeof(uint8_t));
+
+            uint16_t len = *reinterpret_cast<uint16_t *>(m_nameData + pos);
+
+            char *ptr = reinterpret_cast<char *>(m_nameData + pos + sizeof(uint16_t));
+
+            std::string name(ptr, len);
+
+            assert(name.length() == len);
+
+            return name;
+        }
+
+        uint8_t *GetValueData() const;
+
+        uint8_t GetNodeType(MetadataTreeNode *treeNode);
+
+        uint16_t GetNodeId(MetadataTreeNode *treeNode);
+
+        MetadataTreeNode *GetRoot() const;
+
+        MetadataTreeNode *GetOrCreateTreeNodeByName(const std::string &className);
+
+        MetadataTreeNode *GetBaseClassNode(MetadataTreeNode *treeNode);
+
+        MetadataTreeNode *GetNodeById(uint16_t nodeId);
 
         inline bool IsNodeTypeArray(uint8_t type) {
-            bool isArray = (((type & MetadataTreeNode::PRIMITIVE) == 0)
-                            && ((type & MetadataTreeNode::ARRAY) == MetadataTreeNode::ARRAY));
+            bool isArray = (((type & MetadataTreeNode::PRIMITIVE) == 0) &&
+                            ((type & MetadataTreeNode::ARRAY) == MetadataTreeNode::ARRAY));
 
             return isArray;
         }
@@ -90,15 +143,16 @@ class MetadataReader {
         }
 
         inline bool IsNodeTypeClass(uint8_t type) {
-            bool isClass = (((type & MetadataTreeNode::PRIMITIVE) == 0)
-                            && ((type & MetadataTreeNode::CLASS) == MetadataTreeNode::CLASS));
+            bool isClass = (((type & MetadataTreeNode::PRIMITIVE) == 0) &&
+                            ((type & MetadataTreeNode::CLASS) == MetadataTreeNode::CLASS));
 
             return isClass;
         }
 
         inline bool IsNodeTypeInterface(uint8_t type) {
-            bool isInterface = (((type & MetadataTreeNode::PRIMITIVE) == 0)
-                                && ((type & MetadataTreeNode::INTERFACE) == MetadataTreeNode::INTERFACE));
+            bool isInterface = (((type & MetadataTreeNode::PRIMITIVE) == 0) &&
+                                ((type & MetadataTreeNode::INTERFACE) ==
+                                 MetadataTreeNode::INTERFACE));
 
             return isInterface;
         }
@@ -109,18 +163,13 @@ class MetadataReader {
             return isPackage;
         }
 
-        inline static void FillReturnType(MetadataEntry& entry) {
-            entry.returnType = ParseReturnType(entry.sig);
-            entry.retType = GetReturnType(entry.returnType);
-        }
-
-        inline static std::string ParseReturnType(const std::string& signature) {
+        inline static std::string ParseReturnType(const std::string &signature) {
             int idx = signature.find(')');
             auto returnType = signature.substr(idx + 1);
             return returnType;
         }
 
-        inline static MethodReturnType GetReturnType(const std::string& returnType) {
+        inline static MethodReturnType GetReturnType(const std::string &returnType) {
             MethodReturnType retType;
             char retTypePrefix = returnType[0];
             switch (retTypePrefix) {
@@ -155,8 +204,7 @@ class MetadataReader {
                 case 'L':
                     retType = (returnType == "Ljava/lang/String;")
                               ? MethodReturnType::String
-                              :
-                              MethodReturnType::Object;
+                              : MethodReturnType::Object;
                     break;
                 default:
                     assert(false);
@@ -169,26 +217,26 @@ class MetadataReader {
 
         static const uint32_t ARRAY_OFFSET = INT32_MAX; // 2147483647
 
-        MetadataTreeNode* BuildTree();
+        MetadataTreeNode *BuildTree();
 
-        std::string ReadTypeNameInternal(MetadataTreeNode* treeNode);
+        std::string ReadTypeNameInternal(MetadataTreeNode *treeNode);
 
-        void FillEntryWithFiedldInfo(FieldInfo* fi, MetadataEntry& entry);
+        void FillEntryWithFiedldInfo(FieldInfo *fi, MetadataEntry &entry);
 
-        void FillEntryWithMethodInfo(MethodInfo& mi, MetadataEntry& entry);
+        void FillEntryWithMethodInfo(MethodInfo &mi, MetadataEntry &entry);
 
-        MetadataTreeNode* m_root;
+        MetadataTreeNode *m_root;
         uint32_t m_nodesLength;
         uint32_t m_nameLength;
         uint32_t m_valueLength;
-        uint8_t* m_nodeData;
-        uint8_t* m_nameData;
-        uint8_t* m_valueData;
-        std::vector<MetadataTreeNode*> m_v;
+        uint8_t *m_nodeData;
+        uint8_t *m_nameData;
+        uint8_t *m_valueData;
+        std::vector<MetadataTreeNode *> m_v;
         GetTypeMetadataCallback m_getTypeMetadataCallback;
 
-        robin_hood::unordered_map<MetadataTreeNode*, std::string> m_typeNameCache;
-};
+        robin_hood::unordered_map<MetadataTreeNode *, std::string> m_typeNameCache;
+    };
 }
 
 #endif /* METADATAREADER_H_ */
