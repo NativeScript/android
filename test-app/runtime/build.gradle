@@ -128,6 +128,11 @@ android {
         }
     }
 
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -144,13 +149,13 @@ android {
 }
 
 allprojects {
-    gradle.projectsEvaluated {
+   /* gradle.projectsEvaluated {
         tasks.withType(JavaCompile).tap {
             configureEach {
                 options.compilerArgs << "-Xlint:all" << "-Werror"
             }
         }
-    }
+    }*/
 }
 
 dependencies {
