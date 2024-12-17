@@ -77,6 +77,12 @@ jobs:
         with:
           name: npm-package
           path: dist/nativescript-android-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
+      - name: Upload debug symbols
+        uses: actions/upload-artifact@v3
+        with:
+          name: debug-symbols
+          path: test-app/runtime/build/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/*
+        
   test:
     name: Test
     runs-on: macos-13
@@ -174,10 +180,17 @@ jobs:
         with:
           name: npm-package
           path: dist
+      - uses: actions/download-artifact@v3
+        with:
+          name: debug-symbols
+          path: dist/debug-symbols
+      - name: Zip debug symbols
+        working-directory: dist/debug-symbols
+        run: zip -r debug-symbols.zip .
       - name: Partial Changelog
         run: npx conventional-changelog -p angular -r2 > body.md
       - uses: ncipollo/release-action@v1
         with:
-          artifacts: "dist/nativescript-android-*.tgz"
+          artifacts: "dist/nativescript-android-*.tgz,dist/debug-symbols/debug-symbols.zip"
           bodyFile: "body.md"
           prerelease: ${{needs.build.outputs.npm_tag != 'latest'}}

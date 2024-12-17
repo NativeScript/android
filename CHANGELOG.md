@@ -1,3 +1,41 @@
+## [8.8.6](https://github.com/NativeScript/android/compare/v8.8.5...v8.8.6) (2024-10-28)
+
+
+### Bug Fixes
+
+* `exit(0)` causes ANR due to destroyed mutex ([#1820](https://github.com/NativeScript/android/issues/1820)) ([94ddb15](https://github.com/NativeScript/android/commit/94ddb159ccf368edebce76a8aa01d141d7297b1a))
+* gradle error when compileSdk or targetSdk is provided ([#1825](https://github.com/NativeScript/android/issues/1825)) ([a983931](https://github.com/NativeScript/android/commit/a983931cf5e9fcc7966a98a2f0ec4e24e040af5e))
+* **URL:** allow undefined 2nd args ([#1826](https://github.com/NativeScript/android/issues/1826)) ([2bab8f5](https://github.com/NativeScript/android/commit/2bab8f5be85c8764faafef4d6374dc8cfd257613))
+
+
+
+## [8.8.5](https://github.com/NativeScript/android/compare/v8.8.4...v8.8.5) (2024-09-30)
+
+
+### Bug Fixes
+
+* prevent metadata offset overflow into array space and convert shorts to uints before addition ([9cfc349](https://github.com/NativeScript/android/commit/9cfc3493017243948b043a51f68b7c7bcab1e6b9))
+
+
+
+## [8.8.4](https://github.com/NativeScript/android/compare/v8.8.3...v8.8.4) (2024-09-06)
+
+
+### Bug Fixes
+
+* ensure same mtime for js and code cache to prevent loading old code caches ([#1822](https://github.com/NativeScript/android/issues/1822)) ([3d6e101](https://github.com/NativeScript/android/commit/3d6e10115227ad556e5bbe1764217716ab5bdac7))
+
+
+
+## [8.8.3](https://github.com/NativeScript/android/compare/v8.8.2...v8.8.3) (2024-09-02)
+
+
+### Bug Fixes
+
+* generate correct metadata when overflowing signed short values ([#1821](https://github.com/NativeScript/android/issues/1821)) ([c9fac4b](https://github.com/NativeScript/android/commit/c9fac4b19a952d4df651d3d6a8b0fa9c50f7c7db))
+
+
+
 ## [8.8.2](https://github.com/NativeScript/android/compare/v8.8.1...v8.8.2) (2024-07-22)
 
 
