@@ -1,3 +1,14 @@
+## [8.8.6](https://github.com/NativeScript/android/compare/v8.8.5...v8.8.6) (2024-10-28)
+
+
+### Bug Fixes
+
+* `exit(0)` causes ANR due to destroyed mutex ([#1820](https://github.com/NativeScript/android/issues/1820)) ([94ddb15](https://github.com/NativeScript/android/commit/94ddb159ccf368edebce76a8aa01d141d7297b1a))
+* gradle error when compileSdk or targetSdk is provided ([#1825](https://github.com/NativeScript/android/issues/1825)) ([a983931](https://github.com/NativeScript/android/commit/a983931cf5e9fcc7966a98a2f0ec4e24e040af5e))
+* **URL:** allow undefined 2nd args ([#1826](https://github.com/NativeScript/android/issues/1826)) ([2bab8f5](https://github.com/NativeScript/android/commit/2bab8f5be85c8764faafef4d6374dc8cfd257613))
+
+
+
 ## [8.8.5](https://github.com/NativeScript/android/compare/v8.8.4...v8.8.5) (2024-09-30)
 
 

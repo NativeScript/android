@@ -138,8 +138,17 @@ void URLImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value> &args) {
                         v8::Exception::TypeError(v8::String::Empty(isolate)));
                 return;
             }
+        } else {
+            // treat 2nd arg as undefined otherwise.
+            auto result = ada::parse<ada::url_aggregator>(url_string, nullptr);
+            if (result) {
+                url = result.value();
+            } else {
+                isolate->ThrowException(
+                        v8::Exception::TypeError(v8::String::Empty(isolate)));
+                return;
+            }
         }
-
     } else {
         auto result = ada::parse<ada::url_aggregator>(url_string, nullptr);
         if (result) {
@@ -149,7 +158,6 @@ void URLImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value> &args) {
                     v8::Exception::TypeError(v8::String::Empty(isolate)));
             return;
         }
-
     }
 
     auto ret = args.This();
@@ -162,7 +170,6 @@ void URLImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value> &args) {
     urlImpl->BindFinalizer(isolate, ret);
 
     args.GetReturnValue().Set(ret);
-
 }
 
 
@@ -178,7 +185,6 @@ void URLImpl::GetHash(v8::Local<v8::String> property,
     auto value = ptr->GetURL()->get_hash();
     info.GetReturnValue().Set(
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
-
 }
 
 void URLImpl::SetHash(v8::Local<v8::String> property,
@@ -235,7 +241,6 @@ void URLImpl::GetHostName(v8::Local<v8::String> property,
 
     info.GetReturnValue().Set(
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
-
 }
 
 void URLImpl::SetHostName(v8::Local<v8::String> property,
@@ -265,7 +270,6 @@ void URLImpl::GetHref(v8::Local<v8::String> property,
 
     info.GetReturnValue().Set(
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
-
 }
 
 void URLImpl::SetHref(v8::Local<v8::String> property,
@@ -294,7 +298,6 @@ void URLImpl::GetOrigin(v8::Local<v8::String> property,
 
     info.GetReturnValue().Set(
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
-
 }
 
 void URLImpl::GetPassword(v8::Local<v8::String> property,
@@ -310,7 +313,6 @@ void URLImpl::GetPassword(v8::Local<v8::String> property,
 
     info.GetReturnValue().Set(
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
-
 }
 
 void URLImpl::SetPassword(v8::Local<v8::String> property,
@@ -339,7 +341,6 @@ void URLImpl::GetPathName(v8::Local<v8::String> property,
 
     info.GetReturnValue().Set(
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
-
 }
 
 void URLImpl::SetPathName(v8::Local<v8::String> property,
@@ -368,7 +369,6 @@ void URLImpl::GetPort(v8::Local<v8::String> property,
 
     info.GetReturnValue().Set(
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
-
 }
 
 void URLImpl::SetPort(v8::Local<v8::String> property,
@@ -397,7 +397,6 @@ void URLImpl::GetProtocol(v8::Local<v8::String> property,
 
     info.GetReturnValue().Set(
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
-
 }
 
 void URLImpl::SetProtocol(v8::Local<v8::String> property,
@@ -427,7 +426,6 @@ void URLImpl::GetSearch(v8::Local<v8::String> property,
 
     info.GetReturnValue().Set(
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
-
 }
 
 void URLImpl::SetSearch(v8::Local<v8::String> property,
@@ -457,7 +455,6 @@ void URLImpl::GetUserName(v8::Local<v8::String> property,
 
     info.GetReturnValue().Set(
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
-
 }
 
 void URLImpl::SetUserName(v8::Local<v8::String> property,
@@ -474,36 +471,36 @@ void URLImpl::SetUserName(v8::Local<v8::String> property,
 }
 
 
-void URLImpl::ToString(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    URLImpl *ptr = GetPointer(args.This());
+void URLImpl::ToString(const v8::FunctionCallbackInfo<v8::Value> &info) {
+    URLImpl *ptr = GetPointer(info.This());
     if (ptr == nullptr) {
-        args.GetReturnValue().SetEmptyString();
+        info.GetReturnValue().SetEmptyString();
         return;
     }
-    auto isolate = args.GetIsolate();
+    auto isolate = info.GetIsolate();
 
 
     auto value = ptr->GetURL()->get_href();
 
     auto ret = ArgConverter::ConvertToV8String(isolate, value.data(), value.length());
 
-    args.GetReturnValue().Set(ret);
+    info.GetReturnValue().Set(ret);
 }
 
 
-void URLImpl::CanParse(const v8::FunctionCallbackInfo<v8::Value> &args) {
+void URLImpl::CanParse(const v8::FunctionCallbackInfo<v8::Value> &info) {
     bool value;
-    auto count = args.Length();
+    auto count = info.Length();
 
 
     if (count > 1) {
-        auto url_string = ArgConverter::ConvertToString(args[0].As<v8::String>());
-        auto base_string = ArgConverter::ConvertToString(args[1].As<v8::String>());
+        auto url_string = ArgConverter::ConvertToString(info[0].As<v8::String>());
+        auto base_string = ArgConverter::ConvertToString(info[1].As<v8::String>());
         std::string_view base_string_view(base_string.data(), base_string.length());
         value = can_parse(url_string, &base_string_view);
     } else {
-        value = can_parse(ArgConverter::ConvertToString(args[0].As<v8::String>()).c_str(), nullptr);
+        value = can_parse(ArgConverter::ConvertToString(info[0].As<v8::String>()).c_str(), nullptr);
     }
 
-    args.GetReturnValue().Set(value);
+    info.GetReturnValue().Set(value);
 }
