@@ -115,6 +115,7 @@ add_library(
         src/main/cpp/MetadataNode.cpp
         src/main/cpp/MetadataReader.cpp
         src/main/cpp/MetadataTreeNode.cpp
+        src/main/cpp/MetadataEntry.cpp
         src/main/cpp/MethodCache.cpp
         src/main/cpp/ModuleBinding.cpp
         src/main/cpp/ModuleInternal.cpp

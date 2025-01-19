@@ -213,7 +213,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 
     auto isolate = args.GetIsolate();
 
-    if ((entry != nullptr) && entry->isResolved) {
+    if ((entry != nullptr) && entry->getIsResolved()) {
+        auto &entrySignature = entry->getSig();
         isStatic = entry->isStatic;
 
         if (entry->memberId == nullptr) {
@@ -236,14 +237,14 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                     if (isFromInterface) {
                         auto methodAndClassPair = env.GetInterfaceStaticMethodIDAndJClass(className,
                                                                                           methodName,
-                                                                                          entry->sig);
+                                                                                          entrySignature);
                         entry->memberId = methodAndClassPair.first;
                         clazz = methodAndClassPair.second;
                     } else {
-                        entry->memberId = env.GetStaticMethodID(clazz, methodName, entry->sig);
+                        entry->memberId = env.GetStaticMethodID(clazz, methodName, entrySignature);
                     }
                 } else {
-                    entry->memberId = env.GetMethodID(clazz, methodName, entry->sig);
+                    entry->memberId = env.GetMethodID(clazz, methodName, entrySignature);
                 }
 
                 if (entry->memberId == nullptr) {
@@ -257,14 +258,14 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                     if (isFromInterface) {
                         auto methodAndClassPair = env.GetInterfaceStaticMethodIDAndJClass(className,
                                                                                           methodName,
-                                                                                          entry->sig);
+                                                                                          entrySignature);
                         entry->memberId = methodAndClassPair.first;
                         clazz = methodAndClassPair.second;
                     } else {
-                        entry->memberId = env.GetStaticMethodID(clazz, methodName, entry->sig);
+                        entry->memberId = env.GetStaticMethodID(clazz, methodName, entrySignature);
                     }
                 } else {
-                    entry->memberId = env.GetMethodID(clazz, methodName, entry->sig);
+                    entry->memberId = env.GetMethodID(clazz, methodName, entrySignature);
                 }
 
                 if (entry->memberId == nullptr) {
@@ -279,9 +280,9 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 
         mid = reinterpret_cast<jmethodID>(entry->memberId);
         clazz = entry->clazz;
-        sig = &entry->sig;
-        returnType = &entry->returnType;
-        retType = entry->retType;
+        sig = &entrySignature;
+        returnType = &entry->getReturnType();
+        retType = entry->getRetType();
     } else {
         DEBUG_WRITE("Resolving method: %s on className %s", methodName.c_str(), className.c_str());
 
