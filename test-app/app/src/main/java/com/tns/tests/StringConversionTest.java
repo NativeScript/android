@@ -71,7 +71,7 @@ public class StringConversionTest {
     private String readString() throws Exception {
         String str = null;
 
-        Context context = com.tns.NativeScriptApplication.getInstance();
+        Context context = com.tns.TestNativeScriptApplication.getInstance();
 
         InputStream inputStream = null;
         try {

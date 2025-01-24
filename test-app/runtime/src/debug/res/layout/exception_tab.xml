@@ -45,24 +45,26 @@
 
         <Button
             android:id="@+id/btnRestartApp"
-            android:text="Restart APP"
-            android:textAlignment="center"
-            android:textColor="@android:color/white"
-            android:background="@drawable/button_accented"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginRight="10dp"
             android:layout_weight="1"
-            android:layout_marginRight="10dp" />
+            android:background="@drawable/button_accented"
+            android:foreground="?android:attr/selectableItemBackground"
+            android:text="Restart APP"
+            android:textAlignment="center"
+            android:textColor="@android:color/white" />
 
         <Button
             android:id="@+id/btnCopyException"
-            android:textColor="@android:color/white"
-            android:text="Copy"
-            android:background="@drawable/button"
-            android:textAlignment="center"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:background="@drawable/button"
+            android:foreground="?android:attr/selectableItemBackground"
+            android:text="Copy"
+            android:textAlignment="center"
+            android:textColor="@android:color/white" />
 
 
     </LinearLayout>
