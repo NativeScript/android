@@ -3,7 +3,7 @@ describe("URLPattern", function () {
   it("throws on invalid URLPattern", function () {
     var exceptionCaught = false;
     try {
-      const pattern = new URLPattern(null);
+      const pattern = new URLPattern(1);
     } catch (e) {
       exceptionCaught = true;
     }
@@ -22,7 +22,7 @@ describe("URLPattern", function () {
 
   it("parses simple pattern", function () {
     const pattern = new URLPattern("https://example.com/books/:id");
-    expect(pattern.protocol).toBe("https:");
+    expect(pattern.protocol).toBe("https");
     expect(pattern.hostname).toBe("example.com");
     expect(pattern.pathname).toBe("/books/:id");
     expect(pattern.port).toBe("");
@@ -36,13 +36,13 @@ describe("URLPattern", function () {
 
   it("parses with undefined base", function () {
     const pattern = new URLPattern("https://google.com", undefined);
-    expect(pattern.protocol).toBe("https:");
+    expect(pattern.protocol).toBe("https");
     expect(pattern.hostname).toBe("google.com");
   });
 
   it("parses with null base", function () {
     const pattern = new URLPattern("https://google.com", null);
-    expect(pattern.protocol).toBe("https:");
+    expect(pattern.protocol).toBe("https");
     expect(pattern.hostname).toBe("google.com");
   });
 
