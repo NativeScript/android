@@ -108,6 +108,7 @@ namespace tns {
     }
 
     u16string Util::ConvertFromUtf8ToUtf16(const string &str) {
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
         auto utf16String =
                 std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>().from_bytes(str);
 

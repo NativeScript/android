@@ -33,6 +33,7 @@
 #include "ModuleBinding.h"
 #include "URLImpl.h"
 #include "URLSearchParamsImpl.h"
+#include "URLPatternImpl.h"
 
 #ifdef APPLICATION_IN_DEBUG
 // #include "NetworkDomainCallbackHandlers.h"
@@ -529,6 +530,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__removeFrameCallback"), FunctionTemplate::New(isolate, CallbackHandlers::RemoveFrameCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URL"), URLImpl::GetCtor(isolate));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URLSearchParams"), URLSearchParamsImpl::GetCtor(isolate));
+    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URLPattern"), URLPatternImpl::GetCtor(isolate));
 
     /*
      * Attach `Worker` object constructor only to the main thread (isolate)'s global object
