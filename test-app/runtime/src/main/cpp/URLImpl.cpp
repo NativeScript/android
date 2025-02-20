@@ -34,6 +34,9 @@ v8::Local<v8::FunctionTemplate> URLImpl::GetCtor(v8::Isolate *isolate) {
             ArgConverter::ConvertToV8String(isolate, "host"),
             GetHost, SetHost);
     tmpl->SetAccessor(
+            ArgConverter::ConvertToV8String(isolate, "hash"),
+            GetHash, SetHash);
+    tmpl->SetAccessor(
             ArgConverter::ConvertToV8String(isolate, "hostname"),
             GetHostName, SetHostName);
     tmpl->SetAccessor(
