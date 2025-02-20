@@ -859,11 +859,15 @@ void MetadataNode::SetInnerTypes(v8::Isolate* isolate, Local<Function>& ctorFunc
         auto context = isolate->GetCurrentContext();
         const auto &children = *treeNode->children;
         for (auto curChild: children) {
-            ctorFunction->SetAccessor(
-                    context,
-                    v8::String::NewFromUtf8(isolate, curChild->name.c_str()).ToLocalChecked(),
-                    InnerTypeAccessorGetterCallback, nullptr, v8::External::New(isolate, curChild)
-            );
+            bool hasOwnProperty = ctorFunction->HasOwnProperty(context, ArgConverter::ConvertToV8String(isolate, curChild->name)).ToChecked();
+                // Child is defined as a function already when the inner type is a companion object
+                if (!hasOwnProperty) {
+                    ctorFunction->SetAccessor(
+                        context,
+                        v8::String::NewFromUtf8(isolate, curChild->name.c_str()).ToLocalChecked(),
+                        InnerTypeAccessorGetterCallback, nullptr, v8::External::New(isolate, curChild)
+                );
+            }
         }
     }
 }
