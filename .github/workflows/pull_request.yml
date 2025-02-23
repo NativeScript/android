@@ -70,12 +70,12 @@ jobs:
       - name: Build npm package
         run: ./gradlew -PgitCommitVersion=${{ github.sha }} -PnoCCache --stacktrace
       - name: Upload npm package artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: npm-package
           path: dist/nativescript-android-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
       - name: Upload debug symbols
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: debug-symbols
           path: test-app/runtime/build/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/*

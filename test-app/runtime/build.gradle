@@ -21,7 +21,7 @@ if (useCCache) {
 }
 
 
-def defaultNdkVersion = "27.0.12077973"
+def defaultNdkVersion = "27.2.12479018"
 
 def hasNdkVersion = project.hasProperty("ndkVersion")
 if (hasNdkVersion) {
@@ -113,8 +113,8 @@ android {
 //
 //                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}"
 
-                cppFlags "-std=c++14"
-                arguments "-DANDROID_STL=c++_shared", "-DANDROID_NDK_ROOT=${NDK_PATH}", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                cppFlags "-std=c++20"
+                arguments "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
             }
         }
 
@@ -149,13 +149,11 @@ android {
 }
 
 allprojects {
-   /* gradle.projectsEvaluated {
-        tasks.withType(JavaCompile).tap {
-            configureEach {
-                options.compilerArgs << "-Xlint:all" << "-Werror"
-            }
-        }
-    }*/
+ afterEvaluate {
+    tasks.withType(JavaCompile).configureEach {
+         options.compilerArgs << "-Xlint:all" << "-Werror"
+    }
+  }
 }
 
 dependencies {
