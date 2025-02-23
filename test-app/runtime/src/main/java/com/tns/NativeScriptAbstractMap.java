@@ -49,7 +49,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V> {
      *
      * @since 1.6
      */
-    public static class SimpleImmutableEntry<K, V> implements Map.Entry<K, V>, Serializable {
+    public static class SimpleImmutableEntry<K extends Serializable, V extends Serializable> implements Map.Entry<K, V>, Serializable {
         private static final long serialVersionUID = 7138329143949025153L;
 
         private final K key;
@@ -111,7 +111,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V> {
      *
      * @since 1.6
      */
-    public static class SimpleEntry<K, V> implements Map.Entry<K, V>, Serializable {
+    public static class SimpleEntry<K extends Serializable, V extends Serializable> implements Map.Entry<K, V>, Serializable {
         private static final long serialVersionUID = -8499721149061103585L;
 
         private final K key;

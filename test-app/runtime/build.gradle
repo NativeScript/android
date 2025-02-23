@@ -151,7 +151,9 @@ android {
 allprojects {
  afterEvaluate {
     tasks.withType(JavaCompile).configureEach {
-         options.compilerArgs << "-Xlint:all" << "-Werror"
+        // remove after "-Xlint:-classfile" https://issuetracker.google.com/issues/359561906
+        // todo remove "-Xlint:-this-escape" after updating runtime-binding-generator
+         options.compilerArgs << "-Xlint:all" << "-Werror" << "-Xlint:-classfile" << "-Xlint:-this-escape"
     }
   }
 }
