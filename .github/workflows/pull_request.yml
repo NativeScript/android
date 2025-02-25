@@ -29,7 +29,7 @@ jobs:
       - uses: actions/setup-java@v3
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "21"
           cache: gradle
       - name: Setup Android SDK
         uses: android-actions/setup-android@v2
@@ -94,7 +94,7 @@ jobs:
       - uses: actions/setup-java@v3
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "21"
           cache: gradle
       - name: Setup Android SDK
         uses: android-actions/setup-android@v2
