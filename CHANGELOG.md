@@ -1,3 +1,25 @@
+# [8.9.0](https://github.com/NativeScript/android/compare/v8.8.6...v8.9.0) (2025-02-26)
+
+
+### Bug Fixes
+
+* inner type should net be set when companion object is defined as function ([#1831](https://github.com/NativeScript/android/issues/1831)) ([e293636](https://github.com/NativeScript/android/commit/e293636ed1e9277d608e3102b404f94539404fdf))
+
+
+### Features
+
+* Ada 3.1.1 ([3633aed](https://github.com/NativeScript/android/commit/3633aed8913c7b93757909a569bfb8ab225add13))
+* ada v3 ([#1830](https://github.com/NativeScript/android/issues/1830)) ([b31fc5f](https://github.com/NativeScript/android/commit/b31fc5f7144b873981b8c7201d72baf26a6e79bc))
+* NDK 27 and Support for Java 21 ([#1819](https://github.com/NativeScript/android/issues/1819)) ([bec401c](https://github.com/NativeScript/android/commit/bec401c918942443bccab4e697cea2ccb843e603))
+* support 16 KB page sizes, gradle 8.5 ([#1818](https://github.com/NativeScript/android/issues/1818)) ([3423e6f](https://github.com/NativeScript/android/commit/3423e6ff05c5340f92eec46f8c8e996d78403860))
+
+
+### Performance Improvements
+
+* optimizations around generating JS classes from Metadata ([#1824](https://github.com/NativeScript/android/issues/1824)) ([f290ed2](https://github.com/NativeScript/android/commit/f290ed26da315ddefb56fa1acd212c6242ab976b))
+
+
+
 ## [8.8.6](https://github.com/NativeScript/android/compare/v8.8.5...v8.8.6) (2024-10-28)
 
 
