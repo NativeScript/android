@@ -4,8 +4,8 @@ on:
 env:
   NPM_TAG: "pr"
   EMULATOR_NAME: "runtime-emu"
-  NDK_VERSION: r23c
-  ANDROID_API: 29
+  NDK_VERSION: r27
+  ANDROID_API: 33
   ANDROID_ABI: x86_64
   NDK_ARCH: darwin
 
@@ -24,12 +24,12 @@ jobs:
           submodules: true
       - uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 22
           registry-url: "https://registry.npmjs.org"
       - uses: actions/setup-java@v3
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "21"
           cache: gradle
       - name: Setup Android SDK
         uses: android-actions/setup-android@v2
@@ -89,12 +89,12 @@ jobs:
           submodules: true
       - uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 22
           registry-url: "https://registry.npmjs.org"
       - uses: actions/setup-java@v3
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "21"
           cache: gradle
       - name: Setup Android SDK
         uses: android-actions/setup-android@v2

@@ -23,7 +23,6 @@ if (useCCache) {
 
 def defaultNdkVersion = "27.2.12479018"
 
-
 def hasNdkVersion = project.hasProperty("ndkVersion")
 if (hasNdkVersion) {
     println "Runtime using NDK version " + ndkVersion
@@ -115,7 +114,7 @@ android {
 //                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}"
 
                 cppFlags "-std=c++20"
-                arguments "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}"
+                arguments "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
             }
         }
 
@@ -127,6 +126,11 @@ android {
                 abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
             }
         }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     buildTypes {
@@ -145,13 +149,13 @@ android {
 }
 
 allprojects {
-    gradle.projectsEvaluated {
-        tasks.withType(JavaCompile).tap {
-            configureEach {
-                //options.compilerArgs << "-Xlint:all" << "-Werror"
-            }
-        }
+ afterEvaluate {
+    tasks.withType(JavaCompile).configureEach {
+        // remove after "-Xlint:-classfile" https://issuetracker.google.com/issues/359561906
+        // todo remove "-Xlint:-this-escape" after updating runtime-binding-generator
+         options.compilerArgs << "-Xlint:all" << "-Werror" << "-Xlint:-classfile" << "-Xlint:-this-escape"
     }
+  }
 }
 
 dependencies {
