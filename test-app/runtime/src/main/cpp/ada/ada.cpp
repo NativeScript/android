@@ -1,4 +1,4 @@
-/* auto-generated on 2025-02-23 20:08:55 -0500. Do not edit! */
+/* auto-generated on 2025-02-26 20:29:12 -0500. Do not edit! */
 /* begin file src/ada.cpp */
 #include "ada.h"
 /* begin file src/checkers.cpp */
@@ -64,24 +64,23 @@ ada_really_inline constexpr bool is_ipv4(std::string_view view) noexcept {
 // encoding.
 static constexpr std::array<uint8_t, 256> path_signature_table =
     []() consteval {
-  std::array<uint8_t, 256> result{};
-  for (size_t i = 0; i < 256; i++) {
-    if (i <= 0x20 || i == 0x22 || i == 0x23 || i == 0x3c || i == 0x3e ||
-        i == 0x3f || i == 0x60 || i == 0x7b || i == 0x7d || i > 0x7e) {
-      result[i] = 1;
-    } else if (i == 0x25) {
-      result[i] = 8;
-    } else if (i == 0x2e) {
-      result[i] = 4;
-    } else if (i == 0x5c) {
-      result[i] = 2;
-    } else {
-      result[i] = 0;
-    }
-  }
-  return result;
-}
-();
+      std::array<uint8_t, 256> result{};
+      for (size_t i = 0; i < 256; i++) {
+        if (i <= 0x20 || i == 0x22 || i == 0x23 || i == 0x3c || i == 0x3e ||
+            i == 0x3f || i == 0x60 || i == 0x7b || i == 0x7d || i > 0x7e) {
+          result[i] = 1;
+        } else if (i == 0x25) {
+          result[i] = 8;
+        } else if (i == 0x2e) {
+          result[i] = 4;
+        } else if (i == 0x5c) {
+          result[i] = 2;
+        } else {
+          result[i] = 0;
+        }
+      }
+      return result;
+    }();
 
 ada_really_inline constexpr uint8_t path_signature(
     std::string_view input) noexcept {
