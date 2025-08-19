@@ -11,8 +11,8 @@
   ],
   "version_info": {
     "v8": "10.3.22.0",
-    "gradle": "8.7",
-    "gradleAndroid": "8.5.0",
+    "gradle": "8.14.3",
+    "gradleAndroid": "8.12.1",
     "ndk": "r27",
     "ndkApiLevel": "21",
     "minSdk": "21",
@@ -22,8 +22,8 @@
   },
   "// this gradle key is here for backwards compatibility - we'll phase it out slowly...": "",
   "gradle": {
-    "version": "8.7",
-    "android": "8.5.0"
+    "version": "8.14.3",
+    "android": "8.12.1"
   },
   "scripts": {
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
