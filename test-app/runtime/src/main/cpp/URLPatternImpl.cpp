@@ -71,7 +71,7 @@ v8_regex_provider::regex_search(std::string_view input,
         ret.reserve(len);
         for (int i = 0; i < len; i++) {
             v8::Local<v8::Value> item;
-            if (array->Get(isolate->GetCurrentContext(), i).ToLocal(&item)) {
+            if (!array->Get(isolate->GetCurrentContext(), i).ToLocal(&item)) {
                 return std::nullopt;
             }
 
@@ -354,7 +354,7 @@ void URLPatternImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value> &args) {
     if(args.Length() == 0){
         auto thiz = args.This();
         auto init = ada::url_pattern_init{};
-        auto url_pattern = ada::parse_url_pattern<v8_regex_provider>(init);
+        auto url_pattern = ada::parse_url_pattern<v8_regex_provider>(std::move(init));
         if (!url_pattern) {
             isolate->ThrowException(
                     v8::Exception::TypeError(
@@ -447,7 +447,7 @@ void URLPatternImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value> &args) {
     }
 
     auto url_pattern = ada::parse_url_pattern<v8_regex_provider>(
-            arg0,
+            std::move(arg0),
             base_url.has_value() ? &base_url_view : nullptr,
             options.has_value() ? &options.value() : nullptr);
     if (!url_pattern) {
