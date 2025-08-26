@@ -122,6 +122,7 @@ add_library(
         src/main/cpp/MethodCache.cpp
         src/main/cpp/ModuleBinding.cpp
         src/main/cpp/ModuleInternal.cpp
+        src/main/cpp/ModuleInternalCallbacks.cpp
         src/main/cpp/NativeScriptException.cpp
         src/main/cpp/NumericCasts.cpp
         src/main/cpp/ObjectManager.cpp

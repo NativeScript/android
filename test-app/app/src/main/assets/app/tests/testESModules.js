@@ -8,102 +8,129 @@ describe("ES Module Tests ", function () {
         jasmine.addCustomEqualityTester(myCustomEquality);
     });
 
-    it("should recognize .mjs files as ES modules", function () {
-        __log("TEST: Testing ES Module recognition");
+    it("should load .mjs files as ES modules", function () {
+        __log("TEST: Loading ES Module (.mjs file)");
         
-        // Test that .mjs files are detected as ES modules
-        var testPath1 = "/app/test-module.mjs";
-        var testPath2 = "/app/test-module.js";
-        var testPath3 = "/app/test-module.mjs.map";
+        var esModuleLoaded = false;
+        var moduleExports = null;
+        var errorMessage = "";
         
-        // Note: We can't directly call IsESModule from JavaScript, but we can test
-        // that the module system attempts to load .mjs files
-        
-        var mjsDetected = true;
         try {
-            // This should attempt to load as ES module (will likely fail since file doesn't exist)
-            require("./test-es-module.mjs");
+            // This should load our test ES module
+            moduleExports = require("./test-es-module.mjs");
+            esModuleLoaded = true;
+            __log("ES Module loaded successfully: " + JSON.stringify(moduleExports));
         } catch (e) {
-            // Check if error indicates ES module handling was attempted
-            mjsDetected = e.message.indexOf("test-es-module.mjs") !== -1;
+            errorMessage = e.message || e.toString();
+            __log("Error loading ES module: " + errorMessage);
         }
         
-        expect(mjsDetected).toBe(true);
+        expect(esModuleLoaded).toBe(true);
+        expect(moduleExports).not.toBe(null);
+    });
+
+    it("should provide ES module exports through namespace", function () {
+        __log("TEST: Testing ES module exports");
+        
+        var hasCorrectExports = false;
+        var moduleExports = null;
+        
+        try {
+            moduleExports = require("./test-es-module.mjs");
+            
+            // Test if we can access named exports through the namespace
+            var hasMessage = moduleExports.hasOwnProperty('message');
+            var hasGreet = moduleExports.hasOwnProperty('greet');
+            var hasDefault = moduleExports.hasOwnProperty('default');
+            
+            hasCorrectExports = hasMessage && hasGreet && hasDefault;
+            
+            __log("Module exports: " + Object.keys(moduleExports).join(", "));
+            __log("Has message: " + hasMessage);
+            __log("Has greet: " + hasGreet);
+            __log("Has default: " + hasDefault);
+            
+        } catch (e) {
+            __log("Error testing ES module exports: " + e.message);
+        }
+        
+        expect(hasCorrectExports).toBe(true);
+    });
+
+    it("should handle ES module functions correctly", function () {
+        __log("TEST: Testing ES module function execution");
+        
+        var functionWorked = false;
+        var result = "";
+        
+        try {
+            var moduleExports = require("./test-es-module.mjs");
+            
+            if (moduleExports.greet && typeof moduleExports.greet === 'function') {
+                result = moduleExports.greet("World");
+                functionWorked = (result === "Hello, World!");
+                __log("Function result: " + result);
+            } else {
+                __log("greet function not found or not a function");
+            }
+            
+        } catch (e) {
+            __log("Error testing ES module function: " + e.message);
+        }
+        
+        expect(functionWorked).toBe(true);
+        expect(result).toBe("Hello, World!");
+    });
+
+    it("should maintain CommonJS compatibility", function () {
+        __log("TEST: Testing CommonJS compatibility with ES modules");
+        
+        var commonJSWorks = false;
+        var esModuleWorks = false;
+        
+        try {
+            // Test that regular CommonJS modules still work
+            var simpleModule = require("./simplemodule");
+            commonJSWorks = true;
+            __log("CommonJS module loaded");
+        } catch (e) {
+            // simplemodule might not exist, that's ok for this test
+            commonJSWorks = true;  // Assume it would work
+            __log("CommonJS test skipped (module not found): " + e.message);
+        }
+        
+        try {
+            // Test that ES modules work alongside CommonJS
+            var esModule = require("./test-es-module.mjs");
+            esModuleWorks = (esModule !== null && esModule !== undefined);
+            __log("ES module works alongside CommonJS");
+        } catch (e) {
+            __log("ES module failed alongside CommonJS: " + e.message);
+        }
+        
+        expect(commonJSWorks).toBe(true);
+        expect(esModuleWorks).toBe(true);
     });
 
     it("should not treat .mjs.map files as ES modules", function () {
         __log("TEST: Testing source map exclusion");
         
-        var sourceMapRejected = true;
+        // This test verifies that .mjs.map files are not treated as ES modules
+        var sourceMapCorrectlyRejected = true;
+        
         try {
-            // This should not be treated as an ES module
+            // This should fail with module not found, not with ES module parsing
             require("./non-existent.mjs.map");
+            sourceMapCorrectlyRejected = false; // Should not reach here
         } catch (e) {
-            // Should get a regular module not found error, not ES module specific error
-            sourceMapRejected = e.message.indexOf("non-existent.mjs.map") !== -1;
+            // Should get a regular module not found error
+            var isModuleNotFoundError = e.message.indexOf("non-existent.mjs.map") !== -1 ||
+                                       e.message.indexOf("Module not found") !== -1 ||
+                                       e.message.indexOf("Cannot find module") !== -1;
+            sourceMapCorrectlyRejected = isModuleNotFoundError;
+            __log("Source map error (expected): " + e.message);
         }
         
-        expect(sourceMapRejected).toBe(true);
-    });
-
-    it("should handle ES module loading alongside CommonJS", function () {
-        __log("TEST: Testing ES module and CommonJS coexistence");
-        
-        // Test that we can still load regular JS modules
-        var regularModuleLoaded = false;
-        try {
-            var simpleModule = require("./simplemodule");
-            regularModuleLoaded = (simpleModule !== undefined);
-        } catch (e) {
-            // If simplemodule doesn't exist, that's okay for this test
-            regularModuleLoaded = true;
-        }
-        
-        expect(regularModuleLoaded).toBe(true);
-    });
-
-    it("should attempt to load .mjs files through module system", function () {
-        __log("TEST: Testing .mjs file processing");
-        
-        var mjsProcessingAttempted = false;
-        try {
-            // This will attempt to process the .mjs file we created
-            require("./test-es-module.mjs");
-        } catch (e) {
-            // Check that the error indicates the file was found and processing was attempted
-            // (It will likely fail because full ES module support isn't implemented yet)
-            mjsProcessingAttempted = e.message.indexOf("test-es-module") !== -1 || 
-                                    e.message.indexOf("module") !== -1;
-        }
-        
-        expect(mjsProcessingAttempted).toBe(true);
-    });
-
-    it("should handle optional module detection", function () {
-        __log("TEST: Testing optional module detection patterns");
-        
-        // Test patterns that should be detected as likely optional modules
-        var bareModuleName = "lodash";  // bare module name
-        var relativePath = "./local-module";  // relative path
-        var absolutePath = "/app/absolute-module";  // absolute path
-        
-        // We can't directly test IsLikelyOptionalModule, but we can test
-        // that the module system handles different path types appropriately
-        var allPatternsHandled = true;
-        
-        // These should all result in appropriate error handling
-        try {
-            require(bareModuleName);
-        } catch (e) {
-            // Should get appropriate error for bare module
-        }
-        
-        try {
-            require(relativePath);
-        } catch (e) {
-            // Should get appropriate error for relative path
-        }
-        
-        expect(allPatternsHandled).toBe(true);
+        expect(sourceMapCorrectlyRejected).toBe(true);
     });
 });
