@@ -58,6 +58,10 @@ class ModuleInternal {
             v8::Persistent<v8::Object>* obj;
         };
 
+        // Helper functions for ES module support
+        static bool IsLikelyOptionalModule(const std::string& moduleName);
+        static bool IsESModule(const std::string& path);
+
         static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
         static void RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& args);

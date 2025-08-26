@@ -30,6 +30,22 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
+// Helper function to check if a module name looks like an optional external module
+bool IsLikelyOptionalModule(const std::string& moduleName) {
+    // Check if it's a bare module name (no path separators) that could be an npm package
+    if (moduleName.find('/') == std::string::npos && moduleName.find('\\') == std::string::npos &&
+        moduleName[0] != '.' && moduleName[0] != '~' && moduleName[0] != '/') {
+        return true;
+    }
+    return false;
+}
+
+// Helper function to check if a file path is an ES module (.mjs) but not a source map (.mjs.map)
+bool IsESModule(const std::string& path) {
+    return path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0 &&
+           !(path.size() >= 8 && path.compare(path.size() - 8, 8, ".mjs.map") == 0);
+}
+
 ModuleInternal::ModuleInternal()
     : m_isolate(nullptr), m_requireFunction(nullptr), m_requireFactoryFunction(nullptr) {
 }
@@ -266,7 +282,7 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleNam
         auto it2 = m_loadedModules.find(path);
 
         if (it2 == m_loadedModules.end()) {
-            if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".so")) {
+            if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".mjs") || Util::EndsWith(path, ".so")) {
                 isData = false;
                 result = LoadModule(isolate, path, cachePathKey);
             } else if (Util::EndsWith(path, ".json")) {
@@ -310,7 +326,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
 
     Local<Function> moduleFunc;
 
-    if (Util::EndsWith(modulePath, ".js")) {
+    if (Util::EndsWith(modulePath, ".js") || Util::EndsWith(modulePath, ".mjs")) {
         auto script = LoadScript(isolate, modulePath, fullRequiredModulePath);
 
         moduleFunc = script->Run(context).ToLocalChecked().As<Function>();

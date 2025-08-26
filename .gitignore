@@ -25,3 +25,6 @@ android-runtime.iml
 test-app/build-tools/*.log
 test-app/analytics/build-statistics.json
 package-lock.json
+
+## temporary, sample build output of an app 
+/app
