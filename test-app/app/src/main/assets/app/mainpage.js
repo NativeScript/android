@@ -1,5 +1,4 @@
 __disableVerboseLogging();
-__log("starting tests");
 
 // methods that common tests need to run
 var testContent = "";
@@ -14,7 +13,6 @@ TNSGetOutput = function () {
 	return testContent;
 }
 __approot = __dirname.substr(0, __dirname.length - 4);
-
 var shared = require("./shared");
 shared.runRequireTests();
 shared.runWeakRefTests();
@@ -72,4 +70,7 @@ require("./tests/testPostFrameCallback");
 require("./tests/console/logTests.js");
 require('./tests/testURLImpl.js');
 require('./tests/testURLSearchParamsImpl.js');
-require('./tests/testESModules.js');
+
+// ES MODULE TESTS
+__log("=== Running ES Modules Tests ===");
+require("./tests/testESModules");
