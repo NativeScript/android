@@ -9,6 +9,11 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
                                                  v8::Local<v8::FixedArray> import_assertions,
                                                  v8::Local<v8::Module> referrer);
 
+// InitializeImportMetaObject - Callback invoked by V8 to initialize import.meta object
+void InitializeImportMetaObject(v8::Local<v8::Context> context, 
+                                v8::Local<v8::Module> module, 
+                                v8::Local<v8::Object> meta);
+
 // Helper functions
 bool IsFile(const std::string& path);
 std::string WithExtension(const std::string& path, const std::string& ext);

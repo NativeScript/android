@@ -16,6 +16,71 @@ using namespace tns;
 // External global module registry declared in ModuleInternal.cpp
 extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
 
+// Import meta callback to support import.meta.url and import.meta.dirname
+void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Local<Object> meta) {
+    Isolate* isolate = context->GetIsolate();
+    
+    // Look up the module path in the global module registry (with safety checks)
+    std::string modulePath;
+    
+    try {
+        for (auto& kv : g_moduleRegistry) {
+            // Check if Global handle is empty before accessing
+            if (kv.second.IsEmpty()) {
+                continue;
+            }
+            
+            Local<Module> registered = kv.second.Get(isolate);
+            if (!registered.IsEmpty() && registered == module) {
+                modulePath = kv.first;
+                break;
+            }
+        }
+    } catch (...) {
+        DEBUG_WRITE("InitializeImportMetaObject: Exception during module registry lookup, using fallback");
+        modulePath = "";  // Will use fallback path
+    }
+    
+    DEBUG_WRITE("InitializeImportMetaObject: Module lookup: found path = %s", 
+                modulePath.empty() ? "(empty)" : modulePath.c_str());
+    DEBUG_WRITE("InitializeImportMetaObject: Registry size: %zu", g_moduleRegistry.size());
+    
+    // Convert file path to file:// URL
+    std::string moduleUrl;
+    if (!modulePath.empty()) {
+        // Create file:// URL from the full path
+        moduleUrl = "file://" + modulePath;
+    } else {
+        // Fallback URL if module not found in registry
+        moduleUrl = "file:///android_asset/app/";
+    }
+    
+    DEBUG_WRITE("InitializeImportMetaObject: Final URL: %s", moduleUrl.c_str());
+    
+    Local<String> url = ArgConverter::ConvertToV8String(isolate, moduleUrl);
+    
+    // Set import.meta.url property
+    meta->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, "url"), url).Check();
+    
+    // Add import.meta.dirname support (extract directory from path)
+    std::string dirname;
+    if (!modulePath.empty()) {
+        size_t lastSlash = modulePath.find_last_of("/\\");
+        if (lastSlash != std::string::npos) {
+            dirname = modulePath.substr(0, lastSlash);
+        } else {
+            dirname = "/android_asset/app";  // fallback
+        }
+    } else {
+        dirname = "/android_asset/app";  // fallback
+    }
+    
+    Local<String> dirnameStr = ArgConverter::ConvertToV8String(isolate, dirname);
+    
+    // Set import.meta.dirname property
+    meta->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, "dirname"), dirnameStr).Check();
+}
+
 // Helper function to check if a file exists and is a regular file
 bool IsFile(const std::string& path) {
     struct stat st;

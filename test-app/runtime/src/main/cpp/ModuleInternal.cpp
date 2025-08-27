@@ -273,14 +273,37 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleNam
             path = std::string(moduleName);
             path.replace(pos, sys_lib.length(), "");
         } else {
-            JEnv env;
-            JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
-            JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
-            JniLocalRef jsModulePath(
-                    env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID,
-                                               (jstring) jsModulename, (jstring) jsBaseDir));
+            // Handle tilde path resolution before calling Java path resolution
+            std::string resolvedModuleName = moduleName;
+            if (!moduleName.empty() && moduleName[0] == '~') {
+                // Convert ~/path to ApplicationPath/path
+                std::string tail = moduleName.size() >= 2 && moduleName[1] == '/' ? moduleName.substr(2) : moduleName.substr(1);
+                resolvedModuleName = Constants::APP_ROOT_FOLDER_PATH + "/" + tail;
+                
+                // For .mjs files with tilde paths, use resolved path directly
+                if (Util::EndsWith(resolvedModuleName, ".mjs")) {
+                    path = resolvedModuleName;
+                } else {
+                    // For non-.mjs files, still use Java resolution with the resolved name
+                    JEnv env;
+                    JniLocalRef jsModulename(env.NewStringUTF(resolvedModuleName.c_str()));
+                    JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
+                    JniLocalRef jsModulePath(
+                            env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID,
+                                                       (jstring) jsModulename, (jstring) jsBaseDir));
 
-            path = ArgConverter::jstringToString((jstring) jsModulePath);
+                    path = ArgConverter::jstringToString((jstring) jsModulePath);
+                }
+            } else {
+                JEnv env;
+                JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
+                JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
+                JniLocalRef jsModulePath(
+                        env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID,
+                                                   (jstring) jsModulename, (jstring) jsBaseDir));
+
+                path = ArgConverter::jstringToString((jstring) jsModulePath);
+            }
         }
 
         auto it2 = m_loadedModules.find(path);
