@@ -87,8 +87,10 @@ class ModuleInternal {
 
         ModulePathKind GetModulePathKind(const std::string& path);
 
+    public:
         static jclass MODULE_CLASS;
         static jmethodID RESOLVE_PATH_METHOD_ID;
+        static jmethodID GET_APPLICATION_FILES_PATH_METHOD_ID;
         static const char* MODULE_PROLOGUE;
         static const char* MODULE_EPILOGUE;
 

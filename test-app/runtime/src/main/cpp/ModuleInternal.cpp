@@ -72,6 +72,9 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
 
         RESOLVE_PATH_METHOD_ID = env.GetStaticMethodID(MODULE_CLASS, "resolvePath", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
         assert(RESOLVE_PATH_METHOD_ID != nullptr);
+        
+        GET_APPLICATION_FILES_PATH_METHOD_ID = env.GetStaticMethodID(MODULE_CLASS, "getApplicationFilesPath", "()Ljava/lang/String;");
+        assert(GET_APPLICATION_FILES_PATH_METHOD_ID != nullptr);
     }
 
     m_isolate = isolate;
@@ -703,6 +706,7 @@ ModuleInternal::ModulePathKind ModuleInternal::GetModulePathKind(const std::stri
 
 jclass ModuleInternal::MODULE_CLASS = nullptr;
 jmethodID ModuleInternal::RESOLVE_PATH_METHOD_ID = nullptr;
+jmethodID ModuleInternal::GET_APPLICATION_FILES_PATH_METHOD_ID = nullptr;
 
 const char* ModuleInternal::MODULE_PROLOGUE = "(function(module, exports, require, __filename, __dirname){ ";
 const char* ModuleInternal::MODULE_EPILOGUE = "\n})";

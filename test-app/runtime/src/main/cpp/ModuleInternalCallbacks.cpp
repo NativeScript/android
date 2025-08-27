@@ -105,9 +105,12 @@ bool IsNodeBuiltinModule(const std::string& spec) {
 
 // Helper function to get application path (for Android, we'll use a simple approach)
 std::string GetApplicationPath() {
-    // For Android, the app assets are typically at /android_asset/app
-    // but for our purposes, we'll use a relative path approach
-    return "/android_asset/app";
+    // For Android, use the actual file system path instead of asset path
+    // This should match the ApplicationFilesPath + "/app" from Module.java
+    JEnv env;
+    jstring applicationFilesPath = (jstring) env.CallStaticObjectMethod(ModuleInternal::MODULE_CLASS, ModuleInternal::GET_APPLICATION_FILES_PATH_METHOD_ID);
+    std::string path = ArgConverter::jstringToString(applicationFilesPath);
+    return path + "/app";
 }
 
 // ResolveModuleCallback - Main callback invoked by V8 to resolve import statements
