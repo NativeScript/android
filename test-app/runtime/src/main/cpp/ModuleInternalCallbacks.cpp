@@ -235,12 +235,75 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         // Check for Node.js built-in modules
         if (IsNodeBuiltinModule(spec)) {
             std::string builtinName = spec.substr(5);  // Remove "node:" prefix
-            std::string builtinPath = appPath + "/" + builtinName + ".mjs";
             
-            // For now, just throw an error - polyfill creation would need file system access
-            std::string msg = "Node.js built-in modules not supported yet: " + spec;
-            isolate->ThrowException(v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, msg)));
-            return v8::MaybeLocal<v8::Module>();
+            // Create polyfill content for Node.js built-in modules
+            std::string polyfillContent;
+            
+            if (builtinName == "url") {
+                // Create a polyfill for node:url with fileURLToPath
+                polyfillContent = "// Polyfill for node:url\n"
+                                "export function fileURLToPath(url) {\n"
+                                "  if (typeof url === 'string') {\n"
+                                "    if (url.startsWith('file://')) {\n"
+                                "      return decodeURIComponent(url.slice(7));\n"
+                                "    }\n"
+                                "    return url;\n"
+                                "  }\n"
+                                "  if (url && typeof url.href === 'string') {\n"
+                                "    return fileURLToPath(url.href);\n"
+                                "  }\n"
+                                "  throw new Error('Invalid URL');\n"
+                                "}\n"
+                                "\n"
+                                "export function pathToFileURL(path) {\n"
+                                "  return new URL('file://' + encodeURIComponent(path));\n"
+                                "}\n";
+            } else {
+                // Generic polyfill for other Node.js built-in modules
+                polyfillContent = "// Polyfill for node:" + builtinName + "\n"
+                                "console.warn('Node.js built-in module \\'node:" + builtinName + "\\' is not fully supported in NativeScript');\n"
+                                "export default {};\n";
+            }
+            
+            // Create module source and compile it in-memory
+            v8::Local<v8::String> sourceText = ArgConverter::ConvertToV8String(isolate, polyfillContent);
+            
+            // Build URL for stack traces
+            std::string moduleUrl = "node:" + builtinName;
+            v8::Local<v8::String> urlString = ArgConverter::ConvertToV8String(isolate, moduleUrl);
+            
+            v8::ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true /* is_module */);
+            v8::ScriptCompiler::Source src(sourceText, origin);
+            
+            v8::Local<v8::Module> polyfillModule;
+            if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&polyfillModule)) {
+                std::string msg = "Failed to compile polyfill for: " + spec;
+                isolate->ThrowException(v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, msg)));
+                return v8::MaybeLocal<v8::Module>();
+            }
+            
+            // Store in registry before instantiation
+            g_moduleRegistry[spec].Reset(isolate, polyfillModule);
+            
+            // Instantiate the module
+            if (!polyfillModule->InstantiateModule(context, ResolveModuleCallback).FromMaybe(false)) {
+                g_moduleRegistry.erase(spec);
+                std::string msg = "Failed to instantiate polyfill for: " + spec;
+                isolate->ThrowException(v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, msg)));
+                return v8::MaybeLocal<v8::Module>();
+            }
+            
+            // Evaluate the module
+            v8::MaybeLocal<v8::Value> evalResult = polyfillModule->Evaluate(context);
+            if (evalResult.IsEmpty()) {
+                g_moduleRegistry.erase(spec);
+                std::string msg = "Failed to evaluate polyfill for: " + spec;
+                isolate->ThrowException(v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, msg)));
+                return v8::MaybeLocal<v8::Module>();
+            }
+            
+            return v8::MaybeLocal<v8::Module>(polyfillModule);
+            
         } else if (tns::ModuleInternal::IsLikelyOptionalModule(spec)) {
             // For optional modules, create a placeholder
             std::string msg = "Optional module not found: " + spec;
