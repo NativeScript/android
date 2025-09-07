@@ -1,6 +1,3 @@
-// Simple direct console-based testing - no XML nonsense!
-console.log("=== STARTING ES MODULE TESTS ===");
-
 function runESModuleTests() {
     var passed = 0;
     var failed = 0;
@@ -10,7 +7,6 @@ function runESModuleTests() {
     try {
         var moduleExports = require("~/test-es-module.mjs");
         if (moduleExports && moduleExports !== null) {
-            console.log("✅ PASS: ES Module loaded successfully");
             console.log("Module exports:", JSON.stringify(moduleExports));
             passed++;
         } else {
@@ -31,9 +27,8 @@ function runESModuleTests() {
             console.log("import.meta test results:", JSON.stringify(metaResults, null, 2));
             
             if (metaResults && metaResults.hasImportMeta && metaResults.hasUrl && metaResults.hasDirname) {
-                console.log("✅ PASS: import.meta functionality works");
-                console.log("   - import.meta.url:", metaResults.url);
-                console.log("   - import.meta.dirname:", metaResults.dirname);
+                // console.log("   - import.meta.url:", metaResults.url);
+                // console.log("   - import.meta.dirname:", metaResults.dirname);
                 passed++;
             } else {
                 console.log("❌ FAIL: import.meta properties missing");
@@ -61,7 +56,6 @@ function runESModuleTests() {
             console.log("Worker features test results:", JSON.stringify(workerResults, null, 2));
             
             if (workerResults && workerResults.stringPathSupported && workerResults.urlObjectSupported && workerResults.tildePathSupported) {
-                console.log("✅ PASS: Worker enhancements work");
                 console.log("   - String path support:", workerResults.stringPathSupported);
                 console.log("   - URL object support:", workerResults.urlObjectSupported);
                 console.log("   - Tilde path support:", workerResults.tildePathSupported);

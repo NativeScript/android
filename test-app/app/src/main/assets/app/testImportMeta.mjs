@@ -1,13 +1,13 @@
 // ES Module test for import.meta functionality
-console.log('=== Testing import.meta functionality ===');
+// console.log('=== Testing import.meta functionality ===');
 
 // Test import.meta.url
-console.log('import.meta.url:', import.meta.url);
-console.log('Type of import.meta.url:', typeof import.meta.url);
+// console.log('import.meta.url:', import.meta.url);
+// console.log('Type of import.meta.url:', typeof import.meta.url);
 
 // Test import.meta.dirname
-console.log('import.meta.dirname:', import.meta.dirname);
-console.log('Type of import.meta.dirname:', typeof import.meta.dirname);
+// console.log('import.meta.dirname:', import.meta.dirname);
+// console.log('Type of import.meta.dirname:', typeof import.meta.dirname);
 
 // Validate expected values
 export function testImportMeta() {
@@ -26,15 +26,15 @@ export function testImportMeta() {
         hasDirname: typeof import.meta.dirname === 'string' && import.meta.dirname.length > 0
     };
     
-    console.log('=== Import.meta Test Results ===');
-    console.log('URL:', results.url);
-    console.log('Dirname:', results.dirname);
-    console.log('URL Type:', results.urlType);
-    console.log('Dirname Type:', results.dirnameType);
-    console.log('URL is string:', results.urlIsString);
-    console.log('Dirname is string:', results.dirnameIsString);
-    console.log('URL starts with file://:', results.urlStartsWithFile);
-    console.log('Dirname exists:', results.dirnameExists);
+    // console.log('=== Import.meta Test Results ===');
+    // console.log('URL:', results.url);
+    // console.log('Dirname:', results.dirname);
+    // console.log('URL Type:', results.urlType);
+    // console.log('Dirname Type:', results.dirnameType);
+    // console.log('URL is string:', results.urlIsString);
+    // console.log('Dirname is string:', results.dirnameIsString);
+    // console.log('URL starts with file://:', results.urlStartsWithFile);
+    // console.log('Dirname exists:', results.dirnameExists);
     
     return results;
 }
