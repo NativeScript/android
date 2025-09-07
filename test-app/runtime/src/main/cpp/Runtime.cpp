@@ -14,6 +14,7 @@
 #include "SimpleProfiler.h"
 #include "SimpleAllocator.h"
 #include "ModuleInternal.h"
+#include "ModuleInternalCallbacks.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include "ArrayHelper.h"
@@ -507,6 +508,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     // Set up import.meta callback
     isolate->SetHostInitializeImportMetaObjectCallback(InitializeImportMetaObject);
+
+    // Enable dynamic import() support
+    isolate->SetHostImportModuleDynamicallyCallback(ImportModuleDynamicallyCallback);
 
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
 

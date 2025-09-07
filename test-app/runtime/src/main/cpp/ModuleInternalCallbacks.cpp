@@ -129,6 +129,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
     // Debug logging
     DEBUG_WRITE("ResolveModuleCallback: Resolving '%s'", spec.c_str());
+    __android_log_print(ANDROID_LOG_DEBUG, "TNS.ResolveCallback", "Resolving module: '%s'", spec.c_str());
 
     // 2) Find which filepath the referrer was compiled under
     std::string referrerPath;
@@ -165,10 +166,33 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     } else if (spec.size() > 7 && spec.substr(0, 7) == "file://") {
         // Absolute file URL
         std::string tail = spec.substr(7);  // strip file://
-        if (tail[0] != '/') {
+        if (tail.empty() || tail[0] != '/') {
             tail = "/" + tail;
         }
-        std::string candidate = appPath + tail;
+
+        // Map common virtual roots to the real appPath
+        const std::string appVirtualRoot = "/app/";                      // e.g. file:///app/foo.mjs
+        const std::string androidAssetAppRoot = "/android_asset/app/";   // e.g. file:///android_asset/app/foo.mjs
+
+        std::string candidate;
+        if (tail.rfind(appVirtualRoot, 0) == 0) {
+            // Drop the leading "/app/" and prepend real appPath
+            candidate = appPath + "/" + tail.substr(appVirtualRoot.size());
+            DEBUG_WRITE("ResolveModuleCallback: file:// to appPath mapping: '%s' -> '%s'", tail.c_str(), candidate.c_str());
+        } else if (tail.rfind(androidAssetAppRoot, 0) == 0) {
+            // Replace "/android_asset/app/" with the real appPath
+            candidate = appPath + "/" + tail.substr(androidAssetAppRoot.size());
+            DEBUG_WRITE("ResolveModuleCallback: file:// android_asset mapping: '%s' -> '%s'", tail.c_str(), candidate.c_str());
+        } else if (tail.rfind(appPath, 0) == 0) {
+            // Already an absolute on-disk path to the app folder
+            candidate = tail;
+            DEBUG_WRITE("ResolveModuleCallback: file:// absolute path preserved: '%s'", candidate.c_str());
+        } else {
+            // Fallback: treat as absolute on-disk path
+            candidate = tail;
+            DEBUG_WRITE("ResolveModuleCallback: file:// generic absolute: '%s'", candidate.c_str());
+        }
+
         candidateBases.push_back(candidate);
     } else if (!spec.empty() && spec[0] == '~') {
         // Alias to application root using ~/path
@@ -258,6 +282,85 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
                                 "export function pathToFileURL(path) {\n"
                                 "  return new URL('file://' + encodeURIComponent(path));\n"
                                 "}\n";
+            } else if (builtinName == "module") {
+                // Create a polyfill for node:module with createRequire
+                polyfillContent = "// Polyfill for node:module\n"
+                                "export function createRequire(filename) {\n"
+                                "  // Return the global require function\n"
+                                "  // In NativeScript, require is globally available\n"
+                                "  if (typeof require === 'function') {\n"
+                                "    return require;\n"
+                                "  }\n"
+                                "  \n"
+                                "  // Fallback: create a basic require function\n"
+                                "  return function(id) {\n"
+                                "    throw new Error('Module ' + id + ' not found. NativeScript require() not available.');\n"
+                                "  };\n"
+                                "}\n"
+                                "\n"
+                                "// Export as default as well for compatibility\n"
+                                "export default { createRequire };\n";
+            } else if (builtinName == "path") {
+                // Create a polyfill for node:path
+                polyfillContent = "// Polyfill for node:path\n"
+                                "export const sep = '/';\n"
+                                "export const delimiter = ':';\n"
+                                "\n"
+                                "export function basename(path, ext) {\n"
+                                "  const name = path.split('/').pop() || '';\n"
+                                "  return ext && name.endsWith(ext) ? name.slice(0, -ext.length) : name;\n"
+                                "}\n"
+                                "\n"
+                                "export function dirname(path) {\n"
+                                "  const parts = path.split('/');\n"
+                                "  return parts.slice(0, -1).join('/') || '/';\n"
+                                "}\n"
+                                "\n"
+                                "export function extname(path) {\n"
+                                "  const name = basename(path);\n"
+                                "  const dot = name.lastIndexOf('.');\n"
+                                "  return dot > 0 ? name.slice(dot) : '';\n"
+                                "}\n"
+                                "\n"
+                                "export function join(...paths) {\n"
+                                "  return paths.filter(Boolean).join('/').replace(/\\/+/g, '/');\n"
+                                "}\n"
+                                "\n"
+                                "export function resolve(...paths) {\n"
+                                "  let resolved = '';\n"
+                                "  for (let path of paths) {\n"
+                                "    if (path.startsWith('/')) {\n"
+                                "      resolved = path;\n"
+                                "    } else {\n"
+                                "      resolved = join(resolved, path);\n"
+                                "    }\n"
+                                "  }\n"
+                                "  return resolved || '/';\n"
+                                "}\n"
+                                "\n"
+                                "export function isAbsolute(path) {\n"
+                                "  return path.startsWith('/');\n"
+                                "}\n"
+                                "\n"
+                                "export default { basename, dirname, extname, join, resolve, isAbsolute, sep, delimiter };\n";
+            } else if (builtinName == "fs") {
+                // Create a basic polyfill for node:fs
+                polyfillContent = "// Polyfill for node:fs\n"
+                                "console.warn('Node.js fs module is not supported in NativeScript. Use @nativescript/core File APIs instead.');\n"
+                                "\n"
+                                "export function readFileSync() {\n"
+                                "  throw new Error('fs.readFileSync is not supported in NativeScript. Use @nativescript/core File APIs.');\n"
+                                "}\n"
+                                "\n"
+                                "export function writeFileSync() {\n"
+                                "  throw new Error('fs.writeFileSync is not supported in NativeScript. Use @nativescript/core File APIs.');\n"
+                                "}\n"
+                                "\n"
+                                "export function existsSync() {\n"
+                                "  throw new Error('fs.existsSync is not supported in NativeScript. Use @nativescript/core File APIs.');\n"
+                                "}\n"
+                                "\n"
+                                "export default { readFileSync, writeFileSync, existsSync };\n";
             } else {
                 // Generic polyfill for other Node.js built-in modules
                 polyfillContent = "// Polyfill for node:" + builtinName + "\n"
@@ -397,4 +500,82 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     }
 
     return v8::MaybeLocal<v8::Module>(it2->second.Get(isolate));
+}
+
+// Dynamic import() host callback
+v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
+    v8::Local<v8::Context> context, v8::Local<v8::Data> host_defined_options,
+    v8::Local<v8::Value> resource_name, v8::Local<v8::String> specifier,
+    v8::Local<v8::FixedArray> import_assertions) {
+    v8::Isolate* isolate = context->GetIsolate();
+    
+    // Convert specifier to std::string for logging
+    v8::String::Utf8Value specUtf8(isolate, specifier);
+    std::string spec = *specUtf8 ? *specUtf8 : "";
+    
+    DEBUG_WRITE("ImportModuleDynamicallyCallback: Dynamic import for '%s'", spec.c_str());
+    __android_log_print(ANDROID_LOG_DEBUG, "TNS.ImportCallback", "Dynamic import: '%s'", spec.c_str());
+    
+    v8::EscapableHandleScope scope(isolate);
+
+    // Create a Promise resolver we'll resolve/reject synchronously for now.
+    v8::Local<v8::Promise::Resolver> resolver;
+    if (!v8::Promise::Resolver::New(context).ToLocal(&resolver)) {
+        // Failed to create resolver, return empty promise
+        return v8::MaybeLocal<v8::Promise>();
+    }
+
+    // Re-use the static resolver to locate / compile the module.
+    try {
+        // Pass empty referrer since this V8 version doesn't expose GetModule() on
+        // ScriptOrModule. The resolver will fall back to absolute-path heuristics.
+        v8::Local<v8::Module> refMod;
+
+        v8::MaybeLocal<v8::Module> maybeModule =
+            ResolveModuleCallback(context, specifier, import_assertions, refMod);
+
+        v8::Local<v8::Module> module;
+        if (!maybeModule.ToLocal(&module)) {
+            // Resolution failed; reject to avoid leaving a pending Promise (white screen)
+            DEBUG_WRITE("ImportModuleDynamicallyCallback: Resolution failed for '%s'", spec.c_str());
+            v8::Local<v8::Value> ex = v8::Exception::Error(
+                ArgConverter::ConvertToV8String(isolate, std::string("Failed to resolve module: ") + spec));
+            resolver->Reject(context, ex).Check();
+            return scope.Escape(resolver->GetPromise());
+        }
+
+        // If not yet instantiated/evaluated, do it now
+        if (module->GetStatus() == v8::Module::kUninstantiated) {
+            if (!module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
+                DEBUG_WRITE("ImportModuleDynamicallyCallback: Instantiate failed for '%s'", spec.c_str());
+                resolver
+                    ->Reject(context,
+                             v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, "Failed to instantiate module")))
+                    .Check();
+                return scope.Escape(resolver->GetPromise());
+            }
+        }
+
+        if (module->GetStatus() != v8::Module::kEvaluated) {
+            if (module->Evaluate(context).IsEmpty()) {
+                DEBUG_WRITE("ImportModuleDynamicallyCallback: Evaluation failed for '%s'", spec.c_str());
+                v8::Local<v8::Value> ex =
+                    v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, "Evaluation failed"));
+                resolver->Reject(context, ex).Check();
+                return scope.Escape(resolver->GetPromise());
+            }
+        }
+
+        resolver->Resolve(context, module->GetModuleNamespace()).Check();
+        DEBUG_WRITE("ImportModuleDynamicallyCallback: Successfully resolved '%s'", spec.c_str());
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8();
+        DEBUG_WRITE("ImportModuleDynamicallyCallback: Native exception for '%s'", spec.c_str());
+        resolver
+            ->Reject(context, v8::Exception::Error(
+                                  ArgConverter::ConvertToV8String(isolate, "Native error during dynamic import")))
+            .Check();
+    }
+
+    return scope.Escape(resolver->GetPromise());
 }
