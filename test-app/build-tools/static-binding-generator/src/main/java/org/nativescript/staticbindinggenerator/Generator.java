@@ -47,6 +47,8 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -153,9 +155,10 @@ public class Generator {
                 name = getSimpleClassname(clazz.getClassName());
             } else {
                 name = getSimpleClassname(clazz.getClassName().replace("$", "_")) + "_";
-                // name of the class: last portion of the full file name + line + column + variable name
-                String[] lastFilePathPart = dataRow.getFile().split("_");
-                name += lastFilePathPart[lastFilePathPart.length - 1] + "_" + dataRow.getLine() + "_" + dataRow.getColumn() + "_" + dataRow.getNewClassName();
+                // Generate a unique identifier that prevents naming collisions
+                // especially with .mjs files and complex Angular component structures
+                String fileIdentifier = generateUniqueFileIdentifier(dataRow.getFile());
+                name += fileIdentifier + "_" + dataRow.getLine() + "_" + dataRow.getColumn() + "_" + dataRow.getNewClassName();
             }
         }
 
@@ -277,6 +280,51 @@ public class Generator {
     private String getSimpleClassname(String classname) {
         int idx = classname.lastIndexOf('.');
         return classname.substring(idx + 1).replace("$", "_");
+    }
+
+    /**
+     * Generates a unique file identifier by combining multiple path components
+     * with a hash to prevent naming collisions in .mjs and complex file structures
+     */
+    private String generateUniqueFileIdentifier(String filePath) {
+        if (filePath == null || filePath.isEmpty()) {
+            return "unknown";
+        }
+        
+        // Split the file path by underscores
+        String[] pathParts = filePath.split("_");
+        
+        // Use last 3 components if available, otherwise use what we have
+        StringBuilder identifier = new StringBuilder();
+        int startIndex = Math.max(0, pathParts.length - 3);
+        
+        for (int i = startIndex; i < pathParts.length; i++) {
+            if (identifier.length() > 0) {
+                identifier.append("_");
+            }
+            identifier.append(pathParts[i]);
+        }
+        
+        // Add a short hash of the full path to ensure uniqueness
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] hash = md.digest(filePath.getBytes());
+            // Convert to hex and take first 6 characters
+            StringBuilder hexString = new StringBuilder();
+            for (int i = 0; i < Math.min(3, hash.length); i++) {
+                String hex = Integer.toHexString(0xff & hash[i]);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            identifier.append("_").append(hexString.toString());
+        } catch (NoSuchAlgorithmException e) {
+            // Fallback: use hashCode if MD5 is not available
+            identifier.append("_").append(Integer.toHexString(Math.abs(filePath.hashCode())));
+        }
+        
+        return identifier.toString();
     }
 
     private void writeBinding(Writer w, DataRow dataRow, JavaClass clazz, String packageName, String name) {
