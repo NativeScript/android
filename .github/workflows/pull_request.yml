@@ -10,6 +10,9 @@ env:
   NDK_ARCH: darwin
 
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build
