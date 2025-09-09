@@ -120,7 +120,7 @@ var TerminalReporter = require('../jasmine-reporters/terminal_reporter').Termina
   env.addReporter(jasmineInterface.jsApiReporter);
 //
   env.addReporter(new TerminalReporter({
-    verbosity: 5
+    verbosity: 2  // Show failures and summary, but not individual passes
   }));
   
   env.addReporter(new JUnitXmlReporter());

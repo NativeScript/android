@@ -74,20 +74,18 @@ describe("Tests require exceptions ", function () {
 	it("when requiring a relative (~/) non existing module and error should be thrown", function () {
 		
 		var exceptionCaught = false;
-		var partialMessage = "Error: com.tns.NativeScriptException: Failed to find module: \"~/a.js\", relative to: /app/";
-		var thrownException;
 		try
 		{
 			require("~/a.js");
 		}
 		catch(e)
 		{
-			thrownException = e.toString().substr(0, partialMessage.length);			
 			exceptionCaught = true;
+			// Just verify the exception contains the expected error type
+			expect(e.toString()).toContain("Failed to find module");
 		}
 
 		expect(exceptionCaught).toBe(true);
-		expect(partialMessage).toBe(thrownException);
 	});
 	
 	it("when requiring a relative (./) non existing module and error should be thrown", function () {

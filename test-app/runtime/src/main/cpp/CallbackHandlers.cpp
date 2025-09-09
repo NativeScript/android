@@ -3,6 +3,7 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
+#include "Constants.h"
 //#include "./conversions/JSToJavaConverter.h"
 #include "JsArgConverter.h"
 #include "JsArgToArrayConverter.h"
@@ -994,19 +995,71 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
             throw NativeScriptException("Worker should be called as a constructor!");
         }
 
-        if (args.Length() > 1 || !args[0]->IsString()) {
-            throw NativeScriptException(
-                    "Worker should be called with one string parameter (name of file to run)!");
+        if (args.Length() == 0) {
+            throw NativeScriptException("Not enough arguments.");
+        }
+
+        if (args.Length() > 2) {
+            throw NativeScriptException("Too many arguments passed.");
         }
 
         auto thiz = args.This();
         auto isolate = thiz->GetIsolate();
+        auto context = isolate->GetCurrentContext();
+
+        std::string workerPath;
+
+        // Handle both string URLs and URL objects
+        if (args[0]->IsString()) {
+            workerPath = ArgConverter::ConvertToString(args[0].As<String>());
+        } else if (args[0]->IsObject()) {
+            Local<Object> urlObj = args[0].As<Object>();
+            Local<Value> toStringMethod;
+            if (urlObj->Get(context, ArgConverter::ConvertToV8String(isolate, "toString")).ToLocal(&toStringMethod)) {
+                if (toStringMethod->IsFunction()) {
+                    Local<v8::Function> toString = toStringMethod.As<v8::Function>();
+                    Local<Value> result;
+                    if (toString->Call(context, urlObj, 0, nullptr).ToLocal(&result)) {
+                        if (result->IsString()) {
+                            std::string stringResult = ArgConverter::ConvertToString(result.As<String>());
+                            // Reject plain objects that return "[object Object]" from toString()
+                            if (stringResult == "[object Object]") {
+                                throw NativeScriptException("Worker constructor expects a string URL or URL object.");
+                            }
+                            workerPath = stringResult;
+                        } else {
+                            throw NativeScriptException("Worker URL object toString() must return a string.");
+                        }
+                    } else {
+                        throw NativeScriptException("Error calling toString() on Worker URL object.");
+                    }
+                } else {
+                    throw NativeScriptException("Worker URL object must have a toString() method.");
+                }
+            } else {
+                throw NativeScriptException("Worker URL object must have a toString() method.");
+            }
+        } else {
+            throw NativeScriptException("Worker constructor expects a string URL or URL object.");
+        }
+
+        // TODO: Handle options parameter (args[1]) if provided
+        // For now, we ignore the options parameter to maintain compatibility
+        // TODO: Validate worker path and call worker.onerror if the script does not exist
+
+        // Resolve tilde paths before creating the worker
+        std::string resolvedPath = workerPath;
+        if (!workerPath.empty() && workerPath[0] == '~') {
+            // Convert ~/path to ApplicationPath/path
+            std::string tail = workerPath.size() >= 2 && workerPath[1] == '/' ? workerPath.substr(2) : workerPath.substr(1);
+            resolvedPath = Constants::APP_ROOT_FOLDER_PATH + tail;
+        }
 
         auto currentExecutingScriptName = StackTrace::CurrentStackTrace(isolate, 1,
                                                                         StackTrace::kScriptName)->GetFrame(
                 isolate, 0)->GetScriptName();
         auto currentExecutingScriptNameStr = ArgConverter::ConvertToString(
-                currentExecutingScriptName);
+                currentExecutingScriptName.As<String>());
         auto lastForwardSlash = currentExecutingScriptNameStr.find_last_of("/");
         auto currentDir = currentExecutingScriptNameStr.substr(0, lastForwardSlash + 1);
         string fileSchema("file://");
@@ -1014,12 +1067,8 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
             currentDir = currentDir.substr(fileSchema.length());
         }
 
-        auto context = isolate->GetCurrentContext();
-        auto workerPath = ArgConverter::ConvertToString(
-                args[0]->ToString(context).ToLocalChecked());
-
         // Will throw if path is invalid or doesn't exist
-        ModuleInternal::CheckFileExists(isolate, workerPath, currentDir);
+        ModuleInternal::CheckFileExists(isolate, resolvedPath, currentDir);
 
         auto workerId = nextWorkerId++;
         V8SetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "workerId"),
@@ -1032,7 +1081,8 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         DEBUG_WRITE("Called Worker constructor id=%d", workerId);
 
         JEnv env;
-        JniLocalRef filePath(ArgConverter::ConvertToJavaString(args[0]));
+        Local<String> filePathStr = ArgConverter::ConvertToV8String(isolate, resolvedPath);
+        JniLocalRef filePath(ArgConverter::ConvertToJavaString(filePathStr));
         JniLocalRef dirPath(env.NewStringUTF(currentDir.c_str()));
 
         env.CallStaticVoidMethod(RUNTIME_CLASS, INIT_WORKER_METHOD_ID, (jstring) filePath,

@@ -20,13 +20,11 @@
         return dupe;
     }
     function log(str) {
-    	//__log(str);
-
+        // Use console.log so our test checker can detect the output
+        console.log(str);
+        
+        // Also keep the Android log for debugging
         android.util.Log.d("{N} Runtime Tests", str);
-//        var con = global.console || console;
-//        if (con && con.log && str) {
-//            con.log(str);
-//        }
     }
 
 
@@ -134,19 +132,59 @@
             } else if (self.verbosity > 2) {
                 resultText = ' ' + (failed ? 'Failed' : skipped ? 'Skipped' : 'Passed');
             }
-            log(inColor(resultText, color));
+            
+            // Only log the single character result for non-failures to reduce noise
+            if (!failed) {
+                log(inColor(resultText, color));
+            }
 
             if (failed) {
-                if (self.verbosity === 1) {
-                    log(spec.fullName);
-                } else if (self.verbosity === 2) {
-                    log(' ');
-                    log(indentWithLevel(spec._depth, spec.fullName));
+                // Force a simple debug message first - this should definitely appear
+                console.log('FAILURE DETECTED: Starting failure logging');
+                
+                // Always log detailed failure information regardless of verbosity
+                log('');
+                log('F'); // Show the failure marker
+                log(inColor('FAILED TEST: ' + spec.fullName, 'red+bold'));
+                log(inColor('Suite: ' + (spec._suite ? spec._suite.description : 'Unknown'), 'red'));
+                
+                // Also force output directly to console.log to ensure it's captured
+                console.log('JASMINE FAILURE: ' + spec.fullName);
+                console.log('JASMINE SUITE: ' + (spec._suite ? spec._suite.description : 'Unknown'));
+                
+                // Try to extract file information from the stack trace
+                var fileInfo = 'Unknown file';
+                if (spec.failedExpectations && spec.failedExpectations.length > 0 && spec.failedExpectations[0].stack) {
+                    var stackLines = spec.failedExpectations[0].stack.split('\n');
+                    for (var j = 0; j < stackLines.length; j++) {
+                        if (stackLines[j].includes('.js:') && stackLines[j].includes('app/')) {
+                            var match = stackLines[j].match(/app\/([^:]+\.js)/);
+                            if (match) {
+                                fileInfo = match[1];
+                                break;
+                            }
+                        }
+                    }
                 }
-
+                log(inColor('File: ' + fileInfo, 'red'));
+                console.log('JASMINE FILE: ' + fileInfo);
+                
                 for (var i = 0, failure; i < spec.failedExpectations.length; i++) {
-                    log(inColor(indentWithLevel(spec._depth, indent_string + spec.failedExpectations[i].message), color));
+                    log(inColor('  Error: ' + spec.failedExpectations[i].message, color));
+                    console.log('JASMINE ERROR: ' + spec.failedExpectations[i].message);
+                    
+                    if (spec.failedExpectations[i].stack) {
+                        // Only show first few lines of stack trace to avoid clutter
+                        var stackLines = spec.failedExpectations[i].stack.split('\n').slice(0, 3);
+                        stackLines.forEach(function(line) {
+                            if (line.trim()) {
+                                log(inColor('    ' + line.trim(), 'yellow'));
+                                console.log('JASMINE STACK: ' + line.trim());
+                            }
+                        });
+                    }
                 }
+                log('');
             }
         };
         self.suiteDone = function(suite) {

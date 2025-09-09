@@ -37,6 +37,11 @@ class ModuleInternal {
          */
         static void CheckFileExists(v8::Isolate* isolate, const std::string& path, const std::string& baseDir);
 
+        // Helper functions for ES module support
+        static bool IsLikelyOptionalModule(const std::string& moduleName);
+        static bool IsESModule(const std::string& path);
+        static v8::Local<v8::Value> LoadESModule(v8::Isolate* isolate, const std::string& path);
+
         static int MODULE_PROLOGUE_LENGTH;
     private:
         enum class ModulePathKind {
@@ -82,8 +87,10 @@ class ModuleInternal {
 
         ModulePathKind GetModulePathKind(const std::string& path);
 
+    public:
         static jclass MODULE_CLASS;
         static jmethodID RESOLVE_PATH_METHOD_ID;
+        static jmethodID GET_APPLICATION_FILES_PATH_METHOD_ID;
         static const char* MODULE_PROLOGUE;
         static const char* MODULE_EPILOGUE;
 

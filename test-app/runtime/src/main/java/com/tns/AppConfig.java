@@ -20,7 +20,8 @@ class AppConfig {
         ForceLog("forceLog", false),
         DiscardUncaughtJsExceptions("discardUncaughtJsExceptions", false),
         EnableLineBreakpoins("enableLineBreakpoints", false),
-        EnableMultithreadedJavascript("enableMultithreadedJavascript", false);
+        EnableMultithreadedJavascript("enableMultithreadedJavascript", false),
+        LogScriptLoading("logScriptLoading", false);
 
         private final String name;
         private final Object defaultValue;
@@ -56,6 +57,9 @@ class AppConfig {
                 if (rootObject.has(KnownKeys.Profiling.getName())) {
                     String profiling = rootObject.getString(KnownKeys.Profiling.getName());
                     values[KnownKeys.Profiling.ordinal()] = profiling;
+                }
+                if (rootObject.has(KnownKeys.LogScriptLoading.getName())) {
+                    values[KnownKeys.LogScriptLoading.ordinal()] = rootObject.getBoolean(KnownKeys.LogScriptLoading.getName());
                 }
                 if (rootObject.has(KnownKeys.DiscardUncaughtJsExceptions.getName())) {
                     values[KnownKeys.DiscardUncaughtJsExceptions.ordinal()] = rootObject.getBoolean(KnownKeys.DiscardUncaughtJsExceptions.getName());
@@ -170,5 +174,10 @@ class AppConfig {
 
     public boolean getEnableMultithreadedJavascript() {
         return (boolean)values[KnownKeys.EnableMultithreadedJavascript.ordinal()];
+    }
+
+    public boolean getLogScriptLoading() {
+    Object v = values[KnownKeys.LogScriptLoading.ordinal()];
+    return (v instanceof Boolean) ? ((Boolean)v).booleanValue() : false;
     }
 }
