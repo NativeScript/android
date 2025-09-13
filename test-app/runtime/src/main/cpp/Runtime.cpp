@@ -34,6 +34,7 @@
 #include "URLImpl.h"
 #include "URLSearchParamsImpl.h"
 #include "URLPatternImpl.h"
+#include <chrono>
 
 #ifdef APPLICATION_IN_DEBUG
 // #include "NetworkDomainCallbackHandlers.h"
@@ -487,6 +488,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     tns::instrumentation::Frame isolateFrame;
     auto isolate = Isolate::New(create_params);
+    // Capture start and realtime origin
+    // MonotonicallyIncreasingTime returns seconds as double; store for performance.now()
+    m_startTime = platform->MonotonicallyIncreasingTime();
+    m_realtimeOrigin = platform->CurrentClockTimeMillis();
     isolateFrame.log("Isolate.New");
 
     s_isolate2RuntimesCache[isolate] = this;
@@ -523,6 +528,15 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runtimeVersion"), ArgConverter::ConvertToV8String(isolate, NATIVE_SCRIPT_RUNTIME_VERSION), readOnlyFlags);
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__time"), FunctionTemplate::New(isolate, CallbackHandlers::TimeCallback));
+
+    // performance object (performance.now() + timeOrigin)
+    {
+        auto performanceTemplate = ObjectTemplate::New(isolate);
+        auto nowFunc = FunctionTemplate::New(isolate, Runtime::PerformanceNowCallback);
+        performanceTemplate->Set(ArgConverter::ConvertToV8String(isolate, "now"), nowFunc);
+        performanceTemplate->Set(ArgConverter::ConvertToV8String(isolate, "timeOrigin"), Number::New(isolate, m_realtimeOrigin));
+        globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "performance"), performanceTemplate);
+    }
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__releaseNativeCounterpart"), FunctionTemplate::New(isolate, CallbackHandlers::ReleaseNativeCounterpartCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__markingMode"), Number::New(isolate, m_objectManager->GetMarkingMode()), readOnlyFlags);
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runOnMainThread"), FunctionTemplate::New(isolate, CallbackHandlers::RunOnMainThreadCallback));
@@ -739,6 +753,14 @@ void Runtime::SetManualInstrumentationMode(jstring mode) {
     if (modeStr == "timeline") {
         tns::instrumentation::Frame::enable();
     }
+}
+
+void Runtime::PerformanceNowCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    auto isolate = args.GetIsolate();
+    auto runtime = Runtime::GetRuntime(isolate);
+    // Difference in seconds * 1000 for ms
+    double ms = (platform->MonotonicallyIncreasingTime() - runtime->m_startTime) * 1000.0;
+    args.GetReturnValue().Set(ms);
 }
 
 void Runtime::DestroyRuntime() {
