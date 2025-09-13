@@ -290,9 +290,17 @@ public class Generator {
         if (filePath == null || filePath.isEmpty()) {
             return "unknown";
         }
-        
-        // Split the file path by underscores
-        String[] pathParts = filePath.split("_");
+        // Normalize separators and split primarily by path segments, then hyphens/underscores
+        String normalized = filePath.replace('\\', '/');
+        String[] segments = normalized.split("/");
+        List<String> pathPartsList = new ArrayList<>();
+        for (String segment : segments) {
+            if (segment == null || segment.isEmpty()) continue;
+            // further split on hyphens and underscores to capture meaningful bits
+            String[] sub = segment.split("[-_]");
+            pathPartsList.addAll(Arrays.asList(sub));
+        }
+        String[] pathParts = pathPartsList.toArray(new String[0]);
         
         // Use last 3 components if available, otherwise use what we have
         StringBuilder identifier = new StringBuilder();
@@ -305,7 +313,7 @@ public class Generator {
             identifier.append(pathParts[i]);
         }
         
-        // Add a short hash of the full path to ensure uniqueness
+        // Add a short hash of the full ORIGINAL path to ensure uniqueness
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
             byte[] hash = md.digest(filePath.getBytes());

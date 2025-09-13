@@ -42,9 +42,14 @@ var es5_visitors = (function() {
         }
 
         // // Parsed Typescript to ES5 Syntax (normal extend pattern + custom extend pattern)
-        // 	// anchor is __extends
-        if (types.isIdentifier(path) && path.node.name === "__extends") {
+        // 	// anchor is __extends (allow suffixed helper names e.g. __extends$1)
+        if (types.isIdentifier(path) && typeof path.node.name === 'string' && path.node.name.indexOf("__extends") === 0) {
             traverseTsExtend(path, config);
+        }
+
+        // ES2015+ class extends syntax (e.g. class Foo extends android.widget.Button {})
+        if ((types.isClassDeclaration(path.node) || types.isClassExpression(path.node)) && path.node.superClass && types.isMemberExpression(path.node.superClass)) {
+            traverseNativeClassExtend(path, config);
         }
         // Maybe it's not a good idea to expose this scenario because it can be explicitly covered
         // //anchor is JavaProxy (optional)
@@ -106,19 +111,19 @@ var es5_visitors = (function() {
             return;
         }
 
-        var overriddenMethodNames = _getOverriddenMethodsTypescript(path, 3);
+    var overriddenMethodNames = _getOverriddenMethodsTypescript(path, 3, config);
 
-        var extendPath = _getParent(path, 3, config);
+    var extendPath = _getParent(path, 3, config);
         var declaredClassName = "";
 
-        var typescriptClassExtendSuperCallLocation = getTypeScriptExtendSuperCallLocation(extendPath, config);
-        var extendParent = _getParent(path, 1, config);
+    var typescriptClassExtendSuperCallLocation = extendPath ? getTypeScriptExtendSuperCallLocation(extendPath, config) : { line: undefined, column: undefined };
+    var extendParent = _getParent(path, 1, config);
 
         if (types.isCallExpression(extendParent)) {
             declaredClassName = extendParent.node.arguments[0].name;
         }
 
-        var decorateNodes = traverseForDecorate(path, config, 3);
+    var decorateNodes = traverseForDecorate(path, config, 3);
 
         var isDecoratedWithExtend = false,
             customExtendDecoratorName,
@@ -159,12 +164,16 @@ var es5_visitors = (function() {
             }
         }
 
+        if (!extendClass) {
+            // nothing to emit if we couldn't resolve the class name in the bundled code
+            return;
+        }
         if (isDecoratedWithExtend) {
             traverseJavaProxyExtend(customExtendDecoratorValue, config, customExtendDecoratorName, extendClass, overriddenMethodNames, implementedInterfaces);
         } else {
             var lineToWrite;
 
-            lineToWrite = _generateLineToWrite("", extendClass, overriddenMethodNames, { file: config.filePath, line: typescriptClassExtendSuperCallLocation.line, column: typescriptClassExtendSuperCallLocation.column, className: declaredClassName }, "", implementedInterfaces);
+            lineToWrite = _generateLineToWrite("", extendClass, overriddenMethodNames, { file: config.filePath, line: typescriptClassExtendSuperCallLocation.line, column: typescriptClassExtendSuperCallLocation.column, className: declaredClassName }, config.fullPathName, implementedInterfaces);
 
             if (config.logger) {
                 config.logger.info(lineToWrite)
@@ -180,6 +189,10 @@ var es5_visitors = (function() {
         var superCalleeStartColumn;
         var superCalleeLine;
         var locationAssigned = false;
+
+        if (!extendPath || !extendPath.node) {
+            return { line: undefined, column: undefined };
+        }
 
         // checks if constructor function and return identifiers match in a transpiled typescript class extend
         if (extendPath.node.body && extendPath.node.body.length >= 3) {
@@ -340,10 +353,11 @@ var es5_visitors = (function() {
 
     function isDecorateStatement(node) {
         var rightExpression = getRightExpression(node.expression);
+        var callee = rightExpression && rightExpression.callee;
+        var calleeName = callee && types.isIdentifier(callee) ? callee.name : undefined;
         return types.isExpressionStatement(node) &&
             types.isAssignmentExpression(node.expression) &&
-            rightExpression.callee &&
-            rightExpression.callee.name === "__decorate" &&
+            calleeName && calleeName.indexOf("__decorate") === 0 &&
             rightExpression.arguments &&
             types.isArrayExpression(rightExpression.arguments[0])
     }
@@ -381,10 +395,11 @@ var es5_visitors = (function() {
                 arg0 = path.node.arguments[0];
                 arg1 = path.node.arguments[1];
             } else {
-                throw {
-                    message: "JSParser Error: Not enough or too many arguments passed(" + path.node.arguments.length + ") when trying to extend interface: " + interfaceName + " in file: " + config.fullPathName,
-                    errCode: 1
+                // Non-fatal: skip malformed interface construction in bundled code
+                if (config.logger) {
+                    config.logger.warn("JSParser Warning: Unexpected arguments (" + path.node.arguments.length + ") for interface implementation: " + (interfaceName || "<unknown>") + " in file: " + (config.fullPathName || "<unknown>"));
                 }
+                return;
             }
 
             var isCorrectInterfaceName = _testClassName(arg0.value);
@@ -395,7 +410,7 @@ var es5_visitors = (function() {
                 column: path.node.loc.start.column + columnOffset,
                 className: (isCorrectInterfaceName ? arg0.value : "")
             }
-            var lineToWrite = _generateLineToWrite("", currentInterface, overriddenInterfaceMethods.join(","), extendInfo, "");
+            var lineToWrite = _generateLineToWrite("", currentInterface, overriddenInterfaceMethods.join(","), extendInfo, config.fullPathName);
             if (config.logger) {
                 config.logger.info(lineToWrite)
             }
@@ -511,7 +526,7 @@ var es5_visitors = (function() {
                 column: path.node.property.loc.start.column + columnOffset,
                 className: className
             };
-            lineToWrite = _generateLineToWrite(isCorrectExtendClassName ? className : "", extendClass.reverse().join("."), overriddenMethodNames, extendInfo, "", implementedInterfaces);
+            lineToWrite = _generateLineToWrite(isCorrectExtendClassName ? className : "", extendClass.reverse().join("."), overriddenMethodNames, extendInfo, config.fullPathName, implementedInterfaces);
             normalExtendsArr.push(lineToWrite)
         } else {
             // don't throw here, because there can be a valid js extend that has nothing to do with NS
@@ -646,10 +661,11 @@ var es5_visitors = (function() {
             if (types.isCallExpression(extendedClass.node)) {
                 var o = extendedClass.node.arguments[0];
             } else {
-                throw {
-                    message: "JSParser Error: Node type is not a call expression. File=" + config.fullPathName + " line=" + path.node.loc.start.line,
-                    errCode: 1
+                // Non-fatal: ESM/uglified bundles may not match expected shape
+                if (config && config.logger) {
+                    config.logger.warn("JSParser Error: Node type is not a call expression. File=" + (config.fullPathName || "<unknown>") + " line=" + (path && path.node && path.node.loc ? path.node.loc.start.line : "?"));
                 }
+                return "";
             }
         }
 
@@ -688,12 +704,15 @@ var es5_visitors = (function() {
         return undefined;
     }
 
-    function _getOverriddenMethodsTypescript(path, count) {
+    function _getOverriddenMethodsTypescript(path, count, config) {
         var overriddenMethods = [];
 
-        var cn = _getParent(path, count)
+        var cn = _getParent(path, count, config)
 
         // this pattern follows typescript generated syntax
+        if (!cn || !cn.node || !cn.node.body) {
+            return overriddenMethods;
+        }
         for (var item in cn.node.body) {
             var ci = cn.node.body[item];
             if (types.isExpressionStatement(ci)) {
@@ -708,18 +727,59 @@ var es5_visitors = (function() {
         return overriddenMethods;
     }
 
+    // Support for native class extends emitted as ES2015 classes
+    function traverseNativeClassExtend(path, config) {
+        try {
+            var superExpr = path.node.superClass;
+            var extClassArr = _getWholeName(superExpr);
+            if (!extClassArr || !extClassArr.length) {
+                return;
+            }
+            var extendClass = extClassArr.reverse().join(".");
+
+            var declaredClassName = (types.isClassDeclaration(path.node) && path.node.id) ? path.node.id.name : "";
+
+            // Collect overridden method names from class body (exclude constructor)
+            var overriddenMethodNames = [];
+            var body = path.node.body && path.node.body.body ? path.node.body.body : [];
+            for (var idx in body) {
+                var el = body[idx];
+                // class methods only; skip fields and private methods
+                if (types.isClassMethod && types.isClassMethod(el)) {
+                    if (el.kind !== 'constructor' && types.isIdentifier(el.key)) {
+                        overriddenMethodNames.push(el.key.name);
+                    }
+                }
+            }
+
+            var loc = superExpr.loc && superExpr.loc.start ? { line: superExpr.loc.start.line, column: superExpr.loc.start.column + columnOffset } : { line: undefined, column: undefined };
+            var extendInfo = { file: config.filePath, line: loc.line, column: loc.column, className: declaredClassName };
+            var lineToWrite = _generateLineToWrite("", extendClass, overriddenMethodNames, extendInfo, config.fullPathName, []);
+            normalExtendsArr.push(lineToWrite);
+        } catch (e) {
+            if (config.logger) {
+                config.logger.warn("Failed to parse class extends: " + e);
+            }
+        }
+    }
+
     function _getParent(node, numberOfParents, config) {
         if (!node) {
-            throw {
-                message: "JSParser Error: No parent found for node in file: " + config.fullPathName,
-                errCode: 1
+            if (config && config.logger) {
+                config.logger.warn("JSParser Warning: No parent found for node in file: " + (config.fullPathName || "<unknown>"));
             }
+            return null;
         }
         if (numberOfParents === 0) {
             return node;
         }
-
-        return _getParent(node.parentPath, --numberOfParents)
+        if (!node.parentPath) {
+            if (config && config.logger) {
+                config.logger.warn("JSParser Warning: parentPath missing when traversing in file: " + (config.fullPathName || "<unknown>"));
+            }
+            return null;
+        }
+        return _getParent(node.parentPath, --numberOfParents, config)
     }
 
     function _testJavaProxyName(name) {

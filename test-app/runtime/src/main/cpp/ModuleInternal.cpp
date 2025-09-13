@@ -516,9 +516,20 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
 Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path) {
     auto context = isolate->GetCurrentContext();
 
+    // Normalize the path to remove ./ and other relative components
+    std::string normalizedPath = path;
+    size_t dotSlashPos = normalizedPath.find("./");
+    while (dotSlashPos != std::string::npos) {
+        normalizedPath.erase(dotSlashPos, 2);
+        dotSlashPos = normalizedPath.find("./");
+    }
+    
+    DEBUG_WRITE("LoadESModule: Original path = %s, Normalized path = %s", 
+                path.c_str(), normalizedPath.c_str());
+
     // 1) Prepare URL & source
-    string url = "file://" + path;
-    string content = Runtime::GetRuntime(isolate)->ReadFileText(path);
+    string url = "file://" + normalizedPath;
+    string content = Runtime::GetRuntime(isolate)->ReadFileText(path); // Still read from original path
     
     Local<String> sourceText = ArgConverter::ConvertToV8String(isolate, content);
     ScriptCompiler::CachedData* cacheData = nullptr; // TODO: Implement cache support for ES modules
@@ -552,40 +563,49 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
 
     // 3) Register for resolution callback
     // Safe Global handle management: Clear any existing entry first
-    auto it = g_moduleRegistry.find(path);
+    auto it = g_moduleRegistry.find(normalizedPath);
     if (it != g_moduleRegistry.end()) {
         // Clear the existing Global handle before replacing it
         it->second.Reset();
     }
 
-    // Now safely set the new module handle
-    g_moduleRegistry[path].Reset(isolate, module);
+    // Now safely set the new module handle using normalized path
+    g_moduleRegistry[normalizedPath].Reset(isolate, module);
+    
+    DEBUG_WRITE("LoadESModule: Registered module with normalized path: %s", normalizedPath.c_str());
+    __android_log_print(ANDROID_LOG_INFO, "TNS.ModuleLoad", "LoadESModule: Registered module: %s", normalizedPath.c_str());
 
     // 4) Instantiate (link) with ResolveModuleCallback
     {
+        __android_log_print(ANDROID_LOG_INFO, "TNS.ModuleLoad", "LoadESModule: About to instantiate module: %s", normalizedPath.c_str());
         TryCatch tcLink(isolate);
         bool linked = module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false);
 
         if (!linked) {
+            __android_log_print(ANDROID_LOG_ERROR, "TNS.ModuleLoad", "LoadESModule: FAILED to instantiate module: %s", normalizedPath.c_str());
             if (tcLink.HasCaught()) {
-                throw NativeScriptException(tcLink, "Cannot instantiate module " + path);
+                throw NativeScriptException(tcLink, "Cannot instantiate module " + normalizedPath);
             } else {
-                throw NativeScriptException(string("Cannot instantiate module ") + path);
+                throw NativeScriptException(string("Cannot instantiate module ") + normalizedPath);
             }
         }
+        __android_log_print(ANDROID_LOG_INFO, "TNS.ModuleLoad", "LoadESModule: Successfully instantiated module: %s", normalizedPath.c_str());
     }
 
     // 5) Evaluate with its own TryCatch
     Local<Value> result;
     {
+        __android_log_print(ANDROID_LOG_INFO, "TNS.ModuleLoad", "LoadESModule: About to evaluate module: %s", normalizedPath.c_str());
         TryCatch tcEval(isolate);
         if (!module->Evaluate(context).ToLocal(&result)) {
+            __android_log_print(ANDROID_LOG_ERROR, "TNS.ModuleLoad", "LoadESModule: FAILED to evaluate module: %s", normalizedPath.c_str());
             if (tcEval.HasCaught()) {
-                throw NativeScriptException(tcEval, "Cannot evaluate module " + path);
+                throw NativeScriptException(tcEval, "Cannot evaluate module " + normalizedPath);
             } else {
-                throw NativeScriptException(string("Cannot evaluate module ") + path);
+                throw NativeScriptException(string("Cannot evaluate module ") + normalizedPath);
             }
         }
+        __android_log_print(ANDROID_LOG_INFO, "TNS.ModuleLoad", "LoadESModule: Successfully evaluated module: %s", normalizedPath.c_str());
 
         // Handle the case where evaluation returns a Promise (for top-level await)
         if (result->IsPromise()) {
@@ -603,7 +623,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                     if (state == Promise::kRejected) {
                         Local<Value> reason = promise->Result();
                         isolate->ThrowException(reason);
-                        throw NativeScriptException(string("Module evaluation promise rejected: ") + path);
+                        throw NativeScriptException(string("Module evaluation promise rejected: ") + normalizedPath);
                     }
                     break;
                 }

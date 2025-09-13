@@ -519,8 +519,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
 
-    __android_log_print(ANDROID_LOG_DEBUG, "TNS.Runtime", "V8 version %s", V8::GetVersion());
-
     auto globalFunctionTemplate = FunctionTemplate::New(isolate);
     globalFunctionTemplate->SetClassName(ArgConverter::ConvertToV8String(isolate, "NativeScriptGlobalObject"));
     tns::binding::CreateInternalBindingTemplates(isolate, globalFunctionTemplate);

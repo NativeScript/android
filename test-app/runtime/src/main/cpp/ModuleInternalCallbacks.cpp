@@ -71,14 +71,7 @@ void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Lo
             }
         }
     } catch (...) {
-        DEBUG_WRITE("InitializeImportMetaObject: Exception during module registry lookup, using fallback");
         modulePath = "";  // Will use fallback path
-    }
-    
-    if (ShouldLogScriptLoading()) {
-        DEBUG_WRITE("InitializeImportMetaObject: Module lookup: found path = %s",
-                    modulePath.empty() ? "(empty)" : modulePath.c_str());
-        DEBUG_WRITE("InitializeImportMetaObject: Registry size: %zu", g_moduleRegistry.size());
     }
     
     // Convert file path to file:// URL
@@ -91,13 +84,9 @@ void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Lo
         moduleUrl = "file:///android_asset/app/";
     }
     
-    if (ShouldLogScriptLoading()) {
-        DEBUG_WRITE("InitializeImportMetaObject: Final URL: %s", moduleUrl.c_str());
-    }
-    
     Local<String> url = ArgConverter::ConvertToV8String(isolate, moduleUrl);
     
-    // Set import.meta.url property
+    // Set import.meta.url property (using .Check() like iOS for consistency)
     meta->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, "url"), url).Check();
     
     // Add import.meta.dirname support (extract directory from path)
@@ -113,9 +102,14 @@ void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Lo
         dirname = "/android_asset/app";  // fallback
     }
     
+    // Ensure dirname is never empty
+    if (dirname.empty()) {
+        dirname = "/android_asset/app";
+    }
+    
     Local<String> dirnameStr = ArgConverter::ConvertToV8String(isolate, dirname);
     
-    // Set import.meta.dirname property
+    // Set import.meta.dirname property (using .Check() like iOS for consistency)
     meta->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, "dirname"), dirnameStr).Check();
 }
 

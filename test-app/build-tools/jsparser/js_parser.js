@@ -136,8 +136,9 @@ function getFileAst(tsHelpersFilePath) {
   return new Promise(function (resolve, reject) {
     fs.readFile(tsHelpersFilePath, "utf8", function (err, fileContent) {
       if (err) {
-        logger.warn("+DIDN'T parse ast from file " + tsHelpersFilePath);
-        return reject(err);
+  // Be tolerant: ts_helpers.js may not exist in ESM-only builds
+  logger.warn("+DIDN'T parse ast from file " + tsHelpersFilePath + ". Continuing without it.");
+  return resolve(null);
       }
 
       logger.info("+parsing ast from " + tsHelpersFilePath);
@@ -336,6 +337,15 @@ const writeToFile = function (data, err) {
       });
     } else {
       logger.info("No need to generate anything. (UP-TO-DATE)");
+      // Ensure the bindings file exists so downstream steps don't fail
+      try {
+        if (!fs.existsSync(outFile)) {
+          fs.writeFileSync(outFile, "");
+        }
+      } catch (touchErr) {
+        logger.warn("Could not touch bindings file: " + touchErr);
+      }
+      return resolve("");
     }
   });
 };
