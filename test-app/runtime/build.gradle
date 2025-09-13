@@ -21,7 +21,7 @@ if (useCCache) {
 }
 
 
-def defaultNdkVersion = "27.2.12479018"
+def defaultNdkVersion = "27.3.13750724"
 
 def hasNdkVersion = project.hasProperty("ndkVersion")
 if (hasNdkVersion) {
