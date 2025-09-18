@@ -10,7 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@babel/parser": "~7.17.3",
+    "@babel/parser": "~7.28.4",
     "@babel/plugin-proposal-decorators": "~7.28.0",
     "@babel/traverse": "~7.17.3",
     "@babel/types": "~7.17.0",
