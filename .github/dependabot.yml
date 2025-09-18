@@ -1,0 +1,196 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/app/src/main/assets/app
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/app/src/main/assets/app/tests
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/app/src/main/assets/app/tns_modules/dummy-package
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/build-tools/android-metadata-generator
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/build-tools/jsparser
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/build-tools/jsparser/tests/cases/mini_app/app
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/build-tools/jsparser/tests/cases/mini_app/app/tns_modules/component/not_ns_subcomponent
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/build-tools/jsparser/tests/cases/mini_app/app/tns_modules/component
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/build-tools/jsparser/tests/cases/mini_app/app/tns_modules/components_collection/component1
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/build-tools/jsparser/tests/cases/mini_app/app/tns_modules/components_collection/component2
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/build-tools/jsparser/tests/cases/mini_app/app/tns_modules/components_collection/component2/subcomponent2.1
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/build-tools/jsparser/tests/cases/mini_app/app/tns_modules/components_collection
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/build-tools/jsparser/tests/cases/mini_app/app/tns_modules/not_ns_module/not_ns_module_submodule
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/build-tools/jsparser/tests/cases/mini_app/app/tns_modules/not_ns_module
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/build-tools/jsparser/tests/cases/mini_app/app/tns_modules
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/build-tools/jsparser/tests
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /test-app/tools
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

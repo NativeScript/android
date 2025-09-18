@@ -1,7 +1,7 @@
 {
   "name": "@nativescript/android",
   "description": "NativeScript for Android using v8",
-  "version": "8.9.1",
+  "version": "8.9.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/NativeScript/android.git"
@@ -13,7 +13,7 @@
     "v8": "10.3.22.0",
     "gradle": "8.14.3",
     "gradleAndroid": "8.12.1",
-    "ndk": "r27",
+    "ndk": "r27d",
     "ndkApiLevel": "21",
     "minSdk": "21",
     "compileSdk": "35",
