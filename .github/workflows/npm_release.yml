@@ -13,6 +13,9 @@ env:
   ANDROID_ABI: x86_64
   NDK_ARCH: darwin
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build
