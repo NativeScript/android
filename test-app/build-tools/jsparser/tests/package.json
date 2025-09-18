@@ -17,7 +17,7 @@
     "lodash": "4.17.19"
   },
   "devDependencies": {
-    "jasmine": "3.1.0",
+    "jasmine": "3.99.0",
     "jasmine-node": "3.0.0",
     "jasmine-reporters": "2.5.2",
     "jasmine-xml-reporter": "1.1.0"
