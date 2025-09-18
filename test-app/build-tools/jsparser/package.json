@@ -19,6 +19,6 @@
   "repository": "https://github.com/NativeScript/android-runtime",
   "devDependencies": {
     "webpack": "5.70.0",
-    "webpack-cli": "4.9.2"
+    "webpack-cli": "4.10.0"
   }
 }
