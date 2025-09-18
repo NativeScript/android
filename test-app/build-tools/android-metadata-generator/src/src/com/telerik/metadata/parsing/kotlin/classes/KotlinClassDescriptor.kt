@@ -15,6 +15,9 @@ import com.telerik.metadata.parsing.kotlin.metadata.bytecode.BytecodeClassMetada
 import com.telerik.metadata.parsing.kotlin.methods.KotlinMethodDescriptor
 import com.telerik.metadata.parsing.kotlin.properties.KotlinPropertyDescriptor
 import com.telerik.metadata.security.classes.SecuredClassRepository
+import org.apache.bcel.classfile.JavaClass
+import java.util.*
+import java.util.stream.Collectors
 import kotlin.metadata.KmClass
 import kotlin.metadata.KmProperty
 import kotlin.metadata.Visibility
@@ -23,13 +26,6 @@ import kotlin.metadata.jvm.Metadata
 import kotlin.metadata.jvm.getterSignature
 import kotlin.metadata.jvm.setterSignature
 import kotlin.metadata.visibility
-import org.apache.bcel.classfile.JavaClass
-import java.io.IOException
-import java.nio.file.Files
-import java.nio.file.Paths
-import java.nio.file.StandardOpenOption
-import java.util.*
-import java.util.stream.Collectors
 
 class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotation: MetadataAnnotation,
                             override val isPackagePrivate: Boolean
@@ -62,9 +58,9 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
                 fields.add(possibleObjectInstanceField.get())
             }
 
-            if (metaClass.enumEntries.isNotEmpty()) {
-
-                val enumFields = getEnumEntriesAsFields(nativeClass, metaClass.enumEntries)
+            if (metaClass.kmEnumEntries.isNotEmpty()) {
+                val enums: Collection<String> = metaClass.kmEnumEntries.map { it.name }
+                val enumFields = getEnumEntriesAsFields(nativeClass, enums)
                 fields.addAll(enumFields)
             }
 
