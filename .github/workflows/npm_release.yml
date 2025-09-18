@@ -21,6 +21,11 @@ jobs:
       npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        with:
+          egress-policy: audit
+
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -88,6 +93,11 @@ jobs:
     runs-on: macos-13
     needs: build
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        with:
+          egress-policy: audit
+
       - uses: actions/checkout@v3
         with:
           submodules: true
@@ -142,6 +152,11 @@ jobs:
       NPM_VERSION: ${{needs.build.outputs.npm_version}}
       NPM_TAG: ${{needs.build.outputs.npm_tag}}
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        with:
+          egress-policy: audit
+
       - uses: actions/setup-node@v3
         with:
           node-version: 22
@@ -168,6 +183,11 @@ jobs:
     env:
       NPM_VERSION: ${{needs.build.outputs.npm_version}}
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        with:
+          egress-policy: audit
+
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
