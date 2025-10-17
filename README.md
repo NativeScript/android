@@ -22,7 +22,7 @@ Several Wiki pages describe some internal topics about the runtime [here](https:
 ## Main Projects
 The repo is structured in the following projects (ordered by dependencies):
 
-* [**android-metadata-generator**](android-metadata-generator) - generates metadata necessary for the Android Runtime.
+* [**android-metadata-generator**](test-app/build-tools/android-metadata-generator) - generates metadata necessary for the Android Runtime.
 * [**android-binding-generator**](test-app/runtime-binding-generator) - enables Java & Android types to be dynamically created at runtime. Needed by the `extend` routine.
 * [**android-runtime**](test-app/runtime) - contains the core logic behind the NativeScript's Android Runtime. This project contains native C++ code and needs the Android NDK to build properly.
 * [**android-runtime-testapp**](test-app/app) - this is a vanilla Android Application, which contains the tests for the runtime project.
