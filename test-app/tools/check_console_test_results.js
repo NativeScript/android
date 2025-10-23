@@ -80,7 +80,7 @@ function checkTestResults() {
         
         // Report results
         console.log('📊 Test Results Summary:');
-        console.log('=' .repeat(50));
+        console.log('='.repeat(50));
         
         // ES Module tests
         if (testResults.esModules.passed) {
