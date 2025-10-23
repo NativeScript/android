@@ -9,6 +9,9 @@
 #include <vector>
 #include <algorithm>
 #include <atomic>
+#include "HMRSupport.h"
+#include "DevFlags.h"
+#include "JEnv.h"
 
 using namespace v8;
 using namespace std;
@@ -20,35 +23,7 @@ extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
 // Forward declaration used by logging helper
 std::string GetApplicationPath();
 
-// Cached toggle for verbose script loading logs sourced from Java AppConfig via JNI
-static bool ShouldLogScriptLoading() {
-    static std::atomic<int> cached{-1}; // -1 unknown, 0 false, 1 true
-    int v = cached.load(std::memory_order_acquire);
-    if (v != -1) {
-        return v == 1;
-    }
-
-    static std::once_flag initFlag;
-    std::call_once(initFlag, []() {
-        bool enabled = false;
-        try {
-            JEnv env;
-            jclass runtimeClass = env.FindClass("com/tns/Runtime");
-            if (runtimeClass != nullptr) {
-                jmethodID mid = env.GetStaticMethodID(runtimeClass, "getLogScriptLoadingEnabled", "()Z");
-                if (mid != nullptr) {
-                    jboolean res = env.CallStaticBooleanMethod(runtimeClass, mid);
-                    enabled = (res == JNI_TRUE);
-                }
-            }
-        } catch (...) {
-            // ignore and keep default false
-        }
-        cached.store(enabled ? 1 : 0, std::memory_order_release);
-    });
-
-    return cached.load(std::memory_order_acquire) == 1;
-}
+// Logging flag now provided via DevFlags for fast cached access
 
 // Import meta callback to support import.meta.url and import.meta.dirname
 void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Local<Object> meta) {
@@ -75,23 +50,26 @@ void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Lo
         modulePath = "";  // Will use fallback path
     }
     
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
         DEBUG_WRITE("InitializeImportMetaObject: Module lookup: found path = %s",
                     modulePath.empty() ? "(empty)" : modulePath.c_str());
         DEBUG_WRITE("InitializeImportMetaObject: Registry size: %zu", g_moduleRegistry.size());
     }
     
-    // Convert file path to file:// URL
+    // Convert to URL for import.meta.url; keep http(s) untouched, file paths with file://
     std::string moduleUrl;
     if (!modulePath.empty()) {
-        // Create file:// URL from the full path
-        moduleUrl = "file://" + modulePath;
+        if (modulePath.rfind("http://", 0) == 0 || modulePath.rfind("https://", 0) == 0) {
+            moduleUrl = modulePath;
+        } else {
+            moduleUrl = "file://" + modulePath;
+        }
     } else {
         // Fallback URL if module not found in registry
         moduleUrl = "file:///android_asset/app/";
     }
     
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
         DEBUG_WRITE("InitializeImportMetaObject: Final URL: %s", moduleUrl.c_str());
     }
     
@@ -100,14 +78,22 @@ void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Lo
     // Set import.meta.url property
     meta->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, "url"), url).Check();
     
-    // Add import.meta.dirname support (extract directory from path)
+    // Add import.meta.dirname support (extract directory)
     std::string dirname;
     if (!modulePath.empty()) {
-        size_t lastSlash = modulePath.find_last_of("/\\");
-        if (lastSlash != std::string::npos) {
-            dirname = modulePath.substr(0, lastSlash);
+        if (modulePath.rfind("http://", 0) == 0 || modulePath.rfind("https://", 0) == 0) {
+            // For URLs, compute dirname by trimming after last '/'
+            size_t q = modulePath.find('?');
+            std::string noQuery = (q == std::string::npos) ? modulePath : modulePath.substr(0, q);
+            size_t lastSlash = noQuery.find_last_of('/');
+            dirname = (lastSlash == std::string::npos) ? modulePath : noQuery.substr(0, lastSlash);
         } else {
-            dirname = "/android_asset/app";  // fallback
+            size_t lastSlash = modulePath.find_last_of("/\\");
+            if (lastSlash != std::string::npos) {
+                dirname = modulePath.substr(0, lastSlash);
+            } else {
+                dirname = "/android_asset/app";  // fallback
+            }
         }
     } else {
         dirname = "/android_asset/app";  // fallback
@@ -117,6 +103,9 @@ void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Lo
     
     // Set import.meta.dirname property
     meta->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, "dirname"), dirnameStr).Check();
+
+    // Attach import.meta.hot for HMR
+    tns::InitializeImportMetaHot(isolate, context, meta, modulePath);
 }
 
 // Helper function to check if a file exists and is a regular file
@@ -166,8 +155,48 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     }
 
     // Debug logging
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
         DEBUG_WRITE("ResolveModuleCallback: Resolving '%s'", spec.c_str());
+    }
+
+    // HTTP(S) ESM support: resolve, fetch and compile from dev server
+    if (spec.rfind("http://", 0) == 0 || spec.rfind("https://", 0) == 0) {
+        std::string canonical = tns::CanonicalizeHttpUrlKey(spec);
+        auto it = g_moduleRegistry.find(canonical);
+        if (it != g_moduleRegistry.end()) {
+            if (IsScriptLoadingLogEnabled()) {
+                DEBUG_WRITE("ResolveModuleCallback: Using cached HTTP module '%s'", canonical.c_str());
+            }
+            return v8::MaybeLocal<v8::Module>(it->second.Get(isolate));
+        }
+
+        std::string body, ct;
+        int status = 0;
+        if (!tns::HttpFetchText(spec, body, ct, status)) {
+            std::string msg = std::string("Failed to fetch ") + spec + ", status=" + std::to_string(status);
+            isolate->ThrowException(v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, msg)));
+            return v8::MaybeLocal<v8::Module>();
+        }
+
+        v8::Local<v8::String> sourceText = ArgConverter::ConvertToV8String(isolate, body);
+        v8::Local<v8::String> urlString = ArgConverter::ConvertToV8String(isolate, canonical);
+        v8::ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true);
+        v8::ScriptCompiler::Source src(sourceText, origin);
+        v8::Local<v8::Module> mod;
+        if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&mod)) {
+            isolate->ThrowException(v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, "HTTP module compile failed")));
+            return v8::MaybeLocal<v8::Module>();
+        }
+        // Register before instantiation to allow cyclic imports to resolve to same instance
+        g_moduleRegistry[canonical].Reset(isolate, mod);
+        if (mod->GetStatus() == v8::Module::kUninstantiated) {
+            if (!mod->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
+                g_moduleRegistry.erase(canonical);
+                return v8::MaybeLocal<v8::Module>();
+            }
+        }
+        // Let V8 evaluate during importer evaluation. Returning compiled module is fine.
+        return v8::MaybeLocal<v8::Module>(mod);
     }
 
     // 2) Find which filepath the referrer was compiled under
@@ -200,7 +229,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         std::string cleanSpec = spec.substr(0, 2) == "./" ? spec.substr(2) : spec;
         std::string candidate = baseDir + cleanSpec;
         candidateBases.push_back(candidate);
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("ResolveModuleCallback: Relative import: '%s' + '%s' -> '%s'",
                        baseDir.c_str(), cleanSpec.c_str(), candidate.c_str());
         }
@@ -219,25 +248,25 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         if (tail.rfind(appVirtualRoot, 0) == 0) {
             // Drop the leading "/app/" and prepend real appPath
             candidate = appPath + "/" + tail.substr(appVirtualRoot.size());
-            if (ShouldLogScriptLoading()) {
+            if (IsScriptLoadingLogEnabled()) {
                 DEBUG_WRITE("ResolveModuleCallback: file:// to appPath mapping: '%s' -> '%s'", tail.c_str(), candidate.c_str());
             }
         } else if (tail.rfind(androidAssetAppRoot, 0) == 0) {
             // Replace "/android_asset/app/" with the real appPath
             candidate = appPath + "/" + tail.substr(androidAssetAppRoot.size());
-            if (ShouldLogScriptLoading()) {
+            if (IsScriptLoadingLogEnabled()) {
                 DEBUG_WRITE("ResolveModuleCallback: file:// android_asset mapping: '%s' -> '%s'", tail.c_str(), candidate.c_str());
             }
         } else if (tail.rfind(appPath, 0) == 0) {
             // Already an absolute on-disk path to the app folder
             candidate = tail;
-            if (ShouldLogScriptLoading()) {
+            if (IsScriptLoadingLogEnabled()) {
                 DEBUG_WRITE("ResolveModuleCallback: file:// absolute path preserved: '%s'", candidate.c_str());
             }
         } else {
             // Fallback: treat as absolute on-disk path
             candidate = tail;
-            if (ShouldLogScriptLoading()) {
+            if (IsScriptLoadingLogEnabled()) {
                 DEBUG_WRITE("ResolveModuleCallback: file:// generic absolute: '%s'", candidate.c_str());
             }
         }
@@ -472,7 +501,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
     // 7) Handle JSON modules
     if (absPath.size() >= 5 && absPath.compare(absPath.size() - 5, 5, ".json") == 0) {
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("ResolveModuleCallback: Handling JSON module '%s'", absPath.c_str());
         }
 
@@ -526,14 +555,14 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     // 8) Check if we've already compiled this module
     auto it = g_moduleRegistry.find(absPath);
     if (it != g_moduleRegistry.end()) {
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("ResolveModuleCallback: Found cached module '%s'", absPath.c_str());
         }
         return v8::MaybeLocal<v8::Module>(it->second.Get(isolate));
     }
 
     // 9) Compile and register the new module
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
         DEBUG_WRITE("ResolveModuleCallback: Compiling new module '%s'", absPath.c_str());
     }
     try {
@@ -568,7 +597,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     v8::String::Utf8Value specUtf8(isolate, specifier);
     std::string spec = *specUtf8 ? *specUtf8 : "";
     
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
         DEBUG_WRITE("ImportModuleDynamicallyCallback: Dynamic import for '%s'", spec.c_str());
     }
     
@@ -581,7 +610,46 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         return v8::MaybeLocal<v8::Promise>();
     }
 
-    // Re-use the static resolver to locate / compile the module.
+    // Handle HTTP(S) dynamic import directly
+    if (!spec.empty() && (spec.rfind("http://", 0) == 0 || spec.rfind("https://", 0) == 0)) {
+        std::string canonical = tns::CanonicalizeHttpUrlKey(spec);
+        v8::Local<v8::Module> mod;
+        auto it = g_moduleRegistry.find(canonical);
+        if (it != g_moduleRegistry.end()) {
+            mod = it->second.Get(isolate);
+        } else {
+            std::string body, ct; int status = 0;
+            if (!tns::HttpFetchText(spec, body, ct, status)) {
+                resolver->Reject(context, v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, std::string("Failed to fetch ")+spec))).Check();
+                return scope.Escape(resolver->GetPromise());
+            }
+            v8::Local<v8::String> sourceText = ArgConverter::ConvertToV8String(isolate, body);
+            v8::Local<v8::String> urlString = ArgConverter::ConvertToV8String(isolate, canonical);
+            v8::ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true);
+            v8::ScriptCompiler::Source src(sourceText, origin);
+            if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&mod)) {
+                resolver->Reject(context, v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, "HTTP module compile failed"))).Check();
+                return scope.Escape(resolver->GetPromise());
+            }
+            g_moduleRegistry[canonical].Reset(isolate, mod);
+        }
+        if (mod->GetStatus() == v8::Module::kUninstantiated) {
+            if (!mod->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
+                resolver->Reject(context, v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, "Instantiate failed"))).Check();
+                return scope.Escape(resolver->GetPromise());
+            }
+        }
+        if (mod->GetStatus() != v8::Module::kEvaluated) {
+            if (mod->Evaluate(context).IsEmpty()) {
+                resolver->Reject(context, v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, "Evaluation failed"))).Check();
+                return scope.Escape(resolver->GetPromise());
+            }
+        }
+        resolver->Resolve(context, mod->GetModuleNamespace()).Check();
+        return scope.Escape(resolver->GetPromise());
+    }
+
+    // Re-use the static resolver to locate / compile the module for non-HTTP cases.
     try {
         // Pass empty referrer since this V8 version doesn't expose GetModule() on
         // ScriptOrModule. The resolver will fall back to absolute-path heuristics.
@@ -593,7 +661,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         v8::Local<v8::Module> module;
         if (!maybeModule.ToLocal(&module)) {
             // Resolution failed; reject to avoid leaving a pending Promise (white screen)
-            if (ShouldLogScriptLoading()) {
+            if (IsScriptLoadingLogEnabled()) {
                 DEBUG_WRITE("ImportModuleDynamicallyCallback: Resolution failed for '%s'", spec.c_str());
             }
             v8::Local<v8::Value> ex = v8::Exception::Error(
@@ -605,7 +673,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         // If not yet instantiated/evaluated, do it now
         if (module->GetStatus() == v8::Module::kUninstantiated) {
             if (!module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
-                if (ShouldLogScriptLoading()) {
+                if (IsScriptLoadingLogEnabled()) {
                     DEBUG_WRITE("ImportModuleDynamicallyCallback: Instantiate failed for '%s'", spec.c_str());
                 }
                 resolver
@@ -618,7 +686,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
         if (module->GetStatus() != v8::Module::kEvaluated) {
             if (module->Evaluate(context).IsEmpty()) {
-                if (ShouldLogScriptLoading()) {
+                if (IsScriptLoadingLogEnabled()) {
                     DEBUG_WRITE("ImportModuleDynamicallyCallback: Evaluation failed for '%s'", spec.c_str());
                 }
                 v8::Local<v8::Value> ex =
@@ -629,12 +697,12 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         }
 
         resolver->Resolve(context, module->GetModuleNamespace()).Check();
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("ImportModuleDynamicallyCallback: Successfully resolved '%s'", spec.c_str());
         }
     } catch (NativeScriptException& ex) {
         ex.ReThrowToV8();
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("ImportModuleDynamicallyCallback: Native exception for '%s'", spec.c_str());
         }
         resolver
