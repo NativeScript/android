@@ -184,7 +184,7 @@ function checkTestResults() {
                            testResults.manual.tests.length > 0 ||
                            testResults.general.passes > 0;
         
-        console.log('\n' + '=' .repeat(50));
+        console.log('\n' + '='.repeat(50));
         
         if (hasFailures) {
             console.error('💥 OVERALL RESULT: TESTS FAILED');
