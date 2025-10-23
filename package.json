@@ -13,7 +13,7 @@
     "v8": "10.3.22.0",
     "gradle": "8.14.3",
     "gradleAndroid": "8.12.1",
-    "ndk": "r27",
+    "ndk": "r27d",
     "ndkApiLevel": "21",
     "minSdk": "21",
     "compileSdk": "35",

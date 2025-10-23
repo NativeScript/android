@@ -545,6 +545,21 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         performanceTemplate->Set(ArgConverter::ConvertToV8String(isolate, "timeOrigin"), Number::New(isolate, m_realtimeOrigin));
         globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "performance"), performanceTemplate);
     }
+    // queueMicrotask(callback) per spec: https://developer.mozilla.org/en-US/docs/Web/API/Window/queueMicrotask
+    globalTemplate->Set(
+        ArgConverter::ConvertToV8String(isolate, "queueMicrotask"),
+        FunctionTemplate::New(
+            isolate,
+            [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                auto* isolate = info.GetIsolate();
+                if (info.Length() < 1 || !info[0]->IsFunction()) {
+                    isolate->ThrowException(v8::Exception::TypeError(
+                        ArgConverter::ConvertToV8String(isolate, "queueMicrotask: callback must be a function")));
+                    return;
+                }
+                v8::Local<v8::Function> cb = info[0].As<v8::Function>();
+                isolate->EnqueueMicrotask(cb);
+            }));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__releaseNativeCounterpart"), FunctionTemplate::New(isolate, CallbackHandlers::ReleaseNativeCounterpartCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__markingMode"), Number::New(isolate, m_objectManager->GetMarkingMode()), readOnlyFlags);
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runOnMainThread"), FunctionTemplate::New(isolate, CallbackHandlers::RunOnMainThreadCallback));
