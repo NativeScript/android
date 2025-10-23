@@ -115,7 +115,7 @@ function checkTestResults() {
             console.log(`📈 General Results: ${testResults.general.passes} passes, ${testResults.general.failures} failures`);
         }
         
-        console.log('=' .repeat(50));
+        console.log('='.repeat(50));
         
         // Show recent test output for debugging
         const recentTestLines = testLines
