@@ -6,6 +6,7 @@
 #include <jni.h>
 #include <unordered_map>
 #include <cstring>
+#include <string>
 
 namespace tns {
 
@@ -183,6 +184,31 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
   try {
     JEnv env;
 
+    // Allow network operations on the current thread (dev-only HMR path)
+    // Some Android environments enforce StrictMode which throws NetworkOnMainThreadException
+    // when performing network I/O on the main thread. Since this fetch runs on the JS/V8 thread
+    // during development, explicitly relax the policy here.
+    {
+      jclass clsStrict = env.FindClass("android/os/StrictMode");
+      jclass clsPolicyBuilder = env.FindClass("android/os/StrictMode$ThreadPolicy$Builder");
+      if (clsStrict && clsPolicyBuilder) {
+        jmethodID builderCtor = env.GetMethodID(clsPolicyBuilder, "<init>", "()V");
+        jobject builder = env.NewObject(clsPolicyBuilder, builderCtor);
+        if (builder) {
+          jmethodID permitAll = env.GetMethodID(clsPolicyBuilder, "permitAll", "()Landroid/os/StrictMode$ThreadPolicy$Builder;");
+          jobject builder2 = permitAll ? env.CallObjectMethod(builder, permitAll) : builder;
+          jmethodID build = env.GetMethodID(clsPolicyBuilder, "build", "()Landroid/os/StrictMode$ThreadPolicy;");
+          jobject policy = build ? env.CallObjectMethod(builder2 ? builder2 : builder, build) : nullptr;
+          if (policy) {
+            jmethodID setThreadPolicy = env.GetStaticMethodID(clsStrict, "setThreadPolicy", "(Landroid/os/StrictMode$ThreadPolicy;)V");
+            if (setThreadPolicy) {
+              env.CallStaticVoidMethod(clsStrict, setThreadPolicy, policy);
+            }
+          }
+        }
+      }
+    }
+
     jclass clsURL = env.FindClass("java/net/URL");
     if (!clsURL) return false;
     jmethodID urlCtor = env.GetMethodID(clsURL, "<init>", "(Ljava/lang/String;)V");
@@ -190,29 +216,43 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     jstring jUrlStr = env.NewStringUTF(url.c_str());
     jobject urlObj = env.NewObject(clsURL, urlCtor, jUrlStr);
 
-    jobject conn = env.CallObjectMethod(urlObj, openConnection);
+  jobject conn = env.CallObjectMethod(urlObj, openConnection);
     if (!conn) return false;
 
     jclass clsConn = env.GetObjectClass(conn);
     jmethodID setConnectTimeout = env.GetMethodID(clsConn, "setConnectTimeout", "(I)V");
     jmethodID setReadTimeout = env.GetMethodID(clsConn, "setReadTimeout", "(I)V");
+    jmethodID setDoInput = env.GetMethodID(clsConn, "setDoInput", "(Z)V");
+    jmethodID setUseCaches = env.GetMethodID(clsConn, "setUseCaches", "(Z)V");
     jmethodID setReqProp = env.GetMethodID(clsConn, "setRequestProperty", "(Ljava/lang/String;Ljava/lang/String;)V");
-    env.CallVoidMethod(conn, setConnectTimeout, 5000);
-    env.CallVoidMethod(conn, setReadTimeout, 5000);
-    env.CallVoidMethod(conn, setReqProp, env.NewStringUTF("Accept"), env.NewStringUTF("application/javascript, text/javascript, */*;q=0.1"));
-    env.CallVoidMethod(conn, setReqProp, env.NewStringUTF("Accept-Encoding"), env.NewStringUTF("identity"));
+  env.CallVoidMethod(conn, setConnectTimeout, 15000);
+  env.CallVoidMethod(conn, setReadTimeout, 15000);
+  if (setDoInput) { env.CallVoidMethod(conn, setDoInput, JNI_TRUE); }
+  if (setUseCaches) { env.CallVoidMethod(conn, setUseCaches, JNI_FALSE); }
+  env.CallVoidMethod(conn, setReqProp, env.NewStringUTF("Accept"), env.NewStringUTF("application/javascript, text/javascript, */*;q=0.1"));
+  env.CallVoidMethod(conn, setReqProp, env.NewStringUTF("Accept-Encoding"), env.NewStringUTF("identity"));
+  env.CallVoidMethod(conn, setReqProp, env.NewStringUTF("Cache-Control"), env.NewStringUTF("no-cache"));
+  env.CallVoidMethod(conn, setReqProp, env.NewStringUTF("Connection"), env.NewStringUTF("close"));
+  env.CallVoidMethod(conn, setReqProp, env.NewStringUTF("User-Agent"), env.NewStringUTF("NativeScript-HTTP-ESM"));
 
     // Try to get status via HttpURLConnection if possible
     jclass clsHttp = env.FindClass("java/net/HttpURLConnection");
     bool isHttp = clsHttp && env.IsInstanceOf(conn, clsHttp);
     jmethodID getResponseCode = isHttp ? env.GetMethodID(clsHttp, "getResponseCode", "()I") : nullptr;
+    jmethodID getErrorStream = isHttp ? env.GetMethodID(clsHttp, "getErrorStream", "()Ljava/io/InputStream;") : nullptr;
     if (isHttp && getResponseCode) {
       status = env.CallIntMethod(conn, getResponseCode);
     }
 
-    // Read InputStream
+    // Read InputStream (prefer error stream on HTTP error codes)
     jmethodID getInputStream = env.GetMethodID(clsConn, "getInputStream", "()Ljava/io/InputStream;");
-    jobject inStream = env.CallObjectMethod(conn, getInputStream);
+    jobject inStream = nullptr;
+    if (isHttp && status >= 400 && getErrorStream) {
+      inStream = env.CallObjectMethod(conn, getErrorStream);
+    }
+    if (!inStream) {
+      inStream = env.CallObjectMethod(conn, getInputStream);
+    }
     if (!inStream) return false;
 
     jclass clsIS = env.GetObjectClass(inStream);
@@ -229,7 +269,11 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     jbyteArray buffer = env.NewByteArray(8192);
     while (true) {
       jint n = env.CallIntMethod(inStream, readMethod, buffer);
-      if (n <= 0) break;
+      if (n < 0) break; // -1 indicates EOF
+      if (n == 0) {
+        // Defensive: continue reading if zero bytes returned
+        continue;
+      }
       env.CallVoidMethod(baos, baosWrite, buffer, 0, n);
     }
 
