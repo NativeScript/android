@@ -6,7 +6,7 @@ env:
   EMULATOR_NAME: "runtime-emu"
   NDK_VERSION: r27d
   ANDROID_API: 33
-  ANDROID_ABI: arm64-v8a
+  ANDROID_ABI: x86_64
   NDK_ARCH: darwin
 
 
@@ -16,7 +16,7 @@ permissions:
 jobs:
   build:
     name: Build
-    runs-on: macos-15
+    runs-on: macos-15-intel
     outputs:
       npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
@@ -84,7 +84,7 @@ jobs:
           path: test-app/runtime/build/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/*
   test:
     name: Test
-    runs-on: macos-15
+    runs-on: macos-15-intel
     needs: build
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
