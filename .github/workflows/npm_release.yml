@@ -19,7 +19,7 @@ permissions:
 jobs:
   build:
     name: Build
-    runs-on: macos-13
+    runs-on: macos-15-intel
     outputs:
       npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
@@ -93,7 +93,7 @@ jobs:
         
   test:
     name: Test
-    runs-on: macos-13
+    runs-on: macos-15-intel
     needs: build
     steps:
       - name: Harden the runner (Audit all outbound calls)
