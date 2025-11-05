@@ -20,7 +20,7 @@ ObjectManager::ObjectManager(jobject javaRuntimeObject) :
         m_javaRuntimeObject(javaRuntimeObject),
         m_numberOfGC(0),
         m_currentObjectId(0),
-        m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this) {
+        m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, ValidateWeakGlobalRefCallback, 1000, this) {
 
     JEnv env;
     auto runtimeClass = env.FindClass("com/tns/Runtime");
@@ -507,10 +507,13 @@ jweak ObjectManager::NewWeakGlobalRefCallback(const int &javaObjectID, void *sta
 }
 
 void ObjectManager::DeleteWeakGlobalRefCallback(const jweak &object, void *state) {
-    auto objManager = reinterpret_cast<ObjectManager *>(state);
-
     JEnv env;
     env.DeleteWeakGlobalRef(object);
+}
+
+bool ObjectManager::ValidateWeakGlobalRefCallback(const int &javaObjectID, const jweak &object, void *state) {
+    JEnv env;
+    return !env.isSameObject(object, NULL);
 }
 
 Local<Object> ObjectManager::GetEmptyObject(Isolate *isolate) {
