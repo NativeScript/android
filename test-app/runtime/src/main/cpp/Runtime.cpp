@@ -14,6 +14,7 @@
 #include "SimpleProfiler.h"
 #include "SimpleAllocator.h"
 #include "ModuleInternal.h"
+#include "ModuleInternalCallbacks.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include "ArrayHelper.h"
@@ -31,6 +32,7 @@
 #include <thread>
 #include "File.h"
 #include "ModuleBinding.h"
+#include "ModuleInternalCallbacks.h"
 #include "URLImpl.h"
 #include "URLSearchParamsImpl.h"
 #include "URLPatternImpl.h"
@@ -508,6 +510,12 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
     isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
+
+    // Set up import.meta callback
+    isolate->SetHostInitializeImportMetaObjectCallback(InitializeImportMetaObject);
+
+    // Enable dynamic import() support
+    isolate->SetHostImportModuleDynamicallyCallback(ImportModuleDynamicallyCallback);
 
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
 

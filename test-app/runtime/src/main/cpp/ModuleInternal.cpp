@@ -5,6 +5,7 @@
  *      Author: gatanasov
  */
 #include "ModuleInternal.h"
+#include "ModuleInternalCallbacks.h"
 #include "File.h"
 #include "JniLocalRef.h"
 #include "ArgConverter.h"
@@ -30,6 +31,25 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
+// Global module registry for ES modules: maps absolute file paths → compiled Module handles
+std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
+
+// Helper function to check if a module name looks like an optional external module
+bool ModuleInternal::IsLikelyOptionalModule(const std::string& moduleName) {
+    // Check if it's a bare module name (no path separators) that could be an npm package
+    if (moduleName.find('/') == std::string::npos && moduleName.find('\\') == std::string::npos &&
+        moduleName[0] != '.' && moduleName[0] != '~' && moduleName[0] != '/') {
+        return true;
+    }
+    return false;
+}
+
+// Helper function to check if a file path is an ES module (.mjs) but not a source map (.mjs.map)
+bool ModuleInternal::IsESModule(const std::string& path) {
+    return path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0 &&
+           !(path.size() >= 8 && path.compare(path.size() - 8, 8, ".mjs.map") == 0);
+}
+
 ModuleInternal::ModuleInternal()
     : m_isolate(nullptr), m_requireFunction(nullptr), m_requireFactoryFunction(nullptr) {
 }
@@ -52,6 +72,9 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
 
         RESOLVE_PATH_METHOD_ID = env.GetStaticMethodID(MODULE_CLASS, "resolvePath", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
         assert(RESOLVE_PATH_METHOD_ID != nullptr);
+        
+        GET_APPLICATION_FILES_PATH_METHOD_ID = env.GetStaticMethodID(MODULE_CLASS, "getApplicationFilesPath", "()Ljava/lang/String;");
+        assert(GET_APPLICATION_FILES_PATH_METHOD_ID != nullptr);
     }
 
     m_isolate = isolate;
@@ -253,20 +276,43 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleNam
             path = std::string(moduleName);
             path.replace(pos, sys_lib.length(), "");
         } else {
-            JEnv env;
-            JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
-            JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
-            JniLocalRef jsModulePath(
-                    env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID,
-                                               (jstring) jsModulename, (jstring) jsBaseDir));
+            // Handle tilde path resolution before calling Java path resolution
+            std::string resolvedModuleName = moduleName;
+            if (!moduleName.empty() && moduleName[0] == '~') {
+                // Convert ~/path to ApplicationPath/path
+                std::string tail = moduleName.size() >= 2 && moduleName[1] == '/' ? moduleName.substr(2) : moduleName.substr(1);
+                resolvedModuleName = Constants::APP_ROOT_FOLDER_PATH + "/" + tail;
+                
+                // For .mjs files with tilde paths, use resolved path directly
+                if (Util::EndsWith(resolvedModuleName, ".mjs")) {
+                    path = resolvedModuleName;
+                } else {
+                    // For non-.mjs files, still use Java resolution with the resolved name
+                    JEnv env;
+                    JniLocalRef jsModulename(env.NewStringUTF(resolvedModuleName.c_str()));
+                    JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
+                    JniLocalRef jsModulePath(
+                            env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID,
+                                                       (jstring) jsModulename, (jstring) jsBaseDir));
 
-            path = ArgConverter::jstringToString((jstring) jsModulePath);
+                    path = ArgConverter::jstringToString((jstring) jsModulePath);
+                }
+            } else {
+                JEnv env;
+                JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
+                JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
+                JniLocalRef jsModulePath(
+                        env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID,
+                                                   (jstring) jsModulename, (jstring) jsBaseDir));
+
+                path = ArgConverter::jstringToString((jstring) jsModulePath);
+            }
         }
 
         auto it2 = m_loadedModules.find(path);
 
         if (it2 == m_loadedModules.end()) {
-            if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".so")) {
+            if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".mjs") || Util::EndsWith(path, ".so")) {
                 isData = false;
                 result = LoadModule(isolate, path, cachePathKey);
             } else if (Util::EndsWith(path, ".json")) {
@@ -307,6 +353,20 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
     TempModule tempModule(this, modulePath, moduleCacheKey, poModuleObj);
 
     TryCatch tc(isolate);
+
+    // Check if this is an ES module (.mjs)
+    if (Util::EndsWith(modulePath, ".mjs")) {
+        // For ES modules, load using the ES module system
+        Local<Value> moduleNamespace = LoadESModule(isolate, modulePath);
+        
+        // Create a wrapper object that behaves like a CommonJS module
+        // but exports the ES module namespace
+        moduleObj->Set(context, ArgConverter::ConvertToV8String(isolate, "exports"), moduleNamespace);
+        
+        tempModule.SaveToCache();
+        result = moduleObj;
+        return result;
+    }
 
     Local<Function> moduleFunc;
 
@@ -453,6 +513,111 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
     return json;
 }
 
+Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path) {
+    auto context = isolate->GetCurrentContext();
+
+    // 1) Prepare URL & source
+    string url = "file://" + path;
+    string content = Runtime::GetRuntime(isolate)->ReadFileText(path);
+    
+    Local<String> sourceText = ArgConverter::ConvertToV8String(isolate, content);
+    ScriptCompiler::CachedData* cacheData = nullptr; // TODO: Implement cache support for ES modules
+
+    Local<String> urlString;
+    if (!String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
+        throw NativeScriptException(string("Failed to create URL string for ES module ") + path);
+    }
+
+    ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, Local<Value>(), false, false,
+                        true  // ← is_module
+    );
+    ScriptCompiler::Source source(sourceText, origin, cacheData);
+
+    // 2) Compile with its own TryCatch
+    Local<Module> module;
+    {
+        TryCatch tcCompile(isolate);
+        MaybeLocal<Module> maybeMod = ScriptCompiler::CompileModule(
+            isolate, &source,
+            cacheData ? ScriptCompiler::kConsumeCodeCache : ScriptCompiler::kNoCompileOptions);
+
+        if (!maybeMod.ToLocal(&module)) {
+            if (tcCompile.HasCaught()) {
+                throw NativeScriptException(tcCompile, "Cannot compile ES module " + path);
+            } else {
+                throw NativeScriptException(string("Cannot compile ES module ") + path);
+            }
+        }
+    }
+
+    // 3) Register for resolution callback
+    // Safe Global handle management: Clear any existing entry first
+    auto it = g_moduleRegistry.find(path);
+    if (it != g_moduleRegistry.end()) {
+        // Clear the existing Global handle before replacing it
+        it->second.Reset();
+    }
+
+    // Now safely set the new module handle
+    g_moduleRegistry[path].Reset(isolate, module);
+
+    // 4) Instantiate (link) with ResolveModuleCallback
+    {
+        TryCatch tcLink(isolate);
+        bool linked = module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false);
+
+        if (!linked) {
+            if (tcLink.HasCaught()) {
+                throw NativeScriptException(tcLink, "Cannot instantiate module " + path);
+            } else {
+                throw NativeScriptException(string("Cannot instantiate module ") + path);
+            }
+        }
+    }
+
+    // 5) Evaluate with its own TryCatch
+    Local<Value> result;
+    {
+        TryCatch tcEval(isolate);
+        if (!module->Evaluate(context).ToLocal(&result)) {
+            if (tcEval.HasCaught()) {
+                throw NativeScriptException(tcEval, "Cannot evaluate module " + path);
+            } else {
+                throw NativeScriptException(string("Cannot evaluate module ") + path);
+            }
+        }
+
+        // Handle the case where evaluation returns a Promise (for top-level await)
+        if (result->IsPromise()) {
+            Local<Promise> promise = result.As<Promise>();
+            
+            // Process microtasks to allow Promise resolution
+            int maxAttempts = 100;
+            int attempts = 0;
+
+            while (attempts < maxAttempts) {
+                isolate->PerformMicrotaskCheckpoint();
+                Promise::PromiseState state = promise->State();
+
+                if (state != Promise::kPending) {
+                    if (state == Promise::kRejected) {
+                        Local<Value> reason = promise->Result();
+                        isolate->ThrowException(reason);
+                        throw NativeScriptException(string("Module evaluation promise rejected: ") + path);
+                    }
+                    break;
+                }
+
+                attempts++;
+                usleep(100);  // 0.1ms delay
+            }
+        }
+    }
+
+    // 6) Return the namespace
+    return module->GetModuleNamespace();
+}
+
 Local<String> ModuleInternal::WrapModuleContent(const string& path) {
     TNSPERF();
 
@@ -541,6 +706,7 @@ ModuleInternal::ModulePathKind ModuleInternal::GetModulePathKind(const std::stri
 
 jclass ModuleInternal::MODULE_CLASS = nullptr;
 jmethodID ModuleInternal::RESOLVE_PATH_METHOD_ID = nullptr;
+jmethodID ModuleInternal::GET_APPLICATION_FILES_PATH_METHOD_ID = nullptr;
 
 const char* ModuleInternal::MODULE_PROLOGUE = "(function(module, exports, require, __filename, __dirname){ ";
 const char* ModuleInternal::MODULE_EPILOGUE = "\n})";

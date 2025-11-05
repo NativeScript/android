@@ -231,6 +231,6 @@ public class Main {
     }
 
     private static boolean isJsFile(String fileName) {
-        return fileName.substring(fileName.length() - 3).equals(".js");
+        return fileName.endsWith(".js") || fileName.endsWith(".mjs");
     }
 }

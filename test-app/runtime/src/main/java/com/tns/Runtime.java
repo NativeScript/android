@@ -222,6 +222,8 @@ public class Runtime {
                 runtimeCache.put(this.runtimeId, this);
 
                 gcListener = GcListener.getInstance(config.appConfig.getGcThrottleTime(), config.appConfig.getMemoryCheckInterval(), config.appConfig.getFreeMemoryRatio());
+                // capture static configuration to allow native lookups when currentRuntime is unavailable
+                Runtime.staticConfiguration = config;
             } finally {
                 frame.close();
             }
@@ -252,6 +254,18 @@ public class Runtime {
         } else {
             return false;
         }
+    }
+
+    // Expose logScriptLoading flag for native code without re-reading package.json
+    public static boolean getLogScriptLoadingEnabled() {
+        Runtime runtime = com.tns.Runtime.getCurrentRuntime();
+        if (runtime != null && runtime.config != null && runtime.config.appConfig != null) {
+            return runtime.config.appConfig.getLogScriptLoading();
+        }
+        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
+            return staticConfiguration.appConfig.getLogScriptLoading();
+        }
+        return false;
     }
 
     private static Runtime getObjectRuntime(Object object) {
