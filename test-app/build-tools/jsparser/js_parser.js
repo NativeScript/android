@@ -182,7 +182,7 @@ function readInterfaceNames(data, err) {
 }
 
 /*
- *	Traverses a given input directory and attempts to visit every ".js" file.
+ *	Traverses a given input directory and attempts to visit every ".js" and ".mjs" file.
  *	It passes each found file down the line.
  */
 function traverseAndAnalyseFilesDir(inputDir, err) {
@@ -196,7 +196,7 @@ function traverseAndAnalyseFilesDir(inputDir, err) {
 function traverseFiles(filesToTraverse) {
   for (let i = 0; i < filesToTraverse.length; i += 1) {
     const fp = filesToTraverse[i];
-    logger.info("Visiting JavaScript file: " + fp);
+    logger.info("Visiting JavaScript/ES Module file: " + fp);
 
     readFile(fp)
       .then(astFromFileContent.bind(null, fp))
@@ -228,6 +228,7 @@ const readFile = function (filePath, err) {
 
 /*
  *	Get's the AST (https://en.wikipedia.org/wiki/Abstract_syntax_tree) from the file content and passes it down the line.
+ *	Supports both CommonJS (.js) and ES modules (.mjs) files.
  */
 const astFromFileContent = function (path, data, err) {
   return new Promise(function (resolve, reject) {
@@ -236,13 +237,28 @@ const astFromFileContent = function (path, data, err) {
       return reject(err);
     }
 
-    const ast = babelParser.parse(data.data, {
+    // Determine if this is an ES module based on file extension
+    const isESModule = path.endsWith('.mjs');
+    
+    // Configure Babel parser based on file type
+    const parserOptions = {
       minify: false,
       plugins: [
         ["@babel/plugin-proposal-decorators", { decoratorsBeforeExport: true }],
         "objectRestSpread",
       ],
-    });
+    };
+    
+    // For ES modules, set sourceType to 'module'
+    if (isESModule) {
+      parserOptions.sourceType = 'module';
+      logger.info(`Parsing ES module: ${path}`);
+    } else {
+      // For regular JS files, keep existing behavior (default sourceType is 'script')
+      logger.info(`Parsing CommonJS file: ${path}`);
+    }
+
+    const ast = babelParser.parse(data.data, parserOptions);
     data.ast = ast;
     return resolve(data);
   });
@@ -266,6 +282,10 @@ const visitAst = function (path, data, err) {
 
     traverse.default(data.ast, {
       enter: function (path) {
+        // Determine file extension length to properly strip it from the path
+        const fileExtension = data.filePath.endsWith('.mjs') ? '.mjs' : '.js';
+        const extensionLength = fileExtension.length;
+        
         const decoratorConfig = {
           logger: logger,
           extendDecoratorName: extendDecoratorName,
@@ -273,7 +293,7 @@ const visitAst = function (path, data, err) {
           filePath:
             data.filePath.substring(
               inputDir.length + 1,
-              data.filePath.length - 3
+              data.filePath.length - extensionLength
             ) || "",
           fullPathName: data.filePath
             .substring(inputDir.length + 1)

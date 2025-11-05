@@ -215,9 +215,55 @@
                 return;
             } catch (f) { errors.push('  NodeJS attempt: ' + f.message); }
             try {
-                __JUnitSaveResults(text);
+                // Instead of writing XML files, output test summary to console
+                // Parse the XML text to extract test summary
+                var testMatch = text.match(/tests="(\d+)"/g);
+                var failureMatch = text.match(/failures="(\d+)"/g);
+                var errorMatch = text.match(/errors="(\d+)"/g);
+                var skippedMatch = text.match(/skipped="(\d+)"/g);
+                
+                var totalTests = 0;
+                var totalFailures = 0;
+                var totalErrors = 0;
+                var totalSkipped = 0;
+                
+                // Sum up all test suite results
+                if (testMatch) {
+                    for (var i = 0; i < testMatch.length; i++) {
+                        var match = testMatch[i].match(/tests="(\d+)"/);
+                        if (match) totalTests += parseInt(match[1]);
+                    }
+                }
+                
+                if (failureMatch) {
+                    for (var i = 0; i < failureMatch.length; i++) {
+                        var match = failureMatch[i].match(/failures="(\d+)"/);
+                        if (match) totalFailures += parseInt(match[1]);
+                    }
+                }
+                
+                if (errorMatch) {
+                    for (var i = 0; i < errorMatch.length; i++) {
+                        var match = errorMatch[i].match(/errors="(\d+)"/);
+                        if (match) totalErrors += parseInt(match[1]);
+                    }
+                }
+                
+                if (skippedMatch) {
+                    for (var i = 0; i < skippedMatch.length; i++) {
+                        var match = skippedMatch[i].match(/skipped="(\d+)"/);
+                        if (match) totalSkipped += parseInt(match[1]);
+                    }
+                }
+                
+                // Output in a format our test checker can detect
+                var resultPrefix = (totalFailures > 0 || totalErrors > 0) ? "FAILURE:" : "SUCCESS:";
+                console.log(resultPrefix + " " + totalTests + " specs, " + (totalFailures + totalErrors) + " failures, " + totalSkipped + " skipped");
+                
                 return;
-            } catch (f) { errors.push('  tns-android attempt: ' + f.message); }
+            } catch (f) { 
+                errors.push('  tns-android console output attempt: ' + f.message);
+            }
 
             // If made it here, no write succeeded.  Let user know.
             log("Warning: writing junit report failed for '" + path + "', '" +

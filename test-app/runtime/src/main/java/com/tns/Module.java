@@ -194,26 +194,43 @@ class Module {
 
     //tries to load the path as a file, returns null if that's not possible
     private static File loadAsFile(File path) {
-        String fallbackExtension;
-
         boolean isJSFile = path.getName().endsWith(".js");
+        boolean isMJSFile = path.getName().endsWith(".mjs");
         boolean isSOFile = path.getName().endsWith(".so");
         boolean isJSONFile = path.getName().endsWith(".json");
 
-        if (isJSFile || isJSONFile || isSOFile) {
-            fallbackExtension = "";
-        } else {
-            fallbackExtension = ".js";
-        }
-
-        File foundFile = new File(path.getAbsolutePath() + fallbackExtension);
-        try {
-            File canonicalFile = foundFile.getCanonicalFile();
-            if (canonicalFile.exists() && canonicalFile.isFile()) {
-                return foundFile;
+        if (isJSFile || isMJSFile || isJSONFile || isSOFile) {
+            // File already has an extension, try as-is
+            try {
+                File canonicalFile = path.getCanonicalFile();
+                if (canonicalFile.exists() && canonicalFile.isFile()) {
+                    return path;
+                }
+            } catch (IOException e) {
+                // continue to try with extensions
             }
-        } catch (IOException e) {
-            // return null
+        } else {
+            // No extension provided, try .js first, then .mjs
+            File jsFile = new File(path.getAbsolutePath() + ".js");
+            try {
+                File canonicalFile = jsFile.getCanonicalFile();
+                if (canonicalFile.exists() && canonicalFile.isFile()) {
+                    return jsFile;
+                }
+            } catch (IOException e) {
+                // continue to try .mjs
+            }
+            
+            // Try .mjs extension
+            File mjsFile = new File(path.getAbsolutePath() + ".mjs");
+            try {
+                File canonicalFile = mjsFile.getCanonicalFile();
+                if (canonicalFile.exists() && canonicalFile.isFile()) {
+                    return mjsFile;
+                }
+            } catch (IOException e) {
+                // return null
+            }
         }
 
         return null;
@@ -248,8 +265,18 @@ class Module {
             }
         }
 
-        //fallback to index js
+        //fallback to index.js
         foundFile = new File(path, "index.js");
+        try {
+            if (foundFile.getCanonicalFile().exists()) {
+                return foundFile;
+            }
+        } catch (IOException e) {
+            // continue to try index.mjs
+        }
+
+        //fallback to index.mjs
+        foundFile = new File(path, "index.mjs");
         try {
             if (foundFile.getCanonicalFile().exists()) {
                 return foundFile;
