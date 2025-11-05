@@ -27,8 +27,8 @@ function checkTestResults() {
         };
         
         // Look for ES Module test results
-        testResults.esModules.passed = logcatOutput.includes('🎉 ALL ES MODULE TESTS PASSED!');
-        testResults.esModules.failed = logcatOutput.includes('💥 SOME ES MODULE TESTS FAILED!');
+        testResults.esModules.passed = logcatOutput.includes('ALL ES MODULE TESTS PASSED!');
+        testResults.esModules.failed = logcatOutput.includes('SOME ES MODULE TESTS FAILED!');
         
         // Look for Jasmine test results
         const jasmineSuccessMatch = logcatOutput.match(/SUCCESS:\s*(\d+)\s+specs?,\s*(\d+)\s+failures?/);
@@ -88,7 +88,7 @@ function checkTestResults() {
         } else if (testResults.esModules.failed) {
             console.log('❌ ES Module Tests: FAILED');
         } else {
-            console.log('⚠️  ES Module Tests: No clear results found');
+            console.log('ES Module Tests: No clear results found');
         }
         
         // Jasmine tests
@@ -187,7 +187,7 @@ function checkTestResults() {
         console.log('\n' + '='.repeat(50));
         
         if (hasFailures) {
-            console.error('💥 OVERALL RESULT: TESTS FAILED');
+            console.error('OVERALL RESULT: TESTS FAILED');
             console.log('\nFailure Details:');
             if (testResults.esModules.failed) {
                 console.log('  - ES Module tests failed');
@@ -238,7 +238,7 @@ function checkTestResults() {
             ).slice(-15); // Last 15 failure-related lines for more context
             
             if (failureLines.length > 0) {
-                console.log('\n📋 Formatted Failure Information:');
+                console.log('\nFormatted Failure Information:');
                 failureLines.forEach(line => {
                     const logMatch = line.match(/(?:CONSOLE LOG|JS|{N} Runtime Tests):\s*(.+)/);
                     if (logMatch) {
@@ -251,10 +251,10 @@ function checkTestResults() {
             
             process.exit(1);
         } else if (hasSuccesses) {
-            console.log('🎉 OVERALL RESULT: ALL DETECTED TESTS PASSED');
+            console.log('OVERALL RESULT: ALL DETECTED TESTS PASSED');
             console.log('Note: Some tests may use different execution paths or output methods');
         } else {
-            console.log('⚠️  OVERALL RESULT: NO TEST RESULTS DETECTED');
+            console.log('OVERALL RESULT: NO TEST RESULTS DETECTED');
             console.log('This might indicate tests did not run or complete properly.');
             process.exit(1);
         }

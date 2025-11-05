@@ -156,7 +156,7 @@ public class Generator {
             } else {
                 name = getSimpleClassname(clazz.getClassName().replace("$", "_")) + "_";
                 // Generate a unique identifier that prevents naming collisions
-                // especially with .mjs files and complex Angular component structures
+                // especially with .mjs files and complex structures
                 String fileIdentifier = generateUniqueFileIdentifier(dataRow.getFile());
                 name += fileIdentifier + "_" + dataRow.getLine() + "_" + dataRow.getColumn() + "_" + dataRow.getNewClassName();
             }

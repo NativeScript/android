@@ -84,9 +84,9 @@ function runESModuleTests() {
     console.log("Total tests:", passed + failed);
     
     if (failed === 0) {
-        console.log("🎉 ALL ES MODULE TESTS PASSED!");
+        console.log("ALL ES MODULE TESTS PASSED!");
     } else {
-        console.log("💥 SOME ES MODULE TESTS FAILED!");
+        console.log("SOME ES MODULE TESTS FAILED!");
     }
     
     return { passed: passed, failed: failed };
