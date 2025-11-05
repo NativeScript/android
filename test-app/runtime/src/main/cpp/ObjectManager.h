@@ -12,6 +12,7 @@
 #include <stack>
 #include <vector>
 #include <string>
+#include <unordered_map>
 
 namespace tns {
 class ObjectManager {
