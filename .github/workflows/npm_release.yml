@@ -19,7 +19,7 @@ permissions:
 jobs:
   build:
     name: Build
-    runs-on: macos-13
+    runs-on: macos-15-intel
     outputs:
       npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
@@ -29,15 +29,15 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
           submodules: true
-      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
-      - uses: actions/setup-java@17f84c3641ba7b8f6deff6309fc4c864478f5d62 # v3.14.1
+      - uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
         with:
           distribution: "temurin"
           java-version: "21"
@@ -81,19 +81,19 @@ jobs:
       - name: Build npm package
         run: ./gradlew -PgitCommitVersion=${{ github.sha }} -PnoCCache --stacktrace
       - name: Upload npm package artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: npm-package
           path: dist/nativescript-android-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
       - name: Upload debug symbols
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: debug-symbols
           path: test-app/runtime/build/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/*
         
   test:
     name: Test
-    runs-on: macos-13
+    runs-on: macos-15-intel
     needs: build
     steps:
       - name: Harden the runner (Audit all outbound calls)
@@ -101,14 +101,14 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: true
-      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
-      - uses: actions/setup-java@17f84c3641ba7b8f6deff6309fc4c864478f5d62 # v3.14.1
+      - uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
         with:
           distribution: "temurin"
           java-version: "21"
@@ -160,11 +160,11 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           name: npm-package
           path: dist
@@ -191,19 +191,19 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
       - name: Setup
         run: npm install
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           name: npm-package
           path: dist
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           name: debug-symbols
           path: dist/debug-symbols
