@@ -164,7 +164,7 @@ jobs:
         with:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           name: npm-package
           path: dist
@@ -199,11 +199,11 @@ jobs:
           node-version: 22
       - name: Setup
         run: npm install
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           name: npm-package
           path: dist
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           name: debug-symbols
           path: dist/debug-symbols
