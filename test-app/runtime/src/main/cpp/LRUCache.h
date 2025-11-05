@@ -43,7 +43,7 @@ class LRUCache {
         // Key to value and key history iterator
         typedef robin_hood::unordered_map< key_type, std::pair<value_type, typename key_tracker_type::iterator> > key_to_value_type;
 
-        // Constuctor specifies the cached function and
+        // Constructor specifies the cached function and
         // the maximum number of records to be stored
         LRUCache(value_type (*loadCallback)(const key_type&, void*), void (*evictCallback)(const value_type&, void*), bool (*cacheValidCallback)(const key_type&, const value_type&, void*), size_t capacity, void* state)
             : m_loadCallback(loadCallback), m_capacity(capacity), m_evictCallback(evictCallback), m_cacheValidCallback(cacheValidCallback), m_state(state) {
