@@ -179,6 +179,8 @@ class ObjectManager {
 
         static void DeleteWeakGlobalRefCallback(const jweak& object, void* state);
 
+        static bool ValidateWeakGlobalRefCallback(const int &javaObjectID, const jweak &object, void *state);
+
         static void JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
         jobject m_javaRuntimeObject;

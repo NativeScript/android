@@ -972,12 +972,12 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         }
 
         resolver->Resolve(context, module->GetModuleNamespace()).Check();
-    if (IsScriptLoadingLogEnabled()) {
+        if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("ImportModuleDynamicallyCallback: Successfully resolved '%s'", spec.c_str());
         }
     } catch (NativeScriptException& ex) {
         ex.ReThrowToV8();
-    if (IsScriptLoadingLogEnabled()) {
+        if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("ImportModuleDynamicallyCallback: Native exception for '%s'", spec.c_str());
         }
         resolver
