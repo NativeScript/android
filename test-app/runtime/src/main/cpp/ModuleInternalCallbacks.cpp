@@ -70,7 +70,7 @@ static void LogHttpCompileDiagnostics(v8::Isolate* isolate,
             classification = "wrap-error";
         }
     }
-    if (std::string(classification) == "unknown") {
+    if (strcmp(classification, "unknown") == 0) {
         if (code.find("export default") == std::string::npos && code.find("__sfc__") != std::string::npos) classification = "missing-export-default";
         else if (code.find("__sfc__") != std::string::npos && code.find("export {") == std::string::npos && code.find("export ") == std::string::npos) classification = "no-exports";
         else if (code.find("import ") == std::string::npos && code.find("export ") == std::string::npos) classification = "not-module";
