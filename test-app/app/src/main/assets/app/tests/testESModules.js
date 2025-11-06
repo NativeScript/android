@@ -5,12 +5,19 @@ function runESModuleTests() {
     // Test 1: Load .mjs files as ES modules
     console.log("\n--- Test 1: Loading .mjs files as ES modules ---");
     try {
-        var moduleExports = require("~/test-es-module.mjs");
+        var moduleExports = require("~/testSimpleESModule.mjs");
         if (moduleExports && moduleExports !== null) {
             console.log("Module exports:", JSON.stringify(moduleExports));
             passed++;
         } else {
             console.log("❌ FAIL: ES Module loaded but exports are null");
+            failed++;
+        }
+        if (moduleExports.moduleType === "ES Module") {
+            console.log("   - moduleType check passed");
+            passed++;
+        } else {
+            console.log("❌ FAIL: moduleType check failed");
             failed++;
         }
     } catch (e) {

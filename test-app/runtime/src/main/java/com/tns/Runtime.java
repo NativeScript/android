@@ -223,7 +223,7 @@ public class Runtime {
 
                 gcListener = GcListener.getInstance(config.appConfig.getGcThrottleTime(), config.appConfig.getMemoryCheckInterval(), config.appConfig.getFreeMemoryRatio());
                 // capture static configuration to allow native lookups when currentRuntime is unavailable
-                Runtime.staticConfiguration = config;
+                staticConfiguration = config;
             } finally {
                 frame.close();
             }
