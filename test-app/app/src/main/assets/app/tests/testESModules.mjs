@@ -163,5 +163,5 @@ async function runESModuleTests() {
 
 // Run the tests immediately (avoid top-level await for broader runtime support)
 runESModuleTests().catch((e) => {
-  console.error("ES Module top-level failure:", e && e.message ? e.message : e);
+  console.error("ES Module top-level failure:", e?.message ?? e);
 });
