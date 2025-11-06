@@ -44,7 +44,7 @@ async function runESModuleTests() {
     console.log("\n--- Test 1: Loading .mjs files as ES modules ---");
     try {
       const moduleExports = await import("~/testSimpleESModule.mjs");
-      if (moduleExports && moduleExports !== null) {
+      if (moduleExports) {
         recordPass("Module exports:", JSON.stringify(moduleExports));
       } else {
         recordFailure("ES Module loaded but exports are null");
