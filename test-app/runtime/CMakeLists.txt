@@ -147,6 +147,8 @@ add_library(
         src/main/cpp/URLImpl.cpp
         src/main/cpp/URLSearchParamsImpl.cpp
         src/main/cpp/URLPatternImpl.cpp
+        src/main/cpp/HMRSupport.cpp
+        src/main/cpp/DevFlags.cpp
 
         # V8 inspector source files will be included only in Release mode
         ${INSPECTOR_SOURCES}

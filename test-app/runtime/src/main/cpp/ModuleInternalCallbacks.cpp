@@ -9,6 +9,10 @@
 #include <vector>
 #include <algorithm>
 #include <atomic>
+#include <cstring>
+#include "HMRSupport.h"
+#include "DevFlags.h"
+#include "JEnv.h"
 
 using namespace v8;
 using namespace std;
@@ -20,34 +24,163 @@ extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
 // Forward declaration used by logging helper
 std::string GetApplicationPath();
 
-// Cached toggle for verbose script loading logs sourced from Java AppConfig via JNI
-static bool ShouldLogScriptLoading() {
-    static std::atomic<int> cached{-1}; // -1 unknown, 0 false, 1 true
-    int v = cached.load(std::memory_order_acquire);
-    if (v != -1) {
-        return v == 1;
+// Logging flag now provided via DevFlags for fast cached access
+
+// Diagnostic helper: emit detailed V8 compile error info for HTTP ESM sources.
+static void LogHttpCompileDiagnostics(v8::Isolate* isolate,
+                                      v8::Local<v8::Context> context,
+                                      const std::string& url,
+                                      const std::string& code,
+                                      v8::TryCatch& tc) {
+    if (!IsScriptLoadingLogEnabled()) {
+        return;
+    }
+    using namespace v8;
+
+    const char* classification = "unknown";
+    std::string msgStr;
+    std::string srcLineStr;
+    int lineNum = 0;
+    int startCol = 0;
+    int endCol = 0;
+
+    Local<Message> message = tc.Message();
+    if (!message.IsEmpty()) {
+        String::Utf8Value m8(isolate, message->Get());
+        if (*m8) msgStr = *m8;
+        lineNum = message->GetLineNumber(context).FromMaybe(0);
+        startCol = message->GetStartColumn();
+        endCol = message->GetEndColumn();
+        MaybeLocal<String> maybeLine = message->GetSourceLine(context);
+        if (!maybeLine.IsEmpty()) {
+            String::Utf8Value l8(isolate, maybeLine.ToLocalChecked());
+            if (*l8) srcLineStr = *l8;
+        }
+        // Heuristics similar to iOS for quick triage
+        if (msgStr.find("Unexpected identifier") != std::string::npos ||
+            msgStr.find("Unexpected token") != std::string::npos) {
+            if (msgStr.find("export") != std::string::npos &&
+                code.find("export default") == std::string::npos &&
+                code.find("__sfc__") != std::string::npos) {
+                classification = "missing-export-default";
+            } else {
+                classification = "syntax";
+            }
+        } else if (msgStr.find("Cannot use import statement") != std::string::npos) {
+            classification = "wrap-error";
+        }
+    }
+    if (strcmp(classification, "unknown") == 0) {
+        if (code.find("export default") == std::string::npos && code.find("__sfc__") != std::string::npos) classification = "missing-export-default";
+        else if (code.find("__sfc__") != std::string::npos && code.find("export {") == std::string::npos && code.find("export ") == std::string::npos) classification = "no-exports";
+        else if (code.find("import ") == std::string::npos && code.find("export ") == std::string::npos) classification = "not-module";
+        else if (code.find("_openBlock") != std::string::npos && code.find("openBlock") == std::string::npos) classification = "underscore-helper-unmapped";
     }
 
-    static std::once_flag initFlag;
-    std::call_once(initFlag, []() {
-        bool enabled = false;
-        try {
-            JEnv env;
-            jclass runtimeClass = env.FindClass("com/tns/Runtime");
-            if (runtimeClass != nullptr) {
-                jmethodID mid = env.GetStaticMethodID(runtimeClass, "getLogScriptLoadingEnabled", "()Z");
-                if (mid != nullptr) {
-                    jboolean res = env.CallStaticBooleanMethod(runtimeClass, mid);
-                    enabled = (res == JNI_TRUE);
-                }
-            }
-        } catch (...) {
-            // ignore and keep default false
-        }
-        cached.store(enabled ? 1 : 0, std::memory_order_release);
-    });
+    // FNV-1a 64-bit hash of source for correlation
+    unsigned long long h = 1469598103934665603ull; // offset basis
+    for (unsigned char c : code) { h ^= c; h *= 1099511628211ull; }
 
-    return cached.load(std::memory_order_acquire) == 1;
+    // Trim the snippet for readability
+    std::string snippet = code.substr(0, 600);
+    for (char& ch : snippet) { if (ch == '\n' || ch == '\r') ch = ' '; }
+    if (srcLineStr.size() > 240) srcLineStr = srcLineStr.substr(0, 240);
+
+    DEBUG_WRITE("[http-esm][compile][v8-error][%s] %s line=%d col=%d..%d hash=%llx bytes=%lu msg=%s srcLine=%s snippet=%s",
+                classification,
+                url.c_str(),
+                lineNum,
+                startCol,
+                endCol,
+                (unsigned long long)h,
+                (unsigned long)code.size(),
+                msgStr.c_str(),
+                srcLineStr.c_str(),
+                snippet.c_str());
+}
+
+// Helper: resolve relative or root-absolute spec against an HTTP(S) referrer URL.
+// Returns empty string if resolution is not possible.
+static std::string ResolveHttpRelative(const std::string& referrerUrl, const std::string& spec) {
+    if (referrerUrl.empty()) {
+        return std::string();
+    }
+    auto startsWith = [](const std::string& s, const char* pre) -> bool {
+        size_t n = strlen(pre);
+        return s.size() >= n && s.compare(0, n, pre) == 0;
+    };
+    if (!(startsWith(referrerUrl, "http://") || startsWith(referrerUrl, "https://"))) {
+        return std::string();
+    }
+    // Normalize referrer: drop fragment and query
+    std::string base = referrerUrl;
+    size_t hashPos = base.find('#');
+    if (hashPos != std::string::npos) base = base.substr(0, hashPos);
+    size_t qPos = base.find('?');
+    if (qPos != std::string::npos) base = base.substr(0, qPos);
+
+    // Extract origin and path
+    size_t schemePos = base.find("://");
+    if (schemePos == std::string::npos) {
+        return std::string();
+    }
+    size_t pathStart = base.find('/', schemePos + 3);
+    std::string origin = (pathStart == std::string::npos) ? base : base.substr(0, pathStart);
+    std::string path = (pathStart == std::string::npos) ? std::string("/") : base.substr(pathStart);
+
+    // Separate query/fragment from spec
+    std::string specPath = spec;
+    std::string specSuffix;
+    size_t specQ = specPath.find('?');
+    size_t specH = specPath.find('#');
+    size_t cut = std::string::npos;
+    if (specQ != std::string::npos && specH != std::string::npos) {
+        cut = std::min(specQ, specH);
+    } else if (specQ != std::string::npos) {
+        cut = specQ;
+    } else if (specH != std::string::npos) {
+        cut = specH;
+    }
+    if (cut != std::string::npos) {
+        specSuffix = specPath.substr(cut);
+        specPath = specPath.substr(0, cut);
+    }
+
+    // Build new path
+    std::string newPath;
+    if (!specPath.empty() && specPath[0] == '/') {
+        // Root-absolute relative to origin
+        newPath = specPath;
+    } else {
+        // Relative to directory of referrer path
+        size_t lastSlash = path.find_last_of('/');
+        std::string baseDir = (lastSlash == std::string::npos) ? std::string("/") : path.substr(0, lastSlash + 1);
+        newPath = baseDir + specPath;
+    }
+
+    // Normalize "." and ".." segments
+    std::vector<std::string> stack;
+    bool absolute = !newPath.empty() && newPath[0] == '/';
+    size_t i = 0;
+    while (i <= newPath.size()) {
+        size_t j = newPath.find('/', i);
+        std::string seg = (j == std::string::npos) ? newPath.substr(i) : newPath.substr(i, j - i);
+        if (seg.empty() || seg == ".") {
+            // skip
+        } else if (seg == "..") {
+            if (!stack.empty()) stack.pop_back();
+        } else {
+            stack.push_back(seg);
+        }
+        if (j == std::string::npos) break;
+        i = j + 1;
+    }
+    std::string normPath = absolute ? "/" : std::string();
+    for (size_t k = 0; k < stack.size(); k++) {
+        if (k > 0) normPath += "/";
+        normPath += stack[k];
+    }
+    return origin + normPath + specSuffix;
 }
 
 // Import meta callback to support import.meta.url and import.meta.dirname
@@ -75,23 +208,26 @@ void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Lo
         modulePath = "";  // Will use fallback path
     }
     
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
         DEBUG_WRITE("InitializeImportMetaObject: Module lookup: found path = %s",
                     modulePath.empty() ? "(empty)" : modulePath.c_str());
         DEBUG_WRITE("InitializeImportMetaObject: Registry size: %zu", g_moduleRegistry.size());
     }
     
-    // Convert file path to file:// URL
+    // Convert to URL for import.meta.url; keep http(s) untouched, file paths with file://
     std::string moduleUrl;
     if (!modulePath.empty()) {
-        // Create file:// URL from the full path
-        moduleUrl = "file://" + modulePath;
+        if (modulePath.rfind("http://", 0) == 0 || modulePath.rfind("https://", 0) == 0) {
+            moduleUrl = modulePath;
+        } else {
+            moduleUrl = "file://" + modulePath;
+        }
     } else {
         // Fallback URL if module not found in registry
         moduleUrl = "file:///android_asset/app/";
     }
     
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
         DEBUG_WRITE("InitializeImportMetaObject: Final URL: %s", moduleUrl.c_str());
     }
     
@@ -100,14 +236,22 @@ void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Lo
     // Set import.meta.url property
     meta->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, "url"), url).Check();
     
-    // Add import.meta.dirname support (extract directory from path)
+    // Add import.meta.dirname support (extract directory)
     std::string dirname;
     if (!modulePath.empty()) {
-        size_t lastSlash = modulePath.find_last_of("/\\");
-        if (lastSlash != std::string::npos) {
-            dirname = modulePath.substr(0, lastSlash);
+        if (modulePath.rfind("http://", 0) == 0 || modulePath.rfind("https://", 0) == 0) {
+            // For URLs, compute dirname by trimming after last '/'
+            size_t q = modulePath.find('?');
+            std::string noQuery = (q == std::string::npos) ? modulePath : modulePath.substr(0, q);
+            size_t lastSlash = noQuery.find_last_of('/');
+            dirname = (lastSlash == std::string::npos) ? modulePath : noQuery.substr(0, lastSlash);
         } else {
-            dirname = "/android_asset/app";  // fallback
+            size_t lastSlash = modulePath.find_last_of("/\\");
+            if (lastSlash != std::string::npos) {
+                dirname = modulePath.substr(0, lastSlash);
+            } else {
+                dirname = "/android_asset/app";  // fallback
+            }
         }
     } else {
         dirname = "/android_asset/app";  // fallback
@@ -117,6 +261,9 @@ void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Lo
     
     // Set import.meta.dirname property
     meta->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, "dirname"), dirnameStr).Check();
+
+    // Attach import.meta.hot for HMR
+    tns::InitializeImportMetaHot(isolate, context, meta, modulePath);
 }
 
 // Helper function to check if a file exists and is a regular file
@@ -166,24 +313,139 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     }
 
     // Debug logging
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
         DEBUG_WRITE("ResolveModuleCallback: Resolving '%s'", spec.c_str());
     }
 
-    // 2) Find which filepath the referrer was compiled under
+    // Normalize malformed http:/ and https:/ prefixes
+    if (spec.rfind("http:/", 0) == 0 && spec.rfind("http://", 0) != 0) {
+        spec.insert(5, "/");
+    } else if (spec.rfind("https:/", 0) == 0 && spec.rfind("https://", 0) != 0) {
+        spec.insert(6, "/");
+    }
+
+    // Attempt to resolve relative or root-absolute specifiers against an HTTP referrer URL
     std::string referrerPath;
     for (auto& kv : g_moduleRegistry) {
         v8::Local<v8::Module> registered = kv.second.Get(isolate);
-        if (registered == referrer) {
+        if (!registered.IsEmpty() && registered == referrer) {
             referrerPath = kv.first;
             break;
+        }
+    }
+    bool specIsRelative = !spec.empty() && spec[0] == '.';
+    bool specIsRootAbs = !spec.empty() && spec[0] == '/';
+    auto startsWithHttp = [](const std::string& s) -> bool {
+        return s.rfind("http://", 0) == 0 || s.rfind("https://", 0) == 0;
+    };
+    if (!startsWithHttp(spec) && (specIsRelative || specIsRootAbs)) {
+        if (!referrerPath.empty() && startsWithHttp(referrerPath)) {
+            std::string resolved = ResolveHttpRelative(referrerPath, spec);
+            if (!resolved.empty()) {
+                if (IsScriptLoadingLogEnabled()) {
+                    DEBUG_WRITE("ResolveModuleCallback: HTTP-relative resolved '%s' + '%s' -> '%s'",
+                                referrerPath.c_str(), spec.c_str(), resolved.c_str());
+                }
+                spec = resolved;
+            }
+        } else if (specIsRootAbs) {
+            // Fallback: use global __NS_HTTP_ORIGIN__ if present to anchor root-absolute specs
+            v8::Local<v8::String> key = ArgConverter::ConvertToV8String(isolate, "__NS_HTTP_ORIGIN__");
+            v8::Local<v8::Object> global = context->Global();
+            v8::MaybeLocal<v8::Value> maybeOriginVal = global->Get(context, key);
+            v8::Local<v8::Value> originVal;
+            if (!maybeOriginVal.IsEmpty() && maybeOriginVal.ToLocal(&originVal) && originVal->IsString()) {
+                v8::String::Utf8Value o8(isolate, originVal);
+                std::string origin = *o8 ? *o8 : "";
+                if (!origin.empty() && (origin.rfind("http://", 0) == 0 || origin.rfind("https://", 0) == 0)) {
+                    std::string refBase = origin;
+                    if (refBase.back() != '/') refBase += '/';
+                    std::string resolved = ResolveHttpRelative(refBase, spec);
+                    if (!resolved.empty()) {
+                        if (IsScriptLoadingLogEnabled()) {
+                            DEBUG_WRITE("[http-esm][http-origin][fallback] origin=%s spec=%s -> %s", refBase.c_str(), spec.c_str(), resolved.c_str());
+                        }
+                        spec = resolved;
+                    }
+                }
+            }
+        }
+    }
+
+    // HTTP(S) ESM support: resolve, fetch and compile from dev server
+    if (spec.rfind("http://", 0) == 0 || spec.rfind("https://", 0) == 0) {
+        std::string canonical = tns::CanonicalizeHttpUrlKey(spec);
+        if (IsScriptLoadingLogEnabled()) {
+            DEBUG_WRITE("[http-esm][resolve] spec=%s canonical=%s", spec.c_str(), canonical.c_str());
+        }
+        auto it = g_moduleRegistry.find(canonical);
+        if (it != g_moduleRegistry.end()) {
+            if (IsScriptLoadingLogEnabled()) {
+                DEBUG_WRITE("[http-esm][cache] hit %s", canonical.c_str());
+            }
+            return v8::MaybeLocal<v8::Module>(it->second.Get(isolate));
+        }
+
+        std::string body, ct;
+        int status = 0;
+        if (!tns::HttpFetchText(spec, body, ct, status)) {
+            if (IsScriptLoadingLogEnabled()) {
+                DEBUG_WRITE("[http-esm][fetch][fail] url=%s status=%d", spec.c_str(), status);
+            }
+            std::string msg = std::string("Failed to fetch ") + spec + ", status=" + std::to_string(status);
+            isolate->ThrowException(v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, msg)));
+            return v8::MaybeLocal<v8::Module>();
+        }
+        if (IsScriptLoadingLogEnabled()) {
+            DEBUG_WRITE("[http-esm][fetch][ok] url=%s status=%d bytes=%lu ct=%s", spec.c_str(), status, (unsigned long)body.size(), ct.c_str());
+        }
+
+        v8::Local<v8::String> sourceText = ArgConverter::ConvertToV8String(isolate, body);
+        v8::Local<v8::String> urlString = ArgConverter::ConvertToV8String(isolate, canonical);
+        v8::ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true);
+        v8::ScriptCompiler::Source src(sourceText, origin);
+        v8::Local<v8::Module> mod;
+        {
+            v8::TryCatch tc(isolate);
+            if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&mod)) {
+                LogHttpCompileDiagnostics(isolate, context, canonical, body, tc);
+                isolate->ThrowException(v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, "HTTP module compile failed")));
+                return v8::MaybeLocal<v8::Module>();
+            }
+        }
+        if (IsScriptLoadingLogEnabled()) {
+            DEBUG_WRITE("[http-esm][compile][ok] %s bytes=%lu", canonical.c_str(), (unsigned long)body.size());
+        }
+        // Register before instantiation to allow cyclic imports to resolve to same instance
+        g_moduleRegistry[canonical].Reset(isolate, mod);
+        // Do not evaluate here; allow V8 to handle instantiation/evaluation in importer context.
+        // Instantiate proactively if desired (safe), but not required.
+        // if (mod->GetStatus() == v8::Module::kUninstantiated) {
+        //     if (!mod->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
+        //         g_moduleRegistry.erase(canonical);
+        //         return v8::MaybeLocal<v8::Module>();
+        //     }
+        // }
+        // Let V8 evaluate during importer evaluation. Returning compiled module is fine.
+        return v8::MaybeLocal<v8::Module>(mod);
+    }
+
+    // 2) Find which filepath the referrer was compiled under (local filesystem case)
+    // referrerPath may already be set above; leave as-is if found.
+    if (referrerPath.empty()) {
+        for (auto& kv : g_moduleRegistry) {
+            v8::Local<v8::Module> registered = kv.second.Get(isolate);
+            if (registered == referrer) {
+                referrerPath = kv.first;
+                break;
+            }
         }
     }
 
     // If we couldn't identify the referrer and the specifier is relative, 
     // assume the base directory is the application root
-    bool specIsRelative = !spec.empty() && spec[0] == '.';
-    if (referrerPath.empty() && specIsRelative) {
+    bool specIsRelativeFs = !spec.empty() && spec[0] == '.';
+    if (referrerPath.empty() && specIsRelativeFs) {
         referrerPath = GetApplicationPath() + "/index.mjs";  // Default referrer
     }
 
@@ -200,7 +462,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         std::string cleanSpec = spec.substr(0, 2) == "./" ? spec.substr(2) : spec;
         std::string candidate = baseDir + cleanSpec;
         candidateBases.push_back(candidate);
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("ResolveModuleCallback: Relative import: '%s' + '%s' -> '%s'",
                        baseDir.c_str(), cleanSpec.c_str(), candidate.c_str());
         }
@@ -219,25 +481,25 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         if (tail.rfind(appVirtualRoot, 0) == 0) {
             // Drop the leading "/app/" and prepend real appPath
             candidate = appPath + "/" + tail.substr(appVirtualRoot.size());
-            if (ShouldLogScriptLoading()) {
+            if (IsScriptLoadingLogEnabled()) {
                 DEBUG_WRITE("ResolveModuleCallback: file:// to appPath mapping: '%s' -> '%s'", tail.c_str(), candidate.c_str());
             }
         } else if (tail.rfind(androidAssetAppRoot, 0) == 0) {
             // Replace "/android_asset/app/" with the real appPath
             candidate = appPath + "/" + tail.substr(androidAssetAppRoot.size());
-            if (ShouldLogScriptLoading()) {
+            if (IsScriptLoadingLogEnabled()) {
                 DEBUG_WRITE("ResolveModuleCallback: file:// android_asset mapping: '%s' -> '%s'", tail.c_str(), candidate.c_str());
             }
         } else if (tail.rfind(appPath, 0) == 0) {
             // Already an absolute on-disk path to the app folder
             candidate = tail;
-            if (ShouldLogScriptLoading()) {
+            if (IsScriptLoadingLogEnabled()) {
                 DEBUG_WRITE("ResolveModuleCallback: file:// absolute path preserved: '%s'", candidate.c_str());
             }
         } else {
             // Fallback: treat as absolute on-disk path
             candidate = tail;
-            if (ShouldLogScriptLoading()) {
+            if (IsScriptLoadingLogEnabled()) {
                 DEBUG_WRITE("ResolveModuleCallback: file:// generic absolute: '%s'", candidate.c_str());
             }
         }
@@ -472,7 +734,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
     // 7) Handle JSON modules
     if (absPath.size() >= 5 && absPath.compare(absPath.size() - 5, 5, ".json") == 0) {
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("ResolveModuleCallback: Handling JSON module '%s'", absPath.c_str());
         }
 
@@ -526,14 +788,14 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     // 8) Check if we've already compiled this module
     auto it = g_moduleRegistry.find(absPath);
     if (it != g_moduleRegistry.end()) {
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("ResolveModuleCallback: Found cached module '%s'", absPath.c_str());
         }
         return v8::MaybeLocal<v8::Module>(it->second.Get(isolate));
     }
 
     // 9) Compile and register the new module
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
         DEBUG_WRITE("ResolveModuleCallback: Compiling new module '%s'", absPath.c_str());
     }
     try {
@@ -568,7 +830,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     v8::String::Utf8Value specUtf8(isolate, specifier);
     std::string spec = *specUtf8 ? *specUtf8 : "";
     
-    if (ShouldLogScriptLoading()) {
+    if (IsScriptLoadingLogEnabled()) {
         DEBUG_WRITE("ImportModuleDynamicallyCallback: Dynamic import for '%s'", spec.c_str());
     }
     
@@ -581,7 +843,88 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         return v8::MaybeLocal<v8::Promise>();
     }
 
-    // Re-use the static resolver to locate / compile the module.
+    // Resolve relative or root-absolute dynamic imports against the referrer's URL when provided
+    auto isHttpLike = [](const std::string& s) -> bool {
+        return s.rfind("http://", 0) == 0 || s.rfind("https://", 0) == 0;
+    };
+    bool specIsRelative = !spec.empty() && spec[0] == '.';
+    bool specIsRootAbs = !spec.empty() && spec[0] == '/';
+    std::string referrerUrl;
+    if (!resource_name.IsEmpty() && resource_name->IsString()) {
+        v8::String::Utf8Value r8(isolate, resource_name);
+        referrerUrl = *r8 ? *r8 : "";
+    }
+    if ((specIsRelative || specIsRootAbs) && isHttpLike(referrerUrl)) {
+        std::string resolved = ResolveHttpRelative(referrerUrl, spec);
+        if (!resolved.empty()) {
+            if (IsScriptLoadingLogEnabled()) {
+                DEBUG_WRITE("[http-esm][dyn][http-rel] base=%s spec=%s -> %s", referrerUrl.c_str(), spec.c_str(), resolved.c_str());
+            }
+            spec = resolved;
+        } else if (IsScriptLoadingLogEnabled()) {
+            DEBUG_WRITE("[http-esm][dyn][http-rel][skip] base=%s spec=%s", referrerUrl.c_str(), spec.c_str());
+        }
+    }
+
+    // Handle HTTP(S) dynamic import directly
+    if (!spec.empty() && isHttpLike(spec)) {
+        std::string canonical = tns::CanonicalizeHttpUrlKey(spec);
+        if (IsScriptLoadingLogEnabled()) {
+            DEBUG_WRITE("[http-esm][dyn][resolve] spec=%s canonical=%s", spec.c_str(), canonical.c_str());
+        }
+        v8::Local<v8::Module> mod;
+        auto it = g_moduleRegistry.find(canonical);
+        if (it != g_moduleRegistry.end()) {
+            mod = it->second.Get(isolate);
+            if (IsScriptLoadingLogEnabled()) {
+                DEBUG_WRITE("[http-esm][dyn][cache] hit %s", canonical.c_str());
+            }
+        } else {
+            std::string body, ct; int status = 0;
+            if (!tns::HttpFetchText(spec, body, ct, status)) {
+                if (IsScriptLoadingLogEnabled()) {
+                    DEBUG_WRITE("[http-esm][dyn][fetch][fail] url=%s status=%d", spec.c_str(), status);
+                }
+                resolver->Reject(context, v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, std::string("Failed to fetch ")+spec))).Check();
+                return scope.Escape(resolver->GetPromise());
+            }
+            if (IsScriptLoadingLogEnabled()) {
+                DEBUG_WRITE("[http-esm][dyn][fetch][ok] url=%s status=%d bytes=%lu ct=%s", spec.c_str(), status, (unsigned long)body.size(), ct.c_str());
+            }
+            v8::Local<v8::String> sourceText = ArgConverter::ConvertToV8String(isolate, body);
+            v8::Local<v8::String> urlString = ArgConverter::ConvertToV8String(isolate, canonical);
+            v8::ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true);
+            v8::ScriptCompiler::Source src(sourceText, origin);
+            {
+                v8::TryCatch tc(isolate);
+                if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&mod)) {
+                    LogHttpCompileDiagnostics(isolate, context, canonical, body, tc);
+                    resolver->Reject(context, v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, "HTTP module compile failed"))).Check();
+                    return scope.Escape(resolver->GetPromise());
+                }
+            }
+            if (IsScriptLoadingLogEnabled()) {
+                DEBUG_WRITE("[http-esm][dyn][compile][ok] %s bytes=%lu", canonical.c_str(), (unsigned long)body.size());
+            }
+            g_moduleRegistry[canonical].Reset(isolate, mod);
+        }
+        if (mod->GetStatus() == v8::Module::kUninstantiated) {
+            if (!mod->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
+                resolver->Reject(context, v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, "Instantiate failed"))).Check();
+                return scope.Escape(resolver->GetPromise());
+            }
+        }
+        if (mod->GetStatus() != v8::Module::kEvaluated) {
+            if (mod->Evaluate(context).IsEmpty()) {
+                resolver->Reject(context, v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, "Evaluation failed"))).Check();
+                return scope.Escape(resolver->GetPromise());
+            }
+        }
+        resolver->Resolve(context, mod->GetModuleNamespace()).Check();
+        return scope.Escape(resolver->GetPromise());
+    }
+
+    // Re-use the static resolver to locate / compile the module for non-HTTP cases.
     try {
         // Pass empty referrer since this V8 version doesn't expose GetModule() on
         // ScriptOrModule. The resolver will fall back to absolute-path heuristics.
@@ -593,7 +936,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         v8::Local<v8::Module> module;
         if (!maybeModule.ToLocal(&module)) {
             // Resolution failed; reject to avoid leaving a pending Promise (white screen)
-            if (ShouldLogScriptLoading()) {
+            if (IsScriptLoadingLogEnabled()) {
                 DEBUG_WRITE("ImportModuleDynamicallyCallback: Resolution failed for '%s'", spec.c_str());
             }
             v8::Local<v8::Value> ex = v8::Exception::Error(
@@ -605,7 +948,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         // If not yet instantiated/evaluated, do it now
         if (module->GetStatus() == v8::Module::kUninstantiated) {
             if (!module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
-                if (ShouldLogScriptLoading()) {
+                if (IsScriptLoadingLogEnabled()) {
                     DEBUG_WRITE("ImportModuleDynamicallyCallback: Instantiate failed for '%s'", spec.c_str());
                 }
                 resolver
@@ -618,7 +961,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
         if (module->GetStatus() != v8::Module::kEvaluated) {
             if (module->Evaluate(context).IsEmpty()) {
-                if (ShouldLogScriptLoading()) {
+                if (IsScriptLoadingLogEnabled()) {
                     DEBUG_WRITE("ImportModuleDynamicallyCallback: Evaluation failed for '%s'", spec.c_str());
                 }
                 v8::Local<v8::Value> ex =
@@ -629,12 +972,12 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         }
 
         resolver->Resolve(context, module->GetModuleNamespace()).Check();
-    if (ShouldLogScriptLoading()) {
+        if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("ImportModuleDynamicallyCallback: Successfully resolved '%s'", spec.c_str());
         }
     } catch (NativeScriptException& ex) {
         ex.ReThrowToV8();
-    if (ShouldLogScriptLoading()) {
+        if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("ImportModuleDynamicallyCallback: Native exception for '%s'", spec.c_str());
         }
         resolver
