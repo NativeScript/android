@@ -1,3 +1,20 @@
+# [9.0.0](https://github.com/NativeScript/android/compare/v8.9.2...v9.0.0) (2025-11-17)
+
+
+### Bug Fixes
+
+* prevent crash when jweak points to null ([#1881](https://github.com/NativeScript/android/issues/1881)) ([5cb66ee](https://github.com/NativeScript/android/commit/5cb66ee7a5b4c4febdea999d79f9fe2800018fd3))
+
+
+### Features
+
+* Ada 3.3.0 ([#1884](https://github.com/NativeScript/android/issues/1884)) ([45fb275](https://github.com/NativeScript/android/commit/45fb27594f8d80d76acf79648b010151fa8b9ed7))
+* ES modules (ESM) support with conditional esm or commonjs consumption ([#1836](https://github.com/NativeScript/android/issues/1836)) ([052cb21](https://github.com/NativeScript/android/commit/052cb215f475453665c6c7d9e3dba419aa9a606a))
+* http loaded es module realms + HMR DX enrichments ([#1883](https://github.com/NativeScript/android/issues/1883)) ([7782720](https://github.com/NativeScript/android/commit/7782720f50fb5db4f43af8bdca501e90475c96c0))
+* queueMicrotask support ([#1868](https://github.com/NativeScript/android/issues/1868)) ([f033061](https://github.com/NativeScript/android/commit/f03306118ee178365ef16f2789a95b1f43117947))
+
+
+
 # [8.9.0](https://github.com/NativeScript/android/compare/v8.8.6...v8.9.0) (2025-02-26)
 
 
