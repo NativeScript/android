@@ -75,8 +75,7 @@ void NativeScriptException::ReThrowToJava() {
 
 
     if (!m_javaException.IsNull()) {
-        auto objectManager = Runtime::GetObjectManager(isolate);
-        auto excClassName = objectManager->GetClassName((jobject) m_javaException);
+        auto excClassName = ObjectManager::GetClassName((jobject) m_javaException);
         if (excClassName == "com/tns/NativeScriptException") {
             ex = m_javaException;
         } else {
@@ -103,8 +102,7 @@ void NativeScriptException::ReThrowToJava() {
         if (ex == nullptr) {
             ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring) msg, (jstring)stackTrace, reinterpret_cast<jlong>(m_javascriptException)));
         } else {
-            auto objectManager = Runtime::GetObjectManager(isolate);
-            auto excClassName = objectManager->GetClassName(ex);
+            auto excClassName = ObjectManager::GetClassName(ex);
             if (excClassName != "com/tns/NativeScriptException") {
                 ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID, (jstring) msg, (jstring)stackTrace, ex));
             }
@@ -184,9 +182,8 @@ Local<Value> NativeScriptException::WrapJavaToJsException() {
     JEnv env;
 
     auto isolate = Isolate::GetCurrent();
-    auto objectManager = Runtime::GetObjectManager(isolate);
 
-    string excClassName = objectManager->GetClassName((jobject) m_javaException);
+    string excClassName = ObjectManager::GetClassName((jobject) m_javaException);
     if (excClassName == "com/tns/NativeScriptException") {
         jfieldID fieldID = env.GetFieldID(env.GetObjectClass(m_javaException), "jsValueAddress", "J");
         jlong addr = env.GetLongField(m_javaException, fieldID);
