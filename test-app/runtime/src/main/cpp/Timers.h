@@ -128,7 +128,7 @@ namespace tns {
         std::condition_variable bufferFull;
         std::mutex mutex;
         std::thread watcher_;
-        bool stopped = false;
+        std::atomic<bool> stopped = false;
     };
 
 }

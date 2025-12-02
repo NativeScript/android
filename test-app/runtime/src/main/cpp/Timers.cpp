@@ -89,11 +89,14 @@ void Timers::addTask(std::shared_ptr<TimerTask> task) {
     bool needsScheduling = true;
     if (!isBufferFull.load() && task->dueTime_ <= now) {
         auto result = write(fd_[1], &task->id_, sizeof(int));
-        if (result != -1 || errno != EAGAIN) {
+        if (result != -1) {
+            // Wrote successfully to the pipe; no need to schedule in sortedTimers_
             needsScheduling = false;
-        } else {
+        } else if (errno == EAGAIN) {
+            // Pipe is full; mark buffer as full and fall back to sortedTimers_
             isBufferFull = true;
         }
+        // For other errors: keep needsScheduling = true to avoid dropping timer
     }
     if (needsScheduling) {
         {
@@ -156,11 +159,16 @@ void Timers::threadLoop() {
                 auto result = write(fd_[1], &timer->id, sizeof(int));
                 if (result == -1 && errno == EAGAIN) {
                     isBufferFull = true;
-                    while (!stopped && deletedTimers_.find(timer->id) != deletedTimers_.end() &&
+                    while (!stopped && deletedTimers_.find(timer->id) == deletedTimers_.end() &&
                            write(fd_[1], &timer->id, sizeof(int)) == -1 && errno == EAGAIN) {
                         bufferFull.wait(lk);
                     }
-                } else if (isBufferFull.load() &&
+                    // If the timer was cleared while we were waiting for buffer space,
+                    // clean up deletedTimers_ to avoid leaking the timer ID.
+                    if (deletedTimers_.find(timer->id) != deletedTimers_.end()) {
+                        deletedTimers_.erase(timer->id);
+                    }
+                } else if (result != -1 && isBufferFull.load() &&
                            (sortedTimers_.empty() || sortedTimers_.at(0)->dueTime > now)) {
                     // we had a successful write and the next timer is not due
                     // mark the buffer as free to re-enable the setTimeout with 0 optimization
@@ -189,6 +197,7 @@ void Timers::Destroy() {
     auto mainLooper = Runtime::GetMainLooper();
     ALooper_removeFd(mainLooper, fd_[0]);
     close(fd_[0]);
+    close(fd_[1]);
     timerMap_.clear();
     ALooper_release(looper_);
 }
@@ -319,6 +328,10 @@ int Timers::PumpTimerLoopCallback(int fd, int events, void *data) {
         }
 
 
+    } else {
+        // Timer was cleared before callback ran - clean up deletedTimers_
+        std::lock_guard<std::mutex> lock(thiz->mutex);
+        thiz->deletedTimers_.erase(timerId);
     }
     thiz->bufferFull.notify_one();
     return 1;
