@@ -132,15 +132,15 @@ Runtime* Runtime::GetRuntime(int runtimeId) {
 }
 
 Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
-    auto runtime = s_isolate2RuntimesCache.at(isolate);
+    auto it = s_isolate2RuntimesCache.find(isolate);
 
-    if (runtime == nullptr) {
+    if (it == s_isolate2RuntimesCache.end()) {
         stringstream ss;
         ss << "Cannot find runtime for isolate: " << isolate;
         throw NativeScriptException(ss.str());
     }
 
-    return runtime;
+    return it->second;
 }
 
 Runtime* Runtime::GetRuntimeFromIsolateData(v8::Isolate* isolate) {
