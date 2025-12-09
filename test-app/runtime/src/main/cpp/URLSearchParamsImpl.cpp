@@ -160,19 +160,27 @@ namespace tns {
             return;
         }
         auto callback = args[0].As<v8::Function>();
-        auto keys = ptr->GetURLSearchParams()->get_keys();
-        while (keys.has_next()) {
-            auto key = keys.next();
-            if (key) {
-                auto keyValue = key.value();
-                auto value = ptr->GetURLSearchParams()->get(keyValue).value();
-                v8::Local<v8::Value> values[] = {
-                        ArgConverter::ConvertToV8String(isolate, keyValue.data()),
+        auto searchParams = args.This();
+        // Use thisArg if provided, otherwise undefined
+        auto thisArg = args.Length() > 1 ? args[1] : v8::Undefined(isolate).As<v8::Value>();
+        // Use get_entries() to correctly handle duplicate keys
+        auto entries = ptr->GetURLSearchParams()->get_entries();
+        while (entries.has_next()) {
+            auto entry = entries.next();
+            if (entry) {
+                auto& [key, value] = entry.value();
+                // Per spec, forEach callback receives (value, key, searchParams)
+                v8::Local<v8::Value> callbackArgs[] = {
                         ArgConverter::ConvertToV8String(isolate, value.data()),
+                        ArgConverter::ConvertToV8String(isolate, key.data()),
+                        searchParams,
                 };
-                callback->Call(context, v8::Local<v8::Value>(), 2, values);
+                v8::Local<v8::Value> result;
+                if (!callback->Call(context, thisArg, 3, callbackArgs).ToLocal(&result)) {
+                    // If the callback throws an exception, stop iteration
+                    return;
+                }
             }
-
         }
     }
 
