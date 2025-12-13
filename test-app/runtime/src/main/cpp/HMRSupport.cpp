@@ -3,6 +3,7 @@
 #include "ArgConverter.h"
 #include "JEnv.h"
 #include <algorithm>
+#include <cctype>
 #include <jni.h>
 #include <unordered_map>
 #include <cstring>
@@ -148,11 +149,43 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   size_t hashPos = url.find('#');
   std::string noHash = (hashPos == std::string::npos) ? url : url.substr(0, hashPos);
 
-  // Strip ?import markers and sort remaining query params for stability
+  // Split into origin+path and query
   size_t qPos = noHash.find('?');
-  if (qPos == std::string::npos) return noHash;
-  std::string originAndPath = noHash.substr(0, qPos);
-  std::string query = noHash.substr(qPos + 1);
+  std::string originAndPath = (qPos == std::string::npos) ? noHash : noHash.substr(0, qPos);
+  std::string query = (qPos == std::string::npos) ? std::string() : noHash.substr(qPos + 1);
+
+  // Normalize bridge endpoints to keep a single realm across HMR updates:
+  // - /ns/rt/<ver>    -> /ns/rt
+  // - /ns/core/<ver>  -> /ns/core
+  size_t schemePos = originAndPath.find("://");
+  if (schemePos != std::string::npos) {
+    size_t pathStart = originAndPath.find('/', schemePos + 3);
+    if (pathStart != std::string::npos) {
+      std::string pathOnly = originAndPath.substr(pathStart);
+      auto normalizeBridge = [&](const char* needle) {
+        size_t nlen = strlen(needle);
+        if (pathOnly.size() <= nlen) return false;
+        if (pathOnly.compare(0, nlen, needle) != 0) return false;
+        if (pathOnly.size() == nlen) return true;
+        if (pathOnly[nlen] != '/') return false;
+        size_t i = nlen + 1;
+        size_t j = i;
+        while (j < pathOnly.size() && isdigit((unsigned char)pathOnly[j])) j++;
+        // Only normalize exact version segment: /ns/*/<digits> (no further segments)
+        if (j == i) return false;
+        if (j != pathOnly.size()) return false;
+        originAndPath = originAndPath.substr(0, pathStart) + std::string(needle);
+        return true;
+      };
+      if (!normalizeBridge("/ns/rt")) {
+        normalizeBridge("/ns/core");
+      }
+    }
+  }
+
+  if (query.empty()) return originAndPath;
+
+  // Strip ?import markers and sort remaining query params for stability
   std::vector<std::string> kept;
   size_t start = 0;
   while (start <= query.size()) {

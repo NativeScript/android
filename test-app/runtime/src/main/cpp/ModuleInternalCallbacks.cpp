@@ -591,7 +591,8 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
                                 "}\n"
                                 "\n"
                                 "export function pathToFileURL(path) {\n"
-                                "  return new URL('file://' + encodeURIComponent(path));\n"
+                                "  const encoded = encodeURIComponent(path).replace(/%2F/g, '/');\n"
+                                "  return new URL('file://' + encoded);\n"
                                 "}\n";
             } else if (builtinName == "module") {
                 // Create a polyfill for node:module with createRequire
