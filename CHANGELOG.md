@@ -1,3 +1,15 @@
+## [9.0.1](https://github.com/NativeScript/android/compare/v9.0.0...v9.0.1) (2025-12-14)
+
+
+### Bug Fixes
+
+* http realm cache key with query params ([#1896](https://github.com/NativeScript/android/issues/1896)) ([288491f](https://github.com/NativeScript/android/commit/288491fb0f5ce0f296285a878ba6ac34f78f299b))
+* improve reThrowToJava exception handling and runtime retrieval logic ([#1886](https://github.com/NativeScript/android/issues/1886)) ([c05e283](https://github.com/NativeScript/android/commit/c05e283823f1ddab43cefa3c9e828b3e66c97794))
+* proguard builds ([#1887](https://github.com/NativeScript/android/issues/1887)) ([3ecd707](https://github.com/NativeScript/android/commit/3ecd707be4494e26050bacc8d1916d22c5dd6433))
+* URLSearchParams.forEach() crash and spec compliance ([#1895](https://github.com/NativeScript/android/issues/1895)) ([3e61cef](https://github.com/NativeScript/android/commit/3e61cef4e90a7d3b27155ca38d69e6ce59dc0d2e))
+
+
+
 # [9.0.0](https://github.com/NativeScript/android/compare/v8.9.2...v9.0.0) (2025-11-17)
 
 
