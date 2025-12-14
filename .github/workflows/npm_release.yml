@@ -145,6 +145,7 @@ jobs:
           script: ./gradlew runtestsAndVerifyResults --stacktrace
   publish:
     runs-on: ubuntu-latest
+    environment: npm-publish
     needs:
       - build
       - test
@@ -168,10 +169,27 @@ jobs:
         with:
           name: npm-package
           path: dist
-      - name: Publish package
+      - name: Update npm (required for OIDC trusted publishing)
         run: |
-          echo "Publishing @nativescript/android@$NPM_VERSION to NPM with tag $NPM_TAG..."
-          npm publish ./dist/nativescript-android-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --provenance
+          npm install -g npm@^11.5.1
+          npm --version
+      - name: Publish package (OIDC trusted publishing)
+        if: ${{ vars.USE_NPM_TOKEN != 'true' }}
+        run: |
+          echo "Publishing @nativescript/android@$NPM_VERSION to NPM with tag $NPM_TAG via OIDC trusted publishing..."
+          unset NODE_AUTH_TOKEN
+          if [ -n "${NPM_CONFIG_USERCONFIG:-}" ]; then
+            rm -f "$NPM_CONFIG_USERCONFIG"
+          fi
+          npm publish ./dist/nativescript-android-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ""
+
+      - name: Publish package (granular token)
+        if: ${{ vars.USE_NPM_TOKEN == 'true' }}
+        run: |
+          echo "Publishing @nativescript/android@$NPM_VERSION to NPM with tag $NPM_TAG via granular token..."
+          npm publish ./dist/nativescript-android-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
   github-release:
