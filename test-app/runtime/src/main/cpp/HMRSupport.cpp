@@ -16,6 +16,11 @@ static inline bool StartsWith(const std::string& s, const char* prefix) {
   return s.size() >= n && s.compare(0, n, prefix) == 0;
 }
 
+static inline bool EndsWith(const std::string& s, const char* suffix) {
+  size_t n = strlen(suffix);
+  return s.size() >= n && s.compare(s.size() - n, n, suffix) == 0;
+}
+
 // Per-module hot data and callbacks. Keyed by canonical module path (file path or URL).
 static std::unordered_map<std::string, v8::Global<v8::Object>> g_hotData;
 static std::unordered_map<std::string, std::vector<v8::Global<v8::Function>>> g_hotAccept;
@@ -76,6 +81,63 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
 
   v8::HandleScope scope(isolate);
 
+  // Canonicalize key to ensure per-module hot.data persists across HMR URLs.
+  // Important: this must NOT affect the HTTP loader cache key; otherwise HMR fetches
+  // can collapse onto an already-evaluated module and no update occurs.
+  auto canonicalHotKey = [&](const std::string& in) -> std::string {
+    // Some loaders wrap HTTP module URLs as file://http(s)://...
+    std::string s = in;
+    if (StartsWith(s, "file://http://") || StartsWith(s, "file://https://")) {
+      s = s.substr(strlen("file://"));
+    }
+
+    // Drop fragment
+    size_t hashPos = s.find('#');
+    if (hashPos != std::string::npos) {
+      s = s.substr(0, hashPos);
+    }
+
+    // Drop query (we want hot key stability)
+    size_t qPos = s.find('?');
+    std::string noQuery = (qPos == std::string::npos) ? s : s.substr(0, qPos);
+
+    // If it's an http(s) URL, normalize only the path portion below.
+    size_t schemePos = noQuery.find("://");
+    size_t pathStart = (schemePos == std::string::npos) ? 0 : noQuery.find('/', schemePos + 3);
+    if (pathStart == std::string::npos) {
+      // No path; return without query
+      return noQuery;
+    }
+
+    std::string origin = noQuery.substr(0, pathStart);
+    std::string path = noQuery.substr(pathStart);
+
+    // Normalize NS HMR virtual module paths:
+    // /ns/m/__ns_hmr__/<token>/<rest> -> /ns/m/<rest>
+    const char* hmrPrefix = "/ns/m/__ns_hmr__/";
+    size_t hmrLen = strlen(hmrPrefix);
+    if (path.compare(0, hmrLen, hmrPrefix) == 0) {
+      size_t nextSlash = path.find('/', hmrLen);
+      if (nextSlash != std::string::npos) {
+        path = std::string("/ns/m/") + path.substr(nextSlash + 1);
+      }
+    }
+
+    // Normalize common script extensions so `/foo` and `/foo.ts` share hot.data.
+    const char* exts[] = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"};
+    for (auto ext : exts) {
+      if (EndsWith(path, ext)) {
+        path = path.substr(0, path.size() - strlen(ext));
+        break;
+      }
+    }
+
+    // Also drop `.vue`? No — SFC endpoints should stay distinct.
+    return origin + path;
+  };
+
+  const std::string key = canonicalHotKey(modulePath);
+
   auto makeKeyData = [&](const std::string& key) -> Local<Value> {
     return ArgConverter::ConvertToV8String(isolate, key);
   };
@@ -121,33 +183,38 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
 
   Local<Object> hot = Object::New(isolate);
   hot->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, "data"),
-                          GetOrCreateHotData(isolate, modulePath)).Check();
+                GetOrCreateHotData(isolate, key)).Check();
   hot->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, "prune"),
                           v8::Boolean::New(isolate, false)).Check();
   hot->CreateDataProperty(
       context, ArgConverter::ConvertToV8String(isolate, "accept"),
-      v8::Function::New(context, acceptCb, makeKeyData(modulePath)).ToLocalChecked()).Check();
+      v8::Function::New(context, acceptCb, makeKeyData(key)).ToLocalChecked()).Check();
   hot->CreateDataProperty(
       context, ArgConverter::ConvertToV8String(isolate, "dispose"),
-      v8::Function::New(context, disposeCb, makeKeyData(modulePath)).ToLocalChecked()).Check();
+      v8::Function::New(context, disposeCb, makeKeyData(key)).ToLocalChecked()).Check();
   hot->CreateDataProperty(
       context, ArgConverter::ConvertToV8String(isolate, "decline"),
-      v8::Function::New(context, declineCb, makeKeyData(modulePath)).ToLocalChecked()).Check();
+      v8::Function::New(context, declineCb, makeKeyData(key)).ToLocalChecked()).Check();
   hot->CreateDataProperty(
       context, ArgConverter::ConvertToV8String(isolate, "invalidate"),
-      v8::Function::New(context, invalidateCb, makeKeyData(modulePath)).ToLocalChecked()).Check();
+      v8::Function::New(context, invalidateCb, makeKeyData(key)).ToLocalChecked()).Check();
 
   importMeta->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, "hot"), hot).Check();
 }
 
 // Drop fragments and normalize parameters for consistent registry keys.
 std::string CanonicalizeHttpUrlKey(const std::string& url) {
-  if (!(StartsWith(url, "http://") || StartsWith(url, "https://"))) {
-    return url;
+  // Some loaders wrap HTTP module URLs as file://http(s)://...
+  std::string normalizedUrl = url;
+  if (StartsWith(normalizedUrl, "file://http://") || StartsWith(normalizedUrl, "file://https://")) {
+    normalizedUrl = normalizedUrl.substr(strlen("file://"));
+  }
+  if (!(StartsWith(normalizedUrl, "http://") || StartsWith(normalizedUrl, "https://"))) {
+    return normalizedUrl;
   }
   // Remove fragment
-  size_t hashPos = url.find('#');
-  std::string noHash = (hashPos == std::string::npos) ? url : url.substr(0, hashPos);
+  size_t hashPos = normalizedUrl.find('#');
+  std::string noHash = (hashPos == std::string::npos) ? normalizedUrl : normalizedUrl.substr(0, hashPos);
 
   // Split into origin+path and query
   size_t qPos = noHash.find('?');
@@ -158,10 +225,13 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   // - /ns/rt/<ver>    -> /ns/rt
   // - /ns/core/<ver>  -> /ns/core
   size_t schemePos = originAndPath.find("://");
-  if (schemePos != std::string::npos) {
-    size_t pathStart = originAndPath.find('/', schemePos + 3);
-    if (pathStart != std::string::npos) {
-      std::string pathOnly = originAndPath.substr(pathStart);
+  size_t pathStart = (schemePos == std::string::npos) ? std::string::npos : originAndPath.find('/', schemePos + 3);
+  if (pathStart == std::string::npos) {
+    // No path; preserve query as-is (fragment already removed).
+    return noHash;
+  }
+  {
+    std::string pathOnly = originAndPath.substr(pathStart);
       auto normalizeBridge = [&](const char* needle) {
         size_t nlen = strlen(needle);
         if (pathOnly.size() <= nlen) return false;
@@ -180,12 +250,29 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
       if (!normalizeBridge("/ns/rt")) {
         normalizeBridge("/ns/core");
       }
+  }
+
+  // IMPORTANT: This function is used as an HTTP module registry/cache key.
+  // For general-purpose HTTP module loading (public internet), the query string
+  // can be part of the module's identity (auth, content versioning, routing, etc).
+  // Therefore we only apply query normalization (sorting/dropping) for known
+  // NativeScript dev endpoints where `t`/`v`/`import` are purely cache busters.
+  {
+    std::string pathOnly = originAndPath.substr(pathStart);
+    const bool isDevEndpoint =
+        StartsWith(pathOnly, "/ns/") ||
+        StartsWith(pathOnly, "/node_modules/.vite/") ||
+        StartsWith(pathOnly, "/@id/") ||
+        StartsWith(pathOnly, "/@fs/");
+    if (!isDevEndpoint) {
+      // Preserve query as-is (fragment already removed).
+      return noHash;
     }
   }
 
   if (query.empty()) return originAndPath;
 
-  // Strip ?import markers and sort remaining query params for stability
+  // Strip ?import markers / cache busters and sort remaining query params for stability
   std::vector<std::string> kept;
   size_t start = 0;
   while (start <= query.size()) {
@@ -194,7 +281,7 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
     if (!pair.empty()) {
       size_t eq = pair.find('=');
       std::string name = (eq == std::string::npos) ? pair : pair.substr(0, eq);
-      if (!(name == "import")) kept.push_back(pair);
+      if (!(name == "import" || name == "t" || name == "v")) kept.push_back(pair);
     }
     if (amp == std::string::npos) break;
     start = amp + 1;
