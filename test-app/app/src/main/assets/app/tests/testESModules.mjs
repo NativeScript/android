@@ -150,6 +150,57 @@ async function runESModuleTests() {
     } catch (e) {
       recordFailure("Error testing Worker features", { error: e });
     }
+
+    console.log("\n--- Testing import.meta.hot and hot.data persistence ---");
+    try {
+      // Import same base module under different extensions. The runtime canonicalizes
+      // the hot-data key by stripping common script extensions, so these should share
+      // a single hot.data object.
+      const modMjs = await import("~/hmrHotKeyExt.mjs");
+      const modJs = await import("~/hmrHotKeyExt.js");
+
+      const apiMjs = modMjs?.testHotApi?.();
+      const apiJs = modJs?.testHotApi?.();
+      if (apiMjs?.ok && apiJs?.ok) {
+        recordPass("import.meta.hot API available");
+      } else {
+        recordFailure("import.meta.hot API missing or invalid", {
+          details: [
+            `mjs: ${JSON.stringify(apiMjs)}`,
+            `js: ${JSON.stringify(apiJs)}`,
+          ],
+        });
+      }
+
+      const dataMjs = modMjs?.getHotData?.();
+      const dataJs = modJs?.getHotData?.();
+      if (dataMjs && dataJs) {
+        // Share a value through hot.data from one module and read it from the other.
+        const token = `tok_${Date.now()}_${Math.random()}`;
+        modMjs?.setHotValue?.(token);
+
+        const readBack = modJs?.getHotValue?.();
+        if (readBack === token) {
+          recordPass("hot.data shared across .mjs/.js imports");
+        } else {
+          recordFailure("hot.data not shared across .mjs/.js imports", {
+            details: [`expected=${token}`, `actual=${readBack}`],
+          });
+        }
+
+        if (dataMjs === dataJs) {
+          recordPass("hot.data object identity matches");
+        } else {
+          recordFailure("hot.data object identity differs");
+        }
+      } else {
+        recordFailure("hot.data is missing", {
+          details: [`dataMjs=${String(!!dataMjs)}`, `dataJs=${String(!!dataJs)}`],
+        });
+      }
+    } catch (e) {
+      recordFailure("Error testing import.meta.hot", { error: e });
+    }
   } catch (unexpectedError) {
     recordFailure("Unexpected ES module test harness failure", {
       error: unexpectedError,
