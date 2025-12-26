@@ -13,5 +13,12 @@
 		"enableLineBreakpoints": false,
 		"enableMultithreadedJavascript": true
 	},
-	"discardUncaughtJsExceptions": false
+	"discardUncaughtJsExceptions": false,
+	"security": {
+		"allowRemoteModules": true,
+		"remoteModuleAllowlist": [
+			"https://cdn.example.com/modules/",
+			"https://esm.sh/"
+		]
+	}
 }
