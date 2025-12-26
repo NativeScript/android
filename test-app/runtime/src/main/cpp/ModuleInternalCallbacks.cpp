@@ -26,6 +26,21 @@ std::string GetApplicationPath();
 
 // Logging flag now provided via DevFlags for fast cached access
 
+// Security gate
+// In debug mode, all URLs are allowed. In production, checks security.allowRemoteModules and security.remoteModuleAllowlist
+static inline bool IsHttpUrlAllowedForLoading(const std::string& url) {
+  return IsRemoteUrlAllowed(url);
+}
+
+// Helper to create a security error message for blocked remote modules
+static std::string GetRemoteModuleBlockedMessage(const std::string& url) {
+  if (!IsRemoteModulesAllowed()) {
+    return "Remote ES modules are not allowed in production. URL: " + url +
+           ". Enable via security.allowRemoteModules in nativescript.config.ts";
+  }
+  return "Remote URL not in security.remoteModuleAllowlist: " + url;
+}
+
 // Diagnostic helper: emit detailed V8 compile error info for HTTP ESM sources.
 static void LogHttpCompileDiagnostics(v8::Isolate* isolate,
                                       v8::Local<v8::Context> context,
@@ -374,6 +389,16 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
     // HTTP(S) ESM support: resolve, fetch and compile from dev server
     if (spec.rfind("http://", 0) == 0 || spec.rfind("https://", 0) == 0) {
+        // Security gate: check if remote module loading is allowed
+        if (!IsHttpUrlAllowedForLoading(spec)) {
+            std::string msg = GetRemoteModuleBlockedMessage(spec);
+            if (IsScriptLoadingLogEnabled()) {
+                DEBUG_WRITE("[http-esm][security][blocked] %s", msg.c_str());
+            }
+            isolate->ThrowException(v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, msg)));
+            return v8::MaybeLocal<v8::Module>();
+        }
+        
         std::string canonical = tns::CanonicalizeHttpUrlKey(spec);
         if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("[http-esm][resolve] spec=%s canonical=%s", spec.c_str(), canonical.c_str());
@@ -869,6 +894,16 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
     // Handle HTTP(S) dynamic import directly
     if (!spec.empty() && isHttpLike(spec)) {
+        // Security gate: check if remote module loading is allowed
+        if (!IsHttpUrlAllowedForLoading(spec)) {
+            std::string msg = GetRemoteModuleBlockedMessage(spec);
+            if (IsScriptLoadingLogEnabled()) {
+                DEBUG_WRITE("[http-esm][dyn][security][blocked] %s", msg.c_str());
+            }
+            resolver->Reject(context, v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, msg))).Check();
+            return scope.Escape(resolver->GetPromise());
+        }
+        
         std::string canonical = tns::CanonicalizeHttpUrlKey(spec);
         if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("[http-esm][dyn][resolve] spec=%s canonical=%s", spec.c_str(), canonical.c_str());
