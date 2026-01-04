@@ -2,6 +2,8 @@
 #include "HMRSupport.h"
 #include "ArgConverter.h"
 #include "JEnv.h"
+#include "DevFlags.h"
+#include "NativeScriptAssert.h"
 #include <algorithm>
 #include <cctype>
 #include <jni.h>
