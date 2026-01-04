@@ -97,8 +97,25 @@ describe("Remote Module Security", function() {
             var hasEsmSh = false;
             var hasCdn = false;
             for (var i = 0; i < allowlist.length; i++) {
-                if (allowlist[i].indexOf("esm.sh") !== -1) hasEsmSh = true;
-                if (allowlist[i].indexOf("cdn.example.com") !== -1) hasCdn = true;
+                var entry = allowlist[i];
+                try {
+                    // Prefer checking the hostname of a parsed URL entry
+                    var parsed = new URL(entry);
+                    if (parsed.hostname === "esm.sh") {
+                        hasEsmSh = true;
+                    }
+                    if (parsed.hostname === "cdn.example.com") {
+                        hasCdn = true;
+                    }
+                } catch (e) {
+                    // Fallback: support non-URL entries that may be bare hostnames
+                    if (entry === "esm.sh") {
+                        hasEsmSh = true;
+                    }
+                    if (entry === "cdn.example.com") {
+                        hasCdn = true;
+                    }
+                }
             }
             expect(hasEsmSh).toBe(true);
             expect(hasCdn).toBe(true);
