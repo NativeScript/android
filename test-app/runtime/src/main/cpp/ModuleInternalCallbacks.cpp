@@ -24,7 +24,6 @@ extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
 // Forward declaration used by logging helper
 std::string GetApplicationPath();
 
-// Logging flag now provided via DevFlags for fast cached access
 
 // Diagnostic helper: emit detailed V8 compile error info for HTTP ESM sources.
 static void LogHttpCompileDiagnostics(v8::Isolate* isolate,
@@ -373,6 +372,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     }
 
     // HTTP(S) ESM support: resolve, fetch and compile from dev server
+    // Security: HttpFetchText gates remote module access centrally.
     if (spec.rfind("http://", 0) == 0 || spec.rfind("https://", 0) == 0) {
         std::string canonical = tns::CanonicalizeHttpUrlKey(spec);
         if (IsScriptLoadingLogEnabled()) {
@@ -868,6 +868,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     }
 
     // Handle HTTP(S) dynamic import directly
+    // Security: HttpFetchText gates remote module access centrally.
     if (!spec.empty() && isHttpLike(spec)) {
         std::string canonical = tns::CanonicalizeHttpUrlKey(spec);
         if (IsScriptLoadingLogEnabled()) {
