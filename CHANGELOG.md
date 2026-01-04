@@ -1,3 +1,12 @@
+## [9.0.2](https://github.com/NativeScript/android/compare/v9.0.1...v9.0.2) (2026-01-04)
+
+
+### Features
+
+* remote module security ([#1899](https://github.com/NativeScript/android/issues/1899)) ([5ceb3d4](https://github.com/NativeScript/android/commit/5ceb3d4ed49d11256f751be587925c05397e9b11))
+
+
+
 ## [9.0.1](https://github.com/NativeScript/android/compare/v9.0.0...v9.0.1) (2025-12-14)
 
 
