@@ -267,6 +267,74 @@ public class Runtime {
         }
         return false;
     }
+    
+    // Security config
+    
+    /**
+     * checks security.allowRemoteModules from nativescript.config
+     */
+    public static boolean isRemoteModulesAllowed() {
+        // Debug mode always allows remote modules for development convenience
+        if (isDebuggable()) {
+            return true;
+        }
+        
+        // Production: check security config
+        Runtime runtime = com.tns.Runtime.getCurrentRuntime();
+        if (runtime != null && runtime.config != null && runtime.config.appConfig != null) {
+            return runtime.config.appConfig.getAllowRemoteModules();
+        }
+        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
+            return staticConfiguration.appConfig.getAllowRemoteModules();
+        }
+        return false;
+    }
+    
+    /**
+     * checks against security.remoteModuleAllowlist.
+     */
+    public static boolean isRemoteUrlAllowed(String url) {
+        // Debug mode always allows all URLs
+        if (isDebuggable()) {
+            return true;
+        }
+        
+        // Production: first check if remote modules are allowed at all
+        if (!isRemoteModulesAllowed()) {
+            return false;
+        }
+        
+        // Get the allowlist
+        String[] allowlist = getRemoteModuleAllowlist();
+        
+        // If no allowlist is configured, allow all URLs (user explicitly enabled remote modules)
+        if (allowlist == null || allowlist.length == 0) {
+            return true;
+        }
+        
+        // Check if URL matches any allowlist prefix
+        for (String prefix : allowlist) {
+            if (url != null && prefix != null && url.startsWith(prefix)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Returns the remote module allowlist as a String array for JNI.
+     */
+    public static String[] getRemoteModuleAllowlist() {
+        Runtime runtime = com.tns.Runtime.getCurrentRuntime();
+        if (runtime != null && runtime.config != null && runtime.config.appConfig != null) {
+            return runtime.config.appConfig.getRemoteModuleAllowlistArray();
+        }
+        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
+            return staticConfiguration.appConfig.getRemoteModuleAllowlistArray();
+        }
+        return new String[0];
+    }
 
     private static Runtime getObjectRuntime(Object object) {
         Runtime runtime = null;

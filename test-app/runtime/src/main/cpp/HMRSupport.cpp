@@ -2,6 +2,8 @@
 #include "HMRSupport.h"
 #include "ArgConverter.h"
 #include "JEnv.h"
+#include "DevFlags.h"
+#include "NativeScriptAssert.h"
 #include <algorithm>
 #include <cctype>
 #include <jni.h>
@@ -210,10 +212,23 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
 }
 
 // Minimal HTTP fetch using java.net.* via JNI. Returns true on success (2xx) and non-empty body.
+// Security: This is the single point of enforcement for remote module loading.
+// In debug mode, all URLs are allowed. In production, checks security.allowRemoteModules
+// and security.remoteModuleAllowlist from the app config.
 bool HttpFetchText(const std::string& url, std::string& out, std::string& contentType, int& status) {
   out.clear();
   contentType.clear();
   status = 0;
+  
+  // Security gate: check if remote module loading is allowed before any HTTP fetch.
+  if (!IsRemoteUrlAllowed(url)) {
+    status = 403; // Forbidden
+    if (IsScriptLoadingLogEnabled()) {
+      DEBUG_WRITE("[http-esm][security][blocked] %s", url.c_str());
+    }
+    return false;
+  }
+  
   try {
     JEnv env;
 
