@@ -90,4 +90,48 @@ describe("Tests Kotlin companion objects support", function () {
     	expect(str).toBe("someString");
     });
 
+
+		it("Test Kotlin enum class companion object without a name should be supported", function () {
+			console.log(com.tns.tests.kotlin.companions.KotlinEnumClassWithCompanionWithNestedClass.Companion);
+	    var stringFromCompanion = com.tns.tests.kotlin.companions.KotlinEnumClassWithCompanionWithNestedClass.Companion.getStringFromCompanion();
+	    expect(stringFromCompanion).toBe("testCompanion");
+
+	    var providedStringFromCompanion = com.tns.tests.kotlin.companions.KotlinEnumClassWithCompanionWithNestedClass.Companion.getProvidedStringFromCompanion("providedString");
+	    expect(providedStringFromCompanion).toBe("providedString");
+
+	    var simpleObjectFromCompanion = com.tns.tests.kotlin.companions.KotlinEnumClassWithCompanionWithNestedClass.Companion.getSimpleObjectFromCompanion();
+	    expect(simpleObjectFromCompanion.getSomeString()).toBe("test");
+
+	    var simpleKotlinObject = new com.tns.tests.kotlin.SimpleKotlinObject();
+	    var providedSimpleObjectFromCompanion = com.tns.tests.kotlin.companions.KotlinEnumClassWithCompanionWithNestedClass.Companion.getProvidedSimpleObjectFromCompanion(simpleKotlinObject);
+	    expect(simpleKotlinObject.equals(providedSimpleObjectFromCompanion)).toBe(true);
+
+	    var stringJvmStaticFromCompanion = com.tns.tests.kotlin.companions.KotlinEnumClassWithCompanionWithNestedClass.getStringJvmStaticFromCompanion();
+	    expect(stringJvmStaticFromCompanion).toBe("testCompanion");
+
+	    var providedStringJvmStaticFromCompanion = com.tns.tests.kotlin.companions.KotlinEnumClassWithCompanionWithNestedClass.getProvidedStringJvmStaticFromCompanion("providedString");
+	    expect(providedStringJvmStaticFromCompanion).toBe("providedString");
+	});
+
+	it("Test Kotlin enum class named companion object without a name should be supported", function () {
+	    var stringFromCompanion = com.tns.tests.kotlin.companions.KotlinEnumClassWithNamedCompanionWithNestedClass.NamedCompanion.getStringFromNamedCompanion();
+        expect(stringFromCompanion).toBe("testCompanion");
+
+        var providedStringFromCompanion = com.tns.tests.kotlin.companions.KotlinEnumClassWithNamedCompanionWithNestedClass.NamedCompanion.getProvidedStringFromNamedCompanion("providedString");
+        expect(providedStringFromCompanion).toBe("providedString");
+
+        var simpleObjectFromCompanion = com.tns.tests.kotlin.companions.KotlinEnumClassWithNamedCompanionWithNestedClass.NamedCompanion.getSimpleObjectFromNamedCompanion();
+        expect(simpleObjectFromCompanion.getSomeString()).toBe("test");
+
+        var simpleKotlinObject = new com.tns.tests.kotlin.SimpleKotlinObject();
+        var providedSimpleObjectFromCompanion = com.tns.tests.kotlin.companions.KotlinEnumClassWithNamedCompanionWithNestedClass.NamedCompanion.getProvidedSimpleObjectFromNamedCompanion(simpleKotlinObject);
+        expect(simpleKotlinObject.equals(providedSimpleObjectFromCompanion)).toBe(true);
+
+        var stringJvmStaticFromCompanion = com.tns.tests.kotlin.companions.KotlinEnumClassWithNamedCompanionWithNestedClass.getStringJvmStaticFromNamedCompanion();
+        expect(stringJvmStaticFromCompanion).toBe("testCompanion");
+
+        var providedStringJvmStaticFromCompanion = com.tns.tests.kotlin.companions.KotlinEnumClassWithNamedCompanionWithNestedClass.getProvidedStringJvmStaticFromNamedCompanion("providedString");
+        expect(providedStringJvmStaticFromCompanion).toBe("providedString");
+	});
+
 });
