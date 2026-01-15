@@ -1246,7 +1246,8 @@ public class Runtime {
     public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException {
         Runtime runtime = Runtime.getCurrentRuntime();
 
-        if (runtime == null) {
+        // if we're not in a runtime or the runtime we're in does not have the object, try to find the right one (this might happen if a worker fires a JS method on an object created in the main thread or another worker)
+        if (runtime == null || runtime.getJavaObjectID(javaObject) == null) {
             runtime = getObjectRuntime(javaObject);
         }
 

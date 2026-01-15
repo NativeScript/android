@@ -105,14 +105,23 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(
   JSInstanceInfo* jsInstanceInfo = GetJSInstanceInfo(object);
 
   if (jsInstanceInfo != nullptr) {
+    jweak existingObject;
+    try {
+      existingObject = GetJavaObjectByID(jsInstanceInfo->JavaObjectID);
+    } catch (const NativeScriptException& e) {
+      // this captures usually the error
+      auto className = GetClassName(jsInstanceInfo->ObjectClazz);
+      throw NativeScriptException("Failed to get Java object by ID. id=" +
+                                  std::to_string(jsInstanceInfo->JavaObjectID) +
+                                  ", class=" + className + ". " +
+                                  e.GetErrorMessage());
+    }
     if (m_useGlobalRefs) {
-      JniLocalRef javaObject(GetJavaObjectByID(jsInstanceInfo->JavaObjectID),
-                             true);
+      JniLocalRef javaObject(existingObject, true);
       return javaObject;
     } else {
       JEnv env;
-      JniLocalRef javaObject(
-          env.NewLocalRef(GetJavaObjectByID(jsInstanceInfo->JavaObjectID)));
+      JniLocalRef javaObject(env.NewLocalRef(existingObject));
       return javaObject;
     }
   }
