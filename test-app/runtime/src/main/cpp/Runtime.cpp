@@ -72,6 +72,26 @@ void SIG_handler(int sigNumber) {
   throw NativeScriptException(msg.str());
 }
 
+void LogAndAbortUncaught() {
+  try {
+    throw;  // rethrow the current unknown
+  } catch (const tns::NativeScriptException& e) {
+    // We only have message/stack; no safe ReThrowToJava here.
+    __android_log_print(ANDROID_LOG_FATAL, "TNS.Native",
+                        "Uncaught NativeScriptException: %s",
+                        e.ToString().c_str());
+  } catch (const std::exception& e) {
+    __android_log_print(ANDROID_LOG_FATAL, "TNS.Native",
+                        "Uncaught std::exception: %s", e.what());
+  } catch (...) {
+    __android_log_print(ANDROID_LOG_FATAL, "TNS.Native",
+                        "Uncaught unknown native exception");
+  }
+
+  // Preserve default abort behavior so crashes are visible to tooling
+  std::_Exit(EXIT_FAILURE);
+}
+
 void Runtime::Init(JavaVM* vm, void* reserved) {
   __android_log_print(ANDROID_LOG_INFO, "TNS.Runtime",
                       "NativeScript Runtime Version %s, commit %s",
@@ -92,6 +112,8 @@ void Runtime::Init(JavaVM* vm, void* reserved) {
     sigaction(SIGABRT, &action, NULL);
     sigaction(SIGSEGV, &action, NULL);
   }
+  // Set terminate handler for uncaught exceptions
+  std::set_terminate(LogAndAbortUncaught);
 }
 
 int Runtime::GetAndroidVersion() {
