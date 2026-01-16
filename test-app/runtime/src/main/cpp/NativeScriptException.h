@@ -33,6 +33,9 @@ class NativeScriptException {
         void ReThrowToV8();
         void ReThrowToJava();
 
+        std::string ToString() const;
+        std::string GetErrorMessage() const;
+
         static void Init();
 
         /*
@@ -54,12 +57,12 @@ class NativeScriptException {
         /*
          * Gets java exception message from jthrowable
          */
-        std::string GetExceptionMessage(JEnv& env, jthrowable exception);
+        std::string GetExceptionMessage(JEnv& env, jthrowable exception) const;
 
         /*
          * Gets java exception stack trace from jthrowable
          */
-        std::string GetExceptionStackTrace(JEnv& env, jthrowable exception);
+        std::string GetExceptionStackTrace(JEnv& env, jthrowable exception) const;
 
         /*
          * Gets the member m_javaException, wraps it and creates a javascript error object from it

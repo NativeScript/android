@@ -143,6 +143,34 @@ void NativeScriptException::Init() {
     assert(NATIVESCRIPTEXCEPTION_GET_MESSAGE_METHOD_ID != nullptr);
 }
 
+std::string NativeScriptException::ToString() const {
+    std::stringstream ss;
+    if (!m_javaException.IsNull()) {
+        JEnv env;
+        std::string message = GetExceptionMessage(env, m_javaException);
+        std::string stackTrace = GetExceptionStackTrace(env, m_javaException);
+        ss << "Java Exception: " << message << "\n" << stackTrace;
+    } else if (m_javascriptException != nullptr) {
+        ss << "JavaScript Exception: " << m_message << "\n" << m_stackTrace;
+    } else if (!m_message.empty()) {
+        ss << "Exception Message: " << m_message << "\n" << m_stackTrace;
+    } else {
+        ss << "No exception information available.";
+    }
+    return ss.str();
+}
+
+std::string NativeScriptException::GetErrorMessage() const {
+    if(!m_javaException.IsNull()) {
+        JEnv env;
+        return GetExceptionMessage(env, m_javaException);
+    } else if (m_javascriptException != nullptr) {
+        return m_message;
+    } else {
+        return m_message.empty() ? "No exception message available." : m_message;
+    }
+}
+
 // ON V8 UNCAUGHT EXCEPTION
 void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value> error) {
     string errorMessage = GetErrorMessage(message, error);
@@ -375,7 +403,7 @@ string NativeScriptException::GetErrorStackTrace(const Local<StackTrace>& stackT
     return ss.str();
 }
 
-string NativeScriptException::GetExceptionMessage(JEnv& env, jthrowable exception) {
+string NativeScriptException::GetExceptionMessage(JEnv& env, jthrowable exception) const {
     string errMsg;
     JniLocalRef msg(env.CallStaticObjectMethod(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_GET_MESSAGE_METHOD_ID, exception));
 
@@ -388,7 +416,7 @@ string NativeScriptException::GetExceptionMessage(JEnv& env, jthrowable exceptio
     return errMsg;
 }
 
-string NativeScriptException::GetExceptionStackTrace(JEnv& env, jthrowable exception) {
+string NativeScriptException::GetExceptionStackTrace(JEnv& env, jthrowable exception) const {
     string errStackTrace;
     JniLocalRef msg(env.CallStaticObjectMethod(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID, exception));
 
