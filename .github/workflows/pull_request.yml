@@ -1,3 +1,4 @@
+name: Pull Request
 on:
   pull_request:
 
@@ -128,10 +129,9 @@ jobs:
           #target: google_apis
           arch: ${{env.ANDROID_ABI}}
           script: ./gradlew runtestsAndVerifyResults --stacktrace
-      - name: Test Report
-        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2.5.0
+      - name: Upload Test Results
         if: ${{ !cancelled() }} # run this step even if previous step failed
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: Android Runtime Tests
+          name: android-unit-test-results
           path: test-app/dist/android_unit_test_results.xml
-          reporter: jest-junit # Format of test results
