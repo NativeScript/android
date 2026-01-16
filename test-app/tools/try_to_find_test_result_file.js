@@ -70,8 +70,18 @@ function filterLogcatFromCutoff(logcatOutput) {
 }
 
 async function readAndFilterLogcat() {
+	// if we have a PID, filter by it
+  if (appPID !== -1) {
+    return new Promise((resolve) => {
+      exec(`${adbPrefix} logcat -d --pid=${appPID}`, (error, stdout) => {
+        resolve(filterLogcatFromCutoff(stdout || ""));
+      });
+    });
+  }
+	// otherwise, do a general logcat read
   return new Promise((resolve) => {
-    exec(`${adbPrefix} logcat -d | grep ${appId}`, (error, stdout) => {
+		console.log('Reading full logcat since app PID is unknown');
+    exec(`${adbPrefix} logcat -d`, (error, stdout) => {
       resolve(filterLogcatFromCutoff(stdout || ""));
     });
   });
@@ -96,8 +106,18 @@ async function ensureProcessAlive() {
     console.error(`${appId} process died or never started!`);
     await exitWithLogcatDump();
   }
+	await updateAppPID();
 
   console.log(`${appId} process is running`);
+}
+let appPID = -1;
+async function updateAppPID() {
+  if (appPID !== -1) {
+    return appPID;
+  }
+  const { stdout } = await execAndStream(`${adbPrefix} shell "pidof ${appId}"`);
+  appPID = parseInt(stdout.trim(), 10);
+  return appPID;
 }
 
 async function checkForErrorActivity() {
