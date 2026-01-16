@@ -1,0 +1,20 @@
+name: "Test Report"
+on:
+  workflow_run:
+    workflows: ["Pull Request", "NPM Release"] # runs after Pull Request workflow
+    types:
+      - completed
+permissions:
+  contents: read
+  actions: read
+  checks: write
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2.5.0
+        with:
+          name: Android Runtime Tests
+          artifact: android-unit-test-results # artifact name
+          path: test-app/dist/android_unit_test_results.xml
+          reporter: jest-junit # Format of test results

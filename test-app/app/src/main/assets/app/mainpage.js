@@ -73,6 +73,4 @@ require('./tests/testURLSearchParamsImpl.js');
 require('./tests/testPerformanceNow');
 require('./tests/testQueueMicrotask');
 
-// ES MODULE TESTS
-__log("=== Running ES Modules Tests ===");
 require("./tests/testESModules.mjs");

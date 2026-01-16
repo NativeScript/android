@@ -68,9 +68,9 @@ task deletePreviousResultXml(type: Exec) {
         println "Removing previous android_unit_test_results.xml"
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "shell", "run-as", "com.tns.testapplication", "rm", "-f", "/data/data/com.tns.testapplication/android_unit_test_results.xml", "||", "true"
+            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "-e", "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
         } else {
-            commandLine "bash", "-c", "adb " + runOnDeviceOrEmulator + " shell 'run-as com.tns.testapplication rm -f /data/data/com.tns.testapplication/android_unit_test_results.xml || true'"
+            commandLine "adb", runOnDeviceOrEmulator, "-e", "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
         }
     }
 }
@@ -80,9 +80,9 @@ task startInstalledApk(type: Exec) {
         println "Starting test application"
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "-e", "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
         } else {
-            commandLine "adb", runOnDeviceOrEmulator, "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+            commandLine "adb", runOnDeviceOrEmulator, "-e", "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
         }
     }
 }
@@ -94,27 +94,39 @@ task createDistFolder {
     }
 }
 
-task waitForTestsToComplete {
-    doLast {
-        println "Waiting for tests to complete..."
-        Thread.sleep(15000) // Wait 15 seconds for tests to run
+task waitForUnitTestResultFile(type: Exec) {
+    doFirst {
+        println "Waiting for tests to finish..."
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "node", "$rootDir\\tools\\try_to_find_test_result_file.js", runOnDeviceOrEmulator
+        } else {
+            commandLine "node", "$rootDir/tools/try_to_find_test_result_file.js", runOnDeviceOrEmulator
+        }
     }
+}
+
+task copyResultToDist(type: Copy) {
+    from "$rootDir/android_unit_test_results.xml"
+    into "$rootDir/dist"
+}
+
+task deleteRootLevelResult(type: Delete) {
+    delete "$rootDir/android_unit_test_results.xml"
 }
 
 task verifyResults(type: Exec) {
     doFirst {
-        println "Verifying test results from console output..."
-        
         if (isWinOs) {
-            commandLine "cmd", "/c", "node", "$rootDir\\tools\\check_console_test_results.js"
+            commandLine "cmd", "/c", "node", "$rootDir\\tools\\check_if_tests_passed.js", "$rootDir\\dist\\android_unit_test_results.xml"
         } else {
-            commandLine "node", "$rootDir/tools/check_console_test_results.js"
+            commandLine "node", "$rootDir/tools/check_if_tests_passed.js", "$rootDir/dist/android_unit_test_results.xml"
         }
     }
 }
 
 task runtests {
-    dependsOn startInstalledApk
+    dependsOn deleteRootLevelResult
 }
 
 // waitForEmulatorToStart.dependsOn(deleteDist)
@@ -123,8 +135,10 @@ deletePreviousResultXml.dependsOn(runAdbAsRoot)
 installApk.dependsOn(deletePreviousResultXml)
 startInstalledApk.dependsOn(installApk)
 createDistFolder.dependsOn(startInstalledApk)
-waitForTestsToComplete.dependsOn(createDistFolder)
-verifyResults.dependsOn(waitForTestsToComplete)
+waitForUnitTestResultFile.dependsOn(createDistFolder)
+copyResultToDist.dependsOn(waitForUnitTestResultFile)
+deleteRootLevelResult.dependsOn(copyResultToDist)
+verifyResults.dependsOn(runtests)
 
 task runtestsAndVerifyResults {
     dependsOn verifyResults

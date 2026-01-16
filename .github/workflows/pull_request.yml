@@ -1,3 +1,4 @@
+name: Pull Request
 on:
   pull_request:
 
@@ -9,14 +10,13 @@ env:
   ANDROID_ABI: x86_64
   NDK_ARCH: darwin
 
-
 permissions:
   contents: read
 
 jobs:
   build:
     name: Build
-    runs-on: macos-15-intel
+    runs-on: macos-15
     outputs:
       npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
@@ -129,3 +129,9 @@ jobs:
           #target: google_apis
           arch: ${{env.ANDROID_ABI}}
           script: ./gradlew runtestsAndVerifyResults --stacktrace
+      - name: Upload Test Results
+        if: ${{ !cancelled() }} # run this step even if previous step failed
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: android-unit-test-results
+          path: test-app/dist/android_unit_test_results.xml
