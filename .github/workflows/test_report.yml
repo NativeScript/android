@@ -1,7 +1,9 @@
 name: "Test Report"
 on:
   workflow_run:
-    workflows: ["Pull Request", "NPM Release"] # runs after Pull Request workflow
+    workflows:
+      - Pull Request
+      - NPM Release
     types:
       - completed
 permissions:
