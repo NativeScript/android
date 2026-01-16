@@ -51,7 +51,7 @@ jobs:
       - name: Setup NDK
         run: |
           echo "y" | sdkmanager "cmake;3.6.4111459"
-          wget https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-$NDK_ARCH.zip
+          wget -q https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           chmod +x android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           unzip -q android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           rm -rf android-ndk-$NDK_VERSION-$NDK_ARCH.zip
@@ -122,7 +122,7 @@ jobs:
       - name: Setup NDK
         run: |
           echo "y" | sdkmanager "cmake;3.6.4111459"
-          wget https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-$NDK_ARCH.zip
+          wget -q https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           chmod +x android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           unzip -q android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           rm -rf android-ndk-$NDK_VERSION-$NDK_ARCH.zip
