@@ -18,5 +18,5 @@ jobs:
         with:
           name: Android Runtime Tests
           artifact: android-unit-test-results # artifact name
-          path: test-app/dist/android_unit_test_results.xml
+          path: android_unit_test_results.xml
           reporter: jest-junit # Format of test results
