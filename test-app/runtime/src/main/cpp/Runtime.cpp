@@ -78,8 +78,7 @@ void LogAndAbortUncaught() {
   } catch (const tns::NativeScriptException& e) {
     // We only have message/stack; no safe ReThrowToJava here.
     __android_log_print(ANDROID_LOG_FATAL, "TNS.Native",
-                        "Uncaught NativeScriptException: %s",
-                        e.ToString().c_str());
+                        "Uncaught NativeScriptException: %s", e.what());
   } catch (const std::exception& e) {
     __android_log_print(ANDROID_LOG_FATAL, "TNS.Native",
                         "Uncaught std::exception: %s", e.what());
