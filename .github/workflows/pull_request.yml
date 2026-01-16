@@ -9,7 +9,6 @@ env:
   ANDROID_ABI: x86_64
   NDK_ARCH: darwin
 
-
 permissions:
   contents: read
 
@@ -129,3 +128,10 @@ jobs:
           #target: google_apis
           arch: ${{env.ANDROID_ABI}}
           script: ./gradlew runtestsAndVerifyResults --stacktrace
+      - name: Test Report
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2.5.0
+        if: ${{ !cancelled() }} # run this step even if previous step failed
+        with:
+          name: Android Runtime Tests
+          path: test-app/dist/android_unit_test_results.xml
+          reporter: jest-junit # Format of test results
