@@ -20,7 +20,7 @@ permissions:
 jobs:
   build:
     name: Build
-    runs-on: macos-15-intel
+    runs-on: macos-15
     outputs:
       npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
