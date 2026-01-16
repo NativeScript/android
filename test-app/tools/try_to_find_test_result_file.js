@@ -34,7 +34,9 @@ function execAndStream(command, streamOutput = false) {
 
 function parseLogcatTimestamp(line) {
   // Logcat format: "MM-DD HH:mm:ss.mmm"
-  const timeMatch = line.match(/(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/);
+  const timeMatch = line.match(
+    /(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/
+  );
   if (!timeMatch) return null;
 
   const month = parseInt(timeMatch[1], 10) - 1; // JavaScript months are 0-indexed
@@ -131,7 +133,11 @@ async function pollForResults() {
   setTimeout(pollForResults, pollIntervalMs);
 }
 
-function main() {
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function main() {
   setTimeout(() => {
     timedOut = true;
   }, processTimeoutMs);
@@ -141,6 +147,7 @@ function main() {
       runOnDeviceOrEmulator || "default device"
     }...`
   );
+  await delay(10000); // Initial delay to allow app startup
   pollForResults().catch((err) => {
     console.error("Unexpected failure while waiting for results", err);
     process.exit(1);
