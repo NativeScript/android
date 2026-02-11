@@ -220,9 +220,13 @@ public class Runtime {
                 if (config.appConfig.getEnableMultithreadedJavascript()) {
                     this.strongInstances = new ConcurrentHashMap<>();
                     this.weakInstances = new ConcurrentHashMap<>();
-                    this.loadedJavaScriptExtends = new ConcurrentHashMap<Class<?>, JavaScriptImplementation>();
-                    this.strongJavaObjectToID = Collections.synchronizedMap(new NativeScriptHashMap<Object, Integer>());
-                    this.weakJavaObjectToID = Collections.synchronizedMap(new NativeScriptWeakHashMap<Object, Integer>());
+                    // TODO: figure out why using a concurrent map for loadedJavaScriptExtends
+                    // results in a fail of TestCanFindImplementationObjectWhenCreateExtendedObjectFromJava
+                    // with java.lang.reflect.InvocationTargetException
+                    // but works with synchronizeMap
+                    this.loadedJavaScriptExtends = Collections.synchronizedMap(new HashMap<>());
+                    this.strongJavaObjectToID = Collections.synchronizedMap(new NativeScriptHashMap<>());
+                    this.weakJavaObjectToID = Collections.synchronizedMap(new NativeScriptWeakHashMap<>());
                 }
 
                 classResolver = new ClassResolver(classStorageService);
