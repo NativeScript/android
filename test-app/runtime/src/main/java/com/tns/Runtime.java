@@ -53,7 +53,7 @@ public class Runtime {
     private native void createJSInstanceNative(int runtimeId, Object javaObject, int javaObjectID, String canonicalName);
 
     @CriticalNative
-    private native int generateNewObjectId(int runtimeId);
+    private static native int generateNewObjectId(int runtimeId);
 
     @FastNative
     private native boolean notifyGc(int runtimeId);
