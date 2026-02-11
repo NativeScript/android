@@ -35,6 +35,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import dalvik.annotation.optimization.CriticalNative;
+import dalvik.annotation.optimization.FastNative;
 
 public class Runtime {
     private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName,
@@ -50,8 +52,10 @@ public class Runtime {
 
     private native void createJSInstanceNative(int runtimeId, Object javaObject, int javaObjectID, String canonicalName);
 
+    @CriticalNative
     private native int generateNewObjectId(int runtimeId);
 
+    @FastNative
     private native boolean notifyGc(int runtimeId);
 
     private native void lock(int runtimeId);
@@ -60,10 +64,13 @@ public class Runtime {
 
     private native void passExceptionToJsNative(int runtimeId, Throwable ex, String message, String fullStackTrace, String jsStackTrace, boolean isDiscarded);
 
+    @CriticalNative
     private static native int getCurrentRuntimeId();
 
+    @CriticalNative
     public static native int getPointerSize();
 
+    @FastNative
     public static native void SetManualInstrumentationMode(String mode);
 
     private static native void WorkerGlobalOnMessageCallback(int runtimeId, String message);
