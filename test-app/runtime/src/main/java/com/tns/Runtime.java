@@ -222,7 +222,7 @@ public class Runtime {
                     this.weakInstances = new ConcurrentHashMap<>();
                     // TODO: can't use a ConcurrentHashMap for loadedJavaScriptExtends because it loads null objects, which aren't supported
                     // either leave it like this or create a separate set for null caches
-                    this.loadedJavaScriptExtends = new ConcurrentHashMap<>();
+                    this.loadedJavaScriptExtends = Collections.synchronizedMap(new HashMap<>());
                     this.strongJavaObjectToID = Collections.synchronizedMap(new NativeScriptHashMap<>());
                     this.weakJavaObjectToID = Collections.synchronizedMap(new NativeScriptWeakHashMap<>());
                 }
