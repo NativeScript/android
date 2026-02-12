@@ -72,5 +72,6 @@ require('./tests/testURLImpl.js');
 require('./tests/testURLSearchParamsImpl.js');
 require('./tests/testPerformanceNow');
 require('./tests/testQueueMicrotask');
+require("./tests/testConcurrentAccess");
 
 require("./tests/testESModules.mjs");
