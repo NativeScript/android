@@ -25,6 +25,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
     return JNI_VERSION_1_6;
 }
 
+// @FastNative signature - optimized JNI, keeps JNIEnv* for jstring handling
 extern "C" JNIEXPORT void Java_com_tns_Runtime_SetManualInstrumentationMode(JNIEnv* _env, jobject obj, jstring mode) {
     try {
         Runtime::SetManualInstrumentationMode(mode);
@@ -214,13 +215,14 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv* _e
     }
 }
 
-extern "C" JNIEXPORT jint Java_com_tns_Runtime_generateNewObjectId(JNIEnv* env, jobject obj, jint runtimeId) {
+// @CriticalNative signature - no JNIEnv* or jobject parameters
+extern "C" JNIEXPORT jint Java_com_tns_Runtime_generateNewObjectId(jint runtimeId) {
     try {
         auto runtime = TryGetRuntime(runtimeId);
         if (runtime == nullptr) {
             return 0;
         }
-        return runtime->GenerateNewObjectId(env, obj);
+        return runtime->GenerateNewObjectId(nullptr, nullptr);
     } catch (NativeScriptException& e) {
         e.ReThrowToJava();
     } catch (std::exception e) {
@@ -236,6 +238,7 @@ extern "C" JNIEXPORT jint Java_com_tns_Runtime_generateNewObjectId(JNIEnv* env, 
     return 0;
 }
 
+// @FastNative signature - optimized JNI, keeps JNIEnv* for NotifyGC
 extern "C" JNIEXPORT jboolean Java_com_tns_Runtime_notifyGc(JNIEnv* env, jobject obj, jint runtimeId) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
@@ -288,11 +291,13 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_passExceptionToJsNative(JNIEnv* e
     }
 }
 
-extern "C" JNIEXPORT jint Java_com_tns_Runtime_getPointerSize(JNIEnv* env, jobject obj) {
+// @CriticalNative signature - no JNIEnv* or jobject parameters
+extern "C" JNIEXPORT jint Java_com_tns_Runtime_getPointerSize() {
     return sizeof(void*);
 }
 
-extern "C" JNIEXPORT jint Java_com_tns_Runtime_getCurrentRuntimeId(JNIEnv* _env, jobject obj) {
+// @CriticalNative signature - no JNIEnv* or jobject parameters
+extern "C" JNIEXPORT jint Java_com_tns_Runtime_getCurrentRuntimeId() {
     Isolate* isolate = Isolate::TryGetCurrent();
     if (isolate == nullptr) {
         return -1;
