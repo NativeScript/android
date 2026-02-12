@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Collections;
 
 public class Runtime {
     private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName,
@@ -103,15 +104,15 @@ public class Runtime {
             "Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
             "If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
 
-    private HashMap<Integer, Object> strongInstances = new HashMap<>();
+    private Map<Integer, Object> strongInstances = new HashMap<>();
 
-    private HashMap<Integer, WeakReference<Object>> weakInstances = new HashMap<>();
+    private Map<Integer, WeakReference<Object>> weakInstances = new HashMap<>();
 
-    private NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
+    private Map<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
 
-    private NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
+    private Map<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
 
-    private final Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
+    private Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
 
     private final java.lang.Runtime dalvikRuntime = java.lang.Runtime.getRuntime();
 
@@ -214,6 +215,16 @@ public class Runtime {
                 this.workerId = dynamicConfiguration.workerId;
                 if (dynamicConfiguration.mainThreadScheduler != null) {
                     this.mainThreadHandler = dynamicConfiguration.mainThreadScheduler.getHandler();
+                }
+                // if multithreadedJS, make all maps concurrent or synchronized:
+                if (config.appConfig.getEnableMultithreadedJavascript()) {
+                    this.strongInstances = new ConcurrentHashMap<>();
+                    this.weakInstances = new ConcurrentHashMap<>();
+                    // TODO: can't use a ConcurrentHashMap for loadedJavaScriptExtends because it loads null objects, which aren't supported
+                    // either leave it like this or create a separate set for null caches
+                    this.loadedJavaScriptExtends = Collections.synchronizedMap(new HashMap<>());
+                    this.strongJavaObjectToID = Collections.synchronizedMap(new NativeScriptHashMap<>());
+                    this.weakJavaObjectToID = Collections.synchronizedMap(new NativeScriptWeakHashMap<>());
                 }
 
                 classResolver = new ClassResolver(classStorageService);
