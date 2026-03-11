@@ -301,6 +301,10 @@ repositories {
         "$rootDir/${it.directory}/$PLATFORMS_ANDROID"
     }
 
+    pluginDependencies.addAll( nativescriptDependencies.collect {
+        "$rootDir/${it.generatedDirectory}"
+    } )
+
     // some plugins may have their android dependencies in a /libs subdirectory
     pluginDependencies.addAll(nativescriptDependencies.collect {
         "$rootDir/${it.directory}/$PLATFORMS_ANDROID/libs"
@@ -425,6 +429,14 @@ task 'addDependenciesFromNativeScriptPlugins' {
             def length = aarFile.name.length() - 4
             def fileName = aarFile.name[0..<length]
             outLogger.withStyle(Style.SuccessHeader).println "\t + adding aar plugin dependency: " + aarFile.getAbsolutePath()
+            project.dependencies.add("implementation", [name: fileName, ext: "aar"])
+        }
+
+        def generatedAarFiles = fileTree(dir: file("$rootDir/${dep.generatedDirectory}"), include: ["**/*.aar"])
+        generatedAarFiles.each { aarFile ->
+            def length = aarFile.name.length() - 4
+            def fileName = aarFile.name[0..<length]
+            outLogger.withStyle(Style.SuccessHeader).println "\t + adding generated aar plugin dependency: " + aarFile.getAbsolutePath()
             project.dependencies.add("implementation", [name: fileName, ext: "aar"])
         }
 
