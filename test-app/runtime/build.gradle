@@ -21,6 +21,7 @@ if (useCCache) {
 }
 
 
+def defaultNdkVersion = "27.3.13750724"
 
 def hasNdkVersion = project.hasProperty("ndkVersion")
 if (hasNdkVersion) {
@@ -30,29 +31,50 @@ if (hasNdkVersion) {
 
 def NDK_PATH = ""
 def hasNdkDirectory = project.hasProperty("ndkDirectory")
-if(!hasNdkDirectory){
+if (!hasNdkDirectory) {
     println "No ndkDirectory set, checking environment \$ANDROID_NDK..."
-    
+
     NDK_PATH = "$System.env.ANDROID_NDK"
-    if (NDK_PATH == null || NDK_PATH == "null"){
+    if (NDK_PATH == null || NDK_PATH == "null") {
         println "No ndkDirectory set, checking environment \$ANDROID_NDK_ROOT..."
         NDK_PATH = "$System.env.ANDROID_NDK_ROOT"
     }
-    
-    if (NDK_PATH == null || NDK_PATH == "null"){
+
+    if (NDK_PATH == null || NDK_PATH == "null") {
         println "No ndkDirectory set, checking environment \$ANDROID_NDK_HOME..."
         NDK_PATH = "$System.env.ANDROID_NDK_HOME"
     }
 } else {
     NDK_PATH = ndkDirectory
 }
+
+if (NDK_PATH == null || NDK_PATH == "null" || NDK_PATH == "") {
+    if (!hasNdkVersion) {
+        NDK_PATH = "$System.env.ANDROID_HOME/ndk/${defaultNdkVersion}"
+    } else {
+        NDK_PATH = "$System.env.ANDROID_HOME/ndk/${ndkVersion}"
+    }
+}
+
 println "Runtime using NDK_PATH: " + NDK_PATH
+
+base {
+    if (!optimized && !optimizedWithInspector) {
+        archivesName = "${base.archivesName.get()}-regular"
+    } else {
+        if (optimized) {
+            archivesName = "${base.archivesName.get()}-optimized"
+        } else if (optimizedWithInspector) {
+            archivesName = "${base.archivesName.get()}-optimized-with-inspector"
+        }
+    }
+}
 
 android {
     namespace "com.tns.android_runtime"
 
-    compileSdkVersion NS_DEFAULT_COMPILE_SDK_VERSION as int
-    buildToolsVersion NS_DEFAULT_BUILD_TOOLS_VERSION as String
+    compileSdk NS_DEFAULT_COMPILE_SDK_VERSION as int
+    buildToolsVersion = NS_DEFAULT_BUILD_TOOLS_VERSION as String
 
     sourceSets {
         main {
@@ -67,23 +89,12 @@ android {
     if (hasNdkVersion) {
         ndkVersion ndkVersion
     } else {
-        ndkVersion "21.1.6352462"
-        // ndkVersion "22.1.7171670"
+        ndkVersion defaultNdkVersion
     }
 
     defaultConfig {
         minSdkVersion NS_DEFAULT_MIN_SDK_VERSION as int
         targetSdkVersion NS_DEFAULT_COMPILE_SDK_VERSION as int
-
-        if (!optimized && !optimizedWithInspector) {
-            project.archivesBaseName = "${archivesBaseName}-regular"
-        } else {
-            if (optimized) {
-                project.archivesBaseName = "${archivesBaseName}-optimized"
-            } else if (optimizedWithInspector) {
-                project.archivesBaseName = "${archivesBaseName}-optimized-with-inspector"
-            }
-        }
 
         externalNativeBuild {
             cmake {
@@ -102,19 +113,26 @@ android {
 //
 //                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}"
 
-                cppFlags "-std=c++14"
-                arguments "-DANDROID_STL=c++_shared", "-DANDROID_NDK_ROOT=${NDK_PATH}"
+                cppFlags "-std=c++20"
+                arguments "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
             }
         }
 
         ndk {
             minSdkVersion NS_DEFAULT_MIN_SDK_VERSION as int
-           if (onlyX86) {
-               abiFilters 'x86'
-           } else {
-               abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
-           }
+            if (onlyX86) {
+                abiFilters 'x86'
+            } else {
+                abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
+            }
         }
+
+        consumerProguardFiles 'consumer-rules.pro'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     buildTypes {
@@ -133,11 +151,16 @@ android {
 }
 
 allprojects {
-    gradle.projectsEvaluated {
-        tasks.withType(JavaCompile) {
-            options.compilerArgs << "-Xlint:all" << "-Werror"
+ afterEvaluate {
+    tasks.withType(JavaCompile).configureEach {
+        // remove after "-Xlint:-classfile" https://issuetracker.google.com/issues/359561906
+        options.compilerArgs << "-Xlint:all" << "-Werror" << "-Xlint:-classfile"
+        if (javaVersion.current() >= JavaVersion.VERSION_21) {
+            // todo remove "-Xlint:-this-escape" after updating runtime-binding-generator
+            options.compilerArgs << "-Xlint:-this-escape"
         }
     }
+  }
 }
 
 dependencies {
@@ -148,15 +171,16 @@ dependencies {
     testImplementation "org.mockito:mockito-core:${ns_default_mockito_core_version}"
 }
 
-tasks.whenTaskAdded { task ->
+
+tasks.configureEach { task ->
     def taskName = task.getName()
-    // println "\t ~ [DEBUG][runtime] build.gradle whenTaskAdded taskName = ${taskName}"
+    //   println "\t ~ [DEBUG][runtime] build.gradle whenTaskAdded taskName = ${taskName}"
     if (taskName.contains("preReleaseBuild")) {
         setRuntimeCommit.dependsOn(setPackageVersion)
         task.dependsOn(setRuntimeCommit)
     }
 
-    if(taskName.contains("bundleReleaseAar")){
+    if (taskName.contains("bundleReleaseAar")) {
         task.dependsOn("testDebugUnitTest")
     }
 
@@ -166,9 +190,77 @@ tasks.whenTaskAdded { task ->
     if ((taskName == "bundleDebug") || (taskName == "bundleRelease")) {
         task.finalizedBy createPackageConfigFileTask(taskName)
     }
+
+    if (task =~ /configureCMake.*/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (task =~ /buildCMake.*/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (taskName.contains("syncReleaseLibJars") || taskName.contains("syncDebugLibJars")) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (taskName.contains("mergeReleaseJniLibFolders") || taskName.contains("mergeDebugJniLibFolders")) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (taskName.contains("mergeReleaseShaders") || taskName.contains("mergeDebugShaders")) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (taskName.contains("packageReleaseAssets") || taskName.contains("packageDebugAssets")) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (taskName.contains("copyReleaseJniLibsProjectOnly") || taskName.contains("copyDebugJniLibsProjectOnly")) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (taskName.contains("copyReleaseJniLibsProjectAndLocalJars") || taskName.contains("copyDebugJniLibsProjectAndLocalJars")) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (taskName.contains("generateReleaseLintVitalModel") || taskName.contains("generateDebugLintVitalModel")) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (taskName.contains("lintVitalAnalyzeRelease") || taskName.contains("lintVitalAnalyzeDebug")) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (task =~ /lintAnalyze.+AndroidTest/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (task =~ /compile.+UnitTestJavaWithJavac/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (task =~ /generate.+LintModel/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (task =~ /process.+Manifest/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (task =~ /merge.+Resources/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (task =~ /verify.+Resources/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
+
+    if (task =~ /test.+UnitTest/) {
+        task.finalizedBy(":app:buildMetadata")
+    }
 }
 
-task setPackageVersion {
+task 'setPackageVersion' {
     onlyIf {
         project.hasProperty('packageVersion')
     }
@@ -183,7 +275,7 @@ task setPackageVersion {
     }
 }
 
-task setRuntimeCommit {
+task 'setRuntimeCommit' {
     onlyIf {
         project.hasProperty('gitCommitVersion')
     }

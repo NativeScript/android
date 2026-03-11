@@ -1,60 +1,177 @@
-var
-	searchForFile = require('child_process').exec,
-	execFindFile = require('child_process').exec,
-	checkIfAppIsRunning = require('child_process').exec,
-	fs = require('fs'),
-	pullfile,
+const { exec } = require("child_process");
 
-	isTimeToExit = false,
+const appId = "com.tns.testapplication";
+const runOnDeviceOrEmulator = process.argv[2] || "";
+const adbPrefix = `adb ${runOnDeviceOrEmulator} -e`;
+const resultsPath = `/data/data/${appId}/android_unit_test_results.xml`;
 
-	processTimeout = 20 * 60 * 1000, // 20 minutes timeout (empirical constant :)) 
-	searchInterval = 10 * 1000;
+const processTimeoutMs = 20 * 60 * 1000; // 20 minutes timeout (empirical constant)
+const pollIntervalMs = 10 * 1000;
+const scriptStartTime = new Date();
+const logcatCutoffTime = new Date(scriptStartTime.getTime() - 60 * 1000); // 1 minute before start
 
-searchForFile("empty", getFile);
+let timedOut = false;
+// TODO: check why gradle doesn't show error logs
+console.error = console.log; // Redirect stderr to stdout for easier logcat capture
 
-var runOnDeviceOrEmulator = process.argv[2];
+function execAndStream(command, streamOutput = false) {
+  return new Promise((resolve) => {
+    const child = exec(command, (error, stdout, stderr) => {
+      resolve({ error, stdout, stderr });
+    });
 
-function getFile(error, stdout, stderr) {
-	closeProcessAfter(processTimeout);
-	setInterval(tryToGetFile, searchInterval);
-};
-
-function closeProcessAfter(timeout) {
-	//this will force process closed even if the the file is not found
-	setTimeout(function () { isTimeToExit = true; }, timeout);
+    if (!streamOutput) {
+      return;
+    }
+    if (child.stdout) {
+      child.stdout.pipe(process.stdout, { end: false });
+    }
+    if (child.stderr) {
+      child.stderr.pipe(process.stderr, { end: false });
+    }
+  });
 }
 
-function tryToGetFile() {
-	var checkApp = checkIfAppIsRunning("adb " + runOnDeviceOrEmulator + " -e shell \"ps | grep com.tns.testapplication\"", checkIfProcessIsRunning);
-	pullfile = execFindFile("adb " + runOnDeviceOrEmulator + " -e pull /data/data/com.tns.testapplication/android_unit_test_results.xml", checkIfFileExists);
-	pullfile.stdout.pipe(process.stdout, { end: false });
-	pullfile.stderr.pipe(process.stderr, { end: false });
+function parseLogcatTimestamp(line) {
+  // Logcat format: "MM-DD HH:mm:ss.mmm"
+  const timeMatch = line.match(
+    /(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/
+  );
+  if (!timeMatch) return null;
+
+  const month = parseInt(timeMatch[1], 10) - 1; // JavaScript months are 0-indexed
+  const day = parseInt(timeMatch[2], 10);
+  const hour = parseInt(timeMatch[3], 10);
+  const minute = parseInt(timeMatch[4], 10);
+  const second = parseInt(timeMatch[5], 10);
+  const ms = parseInt(timeMatch[6], 10);
+
+  // Create a date object for this log entry (use current year)
+  const logDate = new Date();
+  logDate.setMonth(month);
+  logDate.setDate(day);
+  logDate.setHours(hour, minute, second, ms);
+
+  return logDate;
 }
 
-function checkIfProcessIsRunning(err, stdout, stderr) {
-	if(stdout) {
-		console.log("com.tns.testapplication process is running")
-	}
-	else {
-		console.log('com.tns.testapplication process died or never started!');
-		process.exit(1);
-	}
+function filterLogcatFromCutoff(logcatOutput) {
+  const lines = logcatOutput.split("\n");
 
+  // Find the first line that is at or after the cutoff time
+  const startIndex = lines.findIndex((line) => {
+    const timestamp = parseLogcatTimestamp(line);
+    return timestamp && timestamp >= logcatCutoffTime;
+  });
+
+  // If no matching line found, return empty; otherwise return from that line onward
+  if (startIndex === -1) return "";
+  return lines.slice(startIndex).join("\n");
 }
 
-function checkIfFileExists(err, stout, stderr) {
-
-	//if you find file in /data/data/com.tns.testapplication exit process
-	if (!err) {
-		console.log('Tests results file found file!');
-		process.exit();
-	}
-	else {
-		//if the time to get the file is out exit process
-		if (isTimeToExit) {
-			console.log(err);
-			console.log('Tests results file not found!');
-			process.exit(1);
-		}
-	}
+async function readAndFilterLogcat() {
+	// if we have a PID, filter by it
+  if (appPID !== -1) {
+    return new Promise((resolve) => {
+      exec(`${adbPrefix} logcat -d --pid=${appPID}`, (error, stdout) => {
+        resolve(filterLogcatFromCutoff(stdout || ""));
+      });
+    });
+  }
+	// otherwise, do a general logcat read
+  return new Promise((resolve) => {
+		console.log('Reading full logcat since app PID is unknown');
+    exec(`${adbPrefix} logcat -d`, (error, stdout) => {
+      resolve(filterLogcatFromCutoff(stdout || ""));
+    });
+  });
 }
+
+async function exitWithLogcatDump() {
+  console.log("Dumping logcat for debugging:");
+  try {
+    const logcat = await readAndFilterLogcat();
+    console.log(logcat);
+  } finally {
+    process.exit(1);
+  }
+}
+
+async function ensureProcessAlive() {
+  const { stdout } = await execAndStream(
+    `${adbPrefix} shell "ps | grep ${appId}"`
+  );
+
+  if (!stdout) {
+    console.error(`${appId} process died or never started!`);
+    await exitWithLogcatDump();
+  }
+	await updateAppPID();
+
+  console.log(`${appId} process is running`);
+}
+let appPID = -1;
+async function updateAppPID() {
+  if (appPID !== -1) {
+    return appPID;
+  }
+  const { stdout } = await execAndStream(`${adbPrefix} shell "pidof ${appId}"`);
+  appPID = parseInt(stdout.trim(), 10);
+  return appPID;
+}
+
+async function checkForErrorActivity() {
+  const { error } = await execAndStream(
+    `${adbPrefix} shell "dumpsys activity activities | grep ${appId} | grep ${appId}.ErrorReportActivity"`
+  );
+
+  if (!error) {
+    console.error("App has crashed - ErrorReportActivity is displaying!");
+    await exitWithLogcatDump();
+  }
+}
+
+async function tryPullResultsFile() {
+  const { error } = await execAndStream(`${adbPrefix} pull ${resultsPath}`);
+
+  if (!error) {
+    console.log("Tests results file found!");
+    process.exit(0);
+  }
+}
+
+async function pollForResults() {
+  await ensureProcessAlive();
+  await checkForErrorActivity();
+  await tryPullResultsFile();
+
+  if (timedOut) {
+    console.error("Tests results file not found within timeout window.");
+    await exitWithLogcatDump();
+  }
+
+  setTimeout(pollForResults, pollIntervalMs);
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function main() {
+  setTimeout(() => {
+    timedOut = true;
+  }, processTimeoutMs);
+
+  console.log(
+    `Waiting for test results file on ${
+      runOnDeviceOrEmulator || "default device"
+    }...`
+  );
+  await delay(10000); // Initial delay to allow app startup
+  pollForResults().catch((err) => {
+    console.error("Unexpected failure while waiting for results", err);
+    process.exit(1);
+  });
+}
+
+main();

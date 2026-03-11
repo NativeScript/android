@@ -1,7 +1,7 @@
 {
   "name": "@nativescript/android",
   "description": "NativeScript for Android using v8",
-  "version": "8.6.2",
+  "version": "9.0.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/NativeScript/android.git"
@@ -10,20 +10,20 @@
     "**/*"
   ],
   "version_info": {
-    "v8": "8.3.110.9",
-    "gradle": "7.6",
-    "gradleAndroid": "7.4.2",
-    "ndk": "r21",
-    "ndkApiLevel": "22",
-    "minSdk": "17",
-    "compileSdk": "32",
-    "buildTools": "32.0.0",
-    "kotlin": "1.7.10"
+    "v8": "10.3.22.0",
+    "gradle": "8.14.3",
+    "gradleAndroid": "8.12.1",
+    "ndk": "r27d",
+    "ndkApiLevel": "21",
+    "minSdk": "21",
+    "compileSdk": "35",
+    "buildTools": "35.0.0",
+    "kotlin": "2.0.0"
   },
   "// this gradle key is here for backwards compatibility - we'll phase it out slowly...": "",
   "gradle": {
-    "version": "7.6",
-    "android": "7.4.2"
+    "version": "8.14.3",
+    "android": "8.12.1"
   },
   "scripts": {
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",

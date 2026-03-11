@@ -1,4 +1,5 @@
 #include "Util.h"
+#include "JsV8InspectorClient.h"
 #include <sstream>
 #include <iostream>
 #include <codecvt>
@@ -107,6 +108,7 @@ namespace tns {
     }
 
     u16string Util::ConvertFromUtf8ToUtf16(const string &str) {
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
         auto utf16String =
                 std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>().from_bytes(str);
 
@@ -426,5 +428,17 @@ namespace tns {
         if (flag == SetConstructorFunctionFlag::SET_CLASS_NAME)
             tmpl->SetClassName(name);
         that->Set(name, tmpl);
+    }
+
+    std::vector<uint16_t> Util::ToVector(const std::string &value) {
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+        // FIXME: std::codecvt_utf8_utf16 is deprecated
+        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
+        std::u16string value16 = convert.from_bytes(value);
+
+        const uint16_t *begin = reinterpret_cast<uint16_t const *>(value16.data());
+        const uint16_t *end = reinterpret_cast<uint16_t const *>(value16.data() + value16.size());
+        std::vector<uint16_t> vector(begin, end);
+        return vector;
     }
 };

@@ -350,7 +350,7 @@ class AndroidJsV8Inspector {
         @Override
         protected void onException(IOException exception) {
             // when the chrome inspector is disconnected by closing the tab a "Broken pipe" exception is thrown which we don't need to log, only in verbose logging mode
-            if(!exception.getMessage().equals("Broken pipe") || currentRuntimeLogger.isEnabled()) {
+            if(exception != null && !exception.getMessage().equals("Broken pipe") || currentRuntimeLogger.isEnabled()) {
                 if (com.tns.Runtime.isDebuggable()) {
                     exception.printStackTrace();
                 }

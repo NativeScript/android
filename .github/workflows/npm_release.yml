@@ -1,3 +1,4 @@
+name: NPM Release
 on:
   push:
     branches:
@@ -8,41 +9,49 @@ on:
 env:
   NPM_TAG: "next"
   EMULATOR_NAME: "runtime-emu"
-  NDK_VERSION: r21b
-  ANDROID_API: 29
+  NDK_VERSION: r27d
+  ANDROID_API: 33
   ANDROID_ABI: x86_64
-  NDK_ARCH: darwin-x86_64
+  NDK_ARCH: darwin
+
+permissions:
+  contents: read
 
 jobs:
   build:
     name: Build
-    runs-on: macos-latest
+    runs-on: macos-15
     outputs:
       npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
     steps:
-      - uses: actions/checkout@v3
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           fetch-depth: 0
           submodules: true
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: 18
+          node-version: 22
           registry-url: "https://registry.npmjs.org"
-      - uses: actions/setup-java@v3
+      - uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5.1.0
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "21"
           cache: gradle
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
       - name: Homebrew dependencies
         run: |
           brew install wget
       - name: Setup NDK
         run: |
           echo "y" | sdkmanager "cmake;3.6.4111459"
-          wget https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-$NDK_ARCH.zip
+          wget -q https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           chmod +x android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           unzip -q android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           rm -rf android-ndk-$NDK_VERSION-$NDK_ARCH.zip
@@ -73,36 +82,46 @@ jobs:
       - name: Build npm package
         run: ./gradlew -PgitCommitVersion=${{ github.sha }} -PnoCCache --stacktrace
       - name: Upload npm package artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: npm-package
           path: dist/nativescript-android-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
+      - name: Upload debug symbols
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: debug-symbols
+          path: test-app/runtime/build/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/*
+
   test:
     name: Test
-    runs-on: macos-latest
-    needs: build
+    runs-on: macos-15-intel
     steps:
-      - uses: actions/checkout@v3
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           submodules: true
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: 18
+          node-version: 22
           registry-url: "https://registry.npmjs.org"
-      - uses: actions/setup-java@v3
+      - uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5.1.0
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "21"
           cache: gradle
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
       - name: Homebrew dependencies
         run: |
           brew install wget
       - name: Setup NDK
         run: |
           echo "y" | sdkmanager "cmake;3.6.4111459"
-          wget https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-$NDK_ARCH.zip
+          wget -q https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           chmod +x android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           unzip -q android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           rm -rf android-ndk-$NDK_VERSION-$NDK_ARCH.zip
@@ -117,15 +136,22 @@ jobs:
       - name: SBG tests
         run: ./gradlew runSbgTests --stacktrace
       - name: Run unit tests
-        uses: ReactiveCircus/android-emulator-runner@v2
+        uses: ReactiveCircus/android-emulator-runner@b530d96654c385303d652368551fb075bc2f0b6b # v2.35.0
         with:
           api-level: ${{env.ANDROID_API}}
           # this is needed on API 30+
           #target: google_apis
           arch: ${{env.ANDROID_ABI}}
           script: ./gradlew runtestsAndVerifyResults --stacktrace
+      - name: Upload Test Results
+        if: ${{ !cancelled() }} # run this step even if previous step failed
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: android-unit-test-results
+          path: test-app/dist/android_unit_test_results.xml
   publish:
     runs-on: ubuntu-latest
+    environment: npm-publish
     needs:
       - build
       - test
@@ -136,18 +162,40 @@ jobs:
       NPM_VERSION: ${{needs.build.outputs.npm_version}}
       NPM_TAG: ${{needs.build.outputs.npm_tag}}
     steps:
-      - uses: actions/setup-node@v3
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
         with:
-          node-version: 18
+          egress-policy: audit
+
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
           registry-url: "https://registry.npmjs.org"
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v8
         with:
           name: npm-package
           path: dist
-      - name: Publish package
+      - name: Update npm (required for OIDC trusted publishing)
         run: |
-          echo "Publishing @nativescript/android@$NPM_VERSION to NPM with tag $NPM_TAG..."
-          npm publish ./dist/nativescript-android-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --provenance
+          npm install -g npm@^11.5.1
+          npm --version
+      - name: Publish package (OIDC trusted publishing)
+        if: ${{ vars.USE_NPM_TOKEN != 'true' }}
+        run: |
+          echo "Publishing @nativescript/android@$NPM_VERSION to NPM with tag $NPM_TAG via OIDC trusted publishing..."
+          unset NODE_AUTH_TOKEN
+          if [ -n "${NPM_CONFIG_USERCONFIG:-}" ]; then
+            rm -f "$NPM_CONFIG_USERCONFIG"
+          fi
+          npm publish ./dist/nativescript-android-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ""
+
+      - name: Publish package (granular token)
+        if: ${{ vars.USE_NPM_TOKEN == 'true' }}
+        run: |
+          echo "Publishing @nativescript/android@$NPM_VERSION to NPM with tag $NPM_TAG via granular token..."
+          npm publish ./dist/nativescript-android-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
   github-release:
@@ -162,22 +210,34 @@ jobs:
     env:
       NPM_VERSION: ${{needs.build.outputs.npm_version}}
     steps:
-      - uses: actions/checkout@v3
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: 18
+          node-version: 22
       - name: Setup
         run: npm install
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v8
         with:
           name: npm-package
           path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: debug-symbols
+          path: dist/debug-symbols
+      - name: Zip debug symbols
+        working-directory: dist/debug-symbols
+        run: zip -r debug-symbols.zip .
       - name: Partial Changelog
         run: npx conventional-changelog -p angular -r2 > body.md
-      - uses: ncipollo/release-action@v1
+      - uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
         with:
-          artifacts: "dist/nativescript-android-*.tgz"
+          artifacts: "dist/nativescript-android-*.tgz,dist/debug-symbols/debug-symbols.zip"
           bodyFile: "body.md"
           prerelease: ${{needs.build.outputs.npm_tag != 'latest'}}

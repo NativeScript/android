@@ -1,35 +1,28 @@
 #include "MetadataMethodInfo.h"
+#include "MetadataNode.h"
+
 
 using namespace tns;
 
 std::string MethodInfo::GetName() {
-    uint32_t nameOfffset = *reinterpret_cast<uint32_t*>(m_pData);
-    string methodName = m_reader->ReadName(nameOfffset);
-    m_pData += sizeof(uint32_t);
-
+    string methodName = MetadataNode::getMetadataReader()->ReadName(nameOffset);
     return methodName;
 }
 
 uint8_t MethodInfo::CheckIsResolved() {
-    auto resolvedData = *reinterpret_cast<uint8_t*>(m_pData);
-    m_pData += sizeof(uint8_t);
-
     return resolvedData;
 }
 
 uint16_t MethodInfo::GetSignatureLength() {
-    m_signatureLength = *reinterpret_cast<uint16_t*>(m_pData);
-    m_pData += sizeof(uint16_t);
-
     return m_signatureLength;
 }
 
 std::string MethodInfo::GetSignature() { //use nodeId's to read the whole signature
-    uint16_t* nodeIdPtr = reinterpret_cast<uint16_t*>(m_pData);
+    auto m_reader = MetadataNode::getMetadataReader();
     string signature = "(";
     string ret;
     for (int i = 0; i < m_signatureLength; i++) {
-        uint16_t nodeId = *nodeIdPtr++;
+        uint16_t nodeId = nodeIds[i];
         string curArgTypeName = m_reader->ReadTypeName(nodeId);
         MetadataTreeNode* node = m_reader->GetNodeById(nodeId);
 
@@ -58,23 +51,49 @@ std::string MethodInfo::GetSignature() { //use nodeId's to read the whole signat
     }
     signature += ")" + ret;
 
-    int sizeofReadNodeIds = m_signatureLength * sizeof(uint16_t);
-    m_pData += sizeofReadNodeIds;
-
     return signature;
 }
 
 std::string MethodInfo::GetDeclaringType() {
-    uint16_t* declaringTypePtr = reinterpret_cast<uint16_t*>(m_pData);
-    uint16_t nodeId = *declaringTypePtr;
+    auto m_reader = MetadataNode::getMetadataReader();
 
-    string declTypeName = m_reader->ReadTypeName(nodeId);
-
-    m_pData += sizeof(uint16_t);
-
-    return declTypeName;
+    return m_reader->ReadTypeName(declaringNodeId);
 }
 
 int MethodInfo::GetSizeOfReadMethodInfo() {
+
+    if (!sizeMeasured) {
+        sizeMeasured = true;
+        // name
+        nameOffset = *reinterpret_cast<uint32_t*>(m_pData);
+        m_pData += sizeof(uint32_t);
+        // resolved data
+        resolvedData = *reinterpret_cast<uint8_t*>(m_pData);
+        m_pData += sizeof(uint8_t);
+        // sig length
+        m_signatureLength = *reinterpret_cast<uint16_t*>(m_pData);
+        m_pData += sizeof(uint16_t);
+
+        // signature
+        if (m_signatureLength > 0) {
+            uint16_t* nodeIdPtr = reinterpret_cast<uint16_t*>(m_pData);
+            nodeIds.resize(m_signatureLength);
+            for (int i = 0; i < m_signatureLength; i++) {
+                nodeIds[i] = *nodeIdPtr++;
+            }
+            m_pData +=  m_signatureLength * sizeof(uint16_t);
+        }
+
+        // declaring type
+        if (isStatic) {
+            auto declaringTypePtr = reinterpret_cast<uint16_t*>(m_pData);
+            declaringNodeId = *declaringTypePtr;
+            m_pData += sizeof(uint16_t);
+        }
+
+
+
+    }
+
     return m_pData - m_pStartData;
 }

@@ -35,6 +35,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Collections;
+import dalvik.annotation.optimization.CriticalNative;
+import dalvik.annotation.optimization.FastNative;
 
 public class Runtime {
     private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName,
@@ -50,8 +53,10 @@ public class Runtime {
 
     private native void createJSInstanceNative(int runtimeId, Object javaObject, int javaObjectID, String canonicalName);
 
-    private native int generateNewObjectId(int runtimeId);
+    @CriticalNative
+    private static native int generateNewObjectId(int runtimeId);
 
+    @FastNative
     private native boolean notifyGc(int runtimeId);
 
     private native void lock(int runtimeId);
@@ -60,10 +65,13 @@ public class Runtime {
 
     private native void passExceptionToJsNative(int runtimeId, Throwable ex, String message, String fullStackTrace, String jsStackTrace, boolean isDiscarded);
 
+    @CriticalNative
     private static native int getCurrentRuntimeId();
 
+    @CriticalNative
     public static native int getPointerSize();
 
+    @FastNative
     public static native void SetManualInstrumentationMode(String mode);
 
     private static native void WorkerGlobalOnMessageCallback(int runtimeId, String message);
@@ -103,15 +111,15 @@ public class Runtime {
             "Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
             "If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
 
-    private HashMap<Integer, Object> strongInstances = new HashMap<>();
+    private Map<Integer, Object> strongInstances = new HashMap<>();
 
-    private HashMap<Integer, WeakReference<Object>> weakInstances = new HashMap<>();
+    private Map<Integer, WeakReference<Object>> weakInstances = new HashMap<>();
 
-    private NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
+    private Map<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
 
-    private NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
+    private Map<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
 
-    private final Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
+    private Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
 
     private final java.lang.Runtime dalvikRuntime = java.lang.Runtime.getRuntime();
 
@@ -215,6 +223,16 @@ public class Runtime {
                 if (dynamicConfiguration.mainThreadScheduler != null) {
                     this.mainThreadHandler = dynamicConfiguration.mainThreadScheduler.getHandler();
                 }
+                // if multithreadedJS, make all maps concurrent or synchronized:
+                if (config.appConfig.getEnableMultithreadedJavascript()) {
+                    this.strongInstances = new ConcurrentHashMap<>();
+                    this.weakInstances = new ConcurrentHashMap<>();
+                    // TODO: can't use a ConcurrentHashMap for loadedJavaScriptExtends because it loads null objects, which aren't supported
+                    // either leave it like this or create a separate set for null caches
+                    this.loadedJavaScriptExtends = Collections.synchronizedMap(new HashMap<>());
+                    this.strongJavaObjectToID = Collections.synchronizedMap(new NativeScriptHashMap<>());
+                    this.weakJavaObjectToID = Collections.synchronizedMap(new NativeScriptWeakHashMap<>());
+                }
 
                 classResolver = new ClassResolver(classStorageService);
                 currentRuntime.set(this);
@@ -222,6 +240,8 @@ public class Runtime {
                 runtimeCache.put(this.runtimeId, this);
 
                 gcListener = GcListener.getInstance(config.appConfig.getGcThrottleTime(), config.appConfig.getMemoryCheckInterval(), config.appConfig.getFreeMemoryRatio());
+                // capture static configuration to allow native lookups when currentRuntime is unavailable
+                staticConfiguration = config;
             } finally {
                 frame.close();
             }
@@ -252,6 +272,86 @@ public class Runtime {
         } else {
             return false;
         }
+    }
+
+    // Expose logScriptLoading flag for native code without re-reading package.json
+    public static boolean getLogScriptLoadingEnabled() {
+        Runtime runtime = com.tns.Runtime.getCurrentRuntime();
+        if (runtime != null && runtime.config != null && runtime.config.appConfig != null) {
+            return runtime.config.appConfig.getLogScriptLoading();
+        }
+        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
+            return staticConfiguration.appConfig.getLogScriptLoading();
+        }
+        return false;
+    }
+    
+    // Security config
+    
+    /**
+     * checks security.allowRemoteModules from nativescript.config
+     */
+    public static boolean isRemoteModulesAllowed() {
+        // Debug mode always allows remote modules for development convenience
+        if (isDebuggable()) {
+            return true;
+        }
+        
+        // Production: check security config
+        Runtime runtime = com.tns.Runtime.getCurrentRuntime();
+        if (runtime != null && runtime.config != null && runtime.config.appConfig != null) {
+            return runtime.config.appConfig.getAllowRemoteModules();
+        }
+        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
+            return staticConfiguration.appConfig.getAllowRemoteModules();
+        }
+        return false;
+    }
+    
+    /**
+     * checks against security.remoteModuleAllowlist.
+     */
+    public static boolean isRemoteUrlAllowed(String url) {
+        // Debug mode always allows all URLs
+        if (isDebuggable()) {
+            return true;
+        }
+        
+        // Production: first check if remote modules are allowed at all
+        if (!isRemoteModulesAllowed()) {
+            return false;
+        }
+        
+        // Get the allowlist
+        String[] allowlist = getRemoteModuleAllowlist();
+        
+        // If no allowlist is configured, allow all URLs (user explicitly enabled remote modules)
+        if (allowlist == null || allowlist.length == 0) {
+            return true;
+        }
+        
+        // Check if URL matches any allowlist prefix
+        for (String prefix : allowlist) {
+            if (url != null && prefix != null && url.startsWith(prefix)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Returns the remote module allowlist as a String array for JNI.
+     */
+    public static String[] getRemoteModuleAllowlist() {
+        Runtime runtime = com.tns.Runtime.getCurrentRuntime();
+        if (runtime != null && runtime.config != null && runtime.config.appConfig != null) {
+            return runtime.config.appConfig.getRemoteModuleAllowlistArray();
+        }
+        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
+            return staticConfiguration.appConfig.getRemoteModuleAllowlistArray();
+        }
+        return new String[0];
     }
 
     private static Runtime getObjectRuntime(Object object) {
@@ -605,6 +705,7 @@ public class Runtime {
     private static Runtime initRuntime(DynamicConfiguration dynamicConfiguration) {
         Runtime runtime = new Runtime(staticConfiguration, dynamicConfiguration);
         runtime.init();
+        runtime.runScript(new File(staticConfiguration.appDir, "internal/ts_helpers.js"));
 
         return runtime;
     }
@@ -1163,7 +1264,8 @@ public class Runtime {
     public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException {
         Runtime runtime = Runtime.getCurrentRuntime();
 
-        if (runtime == null) {
+        // if we're not in a runtime or the runtime we're in does not have the object, try to find the right one (this might happen if a worker fires a JS method on an object created in the main thread or another worker)
+        if (runtime == null || runtime.getJavaObjectID(javaObject) == null) {
             runtime = getObjectRuntime(javaObject);
         }
 

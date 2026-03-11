@@ -64,7 +64,33 @@ class ArgConverter {
                 }
         }
 
-        static std::u16string ConvertToUtf16String(const v8::Local<v8::String>& s);
+    inline static v8::Local<v8::String> ToV8String(v8::Isolate *isolate, const std::string &value) {
+        return v8::String::NewFromUtf8(isolate, value.c_str(), v8::NewStringType::kNormal,
+                                       (int) value.length()).ToLocalChecked();
+    }
+
+    inline static std::string ToString(v8::Isolate *isolate, const v8::Local<v8::Value> &value) {
+        if (value.IsEmpty()) {
+            return std::string();
+        }
+
+        if (value->IsStringObject()) {
+            v8::Local<v8::String> obj = value.As<v8::StringObject>()->ValueOf();
+            return ToString(isolate, obj);
+        }
+
+        v8::String::Utf8Value result(isolate, value);
+
+        const char *val = *result;
+        if (val == nullptr) {
+            return std::string();
+        }
+
+        return std::string(*result, result.length());
+    }
+
+
+    static std::u16string ConvertToUtf16String(const v8::Local<v8::String>& s);
 
         inline static jstring ConvertToJavaString(const v8::Local<v8::Value>& jsValue) {
                 JEnv env;

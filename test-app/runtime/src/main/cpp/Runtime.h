@@ -50,6 +50,7 @@ class Runtime {
         ObjectManager* GetObjectManager() const;
 
         void RunModule(JNIEnv* _env, jobject obj, jstring scriptFile);
+        void RunModule(const char *moduleName);
         void RunWorker(jstring scriptFile);
         jobject RunScript(JNIEnv* _env, jobject obj, jstring scriptFile);
         jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs);
@@ -106,6 +107,15 @@ class Runtime {
         v8::Persistent<v8::Context>* m_context;
 
         bool m_isMainThread;
+
+        // High resolution timing origin values
+        // m_startTime: monotonic clock time captured at isolate creation
+        // m_realtimeOrigin: wall-clock time origin (milliseconds) captured at isolate creation
+        double m_startTime {0};
+        double m_realtimeOrigin {0};
+
+        // performance.now() callback
+        static void PerformanceNowCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
         v8::Isolate* PrepareV8Runtime(const std::string& filesPath, const std::string& nativeLibsDir, const std::string& packageName, bool isDebuggable, const std::string& callingDir, const std::string& profilerOutputDir, const int maxLogcatObjectSize, const bool forceLog);
         jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);

@@ -1,3 +1,163 @@
+## [9.0.2](https://github.com/NativeScript/android/compare/v9.0.1...v9.0.2) (2026-01-04)
+
+
+### Features
+
+* remote module security ([#1899](https://github.com/NativeScript/android/issues/1899)) ([5ceb3d4](https://github.com/NativeScript/android/commit/5ceb3d4ed49d11256f751be587925c05397e9b11))
+
+
+
+## [9.0.1](https://github.com/NativeScript/android/compare/v9.0.0...v9.0.1) (2025-12-14)
+
+
+### Bug Fixes
+
+* http realm cache key with query params ([#1896](https://github.com/NativeScript/android/issues/1896)) ([288491f](https://github.com/NativeScript/android/commit/288491fb0f5ce0f296285a878ba6ac34f78f299b))
+* improve reThrowToJava exception handling and runtime retrieval logic ([#1886](https://github.com/NativeScript/android/issues/1886)) ([c05e283](https://github.com/NativeScript/android/commit/c05e283823f1ddab43cefa3c9e828b3e66c97794))
+* proguard builds ([#1887](https://github.com/NativeScript/android/issues/1887)) ([3ecd707](https://github.com/NativeScript/android/commit/3ecd707be4494e26050bacc8d1916d22c5dd6433))
+* URLSearchParams.forEach() crash and spec compliance ([#1895](https://github.com/NativeScript/android/issues/1895)) ([3e61cef](https://github.com/NativeScript/android/commit/3e61cef4e90a7d3b27155ca38d69e6ce59dc0d2e))
+
+
+
+# [9.0.0](https://github.com/NativeScript/android/compare/v8.9.2...v9.0.0) (2025-11-17)
+
+
+### Bug Fixes
+
+* prevent crash when jweak points to null ([#1881](https://github.com/NativeScript/android/issues/1881)) ([5cb66ee](https://github.com/NativeScript/android/commit/5cb66ee7a5b4c4febdea999d79f9fe2800018fd3))
+
+
+### Features
+
+* Ada 3.3.0 ([#1884](https://github.com/NativeScript/android/issues/1884)) ([45fb275](https://github.com/NativeScript/android/commit/45fb27594f8d80d76acf79648b010151fa8b9ed7))
+* ES modules (ESM) support with conditional esm or commonjs consumption ([#1836](https://github.com/NativeScript/android/issues/1836)) ([052cb21](https://github.com/NativeScript/android/commit/052cb215f475453665c6c7d9e3dba419aa9a606a))
+* http loaded es module realms + HMR DX enrichments ([#1883](https://github.com/NativeScript/android/issues/1883)) ([7782720](https://github.com/NativeScript/android/commit/7782720f50fb5db4f43af8bdca501e90475c96c0))
+* queueMicrotask support ([#1868](https://github.com/NativeScript/android/issues/1868)) ([f033061](https://github.com/NativeScript/android/commit/f03306118ee178365ef16f2789a95b1f43117947))
+
+
+
+# [8.9.0](https://github.com/NativeScript/android/compare/v8.8.6...v8.9.0) (2025-02-26)
+
+
+### Bug Fixes
+
+* inner type should net be set when companion object is defined as function ([#1831](https://github.com/NativeScript/android/issues/1831)) ([e293636](https://github.com/NativeScript/android/commit/e293636ed1e9277d608e3102b404f94539404fdf))
+
+
+### Features
+
+* Ada 3.1.1 ([3633aed](https://github.com/NativeScript/android/commit/3633aed8913c7b93757909a569bfb8ab225add13))
+* ada v3 ([#1830](https://github.com/NativeScript/android/issues/1830)) ([b31fc5f](https://github.com/NativeScript/android/commit/b31fc5f7144b873981b8c7201d72baf26a6e79bc))
+* NDK 27 and Support for Java 21 ([#1819](https://github.com/NativeScript/android/issues/1819)) ([bec401c](https://github.com/NativeScript/android/commit/bec401c918942443bccab4e697cea2ccb843e603))
+* support 16 KB page sizes, gradle 8.5 ([#1818](https://github.com/NativeScript/android/issues/1818)) ([3423e6f](https://github.com/NativeScript/android/commit/3423e6ff05c5340f92eec46f8c8e996d78403860))
+
+
+### Performance Improvements
+
+* optimizations around generating JS classes from Metadata ([#1824](https://github.com/NativeScript/android/issues/1824)) ([f290ed2](https://github.com/NativeScript/android/commit/f290ed26da315ddefb56fa1acd212c6242ab976b))
+
+
+
+## [8.8.6](https://github.com/NativeScript/android/compare/v8.8.5...v8.8.6) (2024-10-28)
+
+
+### Bug Fixes
+
+* `exit(0)` causes ANR due to destroyed mutex ([#1820](https://github.com/NativeScript/android/issues/1820)) ([94ddb15](https://github.com/NativeScript/android/commit/94ddb159ccf368edebce76a8aa01d141d7297b1a))
+* gradle error when compileSdk or targetSdk is provided ([#1825](https://github.com/NativeScript/android/issues/1825)) ([a983931](https://github.com/NativeScript/android/commit/a983931cf5e9fcc7966a98a2f0ec4e24e040af5e))
+* **URL:** allow undefined 2nd args ([#1826](https://github.com/NativeScript/android/issues/1826)) ([2bab8f5](https://github.com/NativeScript/android/commit/2bab8f5be85c8764faafef4d6374dc8cfd257613))
+
+
+
+## [8.8.5](https://github.com/NativeScript/android/compare/v8.8.4...v8.8.5) (2024-09-30)
+
+
+### Bug Fixes
+
+* prevent metadata offset overflow into array space and convert shorts to uints before addition ([9cfc349](https://github.com/NativeScript/android/commit/9cfc3493017243948b043a51f68b7c7bcab1e6b9))
+
+
+
+## [8.8.4](https://github.com/NativeScript/android/compare/v8.8.3...v8.8.4) (2024-09-06)
+
+
+### Bug Fixes
+
+* ensure same mtime for js and code cache to prevent loading old code caches ([#1822](https://github.com/NativeScript/android/issues/1822)) ([3d6e101](https://github.com/NativeScript/android/commit/3d6e10115227ad556e5bbe1764217716ab5bdac7))
+
+
+
+## [8.8.3](https://github.com/NativeScript/android/compare/v8.8.2...v8.8.3) (2024-09-02)
+
+
+### Bug Fixes
+
+* generate correct metadata when overflowing signed short values ([#1821](https://github.com/NativeScript/android/issues/1821)) ([c9fac4b](https://github.com/NativeScript/android/commit/c9fac4b19a952d4df651d3d6a8b0fa9c50f7c7db))
+
+
+
+## [8.8.2](https://github.com/NativeScript/android/compare/v8.8.1...v8.8.2) (2024-07-22)
+
+
+### Bug Fixes
+
+* config with multiple bundle ids ([#1816](https://github.com/NativeScript/android/issues/1816)) ([cdcfee2](https://github.com/NativeScript/android/commit/cdcfee266617472ac7f3ac59742b858ad093e46b))
+
+
+
+## [8.8.1](https://github.com/NativeScript/android/compare/v8.8.0...v8.8.1) (2024-07-10)
+
+
+### Features
+
+* Ada 2.9 ([#1814](https://github.com/NativeScript/android/issues/1814)) ([91accf9](https://github.com/NativeScript/android/commit/91accf9be1caf9ad2accb80bf9aca18efe4dd75a))
+
+
+
+# [8.8.0](https://github.com/NativeScript/android/compare/v8.7.0...v8.8.0) (2024-07-09)
+
+
+### Bug Fixes
+
+* correctly load ts_helpers.js in workers ([#1798](https://github.com/NativeScript/android/issues/1798)) ([31f8501](https://github.com/NativeScript/android/commit/31f8501bb902815cfed8e1cd123fe8b6de2cb757))
+
+
+### Features
+
+* Kotlin 2 + Gradle 8+ ([#1812](https://github.com/NativeScript/android/issues/1812)) ([d4b7164](https://github.com/NativeScript/android/commit/d4b716427934ebb4387a04842561d5b5d0e1fa3d))
+
+
+
+# [8.7.0](https://github.com/NativeScript/android/compare/v8.7.0-rc.3...v8.7.0) (2024-04-08)
+
+
+
+# [8.7.0-rc.3](https://github.com/NativeScript/android/compare/v8.6.2...v8.7.0-rc.3) (2024-04-08)
+
+
+### Bug Fixes
+
+* devtools namespace usage ([#1810](https://github.com/NativeScript/android/issues/1810)) ([5aaac57](https://github.com/NativeScript/android/commit/5aaac5788ff9abf1c043817e87c8e03eb61907c0))
+* dts-generator.jar path ([1120a32](https://github.com/NativeScript/android/commit/1120a3258d53f83b7b4dfe7e505234e2b0d6cd2b))
+* inspector and globals ([#1811](https://github.com/NativeScript/android/issues/1811)) ([79ebd18](https://github.com/NativeScript/android/commit/79ebd18f308cd86fa98784f14b5c3f5ac39d8c5f))
+
+
+### Features
+
+* bump ndk to r23c ([#1803](https://github.com/NativeScript/android/issues/1803)) ([3894959](https://github.com/NativeScript/android/commit/3894959e0b4fe31f61cfd9fa70d5e2b04a0f36ac))
+* devtools element/network inspectors ([#1808](https://github.com/NativeScript/android/issues/1808)) ([1470796](https://github.com/NativeScript/android/commit/1470796dc506f0d01e94fe117119dc217ff8c909))
+* migrate to faster maps and use runtime context ([#1793](https://github.com/NativeScript/android/issues/1793)) ([b248dc4](https://github.com/NativeScript/android/commit/b248dc4038d0c1a6af420447c713bc968431f97e))
+* update libzip to 1.10.1 ([#1805](https://github.com/NativeScript/android/issues/1805)) ([ee2e3e0](https://github.com/NativeScript/android/commit/ee2e3e0b87caf3cff4784f1464dd51b2923c6861))
+* use node module bindings like the iOS runtime ([#1795](https://github.com/NativeScript/android/issues/1795)) ([643958b](https://github.com/NativeScript/android/commit/643958b6a4c3698567edde3fd03052873b2644dc))
+* **WinterCG:** URL & URLSearchParams ([#1801](https://github.com/NativeScript/android/issues/1801)) ([4f3a0d7](https://github.com/NativeScript/android/commit/4f3a0d7f2de5f899779bd0fe9081390e6c4d24b2))
+
+
+### Reverts
+
+* Version.h changes ([9faa25d](https://github.com/NativeScript/android/commit/9faa25dda197d3da4f694ea59208309bb02e529c))
+
+
+
 ## [8.6.2](https://github.com/NativeScript/android/compare/v8.6.1...v8.6.2) (2023-10-10)
 
 

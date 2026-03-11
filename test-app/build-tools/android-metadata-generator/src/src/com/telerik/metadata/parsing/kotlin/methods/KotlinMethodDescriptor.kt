@@ -2,10 +2,11 @@ package com.telerik.metadata.parsing.kotlin.methods
 
 import com.telerik.metadata.parsing.bytecode.methods.NativeMethodBytecodeDescriptor
 import com.telerik.metadata.parsing.kotlin.classes.KotlinClassDescriptor
-import kotlinx.metadata.Flag
-import kotlinx.metadata.KmDeclarationContainer
-import kotlinx.metadata.jvm.KotlinClassMetadata
-import kotlinx.metadata.jvm.signature
+import kotlin.metadata.KmDeclarationContainer
+import kotlin.metadata.Visibility
+import kotlin.metadata.jvm.KotlinClassMetadata
+import kotlin.metadata.jvm.signature
+import kotlin.metadata.visibility
 import org.apache.bcel.classfile.Method
 
 class KotlinMethodDescriptor(private val method: Method, private val originClass: KotlinClassDescriptor,
@@ -26,11 +27,15 @@ class KotlinMethodDescriptor(private val method: Method, private val originClass
 
     override val isInternal by lazy {
         return@lazy when (val kotlinMetadata = originClass.kotlinMetadata) {
-            is KotlinClassMetadata.Class -> checkIfMethodIsInternal(method, kotlinMetadata.toKmClass())
-            is KotlinClassMetadata.FileFacade -> checkIfMethodIsInternal(method, kotlinMetadata.toKmPackage())
+            is KotlinClassMetadata.Class -> checkIfMethodIsInternal(method, kotlinMetadata.kmClass)
+            is KotlinClassMetadata.FileFacade -> checkIfMethodIsInternal(method,
+                kotlinMetadata.kmPackage
+            )
             is KotlinClassMetadata.SyntheticClass -> false
             is KotlinClassMetadata.MultiFileClassFacade -> false
-            is KotlinClassMetadata.MultiFileClassPart -> checkIfMethodIsInternal(method, kotlinMetadata.toKmPackage())
+            is KotlinClassMetadata.MultiFileClassPart -> checkIfMethodIsInternal(method,
+                kotlinMetadata.kmPackage
+            )
             is KotlinClassMetadata.Unknown -> false
             null -> false
         }
@@ -40,8 +45,8 @@ class KotlinMethodDescriptor(private val method: Method, private val originClass
         val function = kotlinDeclarationContainer
                 .functions
                 .firstOrNull {
-                    it.signature != null && it.signature!!.name == method.name && it.signature!!.desc == method.signature
+                    it.signature != null && it.signature!!.name == method.name && it.signature!!.descriptor == method.signature
                 }
-        return if (function != null) Flag.IS_INTERNAL(function.flags) else false
+        return if (function != null) function.visibility == Visibility.INTERNAL else false
     }
 }

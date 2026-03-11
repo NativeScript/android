@@ -696,9 +696,9 @@ public abstract class NanoWSD extends NanoHTTPD {
         public void write(OutputStream out) throws IOException {
             byte header = 0;
             if (this.fin) {
-                header |= 0x80;
+                header |= (byte) 0x80;
             }
-            header |= this.opCode.getValue() & 0x0F;
+            header |= (byte) (this.opCode.getValue() & 0x0F);
             out.write(header);
 
             this._payloadLength = getBinaryPayload().length;

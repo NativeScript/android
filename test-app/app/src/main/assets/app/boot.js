@@ -14,7 +14,6 @@ global.__onUncaughtError = function(error){
 }
 
 require('./Infrastructure/timers');
-
 global.__JUnitSaveResults = function (unitTestResults) {
 	var pathToApp = '/data/data/com.tns.testapplication';
 	var unitTestFileName = 'android_unit_test_results.xml';

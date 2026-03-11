@@ -1,107 +1,128 @@
 #ifndef NATIVESCRIPTEXCEPTION_H_
 #define NATIVESCRIPTEXCEPTION_H_
 
-#include "v8.h"
+#include <exception>
+
 #include "JEnv.h"
 #include "JniLocalRef.h"
 #include "ObjectManager.h"
 #include "include/v8.h"
+#include "v8.h"
 
 namespace tns {
-class NativeScriptException {
-    public:
-        /*
-         * Generates a NativeScriptException with java error from environment
-         */
-        NativeScriptException(JEnv& env);
+class NativeScriptException : public std::exception {
+ public:
+  /*
+   * Generates a NativeScriptException with java error from environment
+   */
+  NativeScriptException(JEnv& env);
 
-        /*
-         * Generates a NativeScriptException with given message
-         */
-        NativeScriptException(const std::string& message);
+  /*
+   * Generates a NativeScriptException with given message
+   */
+  NativeScriptException(const std::string& message);
 
-        /*
-         * Generates a NativeScriptException with given message and stackTrace
-         */
-        NativeScriptException(const std::string& message, const std::string& stackTrace);
+  /*
+   * Generates a NativeScriptException with given message and stackTrace
+   */
+  NativeScriptException(const std::string& message,
+                        const std::string& stackTrace);
 
-        /*
-         * Generates a NativeScriptException with javascript error from TryCatch and a prepend message if any
-         */
-        NativeScriptException(v8::TryCatch& tc, const std::string& message = "");
+  /*
+   * Generates a NativeScriptException with javascript error from TryCatch and a
+   * prepend message if any
+   */
+  NativeScriptException(v8::TryCatch& tc, const std::string& message = "");
 
-        void ReThrowToV8();
-        void ReThrowToJava();
+  void ReThrowToV8();
+  void ReThrowToJava();
 
-        static void Init();
+  std::string ToString() const;
+  std::string GetErrorMessage() const;
+  const char* what() const noexcept override;
 
-        /*
-         * This handler is attached to v8 to handle uncaught javascript exceptions.
-         */
-        static void OnUncaughtError(v8::Local<v8::Message> message, v8::Local<v8::Value> error);
+  static void Init();
 
-        /*
-         * Calls the global "__onUncaughtError" or "__onDiscardedError" if such is provided
-         */
-        static void CallJsFuncWithErr(v8::Local<v8::Value> errObj, jboolean isDiscarded);
+  /*
+   * This handler is attached to v8 to handle uncaught javascript exceptions.
+   */
+  static void OnUncaughtError(v8::Local<v8::Message> message,
+                              v8::Local<v8::Value> error);
 
-    private:
-        /*
-         * Try to get native exception or NativeScriptException from js object
-         */
-        JniLocalRef TryGetJavaThrowableObject(JEnv& env, const v8::Local<v8::Object>& jsObj);
+  /*
+   * Calls the global "__onUncaughtError" or "__onDiscardedError" if such is
+   * provided
+   */
+  static void CallJsFuncWithErr(v8::Local<v8::Value> errObj,
+                                jboolean isDiscarded);
 
-        /*
-         * Gets java exception message from jthrowable
-         */
-        std::string GetExceptionMessage(JEnv& env, jthrowable exception);
+ private:
+  /*
+   * Try to get native exception or NativeScriptException from js object
+   */
+  JniLocalRef TryGetJavaThrowableObject(JEnv& env,
+                                        const v8::Local<v8::Object>& jsObj);
 
-        /*
-         * Gets java exception stack trace from jthrowable
-         */
-        std::string GetExceptionStackTrace(JEnv& env, jthrowable exception);
+  /*
+   * Gets java exception message from jthrowable
+   */
+  std::string GetExceptionMessage(JEnv& env, jthrowable exception) const;
 
-        /*
-         * Gets the member m_javaException, wraps it and creates a javascript error object from it
-         */
-        v8::Local<v8::Value> WrapJavaToJsException();
+  /*
+   * Gets java exception stack trace from jthrowable
+   */
+  std::string GetExceptionStackTrace(JEnv& env, jthrowable exception) const;
 
-        /*
-         * Gets all the information from a java exception and puts it in a javascript errror object
-         */
-        v8::Local<v8::Value> GetJavaExceptionFromEnv(const JniLocalRef& exc, JEnv& env);
+  /*
+   * Gets the member m_javaException, wraps it and creates a javascript error
+   * object from it
+   */
+  v8::Local<v8::Value> WrapJavaToJsException();
 
-        /*
-         * Gets all the information from a js message and an js error object and puts it in a string
-         */
-        static std::string GetErrorMessage(const v8::Local<v8::Message>& message, v8::Local<v8::Value>& error, const std::string& prependMessage = "");
+  /*
+   * Gets all the information from a java exception and puts it in a javascript
+   * errror object
+   */
+  v8::Local<v8::Value> GetJavaExceptionFromEnv(const JniLocalRef& exc,
+                                               JEnv& env);
 
-        /*
-         * Generates string stack trace from js StackTrace
-         */
-        static std::string GetErrorStackTrace(const v8::Local<v8::StackTrace>& stackTrace);
+  /*
+   * Gets all the information from a js message and an js error object and puts
+   * it in a string
+   */
+  static std::string GetErrorMessage(const v8::Local<v8::Message>& message,
+                                     v8::Local<v8::Value>& error,
+                                     const std::string& prependMessage = "");
 
-        /*
-         *	Adds a prepend message to the normal message process
-         */
-        std::string GetFullMessage(const v8::TryCatch& tc, const std::string& jsExceptionMessage);
+  /*
+   * Generates string stack trace from js StackTrace
+   */
+  static std::string GetErrorStackTrace(
+      const v8::Local<v8::StackTrace>& stackTrace);
 
-        v8::Persistent<v8::Value>* m_javascriptException;
-        JniLocalRef m_javaException;
-        std::string m_message;
-        std::string m_stackTrace;
-        std::string m_fullMessage;
+  /*
+   *	Adds a prepend message to the normal message process
+   */
+  std::string GetFullMessage(const v8::TryCatch& tc,
+                             const std::string& jsExceptionMessage);
 
-        static jclass RUNTIME_CLASS;
-        static jclass THROWABLE_CLASS;
-        static jclass NATIVESCRIPTEXCEPTION_CLASS;
-        static jmethodID NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID;
-        static jmethodID NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID;
-        static jmethodID NATIVESCRIPTEXCEPTION_GET_MESSAGE_METHOD_ID;
-        static jmethodID NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID;
+  v8::Persistent<v8::Value>* m_javascriptException;
+  JniLocalRef m_javaException;
+  std::string m_message;
+  std::string m_stackTrace;
+  std::string m_fullMessage;
+  mutable std::string m_whatCache;
 
-        static void PrintErrorMessage(const std::string& errorMessage);
+  static jclass RUNTIME_CLASS;
+  static jclass THROWABLE_CLASS;
+  static jclass NATIVESCRIPTEXCEPTION_CLASS;
+  static jmethodID NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID;
+  static jmethodID NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID;
+  static jmethodID NATIVESCRIPTEXCEPTION_GET_MESSAGE_METHOD_ID;
+  static jmethodID NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID;
+
+  static void PrintErrorMessage(const std::string& errorMessage);
 };
-}
+}  // namespace tns
 
 #endif /* NATIVESCRIPTEXCEPTION_H_ */

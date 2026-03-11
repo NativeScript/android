@@ -123,7 +123,7 @@ namespace tns {
         // background thread lost cycles
         std::set<int> deletedTimers_;
         int fd_[2];
-        std::atomic_bool isBufferFull = ATOMIC_VAR_INIT(false);
+        std::atomic_bool isBufferFull = false;
         std::condition_variable taskReady;
         std::condition_variable bufferFull;
         std::mutex mutex;

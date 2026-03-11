@@ -2,8 +2,11 @@ package com.tns;
 
 import java.io.File;
 import org.json.JSONObject;
+import org.json.JSONArray;
 import android.os.Build;
 import android.util.Log;
+import java.util.ArrayList;
+import java.util.List;
 
 class AppConfig {
     protected enum KnownKeys {
@@ -20,7 +23,8 @@ class AppConfig {
         ForceLog("forceLog", false),
         DiscardUncaughtJsExceptions("discardUncaughtJsExceptions", false),
         EnableLineBreakpoins("enableLineBreakpoints", false),
-        EnableMultithreadedJavascript("enableMultithreadedJavascript", false);
+        EnableMultithreadedJavascript("enableMultithreadedJavascript", false),
+        LogScriptLoading("logScriptLoading", false);
 
         private final String name;
         private final Object defaultValue;
@@ -39,8 +43,13 @@ class AppConfig {
     }
 
     private final static String AndroidKey = "android";
+    private final static String SecurityKey = "security";
 
     private final Object[] values;
+    
+    // Security config
+    private boolean allowRemoteModules = false;
+    private List<String> remoteModuleAllowlist = new ArrayList<>();
 
     public AppConfig(File appDir) {
         values = makeDefaultOptions();
@@ -53,9 +62,29 @@ class AppConfig {
         try {
             rootObject = FileSystem.readJSONFile(packageInfo);
             if (rootObject != null) {
+                // Parse security configuration
+                if (rootObject.has(SecurityKey)) {
+                    JSONObject securityObject = rootObject.getJSONObject(SecurityKey);
+                    if (securityObject.has("allowRemoteModules")) {
+                        allowRemoteModules = securityObject.getBoolean("allowRemoteModules");
+                    }
+                    if (securityObject.has("remoteModuleAllowlist")) {
+                        JSONArray allowlist = securityObject.getJSONArray("remoteModuleAllowlist");
+                        for (int i = 0; i < allowlist.length(); i++) {
+                            String url = allowlist.optString(i);
+                            if (url != null && !url.isEmpty()) {
+                                remoteModuleAllowlist.add(url);
+                            }
+                        }
+                    }
+                }
+                
                 if (rootObject.has(KnownKeys.Profiling.getName())) {
                     String profiling = rootObject.getString(KnownKeys.Profiling.getName());
                     values[KnownKeys.Profiling.ordinal()] = profiling;
+                }
+                if (rootObject.has(KnownKeys.LogScriptLoading.getName())) {
+                    values[KnownKeys.LogScriptLoading.ordinal()] = rootObject.getBoolean(KnownKeys.LogScriptLoading.getName());
                 }
                 if (rootObject.has(KnownKeys.DiscardUncaughtJsExceptions.getName())) {
                     values[KnownKeys.DiscardUncaughtJsExceptions.ordinal()] = rootObject.getBoolean(KnownKeys.DiscardUncaughtJsExceptions.getName());
@@ -170,5 +199,35 @@ class AppConfig {
 
     public boolean getEnableMultithreadedJavascript() {
         return (boolean)values[KnownKeys.EnableMultithreadedJavascript.ordinal()];
+    }
+
+    public boolean getLogScriptLoading() {
+    Object v = values[KnownKeys.LogScriptLoading.ordinal()];
+    return (v instanceof Boolean) ? ((Boolean)v).booleanValue() : false;
+    }
+
+    // Security conf
+    
+    /**
+     * Returns true if remote ES modules are allowed in production.
+     * Default: false
+     */
+    public boolean getAllowRemoteModules() {
+        return allowRemoteModules;
+    }
+    
+    /**
+     * Returns the list of allowed URL prefixes for remote module loading.
+     * Only used when allowRemoteModules is true.
+     */
+    public List<String> getRemoteModuleAllowlist() {
+        return remoteModuleAllowlist;
+    }
+    
+    /**
+     * Returns the allowlist
+     */
+    public String[] getRemoteModuleAllowlistArray() {
+        return remoteModuleAllowlist.toArray(new String[0]);
     }
 }
