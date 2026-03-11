@@ -862,12 +862,12 @@ task buildMetadata(type: BuildToolTask) {
         }
 
 
-        def compileArtProfileTaskName = "compile${buildTypeName}ArtProfile"
-        def compileArtProfileTask = tasks.findByName(compileArtProfileTaskName)
+        // def compileArtProfileTaskName = "compile${buildTypeName}ArtProfile"
+        // def compileArtProfileTask = tasks.findByName(compileArtProfileTaskName)
 
-        if (compileArtProfileTask) {
-            dependsOn compileArtProfileTask
-        }
+        // if (compileArtProfileTask) {
+        //     dependsOn compileArtProfileTask
+        // }
 
 
         def extractNativeSymbolTablesTaskName = "extract${buildTypeName}NativeSymbolTables"
@@ -878,12 +878,12 @@ task buildMetadata(type: BuildToolTask) {
         }
 
 
-        def optimizeResourcesTaskName = "optimize${buildTypeName}Resources"
-        def optimizeResourcesTask = tasks.findByName(optimizeResourcesTaskName)
+        // def optimizeResourcesTaskName = "optimize${buildTypeName}Resources"
+        // def optimizeResourcesTask = tasks.findByName(optimizeResourcesTaskName)
 
-        if (optimizeResourcesTask) {
-            dependsOn optimizeResourcesTask
-        }
+        // if (optimizeResourcesTask) {
+        //     dependsOn optimizeResourcesTask
+        // }
 
         def bundleResourcesTaskName = "bundle${buildTypeName}Resources"
         def bundleResourcesTask = tasks.findByName(bundleResourcesTaskName)
