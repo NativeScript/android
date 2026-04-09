@@ -136,7 +136,7 @@ jobs:
       - name: SBG tests
         run: ./gradlew runSbgTests --stacktrace
       - name: Run unit tests
-        uses: ReactiveCircus/android-emulator-runner@b530d96654c385303d652368551fb075bc2f0b6b # v2.35.0
+        uses: ReactiveCircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a # v2.37.0
         with:
           api-level: ${{env.ANDROID_API}}
           # this is needed on API 30+
