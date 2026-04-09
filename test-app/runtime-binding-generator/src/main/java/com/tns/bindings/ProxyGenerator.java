@@ -58,6 +58,10 @@ public class ProxyGenerator {
 
     private String saveProxy(String proxyName, byte[] proxyBytes) throws IOException {
         File file = new File(path + File.separator + proxyName + ".dex");
+        File parentDir = file.getParentFile();
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs();
+        }
         file.createNewFile();
         FileOutputStream stream = new FileOutputStream(file);
         stream.write(proxyBytes);
