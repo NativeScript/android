@@ -177,8 +177,10 @@ jobs:
           path: dist
       - name: Update npm (required for OIDC trusted publishing)
         run: |
-          npm install -g npm@^11.5.1
-          npm --version
+          corepack enable npm
+          corepack install -g npm@11.5.1
+          test "$(npm --version)" = "11.5.1"
+          test "$(npx --version)" = "11.5.1"
       - name: Publish package (OIDC trusted publishing)
         if: ${{ vars.USE_NPM_TOKEN != 'true' }}
         run: |
