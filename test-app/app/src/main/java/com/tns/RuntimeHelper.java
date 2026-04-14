@@ -123,6 +123,18 @@ public final class RuntimeHelper {
 
                 ClassLoader classLoader = context.getClassLoader();
                 File dexDir = new File(rootDir, "code_cache/secondary-dexes");
+                if (!dexDir.exists()) {
+                    dexDir.mkdirs();
+                }
+                if (!dexDir.exists() || !dexDir.canWrite()) {
+                    if (logger.isEnabled()) {
+                        logger.write("Unable to use dex dir: " + dexDir.getAbsolutePath() + ", falling back to files/secondary-dexes");
+                    }
+                    dexDir = new File(appDir, "secondary-dexes");
+                    if (!dexDir.exists()) {
+                        dexDir.mkdirs();
+                    }
+                }
                 String dexThumb = null;
                 try {
                     dexThumb = Util.getDexThumb(context);
