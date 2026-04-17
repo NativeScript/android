@@ -56,6 +56,11 @@ public class DexFactory {
             odexDir.mkdir();
         }
 
+        if (!dexDir.exists() || !dexDir.canWrite()) {
+            Log.w("JS", "DexFactory: dexDir unusable at init path=" + dexDir.getAbsolutePath()
+                    + " exists=" + dexDir.exists() + " canWrite=" + dexDir.canWrite());
+        }
+
         this.updateDexThumbAndPurgeCache();
         this.proxyGenerator.setProxyThumb(this.dexThumb);
         this.classStorageService = classStorageService;
@@ -123,10 +128,22 @@ public class DexFactory {
             }
 
             String dexFilePath;
-            if (isInterface) {
-                dexFilePath = this.generateDex(name, classToProxy, methodOverrides, implementedInterfaces, isInterface);
-            } else {
-                dexFilePath = this.generateDex(desiredDexClassName, classToProxy, methodOverrides, implementedInterfaces, isInterface);
+            try {
+                if (isInterface) {
+                    dexFilePath = this.generateDex(name, classToProxy, methodOverrides, implementedInterfaces, isInterface);
+                } else {
+                    dexFilePath = this.generateDex(desiredDexClassName, classToProxy, methodOverrides, implementedInterfaces, isInterface);
+                }
+            } catch (IOException e) {
+                String diag = "DexFactory.generateDex failed class=" + className
+                        + " baseClass=" + baseClassName
+                        + " isInterface=" + isInterface
+                        + " dexDir=" + dexDir.getAbsolutePath()
+                        + " dexDir.exists=" + dexDir.exists()
+                        + " dexDir.canWrite=" + dexDir.canWrite()
+                        + " dexThumb=" + dexThumb;
+                Log.e("JS", diag + " | " + e.getMessage());
+                throw new IOException(diag + " | " + e.getMessage(), e);
             }
             dexFile = new File(dexFilePath);
             long stopGenTime = System.nanoTime();

@@ -127,13 +127,15 @@ public final class RuntimeHelper {
                     dexDir.mkdirs();
                 }
                 if (!dexDir.exists() || !dexDir.canWrite()) {
-                    if (logger.isEnabled()) {
-                        logger.write("Unable to use dex dir: " + dexDir.getAbsolutePath() + ", falling back to files/secondary-dexes");
-                    }
+                    File primary = dexDir;
                     dexDir = new File(appDir, "secondary-dexes");
                     if (!dexDir.exists()) {
                         dexDir.mkdirs();
                     }
+                    Log.w(logTag, "Unable to use primary dex dir '" + primary.getAbsolutePath()
+                            + "' (exists=" + primary.exists() + " canWrite=" + primary.canWrite()
+                            + "); falling back to '" + dexDir.getAbsolutePath()
+                            + "' (exists=" + dexDir.exists() + " canWrite=" + dexDir.canWrite() + ")");
                 }
                 String dexThumb = null;
                 try {

@@ -62,12 +62,46 @@ public class ProxyGenerator {
         if (parentDir != null && !parentDir.exists()) {
             parentDir.mkdirs();
         }
-        file.createNewFile();
-        FileOutputStream stream = new FileOutputStream(file);
-        stream.write(proxyBytes);
-        stream.flush();
-        stream.close();
+        try {
+            file.createNewFile();
+            FileOutputStream stream = new FileOutputStream(file);
+            try {
+                stream.write(proxyBytes);
+                stream.flush();
+            } finally {
+                stream.close();
+            }
+        } catch (IOException e) {
+            throw new IOException("Failed to save proxy dex '" + file.getAbsolutePath()
+                    + "' (" + proxyBytes.length + " bytes): " + e.getMessage()
+                    + " | " + describeDexDirState(file, parentDir), e);
+        }
 
         return file.getAbsolutePath();
+    }
+
+    private static String describeDexDirState(File file, File parentDir) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("file.exists=").append(file.exists());
+        if (parentDir != null) {
+            sb.append(" parent=").append(parentDir.getAbsolutePath());
+            sb.append(" parent.exists=").append(parentDir.exists());
+            sb.append(" parent.isDir=").append(parentDir.isDirectory());
+            sb.append(" parent.canWrite=").append(parentDir.canWrite());
+            File grand = parentDir.getParentFile();
+            if (grand != null) {
+                sb.append(" grand=").append(grand.getAbsolutePath());
+                sb.append(" grand.exists=").append(grand.exists());
+                sb.append(" grand.canWrite=").append(grand.canWrite());
+            }
+            try {
+                sb.append(" parent.freeSpace=").append(parentDir.getFreeSpace());
+                sb.append(" parent.usableSpace=").append(parentDir.getUsableSpace());
+            } catch (Throwable ignored) {
+            }
+        } else {
+            sb.append(" parent=null");
+        }
+        return sb.toString();
     }
 }
