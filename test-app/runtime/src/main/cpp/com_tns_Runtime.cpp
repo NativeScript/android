@@ -7,9 +7,75 @@
 using namespace std;
 using namespace tns;
 
+Runtime* TryGetRuntime(int runtimeId);
+
+namespace {
+jint GenerateNewObjectIdFast(jint runtimeId) {
+    auto runtime = TryGetRuntime(runtimeId);
+    if (runtime == nullptr) {
+        return 0;
+    }
+
+    return runtime->GenerateNewObjectId(nullptr, nullptr);
+}
+
+jboolean NotifyGcFast(JNIEnv* env, jclass, jobject runtimeObject, jint runtimeId) {
+    auto runtime = TryGetRuntime(runtimeId);
+    if (runtime == nullptr) {
+        return JNI_FALSE;
+    }
+
+    return runtime->NotifyGC(env, runtimeObject) ? JNI_TRUE : JNI_FALSE;
+}
+
+jint GetPointerSizeFast() {
+    return sizeof(void*);
+}
+
+jint GetCurrentRuntimeIdFast() {
+    Isolate* isolate = Isolate::TryGetCurrent();
+    if (isolate == nullptr) {
+        return -1;
+    }
+
+    Runtime* runtime = Runtime::GetRuntime(isolate);
+    return runtime->GetId();
+}
+
+void SetManualInstrumentationModeFast(JNIEnv*, jclass, jstring mode) {
+    Runtime::SetManualInstrumentationMode(mode);
+}
+
+void RegisterRuntimeNativeFastMethods(JNIEnv* env) {
+    jclass runtimeNativeFastClass = env->FindClass("com/tns/RuntimeNativeFast");
+    if (runtimeNativeFastClass == nullptr) {
+        throw NativeScriptException("Unable to find com/tns/RuntimeNativeFast for JNI registration.");
+    }
+
+    JNINativeMethod methods[] = {
+        { const_cast<char*>("generateNewObjectId"), const_cast<char*>("(I)I"), reinterpret_cast<void*>(GenerateNewObjectIdFast) },
+        { const_cast<char*>("notifyGc"), const_cast<char*>("(Lcom/tns/Runtime;I)Z"), reinterpret_cast<void*>(NotifyGcFast) },
+        { const_cast<char*>("getCurrentRuntimeId"), const_cast<char*>("()I"), reinterpret_cast<void*>(GetCurrentRuntimeIdFast) },
+        { const_cast<char*>("getPointerSize"), const_cast<char*>("()I"), reinterpret_cast<void*>(GetPointerSizeFast) },
+        { const_cast<char*>("SetManualInstrumentationMode"), const_cast<char*>("(Ljava/lang/String;)V"), reinterpret_cast<void*>(SetManualInstrumentationModeFast) },
+    };
+
+    if (env->RegisterNatives(runtimeNativeFastClass, methods, sizeof(methods) / sizeof(methods[0])) != JNI_OK) {
+        throw NativeScriptException("Unable to register com/tns/RuntimeNativeFast native methods.");
+    }
+
+    env->DeleteLocalRef(runtimeNativeFastClass);
+}
+} // namespace
+
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
     try {
         Runtime::Init(vm, reserved);
+        JNIEnv* env = nullptr;
+        if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK || env == nullptr) {
+            throw NativeScriptException("Unable to retrieve JNIEnv during JNI_OnLoad.");
+        }
+        RegisterRuntimeNativeFastMethods(env);
     } catch (NativeScriptException& e) {
         e.ReThrowToJava();
     } catch (std::exception e) {
@@ -25,8 +91,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
     return JNI_VERSION_1_6;
 }
 
-// @FastNative signature - optimized JNI, keeps JNIEnv* for jstring handling
-extern "C" JNIEXPORT void Java_com_tns_Runtime_SetManualInstrumentationMode(JNIEnv* _env, jobject obj, jstring mode) {
+extern "C" JNIEXPORT void Java_com_tns_Runtime_SetManualInstrumentationModeLegacy(JNIEnv*, jclass, jstring mode) {
     try {
         Runtime::SetManualInstrumentationMode(mode);
     } catch (...) {
@@ -215,14 +280,9 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv* _e
     }
 }
 
-// @CriticalNative signature - no JNIEnv* or jobject parameters
-extern "C" JNIEXPORT jint Java_com_tns_Runtime_generateNewObjectId(jint runtimeId) {
+extern "C" JNIEXPORT jint Java_com_tns_Runtime_generateNewObjectIdLegacy(JNIEnv*, jclass, jint runtimeId) {
     try {
-        auto runtime = TryGetRuntime(runtimeId);
-        if (runtime == nullptr) {
-            return 0;
-        }
-        return runtime->GenerateNewObjectId(nullptr, nullptr);
+        return GenerateNewObjectIdFast(runtimeId);
     } catch (NativeScriptException& e) {
         e.ReThrowToJava();
     } catch (std::exception e) {
@@ -238,15 +298,8 @@ extern "C" JNIEXPORT jint Java_com_tns_Runtime_generateNewObjectId(jint runtimeI
     return 0;
 }
 
-// @FastNative signature - optimized JNI, keeps JNIEnv* for NotifyGC
-extern "C" JNIEXPORT jboolean Java_com_tns_Runtime_notifyGc(JNIEnv* env, jobject obj, jint runtimeId) {
-    auto runtime = TryGetRuntime(runtimeId);
-    if (runtime == nullptr) {
-        return JNI_FALSE;
-    }
-
-    jboolean success = runtime->NotifyGC(env, obj) ? JNI_TRUE : JNI_FALSE;
-    return success;
+extern "C" JNIEXPORT jboolean Java_com_tns_Runtime_notifyGcLegacy(JNIEnv* env, jobject obj, jint runtimeId) {
+    return NotifyGcFast(env, nullptr, obj, runtimeId);
 }
 
 extern "C" JNIEXPORT void Java_com_tns_Runtime_lock(JNIEnv* env, jobject obj, jint runtimeId) {
@@ -291,21 +344,12 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_passExceptionToJsNative(JNIEnv* e
     }
 }
 
-// @CriticalNative signature - no JNIEnv* or jobject parameters
-extern "C" JNIEXPORT jint Java_com_tns_Runtime_getPointerSize() {
-    return sizeof(void*);
+extern "C" JNIEXPORT jint Java_com_tns_Runtime_getPointerSizeLegacy(JNIEnv*, jclass) {
+    return GetPointerSizeFast();
 }
 
-// @CriticalNative signature - no JNIEnv* or jobject parameters
-extern "C" JNIEXPORT jint Java_com_tns_Runtime_getCurrentRuntimeId() {
-    Isolate* isolate = Isolate::TryGetCurrent();
-    if (isolate == nullptr) {
-        return -1;
-    }
-
-    Runtime* runtime = Runtime::GetRuntime(isolate);
-    int id = runtime->GetId();
-    return id;
+extern "C" JNIEXPORT jint Java_com_tns_Runtime_getCurrentRuntimeIdLegacy(JNIEnv*, jclass) {
+    return GetCurrentRuntimeIdFast();
 }
 
 extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerGlobalOnMessageCallback(JNIEnv* env, jobject obj, jint runtimeId, jstring msg) {

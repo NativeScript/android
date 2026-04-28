@@ -1,5 +1,6 @@
 package com.tns;
 
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -31,15 +32,15 @@ import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Collections;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.Collections;
-import dalvik.annotation.optimization.CriticalNative;
-import dalvik.annotation.optimization.FastNative;
 
 public class Runtime {
+    private static final boolean USE_FAST_NATIVE_METHODS = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
+
     private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName,
                                          Object[] v8Options, String callingDir, int maxLogcatObjectSize, boolean forceLog);
 
@@ -53,11 +54,25 @@ public class Runtime {
 
     private native void createJSInstanceNative(int runtimeId, Object javaObject, int javaObjectID, String canonicalName);
 
-    @CriticalNative
-    private static native int generateNewObjectId(int runtimeId);
+    private static int generateNewObjectId(int runtimeId) {
+        if (USE_FAST_NATIVE_METHODS) {
+            return RuntimeNativeFast.generateNewObjectId(runtimeId);
+        }
 
-    @FastNative
-    private native boolean notifyGc(int runtimeId);
+        return generateNewObjectIdLegacy(runtimeId);
+    }
+
+    private static native int generateNewObjectIdLegacy(int runtimeId);
+
+    private boolean notifyGc(int runtimeId) {
+        if (USE_FAST_NATIVE_METHODS) {
+            return RuntimeNativeFast.notifyGc(this, runtimeId);
+        }
+
+        return notifyGcLegacy(runtimeId);
+    }
+
+    private native boolean notifyGcLegacy(int runtimeId);
 
     private native void lock(int runtimeId);
 
@@ -65,14 +80,36 @@ public class Runtime {
 
     private native void passExceptionToJsNative(int runtimeId, Throwable ex, String message, String fullStackTrace, String jsStackTrace, boolean isDiscarded);
 
-    @CriticalNative
-    private static native int getCurrentRuntimeId();
+    private static int getCurrentRuntimeId() {
+        if (USE_FAST_NATIVE_METHODS) {
+            return RuntimeNativeFast.getCurrentRuntimeId();
+        }
 
-    @CriticalNative
-    public static native int getPointerSize();
+        return getCurrentRuntimeIdLegacy();
+    }
 
-    @FastNative
-    public static native void SetManualInstrumentationMode(String mode);
+    private static native int getCurrentRuntimeIdLegacy();
+
+    public static int getPointerSize() {
+        if (USE_FAST_NATIVE_METHODS) {
+            return RuntimeNativeFast.getPointerSize();
+        }
+
+        return getPointerSizeLegacy();
+    }
+
+    private static native int getPointerSizeLegacy();
+
+    public static void SetManualInstrumentationMode(String mode) {
+        if (USE_FAST_NATIVE_METHODS) {
+            RuntimeNativeFast.SetManualInstrumentationMode(mode);
+            return;
+        }
+
+        SetManualInstrumentationModeLegacy(mode);
+    }
+
+    private static native void SetManualInstrumentationModeLegacy(String mode);
 
     private static native void WorkerGlobalOnMessageCallback(int runtimeId, String message);
 
