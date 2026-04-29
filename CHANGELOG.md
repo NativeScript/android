@@ -1,3 +1,12 @@
+## [9.0.4](https://github.com/NativeScript/android/compare/v9.0.3...v9.0.4) (2026-04-29)
+
+
+### Bug Fixes
+
+* implement optimized native method registration for Android 8-11 ([#1942](https://github.com/NativeScript/android/issues/1942)) ([3c956cf](https://github.com/NativeScript/android/commit/3c956cfcae81ca1b996a0cc34fea1ebd2638397a))
+
+
+
 ## [9.0.3](https://github.com/NativeScript/android/compare/v9.0.2...v9.0.3) (2026-04-24)
 
 
