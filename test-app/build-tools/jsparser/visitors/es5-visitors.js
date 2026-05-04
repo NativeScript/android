@@ -526,13 +526,32 @@ var es5_visitors = (function() {
     /*
      *	HELPER METHODS
      */
+
+    // Returns the Identifier name of a property's key, or null when the property
+    // is a SpreadElement, has a computed key, or uses a non-Identifier key
+    // (e.g. StringLiteral, NumericLiteral). Such properties cannot be mapped to
+    // a Java method binding, so callers should skip them.
+    function _getIdentifierKeyName(property) {
+        if (!property || property.computed) {
+            return null;
+        }
+        if (!property.key || !types.isIdentifier(property.key)) {
+            return null;
+        }
+        return property.key.name;
+    }
+
     function _getOverriddenMethods(node, config) {
         var overriddenMethodNames = [];
         if (types.isObjectExpression(node)) {
             var objectProperties = node.properties;
 
             for (var index in objectProperties) {
-                overriddenMethodNames.push(objectProperties[index].key.name);
+                var keyName = _getIdentifierKeyName(objectProperties[index]);
+                if (keyName === null) {
+                    continue;
+                }
+                overriddenMethodNames.push(keyName);
             }
         }
 
@@ -567,9 +586,18 @@ var es5_visitors = (function() {
             	will get 'method1' and 'method3'
             */
             for (var index in objectProperties) {
+                var keyName = _getIdentifierKeyName(objectProperties[index]);
+                // Skip spreads, computed keys, and non-Identifier keys — they
+                // cannot be statically mapped to a Java binding. Without this
+                // guard, valid (non-NS) `.extend({ ...other, foo })` calls in
+                // bundled vendor code (e.g. Zod schemas) would crash the parser.
+                if (keyName === null) {
+                    continue;
+                }
+
                 // if the user has declared interfaces that he is implementing
                 if (!interfacesFound &&
-                    objectProperties[index].key.name.toLowerCase() === "interfaces" &&
+                    keyName.toLowerCase() === "interfaces" &&
                     types.isArrayExpression(objectProperties[index].value)) {
                     interfacesFound = true;
                     var interfaces = objectProperties[index].value.elements;
@@ -579,7 +607,7 @@ var es5_visitors = (function() {
                         implementedInterfaces.push(interfaceName);
                     }
                 } else {
-                    overriddenMethodNames.push(objectProperties[index].key.name)
+                    overriddenMethodNames.push(keyName)
                 }
             }
         }
