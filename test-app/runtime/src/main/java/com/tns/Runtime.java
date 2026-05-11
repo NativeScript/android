@@ -765,7 +765,8 @@ public class Runtime {
         try {
             this.logger = logger;
 
-            this.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb, classStorageService);
+            boolean isMainThread = this.workerId == 0;
+            this.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb, classStorageService, isMainThread);
 
             if (logger.isEnabled()) {
                 logger.write("Initializing NativeScript JAVA");
