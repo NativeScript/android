@@ -18,11 +18,14 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.InvalidClassException;
 import java.io.OutputStreamWriter;
+import java.lang.reflect.Array;
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import dalvik.system.BaseDexClassLoader;
 import dalvik.system.DexClassLoader;
 
 public class DexFactory {
@@ -34,15 +37,21 @@ public class DexFactory {
     private final String dexThumb;
     private final ClassLoader classLoader;
     private final ClassStorageService classStorageService;
+    private final boolean injectIntoParentClassLoader;
 
     private ProxyGenerator proxyGenerator;
     private HashMap<String, Class<?>> injectedDexClasses = new HashMap<String, Class<?>>();
 
     DexFactory(Logger logger, ClassLoader classLoader, File dexBaseDir, String dexThumb, ClassStorageService classStorageService) {
+        this(logger, classLoader, dexBaseDir, dexThumb, classStorageService, false);
+    }
+
+    DexFactory(Logger logger, ClassLoader classLoader, File dexBaseDir, String dexThumb, ClassStorageService classStorageService, boolean injectIntoParentClassLoader) {
         this.logger = logger;
         this.classLoader = classLoader;
         this.dexDir = dexBaseDir;
         this.dexThumb = dexThumb;
+        this.injectIntoParentClassLoader = injectIntoParentClassLoader;
 
         this.odexDir = new File(this.dexDir, "odex");
         this.proxyGenerator = new ProxyGenerator(this.dexDir.getAbsolutePath());
@@ -158,12 +167,14 @@ public class DexFactory {
         jarFile.setReadOnly();
 
         Class<?> result;
-        DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexDir.getAbsolutePath(), null, classLoader);
+        String classNameToLoad = isInterface ? fullClassName : desiredDexClassName;
 
-        if (isInterface) {
-            result = dexClassLoader.loadClass(fullClassName);
+        if (injectIntoParentClassLoader && classLoader instanceof BaseDexClassLoader) {
+            injectDexIntoClassLoader((BaseDexClassLoader) classLoader, jarFilePath);
+            result = classLoader.loadClass(classNameToLoad);
         } else {
-            result = dexClassLoader.loadClass(desiredDexClassName);
+            DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexDir.getAbsolutePath(), null, classLoader);
+            result = dexClassLoader.loadClass(classNameToLoad);
         }
 
         classStorageService.storeClass(result.getName(), result);
@@ -370,5 +381,48 @@ public class DexFactory {
         }
 
         return null;
+    }
+
+    /**
+     * Injects a DEX jar into the app's PathClassLoader so that classes in it are
+     * findable by Class.forName(). This is needed because Android framework components
+     * (e.g. FragmentFactory) use Class.forName() to instantiate classes by name, but
+     * NativeScript's dynamically-generated classes normally live in isolated DexClassLoaders
+     * that Class.forName() doesn't search.
+     */
+    private void injectDexIntoClassLoader(BaseDexClassLoader targetClassLoader, String jarFilePath) {
+        try {
+            // Create a temporary DexClassLoader to produce the optimized dex
+            DexClassLoader tempLoader = new DexClassLoader(jarFilePath, this.odexDir.getAbsolutePath(), null, targetClassLoader);
+
+            // Get pathList from both classloaders
+            Field pathListField = BaseDexClassLoader.class.getDeclaredField("pathList");
+            pathListField.setAccessible(true);
+
+            Object targetPathList = pathListField.get(targetClassLoader);
+            Object sourcePathList = pathListField.get(tempLoader);
+
+            // Get dexElements from both pathLists
+            Field dexElementsField = targetPathList.getClass().getDeclaredField("dexElements");
+            dexElementsField.setAccessible(true);
+
+            Object targetElements = dexElementsField.get(targetPathList);
+            Object sourceElements = dexElementsField.get(sourcePathList);
+
+            int targetLen = Array.getLength(targetElements);
+            int sourceLen = Array.getLength(sourceElements);
+
+            // Create merged array: target + source
+            Object merged = Array.newInstance(targetElements.getClass().getComponentType(), targetLen + sourceLen);
+            System.arraycopy(targetElements, 0, merged, 0, targetLen);
+            System.arraycopy(sourceElements, 0, merged, targetLen, sourceLen);
+
+            dexElementsField.set(targetPathList, merged);
+        } catch (Exception e) {
+            if (logger.isEnabled()) {
+                logger.write("Failed to inject dex into parent classloader: " + e.getMessage());
+            }
+            // Non-fatal: class will still be loadable via the ClassStorageService fallback
+        }
     }
 }
