@@ -766,7 +766,13 @@ public class Runtime {
             this.logger = logger;
 
             boolean isMainThread = this.workerId == 0;
-            this.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb, classStorageService, isMainThread);
+            // Parent-classloader injection is for debug/HMR cases where generated
+            // classes must be visible to framework reflection. In release, keep
+            // runtime-generated proxies in their isolated DexClassLoader; injecting
+            // through a temporary DexClassLoader can make ART reject the same dex
+            // path as registered by multiple class loaders.
+            boolean injectIntoParentClassLoader = isMainThread && isDebuggable;
+            this.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb, classStorageService, injectIntoParentClassLoader);
 
             if (logger.isEnabled()) {
                 logger.write("Initializing NativeScript JAVA");
