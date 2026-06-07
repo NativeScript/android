@@ -1026,6 +1026,15 @@ void Runtime::DestroyRuntime() {
   if (m_state != nullptr) {
     m_state->Clear();
   }
+
+  // reloadApplication destroys the main isolate and creates a replacement.
+  // PrepareV8Runtime uses this flag to decide main vs worker shape (global
+  // `self`, metadata build, s_mainEventLoop). Leave it set and the next
+  // main isolate is prepared as a worker against a shutdown loop.
+  if (m_isMainThread) {
+    s_mainEventLoop.reset();
+    s_mainThreadInitialized.store(false, std::memory_order_release);
+  }
 }
 
 Local<Context> Runtime::GetContext() {
