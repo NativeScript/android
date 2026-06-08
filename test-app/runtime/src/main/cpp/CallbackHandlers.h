@@ -149,6 +149,16 @@ namespace tns {
         static void WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
         /*
+         * `globalThis.__nsTerminateAllWorkers()`, installed on the main-thread
+         * isolate only (debug builds). Terminates every worker parented by the
+         * main isolate via WorkerWrapper::TerminateChildren, which snapshots the
+         * registry, terminates and clears each worker, and lets each one cascade
+         * into its own nested workers. Returns the number of direct (top-level)
+         * workers torn down so the HMR client can log it.
+         */
+        static void TerminateAllWorkersCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+        /*
          * Is called when an unhandled exception is thrown inside the worker
          * Will execute 'onerror' if one is provided inside the Worker Scope
          * Will make the exception "bubble up" through to main, to be handled by the Worker Object
