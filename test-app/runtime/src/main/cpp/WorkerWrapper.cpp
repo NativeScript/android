@@ -529,7 +529,7 @@ void WorkerWrapper::ClearWorkerOnParent(int workerId) {
     }
 }
 
-void WorkerWrapper::TerminateChildren(Isolate* parentIsolate) {
+int WorkerWrapper::TerminateChildren(Isolate* parentIsolate) {
     std::vector<std::shared_ptr<WorkerWrapper>> children;
     {
         std::lock_guard<std::mutex> lock(registryMutex_);
@@ -547,6 +547,8 @@ void WorkerWrapper::TerminateChildren(Isolate* parentIsolate) {
         child->Terminate();
         ClearWorkerOnParent(child->workerId_);
     }
+
+    return static_cast<int>(children.size());
 }
 
 WorkerWrapper* WorkerWrapper::FromIsolate(Isolate* isolate) {

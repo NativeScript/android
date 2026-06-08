@@ -21,6 +21,15 @@ namespace tns {
 
         static v8::Local<v8::FunctionTemplate> GetCtor(v8::Isolate *isolate);
 
+        // Compiles and runs the JS polyfill that installs
+        // `URL.createObjectURL` / `URL.revokeObjectURL`, the in-process blob
+        // registry (`URL.InternalAccessor`) used by the HMR loader, and the
+        // `URL.prototype.searchParams` accessor. Must be called once per
+        // realm AFTER `URL` and `URLSearchParams` constructors are installed.
+        // Behavior is bit-for-bit identical to the previously inlined script
+        // literal in `Runtime::Init`.
+        static void InstallBlobMethods(v8::Local<v8::Context> context);
+
         static void Ctor(const v8::FunctionCallbackInfo<v8::Value> &args);
 
 

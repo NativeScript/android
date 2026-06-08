@@ -1,6 +1,7 @@
 // DevFlags.cpp
 #include "DevFlags.h"
 #include "JEnv.h"
+#include "NativeScriptAssert.h"
 #include <atomic>
 #include <mutex>
 #include <vector>
@@ -8,21 +9,25 @@
 
 namespace tns {
 
-bool IsScriptLoadingLogEnabled() {
-  static std::atomic<int> cached{-1}; // -1 unknown, 0 false, 1 true
+// Cache the result of a parameterless `static boolean` method on
+// `com.tns.Runtime`. `cached` and `initFlag` are caller-owned statics so
+// every flag stays independently memoized; the helper does the JNI dance
+// once and pins the result. Returns false (the safe default) if the
+// class or method cannot be resolved.
+static bool CachedBoolFlagFromJava(std::atomic<int>& cached,
+                                   std::once_flag& initFlag,
+                                   const char* javaStaticBoolMethod) {
   int v = cached.load(std::memory_order_acquire);
   if (v != -1) {
     return v == 1;
   }
-
-  static std::once_flag initFlag;
-  std::call_once(initFlag, []() {
+  std::call_once(initFlag, [&]() {
     bool enabled = false;
     try {
       JEnv env;
       jclass runtimeClass = env.FindClass("com/tns/Runtime");
       if (runtimeClass != nullptr) {
-        jmethodID mid = env.GetStaticMethodID(runtimeClass, "getLogScriptLoadingEnabled", "()Z");
+        jmethodID mid = env.GetStaticMethodID(runtimeClass, javaStaticBoolMethod, "()Z");
         if (mid != nullptr) {
           jboolean res = env.CallStaticBooleanMethod(runtimeClass, mid);
           enabled = (res == JNI_TRUE);
@@ -33,8 +38,65 @@ bool IsScriptLoadingLogEnabled() {
     }
     cached.store(enabled ? 1 : 0, std::memory_order_release);
   });
-
   return cached.load(std::memory_order_acquire) == 1;
+}
+
+bool IsScriptLoadingLogEnabled() {
+  static std::atomic<int> cached{-1};
+  static std::once_flag initFlag;
+  return CachedBoolFlagFromJava(cached, initFlag, "getLogScriptLoadingEnabled");
+}
+
+// HTTP module loader flags
+//
+// Reads `httpModulePrefetch` from app config (default: DISABLED).
+//
+// Apps that want to opt in for testing can set in package.json:
+//
+//   {
+//     "httpModulePrefetch": true
+//   }
+//
+// Returning false here short-circuits both the speculative-prefetch cache
+// lookup (in HttpFetchText) and the prefetch wave (in KickstartHmrPrefetchSync /
+// KickstartHmrPrefetchUrlsSync), restoring the pre-prefetcher behavior
+// bit-for-bit. This is layered on top of the IsRemoteUrlAllowed network gate.
+bool IsHttpModulePrefetchEnabled() {
+  static std::atomic<int> cached{-1};
+  static std::once_flag initFlag;
+  bool enabled = CachedBoolFlagFromJava(cached, initFlag, "getHttpModulePrefetchEnabled");
+
+  // Startup banner. Gated on the logScriptLoading flag so it stays silent
+  // by default — flip the flag in package.json when diagnosing why
+  // prefetch is or isn't engaging.
+  //   [http-loader] prefetch=disabled   ← expected default
+  //   [http-loader] prefetch=enabled    ← only if config opt-in
+  static std::once_flag bannerFlag;
+  std::call_once(bannerFlag, [enabled]() {
+    if (IsScriptLoadingLogEnabled()) {
+      DEBUG_WRITE("[http-loader] prefetch=%s shared-session=on hmr-kickstart=on",
+                  enabled ? "enabled" : "disabled");
+    }
+  });
+  return enabled;
+}
+
+// Default OFF because the volume is high (one line per fetch, hundreds per
+// cold boot, hundreds per HMR refresh). Opt in via package.json:
+//   { "httpFetchUrlLog": true }
+bool IsHttpFetchUrlLogEnabled() {
+  static std::atomic<int> cached{-1};
+  static std::once_flag initFlag;
+  bool enabled = CachedBoolFlagFromJava(cached, initFlag, "getHttpFetchUrlLogEnabled");
+
+  static std::once_flag bannerFlag;
+  std::call_once(bannerFlag, [enabled]() {
+    if (IsScriptLoadingLogEnabled()) {
+      DEBUG_WRITE("[http-loader] fetch-url-log=%s",
+                  enabled ? "enabled" : "disabled");
+    }
+  });
+  return enabled;
 }
 
 // Security config
@@ -108,6 +170,11 @@ void InitializeSecurityConfig() {
 bool IsRemoteModulesAllowed() {
   InitializeSecurityConfig();
   return s_allowRemoteModules || s_isDebuggable;
+}
+
+bool IsDebuggable() {
+  InitializeSecurityConfig();
+  return s_isDebuggable;
 }
 
 bool IsRemoteUrlAllowed(const std::string& url) {
