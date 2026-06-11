@@ -186,8 +186,9 @@ void Timers::Destroy() {
     bufferFull.notify_one();
     taskReady.notify_all();
     watcher_.join();
-    auto mainLooper = Runtime::GetMainLooper();
-    ALooper_removeFd(mainLooper, fd_[0]);
+    // remove the fd from this instance's looper - on worker threads this is
+    // the worker looper, not the main one
+    ALooper_removeFd(looper_, fd_[0]);
     close(fd_[0]);
     timerMap_.clear();
     ALooper_release(looper_);
