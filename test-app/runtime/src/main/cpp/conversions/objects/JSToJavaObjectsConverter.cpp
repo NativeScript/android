@@ -118,7 +118,8 @@ bool tns::ConvertJavaScriptObject(
             obj = objectManager->GetJavaObjectByJsObject(jsObject);
 
             if (obj.IsNull() && (jsObject->IsTypedArray() || jsObject->IsArrayBuffer() ||
-                                 jsObject->IsArrayBufferView())) {
+                                 jsObject->IsArrayBufferView() ||
+                                 jsObject->IsSharedArrayBuffer())) {
 
                 JavaObjectCastType bufferCastType = tns::JavaObjectCastType::Byte;
                 std::shared_ptr<BackingStore> store;
@@ -128,6 +129,10 @@ bool tns::ConvertJavaScriptObject(
                 auto link_with_data = false;
                 if (jsObject->IsArrayBuffer()) {
                     auto array = jsObject.As<v8::ArrayBuffer>();
+                    store = array->GetBackingStore();
+                    length = array->ByteLength();
+                } else if (jsObject->IsSharedArrayBuffer()) {
+                    auto array = jsObject.As<v8::SharedArrayBuffer>();
                     store = array->GetBackingStore();
                     length = array->ByteLength();
                 } else if (jsObject->IsArrayBufferView()) {

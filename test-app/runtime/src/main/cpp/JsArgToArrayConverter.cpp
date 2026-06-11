@@ -249,7 +249,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
 
 
                 if (obj.IsNull() && (jsObj->IsTypedArray() || jsObj->IsArrayBuffer() ||
-                                     jsObj->IsArrayBufferView())) {
+                                     jsObj->IsArrayBufferView() || jsObj->IsSharedArrayBuffer())) {
 
                     BufferCastType bufferCastType = tns::BufferCastType::Byte;
                     shared_ptr<BackingStore> store;
@@ -258,6 +258,11 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                     uint8_t *data = nullptr;
                     if (jsObj->IsArrayBuffer()) {
                         auto array = jsObj.As<v8::ArrayBuffer>();
+                        store = array->GetBackingStore();
+                        length = array->ByteLength();
+                        data = static_cast<uint8_t *>(store->Data());
+                    } else if (jsObj->IsSharedArrayBuffer()) {
+                        auto array = jsObj.As<v8::SharedArrayBuffer>();
                         store = array->GetBackingStore();
                         length = array->ByteLength();
                         data = static_cast<uint8_t *>(store->Data());

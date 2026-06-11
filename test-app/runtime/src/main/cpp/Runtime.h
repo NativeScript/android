@@ -12,6 +12,8 @@
 #include "MessageLoopTimer.h"
 #include "File.h"
 #include "Timers.h"
+#include "LooperTasks.h"
+#include <memory>
 #include <mutex>
 #include <android/looper.h>
 #include <fcntl.h>
@@ -21,7 +23,8 @@ class Runtime {
     public:
         enum IsolateData {
             RUNTIME = 0,
-            CONSTANTS = 1
+            CONSTANTS = 1,
+            WORKER_WRAPPER = 2
         };
 
         ~Runtime();
@@ -51,7 +54,7 @@ class Runtime {
 
         void RunModule(JNIEnv* _env, jobject obj, jstring scriptFile);
         void RunModule(const char *moduleName);
-        void RunWorker(jstring scriptFile);
+        void RunWorker(const std::string& filePath);
         jobject RunScript(JNIEnv* _env, jobject obj, jstring scriptFile);
         jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs);
         void CreateJSInstanceNative(JNIEnv* _env, jobject obj, jobject javaObject, jint javaObjectID, jstring className);
@@ -60,7 +63,6 @@ class Runtime {
         bool NotifyGC(JNIEnv* env, jobject obj);
         bool TryCallGC();
         void PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring message, jstring fullStackTrace, jstring jsStackTrace, jboolean isDiscarded);
-        void PassUncaughtExceptionFromWorkerToMainHandler(v8::Local<v8::String> message, v8::Local<v8::String> stackTrace, v8::Local<v8::String> filename, int lineno);
         void DestroyRuntime();
 
         void Lock();
@@ -78,6 +80,18 @@ class Runtime {
         static int GetReader();
         static ALooper* GetMainLooper() {
             return m_mainLooper;
+        }
+        static JavaVM* GetJVM() {
+            return s_jvm;
+        }
+
+        /*
+         * Task queue bound to this runtime's looper. Child workers hold a
+         * weak_ptr to their parent runtime's queue for worker -> parent
+         * delivery (messages, errors, cleanup notifications).
+         */
+        std::shared_ptr<LooperTasks> GetLooperTasks() const {
+            return m_looperTasks;
         }
 
     private:
@@ -98,6 +112,8 @@ class Runtime {
         Profiler m_profiler;
 
         MessageLoopTimer* m_loopTimer;
+
+        std::shared_ptr<LooperTasks> m_looperTasks;
 
         int64_t m_lastUsedMemory;
 
@@ -125,6 +141,12 @@ class Runtime {
         static robin_hood::unordered_map<int, Runtime*> s_id2RuntimeCache;
 
         static robin_hood::unordered_map<v8::Isolate*, Runtime*> s_isolate2RuntimesCache;
+
+        /*
+         * Guards the two caches above: runtimes are now constructed and
+         * destroyed concurrently on native-spawned worker threads.
+         */
+        static std::mutex s_runtimeCacheMutex;
 
         static JavaVM* s_jvm;
 

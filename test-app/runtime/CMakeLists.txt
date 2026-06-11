@@ -99,6 +99,7 @@ add_library(
         src/main/cpp/ArrayHelper.cpp
         src/main/cpp/AssetExtractor.cpp
         src/main/cpp/CallbackHandlers.cpp
+        src/main/cpp/ConcurrentQueue.cpp
         src/main/cpp/Constants.cpp
         src/main/cpp/DirectBuffer.cpp
         src/main/cpp/FieldAccessor.cpp
@@ -112,6 +113,7 @@ add_library(
         src/main/cpp/JsArgToArrayConverter.cpp
         src/main/cpp/JSONObjectHelper.cpp
         src/main/cpp/Logger.cpp
+        src/main/cpp/LooperTasks.cpp
         src/main/cpp/ManualInstrumentation.cpp
         src/main/cpp/MessageLoopTimer.cpp
         src/main/cpp/MetadataMethodInfo.cpp
@@ -135,6 +137,8 @@ add_library(
         src/main/cpp/V8GlobalHelpers.cpp
         src/main/cpp/V8StringConstants.cpp
         src/main/cpp/WeakRef.cpp
+        src/main/cpp/WorkerMessage.cpp
+        src/main/cpp/WorkerWrapper.cpp
         src/main/cpp/Timers.cpp
         src/main/cpp/com_tns_AssetExtractor.cpp
         src/main/cpp/com_tns_Runtime.cpp
