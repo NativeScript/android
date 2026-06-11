@@ -231,6 +231,13 @@ void JsV8InspectorClient::createInspectorSession() {
 }
 
 void JsV8InspectorClient::disconnect() {
+    {
+        // Streams only have meaning to the frontend that opened them; drop any
+        // the old connection never read to the end (or never IO.close-d).
+        std::lock_guard<std::mutex> lock(resourceStreamsMutex_);
+        resourceStreams_.clear();
+    }
+
     if (connection_ == nullptr) {
         return;
     }
