@@ -1,6 +1,9 @@
 #ifndef JSV8INSPECTORCLIENT_H_
 #define JSV8INSPECTORCLIENT_H_
 
+#include <atomic>
+#include <map>
+#include <mutex>
 #include <string>
 #include <vector>
 #include <src/inspector/v8-console-message.h>
@@ -21,6 +24,11 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         void scheduleBreak();
         void disconnect();
         void dispatchMessage(const std::string& message);
+
+        // Runs on the websocket read thread. Returns the JSON response to send
+        // directly on that socket, or an empty string when the message must
+        // flow through the normal dispatch queue.
+        std::string handleMessageOnSocketThread(const std::string& message);
 
         void registerModules();
 
@@ -58,6 +66,25 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
 
         static JsV8InspectorClient* instance;
         static constexpr int contextGroupId = 1;
+
+        // Streams backing Network.loadNetworkResource responses, read by the
+        // frontend through IO.read/IO.close (how Chrome DevTools fetches source
+        // maps from the target). Accessed from the websocket read thread.
+        struct ResourceStream {
+            std::string data;
+            size_t offset = 0;
+        };
+
+        // Source map delivery to Chrome DevTools (Network.loadNetworkResource +
+        // IO domain). V8's inspector doesn't implement these embedder domains.
+        std::string HandleLoadNetworkResource(long long msgId, const std::string& url, const std::string& sessionId);
+        std::string HandleIORead(long long msgId, const std::string& handle, int size, const std::string& sessionId);
+        std::string HandleIOClose(long long msgId, const std::string& handle, const std::string& sessionId);
+
+        std::map<std::string, ResourceStream> resourceStreams_;
+        std::mutex resourceStreamsMutex_;
+        int lastStreamId_ = 0;
+        std::atomic<bool> isPausedNestedLoop_{false};
 
         std::unique_ptr<tns::inspector::TracingAgentImpl> tracing_agent_;
         v8::Isolate* isolate_;
