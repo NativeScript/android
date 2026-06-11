@@ -28,3 +28,17 @@ JNIEXPORT extern "C" void Java_com_tns_AndroidJsV8Inspector_dispatchMessage(JNIE
     std::string message = ArgConverter::jstringToString(jMessage);
     JsV8InspectorClient::GetInstance()->dispatchMessage(message);
 }
+
+JNIEXPORT extern "C" jstring Java_com_tns_AndroidJsV8Inspector_handleMessageOnSocketThread(JNIEnv* env, jobject instance, jstring jMessage) {
+    try {
+        std::string message = ArgConverter::jstringToString(jMessage);
+        std::string response = JsV8InspectorClient::GetInstance()->handleMessageOnSocketThread(message);
+        if (!response.empty()) {
+            return env->NewStringUTF(response.c_str());
+        }
+    } catch (...) {
+        // must never propagate a native exception into the websocket thread
+    }
+
+    return nullptr;
+}

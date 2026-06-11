@@ -1,5 +1,7 @@
 #include "JsV8InspectorClient.h"
 #include <assert.h>
+#include <algorithm>
+#include <cstring>
 #include <include/libplatform/libplatform.h>
 #include <src/inspector/v8-console-message.h>
 #include <src/inspector/v8-inspector-impl.h>
@@ -12,8 +14,13 @@
 #include "NativeScriptAssert.h"
 
 #include "ArgConverter.h"
+#include "Constants.h"
+#include "File.h"
 #include "Util.h"
 #include "Utils.h"
+
+#include "ada/ada.h"
+#include "third_party/json.hpp"
 
 using namespace std;
 using namespace tns;
@@ -21,6 +28,8 @@ using namespace v8;
 
 using namespace v8_inspector;
 using namespace inspector;
+
+using json = nlohmann::json;
 
 // Utility functions for converting between inspector StringView and UTF8 string
 
@@ -42,6 +51,140 @@ static inline std::string stringViewToString(v8::Isolate* isolate, const v8_insp
     v8::String::Utf8Value result(isolate, message);
     return *result;
 }
+
+namespace {
+
+// Scheme advertised to the frontend for source maps the runtime can serve.
+// Chrome DevTools never loads `file:` (or `data:`/`devtools:`) resources
+// through the target -- PageResourceLoader routes those to the frontend host
+// machine, which cannot see files on the device. Any other scheme is fetched
+// with Network.loadNetworkResource, which we answer from disk.
+constexpr const char* kSourceMapScheme = "nsruntime://";
+
+std::string JsonDump(const json& value) {
+    // replace invalid UTF-8 instead of throwing across the JNI boundary
+    return value.dump(-1, ' ', false, json::error_handler_t::replace);
+}
+
+std::string FinishResponse(json& response, const std::string& sessionId) {
+    if (!sessionId.empty()) {
+        response["sessionId"] = sessionId;
+    }
+    return JsonDump(response);
+}
+
+std::string Base64Encode(const char* data, size_t length) {
+    static const char* kAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string encoded;
+    encoded.reserve(((length + 2) / 3) * 4);
+    size_t i = 0;
+    for (; i + 2 < length; i += 3) {
+        uint32_t chunk = (static_cast<uint8_t>(data[i]) << 16) |
+                         (static_cast<uint8_t>(data[i + 1]) << 8) |
+                         static_cast<uint8_t>(data[i + 2]);
+        encoded.push_back(kAlphabet[(chunk >> 18) & 0x3F]);
+        encoded.push_back(kAlphabet[(chunk >> 12) & 0x3F]);
+        encoded.push_back(kAlphabet[(chunk >> 6) & 0x3F]);
+        encoded.push_back(kAlphabet[chunk & 0x3F]);
+    }
+    if (i < length) {
+        uint32_t chunk = static_cast<uint8_t>(data[i]) << 16;
+        bool hasSecond = i + 1 < length;
+        if (hasSecond) {
+            chunk |= static_cast<uint8_t>(data[i + 1]) << 8;
+        }
+        encoded.push_back(kAlphabet[(chunk >> 18) & 0x3F]);
+        encoded.push_back(kAlphabet[(chunk >> 12) & 0x3F]);
+        encoded.push_back(hasSecond ? kAlphabet[(chunk >> 6) & 0x3F] : '=');
+        encoded.push_back('=');
+    }
+    return encoded;
+}
+
+// Opt-out via nativescript.config.ts (serialized into the bundled
+// package.json): `android: { disableSourceMapURLRewrite: true }`, or the same
+// key at the top level.
+bool ShouldRewriteSourceMapURLs() {
+    static bool disabled = []() {
+        int length = 0;
+        auto* data = static_cast<uint8_t*>(File::ReadBinary(Constants::APP_ROOT_FOLDER_PATH + "package.json", length));
+        if (data == nullptr) {
+            return false;
+        }
+        std::string content(reinterpret_cast<const char*>(data), length);
+        delete[] data;
+
+        auto parsed = json::parse(content, nullptr, false);
+        if (parsed.is_discarded() || !parsed.is_object()) {
+            return false;
+        }
+
+        const json* value = nullptr;
+        if (parsed.contains("android") && parsed["android"].contains("disableSourceMapURLRewrite")) {
+            value = &parsed["android"]["disableSourceMapURLRewrite"];
+        } else if (parsed.contains("disableSourceMapURLRewrite")) {
+            value = &parsed["disableSourceMapURLRewrite"];
+        }
+        return value != nullptr && value->is_boolean() && value->get<bool>();
+    }();
+    return !disabled;
+}
+
+// Rewrites the sourceMapURL of outgoing Debugger.scriptParsed /
+// Debugger.scriptFailedToParse events from a file url (or a url relative to
+// the script's file url) to an absolute nsruntime:// url, so DevTools
+// requests the map through the target instead of the frontend host.
+std::string MaybeRewriteSourceMapURL(const std::string& message) {
+    if (message.find("\"Debugger.scriptParsed\"") == std::string::npos &&
+            message.find("\"Debugger.scriptFailedToParse\"") == std::string::npos) {
+        return message;
+    }
+
+    if (!ShouldRewriteSourceMapURLs()) {
+        return message;
+    }
+
+    auto parsed = json::parse(message, nullptr, false);
+    if (parsed.is_discarded() || !parsed.contains("params") || !parsed["params"].is_object()) {
+        return message;
+    }
+
+    auto& params = parsed["params"];
+    std::string sourceMapURL = params.value("sourceMapURL", "");
+    if (sourceMapURL.empty() || sourceMapURL.rfind("data:", 0) == 0 ||
+            sourceMapURL.rfind("http:", 0) == 0 || sourceMapURL.rfind("https:", 0) == 0 ||
+            sourceMapURL.rfind(kSourceMapScheme, 0) == 0) {
+        return message;
+    }
+
+    std::string path;
+    if (sourceMapURL.rfind("file://", 0) == 0) {
+        path = sourceMapURL.substr(strlen("file://"));
+    } else if (sourceMapURL[0] == '/') {
+        path = sourceMapURL;
+    } else {
+        // Relative to the script url, e.g. "bundle.js.map".
+        std::string scriptUrl = params.value("url", "");
+        if (scriptUrl.rfind("file://", 0) != 0) {
+            return message;
+        }
+        std::string scriptPath = scriptUrl.substr(strlen("file://"));
+        auto lastSlash = scriptPath.rfind('/');
+        if (lastSlash == std::string::npos) {
+            return message;
+        }
+        path = scriptPath.substr(0, lastSlash + 1) + sourceMapURL;
+    }
+
+    if (path.empty()) {
+        return message;
+    }
+
+    params["sourceMapURL"] = kSourceMapScheme + path;
+    return JsonDump(parsed);
+}
+
+}  // namespace
 
 JsV8InspectorClient::JsV8InspectorClient(v8::Isolate* isolate)
     : isolate_(isolate),
@@ -202,6 +345,7 @@ void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id) {
 
     terminated_ = false;
     running_nested_loop_ = true;
+    isPausedNestedLoop_.store(true, std::memory_order_release);
     while (!terminated_) {
         JniLocalRef msg(env.CallStaticObjectMethod(inspectorClass_, getInspectorMessageMethod_, connection_));
         if (!msg.IsNull()) {
@@ -212,6 +356,7 @@ void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id) {
         while (v8::platform::PumpMessageLoop(Runtime::platform, isolate_)) {
         }
     }
+    isPausedNestedLoop_.store(false, std::memory_order_release);
     terminated_ = false;
     running_nested_loop_ = false;
 }
@@ -233,6 +378,198 @@ void JsV8InspectorClient::doDispatchMessage(const std::string& message) {
     session_->dispatchProtocolMessage(message_view);
 }
 
+// Chrome DevTools fetches source maps through the target: it sends
+// Network.loadNetworkResource for the resolved sourceMappingURL and reads the
+// returned stream with IO.read/IO.close. Neither domain is implemented by
+// V8's inspector, so they are served here, on the websocket read thread --
+// the main thread may be blocked in the pause message loop or busy running
+// JS. None of these handlers touch V8.
+std::string JsV8InspectorClient::handleMessageOnSocketThread(const std::string& message) {
+    auto parsed = json::parse(message, nullptr, false);
+    if (parsed.is_discarded() || !parsed.is_object()) {
+        return "";
+    }
+
+    std::string method = parsed.contains("method") && parsed["method"].is_string()
+                         ? parsed["method"].get<std::string>()
+                         : "";
+    long long msgId = parsed.contains("id") && parsed["id"].is_number()
+                      ? parsed["id"].get<long long>()
+                      : -1;
+    std::string sessionId = parsed.contains("sessionId") && parsed["sessionId"].is_string()
+                            ? parsed["sessionId"].get<std::string>()
+                            : "";
+
+    if (method == "Network.loadNetworkResource") {
+        std::string url;
+        if (parsed.contains("params") && parsed["params"].contains("url") && parsed["params"]["url"].is_string()) {
+            url = parsed["params"]["url"].get<std::string>();
+        }
+        return HandleLoadNetworkResource(msgId, url, sessionId);
+    }
+
+    if (method == "IO.read" || method == "IO.close") {
+        std::string handle;
+        int size = 0;
+        if (parsed.contains("params")) {
+            const auto& params = parsed["params"];
+            if (params.contains("handle") && params["handle"].is_string()) {
+                handle = params["handle"].get<std::string>();
+            }
+            if (params.contains("size") && params["size"].is_number_integer()) {
+                size = params["size"].get<int>();
+            }
+        }
+        return method == "IO.read"
+               ? HandleIORead(msgId, handle, size, sessionId)
+               : HandleIOClose(msgId, handle, sessionId);
+    }
+
+    // Debugger.pause needs to interrupt V8 even if the main thread is busy
+    // executing JS; RequestInterrupt fires at the next safe bytecode boundary.
+    // The message still flows through the dispatch queue so V8 answers the
+    // request id. Skip it while paused in the nested message loop: no JS is
+    // running, so the interrupt would only fire after the user resumes,
+    // causing a spurious re-pause.
+    if (method == "Debugger.pause" && !isPausedNestedLoop_.load(std::memory_order_acquire)) {
+        isolate_->RequestInterrupt(
+            [](v8::Isolate* isolate, void* data) {
+                auto* client = static_cast<JsV8InspectorClient*>(data);
+                if (client->session_ != nullptr) {
+                    client->session_->schedulePauseOnNextStatement({}, {});
+                }
+            },
+            this);
+    }
+
+    return "";
+}
+
+std::string JsV8InspectorClient::HandleLoadNetworkResource(long long msgId, const std::string& url, const std::string& sessionId) {
+    std::string path;
+    if (url.rfind(kSourceMapScheme, 0) == 0) {
+        path = url.substr(strlen(kSourceMapScheme));
+    } else if (url.rfind("file://", 0) == 0) {
+        path = url.substr(strlen("file://"));
+    } else {
+        // Reply with a protocol error (not success:false) so DevTools falls
+        // back to loading the resource from the frontend host, which is the
+        // pre-existing behavior for http(s) urls.
+        json error = {
+            {"id", msgId},
+            {"error", {{"code", -32000}, {"message", "Unsupported URL scheme"}}}
+        };
+        return FinishResponse(error, sessionId);
+    }
+
+    std::string content;
+    bool loaded = false;
+
+    if (!path.empty()) {
+        std::vector<std::string> candidates;
+        auto addCandidate = [&candidates](const std::string& candidate) {
+            if (!candidate.empty() &&
+                    std::find(candidates.begin(), candidates.end(), candidate) == candidates.end()) {
+                candidates.push_back(candidate);
+            }
+        };
+        auto addVariants = [&addCandidate](const std::string& p) {
+            addCandidate(p);
+            if (p[0] != '/') {
+                addCandidate(Constants::APP_ROOT_FOLDER_PATH + p);
+            }
+            // /data/data/<pkg> and /data/user/0/<pkg> alias the same files;
+            // urls may use either spelling depending on who built them.
+            constexpr const char* kDataData = "/data/data/";
+            constexpr const char* kDataUser0 = "/data/user/0/";
+            if (p.rfind(kDataData, 0) == 0) {
+                addCandidate(kDataUser0 + p.substr(strlen(kDataData)));
+            } else if (p.rfind(kDataUser0, 0) == 0) {
+                addCandidate(kDataData + p.substr(strlen(kDataUser0)));
+            }
+        };
+
+        addVariants(path);
+        // fall back to percent-decoded variants for urls the frontend encoded
+        std::string decoded = ada::unicode::percent_decode(path, path.find('%'));
+        if (decoded != path) {
+            addVariants(decoded);
+        }
+
+        for (const auto& candidate : candidates) {
+            int length = 0;
+            auto* data = static_cast<uint8_t*>(File::ReadBinary(candidate, length));
+            if (data != nullptr) {
+                content.assign(reinterpret_cast<const char*>(data), length);
+                delete[] data;
+                loaded = true;
+                break;
+            }
+        }
+    }
+
+    json resource;
+    if (loaded) {
+        std::string handle;
+        {
+            std::lock_guard<std::mutex> lock(resourceStreamsMutex_);
+            handle = "ns-network-resource-" + std::to_string(++lastStreamId_);
+            resourceStreams_[handle] = {std::move(content), 0};
+        }
+        resource = {{"success", true}, {"httpStatusCode", 200}, {"stream", handle}};
+    } else {
+        resource = {{"success", false},
+                    {"netError", -6},
+                    {"netErrorName", "net::ERR_FILE_NOT_FOUND"},
+                    {"httpStatusCode", 404}};
+    }
+
+    json response = {{"id", msgId}, {"result", {{"resource", resource}}}};
+    return FinishResponse(response, sessionId);
+}
+
+std::string JsV8InspectorClient::HandleIORead(long long msgId, const std::string& handle, int size, const std::string& sessionId) {
+    std::lock_guard<std::mutex> lock(resourceStreamsMutex_);
+    auto it = resourceStreams_.find(handle);
+    if (it == resourceStreams_.end()) {
+        json error = {
+            {"id", msgId},
+            {"error", {{"code", -32602}, {"message", "Invalid stream handle"}}}
+        };
+        return FinishResponse(error, sessionId);
+    }
+
+    ResourceStream& stream = it->second;
+    constexpr size_t kDefaultChunkSize = 1024 * 1024;
+    size_t chunkSize = size > 0 ? static_cast<size_t>(size) : kDefaultChunkSize;
+    size_t remaining = stream.data.size() - stream.offset;
+    chunkSize = std::min(chunkSize, remaining);
+
+    json result;
+    if (chunkSize == 0) {
+        // DevTools ignores any data sent alongside eof, so only signal it once
+        // the whole stream has been delivered.
+        result = {{"data", ""}, {"eof", true}, {"base64Encoded", false}};
+    } else {
+        // Base64 keeps arbitrary file bytes intact through the JSON transport.
+        std::string encoded = Base64Encode(stream.data.data() + stream.offset, chunkSize);
+        stream.offset += chunkSize;
+        result = {{"data", encoded}, {"eof", false}, {"base64Encoded", true}};
+    }
+
+    json response = {{"id", msgId}, {"result", result}};
+    return FinishResponse(response, sessionId);
+}
+
+std::string JsV8InspectorClient::HandleIOClose(long long msgId, const std::string& handle, const std::string& sessionId) {
+    {
+        std::lock_guard<std::mutex> lock(resourceStreamsMutex_);
+        resourceStreams_.erase(handle);
+    }
+    json response = {{"id", msgId}, {"result", json::object()}};
+    return FinishResponse(response, sessionId);
+}
+
 void JsV8InspectorClient::sendResponse(int callId, std::unique_ptr<StringBuffer> message) {
     sendNotification(std::move(message));
 }
@@ -242,7 +579,7 @@ void JsV8InspectorClient::sendNotification(std::unique_ptr<StringBuffer> message
         return;
     }
 
-    const std::string msg = stringViewToString(isolate_, message->string());
+    const std::string msg = MaybeRewriteSourceMapURL(stringViewToString(isolate_, message->string()));
 
     JEnv env;
     // TODO: Pete: Check if we can use a wide (utf 16) string here
