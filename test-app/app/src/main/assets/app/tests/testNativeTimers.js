@@ -94,6 +94,49 @@ describe('native timer', () => {
             done();
         });
     });
+    // these specs schedule from a java-posted runnable so they run outside any
+    // timer callback: jasmine chains specs through timer callbacks, and when
+    // the runtime is built with NS_TIMERS_NESTING_CLAMP the nesting clamp
+    // (>=5 levels -> 4ms minimum) would otherwise make setTimeout(0)
+    // legitimately lose to a postDelayed(0)
+    it('preserves order with java handler posts', (done) => {
+        const order = [];
+        const handler = new android.os.Handler(android.os.Looper.myLooper());
+        handler.post(new java.lang.Runnable({
+            run: () => {
+                setTimeout(() => order.push(1));
+                handler.postDelayed(new java.lang.Runnable({ run: () => order.push(2) }), 0);
+                setTimeout(() => order.push(3));
+                setTimeout(() => {
+                    expect(order.join(',')).toBe('1,2,3');
+                    done();
+                }, 100);
+            }
+        }));
+    });
+
+    it('interleaves many timers with a java handler post', (done) => {
+        const order = [];
+        const handler = new android.os.Handler(android.os.Looper.myLooper());
+        handler.post(new java.lang.Runnable({
+            run: () => {
+                for (let i = 0; i < 50; i++) {
+                    setTimeout(() => order.push('t'));
+                }
+                handler.postDelayed(new java.lang.Runnable({ run: () => order.push('j') }), 0);
+                for (let i = 0; i < 50; i++) {
+                    setTimeout(() => order.push('t'));
+                }
+                setTimeout(() => {
+                    // the java runnable must land exactly between the two timer batches
+                    expect(order.indexOf('j')).toBe(50);
+                    expect(order.length).toBe(101);
+                    done();
+                }, 100);
+            }
+        }));
+    });
+
     it('frees up resources after complete', (done) => {
         let timeout = 0;
         let interval = 0;
