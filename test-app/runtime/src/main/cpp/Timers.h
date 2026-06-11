@@ -1,12 +1,15 @@
 #ifndef TEST_APP_TIMERS_H
 #define TEST_APP_TIMERS_H
 
-#include <android/looper.h>
+#include <jni.h>
 #include "v8.h"
 #include "ObjectManager.h"
-#include "condition_variable"
-#include "thread"
 #include "robin_hood.h"
+
+// Define NS_TIMERS_NESTING_CLAMP to enable the HTML-spec/Chromium nesting
+// clamp (>=5 nested timer levels -> 4ms minimum delay). Off by default: the
+// clamp exists to keep browser pages from spinning the event loop, which is
+// rarely the desired behavior in a native app.
 
 namespace tns {
     /**
@@ -43,7 +46,9 @@ namespace tns {
             queued_ = false;
         }
 
+#ifdef NS_TIMERS_NESTING_CLAMP
         int nestingLevel_ = 0;
+#endif
         v8::Isolate *isolate_;
         v8::Persistent<v8::Function> callback_;
         std::shared_ptr<std::vector<std::shared_ptr<v8::Persistent<v8::Value>>>> args_;
@@ -52,7 +57,7 @@ namespace tns {
          * this helper parameter is used in the following way:
          * task scheduled means queued_ = true
          * this is set to false right before the callback is executed
-         * if this is false then it's not on the background thread queue
+         * if this is false then it's not on the message queue to be executed
          */
         bool queued_ = false;
         double frequency_ = 0;
@@ -70,7 +75,7 @@ namespace tns {
     public:
         /**
          * Initializes the global functions setTimeout, setInterval, clearTimeout and clearInterval
-         * also creates helper threads and binds the timers to the executing thread
+         * also creates the dedicated Java Handler bound to the executing thread's Looper
          * @param isolate target isolate
          * @param globalObjectTemplate global template
          */
@@ -79,18 +84,24 @@ namespace tns {
         static void InitStatic(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalObjectTemplate);
 
         /**
-         * Disposes the timers. This will clear all references and stop all thread.
+         * Disposes the timers. This will clear all references and remove all
+         * pending timer messages from the Java message queue.
          * MUST be called in the same thread Init was called
-         * This methods blocks until the threads are stopped.
          * This method doesn't need to be called most of the time as it's called on object destruction
          * Reusing this class is not advised
          */
         void Destroy();
 
         /**
-         * Calls Destruct
+         * Calls Destroy
          */
         ~Timers();
+
+        /**
+         * Fires the earliest due timer, if any (invoked by Java
+         * TimerHandler.handleMessage once per scheduled "due token")
+         */
+        void FireTimer();
 
     private:
         static void SetTimeoutCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
@@ -101,34 +112,37 @@ namespace tns {
 
         static void ClearTimer(const v8::FunctionCallbackInfo<v8::Value> &args);
 
-        void threadLoop();
-
-        static int PumpTimerLoopCallback(int fd, int events, void *data);
-
         void addTask(std::shared_ptr<TimerTask> task);
 
         void removeTask(const std::shared_ptr<TimerTask> &task);
 
         void removeTask(const int &taskId);
 
+        void postTimer(const std::shared_ptr<TimerTask> &task, double now);
+
         v8::Isolate *isolate_ = nullptr;
-        ALooper *looper_;
         int currentTimerId = 0;
+#ifdef NS_TIMERS_NESTING_CLAMP
         int nesting = 0;
+#endif
         // stores the map of timer tasks
         robin_hood::unordered_map<int, std::shared_ptr<TimerTask>> timerMap_;
-        std::vector<std::shared_ptr<TimerReference>> sortedTimers_;
-        // sets are faster than vector iteration
-        // so we use this to avoid redundant isolate locks and we don't care about the
-        // background thread lost cycles
-        std::set<int> deletedTimers_;
-        int fd_[2];
-        std::atomic_bool isBufferFull = false;
-        std::condition_variable taskReady;
-        std::condition_variable bufferFull;
-        std::mutex mutex;
-        std::thread watcher_;
-        bool stopped = false;
+        // scheduled timers sorted by exact (sub-millisecond) dueTime, stable for
+        // equal dueTimes. Only ever touched under the isolate lock, no mutex.
+        // The Java message queue is millisecond-quantized, so this preserves the
+        // relative order of JS timers; each Java message is an anonymous token
+        // that fires the front of this list.
+        std::vector<TimerReference> sortedTimers_;
+        // global ref to the dedicated com.tns.TimerHandler for this isolate's thread
+        jobject handler_ = nullptr;
+        bool stopped_ = false;
+
+        // process-wide JNI cache, written once on the first Timers::Init (main
+        // runtime), which happens-before any worker thread is spawned
+        static jclass TIMER_HANDLER_CLASS;
+        static jmethodID TIMER_HANDLER_CTOR;
+        static jmethodID TIMER_HANDLER_POST;
+        static jmethodID TIMER_HANDLER_RELEASE;
     };
 
 }
