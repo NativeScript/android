@@ -170,7 +170,18 @@ Runtime* Runtime::GetRuntime(int runtimeId) {
 }
 
 Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
-  Runtime* runtime = nullptr;
+  /*
+   * Hot path, called from V8 callbacks on the isolate's own thread. The slot
+   * is written once in PrepareV8Runtime before the isolate runs any JS, so
+   * reading it requires no lock.
+   */
+  auto runtime = static_cast<Runtime*>(
+      isolate->GetData((uint32_t)Runtime::IsolateData::RUNTIME));
+  if (runtime != nullptr) {
+    return runtime;
+  }
+
+  // covers the window during isolate setup before SetData has run
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     auto it = s_isolate2RuntimesCache.find(isolate);
