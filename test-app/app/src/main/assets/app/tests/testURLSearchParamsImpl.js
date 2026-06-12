@@ -443,6 +443,26 @@ describe("Test URLSearchParams ", function () {
         expect(params.get("a")).toBe("1");
     });
 
+    it("Test URLSearchParams coerces non-string arguments in append and set", function(){
+        const params = new URLSearchParams();
+        params.append(1, 2);
+        expect(params.get("1")).toBe("2");
+        params.set(true, { toString: function(){ return "x"; } });
+        expect(params.get("true")).toBe("x");
+        params.append("a", null);
+        expect(params.get("a")).toBe("null");
+    });
+
+    it("Test URLSearchParams append and set throw when an argument is a Symbol", function(){
+        const params = new URLSearchParams("a=1");
+        expect(function(){ params.append(Symbol("x"), "v"); }).toThrow();
+        expect(function(){ params.append("k", Symbol("x")); }).toThrow();
+        expect(function(){ params.set(Symbol("x"), "v"); }).toThrow();
+        expect(function(){ params.set("k", Symbol("x")); }).toThrow();
+        // Nothing was appended or replaced by the failed calls.
+        expect(params.toString()).toBe("a=1");
+    });
+
     // --- Brand checks: iterators require a genuine receiver. ---
 
     it("Test URLSearchParams entries/keys/values throw on a foreign receiver", function(){
