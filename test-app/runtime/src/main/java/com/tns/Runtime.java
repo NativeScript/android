@@ -1,10 +1,7 @@
 package com.tns;
 
 import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.Looper;
-import android.os.Message;
-import android.os.Process;
 
 import com.tns.bindings.ProxyGenerator;
 import com.tns.system.classes.caching.impl.ClassCacheImpl;
@@ -27,10 +24,8 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
@@ -44,8 +39,6 @@ public class Runtime {
                                          Object[] v8Options, String callingDir, int maxLogcatObjectSize, boolean forceLog);
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
-
-    private native void runWorker(int runtimeId, String filePath) throws NativeScriptException;
 
     private native Object runScript(int runtimeId, String filePath) throws NativeScriptException;
 
@@ -111,16 +104,6 @@ public class Runtime {
             setManualInstrumentationModeLegacy(mode);
         }
     }
-
-    private static native void WorkerGlobalOnMessageCallback(int runtimeId, String message);
-
-    private static native void WorkerObjectOnMessageCallback(int runtimeId, int workerId, String message);
-
-    private static native void TerminateWorkerCallback(int runtimeId);
-
-    private static native void ClearWorkerPersistent(int runtimeId, int workerId);
-
-    private static native void CallWorkerObjectOnErrorHandleMain(int runtimeId, int workerId, String message, String stackTrace, String filename, int lineno, String threadName) throws NativeScriptException;
 
     private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
@@ -205,29 +188,15 @@ public class Runtime {
 
     private final int runtimeId;
 
-    private boolean isTerminating;
-
     /*
-        Used to map to Handler, for messaging between Main and the other Workers
+        The worker's id (0 for the main thread's runtime)
      */
     private final int workerId;
-
-    /*
-        Used by all Worker threads to communicate with the Main thread
-     */
-    private Handler mainThreadHandler;
 
     private static AtomicInteger nextRuntimeId = new AtomicInteger(0);
     private final static ThreadLocal<Runtime> currentRuntime = new ThreadLocal<Runtime>();
     private final static Map<Integer, Runtime> runtimeCache = new ConcurrentHashMap<>();
-    public static Map<Integer, ConcurrentLinkedQueue<Message>> pendingWorkerMessages = new ConcurrentHashMap<>();
     public static boolean nativeLibraryLoaded;
-
-    /*
-        Holds reference to all Worker Threads' handlers
-        Note: Should only be used on the main thread
-     */
-    private Map<Integer, Handler> workerIdToHandler = new HashMap<>();
 
     private static final ClassStorageService classStorageService = new ClassStorageServiceImpl(ClassCacheImpl.INSTANCE, ClassLoadersCollectionImpl.INSTANCE);
 
@@ -258,9 +227,6 @@ public class Runtime {
                 this.dynamicConfig = dynamicConfiguration;
                 this.threadScheduler = dynamicConfiguration.myThreadScheduler;
                 this.workerId = dynamicConfiguration.workerId;
-                if (dynamicConfiguration.mainThreadScheduler != null) {
-                    this.mainThreadHandler = dynamicConfiguration.mainThreadScheduler.getHandler();
-                }
                 // if multithreadedJS, make all maps concurrent or synchronized:
                 if (config.appConfig.getEnableMultithreadedJavascript()) {
                     this.strongInstances = new ConcurrentHashMap<>();
@@ -273,13 +239,15 @@ public class Runtime {
                 }
 
                 classResolver = new ClassResolver(classStorageService);
-                currentRuntime.set(this);
-
-                runtimeCache.put(this.runtimeId, this);
-
                 gcListener = GcListener.getInstance(config.appConfig.getGcThrottleTime(), config.appConfig.getMemoryCheckInterval(), config.appConfig.getFreeMemoryRatio());
                 // capture static configuration to allow native lookups when currentRuntime is unavailable
                 staticConfiguration = config;
+
+                // publish the instance only after everything that can throw has
+                // completed, so a failed construction is never reachable through
+                // the thread-local or the cache
+                currentRuntime.set(this);
+                runtimeCache.put(this.runtimeId, this);
             } finally {
                 frame.close();
             }
@@ -515,225 +483,73 @@ public class Runtime {
         }
     }
 
-    private static class WorkerThreadHandler extends Handler {
-
-        WorkerThreadHandler(Looper looper){
-            super(looper);
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            Runtime currentRuntime = Runtime.getCurrentRuntime();
-
-            if (currentRuntime.isTerminating) {
-                if (currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + currentRuntime.workerId + ") is terminating, it will not process the message.");
-                }
-
-                return;
-            }
-
-            /*
-                Handle messages coming from the Main thread
-             */
-            if (msg.arg1 == MessageType.MainToWorker) {
-                /*
-                    Calls the Worker script's onmessage implementation with arg -> msg.obj.toString()
-                 */
-                WorkerGlobalOnMessageCallback(currentRuntime.runtimeId, msg.obj.toString());
-            } else if (msg.arg1 == MessageType.TerminateThread) {
-                currentRuntime.isTerminating = true;
-                GcListener.unsubscribe(currentRuntime);
-
-                runtimeCache.remove(currentRuntime.runtimeId);
-
-                TerminateWorkerCallback(currentRuntime.runtimeId);
-
-                if (currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + currentRuntime.workerId + ", name=\"" + Thread.currentThread().getName() + "\") has terminated execution. Don't make further function calls to it.");
-                }
-
-                this.getLooper().quit();
-            } else if (msg.arg1 == MessageType.TerminateAndCloseThread) {
-                Message msgToMain = Message.obtain();
-                msgToMain.arg1 = MessageType.CloseWorker;
-                msgToMain.arg2 = currentRuntime.workerId;
-
-                currentRuntime.mainThreadHandler.sendMessage(msgToMain);
-
-                currentRuntime.isTerminating = true;
-                GcListener.unsubscribe(currentRuntime);
-
-                runtimeCache.remove(currentRuntime.runtimeId);
-
-                TerminateWorkerCallback(currentRuntime.runtimeId);
-
-                if (currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + currentRuntime.workerId + ", name=\"" + Thread.currentThread().getName() + "\") has terminated execution. Don't make further function calls to it.");
-                }
-
-                this.getLooper().quit();
-            }
-        }
-    }
-
-    private static class WorkerThread extends HandlerThread {
-
-        private Integer workerId;
-        private ThreadScheduler mainThreadScheduler;
-        private String filePath;
-        private String callingJsDir;
-
-        public WorkerThread(String name, Integer workerId, ThreadScheduler mainThreadScheduler, String callingJsDir) {
-            super("W" + workerId + ": " + name);
-            this.filePath = name;
-            this.workerId = workerId;
-            this.mainThreadScheduler = mainThreadScheduler;
-            this.callingJsDir = callingJsDir;
-        }
-
-        public void startRuntime() {
-            final Handler handler = new Handler(this.getLooper());
-
-            handler.post((new Runnable() {
-                @Override
-                public void run() {
-                    Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
-
-                    WorkThreadScheduler workThreadScheduler = new WorkThreadScheduler(new WorkerThreadHandler(handler.getLooper()));
-
-                    DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(workerId, workThreadScheduler, mainThreadScheduler, callingJsDir);
-
-                    if (staticConfiguration.logger.isEnabled()) {
-                        staticConfiguration.logger.write("Worker (id=" + workerId + ")'s Runtime is initializing!");
-                    }
-
-                    Runtime runtime = initRuntime(dynamicConfiguration);
-
-                    if (staticConfiguration.logger.isEnabled()) {
-                        staticConfiguration.logger.write("Worker (id=" + workerId + ")'s Runtime initialized!");
-                    }
-
-                    /*
-                    	Send a message to the Main Thread to `shake hands`,
-                    	Main Thread will cache the Worker Handler for later use
-                     */
-                    Message msg = Message.obtain();
-                    msg.arg1 = MessageType.Handshake;
-                    msg.arg2 = runtime.runtimeId;
-
-                    runtime.mainThreadHandler.sendMessage(msg);
-                    runtime.runWorker(runtime.runtimeId, filePath);
-
-                    runtime.processPendingMessages();
-                }
-            }));
-        }
-    }
-
-    private void processPendingMessages() {
-        Queue<Message> messages = Runtime.pendingWorkerMessages.get(this.getWorkerId());
-        if (messages == null) {
-            return;
-        }
-
-        Handler handler = this.getHandler();
-        while (!messages.isEmpty()) {
-            handler.sendMessage(messages.poll());
-        }
-    }
-
-    private static class MainThreadHandler extends Handler {
-        public MainThreadHandler(Looper looper) {
-            super(looper);
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            /*
-            	Handle messages coming from a Worker thread
-             */
-            if (msg.arg1 == MessageType.WorkerToMain) {
-                /*
-                    Calls the Worker (with id - workerId) object's onmessage implementation with arg -> msg.obj.toString()
-                 */
-                WorkerObjectOnMessageCallback(Runtime.getCurrentRuntime().runtimeId, msg.arg2, msg.obj.toString());
-            }
-            /*
-            	Handle a 'Handshake' message sent from a new Worker,
-            	so that the Main may cache it and send messages to it later
-             */
-            else if (msg.arg1 == MessageType.Handshake) {
-                int senderRuntimeId = msg.arg2;
-                Runtime workerRuntime = runtimeCache.get(senderRuntimeId);
-                Runtime mainRuntime = Runtime.getCurrentRuntime();
-
-                // If worker has had its close/terminate called before the threads could shake hands
-                if (workerRuntime == null) {
-                    if (mainRuntime.logger.isEnabled()) {
-                        mainRuntime.logger.write("Main thread couldn't shake hands with worker (runtimeId: " + workerRuntime + ") because it has been terminated!");
-                    }
-
-                    return;
-                }
-
-                /*
-                	Main thread now has a reference to the Worker's handler,
-                	so messaging between the two threads can begin
-                 */
-                mainRuntime.workerIdToHandler.put(workerRuntime.getWorkerId(), workerRuntime.getHandler());
-
-                if (mainRuntime.logger.isEnabled()) {
-                    mainRuntime.logger.write("Worker thread (workerId:" + workerRuntime.getWorkerId() + ") shook hands with the main thread!");
-                }
-            } else if (msg.arg1 == MessageType.CloseWorker) {
-                Runtime currentRuntime = Runtime.getCurrentRuntime();
-
-                // remove reference to a Worker thread's handler that is in the process of closing
-                currentRuntime.workerIdToHandler.put(msg.arg2, null);
-
-                ClearWorkerPersistent(currentRuntime.runtimeId, msg.arg2);
-            }
-            /*
-               Handle unhandled exceptions/errors coming from the worker thread
-            */
-            else if (msg.arg1 == MessageType.BubbleUpException) {
-                Runtime currentRuntime = Runtime.getCurrentRuntime();
-
-                int workerId = msg.arg2;
-                JavaScriptErrorMessage errorMessage = (JavaScriptErrorMessage) msg.obj;
-
-                CallWorkerObjectOnErrorHandleMain(currentRuntime.runtimeId, workerId, errorMessage.getMessage(), errorMessage.getStackTrace(), errorMessage.getFilename(), errorMessage.getLineno(), errorMessage.getThreadName());
-            }
-        }
-    }
-
-
     /*
         This method initializes the runtime and should always be called first and through the main thread
         in order to set static configuration that all following workers can use
      */
     public static Runtime initializeRuntimeWithConfiguration(StaticConfiguration config) {
         staticConfiguration = config;
-        WorkThreadScheduler mainThreadScheduler = new WorkThreadScheduler(new MainThreadHandler(Looper.myLooper()));
+        WorkThreadScheduler mainThreadScheduler = new WorkThreadScheduler(new Handler(Looper.myLooper()));
         DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(0, mainThreadScheduler, null);
         Runtime runtime = initRuntime(dynamicConfiguration);
         return runtime;
     }
 
     /*
-        This method should be called via native code only after the static configuration has been initialized.
-        It will use the static configuration for all following calls to initialize a new runtime.
+        Called via JNI from a native-spawned worker thread (WorkerWrapper), after the
+        thread has attached to the JVM and before the worker script runs.
+        Prepares the thread's Java Looper - this must happen before initRuntime so
+        that the native runtime (timers, worker inbox, message loop) binds its fds
+        to the looper that runWorkerLoop later pumps - and creates the worker's
+        Runtime with a Looper-backed scheduler so cross-thread Java->JS calls
+        (dispatchCallJSMethodNative, runScript) keep working.
+        Should only be called after the static configuration has been initialized.
      */
     @RuntimeCallable
-    public static void initWorker(String jsFileName, String callingJsDir, int id) {
-        // This method will always be called from the Main thread
-        Runtime runtime = Runtime.getCurrentRuntime();
-        ThreadScheduler mainThreadScheduler = runtime.getDynamicConfig().myThreadScheduler;
+    public static int initWorkerRuntime(int workerId, String callingJsDir) {
+        Looper.prepare();
 
-        WorkerThread worker = new WorkerThread(jsFileName, id, mainThreadScheduler, callingJsDir);
-        worker.start();
-        worker.startRuntime();
+        WorkThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.myLooper()));
+        DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(workerId, workThreadScheduler, null, callingJsDir);
+
+        if (staticConfiguration.logger.isEnabled()) {
+            staticConfiguration.logger.write("Worker (id=" + workerId + ")'s Runtime is initializing!");
+        }
+
+        Runtime runtime = initRuntime(dynamicConfiguration);
+
+        if (staticConfiguration.logger.isEnabled()) {
+            staticConfiguration.logger.write("Worker (id=" + workerId + ")'s Runtime initialized!");
+        }
+
+        return runtime.getRuntimeId();
+    }
+
+    /*
+        Called via JNI from the native worker thread. Blocks pumping the worker's
+        looper (Java Handler messages and the native fds registered on it) until
+        the looper is quit by WorkerWrapper on terminate()/close().
+     */
+    @RuntimeCallable
+    public static void runWorkerLoop() {
+        Looper.loop();
+    }
+
+    /*
+        Called via JNI from the native worker thread during shutdown, before the
+        worker's isolate is disposed.
+     */
+    @RuntimeCallable
+    public static void detachWorkerRuntime(int runtimeId) {
+        Runtime runtime = runtimeCache.remove(runtimeId);
+        if (runtime != null) {
+            GcListener.unsubscribe(runtime);
+
+            if (runtime.logger != null && runtime.logger.isEnabled()) {
+                runtime.logger.write("Worker(id=" + runtime.workerId + ", name=\"" + Thread.currentThread().getName() + "\") has terminated execution. Don't make further function calls to it.");
+            }
+        }
+        currentRuntime.remove();
     }
 
     /*
@@ -742,8 +558,18 @@ public class Runtime {
      */
     private static Runtime initRuntime(DynamicConfiguration dynamicConfiguration) {
         Runtime runtime = new Runtime(staticConfiguration, dynamicConfiguration);
-        runtime.init();
-        runtime.runScript(new File(staticConfiguration.appDir, "internal/ts_helpers.js"));
+        try {
+            runtime.init();
+            runtime.runScript(new File(staticConfiguration.appDir, "internal/ts_helpers.js"));
+        } catch (Throwable t) {
+            // the constructor already registered the instance - roll back so a
+            // failed bootstrap doesn't leave a stale, half-initialized runtime
+            // reachable through the caches
+            runtimeCache.remove(runtime.getRuntimeId());
+            currentRuntime.remove();
+            GcListener.unsubscribe(runtime);
+            throw t;
+        }
 
         return runtime;
     }
@@ -1546,161 +1372,4 @@ public class Runtime {
         return useGlobalRefs;
     }
 
-    /*
-        ======================================================================
-        ======================================================================
-                            Workers messaging callbacks
-        ======================================================================
-        ======================================================================
-     */
-    @RuntimeCallable
-    public static void sendMessageFromMainToWorker(int workerId, String message) {
-        Runtime currentRuntime = Runtime.getCurrentRuntime();
-
-        Message msg = Message.obtain();
-        msg.obj = message;
-        msg.arg1 = MessageType.MainToWorker;
-
-        boolean hasKey = currentRuntime.workerIdToHandler.containsKey(workerId);
-        Handler workerHandler = currentRuntime.workerIdToHandler.get(workerId);
-
-        // TODO: Pete: Ensure that we won't end up in an endless loop. Can we get an invalid workerId?
-        /*
-            If workHandler is null then the new Worker Thread still hasn't completed initializing
-
-            OR
-
-            The workHandler is null because it has been closed; Check if its key is still in the map
-         */
-        if (workerHandler == null) {
-            // Attempt to send a message to a closed worker, throw error or just log a message
-            if (hasKey) {
-                if (currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + msg.arg2 + ") that you are trying to send a message to has been terminated. No message will be sent.");
-                }
-
-                return;
-            }
-
-            if (currentRuntime.logger.isEnabled()) {
-                currentRuntime.logger.write("Worker(id=" + msg.arg2 + ")'s handler still not initialized. Requeueing message for Worker(id=" + msg.arg2 + ")");
-            }
-
-            if (pendingWorkerMessages.get(workerId) == null) {
-                pendingWorkerMessages.put(workerId, new ConcurrentLinkedQueue<Message>());
-            }
-
-            Queue<Message> messages = pendingWorkerMessages.get(workerId);
-            messages.add(msg);
-
-            return;
-        }
-
-        if (!workerHandler.getLooper().getThread().isAlive()) {
-            return;
-        }
-
-        workerHandler.sendMessage(msg);
-    }
-
-    @RuntimeCallable
-    public static void sendMessageFromWorkerToMain(String message) {
-        Runtime currentRuntime = Runtime.getCurrentRuntime();
-
-        Message msg = Message.obtain();
-        msg.arg1 = MessageType.WorkerToMain;
-
-        /*
-            Send the workerId associated with the JavaScript Worker object
-         */
-        msg.arg2 = currentRuntime.getWorkerId();
-        msg.obj = message;
-
-        currentRuntime.mainThreadHandler.sendMessage(msg);
-    }
-
-    @RuntimeCallable
-    public static void workerObjectTerminate(int workerId) {
-        // Thread should always be main here
-        Runtime currentRuntime = Runtime.getCurrentRuntime();
-        final long ResendDelay = 1000;
-
-        Message msg = Message.obtain();
-
-        boolean hasKey = currentRuntime.workerIdToHandler.containsKey(workerId);
-        Handler workerHandler = currentRuntime.workerIdToHandler.get(workerId);
-
-        msg.arg1 = MessageType.TerminateThread;
-        msg.arg2 = workerId;
-
-        /*
-            If workHandler is null then the new Worker Thread still hasn't completed initializing
-
-            OR
-
-            The workHandler is null because it has been closed; Check if its key is still in the map
-         */
-        if (workerHandler == null) {
-            // Attempt to send a message to a closed worker, throw error or just log a message
-            if (hasKey) {
-                if (currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + msg.arg2 + ") is already terminated. No message will be sent.");
-                }
-
-                return;
-            } else {
-                if (currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + msg.arg2 + ")'s handler still not initialized. Requeueing terminate() message for Worker(id=" + msg.arg2 + ")");
-                }
-
-                if (pendingWorkerMessages.get(workerId) == null) {
-                    pendingWorkerMessages.put(workerId, new ConcurrentLinkedQueue<Message>());
-                }
-
-                Queue<Message> messages = pendingWorkerMessages.get(workerId);
-                messages.add(msg);
-                return;
-            }
-        }
-
-        // Worker was closed during this 'terminate' call, nothing to do here
-        if (!workerHandler.getLooper().getThread().isAlive()) {
-            return;
-        }
-
-        // 'terminate' message must be executed immediately
-        workerHandler.sendMessageAtFrontOfQueue(msg);
-
-        // Set value for workerId key to null
-        currentRuntime.workerIdToHandler.put(workerId, null);
-    }
-
-    @RuntimeCallable
-    public static void workerScopeClose() {
-        // Thread should always be a worker
-        Runtime currentRuntime = Runtime.getCurrentRuntime();
-
-        Message msgToWorker = Message.obtain();
-        msgToWorker.arg1 = MessageType.TerminateAndCloseThread;
-
-        currentRuntime.getHandler().sendMessageAtFrontOfQueue(msgToWorker);
-    }
-
-    @RuntimeCallable
-    public static void passUncaughtExceptionFromWorkerToMain(String message, String filename, String stackTrace, int lineno) {
-        // Thread should always be a worker
-        Runtime currentRuntime = Runtime.getCurrentRuntime();
-
-        Message msg = Message.obtain();
-        msg.arg1 = MessageType.BubbleUpException;
-        msg.arg2 = currentRuntime.workerId;
-
-        String threadName = currentRuntime.getHandler().getLooper().getThread().getName();
-        JavaScriptErrorMessage error = new JavaScriptErrorMessage(message, stackTrace, filename, lineno, threadName);
-
-        msg.obj = error;
-
-        // TODO: Pete: Should we treat the message with higher priority?
-        currentRuntime.mainThreadHandler.sendMessage(msg);
-    }
 }

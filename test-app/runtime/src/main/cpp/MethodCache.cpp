@@ -135,7 +135,7 @@ string MethodCache::GetType(Isolate* isolate, const v8::Local<v8::Value>& value)
 
     if (value->IsArray()) {
         type = "array";
-    } else if (value->IsArrayBuffer() || value->IsInt8Array() || value->IsUint8Array() || value->IsUint8ClampedArray()) {
+    } else if (value->IsArrayBuffer() || value->IsSharedArrayBuffer() || value->IsInt8Array() || value->IsUint8Array() || value->IsUint8ClampedArray()) {
         type = "bytebuffer";
     } else if (value->IsInt16Array() || value->IsUint16Array()) {
         type = "shortbuffer";

@@ -24,14 +24,6 @@ namespace tns {
     class CallbackHandlers {
     public:
 
-        /*
-         * Stores persistent handles of all 'Worker' objects initialized on the main thread
-         * Note: No isolates different than that of the main thread should access this map
-         */
-        static robin_hood::unordered_map<int, v8::Persistent<v8::Object> *> id2WorkerMap;
-
-        static int nextWorkerId;
-
         static void Init(v8::Isolate *isolate);
 
         static v8::Local<v8::Object>
@@ -130,33 +122,21 @@ namespace tns {
         static void NewThreadCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
         /*
-         * main -> worker messaging
-         * Fired when a Worker instance's postMessage is called
+         * parent -> worker messaging
+         * Fired when a Worker instance's postMessage is called.
+         * Serializes the payload (structured clone) and queues it on the
+         * worker's C++ inbox.
          */
         static void
         WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
         /*
-         * main -> worker messaging
-         * Fired when worker object has "postMessage" and the worker has implemented "onMessage" handler
-         * In case "onMessage" handler isn't implemented no exception is thrown
-         */
-        static void WorkerGlobalOnMessageCallback(v8::Isolate *isolate, jstring message);
-
-        /*
-         * worker -> main thread messaging
-         * Fired when a Worker script's "postMessage" is called
+         * worker -> parent messaging
+         * Fired when a Worker script's "postMessage" is called.
+         * Serializes the payload and posts it to the parent runtime's task queue.
          */
         static void
         WorkerGlobalPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
-
-        /*
-         * worker -> main messaging
-         * Fired when worker has sent a message to main and the worker object has implemented "onMessage" handler
-         * In case "onMessage" handler isn't implemented no exception is thrown
-         */
-        static void
-        WorkerObjectOnMessageCallback(v8::Isolate *isolate, jint workerId, jstring message);
 
         /*
          * Fired when a Worker instance's terminate is called (immediately stops execution of the thread)
@@ -169,33 +149,12 @@ namespace tns {
         static void WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
         /*
-         * Clears the persistent Worker object handle associated with a workerId
-         * Occurs when calling a worker object's `terminate` or a worker thread's global scope `close`
-         */
-        static void ClearWorkerPersistent(int workerId);
-
-        /*
-         * Terminates the currently executing Isolate. No scripts can be executed after this call
-         */
-        static void TerminateWorkerThread(v8::Isolate *isolate);
-
-        /*
          * Is called when an unhandled exception is thrown inside the worker
          * Will execute 'onerror' if one is provided inside the Worker Scope
          * Will make the exception "bubble up" through to main, to be handled by the Worker Object
          * if 'onerror' isn't implemented or returns false
          */
         static void CallWorkerScopeOnErrorHandle(v8::Isolate *isolate, v8::TryCatch &tc);
-
-        /*
-         * Is called when an unhandled exception bubbles up from the worker scope to the main thread Worker Object
-         * Will execute `onerror` if one is implemented for the Worker Object instance
-         * Will throw a NativeScript Exception if 'onerror' isn't implemented or returns false
-         */
-        static void
-        CallWorkerObjectOnErrorHandle(v8::Isolate *isolate, jint workerId, jstring message,
-                                      jstring stackTrace, jstring filename, jint lineno,
-                                      jstring threadName);
 
         static void RemoveIsolateEntries(v8::Isolate *isolate);
 
@@ -260,8 +219,6 @@ namespace tns {
         static jmethodID ENABLE_VERBOSE_LOGGING_METHOD_ID;
 
         static jmethodID DISABLE_VERBOSE_LOGGING_METHOD_ID;
-
-        static jmethodID INIT_WORKER_METHOD_ID;
 
         static NumericCasts castFunctions;
 
