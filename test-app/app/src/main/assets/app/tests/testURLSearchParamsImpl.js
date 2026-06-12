@@ -411,4 +411,65 @@ describe("Test URLSearchParams ", function () {
         expect(new URLSearchParams(undefined).toString()).toBe("");
     });
 
+    // --- The name argument is a USVString: coerced, not assumed. ---
+
+    it("Test URLSearchParams coerces a non-string name in get/getAll/has/delete", function(){
+        const params = new URLSearchParams("1=a&true=b&null=c");
+        expect(params.get(1)).toBe("a");
+        expect(params.getAll(1).length).toBe(1);
+        expect(params.getAll(1)[0]).toBe("a");
+        expect(params.has(true)).toBe(true);
+        expect(params.get(null)).toBe("c");
+        params.delete(true);
+        expect(params.has("true")).toBe(false);
+        expect(params.has("1")).toBe(true);
+    });
+
+    it("Test URLSearchParams coerces an object name via toString", function(){
+        const params = new URLSearchParams("a=1");
+        const name = { toString: function(){ return "a"; } };
+        expect(params.get(name)).toBe("1");
+        expect(params.has(name)).toBe(true);
+        params.delete(name);
+        expect(params.has("a")).toBe(false);
+    });
+
+    it("Test URLSearchParams throws when the name is a Symbol", function(){
+        const params = new URLSearchParams("a=1");
+        expect(function(){ params.get(Symbol("x")); }).toThrow();
+        expect(function(){ params.getAll(Symbol("x")); }).toThrow();
+        expect(function(){ params.has(Symbol("x")); }).toThrow();
+        expect(function(){ params.delete(Symbol("x")); }).toThrow();
+        expect(params.get("a")).toBe("1");
+    });
+
+    // --- Brand checks: iterators require a genuine receiver. ---
+
+    it("Test URLSearchParams entries/keys/values throw on a foreign receiver", function(){
+        const params = new URLSearchParams("a=1");
+        expect(function(){ params.entries.call({}); }).toThrow();
+        expect(function(){ params.keys.call({}); }).toThrow();
+        expect(function(){ params.values.call({}); }).toThrow();
+    });
+
+    it("Test URLSearchParams iterator next() throws on a foreign receiver", function(){
+        const params = new URLSearchParams("a=1");
+        const iterator = params.entries();
+        const next = iterator.next;
+        expect(function(){ next.call({}); }).toThrow();
+        // The iterator keeps working when invoked correctly afterwards.
+        const first = iterator.next();
+        expect(first.done).toBe(false);
+        expect(first.value[0]).toBe("a");
+    });
+
+    it("Test URLSearchParams entries retargets to another instance receiver", function(){
+        const a = new URLSearchParams("a=1");
+        const b = new URLSearchParams("b=2");
+        const entries = [...a.entries.call(b)];
+        expect(entries.length).toBe(1);
+        expect(entries[0][0]).toBe("b");
+        expect(entries[0][1]).toBe("2");
+    });
+
 });

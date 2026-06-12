@@ -10,6 +10,12 @@ namespace tns {
     URLSearchParamsImpl::URLSearchParamsImpl(ada::url_search_params params) : params_(params) {}
 
     URLSearchParamsImpl *URLSearchParamsImpl::GetPointer(v8::Local<v8::Object> object) {
+        // A foreign receiver (e.g. entries.call({})) has no internal field, and
+        // reading one that is not there is undefined behavior, so check first
+        // and report not-a-URLSearchParams instead.
+        if (object->InternalFieldCount() < 1) {
+            return nullptr;
+        }
         auto ptr = object->GetAlignedPointerFromInternalField(0);
         if (ptr == nullptr) {
             return nullptr;
@@ -115,6 +121,7 @@ namespace tns {
         const char *const kStateSource = "src";
         const char *const kStateIndex = "idx";
         const char *const kStateKind = "knd";
+        const char *const kStateIterator = "itr";
 
         void IteratorSelf(const v8::FunctionCallbackInfo<v8::Value> &args) {
             // An iterator is itself iterable (iterator[@@iterator]() === iterator),
@@ -126,6 +133,17 @@ namespace tns {
             auto isolate = args.GetIsolate();
             auto context = isolate->GetCurrentContext();
             auto state = args.Data().As<v8::Object>();
+
+            // WebIDL brand check: next() must be invoked on the iterator it was
+            // created on, so a detached next() throws instead of advancing the
+            // captured state.
+            v8::Local<v8::Value> iteratorValue;
+            if (!state->Get(context, ArgConverter::ConvertToV8String(isolate, kStateIterator))
+                    .ToLocal(&iteratorValue) ||
+                !iteratorValue->StrictEquals(args.This())) {
+                ThrowTypeError(isolate, "Illegal invocation");
+                return;
+            }
 
             auto indexKey = ArgConverter::ConvertToV8String(isolate, kStateIndex);
             v8::Local<v8::Value> sourceValue;
@@ -180,6 +198,13 @@ namespace tns {
             auto isolate = args.GetIsolate();
             auto context = isolate->GetCurrentContext();
 
+            // WebIDL brand check: entries()/keys()/values() require a genuine
+            // URLSearchParams receiver, so e.g. entries.call({}) throws.
+            if (URLSearchParamsImpl::GetPointer(args.This()) == nullptr) {
+                ThrowTypeError(isolate, "Illegal invocation");
+                return;
+            }
+
             auto state = v8::Object::New(isolate);
             state->Set(context, ArgConverter::ConvertToV8String(isolate, kStateSource),
                        args.This()).Check();
@@ -196,6 +221,9 @@ namespace tns {
             }
 
             auto iterator = v8::Object::New(isolate);
+            // Recorded in the hidden state so next() can brand-check its receiver.
+            state->Set(context, ArgConverter::ConvertToV8String(isolate, kStateIterator),
+                       iterator).Check();
             iterator->Set(context, ArgConverter::ConvertToV8String(isolate, "next"), nextFn).Check();
             iterator->Set(context, v8::Symbol::GetIterator(isolate), selfFn).Check();
             iterator->DefineOwnProperty(context, v8::Symbol::GetToStringTag(isolate),
@@ -525,7 +553,13 @@ namespace tns {
         if (ptr == nullptr) {
             return;
         }
-        auto key = ArgConverter::ConvertToString(args[0].As<v8::String>());
+        // The name is a USVString (url.bs:3861): coerce it like the optional
+        // value below instead of assuming a string (a Symbol or throwing
+        // toString leaves the pending exception and aborts).
+        std::string key;
+        if (!ValueToString(args.GetIsolate()->GetCurrentContext(), args[0], key)) {
+            return;
+        }
         // Spec delete(name, value): when the value argument is given, remove only
         // tuples matching BOTH name and value (url.bs:4000). The value is a
         // USVString, so coerce via ValueToString (number/boolean -> string; a
@@ -590,8 +624,13 @@ namespace tns {
             args.GetReturnValue().SetUndefined();
             return;
         }
-        auto key = args[0].As<v8::String>();
-        auto value = ptr->GetURLSearchParams()->get(ArgConverter::ConvertToString(key));
+        // The name is a USVString (url.bs:3862); a Symbol or throwing toString
+        // leaves the pending exception and aborts.
+        std::string key;
+        if (!ValueToString(isolate->GetCurrentContext(), args[0], key)) {
+            return;
+        }
+        auto value = ptr->GetURLSearchParams()->get(key);
         if (value.has_value()) {
             auto ret = ArgConverter::ConvertToV8String(isolate, std::string(value.value()));
             args.GetReturnValue().Set(ret);
@@ -610,8 +649,13 @@ namespace tns {
             args.GetReturnValue().Set(v8::Array::New(isolate));
             return;
         }
-        auto key = args[0].As<v8::String>();
-        auto values = ptr->GetURLSearchParams()->get_all(ArgConverter::ConvertToString(key));
+        // The name is a USVString (url.bs:3863); a Symbol or throwing toString
+        // leaves the pending exception and aborts.
+        std::string key;
+        if (!ValueToString(context, args[0], key)) {
+            return;
+        }
+        auto values = ptr->GetURLSearchParams()->get_all(key);
         auto ret = v8::Array::New(isolate, values.size());
         size_t i = 0;
         for (auto item: values) {
@@ -626,7 +670,13 @@ namespace tns {
             args.GetReturnValue().Set(false);
             return;
         }
-        auto key = args[0].As<v8::String>();
+        // The name is a USVString (url.bs:3864): coerce it like the optional
+        // value below instead of assuming a string (a Symbol or throwing
+        // toString leaves the pending exception and aborts).
+        std::string key;
+        if (!ValueToString(args.GetIsolate()->GetCurrentContext(), args[0], key)) {
+            return;
+        }
         // Spec has(name, value): when the value argument is given, return true
         // only for a tuple matching BOTH name and value (url.bs:4028). The value
         // is a USVString, so coerce via ValueToString (number/boolean -> string;
@@ -640,9 +690,9 @@ namespace tns {
             if (!ValueToString(args.GetIsolate()->GetCurrentContext(), args[1], filter)) {
                 return;  // coercion threw (Symbol / throwing toString)
             }
-            value = ptr->GetURLSearchParams()->has(ArgConverter::ConvertToString(key), filter);
+            value = ptr->GetURLSearchParams()->has(key, filter);
         } else {
-            value = ptr->GetURLSearchParams()->has(ArgConverter::ConvertToString(key));
+            value = ptr->GetURLSearchParams()->has(key);
         }
 
         args.GetReturnValue().Set(value);
