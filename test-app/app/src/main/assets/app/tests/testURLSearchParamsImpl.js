@@ -406,9 +406,23 @@ describe("Test URLSearchParams ", function () {
         expect(function(){ new URLSearchParams(Symbol("x")); }).toThrow();
     });
 
-    it("Test URLSearchParams from null or undefined is empty", function(){
-        expect(new URLSearchParams(null).toString()).toBe("");
+    it("Test URLSearchParams from undefined or no argument is empty", function(){
         expect(new URLSearchParams(undefined).toString()).toBe("");
+        expect(new URLSearchParams().toString()).toBe("");
+    });
+
+    it("Test URLSearchParams from null parses as the string null", function(){
+        // The IDL union has no null special case (the type is not nullable and
+        // a record is not a dictionary), so null coerces like any primitive.
+        const params = new URLSearchParams(null);
+        expect(params.toString()).toBe("null=");
+        expect(params.get("null")).toBe("");
+    });
+
+    it("Test URLSearchParams throws when a record key is a Symbol", function(){
+        // Per WebIDL record conversion every own enumerable key is converted to
+        // a USVString, and converting a Symbol throws.
+        expect(function(){ new URLSearchParams({ a: "1", [Symbol("x")]: "v" }); }).toThrow();
     });
 
     // --- The name argument is a USVString: coerced, not assumed. ---
@@ -470,6 +484,19 @@ describe("Test URLSearchParams ", function () {
         expect(function(){ params.entries.call({}); }).toThrow();
         expect(function(){ params.keys.call({}); }).toThrow();
         expect(function(){ params.values.call({}); }).toThrow();
+    });
+
+    it("Test URLSearchParams methods throw on a foreign receiver", function(){
+        const params = new URLSearchParams("a=1");
+        expect(function(){ params.get.call({}, "a"); }).toThrow();
+        expect(function(){ params.getAll.call({}, "a"); }).toThrow();
+        expect(function(){ params.has.call({}, "a"); }).toThrow();
+        expect(function(){ params.append.call({}, "a", "b"); }).toThrow();
+        expect(function(){ params.set.call({}, "a", "b"); }).toThrow();
+        expect(function(){ params.delete.call({}, "a"); }).toThrow();
+        expect(function(){ params.forEach.call({}, function(){}); }).toThrow();
+        expect(function(){ params.sort.call({}); }).toThrow();
+        expect(function(){ params.toString.call({}); }).toThrow();
     });
 
     it("Test URLSearchParams iterator next() throws on a foreign receiver", function(){

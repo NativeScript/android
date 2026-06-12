@@ -99,9 +99,9 @@ namespace tns {
     // `(sequence<sequence<USVString>> or record<USVString, USVString> or USVString)`
     // that browsers/Node apply (https://url.spec.whatwg.org/#interface-urlsearchparams):
     //   object with @@iterator   -> sequence    (Array, Map, Set, URLSearchParams, generator)
-    //   object without @@iterator-> record      (own enumerable string keys, in order)
-    //   other primitive          -> USVString   (number/boolean/bigint -> string; Symbol throws)
-    //   null / undefined         -> empty
+    //   object without @@iterator-> record      (own enumerable keys, in order; a Symbol key throws)
+    //   other primitive / null   -> USVString   (number/boolean/bigint/null -> string; Symbol throws)
+    //   undefined / missing      -> empty       (the IDL default "")
     namespace {
         void ThrowTypeError(v8::Isolate *isolate, const char *message) {
             isolate->ThrowException(
@@ -448,12 +448,15 @@ namespace tns {
         }
 
         // Record init form: a plain object of name -> value, iterated in own
-        // enumerable string-key order. A value that cannot be coerced to a string
-        // aborts with the JS exception left pending.
+        // enumerable key order ([[OwnPropertyKeys]]: strings, then symbols). Per
+        // WebIDL record conversion every enumerable key is converted to a
+        // USVString, so an own enumerable Symbol key throws a TypeError
+        // (ValueToString below raises it); symbols are NOT silently skipped. A
+        // key or value that cannot be coerced to a string aborts with the JS
+        // exception left pending.
         bool BuildFromRecord(v8::Local<v8::Context> context, v8::Local<v8::Object> object,
                              ada::url_search_params &params) {
-            auto filter = static_cast<v8::PropertyFilter>(
-                    v8::PropertyFilter::ONLY_ENUMERABLE | v8::PropertyFilter::SKIP_SYMBOLS);
+            auto filter = v8::PropertyFilter::ONLY_ENUMERABLE;
             v8::Local<v8::Array> keys;
             if (!object->GetOwnPropertyNames(context, filter,
                                              v8::KeyConversionMode::kConvertToString).ToLocal(&keys)) {
@@ -516,17 +519,21 @@ namespace tns {
                 ThrowTypeError(isolate, "URLSearchParams init Symbol.iterator is not a function");
                 return;
             }
-        } else if (!value->IsNullOrUndefined()) {
-            // Other primitive (number / boolean / bigint / symbol): coerce to a
-            // USVString and run the urlencoded string parser. A Symbol cannot be
-            // converted and throws here, matching the spec.
+        } else if (!value->IsUndefined()) {
+            // Other primitive (number / boolean / bigint / symbol / null): coerce
+            // to a USVString and run the urlencoded string parser. The WebIDL
+            // union conversion has no null special case (the union is not
+            // nullable and a record is not a dictionary), so
+            // new URLSearchParams(null) parses the string "null", as the
+            // reference implementation does. A Symbol cannot be converted and
+            // throws here, matching the spec.
             std::string init;
             if (!ValueToString(context, value, init)) {
                 return;
             }
             params = ada::url_search_params(init);
         }
-        // null / undefined -> leave params empty
+        // undefined / missing -> the IDL default "" -> leave params empty
 
         auto searchParams = new URLSearchParamsImpl(params);
 
@@ -541,6 +548,9 @@ namespace tns {
     void URLSearchParamsImpl::Append(const v8::FunctionCallbackInfo<v8::Value> &args) {
         URLSearchParamsImpl *ptr = GetPointer(args.This());
         if (ptr == nullptr) {
+            // WebIDL brand check: every member requires a genuine URLSearchParams
+            // receiver (same as entries()/keys()/values()).
+            ThrowTypeError(args.GetIsolate(), "Illegal invocation");
             return;
         }
         // Both arguments are USVStrings (url.bs:3860); a Symbol or throwing
@@ -558,6 +568,7 @@ namespace tns {
     void URLSearchParamsImpl::Delete(const v8::FunctionCallbackInfo<v8::Value> &args) {
         URLSearchParamsImpl *ptr = GetPointer(args.This());
         if (ptr == nullptr) {
+            ThrowTypeError(args.GetIsolate(), "Illegal invocation");
             return;
         }
         // The name is a USVString (url.bs:3861): coerce it like the optional
@@ -597,6 +608,7 @@ namespace tns {
         auto isolate = args.GetIsolate();
         auto context = isolate->GetCurrentContext();
         if (ptr == nullptr) {
+            ThrowTypeError(isolate, "Illegal invocation");
             return;
         }
         auto callback = args[0].As<v8::Function>();
@@ -628,7 +640,7 @@ namespace tns {
         URLSearchParamsImpl *ptr = GetPointer(args.This());
         auto isolate = args.GetIsolate();
         if (ptr == nullptr) {
-            args.GetReturnValue().SetUndefined();
+            ThrowTypeError(isolate, "Illegal invocation");
             return;
         }
         // The name is a USVString (url.bs:3862); a Symbol or throwing toString
@@ -653,7 +665,7 @@ namespace tns {
         auto isolate = args.GetIsolate();
         auto context = isolate->GetCurrentContext();
         if (ptr == nullptr) {
-            args.GetReturnValue().Set(v8::Array::New(isolate));
+            ThrowTypeError(isolate, "Illegal invocation");
             return;
         }
         // The name is a USVString (url.bs:3863); a Symbol or throwing toString
@@ -674,7 +686,7 @@ namespace tns {
     void URLSearchParamsImpl::Has(const v8::FunctionCallbackInfo<v8::Value> &args) {
         URLSearchParamsImpl *ptr = GetPointer(args.This());
         if (ptr == nullptr) {
-            args.GetReturnValue().Set(false);
+            ThrowTypeError(args.GetIsolate(), "Illegal invocation");
             return;
         }
         // The name is a USVString (url.bs:3864): coerce it like the optional
@@ -713,6 +725,7 @@ namespace tns {
     void URLSearchParamsImpl::Set(const v8::FunctionCallbackInfo<v8::Value> &args) {
         URLSearchParamsImpl *ptr = GetPointer(args.This());
         if (ptr == nullptr) {
+            ThrowTypeError(args.GetIsolate(), "Illegal invocation");
             return;
         }
         // Both arguments are USVStrings (url.bs:3865); a Symbol or throwing
@@ -731,7 +744,7 @@ namespace tns {
                                       const v8::PropertyCallbackInfo<v8::Value> &info) {
         URLSearchParamsImpl *ptr = GetPointer(info.This());
         if (ptr == nullptr) {
-            info.GetReturnValue().Set(0);
+            ThrowTypeError(info.GetIsolate(), "Illegal invocation");
             return;
         }
 
@@ -743,6 +756,7 @@ namespace tns {
     void URLSearchParamsImpl::Sort(const v8::FunctionCallbackInfo<v8::Value> &args) {
         URLSearchParamsImpl *ptr = GetPointer(args.This());
         if (ptr == nullptr) {
+            ThrowTypeError(args.GetIsolate(), "Illegal invocation");
             return;
         }
         ptr->GetURLSearchParams()->sort();
@@ -751,7 +765,7 @@ namespace tns {
     void URLSearchParamsImpl::ToString(const v8::FunctionCallbackInfo<v8::Value> &args) {
         URLSearchParamsImpl *ptr = GetPointer(args.This());
         if (ptr == nullptr) {
-            args.GetReturnValue().SetEmptyString();
+            ThrowTypeError(args.GetIsolate(), "Illegal invocation");
             return;
         }
         auto isolate = args.GetIsolate();
