@@ -50,6 +50,7 @@ require("./tests/java-array-test");
 require("./tests/field-access-test");
 require("./tests/byte-buffer-test");
 require("./tests/dex-interface-implementation");
+require("./tests/testClassForNameDiscovery");
 require("./tests/testInterfaceImplementation");
 require("./tests/testRuntimeImplementedAPIs");
 require("./tests/testsInstanceOfOperator");

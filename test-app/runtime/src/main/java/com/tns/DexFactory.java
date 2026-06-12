@@ -1,5 +1,6 @@
 package com.tns;
 
+import android.os.Build;
 import android.util.Log;
 
 import com.tns.bindings.AnnotationDescriptor;
@@ -20,8 +21,11 @@ import java.io.InvalidClassException;
 import java.io.OutputStreamWriter;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -166,13 +170,19 @@ public class DexFactory {
         }
         jarFile.setReadOnly();
 
-        Class<?> result;
+        Class<?> result = null;
         String classNameToLoad = isInterface ? fullClassName : desiredDexClassName;
 
-        if (injectIntoParentClassLoader && classLoader instanceof BaseDexClassLoader) {
-            injectDexIntoClassLoader((BaseDexClassLoader) classLoader, jarFilePath);
-            result = classLoader.loadClass(classNameToLoad);
-        } else {
+        if (injectIntoParentClassLoader && classLoader instanceof BaseDexClassLoader
+                && injectDexIntoClassLoader((BaseDexClassLoader) classLoader, jarFilePath)) {
+            try {
+                result = classLoader.loadClass(classNameToLoad);
+            } catch (ClassNotFoundException e) {
+                // fall through to the isolated DexClassLoader below
+            }
+        }
+
+        if (result == null) {
             DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexDir.getAbsolutePath(), null, classLoader);
             result = dexClassLoader.loadClass(classNameToLoad);
         }
@@ -389,40 +399,74 @@ public class DexFactory {
      * (e.g. FragmentFactory) use Class.forName() to instantiate classes by name, but
      * NativeScript's dynamically-generated classes normally live in isolated DexClassLoaders
      * that Class.forName() doesn't search.
+     *
+     * The jar must be added through the target class loader's own DexPathList so that
+     * the resulting DexFile has the PathClassLoader as its only owner. Opening the jar
+     * through a separate DexClassLoader first and splicing its dex element would leave
+     * the same DexFile claimed by two loaders, which ART rejects on non-debuggable
+     * builds with "Attempt to register dex file ... with multiple class loaders".
+     *
+     * @return true if the jar was injected and the class can be loaded through the
+     *         target class loader, false if the caller should fall back to an
+     *         isolated DexClassLoader.
      */
-    private void injectDexIntoClassLoader(BaseDexClassLoader targetClassLoader, String jarFilePath) {
+    private boolean injectDexIntoClassLoader(BaseDexClassLoader targetClassLoader, String jarFilePath) {
         try {
-            // Create a temporary DexClassLoader to produce the optimized dex
-            DexClassLoader tempLoader = new DexClassLoader(jarFilePath, this.odexDir.getAbsolutePath(), null, targetClassLoader);
-
-            // Get pathList from both classloaders
-            Field pathListField = BaseDexClassLoader.class.getDeclaredField("pathList");
-            pathListField.setAccessible(true);
-
-            Object targetPathList = pathListField.get(targetClassLoader);
-            Object sourcePathList = pathListField.get(tempLoader);
-
-            // Get dexElements from both pathLists
-            Field dexElementsField = targetPathList.getClass().getDeclaredField("dexElements");
-            dexElementsField.setAccessible(true);
-
-            Object targetElements = dexElementsField.get(targetPathList);
-            Object sourceElements = dexElementsField.get(sourcePathList);
-
-            int targetLen = Array.getLength(targetElements);
-            int sourceLen = Array.getLength(sourceElements);
-
-            // Create merged array: target + source
-            Object merged = Array.newInstance(targetElements.getClass().getComponentType(), targetLen + sourceLen);
-            System.arraycopy(targetElements, 0, merged, 0, targetLen);
-            System.arraycopy(sourceElements, 0, merged, targetLen, sourceLen);
-
-            dexElementsField.set(targetPathList, merged);
-        } catch (Exception e) {
-            if (logger.isEnabled()) {
-                logger.write("Failed to inject dex into parent classloader: " + e.getMessage());
+            if (Build.VERSION.SDK_INT >= 24) {
+                // BaseDexClassLoader.addDexPath exists since API 24
+                Method addDexPath = BaseDexClassLoader.class.getDeclaredMethod("addDexPath", String.class);
+                addDexPath.setAccessible(true);
+                addDexPath.invoke(targetClassLoader, jarFilePath);
+            } else {
+                appendDexElements(targetClassLoader, jarFilePath);
             }
-            // Non-fatal: class will still be loadable via the ClassStorageService fallback
+            return true;
+        } catch (Exception e) {
+            Log.w("JS", "Failed to inject dex into parent classloader: " + e);
+            return false;
         }
+    }
+
+    /**
+     * Pre API 24 equivalent of BaseDexClassLoader.addDexPath: builds the dex elements
+     * through DexPathList's static factory methods (so no temporary class loader is
+     * involved) and splices them into the target loader's dexElements array. This is
+     * the same technique MultiDex used on these OS versions.
+     */
+    private void appendDexElements(BaseDexClassLoader targetClassLoader, String jarFilePath) throws Exception {
+        Field pathListField = BaseDexClassLoader.class.getDeclaredField("pathList");
+        pathListField.setAccessible(true);
+        Object pathList = pathListField.get(targetClassLoader);
+
+        ArrayList<File> files = new ArrayList<File>();
+        files.add(new File(jarFilePath));
+        ArrayList<IOException> suppressedExceptions = new ArrayList<IOException>();
+
+        Object newElements;
+        if (Build.VERSION.SDK_INT >= 23) {
+            Method makePathElements = pathList.getClass().getDeclaredMethod("makePathElements", List.class, File.class, List.class);
+            makePathElements.setAccessible(true);
+            newElements = makePathElements.invoke(null, files, this.odexDir, suppressedExceptions);
+        } else {
+            Method makeDexElements = pathList.getClass().getDeclaredMethod("makeDexElements", ArrayList.class, File.class, ArrayList.class);
+            makeDexElements.setAccessible(true);
+            newElements = makeDexElements.invoke(null, files, this.odexDir, suppressedExceptions);
+        }
+
+        if (!suppressedExceptions.isEmpty()) {
+            throw suppressedExceptions.get(0);
+        }
+
+        Field dexElementsField = pathList.getClass().getDeclaredField("dexElements");
+        dexElementsField.setAccessible(true);
+        Object oldElements = dexElementsField.get(pathList);
+
+        int oldLen = Array.getLength(oldElements);
+        int newLen = Array.getLength(newElements);
+        Object merged = Array.newInstance(oldElements.getClass().getComponentType(), oldLen + newLen);
+        System.arraycopy(oldElements, 0, merged, 0, oldLen);
+        System.arraycopy(newElements, 0, merged, oldLen, newLen);
+
+        dexElementsField.set(pathList, merged);
     }
 }
