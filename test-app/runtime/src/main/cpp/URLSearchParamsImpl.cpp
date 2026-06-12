@@ -399,8 +399,12 @@ namespace tns {
         // by the caller) and append each [name, value] pair. Covers Array, Map, Set,
         // another URLSearchParams and generators uniformly. A pair whose length is
         // not exactly 2 throws a TypeError; a name/value that cannot be coerced to a
-        // string aborts with the JS exception left pending. On either abrupt
-        // completion the source iterator is closed first (ES IteratorClose).
+        // string aborts with the JS exception left pending. On either of those two
+        // failures the source iterator is closed first (ES IteratorClose). A throw
+        // from the stepping itself (next(), or reading the result's done/value)
+        // intentionally does NOT close the iterator: the ES iterator protocol marks
+        // the iterator done on such a throw (IteratorStepValue), and IteratorClose
+        // is skipped for a done iterator, which is also how for..of behaves.
         bool BuildFromSequence(v8::Local<v8::Context> context, v8::Local<v8::Object> object,
                                v8::Local<v8::Function> iterMethod, ada::url_search_params &params) {
             auto isolate = context->GetIsolate();
