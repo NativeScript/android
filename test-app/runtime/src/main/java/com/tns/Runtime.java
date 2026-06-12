@@ -239,13 +239,15 @@ public class Runtime {
                 }
 
                 classResolver = new ClassResolver(classStorageService);
-                currentRuntime.set(this);
-
-                runtimeCache.put(this.runtimeId, this);
-
                 gcListener = GcListener.getInstance(config.appConfig.getGcThrottleTime(), config.appConfig.getMemoryCheckInterval(), config.appConfig.getFreeMemoryRatio());
                 // capture static configuration to allow native lookups when currentRuntime is unavailable
                 staticConfiguration = config;
+
+                // publish the instance only after everything that can throw has
+                // completed, so a failed construction is never reachable through
+                // the thread-local or the cache
+                currentRuntime.set(this);
+                runtimeCache.put(this.runtimeId, this);
             } finally {
                 frame.close();
             }
