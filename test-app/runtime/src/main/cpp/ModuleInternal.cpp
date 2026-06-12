@@ -19,6 +19,7 @@
 #include "CallbackHandlers.h"
 #include "ManualInstrumentation.h"
 #include "Runtime.h"
+#include "DevFlags.h"
 #include <sstream>
 #include <mutex>
 #include <libgen.h>
@@ -26,13 +27,15 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <utime.h>
+#include <unistd.h>
 
 using namespace v8;
 using namespace std;
 using namespace tns;
 
-// Global module registry for ES modules: maps absolute file paths → compiled Module handles
-std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
+// Per-isolate ES module registry definition lives in ModuleInternalCallbacks.cpp
+// (thread_local + leaky-singleton accessor). Declared via ModuleInternalCallbacks.h
+// so every call site below shares the same per-thread map.
 
 // Helper function to check if a module name looks like an optional external module
 bool ModuleInternal::IsLikelyOptionalModule(const std::string& moduleName) {
@@ -226,10 +229,121 @@ void ModuleInternal::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Va
 void ModuleInternal::Load(Local<Context> context, const string& path) {
     TNSPERF();
     auto isolate = m_isolate;
+
+    // HTTP(S) URL fast path. Android's `require()` only resolves file-system
+    // paths (it delegates to Java's `Module.resolvePath`), so
+    // `globalThis.require('http://...')` would fail the Java resolve and leave a
+    // pending V8 exception that the discarded `require->Call(...)` result hides,
+    // making the dev session report success without evaluating anything. Detect
+    // HTTP / ES-module specifiers here and route them through
+    // `tns::LoadHttpModuleForUrl` (fetch + compile + register), then instantiate
+    // and evaluate against the same `ResolveModuleCallback` the rest of the ESM
+    // loader uses, so static imports share the registry the dynamic-import
+    // callback populates.
+    if (path.rfind("http://", 0) == 0 || path.rfind("https://", 0) == 0) {
+        bool logEnabled = tns::IsScriptLoadingLogEnabled();
+        if (logEnabled) {
+            DEBUG_WRITE("[run-module][http-esm][begin] %s", path.c_str());
+        }
+
+        std::string errMsg;
+        auto maybeMod = tns::LoadHttpModuleForUrl(isolate, context, path, &errMsg);
+        Local<Module> module;
+        if (!maybeMod.ToLocal(&module)) {
+            if (logEnabled) {
+                DEBUG_WRITE("[run-module][http-esm][load-fail] %s reason=%s",
+                            path.c_str(), errMsg.c_str());
+            }
+            throw NativeScriptException(string("Cannot load HTTP module ") + path +
+                                        (errMsg.empty() ? "" : (": " + errMsg)));
+        }
+
+        if (module->GetStatus() == Module::kUninstantiated) {
+            TryCatch tcLink(isolate);
+            bool linked = module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false);
+            if (!linked) {
+                if (logEnabled) {
+                    DEBUG_WRITE("[run-module][http-esm][instantiate-fail] %s", path.c_str());
+                }
+                if (tcLink.HasCaught()) {
+                    throw NativeScriptException(tcLink, "Cannot instantiate HTTP module " + path);
+                }
+                throw NativeScriptException(string("Cannot instantiate HTTP module ") + path);
+            }
+        }
+
+        if (module->GetStatus() != Module::kEvaluated) {
+            TryCatch tcEval(isolate);
+            Local<Value> evalResult;
+            if (!module->Evaluate(context).ToLocal(&evalResult)) {
+                if (logEnabled) {
+                    DEBUG_WRITE("[run-module][http-esm][evaluate-fail] %s", path.c_str());
+                }
+                if (tcEval.HasCaught()) {
+                    throw NativeScriptException(tcEval, "Cannot evaluate HTTP module " + path);
+                }
+                throw NativeScriptException(string("Cannot evaluate HTTP module ") + path);
+            }
+
+            // Drain top-level-await the same way `LoadESModule` does so a
+            // module returning a pending Promise is fully settled before we
+            // return — otherwise the caller would advance while evaluation is
+            // still in flight.
+            if (!evalResult.IsEmpty() && evalResult->IsPromise()) {
+                Local<Promise> promise = evalResult.As<Promise>();
+                const int maxAttempts = 100;
+                int attempts = 0;
+                while (attempts < maxAttempts) {
+                    isolate->PerformMicrotaskCheckpoint();
+                    Promise::PromiseState state = promise->State();
+                    if (state != Promise::kPending) {
+                        if (state == Promise::kRejected) {
+                            Local<Value> reason = promise->Result();
+                            std::string reasonStr;
+                            if (!reason.IsEmpty()) {
+                                v8::Local<v8::String> reasonV8;
+                                if (reason->ToString(context).ToLocal(&reasonV8)) {
+                                    reasonStr = ArgConverter::ConvertToString(reasonV8);
+                                }
+                            }
+                            DEBUG_WRITE("[run-module][http-esm][evaluate-rejected] %s reason=%s",
+                                        path.c_str(),
+                                        reasonStr.empty() ? "<unknown>" : reasonStr.c_str());
+                            isolate->ThrowException(reason);
+                            throw NativeScriptException(
+                                string("HTTP module evaluation promise rejected: ") + path +
+                                (reasonStr.empty() ? "" : (" — " + reasonStr)));
+                        }
+                        break;
+                    }
+                    attempts++;
+                    usleep(100);
+                }
+            }
+        }
+
+        if (logEnabled) {
+            DEBUG_WRITE("[run-module][http-esm][ok] %s", path.c_str());
+        }
+        return;
+    }
+
     auto globalObject = context->Global();
     auto require = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "require")).ToLocalChecked().As<Function>();
     Local<Value> args[] = { ArgConverter::ConvertToV8String(isolate, path) };
-    require->Call(context, globalObject, 1, args);
+
+    // Surface JS exceptions thrown by `require` instead of leaving them as
+    // pending V8 exceptions: a discarded `require->Call(...)` result lets the
+    // C++ caller see success while the JS side still carries the exception,
+    // which the next entry-point then mis-attributes.
+    TryCatch tc(isolate);
+    Local<Value> callResult;
+    if (!require->Call(context, globalObject, 1, args).ToLocal(&callResult)) {
+        if (tc.HasCaught()) {
+            throw NativeScriptException(tc, "require() failed for module " + path);
+        }
+        throw NativeScriptException(string("require() failed for module ") + path);
+    }
 }
 
 void ModuleInternal::LoadWorker(Local<Context> context, const string& path) {
@@ -602,8 +716,23 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                 if (state != Promise::kPending) {
                     if (state == Promise::kRejected) {
                         Local<Value> reason = promise->Result();
+                        // Best-effort extract a human-readable reason so the
+                        // wrapped C++ exception names the actual cause instead
+                        // of just "Module evaluation promise rejected: <path>".
+                        std::string reasonStr;
+                        if (!reason.IsEmpty()) {
+                            v8::Local<v8::String> reasonV8;
+                            if (reason->ToString(context).ToLocal(&reasonV8)) {
+                                reasonStr = ArgConverter::ConvertToString(reasonV8);
+                            }
+                        }
+                        DEBUG_WRITE("[esm][evaluate-rejected] %s reason=%s",
+                                    path.c_str(),
+                                    reasonStr.empty() ? "<unknown>" : reasonStr.c_str());
                         isolate->ThrowException(reason);
-                        throw NativeScriptException(string("Module evaluation promise rejected: ") + path);
+                        throw NativeScriptException(
+                            string("Module evaluation promise rejected: ") + path +
+                            (reasonStr.empty() ? "" : (" — " + reasonStr)));
                     }
                     break;
                 }

@@ -35,6 +35,26 @@ import dalvik.system.DexClassLoader;
 public class DexFactory {
     private static final String COM_TNS_GEN_PREFIX = "com.tns.gen.";
 
+    // Generated proxy classes always live under names where the original
+    // `$` separators in inner-class qualifiers have been replaced with
+    // `_`. The proxy generator writes the dex with `_`, so any load via
+    // `classLoader.loadClass(...)` must use the same form. This helper
+    // is the single canonical entry point for that normalization so
+    // every load site agrees.
+    //
+    // Scoped strictly to the `com.tns.gen.` prefix; unrelated
+    // inner-class lookups (e.g. `java.util.HashMap$Entry`) are returned
+    // unchanged so JVM inner-class syntax keeps working.
+    private static String normalizeProxyClassName(String name) {
+        if (name == null) {
+            return null;
+        }
+        if (!name.startsWith(COM_TNS_GEN_PREFIX) || name.indexOf('$') < 0) {
+            return name;
+        }
+        return name.replace('$', '_');
+    }
+
     private final Logger logger;
     private final File dexDir;
     private final File odexDir;
@@ -121,9 +141,19 @@ public class DexFactory {
         String desiredDexClassName = this.getClassToProxyName(fullClassName);
 
         // when interfaces are extended as classes, we still want to preserve
-        // just the interface name without the extra file, line, column information
+        // just the interface name without the extra file, line, column information.
+        //
+        // The loadable proxy class name uses the `_`-normalized form: the proxy
+        // is written into the dex with `_`, while `classToProxy` keeps `$` so
+        // `Class.forName(classToProxy)` (in `generateDex`) can resolve the base
+        // type via JVM inner-class syntax. Without normalizing here, a
+        // `$`-containing base (e.g. unnamed
+        // `.extend(android.app.Application.ActivityLifecycleCallbacks, ...)`)
+        // fails `loadClass` with ClassNotFoundException even though the dex is
+        // present. Surfaces in HMR / dev; production uses an SBG-generated
+        // `@JavaProxy(...)` sibling and bypasses this path.
         if (!baseClassName.isEmpty() && isInterface) {
-            fullClassName = COM_TNS_GEN_PREFIX + classToProxy;
+            fullClassName = normalizeProxyClassName(COM_TNS_GEN_PREFIX + classToProxy);
         }
 
         File dexFile = this.getDexFile(desiredDexClassName);
@@ -202,6 +232,29 @@ public class DexFactory {
         Class<?> existingClass = this.injectedDexClasses.get(canonicalName);
         if (existingClass != null) {
             return existingClass;
+        }
+
+        // Generated proxy classes live under `_`-normalized names (see
+        // `normalizeProxyClassName`). If JNI hands us a `$`-containing
+        // `com.tns.gen.*` lookup (a metadata dispatch that passed a `$`-bearing
+        // base name straight through), try the normalized sibling — both the
+        // `injectedDexClasses` cache and `loadClass` — before falling back to
+        // the raw form. Scoped to the `com.tns.gen.` prefix so unrelated
+        // inner-class lookups (e.g. `java.util.HashMap$Entry`) still resolve via
+        // JVM inner-class syntax at the tail of this method.
+        String normalizedName = normalizeProxyClassName(canonicalName);
+        if (!normalizedName.equals(canonicalName)) {
+            existingClass = this.injectedDexClasses.get(normalizedName);
+            if (existingClass != null) {
+                return existingClass;
+            }
+            try {
+                return classLoader.loadClass(normalizedName);
+            } catch (ClassNotFoundException ignored) {
+                // fall through to the raw canonical lookup so the original
+                // failure (not a noise-from-the-fallback failure) is what
+                // propagates to the caller.
+            }
         }
 
         return classLoader.loadClass(canonicalName);

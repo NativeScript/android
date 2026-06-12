@@ -180,6 +180,21 @@ namespace tns {
         static void TerminateWorkerThread(v8::Isolate *isolate);
 
         /*
+         * `__nsTerminateAllWorkers()` global, installed on the main-thread
+         * isolate only. Iterates `id2WorkerMap` and calls
+         * `Runtime.workerObjectTerminate(workerId)` for each live worker,
+         * then clears the persistent handle. Returns the number of workers
+         * actually terminated (already-terminated entries don't count) so
+         * the HMR JS client can log the count.
+         *
+         * The snapshot-first iteration copies the workerId set before
+         * invoking any terminate so concurrent ClearWorkerPersistent
+         * calls (from a worker self-terminating in parallel) can't
+         * invalidate our iterator.
+         */
+        static void TerminateAllWorkersCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+        /*
          * Is called when an unhandled exception is thrown inside the worker
          * Will execute 'onerror' if one is provided inside the Worker Scope
          * Will make the exception "bubble up" through to main, to be handled by the Worker Object

@@ -1616,6 +1616,73 @@ void CallbackHandlers::TerminateWorkerThread(Isolate *isolate) {
     isolate->TerminateExecution();
 }
 
+void CallbackHandlers::TerminateAllWorkersCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    // Snapshot live worker IDs BEFORE invoking any terminate. Without the
+    // snapshot, calling `ClearWorkerPersistent` mid-iteration mutates
+    // `id2WorkerMap` and invalidates the iterator.
+    //
+    // We don't filter by isTerminated/closing status here. The Java-side
+    // `workerObjectTerminate` is idempotent (it checks `isTerminated`
+    // before queuing the TerminateThread message — Runtime.java:1670)
+    // so re-terminating a worker mid-shutdown is a safe no-op rather
+    // than a double-terminate. The diagnostic count we return below
+    // counts only IDs that survived the no-op gate.
+    Isolate* isolate = args.GetIsolate();
+    HandleScope scope(isolate);
+    Local<Context> context = isolate->GetCurrentContext();
+
+    std::vector<int> snapshot;
+    snapshot.reserve(CallbackHandlers::id2WorkerMap.size());
+    for (auto& kv : CallbackHandlers::id2WorkerMap) {
+        snapshot.push_back(kv.first);
+    }
+
+    int32_t terminatedCount = 0;
+    JEnv env;
+    auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "workerObjectTerminate", "(I)V");
+
+    for (int workerId : snapshot) {
+        auto workerFound = CallbackHandlers::id2WorkerMap.find(workerId);
+        if (workerFound == CallbackHandlers::id2WorkerMap.end()) {
+            continue;
+        }
+        auto* persistent = workerFound->second;
+        if (persistent == nullptr || persistent->IsEmpty()) {
+            continue;
+        }
+        Local<Object> workerObj = Local<Object>::New(isolate, *persistent);
+        if (workerObj.IsEmpty()) {
+            continue;
+        }
+
+        // Check whether this worker already had .terminate() called.
+        // Skip without counting if so.
+        Local<Value> isTerminated;
+        V8GetPrivateValue(isolate, workerObj,
+                          ArgConverter::ConvertToV8String(isolate, "isTerminated"),
+                          isTerminated);
+        if (!isTerminated.IsEmpty() && isTerminated->BooleanValue(isolate)) {
+            continue;
+        }
+
+        V8SetPrivateValue(
+            isolate, workerObj,
+            ArgConverter::ConvertToV8String(isolate, "isTerminated"),
+            Boolean::New(isolate, true));
+
+        try {
+            env.CallStaticVoidMethod(RUNTIME_CLASS, mId, workerId);
+            CallbackHandlers::ClearWorkerPersistent(workerId);
+            ++terminatedCount;
+        } catch (...) {
+            // Swallow per-worker failures — the HMR caller cares about
+            // best-effort "terminate everything you can" semantics.
+        }
+    }
+
+    args.GetReturnValue().Set(terminatedCount);
+}
+
 void CallbackHandlers::RemoveIsolateEntries(v8::Isolate *isolate) {
     for (auto &item: cache_) {
         if (item.second.isolate_ == isolate) {
