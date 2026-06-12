@@ -37,6 +37,8 @@ class AndroidJsV8Inspector {
 
     protected native final void dispatchMessage(String message);
 
+    private native String handleMessageOnSocketThread(String message);
+
     private Handler mainHandler;
 
     private final Object debugBrkLock;
@@ -292,6 +294,22 @@ class AndroidJsV8Inspector {
         protected void onMessage(final NanoWSD.WebSocketFrame message) {
             if (currentRuntimeLogger.isEnabled()) {
                 Log.d("V8Inspector", "To dbg backend: " + message.getTextPayload() + " ThreadId:" + Thread.currentThread().getId());
+            }
+
+            // Network.loadNetworkResource / IO.read / IO.close are served from
+            // disk on this thread so source maps load even while the isolate is
+            // paused at a breakpoint or busy running JS; Debugger.pause schedules
+            // a V8 interrupt and still flows through the queue.
+            String fastPathResponse = handleMessageOnSocketThread(message.getTextPayload());
+            if (fastPathResponse != null) {
+                try {
+                    send(fastPathResponse);
+                } catch (IOException e) {
+                    if (com.tns.Runtime.isDebuggable()) {
+                        e.printStackTrace();
+                    }
+                }
+                return;
             }
 
             inspectorMessages.offer(message.getTextPayload());
