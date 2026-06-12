@@ -421,7 +421,12 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
                               ex.GetErrorMessage().c_str());
         }
 
-        Isolate* isolate = workerIsolate_.exchange(nullptr);
+        // Take the isolate from the runtime, not from workerIsolate_: if the
+        // bootstrap failed between initWorkerRuntime and the workerIsolate_
+        // publish (e.g. a JNI error while resolving the looper), the atomic is
+        // still null while the isolate very much needs disposing.
+        workerIsolate_.store(nullptr);
+        Isolate* isolate = runtime_->GetIsolate();
         {
             v8::Locker locker(isolate);
             Isolate::Scope isolate_scope(isolate);

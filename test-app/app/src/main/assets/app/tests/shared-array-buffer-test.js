@@ -42,33 +42,48 @@ describe("Tests SharedArrayBuffer conversion", function () {
 		var view = new Uint8Array(sab);
 		view[0] = 42;
 
-		// requireNonNull returns its argument, handing back the direct
-		// ByteBuffer the runtime created over the SharedArrayBuffer's memory
-		var javaBuf = java.util.Objects.requireNonNull(sab);
-		expect(javaBuf.get(0)).toBe(42);
+		// the holder keeps the direct ByteBuffer the runtime created over the
+		// SharedArrayBuffer's memory, so Java reads/writes go to the same bytes
+		var holder = new com.tns.tests.ByteBufferHolder();
+		holder.hold(sab);
+		expect(holder.get(0)).toBe(42);
 
-		// mutations after the call are visible through the Java buffer
+		// JS mutations after the call are visible through the Java buffer
 		view[0] = 99;
-		expect(javaBuf.get(0)).toBe(99);
+		expect(holder.get(0)).toBe(99);
+
+		// and Java mutations are visible through the SharedArrayBuffer
+		holder.put(1, 77);
+		expect(view[1]).toBe(77);
 	});
 
 	it("should share a SharedArrayBuffer's memory with a worker and a Java buffer at once", function (done) {
 		var sab = new SharedArrayBuffer(4);
-		var view = new Int32Array(sab);
+		var view = new Uint8Array(sab);
 		view[0] = 0;
 
-		var javaBuf = java.util.Objects.requireNonNull(sab);
+		var holder = new com.tns.tests.ByteBufferHolder();
+		holder.hold(sab);
 
 		var worker = new Worker("../shared/Workers/EvalWorker.js");
 		worker.postMessage({
 			value: sab,
-			eval: "var v = new Int32Array(value); v[0] = 1234; postMessage('written');"
+			eval: "var v = new Uint8Array(value); v[0] = 42; v[3] = 99; postMessage('written');"
 		});
+		// fail fast instead of waiting for the jasmine timeout if the worker
+		// errors before posting back
+		worker.onerror = function (e) {
+			expect("worker error: " + e.message).toBe("");
+			worker.terminate();
+			done();
+		};
 		worker.onmessage = function (msg) {
 			expect(msg.data).toBe("written");
 			// the worker's write is visible both to this isolate and to Java
-			expect(view[0]).toBe(1234);
-			expect(javaBuf.getInt(0)).toBe(1234);
+			expect(view[0]).toBe(42);
+			expect(view[3]).toBe(99);
+			expect(holder.get(0)).toBe(42);
+			expect(holder.get(3)).toBe(99);
 			worker.terminate();
 			done();
 		};

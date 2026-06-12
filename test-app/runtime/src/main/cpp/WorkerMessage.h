@@ -10,7 +10,8 @@ namespace tns {
 
 template <typename T>
 inline T* Malloc(size_t n) {
-  return static_cast<T*>(malloc(n));
+  // n is an element count (see UncheckedRealloc), not a byte count
+  return static_cast<T*>(malloc(sizeof(T) * n));
 }
 
 template <typename T>

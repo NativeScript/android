@@ -31,7 +31,6 @@ private:
     bool terminated_ = false;
     std::mutex mutex_;
     std::mutex initializationMutex_;
-    void SignalAndWakeUp();
 };
 
 }  // namespace tns

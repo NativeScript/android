@@ -556,8 +556,18 @@ public class Runtime {
      */
     private static Runtime initRuntime(DynamicConfiguration dynamicConfiguration) {
         Runtime runtime = new Runtime(staticConfiguration, dynamicConfiguration);
-        runtime.init();
-        runtime.runScript(new File(staticConfiguration.appDir, "internal/ts_helpers.js"));
+        try {
+            runtime.init();
+            runtime.runScript(new File(staticConfiguration.appDir, "internal/ts_helpers.js"));
+        } catch (Throwable t) {
+            // the constructor already registered the instance - roll back so a
+            // failed bootstrap doesn't leave a stale, half-initialized runtime
+            // reachable through the caches
+            runtimeCache.remove(runtime.getRuntimeId());
+            currentRuntime.remove();
+            GcListener.unsubscribe(runtime);
+            throw t;
+        }
 
         return runtime;
     }

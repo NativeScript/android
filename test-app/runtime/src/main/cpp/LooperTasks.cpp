@@ -3,6 +3,8 @@
 #include <sys/eventfd.h>
 #include <unistd.h>
 
+#include <cerrno>
+#include <cstring>
 #include <vector>
 
 #include "NativeScriptAssert.h"
@@ -12,11 +14,23 @@ namespace tns {
 
 void LooperTasks::Initialize(ALooper* looper) {
     std::lock_guard<std::mutex> lock(mutex_);
+
+    int fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    if (fd == -1) {
+        DEBUG_WRITE_FORCE("LooperTasks: eventfd failed: %s", strerror(errno));
+        return;
+    }
+
+    if (ALooper_addFd(looper, fd, ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT,
+                      LooperTasks::TasksReadyCallback, this) != 1) {
+        DEBUG_WRITE_FORCE("LooperTasks: ALooper_addFd failed");
+        close(fd);
+        return;
+    }
+
     looper_ = looper;
     ALooper_acquire(looper_);
-    fd_ = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
-    ALooper_addFd(looper_, fd_, ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT,
-                  LooperTasks::TasksReadyCallback, this);
+    fd_ = fd;
 }
 
 void LooperTasks::Post(std::function<void()> task) {
