@@ -8,6 +8,8 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
@@ -24,6 +26,9 @@ public final class RuntimeHelper {
     }
 
     private static AndroidJsV8Inspector v8Inspector;
+    private static Context applicationContext;
+    private static BroadcastReceiver timezoneChangedReceiver;
+    private static boolean reloadScheduled;
 
     // hasErrorIntent tells you if there was an event (with an uncaught
     // exception) raised from ErrorReport
@@ -59,6 +64,9 @@ public final class RuntimeHelper {
     }
 
     public static Runtime initRuntime(Context context) {
+        Context appContext = context.getApplicationContext();
+        applicationContext = appContext != null ? appContext : context;
+
         if (Runtime.isInitialized()) {
             return Runtime.getCurrentRuntime();
         }
@@ -237,6 +245,40 @@ public final class RuntimeHelper {
         }
     }
 
+    public static synchronized boolean reloadApplication() {
+        final Context context = applicationContext;
+        if (context == null || reloadScheduled) {
+            return false;
+        }
+
+        reloadScheduled = true;
+
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Runtime.destroyMainRuntime();
+
+                    Runtime runtime = initRuntime(context);
+                    if (runtime == null) {
+                        throw new IllegalStateException("NativeScript runtime reload failed to initialize a new runtime.");
+                    }
+
+                    runtime.run();
+                } catch (Throwable e) {
+                    Log.e(logTag, "NativeScript runtime reload failed.", e);
+                    throw new RuntimeException("NativeScript runtime reload failed.", e);
+                } finally {
+                    synchronized (RuntimeHelper.class) {
+                        reloadScheduled = false;
+                    }
+                }
+            }
+        });
+
+        return true;
+    }
+
     private static void waitForLiveSync(Context context) {
         boolean needToWait = false;
 
@@ -295,7 +337,16 @@ public final class RuntimeHelper {
             }
         };
 
-        context.registerReceiver(timezoneReceiver, timezoneFilter);
+        if (timezoneChangedReceiver != null) {
+            try {
+                context.unregisterReceiver(timezoneChangedReceiver);
+            } catch (IllegalArgumentException e) {
+                // Already unregistered.
+            }
+        }
+
+        timezoneChangedReceiver = timezoneReceiver;
+        context.registerReceiver(timezoneChangedReceiver, timezoneFilter);
     }
 
     public static void initLiveSync(Application app) {

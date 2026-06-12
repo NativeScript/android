@@ -118,6 +118,8 @@ public class Runtime {
 
     private static native void TerminateWorkerCallback(int runtimeId);
 
+    private static native void TerminateRuntimeCallback(int runtimeId);
+
     private static native void ClearWorkerPersistent(int runtimeId, int workerId);
 
     private static native void CallWorkerObjectOnErrorHandleMain(int runtimeId, int workerId, String message, String stackTrace, String filename, int lineno, String threadName) throws NativeScriptException;
@@ -484,6 +486,40 @@ public class Runtime {
     public static boolean isInitialized() {
         Runtime runtime = Runtime.getCurrentRuntime();
         return (runtime != null) ? runtime.isInitializedImpl() : false;
+    }
+
+    static void destroyMainRuntime() {
+        Runtime runtime = Runtime.getCurrentRuntime();
+        if (runtime == null) {
+            return;
+        }
+
+        if (runtime.workerId != 0) {
+            throw new NativeScriptException("Only the main NativeScript runtime can be destroyed with destroyMainRuntime().");
+        }
+
+        runtime.isTerminating = true;
+        runtime.terminateWorkers();
+        GcListener.unsubscribe(runtime);
+        runtimeCache.remove(runtime.runtimeId);
+        pendingWorkerMessages.clear();
+        currentRuntime.remove();
+
+        TerminateRuntimeCallback(runtime.runtimeId);
+    }
+
+    private void terminateWorkers() {
+        for (Handler workerHandler : new ArrayList<>(workerIdToHandler.values())) {
+            if (workerHandler == null) {
+                continue;
+            }
+
+            Message msg = Message.obtain();
+            msg.arg1 = MessageType.TerminateThread;
+            workerHandler.sendMessageAtFrontOfQueue(msg);
+        }
+
+        workerIdToHandler.clear();
     }
 
     public int getWorkerId() {
