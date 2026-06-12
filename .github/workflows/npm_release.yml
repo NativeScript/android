@@ -12,7 +12,7 @@ env:
   NDK_VERSION: r27d
   ANDROID_API: 33
   ANDROID_ABI: x86_64
-  NDK_ARCH: darwin
+  NDK_ARCH: linux
 
 permissions:
   contents: read
@@ -20,7 +20,7 @@ permissions:
 jobs:
   build:
     name: Build
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     outputs:
       npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
@@ -45,9 +45,6 @@ jobs:
           cache: gradle
       - name: Setup Android SDK
         uses: android-actions/setup-android@651bceb6f9ca583f16b8d75b62c36ded2ae6fc9c # v4.0.0
-      - name: Homebrew dependencies
-        run: |
-          brew install wget
       - name: Setup NDK
         run: |
           echo "y" | sdkmanager "cmake;3.6.4111459"
@@ -94,7 +91,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: macos-15-intel
+    runs-on: ubuntu-latest
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
@@ -115,9 +112,6 @@ jobs:
           cache: gradle
       - name: Setup Android SDK
         uses: android-actions/setup-android@651bceb6f9ca583f16b8d75b62c36ded2ae6fc9c # v4.0.0
-      - name: Homebrew dependencies
-        run: |
-          brew install wget
       - name: Setup NDK
         run: |
           echo "y" | sdkmanager "cmake;3.6.4111459"
@@ -135,6 +129,11 @@ jobs:
           npm install --prefix ./test-app/tools
       - name: SBG tests
         run: ./gradlew runSbgTests --stacktrace
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - name: Run unit tests
         uses: ReactiveCircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a # v2.37.0
         with:
