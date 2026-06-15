@@ -7,4 +7,4 @@
 [submodule "test-app/build-tools/android-dts-generator"]
 	path = test-app/build-tools/android-dts-generator
 	url = https://github.com/NativeScript/android-dts-generator.git
-	branch = master
+	branch = main
