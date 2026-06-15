@@ -62,6 +62,22 @@ std::string FinishResponse(json& response, const std::string& sessionId) {
     return JsonDump(response);
 }
 
+// Target.attachedToTarget event announcing a worker as a child target.
+std::string BuildWorkerAttachedEvent(WorkerInspectorClient* client) {
+    json attached = {{"method", "Target.attachedToTarget"},
+                     {"params",
+                      {{"sessionId", client->SessionId()},
+                       {"targetInfo",
+                        {{"targetId", client->TargetId()},
+                         {"type", "worker"},
+                         {"title", client->Url()},
+                         {"url", client->Url()},
+                         {"attached", true},
+                         {"canAccessOpener", false}}},
+                       {"waitingForDebugger", false}}}};
+    return JsonDump(attached);
+}
+
 std::string Base64Encode(const char* data, size_t length) {
     static const char* kAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     std::string encoded;
@@ -511,97 +527,107 @@ bool JsV8InspectorClient::handleMessageOnSocketThread(const std::string& message
 
 void JsV8InspectorClient::RouteToWorker(const std::string& sessionId, const std::string& method,
                                         long long msgId, const std::string& message) {
-    std::lock_guard<std::mutex> lock(workerTargetsMutex_);
-    auto it = workerTargets_.find(sessionId);
-    if (it == workerTargets_.end()) {
-        // The worker died (or never existed): answer commands so the frontend
-        // does not wait forever.
-        if (msgId >= 0) {
-            json error = {{"id", msgId},
-                          {"sessionId", sessionId},
-                          {"error", {{"code", -32001}, {"message", "Session not found"}}}};
-            this->SendToFrontend(JsonDump(error));
+    // Built under the lock, sent after releasing it: a blocking socket write
+    // must not stall worker register/unregister on other threads.
+    std::string errorPayload;
+    {
+        std::lock_guard<std::mutex> lock(workerTargetsMutex_);
+        auto it = workerTargets_.find(sessionId);
+        if (it == workerTargets_.end()) {
+            // The worker died (or never existed): answer commands so the
+            // frontend does not wait forever.
+            if (msgId >= 0) {
+                json error = {{"id", msgId},
+                              {"sessionId", sessionId},
+                              {"error", {{"code", -32001}, {"message", "Session not found"}}}};
+                errorPayload = JsonDump(error);
+            }
+        } else {
+            // The lock keeps the client alive against a concurrent
+            // UnregisterWorkerTarget + delete on the worker thread; both calls
+            // below are non-blocking (queue push / RequestInterrupt), so they
+            // never hold the lock across a socket write.
+            WorkerInspectorClient* client = it->second.client;
+
+            // Debugger.pause must interrupt a busy worker; skip it while the
+            // worker sits in its nested pause loop (no JS running - the
+            // interrupt would only fire after resume, causing a spurious
+            // re-pause). The message is still pushed so V8 answers the id.
+            if (method == "Debugger.pause" && !client->IsRunningPauseLoop()) {
+                client->RequestPauseInterrupt();
+            }
+
+            client->PushMessage(message);
         }
-        return;
     }
 
-    WorkerInspectorClient* client = it->second.client;
-
-    // Debugger.pause must interrupt a busy worker; skip it while the worker
-    // sits in its nested pause loop (no JS running - the interrupt would only
-    // fire after resume, causing a spurious re-pause). The message is still
-    // pushed so V8 answers the request id.
-    if (method == "Debugger.pause" && !client->IsRunningPauseLoop()) {
-        client->RequestPauseInterrupt();
+    if (!errorPayload.empty()) {
+        this->SendToFrontend(errorPayload);
     }
-
-    client->PushMessage(message);
 }
 
 void JsV8InspectorClient::RegisterWorkerTarget(int workerId, WorkerInspectorClient* client) {
-    std::lock_guard<std::mutex> lock(workerTargetsMutex_);
-    WorkerTarget target{workerId, client, false};
+    std::string attachedPayload;
+    {
+        std::lock_guard<std::mutex> lock(workerTargetsMutex_);
+        WorkerTarget target{workerId, client, false};
 
-    if (isConnected_ && autoAttach_) {
-        target.announced = true;
-        json attached = {{"method", "Target.attachedToTarget"},
-                         {"params",
-                          {{"sessionId", client->SessionId()},
-                           {"targetInfo",
-                            {{"targetId", client->TargetId()},
-                             {"type", "worker"},
-                             {"title", client->Url()},
-                             {"url", client->Url()},
-                             {"attached", true},
-                             {"canAccessOpener", false}}},
-                           {"waitingForDebugger", false}}}};
-        this->SendToFrontend(JsonDump(attached));
+        if (isConnected_ && autoAttach_) {
+            target.announced = true;
+            attachedPayload = BuildWorkerAttachedEvent(client);
+        }
+
+        workerTargets_.emplace(client->SessionId(), target);
     }
 
-    workerTargets_.emplace(client->SessionId(), target);
+    if (!attachedPayload.empty()) {
+        this->SendToFrontend(attachedPayload);
+    }
 }
 
 void JsV8InspectorClient::UnregisterWorkerTarget(int workerId) {
-    std::lock_guard<std::mutex> lock(workerTargetsMutex_);
-    for (auto it = workerTargets_.begin(); it != workerTargets_.end(); ++it) {
-        if (it->second.workerId != workerId) {
-            continue;
-        }
+    std::string detachedPayload;
+    {
+        std::lock_guard<std::mutex> lock(workerTargetsMutex_);
+        for (auto it = workerTargets_.begin(); it != workerTargets_.end(); ++it) {
+            if (it->second.workerId != workerId) {
+                continue;
+            }
 
-        if (it->second.announced && isConnected_) {
-            json detached = {{"method", "Target.detachedFromTarget"},
-                             {"params",
-                              {{"sessionId", it->second.client->SessionId()},
-                               {"targetId", it->second.client->TargetId()}}}};
-            this->SendToFrontend(JsonDump(detached));
-        }
+            if (it->second.announced && isConnected_) {
+                json detached = {{"method", "Target.detachedFromTarget"},
+                                 {"params",
+                                  {{"sessionId", it->second.client->SessionId()},
+                                   {"targetId", it->second.client->TargetId()}}}};
+                detachedPayload = JsonDump(detached);
+            }
 
-        workerTargets_.erase(it);
-        return;
+            workerTargets_.erase(it);
+            break;
+        }
+    }
+
+    if (!detachedPayload.empty()) {
+        this->SendToFrontend(detachedPayload);
     }
 }
 
 void JsV8InspectorClient::AnnounceWorkerTargets() {
-    std::lock_guard<std::mutex> lock(workerTargetsMutex_);
-    for (auto& entry : workerTargets_) {
-        WorkerTarget& target = entry.second;
-        if (target.announced) {
-            continue;
+    std::vector<std::string> pending;
+    {
+        std::lock_guard<std::mutex> lock(workerTargetsMutex_);
+        for (auto& entry : workerTargets_) {
+            WorkerTarget& target = entry.second;
+            if (target.announced) {
+                continue;
+            }
+            target.announced = true;
+            pending.push_back(BuildWorkerAttachedEvent(target.client));
         }
-        target.announced = true;
+    }
 
-        json attached = {{"method", "Target.attachedToTarget"},
-                         {"params",
-                          {{"sessionId", target.client->SessionId()},
-                           {"targetInfo",
-                            {{"targetId", target.client->TargetId()},
-                             {"type", "worker"},
-                             {"title", target.client->Url()},
-                             {"url", target.client->Url()},
-                             {"attached", true},
-                             {"canAccessOpener", false}}},
-                           {"waitingForDebugger", false}}}};
-        this->SendToFrontend(JsonDump(attached));
+    for (const auto& payload : pending) {
+        this->SendToFrontend(payload);
     }
 }
 
@@ -813,14 +839,22 @@ void JsV8InspectorClient::init() {
 
 JsV8InspectorClient* JsV8InspectorClient::GetInstance() {
     JsV8InspectorClient* client = instance.load(std::memory_order_acquire);
-    if (client == nullptr) {
-        // Main-thread entry points only (JNI init/connect/dispatch); worker
-        // threads use GetInstanceIfCreated and never construct.
-        client = new JsV8InspectorClient(Runtime::GetRuntime(0)->GetIsolate());
-        instance.store(client, std::memory_order_release);
+    if (client != nullptr) {
+        return client;
     }
 
-    return client;
+    // handleMessageOnSocketThread also calls this from the socket thread, so a
+    // concurrent first call is possible: construct, then publish with a CAS and
+    // discard our copy if another thread won the race.
+    auto* created = new JsV8InspectorClient(Runtime::GetRuntime(0)->GetIsolate());
+    JsV8InspectorClient* expected = nullptr;
+    if (!instance.compare_exchange_strong(expected, created, std::memory_order_acq_rel,
+                                          std::memory_order_acquire)) {
+        delete created;
+        return expected;
+    }
+
+    return created;
 }
 
 JsV8InspectorClient* JsV8InspectorClient::GetInstanceIfCreated() {
