@@ -87,7 +87,7 @@ android {
     }
 
     if (hasNdkVersion) {
-        ndkVersion ndkVersion
+        ndkVersion project.ndkVersion
     } else {
         ndkVersion defaultNdkVersion
     }
