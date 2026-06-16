@@ -113,8 +113,9 @@ public:
      * Must run on the parent's thread, before the parent isolate is disposed
      * (the children's Worker object persistents live in that isolate).
      * Cascades: each child terminates its own children during shutdown.
+     * Returns the number of direct child workers that were torn down.
      */
-    static void TerminateChildren(v8::Isolate* parentIsolate);
+    static int TerminateChildren(v8::Isolate* parentIsolate);
 
     /*
      * Resolves the wrapper of a worker isolate via its isolate data slot.

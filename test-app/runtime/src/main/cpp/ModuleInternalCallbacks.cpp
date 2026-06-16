@@ -1,4 +1,5 @@
 #include "ModuleInternal.h"
+#include "ModuleInternalCallbacks.h"
 #include "ArgConverter.h"
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
@@ -9,7 +10,11 @@
 #include <vector>
 #include <algorithm>
 #include <atomic>
+#include <cctype>
+#include <cstdio>
 #include <cstring>
+#include <mutex>
+#include <unordered_set>
 #include "HMRSupport.h"
 #include "DevFlags.h"
 #include "JEnv.h"
@@ -18,8 +23,107 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-// External global module registry declared in ModuleInternal.cpp
-extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
+// ────────────────────────────────────────────────────────────────────────────
+// Forward declarations for helpers defined below their first use. Every helper
+// called from ResolveModuleCallback / ImportModuleDynamicallyCallback is
+// declared here so definition order within the translation unit doesn't matter.
+namespace tns {
+static inline bool StartsWith(const std::string& s, const char* prefix);
+static inline bool EndsWith(const std::string& s, const char* suffix);
+static std::string CanonicalizeRegistryKey(const std::string& key);
+static std::string NormalizeViteSpecifier(const std::string& specifier);
+static std::string LookupImportMap(const std::string& specifier);
+static bool HasUrlScheme(const std::string& spec);
+static bool IsSyntheticNamespaceKey(const std::string& key);
+static bool IsVolatileUrl(const std::string& url);
+static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
+    v8::Isolate* isolate, v8::Local<v8::Context> context,
+    const std::string& source, const std::string& registryKey);
+static v8::MaybeLocal<v8::Module> ResolveFromVendorRegistry(
+    v8::Isolate* isolate, v8::Local<v8::Context> context,
+    const std::string& vendorId);
+}  // namespace tns
+
+// ────────────────────────────────────────────────────────────────────────────
+// Per-isolate ES module registry.
+//
+// `g_moduleRegistry` is `thread_local`: each NS isolate (the main JS thread
+// plus each Worker thread) gets its own per-thread map. `v8::Global<Module>`
+// handles are isolate-bound; sharing one map across isolates lets thread A
+// fetch a handle thread B created, and V8 will fail the identity check during
+// `InstantiateModule` (the dependency module belongs to a different isolate
+// than the module it's being linked into). We use the reference + leaky
+// singleton pattern so that every call site continues to write
+// `g_moduleRegistry[key] = …` without churning ~100+ call sites to use
+// accessor functions, AND so that we don't run a destructor on the underlying
+// map when the worker thread tears down (which would call
+// `v8::Global<Module>::Reset()` on handles whose isolate may already be gone).
+//
+// On each thread's first use of `g_moduleRegistry`, the initializer below
+// runs once per thread to bind the reference to that thread's map.
+namespace {
+using ModuleHandleMap = std::unordered_map<std::string, v8::Global<v8::Module>>;
+
+ModuleHandleMap& MakePerIsolateModuleRegistry() {
+  thread_local auto* p = new ModuleHandleMap();
+  return *p;
+}
+}  // namespace
+
+namespace tns {
+thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleRegistry =
+    MakePerIsolateModuleRegistry();
+}  // namespace tns
+
+// ────────────────────────────────────────────────────────────────────────────
+// Per-process module-resolution state (import map + vendor cache + fallbacks).
+//
+// These are leaky singletons for the same reason as the HMR registries in
+// HMRSupport.cpp: their destructors would call `v8::Global<Module>::Reset()`
+// during `__cxa_finalize_ranges`, after the owning isolate is already gone,
+// crashing the process on app exit. Heap-allocate + leak (`new` once, never
+// `delete`) so the OS reclaims memory on process exit and we never run a
+// destructor that touches V8.
+//
+// Vendor cache is `thread_local` because vendor SyntheticModules are
+// isolate-bound. Reusing one across isolates breaks the linker's
+// export-table check. The other registries are process-wide configuration
+// (no v8::Global) and intentionally shared across isolates.
+
+namespace tns {
+
+static std::mutex g_importMapMutex;
+static auto* _g_importMap = new std::unordered_map<std::string, std::string>();
+static auto& g_importMap = *_g_importMap;
+
+static std::mutex g_volatilePatternsMutex;
+static auto* _g_volatilePatterns = new std::vector<std::string>();
+static auto& g_volatilePatterns = *_g_volatilePatterns;
+
+namespace {
+using ModuleHandleMap = std::unordered_map<std::string, v8::Global<v8::Module>>;
+
+ModuleHandleMap& MakePerIsolateVendorModuleCache() {
+  thread_local auto* p = new ModuleHandleMap();
+  return *p;
+}
+}  // namespace
+
+static thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_vendorModuleCache =
+    MakePerIsolateVendorModuleCache();
+
+// Set of canonical keys currently being resolved (loop-breaker for cyclic
+// HTTP imports). thread_local because dynamic-import waits are isolate-bound.
+namespace {
+std::unordered_set<std::string>& MakePerIsolateInFlightSet() {
+  thread_local auto* p = new std::unordered_set<std::string>();
+  return *p;
+}
+}  // namespace
+static thread_local std::unordered_set<std::string>& g_modulesInFlight =
+    MakePerIsolateInFlightSet();
+
+}  // namespace tns
 
 // Forward declaration used by logging helper
 std::string GetApplicationPath();
@@ -55,7 +159,7 @@ static void LogHttpCompileDiagnostics(v8::Isolate* isolate,
             String::Utf8Value l8(isolate, maybeLine.ToLocalChecked());
             if (*l8) srcLineStr = *l8;
         }
-        // Heuristics similar to iOS for quick triage
+        // Classify the failure for quick triage.
         if (msgStr.find("Unexpected identifier") != std::string::npos ||
             msgStr.find("Unexpected token") != std::string::npos) {
             if (msgStr.find("export") != std::string::npos &&
@@ -98,89 +202,616 @@ static void LogHttpCompileDiagnostics(v8::Isolate* isolate,
                 snippet.c_str());
 }
 
-// Helper: resolve relative or root-absolute spec against an HTTP(S) referrer URL.
-// Returns empty string if resolution is not possible.
-static std::string ResolveHttpRelative(const std::string& referrerUrl, const std::string& spec) {
-    if (referrerUrl.empty()) {
-        return std::string();
-    }
-    auto startsWith = [](const std::string& s, const char* pre) -> bool {
-        size_t n = strlen(pre);
-        return s.size() >= n && s.compare(0, n, pre) == 0;
-    };
-    if (!(startsWith(referrerUrl, "http://") || startsWith(referrerUrl, "https://"))) {
-        return std::string();
-    }
-    // Normalize referrer: drop fragment and query
-    std::string base = referrerUrl;
-    size_t hashPos = base.find('#');
-    if (hashPos != std::string::npos) base = base.substr(0, hashPos);
-    size_t qPos = base.find('?');
-    if (qPos != std::string::npos) base = base.substr(0, qPos);
+// Resolution of relative / root-absolute import specifiers against an http(s)
+// referrer lives in `HMRSupport.cpp` (`ResolveImportSpecifierAgainstUrl`); call
+// sites below invoke `tns::ResolveImportSpecifierAgainstUrl(spec, referrer)`.
 
-    // Extract origin and path
-    size_t schemePos = base.find("://");
-    if (schemePos == std::string::npos) {
-        return std::string();
-    }
-    size_t pathStart = base.find('/', schemePos + 3);
-    std::string origin = (pathStart == std::string::npos) ? base : base.substr(0, pathStart);
-    std::string path = (pathStart == std::string::npos) ? std::string("/") : base.substr(pathStart);
+// ────────────────────────────────────────────────────────────────────────────
+// Module-resolution helpers (ESM resolver hardening). Helpers referenced before
+// their definition are forward-declared at the top of this file.
+namespace tns {
 
-    // Separate query/fragment from spec
-    std::string specPath = spec;
-    std::string specSuffix;
-    size_t specQ = specPath.find('?');
-    size_t specH = specPath.find('#');
-    size_t cut = std::string::npos;
-    if (specQ != std::string::npos && specH != std::string::npos) {
-        cut = std::min(specQ, specH);
-    } else if (specQ != std::string::npos) {
-        cut = specQ;
-    } else if (specH != std::string::npos) {
-        cut = specH;
-    }
-    if (cut != std::string::npos) {
-        specSuffix = specPath.substr(cut);
-        specPath = specPath.substr(0, cut);
-    }
-
-    // Build new path
-    std::string newPath;
-    if (!specPath.empty() && specPath[0] == '/') {
-        // Root-absolute relative to origin
-        newPath = specPath;
-    } else {
-        // Relative to directory of referrer path
-        size_t lastSlash = path.find_last_of('/');
-        std::string baseDir = (lastSlash == std::string::npos) ? std::string("/") : path.substr(0, lastSlash + 1);
-        newPath = baseDir + specPath;
-    }
-
-    // Normalize "." and ".." segments
-    std::vector<std::string> stack;
-    bool absolute = !newPath.empty() && newPath[0] == '/';
-    size_t i = 0;
-    while (i <= newPath.size()) {
-        size_t j = newPath.find('/', i);
-        std::string seg = (j == std::string::npos) ? newPath.substr(i) : newPath.substr(i, j - i);
-        if (seg.empty() || seg == ".") {
-            // skip
-        } else if (seg == "..") {
-            if (!stack.empty()) stack.pop_back();
-        } else {
-            stack.push_back(seg);
-        }
-        if (j == std::string::npos) break;
-        i = j + 1;
-    }
-    std::string normPath = absolute ? "/" : std::string();
-    for (size_t k = 0; k < stack.size(); k++) {
-        if (k > 0) normPath += "/";
-        normPath += stack[k];
-    }
-    return origin + normPath + specSuffix;
+static inline bool StartsWith(const std::string& s, const char* prefix) {
+  size_t n = strlen(prefix);
+  return s.size() >= n && s.compare(0, n, prefix) == 0;
 }
+
+static inline bool EndsWith(const std::string& s, const char* suffix) {
+  size_t n = strlen(suffix);
+  return s.size() >= n && s.compare(s.size() - n, n, suffix) == 0;
+}
+
+// Synthetic-namespace keys (ns-vendor://, optional:, node:, blob:) are NOT
+// filesystem paths. Treat them as opaque identifiers — never collapse,
+// percent-decode, or path-normalize them — so they keep their exact registry
+// identity through invalidation and reload.
+static bool IsSyntheticNamespaceKey(const std::string& key) {
+  return StartsWith(key, "ns-vendor://") || StartsWith(key, "optional:") ||
+         StartsWith(key, "node:") || StartsWith(key, "blob:");
+}
+
+// Returns true for any specifier with a leading URL scheme of the form
+// `<scheme>:` where the scheme contains no `/` (filesystem paths and bare
+// specifiers stay false). Used by InitializeImportMetaObject to decide
+// whether `import.meta.url` should preserve the specifier verbatim vs.
+// wrap it in `file://`.
+static bool HasUrlScheme(const std::string& spec) {
+  size_t schemePos = spec.find(':');
+  if (schemePos == std::string::npos || schemePos == 0) return false;
+  size_t slashPos = spec.find('/');
+  if (slashPos != std::string::npos && slashPos < schemePos) return false;
+  // Scheme chars must be alphanumeric / `+` / `-` / `.` per RFC 3986.
+  for (size_t i = 0; i < schemePos; ++i) {
+    char c = spec[i];
+    if (!std::isalnum(static_cast<unsigned char>(c)) && c != '+' && c != '-' && c != '.') {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Matches `url` against the `volatilePatterns` configured by Vite via
+// `__nsConfigureRuntime({ volatilePatterns: [...] })` (substring match).
+// Android's HTTP loader does not consult this: it enforces volatility
+// structurally — a consume-once prefetch read plus eviction on HMR
+// invalidation (see HttpFetchText in HMRSupport.cpp). It is available for a
+// read-gated cache policy, which the iOS loader uses.
+static bool IsVolatileUrl(const std::string& url) {
+  std::lock_guard<std::mutex> lock(g_volatilePatternsMutex);
+  for (const auto& pat : g_volatilePatterns) {
+    if (url.find(pat) != std::string::npos) return true;
+  }
+  return false;
+}
+
+// Canonicalize a raw module key into a stable registry key.
+//
+// Rules:
+//   - HTTP/HTTPS keys go through `CanonicalizeHttpUrlKey` (drop fragment,
+//     normalize bridge endpoints, sort query, strip `?import`).
+//   - `file://http(s)://...` keys unwrap the outer scheme, then HTTP-canon.
+//   - `blob:` keys are preserved verbatim (they're opaque random IDs).
+//   - `ns-vendor://`, `optional:`, `node:` (and any other custom scheme
+//     where the scheme appears before the first slash) are preserved
+//     verbatim — these are NOT filesystem paths.
+//   - Plain filesystem paths fall through unchanged (the Android resolver
+//     resolves them lazily via candidate scans).
+static std::string CanonicalizeRegistryKey(const std::string& key) {
+  if (key.empty()) {
+    return key;
+  }
+
+  if (StartsWith(key, "http://") || StartsWith(key, "https://") ||
+      StartsWith(key, "file://http://") || StartsWith(key, "file://https://")) {
+    return CanonicalizeHttpUrlKey(key);
+  }
+  if (StartsWith(key, "blob:")) {
+    return key;
+  }
+  if (IsSyntheticNamespaceKey(key)) {
+    return key;
+  }
+  // Any other custom scheme, or a plain filesystem path: preserve verbatim.
+  // The Android resolver resolves filesystem paths lazily via candidate scans.
+  return key;
+}
+
+// Compile a module body for "register only" mode used by the HTTP loader
+// and vendor wrapper. Caller owns instantiation + evaluation; we just
+// produce the v8::Module and seat it in `g_moduleRegistry` under
+// `registryKey` so resolver callbacks can find it during link.
+static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
+    v8::Isolate* isolate, v8::Local<v8::Context> context,
+    const std::string& source, const std::string& registryKey) {
+  v8::EscapableHandleScope scope(isolate);
+  v8::Local<v8::String> sourceText = ArgConverter::ConvertToV8String(isolate, source);
+  v8::Local<v8::String> urlString = ArgConverter::ConvertToV8String(isolate, registryKey);
+  v8::ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false,
+                          true /* is_module */);
+  v8::ScriptCompiler::Source src(sourceText, origin);
+
+  v8::Local<v8::Module> mod;
+  {
+    v8::TryCatch tc(isolate);
+    if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&mod)) {
+      if (IsScriptLoadingLogEnabled()) {
+        v8::Local<v8::Value> ex = tc.Exception();
+        v8::String::Utf8Value m(isolate, ex);
+        DEBUG_WRITE("[http-esm][compile-register][fail] key=%s msg=%s",
+                    registryKey.c_str(), *m ? *m : "(unknown)");
+      }
+      return v8::MaybeLocal<v8::Module>();
+    }
+  }
+  g_moduleRegistry[registryKey].Reset(isolate, mod);
+  return scope.Escape(mod);
+}
+
+// Normalize a Vite-rewritten specifier into the canonical import-map key.
+// Handles two common Vite dev-server rewrite patterns:
+//   1. Prebundled deps:  "/node_modules/.vite/deps/solid-js.js?v=abc"   → "solid-js"
+//                        "/node_modules/.vite/deps/@tanstack_solid-router.js" → "@tanstack/solid-router"
+//   2. Explicit node_modules paths:
+//        "/node_modules/@angular/core/fesm2022/core.mjs" → "@angular/core/fesm2022/core.mjs"
+//        "/node_modules/tslib/tslib.es6.mjs"             → "tslib"
+//
+// For explicit node_modules paths we preserve non-main-entry subpaths so the
+// import map's trailing-slash HTTP prefixes can keep complex package build
+// outputs on HTTP. Only bare package roots and simple root-level main entries
+// collapse back to the package id for vendor/exact import-map resolution.
+static std::string NormalizeViteSpecifier(const std::string& specifier) {
+  // Pattern 1: Vite prebundled deps — /node_modules/.vite/deps/<flattened-id>.js
+  {
+    const std::string viteDepsPrefix = "/node_modules/.vite/deps/";
+    const std::string viteDepsPrefix2 = "node_modules/.vite/deps/";
+    std::string prefix;
+    if (specifier.compare(0, viteDepsPrefix.size(), viteDepsPrefix) == 0)
+      prefix = viteDepsPrefix;
+    else if (specifier.compare(0, viteDepsPrefix2.size(), viteDepsPrefix2) == 0)
+      prefix = viteDepsPrefix2;
+
+    if (!prefix.empty()) {
+      std::string id = specifier.substr(prefix.size());
+      auto qpos = id.find('?');
+      if (qpos != std::string::npos) id = id.substr(0, qpos);
+      auto dotpos = id.rfind('.');
+      if (dotpos != std::string::npos) id = id.substr(0, dotpos);
+      if (!id.empty() && id[0] == '@') {
+        auto upos = id.find('_');
+        if (upos != std::string::npos) {
+          id = id.substr(0, upos) + "/" + id.substr(upos + 1);
+          auto upos2 = id.find('_', upos + 1);
+          if (upos2 != std::string::npos) {
+            id = id.substr(0, upos2);
+          }
+        }
+      }
+      if (IsScriptLoadingLogEnabled()) {
+        DEBUG_WRITE("[import-map][normalize] vite-deps: %s -> %s", specifier.c_str(), id.c_str());
+      }
+      return id;
+    }
+  }
+
+  // Pattern 2: Resolved node_modules path — /node_modules/<pkg>/...
+  {
+    const std::string nmPrefix = "/node_modules/";
+    const std::string nmPrefix2 = "node_modules/";
+    std::string sub;
+    if (specifier.compare(0, nmPrefix.size(), nmPrefix) == 0)
+      sub = specifier.substr(nmPrefix.size());
+    else if (specifier.compare(0, nmPrefix2.size(), nmPrefix2) == 0)
+      sub = specifier.substr(nmPrefix2.size());
+
+    if (!sub.empty() && sub[0] != '.') {
+      if (sub.compare(0, 6, ".vite/") == 0) return "";
+
+      std::string subNoQuery = sub;
+      std::string querySuffix;
+      auto subQueryPos = sub.find('?');
+      if (subQueryPos != std::string::npos) {
+        subNoQuery = sub.substr(0, subQueryPos);
+        querySuffix = sub.substr(subQueryPos);
+      }
+
+      std::string pkgName;
+      if (subNoQuery[0] == '@') {
+        auto slash1 = subNoQuery.find('/');
+        if (slash1 != std::string::npos) {
+          auto slash2 = subNoQuery.find('/', slash1 + 1);
+          pkgName = (slash2 != std::string::npos) ? subNoQuery.substr(0, slash2) : subNoQuery;
+        }
+      } else {
+        auto slash = subNoQuery.find('/');
+        pkgName = (slash != std::string::npos) ? subNoQuery.substr(0, slash) : subNoQuery;
+      }
+      if (!pkgName.empty()) {
+        std::string normalized = pkgName;
+        std::string remainder;
+        if (subNoQuery.size() > pkgName.size()) {
+          remainder = subNoQuery.substr(pkgName.size());
+          if (!remainder.empty() && remainder[0] == '/') {
+            remainder.erase(0, 1);
+          }
+        }
+
+        if (!remainder.empty()) {
+          bool preserveSubpath = remainder.find('/') != std::string::npos;
+
+          if (!preserveSubpath) {
+            const std::string pkgBaseName = pkgName.substr(pkgName.find_last_of('/') + 1);
+            std::string withoutExt = remainder;
+            auto dot = withoutExt.rfind('.');
+            if (dot != std::string::npos) {
+              withoutExt = withoutExt.substr(0, dot);
+            }
+            std::string withoutPlatform = withoutExt;
+            for (const char* suffix : {".ios", ".android", ".visionos"}) {
+              if (EndsWith(withoutPlatform, suffix)) {
+                withoutPlatform = withoutPlatform.substr(0, withoutPlatform.size() - strlen(suffix));
+                break;
+              }
+            }
+            const bool isRootLevelMainEntry = withoutPlatform == "index" ||
+                                              withoutPlatform == pkgBaseName ||
+                                              withoutPlatform.rfind(pkgBaseName + ".", 0) == 0;
+            preserveSubpath = !isRootLevelMainEntry;
+          }
+
+          if (preserveSubpath) {
+            normalized = pkgName + "/" + remainder + querySuffix;
+          }
+        }
+
+        if (IsScriptLoadingLogEnabled()) {
+          DEBUG_WRITE("[import-map][normalize] node_modules: %s -> %s", specifier.c_str(), normalized.c_str());
+        }
+        return normalized;
+      }
+    }
+  }
+
+  return "";
+}
+
+// Look up a specifier in the import map. Supports both exact matches and
+// prefix matches (trailing-slash entries like "solid-js/" that map subpaths).
+// Returns the mapped URL or empty string if no match.
+static std::string LookupImportMap(const std::string& specifier) {
+  std::lock_guard<std::mutex> lock(g_importMapMutex);
+  auto it = g_importMap.find(specifier);
+  if (it != g_importMap.end()) {
+    if (IsScriptLoadingLogEnabled()) {
+      DEBUG_WRITE("[import-map] exact: %s -> %s", specifier.c_str(), it->second.c_str());
+    }
+    return it->second;
+  }
+  std::string bestKey;
+  std::string bestValue;
+  for (const auto& kv : g_importMap) {
+    const std::string& key = kv.first;
+    if (key.empty() || key.back() != '/') continue;
+    if (specifier.size() > key.size() && specifier.compare(0, key.size(), key) == 0) {
+      if (key.size() > bestKey.size()) {
+        bestKey = key;
+        bestValue = kv.second;
+      }
+    }
+  }
+  if (!bestKey.empty()) {
+    std::string remainder = specifier.substr(bestKey.size());
+    std::string resolved = bestValue + remainder;
+    if (IsScriptLoadingLogEnabled()) {
+      DEBUG_WRITE("[import-map] prefix: %s -> %s (via %s)", specifier.c_str(), resolved.c_str(), bestKey.c_str());
+    }
+    return resolved;
+  }
+  return "";
+}
+
+// Escape `s` as a single-quoted JS string literal. Returns the literal
+// including the surrounding quotes so call sites can splice it directly
+// into a generated source string (e.g. `"foo(" + JsStringLiteral(id) + ")"`).
+// Handles backslash, single quote, the JS line terminators (\n, \r,
+// U+2028, U+2029), and other ASCII control characters via `\xNN`.
+static std::string JsStringLiteral(const std::string& s) {
+    std::string out;
+    out.reserve(s.size() + 2);
+    out.push_back('\'');
+    for (size_t i = 0; i < s.size(); ) {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        if (c == '\\') { out += "\\\\"; ++i; continue; }
+        if (c == '\'') { out += "\\'"; ++i; continue; }
+        if (c == '\n') { out += "\\n"; ++i; continue; }
+        if (c == '\r') { out += "\\r"; ++i; continue; }
+        if (c == 0xE2 && i + 2 < s.size() &&
+            static_cast<unsigned char>(s[i + 1]) == 0x80 &&
+            (static_cast<unsigned char>(s[i + 2]) == 0xA8 ||
+             static_cast<unsigned char>(s[i + 2]) == 0xA9)) {
+            out += (static_cast<unsigned char>(s[i + 2]) == 0xA8) ? "\\u2028" : "\\u2029";
+            i += 3;
+            continue;
+        }
+        if (c < 0x20) {
+            char buf[7];
+            std::snprintf(buf, sizeof(buf), "\\x%02X", c);
+            out += buf;
+            ++i;
+            continue;
+        }
+        out.push_back(static_cast<char>(c));
+        ++i;
+    }
+    out.push_back('\'');
+    return out;
+}
+
+// Helper: returns true if `name` is a valid JS identifier that can appear in
+// `export const <name> = ...` without quoting. Conservative check — rejects
+// anything that could cause a parse error in the generated ESM wrapper.
+static bool IsValidJSIdentifier(const std::string& name) {
+  if (name.empty()) return false;
+  char first = name[0];
+  if (!((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') ||
+        first == '_' || first == '$'))
+    return false;
+  for (size_t i = 1; i < name.size(); i++) {
+    char c = name[i];
+    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+          (c >= '0' && c <= '9') || c == '_' || c == '$'))
+      return false;
+  }
+  return true;
+}
+
+// Create an ESM wrapper that re-exports all named exports from the vendor
+// registry. The vendor bootstrap (JS side) populates
+// globalThis.__nsVendorRegistry with pre-bundled module namespace objects
+// (via `import * as`). This function enumerates the actual property names
+// of the vendor module and generates explicit `export const X = __mod['X'];`
+// statements so V8's ESM resolution finds every named export.
+static v8::MaybeLocal<v8::Module> ResolveFromVendorRegistry(v8::Isolate* isolate,
+                                                            v8::Local<v8::Context> context,
+                                                            const std::string& vendorId) {
+  auto cached = g_vendorModuleCache.find(vendorId);
+  if (cached != g_vendorModuleCache.end()) {
+    v8::Local<v8::Module> mod = cached->second.Get(isolate);
+    if (!mod.IsEmpty() && mod->GetStatus() != v8::Module::kErrored) {
+      return mod;
+    }
+    cached->second.Reset();
+    g_vendorModuleCache.erase(cached);
+  }
+
+  std::vector<std::string> exportNames;
+
+  v8::TryCatch tc(isolate);
+  do {
+    v8::Local<v8::Object> global = context->Global();
+
+    v8::Local<v8::Value> regVal;
+    if (!global->Get(context, ArgConverter::ConvertToV8String(isolate, "__nsVendorRegistry")).ToLocal(&regVal) ||
+        regVal->IsNullOrUndefined()) {
+      break;
+    }
+    v8::Local<v8::Object> registry = regVal.As<v8::Object>();
+
+    v8::Local<v8::Value> getFnVal;
+    if (!registry->Get(context, ArgConverter::ConvertToV8String(isolate, "get")).ToLocal(&getFnVal) ||
+        !getFnVal->IsFunction()) {
+      break;
+    }
+    v8::Local<v8::Value> getArgs[] = { ArgConverter::ConvertToV8String(isolate, vendorId) };
+    v8::Local<v8::Value> modVal;
+    if (!getFnVal.As<v8::Function>()->Call(context, registry, 1, getArgs).ToLocal(&modVal) ||
+        modVal->IsNullOrUndefined()) {
+      break;
+    }
+
+    v8::Local<v8::Object> modObj = modVal.As<v8::Object>();
+    v8::Local<v8::Array> keys;
+    if (!modObj->GetOwnPropertyNames(context).ToLocal(&keys)) {
+      break;
+    }
+
+    for (uint32_t i = 0; i < keys->Length(); i++) {
+      v8::Local<v8::Value> key;
+      if (!keys->Get(context, i).ToLocal(&key) || !key->IsString()) continue;
+      v8::String::Utf8Value keyUtf8(isolate, key);
+      if (!*keyUtf8) continue;
+      std::string name(*keyUtf8);
+      if (name != "default" && IsValidJSIdentifier(name)) {
+        exportNames.push_back(name);
+      }
+    }
+  } while (false);
+
+  if (tc.HasCaught()) {
+    tc.Reset();
+  }
+
+  std::string moduleKey = "ns-vendor://" + vendorId;
+  // Two failure modes are distinguished so the runtime error names the
+  // class of problem: registry not yet populated (wrapper evaluated
+  // before `installVendorBootstrap()` ran) vs. specifier absent from a
+  // populated registry (vendor bundle does not ship this entry).
+  // `vendorId` is escaped through `JsStringLiteral` so any character is
+  // safe to embed inside the generated JS source.
+  const std::string idLiteral = JsStringLiteral(vendorId);
+  std::string src =
+    "const __reg = globalThis.__nsVendorRegistry;\n"
+    "if (!__reg || __reg.size === 0) {\n"
+    "  throw new Error('ns-vendor wrapper ' + " + idLiteral +
+    " + ' evaluated before __nsVendorRegistry was populated');\n"
+    "}\n"
+    "const __mod = __reg.get(" + idLiteral + ");\n"
+    "if (!__mod) {\n"
+    "  throw new Error('ns-vendor specifier ' + " + idLiteral +
+    " + ' not in __nsVendorRegistry (' + __reg.size + ' entries)');\n"
+    "}\n"
+    "export default __mod.default !== undefined ? __mod.default : __mod;\n";
+
+  for (const auto& name : exportNames) {
+    src += "export const " + name + " = __mod[" + JsStringLiteral(name) + "];\n";
+  }
+
+  if (IsScriptLoadingLogEnabled()) {
+    DEBUG_WRITE("[import-map][vendor] generating wrapper for ns-vendor://%s with %lu named exports",
+                vendorId.c_str(), (unsigned long)exportNames.size());
+  }
+
+  v8::MaybeLocal<v8::Module> m = CompileModuleForResolveRegisterOnly(isolate, context, src, moduleKey);
+  if (!m.IsEmpty()) {
+    v8::Local<v8::Module> mod;
+    if (m.ToLocal(&mod)) {
+      g_vendorModuleCache[vendorId].Reset(isolate, mod);
+      if (IsScriptLoadingLogEnabled()) {
+        DEBUG_WRITE("[import-map][vendor] resolved ns-vendor://%s", vendorId.c_str());
+      }
+    }
+  }
+  return m;
+}
+
+// Public: replace the import map with parsed (key → URL) entries. The dev server's
+// import-map JSON is parsed by V8 in the caller (HMRSupport.cpp); only the flat
+// `imports` table reaches here.
+void SetImportMapEntries(const std::vector<std::pair<std::string, std::string>>& entries) {
+  std::lock_guard<std::mutex> lock(g_importMapMutex);
+  g_importMap.clear();
+  for (const auto& kv : entries) {
+    if (!kv.first.empty()) {
+      g_importMap[kv.first] = kv.second;
+    }
+  }
+  if (IsScriptLoadingLogEnabled()) {
+    DEBUG_WRITE("[import-map] loaded %lu entries", (unsigned long)g_importMap.size());
+  }
+}
+
+void SetVolatilePatterns(const std::vector<std::string>& patterns) {
+  std::lock_guard<std::mutex> lock(g_volatilePatternsMutex);
+  g_volatilePatterns = patterns;
+  if (IsScriptLoadingLogEnabled()) {
+    DEBUG_WRITE("[import-map] volatile patterns: %lu", (unsigned long)g_volatilePatterns.size());
+  }
+}
+
+void CleanupImportMapGlobals() {
+  {
+    std::lock_guard<std::mutex> lock(g_importMapMutex);
+    g_importMap.clear();
+  }
+  {
+    std::lock_guard<std::mutex> lock(g_volatilePatternsMutex);
+    g_volatilePatterns.clear();
+  }
+  for (auto& kv : g_vendorModuleCache) { kv.second.Reset(); }
+  g_vendorModuleCache.clear();
+  g_modulesInFlight.clear();
+}
+
+std::vector<std::string> GetLoadedModuleUrls() {
+  std::vector<std::string> urls;
+  urls.reserve(g_moduleRegistry.size());
+  for (const auto& kv : g_moduleRegistry) {
+    if (!kv.first.empty()) urls.push_back(kv.first);
+  }
+  return urls;
+}
+
+void RemoveModuleFromRegistry(const std::string& canonicalKey) {
+  const std::string registryKey = CanonicalizeRegistryKey(canonicalKey);
+  // Defensive: never wipe a sentinel key.
+  if (registryKey == "@" ||
+      registryKey.find("__invalid_at__.mjs") != std::string::npos) {
+    if (IsScriptLoadingLogEnabled()) {
+      DEBUG_WRITE("[resolver][guard] ignore remove for sentinel %s", registryKey.c_str());
+    }
+    return;
+  }
+
+  auto it = g_moduleRegistry.find(registryKey);
+  if (it != g_moduleRegistry.end()) {
+    bool isHttpKey = StartsWith(registryKey, "http://") || StartsWith(registryKey, "https://");
+    if (IsScriptLoadingLogEnabled() && !isHttpKey) {
+      DEBUG_WRITE("[resolver] removing stale module %s", registryKey.c_str());
+    }
+    it->second.Reset();
+    g_moduleRegistry.erase(it);
+  }
+}
+
+size_t InvalidateModules(const std::vector<std::string>& keys) {
+  size_t removed = 0;
+  std::vector<std::string> urlsToEvict;
+  urlsToEvict.reserve(keys.size());
+  for (const auto& raw : keys) {
+    if (raw.empty()) continue;
+    const std::string registryKey = CanonicalizeRegistryKey(raw);
+    auto it = g_moduleRegistry.find(registryKey);
+    if (it != g_moduleRegistry.end()) {
+      it->second.Reset();
+      g_moduleRegistry.erase(it);
+      ++removed;
+    }
+    if (StartsWith(registryKey, "http://") || StartsWith(registryKey, "https://")) {
+      urlsToEvict.push_back(registryKey);
+    }
+  }
+  if (!urlsToEvict.empty()) {
+    EvictHttpModulePrefetchCacheUrls(urlsToEvict);
+  }
+  if (IsScriptLoadingLogEnabled()) {
+    DEBUG_WRITE("[resolver][invalidate] requested=%lu removed=%lu",
+                (unsigned long)keys.size(), (unsigned long)removed);
+  }
+  return removed;
+}
+
+v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
+                                                v8::Local<v8::Context> context,
+                                                const std::string& url,
+                                                std::string* errorMessage) {
+  if (url.empty()) {
+    if (errorMessage) *errorMessage = "[http-esm][load] empty URL";
+    return v8::MaybeLocal<v8::Module>();
+  }
+  const std::string registryKey = CanonicalizeRegistryKey(url);
+
+  auto it = g_moduleRegistry.find(registryKey);
+  if (it != g_moduleRegistry.end()) {
+    return it->second.Get(isolate);
+  }
+
+  // Loop-breaker: if we're already fetching this URL inside this isolate
+  // (cyclic HTTP import), don't recurse. The caller's outer fetch will
+  // populate the registry; on the second pass our cache lookup above will
+  // succeed.
+  if (g_modulesInFlight.count(registryKey) > 0) {
+    if (errorMessage) *errorMessage = "[http-esm][load] cyclic-inflight " + registryKey;
+    return v8::MaybeLocal<v8::Module>();
+  }
+  g_modulesInFlight.insert(registryKey);
+
+  std::string body;
+  std::string contentType;
+  int status = 0;
+  bool ok = HttpFetchText(url, body, contentType, status) && !body.empty();
+  g_modulesInFlight.erase(registryKey);
+
+  if (!ok) {
+    if (errorMessage) {
+      *errorMessage = std::string("[http-esm][load] fetch-fail ") + url +
+                      " status=" + std::to_string(status);
+    }
+    if (IsScriptLoadingLogEnabled()) {
+      DEBUG_WRITE("[http-esm][load][fetch-fail] request=%s key=%s status=%d",
+                  url.c_str(), registryKey.c_str(), status);
+    }
+    return v8::MaybeLocal<v8::Module>();
+  }
+
+  v8::MaybeLocal<v8::Module> loaded =
+      CompileModuleForResolveRegisterOnly(isolate, context, body, registryKey);
+  if (loaded.IsEmpty()) {
+    if (errorMessage) {
+      *errorMessage = std::string("[http-esm][load] compile-fail ") + url;
+    }
+    if (IsScriptLoadingLogEnabled()) {
+      DEBUG_WRITE("[http-esm][load][compile-fail] request=%s key=%s bytes=%zu",
+                  url.c_str(), registryKey.c_str(), body.size());
+    }
+    return v8::MaybeLocal<v8::Module>();
+  }
+  if (IsScriptLoadingLogEnabled()) {
+    DEBUG_WRITE("[http-esm][load][ok] request=%s key=%s type=%s bytes=%zu",
+                url.c_str(), registryKey.c_str(), contentType.c_str(), body.size());
+  }
+  return loaded;
+}
+
+}  // namespace tns
 
 // Import meta callback to support import.meta.url and import.meta.dirname
 void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Local<Object> meta) {
@@ -213,10 +844,20 @@ void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Lo
         DEBUG_WRITE("InitializeImportMetaObject: Registry size: %zu", g_moduleRegistry.size());
     }
     
-    // Convert to URL for import.meta.url; keep http(s) untouched, file paths with file://
+    // Convert to URL for import.meta.url:
+    //   - http(s) keys keep the URL verbatim
+    //   - Synthetic-namespace keys (`node:`, `blob:`, `ns-vendor://`,
+    //     `optional:`) MUST preserve their identity — wrapping them in
+    //     `file://` would make `import.meta.url` decode them as filesystem
+    //     paths in user code, which is wrong (they're not files).
+    //   - Any other URL-schemed specifier (`<scheme>:` before any `/`)
+    //     also passes through verbatim (`tns::HasUrlScheme` check).
+    //   - File-system paths get the standard `file://` wrap.
     std::string moduleUrl;
     if (!modulePath.empty()) {
         if (modulePath.rfind("http://", 0) == 0 || modulePath.rfind("https://", 0) == 0) {
+            moduleUrl = modulePath;
+        } else if (tns::HasUrlScheme(modulePath)) {
             moduleUrl = modulePath;
         } else {
             moduleUrl = "file://" + modulePath;
@@ -235,15 +876,22 @@ void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Lo
     // Set import.meta.url property
     meta->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, "url"), url).Check();
     
-    // Add import.meta.dirname support (extract directory)
+    // Add import.meta.dirname support (extract directory).
+    //
+    // For synthetic-namespace keys (node:, blob:, ns-vendor://, optional:)
+    // the concept of a "directory" doesn't apply — the module isn't a file
+    // on disk. dirname falls back to the full URL so user code that joins
+    // paths still produces a recognizable key (and `node:url` /
+    // `blob:abc-def` etc. don't accidentally read as filesystem prefixes).
     std::string dirname;
     if (!modulePath.empty()) {
         if (modulePath.rfind("http://", 0) == 0 || modulePath.rfind("https://", 0) == 0) {
-            // For URLs, compute dirname by trimming after last '/'
             size_t q = modulePath.find('?');
             std::string noQuery = (q == std::string::npos) ? modulePath : modulePath.substr(0, q);
             size_t lastSlash = noQuery.find_last_of('/');
             dirname = (lastSlash == std::string::npos) ? modulePath : noQuery.substr(0, lastSlash);
+        } else if (tns::HasUrlScheme(modulePath)) {
+            dirname = modulePath;  // synthetic — no real directory
         } else {
             size_t lastSlash = modulePath.find_last_of("/\\");
             if (lastSlash != std::string::npos) {
@@ -261,8 +909,16 @@ void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Lo
     // Set import.meta.dirname property
     meta->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, "dirname"), dirnameStr).Check();
 
-    // Attach import.meta.hot for HMR
-    tns::InitializeImportMetaHot(isolate, context, meta, modulePath);
+    // Attach import.meta.hot for HMR — debug/dev builds only. In a release
+    // build the HMR client and dev-session globals are not installed (see the
+    // isDebuggable gate in Runtime::PrepareV8Runtime), so this per-module hot
+    // surface would be inert dead weight on every module. Gate it on
+    // isDebuggable so production modules carry only import.meta.url/dirname.
+    // Standard HMR code always guards with `if (import.meta.hot)`, so leaving
+    // it undefined in release is the conventional, safe behavior.
+    if (tns::IsDebuggable()) {
+        tns::InitializeImportMetaHot(isolate, context, meta, modulePath);
+    }
 }
 
 // Helper function to check if a file exists and is a regular file
@@ -316,11 +972,113 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         DEBUG_WRITE("ResolveModuleCallback: Resolving '%s'", spec.c_str());
     }
 
-    // Normalize malformed http:/ and https:/ prefixes
+    // ── ESM resolver hardening ─────────────────────────────────────────────
+    // Heal common bundler-rewrite anomalies BEFORE any registry lookup so
+    // identity-mismatched keys never enter `g_moduleRegistry`.
+    //
+    //   1. A lone "@" (bundler dropped the package id) → rewrite to a
+    //      sentinel string that downstream resolvers ignore.
+    //   2. "@/<rest>" (root-absolute alias the dev server didn't expand)
+    //      → strip the prefix so the path lookup operates on "/<rest>".
+    //   3. Malformed `http:/<path>` (one slash, often from Vite stripping
+    //      the second slash through string ops) → re-insert.
+    if (spec == "@") {
+        // Sentinel — never matches a real module. Synthesize a clear
+        // failure so the user's error trace anchors to the bad import.
+        if (tns::IsScriptLoadingLogEnabled()) {
+            DEBUG_WRITE("[resolver][guard] bare-@ specifier; returning empty");
+        }
+        return v8::MaybeLocal<v8::Module>();
+    }
+    if (spec.size() >= 2 && spec[0] == '@' && spec[1] == '/') {
+        std::string rewritten = spec.substr(1);  // "@/foo" → "/foo"
+        if (tns::IsScriptLoadingLogEnabled()) {
+            DEBUG_WRITE("[resolver][guard] rewrite @/ -> / for spec=%s -> %s",
+                        spec.c_str(), rewritten.c_str());
+        }
+        spec = rewritten;
+    }
     if (spec.rfind("http:/", 0) == 0 && spec.rfind("http://", 0) != 0) {
         spec.insert(5, "/");
     } else if (spec.rfind("https:/", 0) == 0 && spec.rfind("https://", 0) != 0) {
         spec.insert(6, "/");
+    }
+
+    // ── Import-map lookup (bare specifiers only) ──────────────────────────
+    // Bare specifiers (no `.`, `/`, scheme) are mapped through the dev
+    // server's import map before anything else. The map can resolve to:
+    //   - `ns-vendor://<id>` → SyntheticModule via vendor registry
+    //   - `http(s)://...`    → HTTP loader path below
+    //   - `<path>`           → falls through to filesystem candidate scan
+    // Vite-rewritten `/node_modules/...` specifiers are normalized via
+    // `NormalizeViteSpecifier` first so the import-map key matches.
+    if (!spec.empty() && spec[0] != '.' && spec[0] != '/' &&
+        spec.find("://") == std::string::npos && !tns::HasUrlScheme(spec)) {
+        std::string lookupKey = spec;
+        std::string vNorm = tns::NormalizeViteSpecifier(spec);
+        if (!vNorm.empty()) lookupKey = vNorm;
+        std::string mapped = tns::LookupImportMap(lookupKey);
+        if (!mapped.empty()) {
+            if (tns::IsScriptLoadingLogEnabled()) {
+                DEBUG_WRITE("[import-map][hit] %s -> %s", spec.c_str(), mapped.c_str());
+            }
+            spec = mapped;
+        }
+    } else if (!spec.empty() && spec[0] == '/' &&
+               spec.find("://") == std::string::npos &&
+               spec.find("/node_modules/") != std::string::npos) {
+        // Root-absolute node_modules path — try import-map after normalization.
+        std::string vNorm = tns::NormalizeViteSpecifier(spec);
+        if (!vNorm.empty()) {
+            std::string mapped = tns::LookupImportMap(vNorm);
+            if (!mapped.empty()) {
+                if (tns::IsScriptLoadingLogEnabled()) {
+                    DEBUG_WRITE("[import-map][hit-root-abs] %s -> %s (via %s)",
+                                spec.c_str(), mapped.c_str(), vNorm.c_str());
+                }
+                spec = mapped;
+            }
+        }
+    }
+
+    // ── Synthetic-namespace identity preservation ─────────────────────────
+    // ns-vendor:// / optional: / node: / blob: are NOT filesystem paths.
+    // Resolve them via dedicated paths instead of falling through to the
+    // candidate-scan logic below (which would try to stat them as files).
+    if (spec.rfind("ns-vendor://", 0) == 0) {
+        std::string vendorId = spec.substr(strlen("ns-vendor://"));
+        v8::Local<v8::Module> vendorMod;
+        if (tns::ResolveFromVendorRegistry(isolate, context, vendorId).ToLocal(&vendorMod)) {
+            return v8::MaybeLocal<v8::Module>(vendorMod);
+        }
+        // Vendor registry doesn't have it — throw a clear "not found" so the
+        // import rejects with a useful message instead of a stat-as-file miss.
+        std::string msg = "Vendor module not found: " + spec;
+        isolate->ThrowException(v8::Exception::Error(
+            ArgConverter::ConvertToV8String(isolate, msg)));
+        return v8::MaybeLocal<v8::Module>();
+    }
+    if (spec.rfind("blob:", 0) == 0) {
+        // Blob URLs are issued by URL.createObjectURL — the corresponding
+        // module should already be in g_moduleRegistry under the exact blob
+        // key (loader wrote it on creation). Look up verbatim; no
+        // normalization (the random ID is the identity).
+        auto it = g_moduleRegistry.find(spec);
+        if (it != g_moduleRegistry.end()) {
+            return v8::MaybeLocal<v8::Module>(it->second.Get(isolate));
+        }
+        std::string msg = "Blob module not found: " + spec;
+        isolate->ThrowException(v8::Exception::Error(
+            ArgConverter::ConvertToV8String(isolate, msg)));
+        return v8::MaybeLocal<v8::Module>();
+    }
+    if (spec.rfind("optional:", 0) == 0) {
+        // Optional-module sentinel — return empty so V8 throws the standard
+        // ESM resolve failure (the caller is responsible for swallowing).
+        if (tns::IsScriptLoadingLogEnabled()) {
+            DEBUG_WRITE("[resolver][optional] not found: %s", spec.c_str());
+        }
+        return v8::MaybeLocal<v8::Module>();
     }
 
     // Attempt to resolve relative or root-absolute specifiers against an HTTP referrer URL
@@ -339,7 +1097,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     };
     if (!startsWithHttp(spec) && (specIsRelative || specIsRootAbs)) {
         if (!referrerPath.empty() && startsWithHttp(referrerPath)) {
-            std::string resolved = ResolveHttpRelative(referrerPath, spec);
+            std::string resolved = tns::ResolveImportSpecifierAgainstUrl(spec, referrerPath);
             if (!resolved.empty()) {
                 if (IsScriptLoadingLogEnabled()) {
                     DEBUG_WRITE("ResolveModuleCallback: HTTP-relative resolved '%s' + '%s' -> '%s'",
@@ -359,7 +1117,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
                 if (!origin.empty() && (origin.rfind("http://", 0) == 0 || origin.rfind("https://", 0) == 0)) {
                     std::string refBase = origin;
                     if (refBase.back() != '/') refBase += '/';
-                    std::string resolved = ResolveHttpRelative(refBase, spec);
+                    std::string resolved = tns::ResolveImportSpecifierAgainstUrl(spec, refBase);
                     if (!resolved.empty()) {
                         if (IsScriptLoadingLogEnabled()) {
                             DEBUG_WRITE("[http-esm][http-origin][fallback] origin=%s spec=%s -> %s", refBase.c_str(), spec.c_str(), resolved.c_str());
@@ -389,10 +1147,19 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         std::string body, ct;
         int status = 0;
         if (!tns::HttpFetchText(spec, body, ct, status)) {
+            // Pull any JNI-captured reason BEFORE composing the error so
+            // the user sees `connect failed: ECONNREFUSED` (or whatever)
+            // alongside the bare `status=0` instead of having to dig
+            // through logcat.
+            std::string reason = tns::TakeLastHttpFetchErrorReason();
             if (IsScriptLoadingLogEnabled()) {
-                DEBUG_WRITE("[http-esm][fetch][fail] url=%s status=%d", spec.c_str(), status);
+                DEBUG_WRITE("[http-esm][fetch][fail] url=%s status=%d reason=%s",
+                            spec.c_str(), status, reason.c_str());
             }
             std::string msg = std::string("Failed to fetch ") + spec + ", status=" + std::to_string(status);
+            if (!reason.empty()) {
+                msg += ", " + reason;
+            }
             isolate->ThrowException(v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, msg)));
             return v8::MaybeLocal<v8::Module>();
         }
@@ -856,7 +1623,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         referrerUrl = *r8 ? *r8 : "";
     }
     if ((specIsRelative || specIsRootAbs) && isHttpLike(referrerUrl)) {
-        std::string resolved = ResolveHttpRelative(referrerUrl, spec);
+        std::string resolved = tns::ResolveImportSpecifierAgainstUrl(spec, referrerUrl);
         if (!resolved.empty()) {
             if (IsScriptLoadingLogEnabled()) {
                 DEBUG_WRITE("[http-esm][dyn][http-rel] base=%s spec=%s -> %s", referrerUrl.c_str(), spec.c_str(), resolved.c_str());
@@ -865,6 +1632,42 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         } else if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE("[http-esm][dyn][http-rel][skip] base=%s spec=%s", referrerUrl.c_str(), spec.c_str());
         }
+    }
+
+    // Blob URL dynamic import — synthetic, must preserve identity (no
+    // canonicalization). The HTTP/file machinery below would mis-handle a
+    // `blob:` key as a fetch target. Caller already registered the module
+    // under the exact blob key when URL.createObjectURL was called.
+    if (spec.rfind("blob:", 0) == 0) {
+        auto it = g_moduleRegistry.find(spec);
+        if (it == g_moduleRegistry.end()) {
+            if (IsScriptLoadingLogEnabled()) {
+                DEBUG_WRITE("[dyn-import][blob][miss] %s", spec.c_str());
+            }
+            resolver->Reject(context,
+                v8::Exception::Error(ArgConverter::ConvertToV8String(
+                    isolate, std::string("Blob module not found: ") + spec))).Check();
+            return scope.Escape(resolver->GetPromise());
+        }
+        v8::Local<v8::Module> blobMod = it->second.Get(isolate);
+        if (blobMod->GetStatus() == v8::Module::kUninstantiated) {
+            if (!blobMod->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
+                resolver->Reject(context,
+                    v8::Exception::Error(ArgConverter::ConvertToV8String(
+                        isolate, "Blob module instantiate failed"))).Check();
+                return scope.Escape(resolver->GetPromise());
+            }
+        }
+        if (blobMod->GetStatus() != v8::Module::kEvaluated) {
+            if (blobMod->Evaluate(context).IsEmpty()) {
+                resolver->Reject(context,
+                    v8::Exception::Error(ArgConverter::ConvertToV8String(
+                        isolate, "Blob module evaluation failed"))).Check();
+                return scope.Escape(resolver->GetPromise());
+            }
+        }
+        resolver->Resolve(context, blobMod->GetModuleNamespace()).Check();
+        return scope.Escape(resolver->GetPromise());
     }
 
     // Handle HTTP(S) dynamic import directly
@@ -879,15 +1682,21 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         if (it != g_moduleRegistry.end()) {
             mod = it->second.Get(isolate);
             if (IsScriptLoadingLogEnabled()) {
-                DEBUG_WRITE("[http-esm][dyn][cache] hit %s", canonical.c_str());
+                DEBUG_WRITE("[http-esm][dyn][http-cache hit] %s", canonical.c_str());
             }
         } else {
             std::string body, ct; int status = 0;
             if (!tns::HttpFetchText(spec, body, ct, status)) {
+                std::string reason = tns::TakeLastHttpFetchErrorReason();
                 if (IsScriptLoadingLogEnabled()) {
-                    DEBUG_WRITE("[http-esm][dyn][fetch][fail] url=%s status=%d", spec.c_str(), status);
+                    DEBUG_WRITE("[http-esm][dyn][fetch][fail] url=%s status=%d reason=%s",
+                                spec.c_str(), status, reason.c_str());
                 }
-                resolver->Reject(context, v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, std::string("Failed to fetch ")+spec))).Check();
+                std::string rejMsg = std::string("Failed to fetch ") + spec + ", status=" + std::to_string(status);
+                if (!reason.empty()) {
+                    rejMsg += ", " + reason;
+                }
+                resolver->Reject(context, v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, rejMsg))).Check();
                 return scope.Escape(resolver->GetPromise());
             }
             if (IsScriptLoadingLogEnabled()) {

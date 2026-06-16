@@ -291,6 +291,33 @@ public class Runtime {
         }
         return false;
     }
+
+    // Expose httpModulePrefetch flag for native code without re-reading package.json.
+    // Default OFF: opt in via package.json "httpModulePrefetch": true.
+    public static boolean getHttpModulePrefetchEnabled() {
+        Runtime runtime = com.tns.Runtime.getCurrentRuntime();
+        if (runtime != null && runtime.config != null && runtime.config.appConfig != null) {
+            return runtime.config.appConfig.getHttpModulePrefetch();
+        }
+        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
+            return staticConfiguration.appConfig.getHttpModulePrefetch();
+        }
+        return false;
+    }
+
+    // Expose httpFetchUrlLog flag for native code without re-reading package.json.
+    // Default OFF (per-fetch log volume is high). Opt in via package.json
+    // "httpFetchUrlLog": true to diagnose HTTP module loader behavior.
+    public static boolean getHttpFetchUrlLogEnabled() {
+        Runtime runtime = com.tns.Runtime.getCurrentRuntime();
+        if (runtime != null && runtime.config != null && runtime.config.appConfig != null) {
+            return runtime.config.appConfig.getHttpFetchUrlLog();
+        }
+        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
+            return staticConfiguration.appConfig.getHttpFetchUrlLog();
+        }
+        return false;
+    }
     
     // Security config
     
@@ -336,9 +363,9 @@ public class Runtime {
             return true;
         }
         
-        // Check if URL matches any allowlist prefix
+        // Check if URL matches any allowlist entry on a component boundary
         for (String prefix : allowlist) {
-            if (url != null && prefix != null && url.startsWith(prefix)) {
+            if (url != null && prefix != null && remoteUrlMatchesAllowlistEntry(url, prefix)) {
                 return true;
             }
         }
@@ -346,6 +373,29 @@ public class Runtime {
         return false;
     }
     
+    // Returns true when `url` is covered by allowlist `entry`, matching only on
+    // URL component boundaries (deny-by-default). Mirrors the native
+    // RemoteUrlMatchesAllowlistEntry in DevFlags.cpp.
+    private static boolean remoteUrlMatchesAllowlistEntry(String url, String entry) {
+        if (url == null || entry == null || entry.isEmpty()) {
+            return false;
+        }
+        if (url.length() < entry.length()) {
+            return false;
+        }
+        if (!url.startsWith(entry)) {
+            return false;
+        }
+        if (url.length() == entry.length()) {
+            return true; // exact match
+        }
+        if (entry.charAt(entry.length() - 1) == '/') {
+            return true; // entry ended at a boundary
+        }
+        char next = url.charAt(entry.length());
+        return next == '/' || next == '?' || next == '#';
+    }
+
     /**
      * Returns the remote module allowlist as a String array for JNI.
      */
