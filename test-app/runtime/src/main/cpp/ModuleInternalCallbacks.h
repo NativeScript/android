@@ -19,14 +19,18 @@ extern thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_m
 
 // Import-map and volatile-pattern configuration.
 //
-// `SetImportMap` accepts the dev server's JSON import-map blob (parsed and
-// merged into the process-wide bare-specifier → URL map used by
-// `ResolveModuleCallback`). `SetVolatilePatterns` accepts a list of URL
-// substrings that should always re-fetch (never serve from the
-// speculative-prefetch cache). Both are applied via `__nsConfigureRuntime`
-// / `__nsConfigureDevRuntime` at session start and again at every HMR
-// graph version bump.
-void SetImportMap(const std::string& json);
+// `SetImportMapEntries` populates the process-wide bare-specifier → URL map
+// used by `ResolveModuleCallback`; the dev server's import-map JSON is parsed
+// at the V8 layer by the callers, which pass the flat entries here.
+// `SetVolatilePatterns` accepts a list of URL substrings that should always
+// re-fetch (never serve from the speculative-prefetch cache). Both are applied
+// via `__nsConfigureRuntime` / `__nsConfigureDevRuntime` at session start and
+// again at every HMR graph version bump.
+
+// Set the process-wide import map from the given flat (bare-specifier → URL)
+// entries. The callers hold the parsed import-map object and extract its
+// `imports` table at the V8 layer; this module stores the resulting entries.
+void SetImportMapEntries(const std::vector<std::pair<std::string, std::string>>& entries);
 void SetVolatilePatterns(const std::vector<std::string>& patterns);
 
 // Drop all per-process import-map / vendor / in-flight state.

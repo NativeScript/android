@@ -106,10 +106,25 @@ static bool s_allowRemoteModules = false;
 static std::vector<std::string> s_remoteModuleAllowlist;
 static bool s_isDebuggable = false;
 
-// Helper to check if a URL starts with a given prefix
-static bool UrlStartsWith(const std::string& url, const std::string& prefix) {
-  if (prefix.size() > url.size()) return false;
-  return url.compare(0, prefix.size(), prefix) == 0;
+// Returns true when `url` is covered by allowlist `entry`, matching only on
+// URL component boundaries so lookalike-host and lookalike-port values are
+// refused: an entry of "https://cdn.example.com" does NOT authorize
+// "https://cdn.example.com.attacker.com/x.js" or
+// "https://cdn.example.com:9999/x.js". The character after the matched entry
+// text must be a path/query/fragment boundary ('/', '?', '#'), or the URL must
+// end exactly at the entry, or the entry must already end in '/'.
+//
+// Deny-by-default: an entry without an explicit port does not match a URL
+// that adds one. To allow a specific port, include it in the entry.
+static bool RemoteUrlMatchesAllowlistEntry(const std::string& url,
+                                           const std::string& entry) {
+  if (entry.empty()) return false;
+  if (url.size() < entry.size()) return false;
+  if (url.compare(0, entry.size(), entry) != 0) return false;
+  if (url.size() == entry.size()) return true;   // exact match
+  if (entry.back() == '/') return true;           // entry ended at a boundary
+  const char next = url[entry.size()];
+  return next == '/' || next == '?' || next == '#';
 }
 
 void InitializeSecurityConfig() {
@@ -195,9 +210,9 @@ bool IsRemoteUrlAllowed(const std::string& url) {
     return true;
   }
   
-  // Check if URL matches any allowlist prefix
-  for (const std::string& prefix : s_remoteModuleAllowlist) {
-    if (UrlStartsWith(url, prefix)) {
+  // Check if URL matches any allowlist entry on a component boundary
+  for (const std::string& entry : s_remoteModuleAllowlist) {
+    if (RemoteUrlMatchesAllowlistEntry(url, entry)) {
       return true;
     }
   }

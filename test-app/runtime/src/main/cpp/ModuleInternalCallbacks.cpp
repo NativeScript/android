@@ -250,9 +250,12 @@ static bool HasUrlScheme(const std::string& spec) {
   return true;
 }
 
-// Cache-bypass check. Used by HttpFetchText's fast-path lookup to decide
-// whether to ignore a hit. Patterns are simple substring matches, populated
-// by Vite via `__nsConfigureRuntime({ volatilePatterns: [...] })`.
+// Matches `url` against the `volatilePatterns` configured by Vite via
+// `__nsConfigureRuntime({ volatilePatterns: [...] })` (substring match).
+// Android's HTTP loader does not consult this: it enforces volatility
+// structurally — a consume-once prefetch read plus eviction on HMR
+// invalidation (see HttpFetchText in HMRSupport.cpp). It is available for a
+// read-gated cache policy, which the iOS loader uses.
 static bool IsVolatileUrl(const std::string& url) {
   std::lock_guard<std::mutex> lock(g_volatilePatternsMutex);
   for (const auto& pat : g_volatilePatterns) {
@@ -650,56 +653,16 @@ static v8::MaybeLocal<v8::Module> ResolveFromVendorRegistry(v8::Isolate* isolate
   return m;
 }
 
-// Public: register import-map JSON blob. The full JSON shape is
-// `{"imports": {"<key>": "<url>", ...}}`. The flat shape is walked
-// directly so this module does not need to depend on a JSON parser.
-void SetImportMap(const std::string& json) {
+// Public: replace the import map with parsed (key → URL) entries. The dev server's
+// import-map JSON is parsed by V8 in the caller (HMRSupport.cpp); only the flat
+// `imports` table reaches here.
+void SetImportMapEntries(const std::vector<std::pair<std::string, std::string>>& entries) {
   std::lock_guard<std::mutex> lock(g_importMapMutex);
   g_importMap.clear();
-  size_t importsPos = json.find("\"imports\"");
-  if (importsPos == std::string::npos) return;
-  size_t braceOpen = json.find('{', importsPos + 9);
-  if (braceOpen == std::string::npos) return;
-  // Find matching close brace, accounting for nested values (we still only
-  // support flat key->string, but the body may contain escaped quotes).
-  int depth = 1;
-  size_t i = braceOpen + 1;
-  size_t braceClose = std::string::npos;
-  bool inString = false;
-  while (i < json.size()) {
-    char c = json[i];
-    if (inString) {
-      if (c == '\\' && i + 1 < json.size()) { i += 2; continue; }
-      if (c == '"') inString = false;
-    } else {
-      if (c == '"') inString = true;
-      else if (c == '{') ++depth;
-      else if (c == '}') {
-        --depth;
-        if (depth == 0) { braceClose = i; break; }
-      }
+  for (const auto& kv : entries) {
+    if (!kv.first.empty()) {
+      g_importMap[kv.first] = kv.second;
     }
-    ++i;
-  }
-  if (braceClose == std::string::npos) return;
-
-  std::string inner = json.substr(braceOpen + 1, braceClose - braceOpen - 1);
-  size_t pos = 0;
-  while (pos < inner.size()) {
-    size_t keyStart = inner.find('"', pos);
-    if (keyStart == std::string::npos) break;
-    size_t keyEnd = inner.find('"', keyStart + 1);
-    if (keyEnd == std::string::npos) break;
-    std::string key = inner.substr(keyStart + 1, keyEnd - keyStart - 1);
-
-    size_t valStart = inner.find('"', keyEnd + 1);
-    if (valStart == std::string::npos) break;
-    size_t valEnd = inner.find('"', valStart + 1);
-    if (valEnd == std::string::npos) break;
-    std::string val = inner.substr(valStart + 1, valEnd - valStart - 1);
-
-    g_importMap[key] = val;
-    pos = valEnd + 1;
   }
   if (IsScriptLoadingLogEnabled()) {
     DEBUG_WRITE("[import-map] loaded %lu entries", (unsigned long)g_importMap.size());

@@ -31,7 +31,7 @@ namespace tns {
 // definitions live in ModuleInternalCallbacks.cpp; this header-style
 // forward block lets HMRSupport.cpp call them without pulling the
 // resolver header in (avoids a circular include).
-void SetImportMap(const std::string& json);
+void SetImportMapEntries(const std::vector<std::pair<std::string, std::string>>& entries);
 void SetVolatilePatterns(const std::vector<std::string>& patterns);
 std::vector<std::string> GetLoadedModuleUrls();
 
@@ -178,10 +178,53 @@ static bool IsSupportedDevSessionPlatform(const std::string& platform) {
   return platform == "android";
 }
 
+// Parse an import-map value (a JSON string OR a JS object of shape
+// `{ imports: { "<key>": "<url>", ... } }`) into flat (key → URL) entries using
+// V8's own JSON/object model. Returns true if it found an `imports` object
+// (even if empty); false if the value is unusable. Only flat string key→URL
+// mappings are honored; non-string import values are skipped.
+static bool ReadImportMapEntries(v8::Isolate* isolate,
+                                 v8::Local<v8::Context> context,
+                                 v8::Local<v8::Value> importMapValue,
+                                 std::vector<std::pair<std::string, std::string>>* out) {
+  v8::Local<v8::Value> mapVal = importMapValue;
+  if (mapVal->IsString()) {
+    v8::Local<v8::Value> parsed;
+    if (!v8::JSON::Parse(context, mapVal.As<v8::String>()).ToLocal(&parsed)) {
+      return false;
+    }
+    mapVal = parsed;
+  }
+  if (!mapVal->IsObject()) return false;
+  v8::Local<v8::Object> mapObj = mapVal.As<v8::Object>();
+
+  v8::Local<v8::Value> importsVal;
+  if (!mapObj->Get(context, ToV8String(isolate, "imports")).ToLocal(&importsVal) ||
+      !importsVal->IsObject()) {
+    return false;
+  }
+  v8::Local<v8::Object> imports = importsVal.As<v8::Object>();
+  v8::Local<v8::Array> keys;
+  if (!imports->GetOwnPropertyNames(context).ToLocal(&keys)) return false;
+
+  for (uint32_t i = 0; i < keys->Length(); ++i) {
+    v8::Local<v8::Value> keyVal;
+    if (!keys->Get(context, i).ToLocal(&keyVal)) continue;
+    v8::Local<v8::Value> valVal;
+    if (!imports->Get(context, keyVal).ToLocal(&valVal) || !valVal->IsString()) continue;
+    v8::String::Utf8Value keyUtf8(isolate, keyVal);
+    v8::String::Utf8Value valUtf8(isolate, valVal);
+    if (*keyUtf8 && *valUtf8) {
+      out->emplace_back(std::string(*keyUtf8), std::string(*valUtf8));
+    }
+  }
+  return true;
+}
+
 // Apply the v8::Object payload of `__nsConfigureDevRuntime`: re-validate the
-// `importMap` shape and serialize it back to JSON for `SetImportMap`. Parsing
-// runs entirely in V8 (via `ConfigureDevRuntimeCallback`), so this is a thin
-// wrapper over that shared validation.
+// `importMap` shape and read its entries via `ReadImportMapEntries` (V8-based
+// parsing) into the process-wide map. Mirrors the import-map handling in
+// `ConfigureDevRuntimeCallback`.
 static bool ApplyDevRuntimeConfigObject(v8::Isolate* isolate,
                                         v8::Local<v8::Context> context,
                                         v8::Local<v8::Object> payload,
@@ -202,49 +245,20 @@ static bool ApplyDevRuntimeConfigObject(v8::Isolate* isolate,
     return false;
   }
 
-  // Use JSON.stringify on the importMap object — keeps the on-disk format
-  // identical to what `__nsConfigureRuntime` already accepts.
-  v8::Local<v8::Object> jsonObj;
-  v8::Local<v8::Value> globalJson;
-  if (!context->Global()->Get(context, ToV8String(isolate, "JSON")).ToLocal(&globalJson) ||
-      !globalJson->IsObject()) {
+  std::vector<std::pair<std::string, std::string>> importEntries;
+  if (!ReadImportMapEntries(isolate, context, importMapValue, &importEntries)) {
     if (errorMessage != nullptr) {
-      *errorMessage = "[__nsStartDevSession] JSON global unavailable";
+      *errorMessage = "[__nsStartDevSession] failed to read importMap";
     }
     return false;
   }
-  jsonObj = globalJson.As<v8::Object>();
-
-  v8::Local<v8::Value> stringifyFnVal;
-  if (!jsonObj->Get(context, ToV8String(isolate, "stringify")).ToLocal(&stringifyFnVal) ||
-      !stringifyFnVal->IsFunction()) {
-    if (errorMessage != nullptr) {
-      *errorMessage = "[__nsStartDevSession] JSON.stringify unavailable";
-    }
-    return false;
-  }
-
-  v8::Local<v8::Function> stringifyFn = stringifyFnVal.As<v8::Function>();
-  v8::Local<v8::Value> args[] = {importMapValue};
-  v8::MaybeLocal<v8::Value> maybeJson = stringifyFn->Call(context, jsonObj, 1, args);
-  v8::Local<v8::Value> jsonVal;
-  if (!maybeJson.ToLocal(&jsonVal) || !jsonVal->IsString()) {
-    if (errorMessage != nullptr) {
-      *errorMessage = "[__nsStartDevSession] failed to serialize importMap";
-    }
-    return false;
-  }
-
-  v8::String::Utf8Value jsonUtf8(isolate, jsonVal);
-  std::string importMapJson = *jsonUtf8 ? *jsonUtf8 : "";
-  if (importMapJson.empty()) {
+  if (importEntries.empty()) {
     if (errorMessage != nullptr) {
       *errorMessage = "[__nsStartDevSession] runtime config importMap was empty";
     }
     return false;
   }
-
-  SetImportMap(importMapJson);
+  SetImportMapEntries(importEntries);
 
   std::vector<std::string> patterns;
   v8::Local<v8::Value> volatilePatternsValue;
@@ -447,14 +461,10 @@ bool ApplyDevRuntimeConfigFromUrl(const std::string& url,
   return true;
 }
 
-// Native-side mirror of `__NS_HMR_BOOT_COMPLETE__`. Read by the
-// runloop pump in `MaybePumpJSThreadDuringBoot` so its gate is a
-// single relaxed atomic load on the HMR-time hot path.
-static std::atomic<bool> g_devSessionBootComplete{false};
-
-static inline bool IsDevSessionBootComplete() {
-  return g_devSessionBootComplete.load(std::memory_order_relaxed);
-}
+// The live "dev-session boot complete" signal is the JS global
+// __NS_HMR_BOOT_COMPLETE__, set by ApplyDevSessionGlobals /
+// SetDevSessionBootComplete below. (There is no native runloop pump on
+// Android — the main NativeScript isolate runs JS on the UI thread.)
 
 void ApplyDevSessionGlobals(v8::Isolate* isolate,
                             v8::Local<v8::Context> context,
@@ -464,7 +474,6 @@ void ApplyDevSessionGlobals(v8::Isolate* isolate,
   SetBooleanGlobal(isolate, context, "__NS_HMR_BOOT_COMPLETE__", false);
   SetBooleanGlobal(isolate, context, "__NS_HMR_CLIENT_ACTIVE__", false);
   SetBooleanGlobal(isolate, context, "__NS_HMR_BROWSER_RUNTIME_CLIENT_ACTIVE__", false);
-  g_devSessionBootComplete.store(false, std::memory_order_relaxed);
   if (IsScriptLoadingLogEnabled()) {
     DEBUG_WRITE("[dev-session] globals applied session=%s origin=%s ws=%s bootComplete=false",
                 session.sessionId.c_str(), session.origin.c_str(),
@@ -476,7 +485,6 @@ void SetDevSessionBootComplete(v8::Isolate* isolate,
                                v8::Local<v8::Context> context,
                                bool value) {
   SetBooleanGlobal(isolate, context, "__NS_HMR_BOOT_COMPLETE__", value);
-  g_devSessionBootComplete.store(value, std::memory_order_relaxed);
   if (IsScriptLoadingLogEnabled()) {
     DEBUG_WRITE("[dev-session] __NS_HMR_BOOT_COMPLETE__=%s",
                 value ? "true" : "false");
@@ -2439,32 +2447,12 @@ void ConfigureDevRuntimeCallback(const v8::FunctionCallbackInfo<v8::Value>& info
   v8::Local<v8::Value> importMapVal;
   if (config->Get(ctx, ToV8String(isolate, "importMap")).ToLocal(&importMapVal) &&
       !importMapVal->IsUndefined() && !importMapVal->IsNull()) {
-    std::string jsonStr;
-    if (importMapVal->IsString()) {
-      v8::String::Utf8Value utf8(isolate, importMapVal);
-      if (*utf8) jsonStr = *utf8;
-    } else if (importMapVal->IsObject()) {
-      v8::Local<v8::Value> jsonGlobalVal;
-      if (ctx->Global()->Get(ctx, ToV8String(isolate, "JSON")).ToLocal(&jsonGlobalVal) &&
-          jsonGlobalVal->IsObject()) {
-        v8::Local<v8::Object> jsonObj = jsonGlobalVal.As<v8::Object>();
-        v8::Local<v8::Value> stringifyVal;
-        if (jsonObj->Get(ctx, ToV8String(isolate, "stringify")).ToLocal(&stringifyVal) &&
-            stringifyVal->IsFunction()) {
-          v8::Local<v8::Function> stringify = stringifyVal.As<v8::Function>();
-          v8::Local<v8::Value> args[] = {importMapVal};
-          v8::Local<v8::Value> result;
-          if (stringify->Call(ctx, jsonObj, 1, args).ToLocal(&result) && result->IsString()) {
-            v8::String::Utf8Value utf8(isolate, result);
-            if (*utf8) jsonStr = *utf8;
-          }
-        }
-      }
-    }
-    if (!jsonStr.empty()) {
-      SetImportMap(jsonStr);
+    std::vector<std::pair<std::string, std::string>> importEntries;
+    if (ReadImportMapEntries(isolate, ctx, importMapVal, &importEntries) &&
+        !importEntries.empty()) {
+      SetImportMapEntries(importEntries);
       if (logScriptLoading) {
-        DEBUG_WRITE("[__nsConfigureRuntime] import map set (%zu bytes)", jsonStr.size());
+        DEBUG_WRITE("[__nsConfigureRuntime] import map set (%zu entries)", importEntries.size());
       }
     }
   }
@@ -2909,6 +2897,22 @@ void ApplyStyleUpdateCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
   }
 }
 
+// Debug-only diagnostic: expose CanonicalizeHttpUrlKey to JS so the test harness
+// can pin its identity behavior. Not part of the @nativescript/vite client API.
+// The whole installer is gated on isDebuggable at the call site, so this never
+// ships in release.
+void CanonicalizeHttpUrlKeyCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+  v8::Isolate* isolate = info.GetIsolate();
+  v8::HandleScope scope(isolate);
+  if (info.Length() < 1 || !info[0]->IsString()) {
+    info.GetReturnValue().SetEmptyString();
+    return;
+  }
+  v8::String::Utf8Value u(isolate, info[0]);
+  std::string key = CanonicalizeHttpUrlKey(*u ? std::string(*u) : std::string());
+  info.GetReturnValue().Set(ToV8String(isolate, key.c_str()));
+}
+
 void GetLoadedModuleUrlsCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
   v8::Isolate* isolate = info.GetIsolate();
   v8::HandleScope scope(isolate);
@@ -2962,6 +2966,7 @@ void InitializeHmrDevGlobals(v8::Isolate* isolate, v8::Local<v8::Context> contex
   InstallGlobalFunction(isolate, context, "__nsReloadDevApp", ReloadDevAppCallback);
   InstallGlobalFunction(isolate, context, "__nsApplyStyleUpdate", ApplyStyleUpdateCallback);
   InstallGlobalFunction(isolate, context, "__nsGetLoadedModuleUrls", GetLoadedModuleUrlsCallback);
+  InstallGlobalFunction(isolate, context, "__nsCanonicalizeHttpUrlKey", CanonicalizeHttpUrlKeyCallback);
 }
 
 void CleanupHMRGlobals() {
