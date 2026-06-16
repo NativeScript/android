@@ -167,9 +167,10 @@ void ClearHttpModulePrefetchCache();
 // synchronous network turn so the caller can pump its own runloop (e.g. the
 // JS-thread runloop so a placeholder UI can repaint during cold-boot).
 //
-// Default: a built-in pump that no-ops outside the JS thread / after the
-// dev-session boot completes (see `MaybePumpJSThreadDuringBoot` in
-// HMRSupport.cpp).
+// Default: a no-op (`NoopHttpFetchYield`). Android's main NativeScript
+// isolate runs JS on the UI thread, so there is no separate JS-thread
+// runloop to pump here; a host that drives its own loop can install a real
+// pump (e.g. one calling ALooper_pollOnce(0)) via this hook.
 //
 // Pass `nullptr` to disable any yielding (used by hosts that drive their own
 // run loop or by tests that want bit-for-bit deterministic fetch timing).

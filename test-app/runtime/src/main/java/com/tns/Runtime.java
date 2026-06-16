@@ -363,9 +363,9 @@ public class Runtime {
             return true;
         }
         
-        // Check if URL matches any allowlist prefix
+        // Check if URL matches any allowlist entry on a component boundary
         for (String prefix : allowlist) {
-            if (url != null && prefix != null && url.startsWith(prefix)) {
+            if (url != null && prefix != null && remoteUrlMatchesAllowlistEntry(url, prefix)) {
                 return true;
             }
         }
@@ -373,6 +373,29 @@ public class Runtime {
         return false;
     }
     
+    // Returns true when `url` is covered by allowlist `entry`, matching only on
+    // URL component boundaries (deny-by-default). Mirrors the native
+    // RemoteUrlMatchesAllowlistEntry in DevFlags.cpp.
+    private static boolean remoteUrlMatchesAllowlistEntry(String url, String entry) {
+        if (url == null || entry == null || entry.isEmpty()) {
+            return false;
+        }
+        if (url.length() < entry.length()) {
+            return false;
+        }
+        if (!url.startsWith(entry)) {
+            return false;
+        }
+        if (url.length() == entry.length()) {
+            return true; // exact match
+        }
+        if (entry.charAt(entry.length() - 1) == '/') {
+            return true; // entry ended at a boundary
+        }
+        char next = url.charAt(entry.length());
+        return next == '/' || next == '?' || next == '#';
+    }
+
     /**
      * Returns the remote module allowlist as a String array for JNI.
      */
