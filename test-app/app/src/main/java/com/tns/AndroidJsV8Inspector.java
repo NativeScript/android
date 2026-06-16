@@ -298,15 +298,20 @@ class AndroidJsV8Inspector {
 
             // Network.loadNetworkResource / IO.read / IO.close are served from
             // disk on this thread so source maps load even while the isolate is
-            // paused at a breakpoint or busy running JS; Debugger.pause schedules
-            // a V8 interrupt and still flows through the queue.
+            // paused at a breakpoint or busy running JS; Target domain commands
+            // and worker-session messages (top-level sessionId) are routed here
+            // too. Debugger.pause schedules a V8 interrupt and still flows
+            // through the queue. A null return means "not handled" (queue it);
+            // an empty string means handled with nothing left to send.
             String fastPathResponse = handleMessageOnSocketThread(message.getTextPayload());
             if (fastPathResponse != null) {
-                try {
-                    send(fastPathResponse);
-                } catch (IOException e) {
-                    if (com.tns.Runtime.isDebuggable()) {
-                        e.printStackTrace();
+                if (!fastPathResponse.isEmpty()) {
+                    try {
+                        send(fastPathResponse);
+                    } catch (IOException e) {
+                        if (com.tns.Runtime.isDebuggable()) {
+                            e.printStackTrace();
+                        }
                     }
                 }
                 return;

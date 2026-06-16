@@ -9,6 +9,12 @@
 #include <mutex>
 #include <string>
 
+#ifdef APPLICATION_IN_DEBUG
+#include <vector>
+
+#include <src/inspector/v8-console-message.h>
+#endif
+
 #include "ConcurrentQueue.h"
 #include "WorkerMessage.h"
 #include "v8.h"
@@ -17,6 +23,9 @@ namespace tns {
 
 class LooperTasks;
 class Runtime;
+#ifdef APPLICATION_IN_DEBUG
+class WorkerInspectorClient;
+#endif
 
 /*
  * Owns a worker's native thread and its lifecycle, mirroring the iOS
@@ -121,6 +130,15 @@ public:
      */
     static void EnsureJniCached();
 
+#ifdef APPLICATION_IN_DEBUG
+    /*
+     * Worker thread (console.* fires on the isolate's own thread). Forwards
+     * to the worker's inspector so the log reaches DevTools' worker target.
+     */
+    void ConsoleLog(v8_inspector::ConsoleAPIType method,
+                    const std::vector<v8::Local<v8::Value>>& args);
+#endif
+
 private:
     void BackgroundLooper(std::shared_ptr<WorkerWrapper> self);
     void DrainPendingTasks();
@@ -156,6 +174,19 @@ private:
 
     std::mutex looperMutex_;
     jobject javaLooperRef_;
+
+#ifdef APPLICATION_IN_DEBUG
+    /*
+     * Expose this worker to an attached Chrome DevTools frontend as a child
+     * target. Created on the worker thread before the script runs, destroyed
+     * on the worker thread before the isolate is disposed.
+     */
+    void CreateInspector(v8::Isolate* isolate);
+    void DestroyInspector();
+
+    WorkerInspectorClient* inspector_ = nullptr;
+    std::mutex inspectorMutex_;
+#endif
 
     static std::mutex registryMutex_;
     static std::map<int, std::shared_ptr<WorkerWrapper>> registry_;

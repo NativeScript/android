@@ -13,6 +13,11 @@
 #include "NativeScriptException.h"
 #include "Runtime.h"
 
+#ifdef APPLICATION_IN_DEBUG
+#include "JsV8InspectorClient.h"
+#include "WorkerInspectorClient.h"
+#endif
+
 using namespace v8;
 
 namespace tns {
@@ -85,6 +90,18 @@ void WorkerWrapper::Terminate() {
         // JS currently running on the worker (e.g. a busy loop).
         isolate->TerminateExecution();
     }
+
+#ifdef APPLICATION_IN_DEBUG
+    {
+        // A worker paused at a breakpoint sits in the inspector's nested pause
+        // loop, not in Looper.loop() - kick it loose so TerminateExecution and
+        // the looper quit below can take effect.
+        std::lock_guard<std::mutex> lock(inspectorMutex_);
+        if (inspector_ != nullptr) {
+            inspector_->NotifyTerminating();
+        }
+    }
+#endif
 
     QuitLooper();
 }
@@ -357,8 +374,13 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
                 auto context = runtime_->GetContext();
                 Context::Scope context_scope(context);
 
-                // (A future worker inspector would be created here, before the
-                // script runs, mirroring the iOS runtime.)
+#ifdef APPLICATION_IN_DEBUG
+                // Expose this worker to an attached Chrome DevTools frontend
+                // as a child target, mirroring the iOS runtime. Created before
+                // the script runs so the worker's scripts are visible to the
+                // debugger from the start.
+                CreateInspector(isolate);
+#endif
 
                 if (!isTerminating_) {
                     runtime_->RunWorker(workerPath_);
@@ -402,6 +424,12 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
             TerminateChildren(isolate);
         }
     }
+
+#ifdef APPLICATION_IN_DEBUG
+    // The inspector must be gone before the Runtime (and with it the isolate)
+    // is deleted below; unregistering also tells DevTools the target is gone.
+    DestroyInspector();
+#endif
 
     // On this thread: safe to unregister the inbox fd from the looper.
     queue_.Terminate();
@@ -552,6 +580,63 @@ void WorkerWrapper::EnsureJniCached() {
     SET_THREAD_PRIORITY_METHOD_ID =
             env.GetStaticMethodID(PROCESS_CLASS, "setThreadPriority", "(I)V");
 }
+
+#ifdef APPLICATION_IN_DEBUG
+void WorkerWrapper::CreateInspector(Isolate* isolate) {
+    // Only when the root inspector client exists (debuggable app, created on
+    // the main thread during runtime init) - never construct it from here.
+    JsV8InspectorClient* root = JsV8InspectorClient::GetInstanceIfCreated();
+    if (root == nullptr) {
+        return;
+    }
+
+    // Same url scheme the module loader reports in Debugger.scriptParsed.
+    // workerPath_ may still be relative to the caller's dir at this point
+    // (resolution happens in require); callingDir_ ends with '/'.
+    std::string url =
+            "file://" + (workerPath_[0] == '/' ? workerPath_ : callingDir_ + workerPath_);
+
+    auto* client = new WorkerInspectorClient(workerId_, isolate, ALooper_forThread(), url);
+    {
+        std::lock_guard<std::mutex> lock(inspectorMutex_);
+        inspector_ = client;
+    }
+
+    // Register only once fully constructed: registration makes the client
+    // reachable from the socket thread.
+    root->RegisterWorkerTarget(workerId_, client);
+}
+
+void WorkerWrapper::DestroyInspector() {
+    WorkerInspectorClient* client = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(inspectorMutex_);
+        client = inspector_;
+        inspector_ = nullptr;
+    }
+
+    if (client == nullptr) {
+        return;
+    }
+
+    // Unregister first: after this returns no other thread can reach the
+    // client through the root's registry.
+    JsV8InspectorClient* root = JsV8InspectorClient::GetInstanceIfCreated();
+    if (root != nullptr) {
+        root->UnregisterWorkerTarget(workerId_);
+    }
+
+    delete client;
+}
+
+void WorkerWrapper::ConsoleLog(v8_inspector::ConsoleAPIType method,
+                               const std::vector<Local<Value>>& args) {
+    std::lock_guard<std::mutex> lock(inspectorMutex_);
+    if (inspector_ != nullptr) {
+        inspector_->consoleLog(method, args);
+    }
+}
+#endif
 
 std::mutex WorkerWrapper::registryMutex_;
 std::map<int, std::shared_ptr<WorkerWrapper>> WorkerWrapper::registry_;
