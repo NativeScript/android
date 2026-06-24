@@ -98,6 +98,32 @@ static void LogHttpCompileDiagnostics(v8::Isolate* isolate,
                 snippet.c_str());
 }
 
+// Helper: collapse "." and ".." path segments, preserving a leading "/".
+static std::string NormalizeDotSegments(const std::string& path) {
+    std::vector<std::string> stack;
+    bool absolute = !path.empty() && path[0] == '/';
+    size_t i = 0;
+    while (i <= path.size()) {
+        size_t j = path.find('/', i);
+        std::string seg = (j == std::string::npos) ? path.substr(i) : path.substr(i, j - i);
+        if (seg.empty() || seg == ".") {
+            // skip
+        } else if (seg == "..") {
+            if (!stack.empty()) stack.pop_back();
+        } else {
+            stack.push_back(seg);
+        }
+        if (j == std::string::npos) break;
+        i = j + 1;
+    }
+    std::string norm = absolute ? "/" : std::string();
+    for (size_t k = 0; k < stack.size(); k++) {
+        if (k > 0) norm += "/";
+        norm += stack[k];
+    }
+    return norm;
+}
+
 // Helper: resolve relative or root-absolute spec against an HTTP(S) referrer URL.
 // Returns empty string if resolution is not possible.
 static std::string ResolveHttpRelative(const std::string& referrerUrl, const std::string& spec) {
@@ -158,28 +184,30 @@ static std::string ResolveHttpRelative(const std::string& referrerUrl, const std
     }
 
     // Normalize "." and ".." segments
-    std::vector<std::string> stack;
-    bool absolute = !newPath.empty() && newPath[0] == '/';
-    size_t i = 0;
-    while (i <= newPath.size()) {
-        size_t j = newPath.find('/', i);
-        std::string seg = (j == std::string::npos) ? newPath.substr(i) : newPath.substr(i, j - i);
-        if (seg.empty() || seg == ".") {
-            // skip
-        } else if (seg == "..") {
-            if (!stack.empty()) stack.pop_back();
-        } else {
-            stack.push_back(seg);
-        }
-        if (j == std::string::npos) break;
-        i = j + 1;
-    }
-    std::string normPath = absolute ? "/" : std::string();
-    for (size_t k = 0; k < stack.size(); k++) {
-        if (k > 0) normPath += "/";
-        normPath += stack[k];
-    }
+    std::string normPath = NormalizeDotSegments(newPath);
     return origin + normPath + specSuffix;
+}
+
+// Helper: resolve a relative "./" or "../" specifier against a file:// referrer
+// URL, returning an absolute file:// URL. Returns empty if not applicable.
+static std::string ResolveFileRelative(const std::string& referrerUrl, const std::string& spec) {
+    const std::string filePrefix = "file://";
+    if (referrerUrl.rfind(filePrefix, 0) != 0) {
+        return std::string();
+    }
+    if (spec.empty() || spec[0] != '.') {
+        return std::string();
+    }
+    // Referrer path: strip scheme, drop query and fragment
+    std::string refPath = referrerUrl.substr(filePrefix.size());
+    size_t hashPos = refPath.find('#');
+    if (hashPos != std::string::npos) refPath = refPath.substr(0, hashPos);
+    size_t qPos = refPath.find('?');
+    if (qPos != std::string::npos) refPath = refPath.substr(0, qPos);
+
+    size_t lastSlash = refPath.find_last_of('/');
+    std::string baseDir = (lastSlash == std::string::npos) ? std::string("/") : refPath.substr(0, lastSlash + 1);
+    return filePrefix + NormalizeDotSegments(baseDir + spec);
 }
 
 // Import meta callback to support import.meta.url and import.meta.dirname
@@ -928,12 +956,28 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
     // Re-use the static resolver to locate / compile the module for non-HTTP cases.
     try {
-        // Pass empty referrer since this V8 version doesn't expose GetModule() on
-        // ScriptOrModule. The resolver will fall back to absolute-path heuristics.
+        // V8 exposes only the referrer's URL here (resource_name), not its Module,
+        // so anchor a relative specifier at the referrer's directory and hand the
+        // resolver an absolute file:// URL. Other specifiers pass through unchanged
+        // (the resolver applies its own ~/, bare and absolute heuristics).
+        v8::Local<v8::String> resolvedSpecifier = specifier;
+        if (specIsRelative) {
+            std::string fileResolved = ResolveFileRelative(referrerUrl, spec);
+            if (!fileResolved.empty()) {
+                resolvedSpecifier = ArgConverter::ConvertToV8String(isolate, fileResolved);
+                if (IsScriptLoadingLogEnabled()) {
+                    DEBUG_WRITE("[esm][dyn][file-rel] base=%s spec=%s -> %s",
+                                referrerUrl.c_str(), spec.c_str(), fileResolved.c_str());
+                }
+            }
+        }
+
+        // Pass empty referrer: this V8 version does not expose GetModule() on
+        // ScriptOrModule, and the specifier above is already absolute when needed.
         v8::Local<v8::Module> refMod;
 
         v8::MaybeLocal<v8::Module> maybeModule =
-            ResolveModuleCallback(context, specifier, import_assertions, refMod);
+            ResolveModuleCallback(context, resolvedSpecifier, import_assertions, refMod);
 
         v8::Local<v8::Module> module;
         if (!maybeModule.ToLocal(&module)) {
