@@ -593,6 +593,14 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         if (found) break;
     }
 
+    // Canonicalize "." / ".." segments so a file reached through different
+    // spellings (e.g. "./x" from /a/b and "../x" from /a/b/c both name /a/b/x)
+    // maps to one registry key and is compiled once. The HTTP branch
+    // canonicalizes via CanonicalizeHttpUrlKey.
+    if (found) {
+        absPath = NormalizeDotSegments(absPath);
+    }
+
     // 6) Handle special cases if file not found
     if (!found) {
         // Check for Node.js built-in modules
