@@ -3,6 +3,7 @@
 #include "NativeScriptException.h"
 #include "CallbackHandlers.h"
 #include "NativeScriptPlatform.h"
+#include "WorkerWrapper.h"
 #include <sstream>
 #include <android/log.h>
 
@@ -363,6 +364,11 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_TerminateRuntimeCallback(JNIEnv* 
 
     auto isolate = runtime->GetIsolate();
     auto eventLoop = runtime->GetEventLoop();
+
+    // Terminate this runtime's child workers before disposing the isolate. Their
+    // Worker object persistents live in this isolate, so they must be released
+    // first - mirrors WorkerWrapper::BackgroundLooper's nested-worker teardown.
+    WorkerWrapper::TerminateChildren(isolate);
 
     {
         v8::Locker locker(isolate);

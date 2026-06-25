@@ -486,6 +486,9 @@ public class Runtime {
             mainRuntime = null;
         }
 
+        // Worker teardown happens natively in TerminateRuntimeCallback, which
+        // terminates this runtime's child workers (WorkerWrapper registry) before
+        // destroying the main isolate.
         TerminateRuntimeCallback(runtime.runtimeId);
     }
 
