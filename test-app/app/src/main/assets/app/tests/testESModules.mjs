@@ -61,4 +61,21 @@ describe("ES Modules", () => {
         (err) => { expect(err).toBeUndefined(); done(); }
       );
   });
+
+  it("resolves './x' and '../x' to a single shared module instance", (done) => {
+    Promise.all([
+      import("~/esm-dedup/viaSameDir.mjs"),
+      import("~/esm-dedup/nested/viaParentDir.mjs"),
+    ]).then(
+      ([sameDir, parentDir]) => {
+        // The same counter.mjs is reached as "./counter.mjs" and as
+        // "../counter.mjs"; it must be one module instance sharing one state
+        // object, incremented once per importer.
+        expect(sameDir.seenState).toBe(parentDir.seenState);
+        expect(sameDir.seenState.count).toBe(2);
+        done();
+      },
+      (err) => { expect(err).toBeUndefined(); done(); }
+    );
+  });
 });
