@@ -2,6 +2,7 @@
 #include "Runtime.h"
 #include "NativeScriptException.h"
 #include "CallbackHandlers.h"
+#include "WorkerWrapper.h"
 #include <sstream>
 #include <android/log.h>
 
@@ -352,69 +353,6 @@ extern "C" JNIEXPORT jint Java_com_tns_Runtime_getCurrentRuntimeIdLegacy(JNIEnv*
     return getCurrentRuntimeIdCritical_impl();
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerGlobalOnMessageCallback(JNIEnv* env, jobject obj, jint runtimeId, jstring msg) {
-    // Worker Thread runtime
-    auto runtime = TryGetRuntime(runtimeId);
-    if (runtime == nullptr) {
-        // TODO: Pete: Log message informing the developer of the failure
-        return;
-    }
-
-    auto isolate = runtime->GetIsolate();
-
-    v8::Locker locker(isolate);
-    v8::Isolate::Scope isolate_scope(isolate);
-    v8::HandleScope handleScope(isolate);
-    auto context = runtime->GetContext();
-    v8::Context::Scope context_scope(context);
-
-    CallbackHandlers::WorkerGlobalOnMessageCallback(isolate, msg);
-}
-
-extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerObjectOnMessageCallback(JNIEnv* env, jobject obj, jint runtimeId, jint workerId, jstring msg) {
-    // Main Thread runtime
-    auto runtime = TryGetRuntime(runtimeId);
-    if (runtime == nullptr) {
-        // TODO: Pete: Log message informing the developer of the failure
-        return;
-    }
-
-    auto isolate = runtime->GetIsolate();
-
-    v8::Locker locker(isolate);
-    v8::Isolate::Scope isolate_scope(isolate);
-    v8::HandleScope handleScope(isolate);
-    auto context = runtime->GetContext();
-    v8::Context::Scope context_scope(context);
-
-    CallbackHandlers::WorkerObjectOnMessageCallback(isolate, workerId, msg);
-}
-
-extern "C" JNIEXPORT void Java_com_tns_Runtime_TerminateWorkerCallback(JNIEnv* env, jobject obj, jint runtimeId) {
-    // Worker Thread runtime
-    auto runtime = TryGetRuntime(runtimeId);
-    if (runtime == nullptr) {
-        // TODO: Pete: Log message informing the developer of the failure
-        return;
-    }
-
-    auto isolate = runtime->GetIsolate();
-
-    {
-        v8::Locker locker(isolate);
-        v8::Isolate::Scope isolate_scope(isolate);
-        v8::HandleScope handleScope(isolate);
-
-        CallbackHandlers::TerminateWorkerThread(isolate);
-
-        runtime->DestroyRuntime();
-    }
-
-    isolate->Dispose();
-
-    delete runtime;
-}
-
 extern "C" JNIEXPORT void Java_com_tns_Runtime_TerminateRuntimeCallback(JNIEnv* env, jobject obj, jint runtimeId) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
@@ -424,6 +362,11 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_TerminateRuntimeCallback(JNIEnv* 
 
     auto isolate = runtime->GetIsolate();
 
+    // Terminate this runtime's child workers before disposing the isolate. Their
+    // Worker object persistents live in this isolate, so they must be released
+    // first - mirrors WorkerWrapper::BackgroundLooper's nested-worker teardown.
+    WorkerWrapper::TerminateChildren(isolate);
+
     {
         v8::Locker locker(isolate);
         v8::Isolate::Scope isolate_scope(isolate);
@@ -437,46 +380,6 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_TerminateRuntimeCallback(JNIEnv* 
     delete runtime;
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_ClearWorkerPersistent(JNIEnv* env, jobject obj, jint runtimeId, jint workerId) {
-    // Worker Thread runtime
-    auto runtime = TryGetRuntime(runtimeId);
-    if (runtime == nullptr) {
-        // TODO: Pete: Log message informing the developer of the failure
-        return;
-    }
-
-    auto isolate = runtime->GetIsolate();
-
-    v8::Locker locker(isolate);
-    v8::Isolate::Scope isolate_scope(isolate);
-    v8::HandleScope handleScope(isolate);
-    auto context = runtime->GetContext();
-    v8::Context::Scope context_scope(context);
-
-    CallbackHandlers::ClearWorkerPersistent(workerId);
-}
-
-extern "C" JNIEXPORT void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain(JNIEnv* env, jobject obj, jint runtimeId, jint workerId, jstring message, jstring stackTrace, jstring filename, jint lineno, jstring threadName) {
-    // Main Thread runtime
-    auto runtime = TryGetRuntime(runtimeId);
-    if (runtime == nullptr) {
-        // TODO: Pete: Log message informing the developer of the failure
-        return;
-    }
-
-    auto isolate = runtime->GetIsolate();
-    v8::Locker locker(isolate);
-    v8::Isolate::Scope isolate_scope(isolate);
-    v8::HandleScope handleScope(isolate);
-    auto context = runtime->GetContext();
-    v8::Context::Scope context_scope(context);
-
-    try {
-        CallbackHandlers::CallWorkerObjectOnErrorHandle(isolate, workerId, message, stackTrace, filename, lineno, threadName);
-    } catch (NativeScriptException& e) {
-        e.ReThrowToJava();
-    }
-}
 extern "C" JNIEXPORT void Java_com_tns_Runtime_ResetDateTimeConfigurationCache(JNIEnv* _env, jobject obj, jint runtimeId) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {

@@ -105,17 +105,8 @@ public class Runtime {
         }
     }
 
-    private static native void WorkerGlobalOnMessageCallback(int runtimeId, String message);
-
-    private static native void WorkerObjectOnMessageCallback(int runtimeId, int workerId, String message);
-
-    private static native void TerminateWorkerCallback(int runtimeId);
-
     private static native void TerminateRuntimeCallback(int runtimeId);
 
-    private static native void ClearWorkerPersistent(int runtimeId, int workerId);
-
-    private static native void CallWorkerObjectOnErrorHandleMain(int runtimeId, int workerId, String message, String stackTrace, String filename, int lineno, String threadName) throws NativeScriptException;
     private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
     void passUncaughtExceptionToJs(Throwable ex, String message, String fullStackTrace, String jsStackTrace) {
@@ -475,28 +466,14 @@ public class Runtime {
             throw new NativeScriptException("Only the main NativeScript runtime can be destroyed with destroyMainRuntime().");
         }
 
-        runtime.isTerminating = true;
-        runtime.terminateWorkers();
         GcListener.unsubscribe(runtime);
         runtimeCache.remove(runtime.runtimeId);
-        pendingWorkerMessages.clear();
         currentRuntime.remove();
 
+        // Worker teardown happens natively in TerminateRuntimeCallback, which
+        // terminates this runtime's child workers (WorkerWrapper registry) before
+        // destroying the main isolate.
         TerminateRuntimeCallback(runtime.runtimeId);
-    }
-
-    private void terminateWorkers() {
-        for (Handler workerHandler : new ArrayList<>(workerIdToHandler.values())) {
-            if (workerHandler == null) {
-                continue;
-            }
-
-            Message msg = Message.obtain();
-            msg.arg1 = MessageType.TerminateThread;
-            workerHandler.sendMessageAtFrontOfQueue(msg);
-        }
-
-        workerIdToHandler.clear();
     }
 
     public int getWorkerId() {
