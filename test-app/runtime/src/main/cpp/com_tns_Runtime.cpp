@@ -357,6 +357,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerGlobalOnMessageCallback(JNI
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
         // TODO: Pete: Log message informing the developer of the failure
+        return;
     }
 
     auto isolate = runtime->GetIsolate();
@@ -375,6 +376,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerObjectOnMessageCallback(JNI
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
         // TODO: Pete: Log message informing the developer of the failure
+        return;
     }
 
     auto isolate = runtime->GetIsolate();
@@ -440,6 +442,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_ClearWorkerPersistent(JNIEnv* env
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
         // TODO: Pete: Log message informing the developer of the failure
+        return;
     }
 
     auto isolate = runtime->GetIsolate();
@@ -458,6 +461,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
         // TODO: Pete: Log message informing the developer of the failure
+        return;
     }
 
     auto isolate = runtime->GetIsolate();
