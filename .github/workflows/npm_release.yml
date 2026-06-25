@@ -12,7 +12,7 @@ env:
   NDK_VERSION: r27d
   ANDROID_API: 33
   ANDROID_ABI: x86_64
-  NDK_ARCH: darwin
+  NDK_ARCH: linux
 
 permissions:
   contents: read
@@ -20,17 +20,17 @@ permissions:
 jobs:
   build:
     name: Build
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     outputs:
       npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
           submodules: true
@@ -45,9 +45,6 @@ jobs:
           cache: gradle
       - name: Setup Android SDK
         uses: android-actions/setup-android@651bceb6f9ca583f16b8d75b62c36ded2ae6fc9c # v4.0.0
-      - name: Homebrew dependencies
-        run: |
-          brew install wget
       - name: Setup NDK
         run: |
           echo "y" | sdkmanager "cmake;3.6.4111459"
@@ -82,26 +79,26 @@ jobs:
       - name: Build npm package
         run: ./gradlew -PgitCommitVersion=${{ github.sha }} -PnoCCache --stacktrace
       - name: Upload npm package artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: npm-package
           path: dist/nativescript-android-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
       - name: Upload debug symbols
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: debug-symbols
           path: test-app/runtime/build/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/*
 
   test:
     name: Test
-    runs-on: macos-15-intel
+    runs-on: ubuntu-latest
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: true
       - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
@@ -115,9 +112,6 @@ jobs:
           cache: gradle
       - name: Setup Android SDK
         uses: android-actions/setup-android@651bceb6f9ca583f16b8d75b62c36ded2ae6fc9c # v4.0.0
-      - name: Homebrew dependencies
-        run: |
-          brew install wget
       - name: Setup NDK
         run: |
           echo "y" | sdkmanager "cmake;3.6.4111459"
@@ -135,6 +129,11 @@ jobs:
           npm install --prefix ./test-app/tools
       - name: SBG tests
         run: ./gradlew runSbgTests --stacktrace
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - name: Run unit tests
         uses: ReactiveCircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a # v2.37.0
         with:
@@ -145,7 +144,7 @@ jobs:
           script: ./gradlew runtestsAndVerifyResults --stacktrace
       - name: Upload Test Results
         if: ${{ !cancelled() }} # run this step even if previous step failed
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: android-unit-test-results
           path: test-app/dist/android_unit_test_results.xml
@@ -163,7 +162,7 @@ jobs:
       NPM_TAG: ${{needs.build.outputs.npm_tag}}
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
@@ -213,11 +212,11 @@ jobs:
       NPM_VERSION: ${{needs.build.outputs.npm_version}}
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
       - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
@@ -238,7 +237,7 @@ jobs:
         run: zip -r debug-symbols.zip .
       - name: Partial Changelog
         run: npx conventional-changelog -p angular -r2 > body.md
-      - uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
+      - uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
         with:
           artifacts: "dist/nativescript-android-*.tgz,dist/debug-symbols/debug-symbols.zip"
           bodyFile: "body.md"

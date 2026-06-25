@@ -153,34 +153,6 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_runModule(JNIEnv* _env, jobject o
     }
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_runWorker(JNIEnv* _env, jobject obj, jint runtimeId, jstring scriptFile) {
-    auto runtime = TryGetRuntime(runtimeId);
-    if (runtime == nullptr) {
-        return;
-    }
-
-    auto isolate = runtime->GetIsolate();
-    v8::Locker locker(isolate);
-    v8::Isolate::Scope isolate_scope(isolate);
-    v8::HandleScope handleScope(isolate);
-    auto context = runtime->GetContext();
-    v8::Context::Scope context_scope(context);
-
-    try {
-        runtime->RunWorker(scriptFile);
-    } catch (NativeScriptException& e) {
-        e.ReThrowToJava();
-    } catch (std::exception e) {
-        stringstream ss;
-        ss << "Error: c++ exception: " << e.what() << endl;
-        NativeScriptException nsEx(ss.str());
-        nsEx.ReThrowToJava();
-    } catch (...) {
-        NativeScriptException nsEx(std::string("Error: c++ exception!"));
-        nsEx.ReThrowToJava();
-    }
-}
-
 extern "C" JNIEXPORT jobject Java_com_tns_Runtime_runScript(JNIEnv* _env, jobject obj, jint runtimeId, jstring scriptFile) {
     jobject result = nullptr;
 
@@ -501,7 +473,6 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain
         e.ReThrowToJava();
     }
 }
-
 extern "C" JNIEXPORT void Java_com_tns_Runtime_ResetDateTimeConfigurationCache(JNIEnv* _env, jobject obj, jint runtimeId) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {

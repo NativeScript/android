@@ -74,6 +74,7 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
 
         src/main/cpp/com_tns_AndroidJsV8Inspector.cpp
         src/main/cpp/JsV8InspectorClient.cpp
+        src/main/cpp/WorkerInspectorClient.cpp
         src/main/cpp/v8_inspector/ns-v8-tracing-agent-impl.cpp
         src/main/cpp/v8_inspector/Utils.cpp
     )
@@ -99,6 +100,7 @@ add_library(
         src/main/cpp/ArrayHelper.cpp
         src/main/cpp/AssetExtractor.cpp
         src/main/cpp/CallbackHandlers.cpp
+        src/main/cpp/ConcurrentQueue.cpp
         src/main/cpp/Constants.cpp
         src/main/cpp/DirectBuffer.cpp
         src/main/cpp/FieldAccessor.cpp
@@ -112,6 +114,7 @@ add_library(
         src/main/cpp/JsArgToArrayConverter.cpp
         src/main/cpp/JSONObjectHelper.cpp
         src/main/cpp/Logger.cpp
+        src/main/cpp/LooperTasks.cpp
         src/main/cpp/ManualInstrumentation.cpp
         src/main/cpp/MessageLoopTimer.cpp
         src/main/cpp/MetadataMethodInfo.cpp
@@ -135,6 +138,8 @@ add_library(
         src/main/cpp/V8GlobalHelpers.cpp
         src/main/cpp/V8StringConstants.cpp
         src/main/cpp/WeakRef.cpp
+        src/main/cpp/WorkerMessage.cpp
+        src/main/cpp/WorkerWrapper.cpp
         src/main/cpp/Timers.cpp
         src/main/cpp/com_tns_AssetExtractor.cpp
         src/main/cpp/com_tns_Runtime.cpp
