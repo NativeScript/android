@@ -105,6 +105,8 @@ public class Runtime {
         }
     }
 
+    private static native void TerminateRuntimeCallback(int runtimeId);
+
     private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
     void passUncaughtExceptionToJs(Throwable ex, String message, String fullStackTrace, String jsStackTrace) {
@@ -452,6 +454,26 @@ public class Runtime {
     public static boolean isInitialized() {
         Runtime runtime = Runtime.getCurrentRuntime();
         return (runtime != null) ? runtime.isInitializedImpl() : false;
+    }
+
+    static void destroyMainRuntime() {
+        Runtime runtime = Runtime.getCurrentRuntime();
+        if (runtime == null) {
+            return;
+        }
+
+        if (runtime.workerId != 0) {
+            throw new NativeScriptException("Only the main NativeScript runtime can be destroyed with destroyMainRuntime().");
+        }
+
+        GcListener.unsubscribe(runtime);
+        runtimeCache.remove(runtime.runtimeId);
+        currentRuntime.remove();
+
+        // Worker teardown happens natively in TerminateRuntimeCallback, which
+        // terminates this runtime's child workers (WorkerWrapper registry) before
+        // destroying the main isolate.
+        TerminateRuntimeCallback(runtime.runtimeId);
     }
 
     public int getWorkerId() {
