@@ -9,6 +9,6 @@ public final class NativeScriptRuntime {
     }
 
     public static boolean reloadApplication(String baseDir) {
-        return RuntimeHelper.reloadApplication();
+        return RuntimeHelper.reloadApplication(baseDir);
     }
 }
