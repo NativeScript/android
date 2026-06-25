@@ -245,6 +245,11 @@ public final class RuntimeHelper {
         }
     }
 
+    // The overload is kept for API parity with ios, but not needed with android.
+    public static synchronized boolean reloadApplication(String baseDir) {
+        return reloadApplication();
+    }
+
     public static synchronized boolean reloadApplication() {
         final Context context = applicationContext;
         if (context == null || reloadScheduled) {
@@ -307,6 +312,12 @@ public final class RuntimeHelper {
     }
 
     private static void registerTimezoneChangedListener(Context context, final Runtime runtime) {
+        // Register/unregister against the application context so the same Context
+        // instance is used across initial launch and reload. Using the passed-in
+        // context (which may be an Activity on first launch but applicationContext
+        // on reload) would make unregisterReceiver fail and leak the old receiver.
+        final Context receiverContext = applicationContext != null ? applicationContext : context;
+
         IntentFilter timezoneFilter = new IntentFilter(Intent.ACTION_TIMEZONE_CHANGED);
 
         BroadcastReceiver timezoneReceiver = new BroadcastReceiver() {
@@ -339,14 +350,14 @@ public final class RuntimeHelper {
 
         if (timezoneChangedReceiver != null) {
             try {
-                context.unregisterReceiver(timezoneChangedReceiver);
+                receiverContext.unregisterReceiver(timezoneChangedReceiver);
             } catch (IllegalArgumentException e) {
                 // Already unregistered.
             }
         }
 
         timezoneChangedReceiver = timezoneReceiver;
-        context.registerReceiver(timezoneChangedReceiver, timezoneFilter);
+        receiverContext.registerReceiver(timezoneChangedReceiver, timezoneFilter);
     }
 
     public static void initLiveSync(Application app) {
