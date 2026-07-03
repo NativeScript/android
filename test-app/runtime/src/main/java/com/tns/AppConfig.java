@@ -25,7 +25,6 @@ class AppConfig {
         EnableLineBreakpoins("enableLineBreakpoints", false),
         EnableMultithreadedJavascript("enableMultithreadedJavascript", false),
         LogScriptLoading("logScriptLoading", false),
-        HttpModulePrefetch("httpModulePrefetch", false),
         HttpFetchUrlLog("httpFetchUrlLog", false);
 
         private final String name;
@@ -87,9 +86,6 @@ class AppConfig {
                 }
                 if (rootObject.has(KnownKeys.LogScriptLoading.getName())) {
                     values[KnownKeys.LogScriptLoading.ordinal()] = rootObject.getBoolean(KnownKeys.LogScriptLoading.getName());
-                }
-                if (rootObject.has(KnownKeys.HttpModulePrefetch.getName())) {
-                    values[KnownKeys.HttpModulePrefetch.ordinal()] = rootObject.getBoolean(KnownKeys.HttpModulePrefetch.getName());
                 }
                 if (rootObject.has(KnownKeys.HttpFetchUrlLog.getName())) {
                     values[KnownKeys.HttpFetchUrlLog.ordinal()] = rootObject.getBoolean(KnownKeys.HttpFetchUrlLog.getName());
@@ -212,11 +208,6 @@ class AppConfig {
     public boolean getLogScriptLoading() {
     Object v = values[KnownKeys.LogScriptLoading.ordinal()];
     return (v instanceof Boolean) ? ((Boolean)v).booleanValue() : false;
-    }
-
-    public boolean getHttpModulePrefetch() {
-        Object v = values[KnownKeys.HttpModulePrefetch.ordinal()];
-        return (v instanceof Boolean) ? ((Boolean)v).booleanValue() : false;
     }
 
     public boolean getHttpFetchUrlLog() {

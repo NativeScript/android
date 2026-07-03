@@ -1347,7 +1347,7 @@ CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackInfo<v
 
 void
 CallbackHandlers::TerminateAllWorkersCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    // `globalThis.__nsTerminateAllWorkers()` — main-isolate-only HMR helper.
+    // `__NS_DEV__.terminateAllWorkers()` — main-isolate-only dev helper.
     // Tears down every worker parented by this isolate through the WorkerWrapper
     // registry. TerminateChildren snapshots the registry under its lock,
     // terminates and clears each worker, and lets each one cascade into its own

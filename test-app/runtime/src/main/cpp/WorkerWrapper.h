@@ -94,9 +94,8 @@ public:
                                                  int lineno);
 
     /*
-     * Registry of live workers, keyed by workerId. Replaces the old
-     * CallbackHandlers::id2WorkerMap. Guarded by a mutex because the worker
-     * shutdown path posts cleanup from the worker thread.
+     * Registry of live workers, keyed by workerId. Guarded by a mutex
+     * because the worker shutdown path posts cleanup from the worker thread.
      */
     static int NextWorkerId();
     static std::shared_ptr<WorkerWrapper> GetById(int workerId);

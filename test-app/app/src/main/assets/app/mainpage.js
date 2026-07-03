@@ -77,6 +77,6 @@ require('./tests/testQueueMicrotask');
 require("./tests/testConcurrentAccess");
 
 require("./tests/testESModules.mjs");
-require("./tests/testHmrHotDataExt.mjs");
+require("./tests/testNsDevBoundary.mjs");
 require("./tests/testHttpCanonicalKey.mjs");
 require("./tests/testNodeBuiltinsAndOptionalModules.mjs");

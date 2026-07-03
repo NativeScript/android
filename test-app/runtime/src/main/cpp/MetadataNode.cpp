@@ -1753,13 +1753,12 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
                 fullPathToFile = "script";
             } else {
                 // ── Normalize srcFileName down to a path-like string ──────────
-                // The earlier logic assumed srcFileName was always
-                // `file://<APP_ROOT_FOLDER_PATH>/<path>.js` and stripped the
-                // scheme + app root before chopping a literal `.js`. HTTP ESM
-                // loading (HMR dev workflow) passes a full URL like
+                // srcFileName is not always `file://<APP_ROOT>/<path>.js`:
+                // HTTP ESM loading (HMR dev workflow) passes a full URL like
                 // `http://127.0.0.1:5173/ns/core/...` with no `.js` suffix and
-                // no app-root prefix, so that arithmetic could yield an empty
-                // `fullPathToFile` and crash downstream on an empty token list.
+                // no app-root prefix, so naive scheme/app-root/`.js` stripping
+                // can yield an empty `fullPathToFile` and crash downstream on
+                // an empty token list.
                 //
                 // The logic below is shape-aware:
                 //   1. Strip a leading URL scheme + authority (`file://`,
@@ -1816,9 +1815,9 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
                 std::vector<std::string> pathParts;
                 Util::SplitString(fullPathToFile, "_", pathParts);
 
-                // Pre-fix this was an unconditional `pathParts.back()` and
-                // SEGV'd when `fullPathToFile` was empty. Walk backwards
-                // for the last non-empty token; if none, use a sentinel.
+                // An unconditional `pathParts.back()` SEGVs when
+                // `fullPathToFile` is empty. Walk backwards for the last
+                // non-empty token; if none, use a sentinel.
                 std::string lastPathPart;
                 for (auto it = pathParts.rbegin(); it != pathParts.rend(); ++it) {
                     if (!it->empty()) {

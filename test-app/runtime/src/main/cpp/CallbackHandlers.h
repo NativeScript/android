@@ -149,11 +149,13 @@ namespace tns {
         static void WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
         /*
-         * `globalThis.__nsTerminateAllWorkers()`, installed on the main-thread
-         * isolate only (debug builds). Terminates every worker parented by the
-         * main isolate via WorkerWrapper::TerminateChildren, which snapshots the
-         * registry, terminates and clears each worker, and lets each one cascade
-         * into its own nested workers. Returns the number of direct (top-level)
+         * `__NS_DEV__.terminateAllWorkers()`, installed on the main-thread
+         * isolate only (see HMRSupport's InitializeHmrDevGlobals — worker
+         * threads do NOT receive it, so a stuck worker can't take down its
+         * peers). Terminates every worker parented by the main isolate via
+         * WorkerWrapper::TerminateChildren, which snapshots the registry,
+         * terminates and clears each worker, and lets each one cascade into
+         * its own nested workers. Returns the number of direct (top-level)
          * workers torn down so the HMR client can log it.
          */
         static void TerminateAllWorkersCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
