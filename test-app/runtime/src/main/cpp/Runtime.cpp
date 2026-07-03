@@ -32,7 +32,6 @@
 #include "SimpleProfiler.h"
 #include "URLImpl.h"
 #include "HMRSupport.h"
-#include "ModuleInternalCallbacks.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
 #include "Util.h"
@@ -167,9 +166,9 @@ void SIG_handler(int sigNumber, siginfo_t* sigInfo, void* /*ucontext*/) {
   __android_log_print(ANDROID_LOG_FATAL, "TNS.Native",
                       "=== end native crash ===");
 
-  // Existing behavior: throw so JS-side error pipeline still reports.
-  // Note: throwing from a signal handler is technically UB, but the existing
-  // runtime has relied on it for years and works under libgcc/libunwind+itanium-abi.
+  // Throw so the JS-side error pipeline still reports the crash.
+  // Note: throwing from a signal handler is technically UB, but the runtime
+  // has relied on it for years and works under libgcc/libunwind+itanium-abi.
   stringstream msg;
   msg << "JNI Exception occurred (" << sigName
       << ").\n=======\nCheck the 'adb logcat' for additional information about "
@@ -400,6 +399,13 @@ Runtime::~Runtime() {
   delete this->m_loopTimer;
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
   if (m_isMainThread) {
+    // Clear process-wide dev-loader state (prewarm cache, cache-bust marks,
+    // boot flag, import map, vendor registry). Main isolate only: workers
+    // share these registries but the main isolate owns their lifetime —
+    // wiping them on worker teardown would race with the live main isolate.
+    tns::CleanupHMRGlobals();
+    tns::CleanupImportMapGlobals();
+
     if (m_mainLooper_fd[0] != -1) {
       ALooper_removeFd(m_mainLooper, m_mainLooper_fd[0]);
     }
@@ -898,22 +904,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "Worker"),
                         workerFuncTemplate);
 
-    // Main-thread-only HMR helper: `globalThis.__nsTerminateAllWorkers()`.
-    // Returns the count of workers terminated. HMR runtimes (e.g.
-    // @nativescript/vite) call this before re-bootstrapping the JS app so a
-    // cycle that re-runs a Worker-constructing scope doesn't leak a live
-    // worker. Workers never receive this global — a stuck worker shouldn't be
-    // able to take down its peers.
-    //
-    // Debug/dev only: it lets any in-process JS terminate every worker, so it
-    // must not ship in release. Gated on `isDebuggable` like the rest of the
-    // dev-global surface installed by `InitializeHmrDevGlobals` below.
-    if (isDebuggable) {
-      Local<FunctionTemplate> terminateAllWorkersTemplate = FunctionTemplate::New(
-          isolate, CallbackHandlers::TerminateAllWorkersCallback);
-      globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__nsTerminateAllWorkers"),
-                          terminateAllWorkersTemplate);
-    }
+    // Worker termination for dev tooling is exposed as
+    // `__NS_DEV__.terminateAllWorkers()`, installed by
+    // InitializeHmrDevGlobals below for the main isolate only.
   }
 
   /*
@@ -940,20 +933,14 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   // it can be shared between runtimes.
   URLImpl::InstallBlobMethods(context);
 
-  // Install HMR + dev-session JS-callable globals on the main-thread
-  // isolate ONLY, and ONLY in a debuggable/dev build. Workers don't need
-  // (and would race on) the dev-session surface — the import-map, vendor
-  // registry, and per-module hot data all live on the main thread.
-  //
-  // The `isDebuggable` gate is required: this surface includes
-  // `__nsStartDevSession` / `__nsConfigureRuntime` which mutate the
-  // process-wide import map and can drive module loading, so it must be
-  // absent from release binaries. The actual remote fetch is independently
-  // gated by `DevFlags::IsRemoteUrlAllowed`, but the install itself should
-  // not happen in release. (`isDebuggable` is the PrepareV8Runtime param.)
-  if (m_isMainThread && isDebuggable) {
-    tns::InitializeHmrDevGlobals(isolate, context);
-  }
+  // Install the `__NS_DEV__` dev-loader namespace on EVERY isolate (main
+  // and worker) in EVERY build. The runtime's dev surface is mechanism
+  // only — the security boundary sits at the network layer
+  // (`DevFlags::IsRemoteUrlAllowed`), not at namespace installation; in a
+  // default-config release app the members are inert because every fetch
+  // they could trigger is denied. Workers get the same surface minus
+  // `terminateAllWorkers` (main-isolate only, see CallbackHandlers.h).
+  tns::InitializeHmrDevGlobals(isolate, context, /*isWorker=*/!m_isMainThread);
   m_objectManager->Init(isolate);
 
   m_module.Init(isolate, callingDir);

@@ -299,7 +299,7 @@ static bool HasUrlScheme(const std::string& spec) {
 }
 
 // Matches `url` against the `volatilePatterns` configured by Vite via
-// `__nsConfigureRuntime({ volatilePatterns: [...] })` (substring match).
+// `__NS_DEV__.configureRuntime({ volatilePatterns: [...] })` (substring match).
 // Android's HTTP loader does not consult this: it enforces volatility
 // structurally — a consume-once prefetch read plus eviction on HMR
 // invalidation (see HttpFetchText in HMRSupport.cpp). It is available for a
@@ -788,7 +788,22 @@ size_t InvalidateModules(const std::vector<std::string>& keys) {
     }
   }
   if (!urlsToEvict.empty()) {
+    // Second layer: drop stale HTTP bodies from the kickstart prewarm
+    // cache for every URL we just invalidated. Without this, the next
+    // `HttpFetchText` for an evicted URL would happily return a stale
+    // body a previous kickstart wave left in the cache, and V8 would
+    // compile that stale source — producing the "1 cycle behind" lag
+    // for edits with many transitive importers.
     EvictHttpModulePrefetchCacheUrls(urlsToEvict);
+
+    // Third layer: any HTTP cache between the runtime and the dev server
+    // (OS URL cache, proxy, host-installed HttpResponseCache) is outside
+    // the runtime's direct control. Mark every invalidated key so the
+    // NEXT network fetch of that URL carries a unique `__ns_dev_nonce`
+    // query param — the cache sees a URL it has never stored and must go
+    // to origin. The nonce is transport-only; module identity stays the
+    // canonical URL.
+    MarkUrlsForCacheBust(urlsToEvict);
   }
   if (IsScriptLoadingLogEnabled()) {
     DEBUG_WRITE("[resolver][invalidate] requested=%lu removed=%lu",
@@ -957,16 +972,12 @@ void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Lo
     // Set import.meta.dirname property
     meta->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, "dirname"), dirnameStr).Check();
 
-    // Attach import.meta.hot for HMR — debug/dev builds only. In a release
-    // build the HMR client and dev-session globals are not installed (see the
-    // isDebuggable gate in Runtime::PrepareV8Runtime), so this per-module hot
-    // surface would be inert dead weight on every module. Gate it on
-    // isDebuggable so production modules carry only import.meta.url/dirname.
-    // Standard HMR code always guards with `if (import.meta.hot)`, so leaving
-    // it undefined in release is the conventional, safe behavior.
-    if (tns::IsDebuggable()) {
-        tns::InitializeImportMetaHot(isolate, context, meta, modulePath);
-    }
+    // NOTE: the runtime deliberately does NOT attach `import.meta.hot`.
+    // Hot contexts are HMR *policy* and are injected by the JS dev client
+    // (`@nativescript/vite` rewrites served module source to
+    // `import.meta.hot = __NS_HOT_REGISTRY__.createHotContext(id)`).
+    // Modules loaded outside a dev session see no hot object at all —
+    // standard HMR code always guards with `if (import.meta.hot)`.
 }
 
 // Helper function to check if a file exists and is a regular file
@@ -1722,6 +1733,10 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                 return scope.Escape(resolver->GetPromise());
             }
         }
+        if (blobMod->GetStatus() == v8::Module::kErrored) {
+            resolver->Reject(context, blobMod->GetException()).Check();
+            return scope.Escape(resolver->GetPromise());
+        }
         resolver->Resolve(context, blobMod->GetModuleNamespace()).Check();
         return scope.Escape(resolver->GetPromise());
     }
@@ -1786,6 +1801,22 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                 resolver->Reject(context, v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, "Evaluation failed"))).Check();
                 return scope.Escape(resolver->GetPromise());
             }
+        }
+        // With top-level-await enabled, Evaluate() returns a promise instead of
+        // an empty MaybeLocal on throw; the module's errored state must be read
+        // from its status. Propagate the real exception so import() rejects
+        // (and the dev client can surface it) instead of resolving a
+        // half-evaluated namespace.
+        if (mod->GetStatus() == v8::Module::kErrored) {
+            v8::Local<v8::Value> exception = mod->GetException();
+            if (IsScriptLoadingLogEnabled()) {
+                v8::String::Utf8Value exc8(isolate, exception);
+                DEBUG_WRITE("[http-esm][dyn][eval][errored] %s: %s", canonical.c_str(),
+                            *exc8 ? *exc8 : "(no message)");
+            }
+            g_moduleRegistry.erase(canonical);
+            resolver->Reject(context, exception).Check();
+            return scope.Escape(resolver->GetPromise());
         }
         resolver->Resolve(context, mod->GetModuleNamespace()).Check();
         return scope.Escape(resolver->GetPromise());
@@ -1852,6 +1883,16 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                 resolver->Reject(context, ex).Check();
                 return scope.Escape(resolver->GetPromise());
             }
+        }
+
+        // Top-level-await semantics: a throwing module leaves Evaluate() with a
+        // (rejected) promise, so the errored state must be read from status.
+        if (module->GetStatus() == v8::Module::kErrored) {
+            if (IsScriptLoadingLogEnabled()) {
+                DEBUG_WRITE("ImportModuleDynamicallyCallback: Evaluation errored for '%s'", spec.c_str());
+            }
+            resolver->Reject(context, module->GetException()).Check();
+            return scope.Escape(resolver->GetPromise());
         }
 
         resolver->Resolve(context, module->GetModuleNamespace()).Check();

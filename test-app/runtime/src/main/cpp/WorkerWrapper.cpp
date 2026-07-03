@@ -387,8 +387,7 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
                 }
             }
 
-            // Deliver messages that were posted before the worker was ready
-            // (replaces the old Java Handshake + pendingWorkerMessages).
+            // Deliver messages that were posted before the worker was ready.
             DrainPendingTasks();
 
             if (!isTerminating_ && !isClosing_) {
@@ -437,8 +436,8 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
     if (runtime_ != nullptr) {
         try {
             // Java-side detach (GcListener.unsubscribe + runtimeCache.remove)
-            // must happen before the isolate is disposed, preserving the old
-            // WorkerThreadHandler -> TerminateWorkerCallback ordering.
+            // must happen before the isolate is disposed so Java never holds
+            // a runtime whose isolate is already gone.
             JEnv env;
             env.CallStaticVoidMethod(RUNTIME_CLASS, DETACH_WORKER_RUNTIME_METHOD_ID, runtimeId);
         } catch (NativeScriptException& ex) {

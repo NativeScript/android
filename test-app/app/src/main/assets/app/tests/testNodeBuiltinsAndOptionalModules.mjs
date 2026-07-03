@@ -1,4 +1,4 @@
-// Tests the resolver paths added in the HMR/ESM hardening port:
+// Tests the ESM resolver's synthetic-module paths:
 // - node: built-in polyfills (in-memory ES modules)
 // - bare-specifier optional-module placeholders
 // - ns-vendor:// vendor-registry resolution via configureRuntime importMap
@@ -46,9 +46,10 @@ describe("Node built-in and optional module resolution", function () {
   });
 
   it("resolves import-map vendor modules through the explicit vendor registry", async function () {
-    const configureRuntime = globalThis.__nsConfigureDevRuntime || globalThis.__nsConfigureRuntime;
+    const dev = globalThis.__NS_DEV__;
+    const configureRuntime = dev && dev.configureRuntime;
     if (typeof configureRuntime !== "function") {
-      pending("__nsConfigureDevRuntime not available (release build?)");
+      pending("__NS_DEV__.configureRuntime not available");
       return;
     }
 

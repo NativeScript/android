@@ -23,9 +23,9 @@ extern thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_m
 // used by `ResolveModuleCallback`; the dev server's import-map JSON is parsed
 // at the V8 layer by the callers, which pass the flat entries here.
 // `SetVolatilePatterns` accepts a list of URL substrings that should always
-// re-fetch (never serve from the speculative-prefetch cache). Both are applied
-// via `__nsConfigureRuntime` / `__nsConfigureDevRuntime` at session start and
-// again at every HMR graph version bump.
+// re-fetch (never serve from the kickstart prewarm cache). Both are applied
+// via `__NS_DEV__.configureRuntime` at session start and again at every HMR
+// graph version bump.
 
 // Set the process-wide import map from the given flat (bare-specifier → URL)
 // entries. The callers hold the parsed import-map object and extract its
@@ -46,17 +46,18 @@ void CleanupImportMapGlobals();
 std::vector<std::string> GetLoadedModuleUrls();
 
 // Evict the given keys (canonical registry keys) from `g_moduleRegistry`.
-// No-op if the key is missing. Used by `__nsInvalidateModules` and by
-// the HMR cycle to drop stale modules before re-importing.
+// No-op if the key is missing. Used by `__NS_DEV__.invalidateModules` and
+// by the JS dev client's HMR cycle to drop stale modules before
+// re-importing.
 void RemoveModuleFromRegistry(const std::string& canonicalKey);
 
 // Drop a list of keys + their HTTP cache entries in one pass. Returns the
 // number of registry entries removed.
 size_t InvalidateModules(const std::vector<std::string>& keys);
 
-// Compile + register-only path used by the speculative HTTP loader so that
-// a module can be cached without being instantiated/evaluated. The caller
-// is responsible for instantiation + evaluation on the JS thread.
+// Fetch + compile + register path used when an HTTP(S) URL is loaded as a
+// module entry point (see ModuleInternal). The caller is responsible for
+// instantiation + evaluation on the JS thread.
 v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
                                                 v8::Local<v8::Context> context,
                                                 const std::string& url,
