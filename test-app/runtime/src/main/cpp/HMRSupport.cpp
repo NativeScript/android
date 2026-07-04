@@ -1402,6 +1402,91 @@ void KickstartHmrPrefetchCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
   buildResult(ok, fetched, elapsedMs);
 }
 
+// `__NS_DEV__.seedModuleBodies(entries)` — batch prewarm-cache seeding.
+//
+// The JS bootstrap downloads `/__ns_dev__/boot-archive` (NDJSON of
+// {url, body} lines) and hands the parsed entries here. Each entry lands in
+// the one-shot prewarm cache (`g_prefetchCache`, consumed by `HttpFetchText`
+// during V8's synchronous module walk), behind the same gates as a kickstart
+// fetch. Mechanism only: the dev server computed the closure and produced
+// the bodies; the runtime just stores them.
+//
+// Accepts Array<{ url, body }>. Returns { ok, seeded, bytes }; callers fall
+// back to `kickstartPrefetch(urls)` when nothing was seeded.
+void SeedModuleBodiesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+  v8::Isolate* isolate = info.GetIsolate();
+  v8::HandleScope scope(isolate);
+  v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+
+  auto buildResult = [&](bool ok, size_t seeded, size_t bytes) {
+    v8::Local<v8::Object> result = v8::Object::New(isolate);
+    (void)result->Set(ctx, ToV8String(isolate, "ok"), v8::Boolean::New(isolate, ok));
+    (void)result->Set(ctx, ToV8String(isolate, "seeded"),
+                      v8::Integer::NewFromUnsigned(isolate, (uint32_t)seeded));
+    (void)result->Set(ctx, ToV8String(isolate, "bytes"),
+                      v8::Number::New(isolate, (double)bytes));
+    info.GetReturnValue().Set(result);
+  };
+
+  if (info.Length() < 1 || !info[0]->IsArray()) {
+    if (tns::IsScriptLoadingLogEnabled()) {
+      DEBUG_WRITE("[__NS_DEV__.seedModuleBodies] expected Array<{url, body}>");
+    }
+    buildResult(false, 0, 0);
+    return;
+  }
+
+  v8::Local<v8::Array> arr = info[0].As<v8::Array>();
+  const uint32_t len = arr->Length();
+  v8::Local<v8::String> urlKey = ToV8String(isolate, "url");
+  v8::Local<v8::String> bodyKey = ToV8String(isolate, "body");
+
+  size_t seeded = 0;
+  size_t bytes = 0;
+  for (uint32_t i = 0; i < len; i++) {
+    v8::Local<v8::Value> elemVal;
+    if (!arr->Get(ctx, i).ToLocal(&elemVal) || !elemVal->IsObject()) continue;
+    v8::Local<v8::Object> elem = elemVal.As<v8::Object>();
+
+    v8::Local<v8::Value> urlVal;
+    if (!elem->Get(ctx, urlKey).ToLocal(&urlVal) || !urlVal->IsString()) continue;
+    v8::String::Utf8Value urlU8(isolate, urlVal);
+    if (!*urlU8) continue;
+    std::string url(*urlU8);
+    if (url.empty()) continue;
+
+    // Same gates a kickstart fetch passes before it may populate the
+    // prewarm cache (scheme, JS-source shape, remote-URL allowlist).
+    if (!StartsWith(url, "http://") && !StartsWith(url, "https://")) continue;
+    if (!LooksLikeJsSourceUrl(url)) continue;
+    if (!IsRemoteUrlAllowed(url)) continue;
+
+    v8::Local<v8::Value> bodyVal;
+    if (!elem->Get(ctx, bodyKey).ToLocal(&bodyVal) || !bodyVal->IsString()) continue;
+    v8::String::Utf8Value bodyU8(isolate, bodyVal);
+    if (!*bodyU8) continue;
+    std::string body(*bodyU8);
+    if (body.empty()) continue;
+
+    const size_t bodySize = body.size();
+    // Overwrite unconditionally — the archive body is the authoritative
+    // fresh copy, mirroring the kickstart's overwrite semantics.
+    {
+      std::lock_guard<std::mutex> lock(g_prefetchMutex);
+      g_prefetchCache[url] = std::move(body);
+    }
+    ++seeded;
+    bytes += bodySize;
+  }
+
+  if (tns::IsScriptLoadingLogEnabled()) {
+    DEBUG_WRITE("[__NS_DEV__.seedModuleBodies] seeded=%lu bytes=%lu of %u entries",
+                (unsigned long)seeded, (unsigned long)bytes, len);
+  }
+
+  buildResult(seeded > 0, seeded, bytes);
+}
+
 void GetLoadedModuleUrlsCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
   v8::Isolate* isolate = info.GetIsolate();
   v8::HandleScope scope(isolate);
@@ -1468,6 +1553,7 @@ void InitializeHmrDevGlobals(v8::Isolate* isolate, v8::Local<v8::Context> contex
   InstallDevFunction(isolate, context, dev, "configureRuntime", ConfigureDevRuntimeCallback);
   InstallDevFunction(isolate, context, dev, "invalidateModules", InvalidateModulesCallback);
   InstallDevFunction(isolate, context, dev, "kickstartPrefetch", KickstartHmrPrefetchCallback);
+  InstallDevFunction(isolate, context, dev, "seedModuleBodies", SeedModuleBodiesCallback);
   InstallDevFunction(isolate, context, dev, "getLoadedModuleUrls", GetLoadedModuleUrlsCallback);
   InstallDevFunction(isolate, context, dev, "setDevBootComplete", SetDevBootCompleteCallback);
 

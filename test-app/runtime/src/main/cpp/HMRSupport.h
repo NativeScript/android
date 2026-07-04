@@ -179,6 +179,7 @@ void MirrorGlobalOnGlobalThis(v8::Isolate* isolate, v8::Local<v8::Context> conte
 //   - configureRuntime(config)        (import map + volatile patterns)
 //   - invalidateModules(urls)         (registry + cache eviction)
 //   - kickstartPrefetch(urls, opts?)  (parallel HTTP prewarm, list mode)
+//   - seedModuleBodies(entries)       (batch prewarm seeding from the boot archive)
 //   - getLoadedModuleUrls()           (registry introspection)
 //   - setDevBootComplete(value?)      (boot-complete signal)
 //   - terminateAllWorkers()           (main isolate only; see CallbackHandlers.h)
