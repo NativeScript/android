@@ -2,9 +2,15 @@ name: NPM Release
 on:
   push:
     branches:
-      - main
+      - main # -> prerelease published under the "next" dist-tag
     tags:
-      - "v*"
+      - "v*" # -> release published under the "latest" dist-tag
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to cut, e.g. 9.1.0 (creates tag v<version> and publishes 'latest'). Leave empty for a manual 'next' build."
+        required: false
+        default: ""
 
 env:
   NPM_TAG: "next"
@@ -64,8 +70,19 @@ jobs:
         run: |
           NPM_VERSION=$(node -e "console.log(require('./package.json').version);")
           echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
+      - name: Set manual release version
+        # manual dispatch with a version: cut tag v<input> and publish ('latest'
+        # unless the version is a prerelease)
+        if: ${{ inputs.version != '' }}
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          NPM_VERSION="${INPUT_VERSION#v}"
+          echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
+          npm version $NPM_VERSION --no-git-tag-version --allow-same-version
       - name: Bump version for dev release
-        if: ${{ !contains(github.ref, 'refs/tags/') }}
+        # branch push (main) or manual run without a version -> "next" prerelease
+        if: ${{ !contains(github.ref, 'refs/tags/') && inputs.version == '' }}
         run: |
           NPM_VERSION=$(node ./scripts/get-next-version.js)
           echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
@@ -201,8 +218,9 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
   github-release:
     runs-on: ubuntu-latest
-    # only runs on tagged commits
-    if: ${{ contains(github.ref, 'refs/tags/') }}
+    # only runs on tagged commits, or a manual dispatch with a version (which
+    # creates tag v<version> itself via the release action below)
+    if: ${{ contains(github.ref, 'refs/tags/') || inputs.version != '' }}
     permissions:
       contents: write
     needs:
@@ -239,6 +257,13 @@ jobs:
         run: npx conventional-changelog -p angular -r2 > body.md
       - uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
         with:
+          # explicit tag + commit so a manual dispatch (no pushed tag ref) creates
+          # tag v<version> at the dispatched commit; on tag pushes this resolves
+          # to the pushed tag itself
+          tag: "v${{ env.NPM_VERSION }}"
+          name: "v${{ env.NPM_VERSION }}"
+          commit: ${{ github.sha }}
           artifacts: "dist/nativescript-android-*.tgz,dist/debug-symbols/debug-symbols.zip"
           bodyFile: "body.md"
           prerelease: ${{needs.build.outputs.npm_tag != 'latest'}}
+          allowUpdates: true
