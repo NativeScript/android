@@ -74,6 +74,14 @@ class MetadataNode {
 
         static bool TryGetPackageName(v8::Isolate* isolate, const v8::Local<v8::Object>& value, std::string& out);
 
+        /*
+         * Resolves the Java class name a constructor function stands for, lazily registering a
+         * Java proxy class when the function is a plain ES `class X extends NativeType {}` that
+         * has not been registered yet. Returns an empty string when the function is not part of
+         * a native inheritance chain. Used when marshalling a constructor function to a Java
+         * `java.lang.Class` (or `java.lang.Object`) argument.
+         */
+        static std::string TryResolveClassCtorTypeName(v8::Isolate* isolate, const v8::Local<v8::Function>& func);
 
         static MetadataReader* getMetadataReader();
     private:
@@ -143,7 +151,23 @@ class MetadataNode {
 
         static TypeMetadata* GetTypeMetadata(v8::Isolate* isolate, const v8::Local<v8::Function>& value);
 
+        // Safe variant of GetTypeMetadata - returns nullptr when the function carries no type
+        // metadata (e.g. a plain ES class constructor) instead of crashing
+        static TypeMetadata* TryGetTypeMetadata(v8::Isolate* isolate, const v8::Local<v8::Function>& value);
+
         static void SetTypeMetadata(v8::Isolate* isolate, v8::Local<v8::Function> value, TypeMetadata* data);
+
+        /*
+         * Lazily registers a Java proxy class for a plain ES `class X extends NativeType {}`
+         * constructor function (no `.extend()` call, no downleveling). Walks the constructor
+         * prototype chain to the native base, collects overridden method names from every ES
+         * level's prototype and implemented interfaces from `static interfaces = [...]`, resolves
+         * the proxy class through the regular DexFactory pipeline and tags the constructor the
+         * same way `.extend()` tags its result (typemetadata + ExtendedCtorFuncCache entry).
+         * Returns nullptr when ctorFunc is not part of a native inheritance chain or the chain
+         * goes through a legacy `.extend()`-created class. Idempotent.
+         */
+        static TypeMetadata* EnsureExtendedESClass(v8::Isolate* isolate, v8::Local<v8::Function> ctorFunc);
 
         static std::string CreateFullClassName(const std::string& className, const std::string& extendNameAndLocation);
         static void MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -255,12 +279,16 @@ class MetadataNode {
         };
 
         struct TypeMetadata {
-            TypeMetadata(const std::string& _name)
+            TypeMetadata(const std::string& _name, bool _isESDerived = false)
                 :
-                name(_name) {
+                name(_name), isESDerived(_isESDerived) {
             }
 
             std::string name;
+
+            // true when the class was registered lazily from a plain ES
+            // `class X extends NativeType {}` constructor (see EnsureExtendedESClass)
+            bool isESDerived;
         };
 
         struct CtorCacheData {
