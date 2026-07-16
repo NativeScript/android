@@ -134,6 +134,20 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
         SetConvertedObject(env, index, stringObject);
 
         success = true;
+    } else if (arg->IsFunction() && !MetadataNode::TryResolveClassCtorTypeName(isolate, arg.As<Function>()).empty()) {
+        // a native type ctor (or a plain ES class extending one - registered lazily here)
+        // marshals to its java.lang.Class. Typed nulls (`SomeClass.null`) and other functions
+        // resolve to an empty name and keep flowing through the object branch below.
+        auto typeName = MetadataNode::TryResolveClassCtorTypeName(isolate, arg.As<Function>());
+        jclass clazz = env.FindClass(typeName);
+        if (clazz != nullptr) {
+            // JEnv caches classes as global refs - mark as global so the dtor doesn't delete it
+            SetConvertedObject(env, index, clazz, true /* isGlobal */);
+            success = true;
+        } else {
+            s << "Cannot marshal JavaScript function at index " << index
+              << " to Java type. Only native type constructors can be marshalled (to java.lang.Class).";
+        }
     } else if (arg->IsObject()) {
         auto jsObj = arg->ToObject(context).ToLocalChecked();
 
