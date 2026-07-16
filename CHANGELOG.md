@@ -1,3 +1,26 @@
+## [9.0.5](https://github.com/NativeScript/android/compare/v9.0.4...v9.0.5) (2026-07-13)
+
+
+### Bug Fixes
+
+* anchor relative dynamic imports at the file:// referrer's directory ([#1976](https://github.com/NativeScript/android/issues/1976)) ([92c2654](https://github.com/NativeScript/android/commit/92c26548ee1111c5439bef4305227711022d5397))
+* **DexFactory:** add support for injecting DEX into parent class loader ([#1951](https://github.com/NativeScript/android/issues/1951)) ([c9d41e6](https://github.com/NativeScript/android/commit/c9d41e620b3413a67c1bd766e3f68e534a082814))
+* **DexFactory:** register injected proxy dex with a single class loader ([#1968](https://github.com/NativeScript/android/issues/1968)) ([fce8e29](https://github.com/NativeScript/android/commit/fce8e296c2345cc75d5a675e1beef5c0214ba2cf)), closes [pre-#1951](https://github.com/pre-/issues/1951) [#1962](https://github.com/NativeScript/android/issues/1962) [#1951](https://github.com/NativeScript/android/issues/1951)
+* **jsparser:** skip non-Identifier keys in `.extend({})` argument ([#1950](https://github.com/NativeScript/android/issues/1950)) ([dd2984b](https://github.com/NativeScript/android/commit/dd2984bc6b64d06e13f626139e5b54b04a33cfb7))
+* normalize "." and ".." in resolved module paths to dedupe modules ([#1977](https://github.com/NativeScript/android/issues/1977)) ([45ed1f6](https://github.com/NativeScript/android/commit/45ed1f6bb567b407cfd6e579b0372aead9434289))
+* propagate custom ndkVersion to the runtime build ([#1974](https://github.com/NativeScript/android/issues/1974)) ([51e9fa0](https://github.com/NativeScript/android/commit/51e9fa00819e79ed71bd1635d40d781ca265aa71))
+* **timers:** order timers with the Java MessageQueue instead of ALooper fds ([bfd7650](https://github.com/NativeScript/android/commit/bfd765043aaa30cc1ef14d00e3cebfa04e980597))
+* URLSearchParams construction and iteration spec compliance ([#1970](https://github.com/NativeScript/android/issues/1970)) ([89893ae](https://github.com/NativeScript/android/commit/89893ae6961ee6d55037bd1f710c619a4282f817))
+
+
+### Features
+
+* **inspector:** attach Chrome DevTools to Web Worker isolates ([#1973](https://github.com/NativeScript/android/issues/1973)) ([4b5ab0a](https://github.com/NativeScript/android/commit/4b5ab0ac8426762af2092f1f405eb547a443719a))
+* **inspector:** serve source maps to DevTools via Network.loadNetwor… ([#1969](https://github.com/NativeScript/android/issues/1969)) ([55da2da](https://github.com/NativeScript/android/commit/55da2da87e1a0ef9cf35adc3cc5cba1fb8a69cd9)), closes [NativeScript/ios#385](https://github.com/NativeScript/ios/issues/385) [NativeScript/ios#378](https://github.com/NativeScript/ios/issues/378) [nodejs/node#58077](https://github.com/nodejs/node/issues/58077)
+* **workers:** move worker threading and messaging to C++, mirroring the iOS runtime, and support SharedArrayBuffer ([#1972](https://github.com/NativeScript/android/issues/1972)) ([a84d3c7](https://github.com/NativeScript/android/commit/a84d3c7ab33f8c80c5f42af6d36e9763236d17b5))
+
+
+
 ## [9.0.4](https://github.com/NativeScript/android/compare/v9.0.3...v9.0.4) (2026-04-29)
 
 
