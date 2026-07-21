@@ -269,7 +269,12 @@ task copyFilesToProjectTemeplate {
             into "$DIST_FRAMEWORK_PATH/build-tools"
         }
         copy {
-            from "$BUILD_TOOLS_PATH/jsparser/build/js_parser.js"
+            from("$BUILD_TOOLS_PATH/jsparser/build") {
+                include "js_parser.js"
+            }
+            from("$BUILD_TOOLS_PATH/jsparser") {
+                include "package.json"
+            }
             into "$DIST_FRAMEWORK_PATH/build-tools/jsparser"
         }
         copy {
@@ -343,6 +348,20 @@ task copyProjectTemplate(type: Copy) {
     into "$DIST_FRAMEWORK_PATH"
 }
 
+task verifyJsParserPackage {
+    doLast {
+        def packageFile = new File("$DIST_FRAMEWORK_PATH/build-tools/jsparser/package.json")
+        if (!packageFile.exists()) {
+            throw new GradleException("The packaged JavaScript parser is missing its package.json boundary.")
+        }
+
+        def packageJson = new JsonSlurper().parseText(packageFile.text)
+        if (packageJson.type != "commonjs") {
+            throw new GradleException("The packaged JavaScript parser must run as CommonJS.")
+        }
+    }
+}
+
 task copyPackageJson(type: Copy) {
     from "$rootDir/package.json"
     into "$DIST_PATH"
@@ -394,7 +413,8 @@ if (generateRegularRuntimePackage) {
 }
 
 copyFilesToProjectTemeplate.dependsOn(buildJsParser)
-copyProjectTemplate.dependsOn(copyFilesToProjectTemeplate)
+verifyJsParserPackage.dependsOn(copyFilesToProjectTemeplate)
+copyProjectTemplate.dependsOn(verifyJsParserPackage)
 copyPackageJson.dependsOn(copyProjectTemplate)
 setPackageVersionInPackageJsonFile.dependsOn(copyPackageJson)
 copyReadme.dependsOn(setPackageVersionInPackageJsonFile)
