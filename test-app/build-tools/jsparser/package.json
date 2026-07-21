@@ -1,6 +1,7 @@
 {
   "name": "js-parser",
   "version": "1.0.0",
+  "type": "commonjs",
   "description": "javascript static analysis tool",
   "main": "js_parser.js",
   "scripts": {
