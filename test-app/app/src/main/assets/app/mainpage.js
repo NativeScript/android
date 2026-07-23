@@ -76,6 +76,7 @@ require('./tests/testPerformanceNow');
 require('./tests/testQueueMicrotask');
 require('./tests/testErrorEvents');
 require('./tests/testUnhandledRejections');
+require('./tests/testEscapeException');
 require("./tests/testConcurrentAccess");
 
 require("./tests/testESModules.mjs");

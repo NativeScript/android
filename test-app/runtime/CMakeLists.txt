@@ -107,6 +107,7 @@ add_library(
         src/main/cpp/Events.cpp
         src/main/cpp/FieldAccessor.cpp
         src/main/cpp/File.cpp
+        src/main/cpp/Interop.cpp
         src/main/cpp/IsolateDisposer.cpp
         src/main/cpp/JEnv.cpp
         src/main/cpp/DesugaredInterfaceCompanionClassNameResolver.cpp

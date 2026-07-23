@@ -5,6 +5,7 @@
 
 #include "ArgConverter.h"
 #include "ErrorEvents.h"
+#include "Interop.h"
 #include "LooperTasks.h"
 #include "NativeScriptAssert.h"
 #include "Runtime.h"
@@ -108,6 +109,16 @@ void NativeScriptException::ReThrowToJava() {
     auto isolate = Isolate::GetCurrent();
     auto errObj = Local<Value>::New(isolate, *m_javascriptException);
     if (errObj->IsObject()) {
+      // A branded interop.escapeException(...) throw carrying an original
+      // Java throwable: rethrow it unwrapped, so a native catch of its
+      // concrete type still matches (instead of receiving a
+      // com.tns.NativeScriptException wrapper).
+      jthrowable escaped =
+          Interop::ExtractEscapedJavaException(env, errObj.As<Object>());
+      if (escaped != nullptr) {
+        env.Throw(escaped);
+        return;
+      }
       auto exObj = TryGetJavaThrowableObject(env, errObj.As<Object>());
       ex = (jthrowable)exObj.Move();
     }

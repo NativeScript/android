@@ -17,6 +17,7 @@
 #include "ErrorEvents.h"
 #include "Events.h"
 #include "File.h"
+#include "Interop.h"
 #include "IsolateDisposer.h"
 #include "JsArgConverter.h"
 #include "JsArgToArrayConverter.h"
@@ -881,6 +882,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   // installed for both the main and worker isolates.
   Events::Init(context);
   ErrorEvents::Init(context);
+
+  // The `interop` global (interop.escapeException), mirroring iOS.
+  Interop::Init(context);
 
   m_objectManager->Init(isolate);
 
