@@ -14,6 +14,8 @@
 #include "ArrayHelper.h"
 #include "CallbackHandlers.h"
 #include "Constants.h"
+#include "ErrorEvents.h"
+#include "Events.h"
 #include "File.h"
 #include "IsolateDisposer.h"
 #include "JsArgConverter.h"
@@ -495,11 +497,11 @@ bool Runtime::TryCallGC() {
   return success;
 }
 
-void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj,
-                                      jthrowable exception, jstring message,
-                                      jstring fullStackTrace,
-                                      jstring jsStackTrace,
-                                      jboolean isDiscarded) {
+jboolean Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj,
+                                          jthrowable exception, jstring message,
+                                          jstring fullStackTrace,
+                                          jstring jsStackTrace,
+                                          jboolean isDiscarded) {
   auto isolate = m_isolate;
 
   string errMsg = ArgConverter::jstringToString(message);
@@ -534,8 +536,17 @@ void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj,
                 ArgConverter::jstringToV8String(isolate, jsStackTrace));
   }
 
+  // Give WHATWG `error` event listeners a chance first; preventDefault()
+  // fully handles the report - no __on*Error shim, and the Java caller is
+  // told the exception was handled.
+  string stackTraceStr = ArgConverter::jstringToString(fullStackTrace);
+  if (ErrorEvents::DispatchError(isolate, errObj, errMsg, stackTraceStr)) {
+    return JNI_TRUE;
+  }
+
   // pass err to JS
   NativeScriptException::CallJsFuncWithErr(errObj, isDiscarded);
+  return JNI_FALSE;
 }
 
 static void InitializeV8() {
@@ -603,6 +614,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
       ImportModuleDynamicallyCallback);
 
   isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
+  isolate->SetPromiseRejectCallback(NativeScriptException::OnPromiseRejected);
 
   __android_log_print(ANDROID_LOG_DEBUG, "TNS.Runtime", "V8 version %s",
                       V8::GetVersion());
@@ -779,6 +791,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   m_looperTasks = std::make_shared<LooperTasks>();
   m_looperTasks->Initialize(ALooper_forThread());
 
+  // Unhandled-promise-rejection tracker; fed by the SetPromiseRejectCallback
+  // above and drained via a LooperTasks task once per looper turn.
+  m_promiseRejections = std::make_unique<PromiseRejectionTracker>(this);
+
   SimpleProfiler::Init(isolate, globalTemplate);
 
   CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
@@ -858,6 +874,14 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   v8::Local<v8::Value> out;
   script->Run(context).ToLocal(&out);
+
+  // Generic WHATWG event primitives (Event/EventTarget + the globalThis
+  // mixin), then the error-events layer on top (ErrorEvent/
+  // PromiseRejectionEvent, reportError and the native dispatch closures) -
+  // installed for both the main and worker isolates.
+  Events::Init(context);
+  ErrorEvents::Init(context);
+
   m_objectManager->Init(isolate);
 
   m_module.Init(isolate, callingDir);
@@ -973,6 +997,14 @@ void Runtime::DestroyRuntime() {
     // will have their posts dropped from now on
     m_looperTasks->Terminate();
   }
+  // The events state holds v8::Global handles (backing event target, dispatch
+  // closures and tracked promise rejections) - reset them while the isolate
+  // is still alive.
+  m_promiseRejections.reset();
+  m_globalEventTarget.Reset();
+  m_dispatchErrorEventFunc.Reset();
+  m_dispatchUnhandledRejectionFunc.Reset();
+  m_dispatchRejectionHandledFunc.Reset();
   tns::disposeIsolate(m_isolate);
 }
 

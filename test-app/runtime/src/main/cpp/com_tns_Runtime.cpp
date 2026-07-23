@@ -299,10 +299,10 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_unlock(JNIEnv* env, jobject obj, 
     }
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_passExceptionToJsNative(JNIEnv* env, jobject obj, jint runtimeId, jthrowable exception, jstring message, jstring fullStackTrace, jstring jsStackTrace, jboolean isDiscarded) {
+extern "C" JNIEXPORT jboolean Java_com_tns_Runtime_passExceptionToJsNative(JNIEnv* env, jobject obj, jint runtimeId, jthrowable exception, jstring message, jstring fullStackTrace, jstring jsStackTrace, jboolean isDiscarded) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
-        return;
+        return JNI_FALSE;
     }
 
     auto isolate = runtime->GetIsolate();
@@ -313,7 +313,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_passExceptionToJsNative(JNIEnv* e
     v8::Context::Scope context_scope(context);
 
     try {
-        runtime->PassExceptionToJsNative(env, obj, exception, message, fullStackTrace, jsStackTrace, isDiscarded);
+        return runtime->PassExceptionToJsNative(env, obj, exception, message, fullStackTrace, jsStackTrace, isDiscarded);
     } catch (NativeScriptException& e) {
         e.ReThrowToJava();
     } catch (std::exception e) {
@@ -325,6 +325,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_passExceptionToJsNative(JNIEnv* e
         NativeScriptException nsEx(std::string("Error: c++ exception!"));
         nsEx.ReThrowToJava();
     }
+    return JNI_FALSE;
 }
 
 // @CriticalNative ABI: no JNIEnv* / jclass.

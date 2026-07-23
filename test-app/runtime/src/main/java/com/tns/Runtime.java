@@ -75,7 +75,7 @@ public class Runtime {
 
     private native void unlock(int runtimeId);
 
-    private native void passExceptionToJsNative(int runtimeId, Throwable ex, String message, String fullStackTrace, String jsStackTrace, boolean isDiscarded);
+    private native boolean passExceptionToJsNative(int runtimeId, Throwable ex, String message, String fullStackTrace, String jsStackTrace, boolean isDiscarded);
 
     @CriticalNative
     private static native int getCurrentRuntimeIdCritical();
@@ -107,8 +107,14 @@ public class Runtime {
 
     private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
-    void passUncaughtExceptionToJs(Throwable ex, String message, String fullStackTrace, String jsStackTrace) {
-        passExceptionToJsNative(getRuntimeId(), ex, message, fullStackTrace, jsStackTrace, false);
+    /**
+     * Reports an uncaught exception to JS (WHATWG `error` event, then the
+     * `__onUncaughtError` hook). Returns true when an `error` event listener
+     * called preventDefault(), i.e. the exception is fully handled and the
+     * caller should not crash the process.
+     */
+    boolean passUncaughtExceptionToJs(Throwable ex, String message, String fullStackTrace, String jsStackTrace) {
+        return passExceptionToJsNative(getRuntimeId(), ex, message, fullStackTrace, jsStackTrace, false);
     }
 
     void passDiscardedExceptionToJs(Throwable ex, String prefix) {

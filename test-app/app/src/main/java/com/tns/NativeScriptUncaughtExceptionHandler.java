@@ -22,6 +22,8 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
         String stackTraceErrorMessage = Runtime.getStackTraceErrorMessage(ex);
         String errorMessage = String.format("%s\nStackTrace:\n%s", currentThreadMessage, stackTraceErrorMessage);
 
+        boolean handledByJs = false;
+
         if (Runtime.isInitialized()) {
             try {
                 if (Util.isDebuggableApp(context)) {
@@ -31,7 +33,7 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
                 Runtime runtime = Runtime.getCurrentRuntime();
 
                 if (runtime != null) {
-                    runtime.passUncaughtExceptionToJs(ex, ex.getMessage(), stackTraceErrorMessage, Runtime.getJSStackTrace(ex));
+                    handledByJs = runtime.passUncaughtExceptionToJs(ex, ex.getMessage(), stackTraceErrorMessage, Runtime.getJSStackTrace(ex));
                 }
             } catch (Throwable t) {
                 if (Util.isDebuggableApp(context)) {
@@ -42,6 +44,12 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 
         if (logger.isEnabled()) {
             logger.write("Uncaught Exception Message=" + errorMessage);
+        }
+
+        if (handledByJs) {
+            // A JS `error` event listener called preventDefault() - the
+            // exception is fully handled: no error activity, no crash.
+            return;
         }
 
         boolean res = false;
