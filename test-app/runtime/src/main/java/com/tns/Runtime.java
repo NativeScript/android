@@ -1273,7 +1273,7 @@ public class Runtime {
             try {
                 ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
             } catch (NativeScriptException e) {
-                if (discardUncaughtJsExceptions) {
+                if (discardUncaughtJsExceptions && !e.isEscapedFromJs()) {
                     String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
                     android.util.Log.w("Warning", "NativeScript discarding uncaught JS exception!");
                     passDiscardedExceptionToJs(e, errorMessage);
@@ -1294,7 +1294,7 @@ public class Runtime {
                             final Object[] packagedArgs = packageArgs(tmpArgs);
                             arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs);
                         } catch (NativeScriptException e) {
-                            if (discardUncaughtJsExceptions) {
+                            if (discardUncaughtJsExceptions && !e.isEscapedFromJs()) {
                                 String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
                                 passDiscardedExceptionToJs(e, errorMessage);
                                 android.util.Log.w("Warning", "NativeScript discarding uncaught JS exception!");
@@ -1333,7 +1333,58 @@ public class Runtime {
             ret = arr[0];
         }
 
+        // A contained uncaught JS error (or a discarded one) yields null; for
+        // primitive return types the generated binding would NPE unboxing it,
+        // so substitute the type's default value.
+        if (ret == null && retType != null && retType.isPrimitive() && retType != void.class) {
+            ret = defaultPrimitiveValue(retType);
+        }
+
         return ret;
+    }
+
+    private static Object defaultPrimitiveValue(Class<?> type) {
+        if (type == boolean.class) {
+            return Boolean.FALSE;
+        } else if (type == byte.class) {
+            return (byte) 0;
+        } else if (type == char.class) {
+            return (char) 0;
+        } else if (type == short.class) {
+            return (short) 0;
+        } else if (type == int.class) {
+            return 0;
+        } else if (type == long.class) {
+            return 0L;
+        } else if (type == float.class) {
+            return 0f;
+        } else if (type == double.class) {
+            return 0d;
+        }
+        return null;
+    }
+
+    /*
+     * Called by the native runtime under uncaughtErrorPolicy: "throw" for
+     * errors with no Java caller to unwind into (unhandled promise
+     * rejections): throws from a clean Java frame on this thread's looper so
+     * the thread's uncaught-exception handler (and its reporting) runs
+     * exactly as for a sync uncaught error.
+     */
+    @RuntimeCallable
+    private static void throwUncaughtJsErrorOnCurrentThread(String message, String stackTrace) {
+        final NativeScriptException ex = new NativeScriptException(message, stackTrace, 0);
+        JavaScriptStackTrace.applyFrames(ex, stackTrace, null);
+        android.os.Looper looper = android.os.Looper.myLooper();
+        if (looper == null) {
+            throw ex;
+        }
+        new android.os.Handler(looper).post(new Runnable() {
+            @Override
+            public void run() {
+                throw ex;
+            }
+        });
     }
 
     @RuntimeCallable

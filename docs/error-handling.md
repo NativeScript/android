@@ -1,17 +1,19 @@
 # Error handling
 
-The runtime implements the WHATWG error model at the global level: uncaught JavaScript exceptions and unhandled promise rejections are dispatched as cancelable events on `globalThis`, Java exceptions round-trip into JavaScript with the original `Throwable` attached, and `interop.escapeException` forwards a JavaScript throw to the Java caller as the **original** Java exception. Unlike iOS, a truly-uncaught exception crashes the app by default (the Java default uncaught-exception handler ends the process) — `preventDefault()` and `discardUncaughtJsExceptions` are the opt-outs. Unhandled rejections and `reportError` only report; they never crash.
+The runtime implements the WHATWG error model at the global level: uncaught JavaScript exceptions and unhandled promise rejections are dispatched as cancelable events on `globalThis`, Java exceptions round-trip into JavaScript with the original `Throwable` attached, and `interop.escapeException` forwards a JavaScript throw to the Java caller as the **original** Java exception. Following the web's model — an erroring page doesn't crash the browser — **an uncaught error never crashes the app by default**: it is reported (event → hook → log) and execution continues. Crashing is opt-in via `uncaughtErrorPolicy: "throw"`; suppressing a report entirely is per-error via `preventDefault()`.
 
 ## Quick reference
 
 | Situation | Default behavior |
 |---|---|
-| Uncaught JS exception during a Java→JS call (overridden method, interface implementation) | Becomes a real `com.tns.NativeScriptException` thrown to the Java caller. If nothing catches it, the thread's uncaught-exception handler reports it (cancelable `error` event → `__onUncaughtError` hook → error activity in debug builds) and the process exits — unless a listener called `preventDefault()`. |
+| Uncaught JS exception in a **native-initiated** callback (the OS invoking an overridden method or interface implementation, a posted `Runnable`, a timer, `__runOnMainThread`, a frame callback) | **Contained at the boundary**: reported (cancelable `error` event → `__onUncaughtError` hook → logcat), the Java caller receives the default value for the return type, and the app keeps running. |
+| Uncaught JS exception in a **JS-initiated** chain (JS → Java → JS callback throws) | **Propagates back to the outer JS `catch`** as the very same JS error object — correct JavaScript semantics; each JS frame on the way gets its chance to catch. Only if it reaches an outermost native-initiated boundary is it contained. |
 | Unhandled promise rejection | Tracked per isolate, reported once per looper turn: cancelable `unhandledrejection` event → `__onUncaughtError` hook, logcat entry prefixed `Unhandled promise rejection:`. The app keeps running. |
 | `.catch()` added after the report | `rejectionhandled` event (non-cancelable), carrying the original reason. |
 | Java exception during a JS→Java call | Surfaced to JS as an `Error` carrying the original as `error.nativeException`. |
-| `throw interop.escapeException(x)` in JS called from Java | The original Java `Throwable` carried by `x` is rethrown **unwrapped** to the Java caller (JS trace attached as a suppressed `com.tns.JavaScriptStackTrace`); with no underlying `Throwable`, a `com.tns.NativeScriptException` whose stack trace is the JS frames. |
+| `throw interop.escapeException(x)` in JS called from Java | Never contained. The original Java `Throwable` carried by `x` is rethrown **unwrapped** to the Java caller (JS trace attached as a suppressed `com.tns.JavaScriptStackTrace`); with no underlying `Throwable`, a `com.tns.NativeScriptException` whose stack trace is the JS frames. |
 | `reportError(x)` | Routed through the same pipeline as an uncaught error; never crashes. |
+| `uncaughtErrorPolicy: "throw"` | Restores the pre-9.1 behavior: unprevented uncaught errors are thrown to the native layer as real Java exceptions (which typically ends the process via the default uncaught-exception handler). |
 
 ## JavaScript API
 
@@ -69,8 +71,9 @@ The stacks live on the error/reason **value**, not on the event — and the thro
 
 | You wrote | `e.error` / `e.reason` is | JS stack | Native exception |
 |---|---|---|---|
-| `throw new Error("x")` | that `Error` | `e.error.stack` | — |
+| `throw new Error("x")` | that `Error` (the actual thrown value) | `e.error.stack` | — |
 | called a Java method that threw, without try/catch | an `Error` with `message` from the Java exception's message | `e.error.stack` (the JS call site); `e.error.stackTrace` combines it with the Java frames | `e.error.nativeException` — the original `Throwable` (call `.getClass()`, `.getMessage()`, `.getCause()`, ... on it) |
+| `throw new java.io.IOException("x")` — a directly-thrown wrapped `Throwable` | the wrapped `Throwable` itself — not an `Error`, no `.stack` | — | `e.error` directly (`instanceof java.io.IOException`) |
 
 ### Catching native exceptions
 
@@ -103,7 +106,17 @@ const listener = new some.api.Listener({
 Semantics:
 
 - `escapeException(err)` returns a JS `Error` (message/stack copied), so it behaves like a normal throw in pure-JS paths; the brand is an isolate-private symbol that user code cannot forge. Passing an already-branded value is a no-op; calling with no argument throws `TypeError`.
-- If `err` is (or carries via `.nativeException`) a Java `Throwable`, the **original object** is rethrown at the boundary — a Java `catch (IOException e)` above the caller matches, and `Throwable` identity is preserved (same object, untouched class/stack/cause chain). The JS journey rides along as a suppressed `com.tns.JavaScriptStackTrace` (see the native section).
+- If `err` is (or carries via `.nativeException`) a Java `Throwable`, the **original object** is rethrown at the boundary — a Java `catch (IOException e)` above the caller matches, and `Throwable` identity is preserved (same object, untouched class/stack/cause chain). The JS journey rides along as a suppressed `com.tns.JavaScriptStackTrace` (see the native section). This includes directly-constructed exceptions:
+
+```js
+// The caller catches THIS exact IOException - no wrapper. Without the brand,
+// a directly-thrown wrapped Throwable behaves like any other uncaught throw:
+// contained (reported, caller resumes) in a native-initiated callback, or -
+// in a JS-initiated chain - propagated to the outer JS catch (and, if it
+// reaches Java code with no JS below, wrapped in a com.tns.NativeScriptException
+// with the IOException as its cause).
+throw interop.escapeException(new java.io.IOException("x"));
+```
 - Otherwise a `com.tns.NativeScriptException` is thrown as usual, but with its stack trace replaced by frames synthesized from the JS stack, so crash reporters group it by where it actually happened in JS.
 - The `escapeException()` call site's stack is recorded too — for non-Error values (`escapeException("boom")`) it is the only stack available.
 - Branded escapes bypass `discardUncaughtJsExceptions` (an explicit forward request must reach the caller).
@@ -156,20 +169,29 @@ for (Throwable suppressed : caught.getSuppressed()) {
 
 ## Configuration
 
-| Flag (app `package.json`, default off) | Effect |
-|---|---|
-| `discardUncaughtJsExceptions` | JS exceptions escaping an overridden-method call are swallowed on the Java side and reported through `__onDiscardedError` instead of crashing the app. Branded `interop.escapeException` throws bypass it. |
+One policy key in the app's `package.json` (root level) governs what happens to an **unprevented** uncaught error or unhandled rejection:
 
-There is no `crashOnUncaughtJsExceptions` flag (unlike iOS): crashing on truly-uncaught exceptions is already Android's default.
+| `uncaughtErrorPolicy` | Effect |
+|---|---|
+| `"report"` (default) | Report (event → hook → log) and continue. Never crashes. |
+| `"throw"` | After the (cancelable) event, the error is thrown to the native layer as a real Java exception — `com.tns.NativeScriptException` with the JS frames as its stack trace — and reported through the thread's uncaught-exception path. This typically ends the process (the pre-9.1 default), though a native catch or a custom `UncaughtExceptionHandler` above the boundary can still intercept it, which is why the policy names the mechanism, not a guaranteed crash. Unhandled rejections are thrown from a clean frame on the runtime's looper. |
+
+Deprecated (kept for the transition, both emit a logcat warning):
+
+| Flag | Behavior |
+|---|---|
+| `discardUncaughtJsExceptions: true` | Legacy quiet routing: contained reports call `__onDiscardedError` instead of `__onUncaughtError` and skip the logcat report. Branded `interop.escapeException` throws bypass it. |
+| `discardUncaughtJsExceptions: false` | Ignored (this used to mean "crash on uncaught errors" — set `uncaughtErrorPolicy: "throw"` for that). |
 
 Terminal-path decision table:
 
 | Condition | legacy hook called | process crash |
 |---|---|---|
-| uncaught exception, default | `__onUncaughtError` | yes |
-| uncaught exception, `discardUncaughtJsExceptions` | `__onDiscardedError` | no |
-| uncaught exception, listener called `preventDefault()` | none | no |
-| unhandled rejection / `reportError`, unprevented | `__onUncaughtError` | no |
+| uncaught error, default (`"report"`) | `__onUncaughtError` | no |
+| uncaught error, `"report"` + `discardUncaughtJsExceptions: true` | `__onDiscardedError` | no |
+| uncaught error, listener called `preventDefault()` | none | no |
+| uncaught error / unhandled rejection, `"throw"`, unprevented | `__onUncaughtError` (via the uncaught-exception path) | yes, normally |
+| unhandled rejection / `reportError`, `"report"`, unprevented | `__onUncaughtError` | no |
 | unhandled rejection / `reportError`, `preventDefault()` | none | no |
 
 ## Crash reporter integration
@@ -188,7 +210,7 @@ globalThis.addEventListener("error", (e) => {
 });
 ```
 
-Java side — for exceptions that never pass through the JS event layer (escaped originals crashing a thread), walk `getSuppressed()` for `com.tns.JavaScriptStackTrace` to attach the JS frames. For embedders with a custom `Thread.UncaughtExceptionHandler`: `Runtime.passUncaughtExceptionToJs(...)` returns `true` when a listener called `preventDefault()` — honor it by not killing the process (see `NativeScriptUncaughtExceptionHandler`).
+Java side — for exceptions that never pass through the JS event layer (escaped originals crashing a thread, `"throw"`-policy fatals), walk `getSuppressed()` for `com.tns.JavaScriptStackTrace` to attach the JS frames. For embedders with a custom `Thread.UncaughtExceptionHandler`: `Runtime.passUncaughtExceptionToJs(...)` returns `true` when a listener called `preventDefault()` — honor it by not killing the process (see `NativeScriptUncaughtExceptionHandler`).
 
 ## Legacy hooks (deprecated)
 
@@ -196,7 +218,9 @@ Java side — for exceptions that never pass through the JS event layer (escaped
 
 ## Behavior details
 
-- Every error is reported exactly once: either the JS→Java boundary (synchronous throws during Java-invoked JS), the rejection drain (once per looper turn, scheduled on the runtime's `ALooper`), or `reportError` — never two of them for the same error.
+- **Containment is boundary-outermost.** The runtime tracks the depth of in-flight JS→Java calls; a throw with JS frames waiting below the boundary propagates (so `try { javaApi.call(cb) } catch` works, with the original JS error object restored across the crossing), and is contained only at an outermost native-initiated entry. `interop.escapeException` and `uncaughtErrorPolicy: "throw"` are the two ways an error crosses that outermost boundary.
+- **Contained callbacks return type defaults.** A throwing overridden method hands its Java caller `null` for reference types and `0`/`false` for primitives (the runtime substitutes the default before unboxing, so no `NullPointerException` from the binding). The error is loudly reported *before* the caller resumes, so logcat shows the real failure ahead of any downstream symptom. If the Java contract genuinely needs the exception, use `interop.escapeException`.
+- Every error is reported exactly once: either the containment point, the rejection drain (once per looper turn, scheduled on the runtime's `ALooper`), `reportError`, or — under `"throw"` — the thread's uncaught-exception path. Never two of them for the same error.
 - A rejection that gets a handler before the end-of-turn drain is never reported (and produces no `rejectionhandled` either).
-- The `error` event for uncaught exceptions fires when the exception is reported to JS (from the uncaught-exception handler via `passUncaughtExceptionToJs`, or the discard path) — after the Java stack has already unwound. `preventDefault()` prevents the crash, but on the main thread the app's looper has exited by then; for background and JS-only threads the process genuinely keeps running.
-- Worker isolates run the same machinery: each worker has its own tracker, drain, and event layer.
+- Module/script evaluation (`runModule`/`runScript`, app bootstrap) is not contained — an app whose main module fails to load still fails loudly.
+- Worker isolates run the same machinery: each worker has its own tracker, drain, event layer and containment.

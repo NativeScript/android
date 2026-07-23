@@ -132,6 +132,53 @@ describe("interop.escapeException", function () {
         expect(second.getSuppressed().length).toBe(1);
     });
 
+    it("escapes a directly-constructed Java exception (not wrapped in an Error)", function () {
+        var original = new java.io.IOException("direct-io");
+        var runnable = new java.lang.Runnable({
+            run: function () {
+                // The escaped value IS the wrapped Throwable - there is no JS
+                // Error and no .nativeException property involved.
+                throw interop.escapeException(original);
+            }
+        });
+        var ret = com.tns.tests.EscapeExceptionTest.invokeCatchingThrowable(runnable);
+
+        expect(ret).not.toBeNull();
+        expect(ret.getClass().getName()).toBe("java.io.IOException");
+        expect(ret.getMessage()).toBe("direct-io");
+        expect(ret.equals(original)).toBe(true);
+
+        // A wrapped Throwable has no JS stack of its own, so the carrier
+        // renders the escape site.
+        var suppressed = ret.getSuppressed();
+        expect(suppressed.length).toBe(1);
+        expect(suppressed[0].getClass().getName()).toBe("com.tns.JavaScriptStackTrace");
+        var frames = suppressed[0].getStackTrace();
+        var sawThisFile = false;
+        for (var i = 0; i < frames.length; i++) {
+            var file = frames[i].getFileName();
+            if (file && file.indexOf("testEscapeException.js") !== -1) {
+                sawThisFile = true;
+                break;
+            }
+        }
+        expect(sawThisFile).toBe(true);
+    });
+
+    it("an unbranded directly-thrown Java exception surfaces wrapped, original as cause", function () {
+        var original = new java.io.IOException("direct-unbranded");
+        var runnable = new java.lang.Runnable({
+            run: function () {
+                throw original;
+            }
+        });
+        var ret = com.tns.tests.EscapeExceptionTest.invokeCatchingThrowable(runnable);
+
+        expect(ret).not.toBeNull();
+        expect(ret.getClass().getName()).toBe("com.tns.NativeScriptException");
+        expect(ret.getCause().equals(original)).toBe(true);
+    });
+
     it("an unbranded rethrow keeps today's wrapping semantics", function () {
         var caught = null;
         try {

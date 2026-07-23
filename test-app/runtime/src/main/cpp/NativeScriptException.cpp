@@ -149,8 +149,13 @@ void NativeScriptException::ReThrowToJava() {
     // NativeScriptException shape, but its Java stack is the (identical) JNI
     // boundary machinery - replace it with frames synthesized from the JS
     // stack so crash reporters group these by where they actually happened.
+    // The escapedFromJs mark exempts it from the deprecated
+    // discardUncaughtJsExceptions handling in the Java dispatch layer.
     if (escapeInfo.branded && ex != nullptr) {
       Interop::ApplyJavaScriptFrames(env, ex, escapeInfo);
+      static jfieldID escapedFromJsField =
+          env.GetFieldID(NATIVESCRIPTEXCEPTION_CLASS, "escapedFromJs", "Z");
+      env.SetBooleanField(ex, escapedFromJsField, JNI_TRUE);
     }
   } else if (!m_message.empty()) {
     JniLocalRef msg(env.NewStringUTF(m_message.c_str()));
@@ -322,13 +327,31 @@ void NativeScriptException::ReportUnhandledRejection(Isolate* isolate,
   if (ErrorEvents::DispatchUnhandledRejection(isolate, promise, reason)) {
     return;
   }
-  ReportFatalTail(isolate, reason, stackTrace, "Unhandled promise rejection:");
+
+  auto runtime = GetRuntimeOrNull(isolate);
+  if (runtime != nullptr &&
+      runtime->GetUncaughtErrorPolicy() == Runtime::UncaughtErrorPolicy::Throw) {
+    // Hand the rejection to the native layer; the post-mortem uncaught path
+    // performs the (single) report, exactly as for a sync uncaught error.
+    string message =
+        "Unhandled promise rejection: " + ToDetailString(isolate, reason);
+    ThrowUncaughtJsErrorToJava(message, stackTrace);
+    return;
+  }
+
+  jboolean isDiscarded =
+      (runtime != nullptr && runtime->GetDiscardUncaughtJsExceptions())
+          ? JNI_TRUE
+          : JNI_FALSE;
+  ReportFatalTail(isolate, reason, stackTrace, "Unhandled promise rejection:",
+                  isDiscarded);
 }
 
 void NativeScriptException::ReportFatalTail(Isolate* isolate,
                                             Local<Value> error,
                                             const string& stackOverride,
-                                            const string& logPrefix) {
+                                            const string& logPrefix,
+                                            jboolean isDiscarded) {
   auto context = isolate->GetCurrentContext();
 
   string stackTrace = stackOverride;
@@ -346,12 +369,16 @@ void NativeScriptException::ReportFatalTail(Isolate* isolate,
         .FromMaybe(false);
   }
 
-  // There is no discardUncaughtJsExceptions decision here - that flag lives
-  // on the Java side and only affects Java-initiated reports. Errors that
-  // reach this tail (reportError, unhandled rejections, throwing listeners)
-  // have no Java caller, so they report through __onUncaughtError and the
-  // process keeps running.
-  CallJsFuncWithErr(error, false /* isDiscarded */);
+  CallJsFuncWithErr(error, isDiscarded);
+
+  if (isDiscarded == JNI_TRUE) {
+    // Deprecated legacy routing: quiet, like the old Java-side discard path.
+    if (!logPrefix.empty()) {
+      DEBUG_WRITE_FORCE("%s", logPrefix.c_str());
+    }
+    DEBUG_WRITE_FORCE("NativeScript discarding uncaught JS exception!");
+    return;
+  }
 
   if (!logPrefix.empty()) {
     DEBUG_WRITE_FORCE("%s", logPrefix.c_str());
@@ -360,6 +387,86 @@ void NativeScriptException::ReportFatalTail(Isolate* isolate,
   if (!stackTrace.empty()) {
     LogLines(stackTrace);
   }
+}
+
+bool NativeScriptException::ContainUncaughtCallbackException(Isolate* isolate,
+                                                             v8::TryCatch& tc) {
+  auto runtime = GetRuntimeOrNull(isolate);
+  if (runtime == nullptr) {
+    return false;
+  }
+
+  // JS-initiated chain (JS -> Java -> JS): a JS frame below this boundary is
+  // waiting for the exception - propagate so it reaches the outer JS catch
+  // (the boundary machinery restores the original JS error object there).
+  if (runtime->JavaCallDepth() > 0) {
+    return false;
+  }
+
+  Local<Value> error = tc.Exception();
+  if (error.IsEmpty()) {
+    return false;
+  }
+
+  // Branded interop.escapeException: an explicit forward to the native
+  // caller - never contained.
+  if (error->IsObject()) {
+    JEnv env;
+    Interop::EscapedExceptionInfo escapeInfo;
+    if (Interop::GetEscapedExceptionInfo(env, error.As<Object>(), escapeInfo)) {
+      if (escapeInfo.original != nullptr) {
+        env.DeleteLocalRef(escapeInfo.original);
+      }
+      return false;
+    }
+  }
+
+  if (runtime->GetUncaughtErrorPolicy() == Runtime::UncaughtErrorPolicy::Throw) {
+    // Pre-9.1 semantics: the exception is thrown to the Java caller and the
+    // post-mortem uncaught-exception path performs the (single) report.
+    return false;
+  }
+
+  // Contain: report through the WHATWG pipeline (`error` event -> legacy
+  // hook -> log) and let the caller resume with a default value.
+  string errorMessage;
+  string stackTrace;
+  auto message = tc.Message();
+  if (!message.IsEmpty()) {
+    errorMessage = GetErrorMessage(message, error);
+    stackTrace = GetErrorStackTrace(message->GetStackTrace());
+  } else {
+    errorMessage = ToDetailString(isolate, error);
+    stackTrace = GetStackTraceOfValue(isolate, error);
+  }
+
+  {
+    // A throwing listener or hook must not escape into the caller.
+    v8::TryCatch reportTc(isolate);
+    if (!ErrorEvents::DispatchError(isolate, error, errorMessage, stackTrace)) {
+      jboolean isDiscarded =
+          runtime->GetDiscardUncaughtJsExceptions() ? JNI_TRUE : JNI_FALSE;
+      ReportFatalTail(isolate, error, stackTrace, "", isDiscarded);
+    }
+    if (reportTc.HasCaught()) {
+      DEBUG_WRITE_FORCE(
+          "ContainUncaughtCallbackException: exception while reporting");
+    }
+  }
+
+  tc.Reset();
+  return true;
+}
+
+void NativeScriptException::ThrowUncaughtJsErrorToJava(const string& message,
+                                                       const string& stackTrace) {
+  JEnv env;
+  static jmethodID mid = env.GetStaticMethodID(
+      RUNTIME_CLASS, "throwUncaughtJsErrorOnCurrentThread",
+      "(Ljava/lang/String;Ljava/lang/String;)V");
+  JniLocalRef msg(env.NewStringUTF(message.c_str()));
+  JniLocalRef stack(env.NewStringUTF(stackTrace.c_str()));
+  env.CallStaticVoidMethod(RUNTIME_CLASS, mid, (jstring)msg, (jstring)stack);
 }
 
 void PromiseRejectionTracker::OnReject(Local<Promise> promise,

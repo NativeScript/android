@@ -19,6 +19,7 @@
 #include "File.h"
 #include "Interop.h"
 #include "IsolateDisposer.h"
+#include "JType.h"
 #include "JsArgConverter.h"
 #include "JsArgToArrayConverter.h"
 #include "ManualInstrumentation.h"
@@ -258,6 +259,29 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
   JniLocalRef cacheCode(env->GetObjectArrayElement(args, 1));
   Constants::V8_CACHE_COMPILED_CODE = (bool)cacheCode;
   JniLocalRef profilerOutputDir(env->GetObjectArrayElement(args, 2));
+
+  {
+    JEnv jEnv(env);
+    JniLocalRef discardUncaught(env->GetObjectArrayElement(
+        args, (jsize)11 /* KnownKeys.DiscardUncaughtJsExceptions */));
+    if (!discardUncaught.IsNull()) {
+      m_discardUncaughtJsExceptions =
+          JType::BooleanValue(jEnv, discardUncaught) == JNI_TRUE;
+    }
+
+    JniLocalRef uncaughtErrorPolicy(env->GetObjectArrayElement(
+        args, (jsize)15 /* KnownKeys.UncaughtErrorPolicy */));
+    if (!uncaughtErrorPolicy.IsNull()) {
+      auto policy = ArgConverter::jstringToString(uncaughtErrorPolicy);
+      if (policy == "throw") {
+        m_uncaughtErrorPolicy = UncaughtErrorPolicy::Throw;
+      } else {
+        // AppConfig validates and warns about unknown values; anything that
+        // is not "throw" behaves as the default.
+        m_uncaughtErrorPolicy = UncaughtErrorPolicy::Report;
+      }
+    }
+  }
 
   DEBUG_WRITE("Initializing Telerik NativeScript");
 

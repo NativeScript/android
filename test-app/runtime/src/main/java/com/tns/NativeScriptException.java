@@ -5,6 +5,17 @@ public class NativeScriptException extends RuntimeException {
     @SuppressWarnings("unused")
     private long jsValueAddress = 0;
     private String incomingStackTrace;
+    /*
+     * Set by the native side when this exception is a branded
+     * interop.escapeException(...) forward. An explicit forward always
+     * reaches the Java caller - it is exempt from the (deprecated)
+     * discardUncaughtJsExceptions handling.
+     */
+    private boolean escapedFromJs = false;
+
+    boolean isEscapedFromJs() {
+        return escapedFromJs;
+    }
 
     public NativeScriptException() {
         super();

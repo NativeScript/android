@@ -69,15 +69,42 @@ class NativeScriptException : public std::exception {
                                        const std::string& stackTrace);
 
   /*
-   * The terminal tail shared by reportError, listener-thrown errors and the
-   * rejection path: calls the __onUncaughtError shim and logs. Does NOT
-   * dispatch any event (the caller already has), preventing recursion.
-   * Unlike a Java-side uncaught exception this never crashes the process -
-   * there is no Java caller to re-throw into.
+   * The terminal tail shared by reportError, listener-thrown errors, the
+   * rejection path and contained callback exceptions: calls the
+   * __onUncaughtError shim (or __onDiscardedError under the deprecated
+   * discardUncaughtJsExceptions flag) and logs. Does NOT dispatch any event
+   * (the caller already has), preventing recursion, and never crashes the
+   * process itself.
    */
   static void ReportFatalTail(v8::Isolate* isolate, v8::Local<v8::Value> error,
                               const std::string& stackOverride = "",
-                              const std::string& logPrefix = "");
+                              const std::string& logPrefix = "",
+                              jboolean isDiscarded = JNI_FALSE);
+
+  /*
+   * Policy-aware handling of an uncaught JS exception at a native->JS
+   * callback boundary (overridden method invoked by native code, timer,
+   * __runOnMainThread / frame callback). Returns true when the error was
+   * CONTAINED - reported through the WHATWG pipeline (`error` event ->
+   * legacy hook -> log) with the TryCatch reset, and the caller should
+   * proceed with a default value. Returns false when the caller must
+   * propagate the exception to Java: the chain is JS-initiated (a JS frame
+   * is waiting for it below the boundary), the throw is a branded
+   * interop.escapeException (explicit forward), or uncaughtErrorPolicy is
+   * "throw".
+   */
+  static bool ContainUncaughtCallbackException(v8::Isolate* isolate,
+                                               v8::TryCatch& tc);
+
+  /*
+   * Hands an unhandled promise rejection to the native layer under
+   * uncaughtErrorPolicy: "throw": schedules a com.tns.NativeScriptException
+   * throw from a clean Java frame on this thread's looper, so the thread's
+   * uncaught-exception handler (and its reporting) runs exactly as for a
+   * sync uncaught error.
+   */
+  static void ThrowUncaughtJsErrorToJava(const std::string& message,
+                                         const std::string& stackTrace);
 
   /*
    * Calls the global "__onUncaughtError" or "__onDiscardedError" if such is

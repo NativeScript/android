@@ -29,6 +29,18 @@ class Runtime {
             WORKER_WRAPPER = 2
         };
 
+        /*
+         * What happens to an unprevented uncaught JS error (sync throw in a
+         * native-initiated callback, or an unhandled promise rejection):
+         * Report (default) - report and continue, never crash; Throw - hand
+         * it to the native layer as a real Java exception (pre-9.1 behavior).
+         * Configured via `uncaughtErrorPolicy` in the app's package.json.
+         */
+        enum class UncaughtErrorPolicy {
+            Report,
+            Throw
+        };
+
         ~Runtime();
 
         static Runtime* GetRuntime(int runtimeId);
@@ -137,6 +149,31 @@ class Runtime {
             return m_promiseRejections.get();
         }
 
+        UncaughtErrorPolicy GetUncaughtErrorPolicy() const {
+            return m_uncaughtErrorPolicy;
+        }
+        bool GetDiscardUncaughtJsExceptions() const {
+            return m_discardUncaughtJsExceptions;
+        }
+
+        /*
+         * Depth of in-flight JS->Java calls on this runtime's thread. When a
+         * JS callback invoked from Java throws while the depth is non-zero,
+         * the whole chain is JS-initiated (JS -> Java -> JS), so the throw
+         * must propagate back to the outer JS catch instead of being
+         * contained at the boundary. Maintained by CallbackHandlers around
+         * the JS->Java invocation sites.
+         */
+        int JavaCallDepth() const {
+            return m_javaCallDepth;
+        }
+        void EnterJavaCall() {
+            ++m_javaCallDepth;
+        }
+        void LeaveJavaCall() {
+            --m_javaCallDepth;
+        }
+
     private:
         Runtime(JNIEnv* env, jobject runtime, int id);
 
@@ -163,6 +200,10 @@ class Runtime {
         v8::Global<v8::Function> m_dispatchUnhandledRejectionFunc;
         v8::Global<v8::Function> m_dispatchRejectionHandledFunc;
         std::unique_ptr<PromiseRejectionTracker> m_promiseRejections;
+
+        UncaughtErrorPolicy m_uncaughtErrorPolicy = UncaughtErrorPolicy::Report;
+        bool m_discardUncaughtJsExceptions = false;
+        int m_javaCallDepth = 0;
 
         int64_t m_lastUsedMemory;
 
