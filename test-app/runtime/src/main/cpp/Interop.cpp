@@ -108,6 +108,19 @@ static void EscapeExceptionCallback(const FunctionCallbackInfo<Value>& info) {
     auto errObj = Exception::Error(ArgConverter::ConvertToV8String(isolate, message))
                           .As<Object>();
 
+    // The freshly-created Error's own stack IS the escapeException() call
+    // site - capture it before the origin stack overwrites it below. It is
+    // the only stack available for non-Error values, and often the more
+    // useful frame when debugging where an error was forwarded from.
+    string escapeSiteStack;
+    {
+        Local<Value> ownStack;
+        if (errObj->Get(context, V8StringConstants::GetStack(isolate)).ToLocal(&ownStack) &&
+            ownStack->IsString()) {
+            escapeSiteStack = ArgConverter::ConvertToString(ownStack.As<String>());
+        }
+    }
+
     // Copy stack from x when it is an Error carrying one.
     string stack;
     if (xIsObject) {
@@ -122,32 +135,36 @@ static void EscapeExceptionCallback(const FunctionCallbackInfo<Value>& info) {
         }
     }
 
-    // Build the branded payload: the original Java throwable when x carries
-    // one, otherwise synthesis info (name/message/stack).
+    string name = "Error";
+    if (xIsObject) {
+        Local<Value> nameVal;
+        if (x.As<Object>()
+                    ->Get(context, ArgConverter::ConvertToV8String(isolate, "name"))
+                    .ToLocal(&nameVal) &&
+            nameVal->IsString()) {
+            name = ArgConverter::ConvertToString(nameVal.As<String>());
+        }
+    }
+
+    // Build the branded payload: name/message and both stacks always (so the
+    // boundary can carry the JS journey over to Java), plus the original Java
+    // throwable when x carries one.
     auto payload = Object::New(isolate);
+    payload->Set(context, ArgConverter::ConvertToV8String(isolate, "name"),
+                 ArgConverter::ConvertToV8String(isolate, name))
+            .FromMaybe(false);
+    payload->Set(context, ArgConverter::ConvertToV8String(isolate, "message"),
+                 ArgConverter::ConvertToV8String(isolate, message))
+            .FromMaybe(false);
+    payload->Set(context, V8StringConstants::GetStack(isolate),
+                 ArgConverter::ConvertToV8String(isolate, stack))
+            .FromMaybe(false);
+    payload->Set(context, ArgConverter::ConvertToV8String(isolate, "escapeSiteStack"),
+                 ArgConverter::ConvertToV8String(isolate, escapeSiteStack))
+            .FromMaybe(false);
     Local<Value> nativeExc = GetWrappedJavaThrowable(context, x);
     if (!nativeExc.IsEmpty()) {
         payload->Set(context, V8StringConstants::GetNativeException(isolate), nativeExc)
-                .FromMaybe(false);
-    } else {
-        string name = "Error";
-        if (xIsObject) {
-            Local<Value> nameVal;
-            if (x.As<Object>()
-                        ->Get(context, ArgConverter::ConvertToV8String(isolate, "name"))
-                        .ToLocal(&nameVal) &&
-                nameVal->IsString()) {
-                name = ArgConverter::ConvertToString(nameVal.As<String>());
-            }
-        }
-        payload->Set(context, ArgConverter::ConvertToV8String(isolate, "name"),
-                     ArgConverter::ConvertToV8String(isolate, name))
-                .FromMaybe(false);
-        payload->Set(context, ArgConverter::ConvertToV8String(isolate, "message"),
-                     ArgConverter::ConvertToV8String(isolate, message))
-                .FromMaybe(false);
-        payload->Set(context, V8StringConstants::GetStack(isolate),
-                     ArgConverter::ConvertToV8String(isolate, stack))
                 .FromMaybe(false);
     }
 
@@ -176,41 +193,102 @@ void Interop::Init(Local<Context> context) {
     }
 }
 
-jthrowable Interop::ExtractEscapedJavaException(JEnv& env,
-                                                const Local<Object>& errObj) {
+static string GetPayloadString(Local<Context> context, Local<Object> payload,
+                               Local<v8::String> key) {
+    Local<Value> val;
+    if (payload->Get(context, key).ToLocal(&val) && val->IsString()) {
+        return ArgConverter::ConvertToString(val.As<String>());
+    }
+    return "";
+}
+
+bool Interop::GetEscapedExceptionInfo(JEnv& env, const Local<Object>& errObj,
+                                      EscapedExceptionInfo& out) {
     auto isolate = Isolate::GetCurrent();
     auto context = isolate->GetCurrentContext();
     if (context.IsEmpty()) {
-        return nullptr;
+        return false;
     }
 
     Local<Private> brand = GetBrand(isolate);
-    Local<Value> payload;
+    Local<Value> payloadVal;
     if (!errObj->HasPrivate(context, brand).FromMaybe(false) ||
-        !errObj->GetPrivate(context, brand).ToLocal(&payload) ||
-        !payload->IsObject()) {
-        return nullptr;
+        !errObj->GetPrivate(context, brand).ToLocal(&payloadVal) ||
+        !payloadVal->IsObject()) {
+        return false;
     }
+    auto payload = payloadVal.As<Object>();
+
+    out.branded = true;
+    out.name = GetPayloadString(context, payload,
+                                ArgConverter::ConvertToV8String(isolate, "name"));
+    out.message = GetPayloadString(context, payload,
+                                   ArgConverter::ConvertToV8String(isolate, "message"));
+    out.stack = GetPayloadString(context, payload, V8StringConstants::GetStack(isolate));
+    out.escapeSiteStack = GetPayloadString(
+            context, payload, ArgConverter::ConvertToV8String(isolate, "escapeSiteStack"));
 
     Local<Value> nativeExc;
-    if (!payload.As<Object>()
-                 ->Get(context, V8StringConstants::GetNativeException(isolate))
-                 .ToLocal(&nativeExc) ||
-        nativeExc.IsEmpty() || !nativeExc->IsObject()) {
-        return nullptr;
+    if (payload->Get(context, V8StringConstants::GetNativeException(isolate))
+                 .ToLocal(&nativeExc) &&
+        !nativeExc.IsEmpty() && nativeExc->IsObject()) {
+        auto objectManager = Runtime::GetObjectManager(isolate);
+        auto javaObj = objectManager->GetJavaObjectByJsObject(nativeExc.As<Object>());
+        if (!javaObj.IsNull()) {
+            JniLocalRef objClass(env.GetObjectClass(javaObj));
+            jclass throwableClass = env.FindClass("java/lang/Throwable");
+            if (env.IsAssignableFrom(objClass, throwableClass) == JNI_TRUE) {
+                out.original = static_cast<jthrowable>(env.NewLocalRef(javaObj));
+            }
+        }
     }
 
-    auto objectManager = Runtime::GetObjectManager(isolate);
-    auto javaObj = objectManager->GetJavaObjectByJsObject(nativeExc.As<Object>());
-    if (javaObj.IsNull()) {
-        return nullptr;
-    }
+    return true;
+}
 
-    JniLocalRef objClass(env.GetObjectClass(javaObj));
-    jclass throwableClass = env.FindClass("java/lang/Throwable");
-    if (env.IsAssignableFrom(objClass, throwableClass) != JNI_TRUE) {
-        return nullptr;
-    }
+/*
+ * com.tns.JavaScriptStackTrace bridge. JEnv::FindClass returns cached global
+ * refs, so the jclass/jmethodIDs are safe to keep in statics (resolved once,
+ * on the first escape that needs them).
+ */
+static jclass GetCarrierClass(JEnv& env) {
+    static jclass clazz = env.FindClass("com/tns/JavaScriptStackTrace");
+    return clazz;
+}
 
-    return static_cast<jthrowable>(env.NewLocalRef(javaObj));
+void Interop::AttachJavaScriptStackTrace(JEnv& env, jthrowable target,
+                                         const EscapedExceptionInfo& info) {
+    if (target == nullptr) {
+        return;
+    }
+    jclass carrierClass = GetCarrierClass(env);
+    static jmethodID attachMethod = env.GetStaticMethodID(
+            carrierClass, "attach",
+            "(Ljava/lang/Throwable;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+
+    string header = info.name.empty()
+                            ? info.message
+                            : (info.message.empty() ? info.name
+                                                    : info.name + ": " + info.message);
+    JniLocalRef headerRef(env.NewStringUTF(header.c_str()));
+    JniLocalRef stackRef(env.NewStringUTF(info.stack.c_str()));
+    JniLocalRef escapeRef(env.NewStringUTF(info.escapeSiteStack.c_str()));
+    env.CallStaticVoidMethod(carrierClass, attachMethod, target, (jstring) headerRef,
+                             (jstring) stackRef, (jstring) escapeRef);
+}
+
+void Interop::ApplyJavaScriptFrames(JEnv& env, jthrowable target,
+                                    const EscapedExceptionInfo& info) {
+    if (target == nullptr) {
+        return;
+    }
+    jclass carrierClass = GetCarrierClass(env);
+    static jmethodID applyMethod = env.GetStaticMethodID(
+            carrierClass, "applyFrames",
+            "(Ljava/lang/Throwable;Ljava/lang/String;Ljava/lang/String;)V");
+
+    JniLocalRef stackRef(env.NewStringUTF(info.stack.c_str()));
+    JniLocalRef escapeRef(env.NewStringUTF(info.escapeSiteStack.c_str()));
+    env.CallStaticVoidMethod(carrierClass, applyMethod, target, (jstring) stackRef,
+                             (jstring) escapeRef);
 }

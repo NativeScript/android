@@ -59,6 +59,79 @@ describe("interop.escapeException", function () {
         expect(1 + 1).toBe(2);
     });
 
+    it("carries the JS trace on the original exception as a suppressed JavaScriptStackTrace", function () {
+        var caught = null;
+        try {
+            com.tns.tests.EscapeExceptionTest.throwIOException();
+        } catch (e) {
+            caught = e;
+        }
+
+        var runnable = new java.lang.Runnable({
+            run: function () {
+                throw interop.escapeException(caught);
+            }
+        });
+        var ret = com.tns.tests.EscapeExceptionTest.invokeCatchingThrowable(runnable);
+
+        var suppressed = ret.getSuppressed();
+        expect(suppressed.length).toBe(1);
+        var carrier = suppressed[0];
+        expect(carrier.getClass().getName()).toBe("com.tns.JavaScriptStackTrace");
+
+        // The carrier renders the JS frames as real StackTraceElements
+        // pointing at this spec file.
+        var frames = carrier.getStackTrace();
+        expect(frames.length).toBeGreaterThan(0);
+        var sawThisFile = false;
+        for (var i = 0; i < frames.length; i++) {
+            var file = frames[i].getFileName();
+            if (file && file.indexOf("testEscapeException.js") !== -1) {
+                sawThisFile = true;
+                break;
+            }
+        }
+        expect(sawThisFile).toBe(true);
+
+        // The escape call site is recorded too, for SDK integrations.
+        expect(carrier.getEscapeSiteStack()).toContain("testEscapeException.js");
+    });
+
+    it("does not stack duplicate carriers when the same throwable escapes twice", function () {
+        var caught = null;
+        try {
+            com.tns.tests.EscapeExceptionTest.throwIOException();
+        } catch (e) {
+            caught = e;
+        }
+
+        var escapeOnce = new java.lang.Runnable({
+            run: function () {
+                throw interop.escapeException(caught);
+            }
+        });
+        var first = com.tns.tests.EscapeExceptionTest.invokeCatchingThrowable(escapeOnce);
+        expect(first.getSuppressed().length).toBe(1);
+
+        // Re-escape the SAME original throwable (re-caught and re-forwarded,
+        // as through nested overrides).
+        var reCaught = null;
+        try {
+            throw interop.escapeException(caught);
+        } catch (e) {
+            reCaught = e;
+        }
+        var escapeAgain = new java.lang.Runnable({
+            run: function () {
+                throw reCaught;
+            }
+        });
+        var second = com.tns.tests.EscapeExceptionTest.invokeCatchingThrowable(escapeAgain);
+
+        expect(second.equals(first)).toBe(true);
+        expect(second.getSuppressed().length).toBe(1);
+    });
+
     it("an unbranded rethrow keeps today's wrapping semantics", function () {
         var caught = null;
         try {
@@ -96,5 +169,47 @@ describe("interop.escapeException", function () {
         expect(ret).not.toBeNull();
         expect(ret.getClass().getName()).toBe("com.tns.NativeScriptException");
         expect(ret.getMessage()).toContain("plain-escape");
+
+        // Its Java stack is replaced with frames synthesized from the JS
+        // stack, so crash reporters group by where it actually happened
+        // instead of the (identical) JNI boundary machinery.
+        var frames = ret.getStackTrace();
+        expect(frames.length).toBeGreaterThan(0);
+        var sawThisFile = false;
+        for (var i = 0; i < frames.length; i++) {
+            var file = frames[i].getFileName();
+            if (file && file.indexOf("testEscapeException.js") !== -1) {
+                sawThisFile = true;
+                break;
+            }
+        }
+        expect(sawThisFile).toBe(true);
+    });
+
+    it("a non-Error escape carries the escape-site stack", function () {
+        var runnable = new java.lang.Runnable({
+            run: function () {
+                throw interop.escapeException("boom-string");
+            }
+        });
+        var ret = com.tns.tests.EscapeExceptionTest.invokeCatchingThrowable(runnable);
+
+        expect(ret).not.toBeNull();
+        expect(ret.getClass().getName()).toBe("com.tns.NativeScriptException");
+        expect(ret.getMessage()).toContain("boom-string");
+
+        // A string has no stack of its own, so the escapeException() call
+        // site - the only stack available - provides the frames.
+        var frames = ret.getStackTrace();
+        expect(frames.length).toBeGreaterThan(0);
+        var sawThisFile = false;
+        for (var i = 0; i < frames.length; i++) {
+            var file = frames[i].getFileName();
+            if (file && file.indexOf("testEscapeException.js") !== -1) {
+                sawThisFile = true;
+                break;
+            }
+        }
+        expect(sawThisFile).toBe(true);
     });
 });

@@ -108,15 +108,19 @@ void NativeScriptException::ReThrowToJava() {
      */
     auto isolate = Isolate::GetCurrent();
     auto errObj = Local<Value>::New(isolate, *m_javascriptException);
+    Interop::EscapedExceptionInfo escapeInfo;
     if (errObj->IsObject()) {
+      Interop::GetEscapedExceptionInfo(env, errObj.As<Object>(), escapeInfo);
       // A branded interop.escapeException(...) throw carrying an original
       // Java throwable: rethrow it unwrapped, so a native catch of its
       // concrete type still matches (instead of receiving a
-      // com.tns.NativeScriptException wrapper).
-      jthrowable escaped =
-          Interop::ExtractEscapedJavaException(env, errObj.As<Object>());
-      if (escaped != nullptr) {
-        env.Throw(escaped);
+      // com.tns.NativeScriptException wrapper). The JS journey rides along as
+      // a suppressed com.tns.JavaScriptStackTrace, which stack dumps and
+      // crash reporters render automatically.
+      if (escapeInfo.original != nullptr) {
+        Interop::AttachJavaScriptStackTrace(env, escapeInfo.original,
+                                            escapeInfo);
+        env.Throw(escapeInfo.original);
         return;
       }
       auto exObj = TryGetJavaThrowableObject(env, errObj.As<Object>());
@@ -139,6 +143,14 @@ void NativeScriptException::ReThrowToJava() {
                           NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID, (jstring)msg,
                           (jstring)stackTrace, ex));
       }
+    }
+
+    // A branded escape with no underlying Java throwable takes the default
+    // NativeScriptException shape, but its Java stack is the (identical) JNI
+    // boundary machinery - replace it with frames synthesized from the JS
+    // stack so crash reporters group these by where they actually happened.
+    if (escapeInfo.branded && ex != nullptr) {
+      Interop::ApplyJavaScriptFrames(env, ex, escapeInfo);
     }
   } else if (!m_message.empty()) {
     JniLocalRef msg(env.NewStringUTF(m_message.c_str()));

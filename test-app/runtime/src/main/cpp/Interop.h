@@ -25,19 +25,53 @@ namespace tns {
 class Interop {
 public:
     /*
+     * The brand payload of an interop.escapeException(...) error, decoded at
+     * the JS->Java boundary. `original` (a new local reference the caller may
+     * env.Throw() directly) is nullptr for a branded error that carries no
+     * Java throwable - the synthesized-escape case.
+     */
+    struct EscapedExceptionInfo {
+        bool branded = false;
+        jthrowable original = nullptr;
+        std::string name;
+        std::string message;
+        /* The JS stack of the escaped error itself (may be empty). */
+        std::string stack;
+        /* The JS stack of the interop.escapeException(...) call site. */
+        std::string escapeSiteStack;
+    };
+
+    /*
      * Installs the `interop` object on the global. Evaluated once per isolate
      * during PrepareV8Runtime, for both the main and worker isolates.
      */
     static void Init(v8::Local<v8::Context> context);
 
     /*
-     * Returns the original Java throwable carried by a branded
-     * interop.escapeException(...) error, as a new local reference the caller
-     * may env.Throw() directly, or nullptr when `errObj` is not branded or
-     * carries no Java throwable.
+     * Decodes the brand payload of `errObj` into `out`. Returns true when the
+     * object is branded.
      */
-    static jthrowable ExtractEscapedJavaException(JEnv& env,
-                                                  const v8::Local<v8::Object>& errObj);
+    static bool GetEscapedExceptionInfo(JEnv& env,
+                                        const v8::Local<v8::Object>& errObj,
+                                        EscapedExceptionInfo& out);
+
+    /*
+     * Attaches a com.tns.JavaScriptStackTrace carrier to `target` as a
+     * suppressed exception, so the JS journey of an escaped original Java
+     * throwable renders in stack dumps and crash reports. Idempotent (the
+     * Java side skips duplicates).
+     */
+    static void AttachJavaScriptStackTrace(JEnv& env, jthrowable target,
+                                           const EscapedExceptionInfo& info);
+
+    /*
+     * Replaces `target`'s stack trace with frames synthesized from the JS
+     * stack (com.tns.JavaScriptStackTrace.applyFrames), so JS-originated
+     * escapes group by their actual JS frames in crash reporters. Only used
+     * on throwables the runtime itself constructs.
+     */
+    static void ApplyJavaScriptFrames(JEnv& env, jthrowable target,
+                                      const EscapedExceptionInfo& info);
 };
 
 }  // namespace tns
