@@ -3,9 +3,12 @@
 #include <console/Console.h>
 #include <dlfcn.h>
 #include <unistd.h>
+#include <unwind.h>
+#include <cxxabi.h>
 
 #include <chrono>
 #include <csignal>
+#include <cstring>
 #include <mutex>
 #include <sstream>
 #include <thread>
@@ -28,6 +31,7 @@
 #include "SimpleAllocator.h"
 #include "SimpleProfiler.h"
 #include "URLImpl.h"
+#include "HMRSupport.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
 #include "Util.h"
@@ -52,22 +56,122 @@ using namespace tns;
 bool tns::LogEnabled = true;
 SimpleAllocator g_allocator;
 
-void SIG_handler(int sigNumber) {
-  stringstream msg;
-  msg << "JNI Exception occurred (";
-  switch (sigNumber) {
-    case SIGABRT:
-      msg << "SIGABRT";
-      break;
-    case SIGSEGV:
-      msg << "SIGSEGV";
-      break;
-    default:
-      // Shouldn't happen, but for completeness
-      msg << "Signal #" << sigNumber;
-      break;
+namespace {
+struct SigHandlerBacktraceState {
+  void** current;
+  void** end;
+};
+
+// libunwind callback that walks the C++ stack frame-by-frame. Captures the
+// PC for each frame into the passed array up to capacity. Signal-handler
+// safe (does not allocate, does not call into libc beyond the unwinder).
+_Unwind_Reason_Code SigHandlerUnwindCallback(struct _Unwind_Context* ctx, void* arg) {
+  auto* state = static_cast<SigHandlerBacktraceState*>(arg);
+  uintptr_t pc = _Unwind_GetIP(ctx);
+  if (pc) {
+    if (state->current == state->end) {
+      return _URC_END_OF_STACK;
+    }
+    *state->current++ = reinterpret_cast<void*>(pc);
   }
-  msg << ").\n=======\nCheck the 'adb logcat' for additional information about "
+  return _URC_NO_REASON;
+}
+
+// Format one backtrace frame to logcat. We use dladdr to resolve the shared
+// object and symbol; if the symbol is mangled we attempt to demangle.
+// Output looks like:
+//   #07 pc 0x00000000004a8b0c  libNativeScript.so (tns::Runtime::Init+12)
+// Matching the format Android's stock crash dump uses so it's familiar.
+void LogBacktraceFrame(int idx, void* pc) {
+  Dl_info info{};
+  const char* libName = "?";
+  const char* symName = "?";
+  uintptr_t relPc = reinterpret_cast<uintptr_t>(pc);
+  uintptr_t symOff = 0;
+  char* demangled = nullptr;
+
+  if (dladdr(pc, &info) && info.dli_fname) {
+    libName = info.dli_fname;
+    if (info.dli_fbase) {
+      relPc = relPc - reinterpret_cast<uintptr_t>(info.dli_fbase);
+    }
+    if (info.dli_sname) {
+      symName = info.dli_sname;
+      symOff = reinterpret_cast<uintptr_t>(pc) - reinterpret_cast<uintptr_t>(info.dli_saddr);
+      int status = 0;
+      demangled = abi::__cxa_demangle(info.dli_sname, nullptr, nullptr, &status);
+      if (status == 0 && demangled) {
+        symName = demangled;
+      }
+    }
+  }
+
+  __android_log_print(ANDROID_LOG_FATAL, "TNS.Native",
+                      "  #%02d pc 0x%016lx  %s (%s+%lu)", idx,
+                      static_cast<unsigned long>(relPc), libName, symName,
+                      static_cast<unsigned long>(symOff));
+  if (demangled) free(demangled);
+}
+}  // namespace
+
+void SIG_handler(int sigNumber, siginfo_t* sigInfo, void* /*ucontext*/) {
+  // Reset all fatal signal handlers to default IMMEDIATELY. If the body of
+  // this handler itself crashes (e.g. malloc is broken because the original
+  // SEGV was in the allocator), the second signal will kill the process
+  // cleanly and let Android write a proper tombstone, instead of looping
+  // forever between handler and signal.
+  ::signal(SIGABRT, SIG_DFL);
+  ::signal(SIGSEGV, SIG_DFL);
+  ::signal(SIGBUS,  SIG_DFL);
+  ::signal(SIGFPE,  SIG_DFL);
+  ::signal(SIGILL,  SIG_DFL);
+
+  // Async-signal-handler caveats: we intentionally avoid std::stringstream
+  // and other allocating code on the signal stack. __android_log_print and
+  // dladdr are not strictly signal-safe but are reliable on Android in
+  // practice and give us the diagnostic we need.
+  const char* sigName = "UNKNOWN";
+  switch (sigNumber) {
+    case SIGABRT: sigName = "SIGABRT"; break;
+    case SIGSEGV: sigName = "SIGSEGV"; break;
+    case SIGBUS:  sigName = "SIGBUS"; break;
+    case SIGFPE:  sigName = "SIGFPE"; break;
+    case SIGILL:  sigName = "SIGILL"; break;
+    default:      sigName = "Signal"; break;
+  }
+
+  // ── Header (must precede backtrace so it isn't lost when the handler
+  //    throws and unwinds the stack). ──────────────────────────────────
+  __android_log_print(ANDROID_LOG_FATAL, "TNS.Native",
+                      "=== Native crash caught by NativeScript runtime ===");
+  __android_log_print(ANDROID_LOG_FATAL, "TNS.Native",
+                      "signal %d (%s), code %d, fault addr %p, tid %d",
+                      sigNumber, sigName,
+                      sigInfo ? sigInfo->si_code : -1,
+                      sigInfo ? sigInfo->si_addr : nullptr,
+                      static_cast<int>(gettid()));
+
+  // ── C++ backtrace via _Unwind_Backtrace. Capped at 64 frames so we
+  //    never run the signal stack out. ────────────────────────────────
+  constexpr size_t kMaxFrames = 64;
+  void* frames[kMaxFrames] = {};
+  SigHandlerBacktraceState state = {frames, frames + kMaxFrames};
+  _Unwind_Backtrace(&SigHandlerUnwindCallback, &state);
+  const int frameCount = static_cast<int>(state.current - frames);
+  __android_log_print(ANDROID_LOG_FATAL, "TNS.Native",
+                      "backtrace (%d frames):", frameCount);
+  for (int i = 0; i < frameCount; ++i) {
+    LogBacktraceFrame(i, frames[i]);
+  }
+  __android_log_print(ANDROID_LOG_FATAL, "TNS.Native",
+                      "=== end native crash ===");
+
+  // Throw so the JS-side error pipeline still reports the crash.
+  // Note: throwing from a signal handler is technically UB, but the runtime
+  // has relied on it for years and works under libgcc/libunwind+itanium-abi.
+  stringstream msg;
+  msg << "JNI Exception occurred (" << sigName
+      << ").\n=======\nCheck the 'adb logcat' for additional information about "
          "the error.\n=======\n";
   throw NativeScriptException(msg.str());
 }
@@ -106,10 +210,34 @@ void Runtime::Init(JavaVM* vm, void* reserved) {
   // handle SIGABRT/SIGSEGV only on API level > 20 as the handling is not so
   // efficient in older versions
   if (m_androidVersion > 20) {
+    // Install an alternate signal stack BEFORE registering the handler so
+    // that we can still produce a meaningful backtrace even when the crash
+    // was caused by a stack overflow on the main JS thread (the original
+    // stack is full and would deadlock the handler otherwise).
+    // NDK r23+ defines SIGSTKSZ via sysconf so it isn't constexpr — use a
+    // fixed 64 KiB which comfortably covers Android's MINSIGSTKSZ.
+    constexpr size_t kAltStackSize = 64 * 1024;
+    static thread_local char altStackBuf[kAltStackSize];
+    stack_t altStack{};
+    altStack.ss_sp = altStackBuf;
+    altStack.ss_size = kAltStackSize;
+    altStack.ss_flags = 0;
+    sigaltstack(&altStack, nullptr);
+
     struct sigaction action;
-    action.sa_handler = SIG_handler;
+    memset(&action, 0, sizeof(action));
+    sigemptyset(&action.sa_mask);
+    // SA_SIGINFO enables the 3-arg handler so we get siginfo_t (fault addr
+    // and si_code). SA_ONSTACK lets the handler run on an alternate stack
+    // — important so we still produce a useful backtrace if the original
+    // crash was a stack overflow.
+    action.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    action.sa_sigaction = SIG_handler;
     sigaction(SIGABRT, &action, NULL);
     sigaction(SIGSEGV, &action, NULL);
+    sigaction(SIGBUS,  &action, NULL);
+    sigaction(SIGFPE,  &action, NULL);
+    sigaction(SIGILL,  &action, NULL);
   }
   // Set terminate handler for uncaught exceptions
   std::set_terminate(LogAndAbortUncaught);
@@ -271,6 +399,13 @@ Runtime::~Runtime() {
   delete this->m_loopTimer;
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
   if (m_isMainThread) {
+    // Clear process-wide dev-loader state (prewarm cache, cache-bust marks,
+    // boot flag, import map, vendor registry). Main isolate only: workers
+    // share these registries but the main isolate owns their lifetime —
+    // wiping them on worker teardown would race with the live main isolate.
+    tns::CleanupHMRGlobals();
+    tns::CleanupImportMapGlobals();
+
     if (m_mainLooper_fd[0] != -1) {
       ALooper_removeFd(m_mainLooper, m_mainLooper_fd[0]);
     }
@@ -768,6 +903,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "Worker"),
                         workerFuncTemplate);
+
+    // Worker termination for dev tooling is exposed as
+    // `__NS_DEV__.terminateAllWorkers()`, installed by
+    // InitializeHmrDevGlobals below for the main isolate only.
   }
 
   /*
@@ -785,79 +924,23 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
 
-  auto blob_methods = R"js(
-    const BLOB_STORE = new Map();
-    URL.createObjectURL = function (object, options = null) {
-        try {
-            if (object instanceof Blob || object instanceof File) {
-                const id = java.util.UUID.randomUUID().toString();
-                const ret = `blob:nativescript/${id}`;
-                BLOB_STORE.set(ret, {
-                    blob: object,
-                    type: object?.type,
-                    ext: options?.ext,
-                });
-                return ret;
-            }
-        } catch (error) {
-            return null;
-        }
-        return null;
-    };
-    URL.revokeObjectURL = function (url) {
-        BLOB_STORE.delete(url);
-    };
-    const InternalAccessor = class {};
-    InternalAccessor.getData = function (url) {
-        return BLOB_STORE.get(url);
-    };
-    URL.InternalAccessor = InternalAccessor;
-    Object.defineProperty(URL.prototype, 'searchParams', {
-        get() {
-            if (this._searchParams == null) {
-                this._searchParams = new URLSearchParams(this.search);
-                Object.defineProperty(this._searchParams, '_url', {
-                    enumerable: false,
-                    writable: false,
-                    value: this,
-                });
-                this._searchParams._append = this._searchParams.append;
-                this._searchParams.append = function (name, value) {
-                    this._append(name, value);
-                    this._url.search = this.toString();
-                };
-                this._searchParams._delete = this._searchParams.delete;
-                this._searchParams.delete = function (name) {
-                    this._delete(name);
-                    this._url.search = this.toString();
-                };
-                this._searchParams._set = this._searchParams.set;
-                this._searchParams.set = function (name, value) {
-                    this._set(name, value);
-                    this._url.search = this.toString();
-                };
-                this._searchParams._sort = this._searchParams.sort;
-                this._searchParams.sort = function () {
-                    this._sort();
-                    this._url.search = this.toString();
-                };
-            }
-            return this._searchParams;
-        },
-    });
-    )js";
-
   auto global = context->Global();
 
   v8::Context::Scope contextScope{context};
 
-  v8::Local<v8::Script> script;
-  v8::Script::Compile(context,
-                      ArgConverter::ConvertToV8String(isolate, blob_methods))
-      .ToLocal(&script);
+  // Install URL.createObjectURL / URL.revokeObjectURL / blob registry /
+  // URL.searchParams accessor. The script literal lives in `URLImpl` so
+  // it can be shared between runtimes.
+  URLImpl::InstallBlobMethods(context);
 
-  v8::Local<v8::Value> out;
-  script->Run(context).ToLocal(&out);
+  // Install the `__NS_DEV__` dev-loader namespace on EVERY isolate (main
+  // and worker) in EVERY build. The runtime's dev surface is mechanism
+  // only — the security boundary sits at the network layer
+  // (`DevFlags::IsRemoteUrlAllowed`), not at namespace installation; in a
+  // default-config release app the members are inert because every fetch
+  // they could trigger is denied. Workers get the same surface minus
+  // `terminateAllWorkers` (main-isolate only, see CallbackHandlers.h).
+  tns::InitializeHmrDevGlobals(isolate, context, /*isWorker=*/!m_isMainThread);
   m_objectManager->Init(isolate);
 
   m_module.Init(isolate, callingDir);

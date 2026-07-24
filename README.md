@@ -7,6 +7,7 @@ Contains the source code for the NativeScript's Android Runtime. [NativeScript](
 
 - [Main Projects](#main-projects)
 - [Helper Projects](#helper-projects)
+- [SBG vs Runtime Dex Generation](#sbg-vs-runtime-dex-generation)
 - [Architecture Diagram](#architecture-diagram)
 - [Build Prerequisites](#build-prerequisites)
 - [How to build](#how-to-build)
@@ -29,8 +30,114 @@ The repo is structured in the following projects (ordered by dependencies):
 
 ## Helper Projects
 
-* [**android-static-binding-generator**](android-static-binding-generator) - build tool that generates bindings based on the user's javascript code.
+* [**android-static-binding-generator**](android-static-binding-generator) - build tool that generates bindings based on the user's javascript code. See [SBG vs Runtime Dex Generation](#sbg-vs-runtime-dex-generation) for the production vs HMR-dev split.
 * [**project-template**](build-artifacts/project-template-gradle) - this is an empty placeholder Android Application project, used by the [NativeScript CLI](https://github.com/NativeScript/nativescript-cli) when building an Android project.
+
+## SBG vs Runtime Dex Generation
+
+The Android runtime turns every JavaScript `.extend('com.tns.Foo', Bar, { ... })`
+(or `Bar.extend({ ... })`) call into a real Java subclass with a dispatching
+proxy. There are **two** code paths that produce that subclass — a build-time
+path and a runtime path — and which one runs depends on whether the
+`.extend(...)` call site was visible to the Static Binding Generator (SBG)
+when the APK was built.
+
+### Build-time path (production / classic CLI)
+
+[**android-static-binding-generator**](android-static-binding-generator) (SBG)
+runs over the bundled JS once during `nativescript build android`:
+
+1. SBG parses every JS file the bundle includes and finds every
+   `.extend('com.tns.X', BaseClass, { ... })` call (and the modern
+   `BaseClass.extend({ ... })` shorthand).
+2. For each call it asks
+   [**android-binding-generator**](test-app/runtime-binding-generator)'s
+   `ProxyGenerator`/`Dump` to emit a `.dex` for a Java class named
+   `com.tns.gen.<BaseFqn-with-$-as-_>` (or, for `@JavaProxy(...)`-style
+   explicit names, the user-chosen name).
+3. The resulting dex files are packaged into the APK alongside the JS
+   bundle and listed in metadata so the runtime can find them via the
+   classloader.
+
+In production this means the Java class is already present and loadable
+the very first time the JS `.extend(...)` call runs. The runtime never
+generates a fresh dex.
+
+### Runtime path (HMR-dev / dynamic `.extend`)
+
+When SBG can't see the call at build time, the runtime generates the dex
+on demand. This happens in two common shapes:
+
+* **HMR/Vite dev workflow** — the build-time bundle (`bundle.mjs`) is just
+  the HMR bootstrap; modules like
+  `@nativescript/core/ui/frame/fragment.android.ts` are fetched over HTTP
+  at runtime. SBG never sees those `.extend(...)` calls, so no pre-baked
+  dex exists.
+* **`unnamed-extend` use cases** — `eval`-generated extends, or extends
+  whose first argument is computed at runtime, escape the SBG scan even
+  in production builds.
+
+The runtime path is wired through
+[`com.tns.ClassResolver`](test-app/runtime/src/main/java/com/tns/ClassResolver.java)
+→ [`com.tns.DexFactory`](test-app/runtime/src/main/java/com/tns/DexFactory.java):
+
+1. `ClassResolver.resolveClass` first tries `classStorageService.retrieveClass(name)`.
+   In production this hits the SBG-generated dex and we're done.
+2. On `LookedUpClassNotFound` (typical for HMR), if a `baseClassName` is
+   present, `ClassResolver` falls back to `DexFactory.resolveClass(...)`
+   which runs the same `ProxyGenerator`/`Dump` pipeline SBG uses — only
+   it does it at runtime, writes the dex into the app's per-thumb cache
+   under `<dexDir>/<name>.dex`, wraps it in a `.jar`, and loads it via
+   `DexClassLoader` (or `BaseDexClassLoader` injection when the
+   `injectIntoParentClassLoader` flag is on).
+3. Generated proxy class names normalize JVM inner-class `$` to `_`
+   (both in `Dump`'s class signature and in `DexFactory`'s
+   `loadClass(...)` arg). The actual JVM lookup name is always
+   `com.tns.gen.<base-with-$-as-_>` — never `com.tns.gen.<base>$<nested>`.
+
+### Edge cases worth knowing about
+
+* **`$` vs `_` mismatches** — `Class.forName(baseClassName)` requires JVM
+  `$` inner-class syntax (`android.app.Application$ActivityLifecycleCallbacks`),
+  but `classLoader.loadClass(generatedName)` requires the `_`-normalized
+  sibling (`com.tns.gen.android.app.Application_ActivityLifecycleCallbacks`).
+  Both `DexFactory.resolveClass` and `DexFactory.findClass` apply the
+  normalization in the loadable-name path while preserving `$` for the
+  reflective base-class lookup. Removing either normalization
+  reintroduces the "Didn't find class
+  `com.tns.gen.android.app.Application$ActivityLifecycleCallbacks`"
+  ClassNotFoundException for runtime-generated proxies.
+* **Cache invalidation** — the runtime dex cache is keyed on a per-build
+  `dexThumb` (the runtime regenerates it whenever the JS bundle changes).
+  Stale dex from a previous boot is purged in
+  `DexFactory.updateDexThumbAndPurgeCache`. Don't bypass the thumb — a
+  dex generated against an older base class can crash at method dispatch
+  time when the base API drifts.
+* **Parent-classloader injection** — Android framework code that calls
+  `Class.forName(name)` searches the app's `PathClassLoader`, *not* an
+  isolated `DexClassLoader`. When a generated proxy needs to be visible
+  to framework reflection (e.g. `FragmentFactory`, `Activity` resolution
+  from `AndroidManifest.xml`), construct the `DexFactory` with
+  `injectIntoParentClassLoader=true` so its `injectDexIntoClassLoader`
+  helper splices the generated jar's `dexElements` onto the parent's
+  `pathList`.
+* **Don't normalize synthetic module keys** — module registry keys like
+  `ns-vendor://...`, `optional:...`, `node:...`, `blob:...` are not
+  filesystem paths and must be preserved verbatim through invalidation
+  + reload. They are NOT the same kind of "synthetic name" as the
+  `com.tns.gen.<...>` class names above and don't go through this dex
+  pipeline.
+
+### What to look at when this breaks
+
+* `ClassResolver.java` — the fallback decision between
+  `classStorageService` and `DexFactory`.
+* `DexFactory.java` — runtime dex generation, cache, and the
+  `$`→`_` normalization.
+* `ProxyGenerator.java` + `Dump.java` (under `runtime-binding-generator`)
+  — what the generated class actually looks like in bytecode.
+* `android-static-binding-generator` — what SBG sees (and crucially
+  what it *doesn't* see) at build time.
 
 ## Architecture Diagram
 The NativeScript Android Runtime architecture can be summarized in the following diagram. 
