@@ -145,6 +145,9 @@ class Runtime {
         v8::Global<v8::Function>& DispatchRejectionHandledFunc() {
             return m_dispatchRejectionHandledFunc;
         }
+        v8::Global<v8::Function>& DispatchNativeUncaughtErrorFunc() {
+            return m_dispatchNativeUncaughtErrorFunc;
+        }
         PromiseRejectionTracker* PromiseRejections() const {
             return m_promiseRejections.get();
         }
@@ -199,6 +202,7 @@ class Runtime {
         v8::Global<v8::Function> m_dispatchErrorEventFunc;
         v8::Global<v8::Function> m_dispatchUnhandledRejectionFunc;
         v8::Global<v8::Function> m_dispatchRejectionHandledFunc;
+        v8::Global<v8::Function> m_dispatchNativeUncaughtErrorFunc;
         std::unique_ptr<PromiseRejectionTracker> m_promiseRejections;
 
         UncaughtErrorPolicy m_uncaughtErrorPolicy = UncaughtErrorPolicy::Report;

@@ -127,8 +127,17 @@ void ErrorEvents::Init(Local<Context> context) {
         });
         globalTarget.dispatchEvent(ev);
       }
+      function dispatchNativeUncaughtError(error, message, stack) {
+        var ev = new ErrorEvent("nativeuncaughterror", {
+          message: message !== undefined && message !== null ? String(message) : "",
+          error: error,
+          cancelable: true
+        });
+        globalTarget.dispatchEvent(ev);
+        return ev.defaultPrevented;
+      }
 
-      return [dispatchErrorEvent, dispatchUnhandledRejection, dispatchRejectionHandled];
+      return [dispatchErrorEvent, dispatchUnhandledRejection, dispatchRejectionHandled, dispatchNativeUncaughtError];
     })
     )js";
 
@@ -168,16 +177,18 @@ void ErrorEvents::Init(Local<Context> context) {
     }
 
     auto closures = iifeResult.As<Array>();
-    Local<Value> errorFn, rejectionFn, handledFn;
+    Local<Value> errorFn, rejectionFn, handledFn, nativeUncaughtFn;
     if (!closures->Get(context, 0).ToLocal(&errorFn) || !errorFn->IsFunction() ||
         !closures->Get(context, 1).ToLocal(&rejectionFn) || !rejectionFn->IsFunction() ||
-        !closures->Get(context, 2).ToLocal(&handledFn) || !handledFn->IsFunction()) {
+        !closures->Get(context, 2).ToLocal(&handledFn) || !handledFn->IsFunction() ||
+        !closures->Get(context, 3).ToLocal(&nativeUncaughtFn) || !nativeUncaughtFn->IsFunction()) {
         throw NativeScriptException("ErrorEvents::Init: unexpected dispatch closures");
     }
 
     runtime->DispatchErrorEventFunc().Reset(isolate, errorFn.As<Function>());
     runtime->DispatchUnhandledRejectionFunc().Reset(isolate, rejectionFn.As<Function>());
     runtime->DispatchRejectionHandledFunc().Reset(isolate, handledFn.As<Function>());
+    runtime->DispatchNativeUncaughtErrorFunc().Reset(isolate, nativeUncaughtFn.As<Function>());
 }
 
 bool ErrorEvents::DispatchError(Isolate* isolate, Local<Value> error,
@@ -219,6 +230,30 @@ bool ErrorEvents::DispatchUnhandledRejection(Isolate* isolate,
     bool success = dispatch->Call(context, context->Global(), 2, args).ToLocal(&result);
     if (tc.HasCaught()) {
         DEBUG_WRITE_FORCE("ErrorEvents: exception while dispatching `unhandledrejection` event");
+        return false;
+    }
+    return success && !result.IsEmpty() && result->BooleanValue(isolate);
+}
+
+bool ErrorEvents::DispatchNativeUncaughtError(Isolate* isolate,
+                                              Local<Value> error,
+                                              const string& messageString,
+                                              const string& stack) {
+    auto runtime = GetRuntimeOrNull(isolate);
+    if (runtime == nullptr || runtime->DispatchNativeUncaughtErrorFunc().IsEmpty()) {
+        return false;
+    }
+
+    auto context = isolate->GetCurrentContext();
+    auto dispatch = runtime->DispatchNativeUncaughtErrorFunc().Get(isolate);
+    Local<Value> args[] = {error,
+                           ArgConverter::ConvertToV8String(isolate, messageString),
+                           ArgConverter::ConvertToV8String(isolate, stack)};
+    Local<Value> result;
+    TryCatch tc(isolate);
+    bool success = dispatch->Call(context, context->Global(), 3, args).ToLocal(&result);
+    if (tc.HasCaught()) {
+        DEBUG_WRITE_FORCE("ErrorEvents: exception while dispatching `nativeuncaughterror` event");
         return false;
     }
     return success && !result.IsEmpty() && result->BooleanValue(isolate);

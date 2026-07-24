@@ -51,6 +51,19 @@ public:
     static void DispatchRejectionHandled(v8::Isolate* isolate,
                                          v8::Local<v8::Promise> promise,
                                          v8::Local<v8::Value> reason);
+
+    /*
+     * Dispatches the `nativeuncaughterror` ErrorEvent - the native-layer
+     * death notification, fired synchronously from the uncaught-exception
+     * handler for exceptions the JS layer does not own (pure-native crashes,
+     * uncaught escapeException forwards, bootstrap failures). Returns true
+     * when a listener called preventDefault() - best-effort semantics: on
+     * Android it skips the error activity and the default (killing) handler.
+     */
+    static bool DispatchNativeUncaughtError(v8::Isolate* isolate,
+                                            v8::Local<v8::Value> error,
+                                            const std::string& messageString,
+                                            const std::string& stack);
 };
 
 }  // namespace tns

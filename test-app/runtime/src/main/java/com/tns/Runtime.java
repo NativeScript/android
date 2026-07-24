@@ -201,6 +201,13 @@ public class Runtime {
 
     private static AtomicInteger nextRuntimeId = new AtomicInteger(0);
     private final static ThreadLocal<Runtime> currentRuntime = new ThreadLocal<Runtime>();
+    /*
+     * The main (workerId 0) runtime. Fallback reporting target for uncaught
+     * exceptions on threads that have no runtime of their own (see
+     * NativeScriptUncaughtExceptionHandler): entering the main isolate from an
+     * arbitrary crashing thread is safe - the JNI layer takes the v8::Locker.
+     */
+    private static volatile Runtime mainRuntime;
     private final static Map<Integer, Runtime> runtimeCache = new ConcurrentHashMap<>();
     public static boolean nativeLibraryLoaded;
 
@@ -577,10 +584,22 @@ public class Runtime {
             throw t;
         }
 
+        if (runtime.workerId == 0) {
+            mainRuntime = runtime;
+        }
+
         return runtime;
     }
 
-    private boolean isInitializedImpl() {
+    /**
+     * The main runtime, or null before initialization. Used as the reporting
+     * fallback for uncaught exceptions on threads with no runtime of their own.
+     */
+    public static Runtime getMainRuntime() {
+        return mainRuntime;
+    }
+
+    boolean isInitializedImpl() {
         return initialized;
     }
 

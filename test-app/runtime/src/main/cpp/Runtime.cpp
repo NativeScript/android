@@ -561,11 +561,22 @@ jboolean Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj,
                 ArgConverter::jstringToV8String(isolate, jsStackTrace));
   }
 
-  // Give WHATWG `error` event listeners a chance first; preventDefault()
-  // fully handles the report - no __on*Error shim, and the Java caller is
-  // told the exception was handled.
+  // Give WHATWG listeners a chance first; preventDefault() fully handles the
+  // report - no __on*Error shim, and the Java caller is told the exception
+  // was handled. The discard path (a containment variant - the app is alive)
+  // dispatches the `error` event; the uncaught path is the post-mortem
+  // native-layer death notification and dispatches `nativeuncaughterror`,
+  // preserving the invariant that `error` only fires while the failure is
+  // still containable.
   string stackTraceStr = ArgConverter::jstringToString(fullStackTrace);
-  if (ErrorEvents::DispatchError(isolate, errObj, errMsg, stackTraceStr)) {
+  bool prevented;
+  if (isDiscarded == JNI_TRUE) {
+    prevented = ErrorEvents::DispatchError(isolate, errObj, errMsg, stackTraceStr);
+  } else {
+    prevented = ErrorEvents::DispatchNativeUncaughtError(isolate, errObj, errMsg,
+                                                         stackTraceStr);
+  }
+  if (prevented) {
     return JNI_TRUE;
   }
 
@@ -1033,6 +1044,7 @@ void Runtime::DestroyRuntime() {
   m_dispatchErrorEventFunc.Reset();
   m_dispatchUnhandledRejectionFunc.Reset();
   m_dispatchRejectionHandledFunc.Reset();
+  m_dispatchNativeUncaughtErrorFunc.Reset();
   tns::disposeIsolate(m_isolate);
 }
 

@@ -14,6 +14,7 @@ The runtime implements the WHATWG error model at the global level: uncaught Java
 | `throw interop.escapeException(x)` in JS called from Java | Never contained. The original Java `Throwable` carried by `x` is rethrown **unwrapped** to the Java caller (JS trace attached as a suppressed `com.tns.JavaScriptStackTrace`); with no underlying `Throwable`, a `com.tns.NativeScriptException` whose stack trace is the JS frames. |
 | `reportError(x)` | Routed through the same pipeline as an uncaught error; never crashes. |
 | `uncaughtErrorPolicy: "throw"` | Restores the pre-9.1 behavior: unprevented uncaught errors are thrown to the native layer as real Java exceptions (which typically ends the process via the default uncaught-exception handler). |
+| Uncaught **native** exception (a Java thread crashing — pure-native errors, uncaught `escapeException` forwards, bootstrap failures) | Cancelable `nativeuncaughterror` event, dispatched synchronously from the uncaught-exception handler (falling back to the **main runtime** for threads with no runtime of their own) → `__onUncaughtError` hook → error activity in debug → process exits. `preventDefault()` skips the error activity and the killing handler — meaningful for background-thread crashes. |
 
 ## JavaScript API
 
@@ -37,6 +38,19 @@ globalThis.addEventListener("rejectionhandled", (e) => {
   // fired (as a task, on a following looper turn) when a handler is attached
   // to a promise whose rejection was already reported; carries the original
   // reason. Not cancelable.
+});
+
+globalThis.addEventListener("nativeuncaughterror", (e) => {
+  // The native-layer death notification: an uncaught NATIVE exception (a Java
+  // thread crashing) - not a JS error. e.error.nativeException is the original
+  // Throwable. Dispatched synchronously from the uncaught-exception handler;
+  // crashes on threads with no runtime of their own report through the main
+  // runtime. preventDefault() is BEST-EFFORT: on Android it skips the error
+  // activity and the default (killing) handler - realistic for background
+  // threads (the crashed thread itself is gone; a main-thread crash has
+  // already lost its looper). On iOS termination is unavoidable and the
+  // cancel is ignored.
+  crashReporter.capture(e.error);
 });
 ```
 
@@ -198,7 +212,7 @@ Terminal-path decision table:
 
 ## Crash reporter integration
 
-JS side — attach both the JS and native exception from one listener:
+JS side — two listeners with distinct roles: `error` for recoverable JS failures, `nativeuncaughterror` for native-layer deaths. Blanket `preventDefault()` belongs only on the former; suppressing the latter keeps a process alive whose crashed thread is already gone.
 
 ```js
 globalThis.addEventListener("error", (e) => {
@@ -225,6 +239,7 @@ Java side — for exceptions that never pass through the JS event layer (escaped
 - Every error is reported exactly once, at its decision point: the containment boundary, the rejection drain (once per looper turn, scheduled on the runtime's `ALooper`), or `reportError`. Under `"throw"` the report still happens at the decision point and the thrown `NativeScriptException` carries `isReportedToJs()`, which the uncaught-exception handler honors by not reporting again — one event per failure on both platforms.
 - The legacy `stackTrace` property (combined JS + Java frames, a NativeScript extension) is set on the error/reason **before** the event dispatches, so listeners and hooks see the same shape. The standard `e.error.stack` is always there for spec-shaped code.
 - A rejection that gets a handler before the end-of-turn drain is never reported (and produces no `rejectionhandled` either).
-- **Android-only asymmetry:** the `error` event also fires for *pure-native* Java uncaught exceptions — the app-level `NativeScriptUncaughtExceptionHandler` reports any crashing `Throwable` through `passUncaughtExceptionToJs`, with no iOS analogue. `preventDefault()` there suppresses the error activity and the default (killing) handler, but the throwing thread has already unwound — on the main thread the looper is gone, so realistic recovery is limited to background threads.
+- **`error` never lies about recoverability.** The invariant across the whole model: `error`/`unhandledrejection` fire only while the failure is still containable (the app is fully alive, `preventDefault()` really means "handled, continue"); `nativeuncaughterror` fires when the native layer is already dying. The uncaught-exception handler classifies nothing: *everything* that reaches it un-marked — pure-native crashes, uncaught `escapeException` forwards, bootstrap failures — dispatches `nativeuncaughterror`. Exceptions already reported at a `"throw"`-policy decision point (`NativeScriptException.isReportedToJs()`) are skipped entirely.
+- **Runtime-less threads report through the main runtime.** `NativeScriptUncaughtExceptionHandler` falls back to `Runtime.getMainRuntime()` when the crashing thread has no runtime of its own, entering the main isolate cross-thread (the JNI layer takes the `v8::Locker`), so plugin/executor-thread crashes are no longer invisible to JS. The legacy `__onUncaughtError` hook keeps firing for unprevented native crashes (deprecated back-compat — it is what `Application.uncaughtErrorEvent` has received for years).
 - Module/script evaluation (`runModule`/`runScript`, app bootstrap) is not contained — an app whose main module fails to load still fails loudly.
 - Worker isolates run the same machinery: each worker has its own tracker, drain, event layer and containment.

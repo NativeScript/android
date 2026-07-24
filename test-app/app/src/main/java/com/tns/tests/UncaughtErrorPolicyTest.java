@@ -25,4 +25,18 @@ public class UncaughtErrorPolicyTest {
     public static void invoke(Runnable runnable) {
         runnable.run();
     }
+
+    /*
+     * Crashes a brand-new thread that has no runtime of its own: the default
+     * uncaught-exception handler must fall back to the main runtime and
+     * dispatch `nativeuncaughterror` there.
+     */
+    public static void throwOnNewThread(final String message) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                throw new RuntimeException(message);
+            }
+        }).start();
+    }
 }

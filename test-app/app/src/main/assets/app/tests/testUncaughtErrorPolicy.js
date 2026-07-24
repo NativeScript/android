@@ -172,3 +172,96 @@ describe("uncaughtErrorPolicy (default: report)", function () {
     // whose stack trace points at the JS frames. Default-off behavior is
     // covered by every other suite here.
 });
+
+describe("nativeuncaughterror", function () {
+    // The native-layer death notification: fired synchronously from the
+    // uncaught-exception handler for exceptions the JS layer does not own.
+    // preventDefault() is best-effort - on Android it skips the error
+    // activity and the default (killing) handler, which is what keeps the
+    // test runner alive here.
+    var previousUncaughtHook;
+    var uncaught;
+    var addedGlobalListeners;
+
+    beforeEach(function () {
+        previousUncaughtHook = global.__onUncaughtError;
+        uncaught = [];
+        global.__onUncaughtError = function (error) {
+            uncaught.push(error);
+        };
+        addedGlobalListeners = [];
+    });
+
+    afterEach(function () {
+        global.__onUncaughtError = previousUncaughtHook;
+        for (var i = 0; i < addedGlobalListeners.length; i++) {
+            var l = addedGlobalListeners[i];
+            global.removeEventListener(l.type, l.handler);
+        }
+        addedGlobalListeners = [];
+    });
+
+    function onGlobal(type, handler) {
+        global.addEventListener(type, handler);
+        addedGlobalListeners.push({ type: type, handler: handler });
+    }
+
+    function pollUntil(predicate, cb) {
+        var turns = 0;
+        (function poll() {
+            if (predicate() || turns >= 50) {
+                cb();
+                return;
+            }
+            turns++;
+            setTimeout(poll, 10);
+        })();
+    }
+
+    it("fires for a native crash on a runtime-less thread (via the main runtime); preventDefault() spares the process", function (done) {
+        var marker = "native-crash-on-alien-thread";
+        var received = null;
+        var errorEventFired = false;
+
+        onGlobal("nativeuncaughterror", function (e) {
+            if (e.message && e.message.indexOf(marker) !== -1) {
+                received = e;
+                // Best-effort cancel: skip the error activity and the default
+                // (killing) handler. Without this the test runner would die.
+                e.preventDefault();
+            }
+        });
+        onGlobal("error", function (e) {
+            if (e.message && e.message.indexOf(marker) !== -1) {
+                errorEventFired = true;
+            }
+        });
+
+        com.tns.tests.UncaughtErrorPolicyTest.throwOnNewThread(marker);
+
+        pollUntil(function () { return received !== null; }, function () {
+            expect(received).not.toBeNull();
+            expect(received instanceof ErrorEvent).toBe(true);
+            expect(received.type).toBe("nativeuncaughterror");
+            // The event carries the wrapped original Java exception.
+            expect(received.error.nativeException).toBeDefined();
+            expect(received.error.nativeException.getMessage()).toBe(marker);
+            // `error` keeps its still-containable invariant: it never fires
+            // for a native-layer death.
+            expect(errorEventFired).toBe(false);
+            // Prevented, so the legacy hook did not fire either.
+            var hookSaw = false;
+            for (var i = 0; i < uncaught.length; i++) {
+                var err = uncaught[i];
+                if (err && err.message === marker) {
+                    hookSaw = true;
+                    break;
+                }
+            }
+            expect(hookSaw).toBe(false);
+            // And the app survived the background-thread crash.
+            expect(1 + 1).toBe(2);
+            done();
+        });
+    });
+});
