@@ -24,7 +24,12 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 
         boolean handledByJs = false;
 
-        if (Runtime.isInitialized()) {
+        // An uncaughtErrorPolicy: "throw" exception was already fully reported
+        // to JS (event + hook + log) at the throw decision point - reporting
+        // it again here would double-dispatch the same failure.
+        boolean alreadyReportedToJs = ex instanceof NativeScriptException && ((NativeScriptException) ex).isReportedToJs();
+
+        if (Runtime.isInitialized() && !alreadyReportedToJs) {
             try {
                 if (Util.isDebuggableApp(context)) {
                     System.err.println(errorMessage);

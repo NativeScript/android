@@ -1375,6 +1375,10 @@ public class Runtime {
     private static void throwUncaughtJsErrorOnCurrentThread(String message, String stackTrace) {
         final NativeScriptException ex = new NativeScriptException(message, stackTrace, 0);
         JavaScriptStackTrace.applyFrames(ex, stackTrace, null);
+        // The failure was already reported (event + hook + log) at the throw
+        // decision point - the uncaught-exception handler must not report it
+        // a second time.
+        ex.markReportedToJs();
         android.os.Looper looper = android.os.Looper.myLooper();
         if (looper == null) {
             throw ex;

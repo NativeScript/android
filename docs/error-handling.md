@@ -120,6 +120,7 @@ throw interop.escapeException(new java.io.IOException("x"));
 - Otherwise a `com.tns.NativeScriptException` is thrown as usual, but with its stack trace replaced by frames synthesized from the JS stack, so crash reporters group it by where it actually happened in JS.
 - The `escapeException()` call site's stack is recorded too — for non-Error values (`escapeException("boom")`) it is the only stack available.
 - Branded escapes bypass `discardUncaughtJsExceptions` (an explicit forward request must reach the caller).
+- The `interop` global is new in this release with `escapeException` as its only member — shared code targeting older runtimes should feature-detect: `global.interop?.escapeException`.
 
 ## Native (Java) API
 
@@ -174,7 +175,7 @@ One policy key in the app's `package.json` (root level) governs what happens to 
 | `uncaughtErrorPolicy` | Effect |
 |---|---|
 | `"report"` (default) | Report (event → hook → log) and continue. Never crashes. |
-| `"throw"` | After the (cancelable) event, the error is thrown to the native layer as a real Java exception — `com.tns.NativeScriptException` with the JS frames as its stack trace — and reported through the thread's uncaught-exception path. This typically ends the process (the pre-9.1 default), though a native catch or a custom `UncaughtExceptionHandler` above the boundary can still intercept it, which is why the policy names the mechanism, not a guaranteed crash. Unhandled rejections are thrown from a clean frame on the runtime's looper. |
+| `"throw"` | The full report runs first, at the decision point — cancelable event (`preventDefault()` still fully contains the error, same as iOS), then hook and log — and the error is *then* thrown to the native layer as a real Java exception: `com.tns.NativeScriptException` with the JS frames as its stack trace, marked `isReportedToJs()` so the uncaught-exception path does not report the same failure twice. This typically ends the process (the pre-9.1 default), though the policy names the mechanism, not a guaranteed crash. Unhandled rejections are thrown from a clean frame on the runtime's looper. **Cross-platform note:** on Android the sync throw unwinds through the native caller at the method boundary, so a Java `try/catch` above it can intercept; on iOS the rethrow is synchronous (catchable) only at boundaries that report within their own frame (property accessors, adapter reads) — block/overridden-method callbacks and loop-originated errors fall back to a deferred clean-frame throw. Portable code that needs a native-interceptable exception for a *specific* call should use `interop.escapeException`, which behaves identically on both platforms at every boundary; the policy governs unprevented, already-reported errors only. |
 
 Deprecated (kept for the transition, both emit a logcat warning):
 
@@ -189,8 +190,9 @@ Terminal-path decision table:
 |---|---|---|
 | uncaught error, default (`"report"`) | `__onUncaughtError` | no |
 | uncaught error, `"report"` + `discardUncaughtJsExceptions: true` | `__onDiscardedError` | no |
-| uncaught error, listener called `preventDefault()` | none | no |
-| uncaught error / unhandled rejection, `"throw"`, unprevented | `__onUncaughtError` (via the uncaught-exception path) | yes, normally |
+| uncaught error, listener called `preventDefault()` (either policy) | none | no |
+| uncaught error / unhandled rejection, `"throw"`, unprevented | `__onUncaughtError` (at the decision point, before the throw) | yes, normally |
+| uncaught error / unhandled rejection, `"throw"` + `discardUncaughtJsExceptions: true` | `__onDiscardedError` | no (discard disables the throw, matching iOS) |
 | unhandled rejection / `reportError`, `"report"`, unprevented | `__onUncaughtError` | no |
 | unhandled rejection / `reportError`, `preventDefault()` | none | no |
 
@@ -220,7 +222,9 @@ Java side — for exceptions that never pass through the JS event layer (escaped
 
 - **Containment is boundary-outermost.** The runtime tracks the depth of in-flight JS→Java calls; a throw with JS frames waiting below the boundary propagates (so `try { javaApi.call(cb) } catch` works, with the original JS error object restored across the crossing), and is contained only at an outermost native-initiated entry. `interop.escapeException` and `uncaughtErrorPolicy: "throw"` are the two ways an error crosses that outermost boundary.
 - **Contained callbacks return type defaults.** A throwing overridden method hands its Java caller `null` for reference types and `0`/`false` for primitives (the runtime substitutes the default before unboxing, so no `NullPointerException` from the binding). The error is loudly reported *before* the caller resumes, so logcat shows the real failure ahead of any downstream symptom. If the Java contract genuinely needs the exception, use `interop.escapeException`.
-- Every error is reported exactly once: either the containment point, the rejection drain (once per looper turn, scheduled on the runtime's `ALooper`), `reportError`, or — under `"throw"` — the thread's uncaught-exception path. Never two of them for the same error.
+- Every error is reported exactly once, at its decision point: the containment boundary, the rejection drain (once per looper turn, scheduled on the runtime's `ALooper`), or `reportError`. Under `"throw"` the report still happens at the decision point and the thrown `NativeScriptException` carries `isReportedToJs()`, which the uncaught-exception handler honors by not reporting again — one event per failure on both platforms.
+- The legacy `stackTrace` property (combined JS + Java frames, a NativeScript extension) is set on the error/reason **before** the event dispatches, so listeners and hooks see the same shape. The standard `e.error.stack` is always there for spec-shaped code.
 - A rejection that gets a handler before the end-of-turn drain is never reported (and produces no `rejectionhandled` either).
+- **Android-only asymmetry:** the `error` event also fires for *pure-native* Java uncaught exceptions — the app-level `NativeScriptUncaughtExceptionHandler` reports any crashing `Throwable` through `passUncaughtExceptionToJs`, with no iOS analogue. `preventDefault()` there suppresses the error activity and the default (killing) handler, but the throwing thread has already unwound — on the main thread the looper is gone, so realistic recovery is limited to background threads.
 - Module/script evaluation (`runModule`/`runScript`, app bootstrap) is not contained — an app whose main module fails to load still fails loudly.
 - Worker isolates run the same machinery: each worker has its own tracker, drain, event layer and containment.

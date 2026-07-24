@@ -132,6 +132,10 @@ describe("unhandled promise rejections", function () {
             expect(received.type).toBe("unhandledrejection");
             expect(received.reason).toBe(reason);
             expect(typeof received.promise.then).toBe("function");
+            // The drain sets a combined `stackTrace` on the (object) reason
+            // BEFORE dispatching the event, so a listener sees it.
+            expect(typeof received.reason.stackTrace).toBe("string");
+            expect(received.reason.stackTrace.length).toBeGreaterThan(0);
             afterQuietTurns(function () {
                 expect(reportedSeen(reason)).toBe(false);
                 done();

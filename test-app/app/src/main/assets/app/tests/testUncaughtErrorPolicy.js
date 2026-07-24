@@ -73,6 +73,10 @@ describe("uncaughtErrorPolicy (default: report)", function () {
             expect(received).not.toBeNull();
             // The event carries the actual thrown value.
             expect(received.error).toBe(reason);
+            // The combined `stackTrace` string is populated BEFORE dispatch,
+            // so listeners can read it (not only e.error.stack).
+            expect(typeof received.error.stackTrace).toBe("string");
+            expect(received.error.stackTrace.length).toBeGreaterThan(0);
             // Unprevented, so the legacy hook fired too.
             expect(uncaughtSeen(reason)).toBe(true);
             // And the app is still running.

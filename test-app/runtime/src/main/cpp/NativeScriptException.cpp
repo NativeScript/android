@@ -18,6 +18,10 @@ using namespace std;
 using namespace tns;
 using namespace v8;
 
+/* Defined below, next to ContainUncaughtCallbackException. */
+static void MarkReportedToJs(Isolate* isolate, Local<Value> error);
+static bool IsMarkedReportedToJs(Isolate* isolate, Local<Value> error);
+
 NativeScriptException::NativeScriptException(JEnv& env)
     : m_javascriptException(nullptr) {
   m_javaException = JniLocalRef(env.ExceptionOccurred());
@@ -156,6 +160,16 @@ void NativeScriptException::ReThrowToJava() {
       static jfieldID escapedFromJsField =
           env.GetFieldID(NATIVESCRIPTEXCEPTION_CLASS, "escapedFromJs", "Z");
       env.SetBooleanField(ex, escapedFromJsField, JNI_TRUE);
+    }
+
+    // A `uncaughtErrorPolicy: "throw"` propagation whose report already ran
+    // at the boundary: carry the mark so the post-mortem uncaught path does
+    // not report the same failure a second time. `ex` is always a
+    // com.tns.NativeScriptException at this point.
+    if (ex != nullptr && IsMarkedReportedToJs(isolate, errObj)) {
+      static jfieldID reportedToJsField =
+          env.GetFieldID(NATIVESCRIPTEXCEPTION_CLASS, "reportedToJs", "Z");
+      env.SetBooleanField(ex, reportedToJsField, JNI_TRUE);
     }
   } else if (!m_message.empty()) {
     JniLocalRef msg(env.NewStringUTF(m_message.c_str()));
@@ -324,27 +338,37 @@ void NativeScriptException::ReportUnhandledRejection(Isolate* isolate,
                                                      Local<Promise> promise,
                                                      Local<Value> reason,
                                                      const string& stackTrace) {
+  // Populate the legacy `stackTrace` property before dispatch so event
+  // listeners see the same shape the hooks do (matches the sync path).
+  if (reason->IsObject() && !stackTrace.empty()) {
+    auto context = isolate->GetCurrentContext();
+    reason.As<Object>()
+        ->Set(context, V8StringConstants::GetStackTrace(isolate),
+              ArgConverter::ConvertToV8String(isolate, stackTrace))
+        .FromMaybe(false);
+  }
+
   if (ErrorEvents::DispatchUnhandledRejection(isolate, promise, reason)) {
     return;
   }
 
   auto runtime = GetRuntimeOrNull(isolate);
-  if (runtime != nullptr &&
+  bool discard =
+      runtime != nullptr && runtime->GetDiscardUncaughtJsExceptions();
+  ReportFatalTail(isolate, reason, stackTrace, "Unhandled promise rejection:",
+                  discard ? JNI_TRUE : JNI_FALSE);
+
+  // The report is complete (event + hook + log, exactly once). Under the
+  // "throw" policy the rejection is additionally handed to the native layer;
+  // the thrown exception is marked reported-to-JS so the post-mortem
+  // uncaught path does not report it a second time. The deprecated discard
+  // flag disables the throw, matching iOS.
+  if (runtime != nullptr && !discard &&
       runtime->GetUncaughtErrorPolicy() == Runtime::UncaughtErrorPolicy::Throw) {
-    // Hand the rejection to the native layer; the post-mortem uncaught path
-    // performs the (single) report, exactly as for a sync uncaught error.
     string message =
         "Unhandled promise rejection: " + ToDetailString(isolate, reason);
     ThrowUncaughtJsErrorToJava(message, stackTrace);
-    return;
   }
-
-  jboolean isDiscarded =
-      (runtime != nullptr && runtime->GetDiscardUncaughtJsExceptions())
-          ? JNI_TRUE
-          : JNI_FALSE;
-  ReportFatalTail(isolate, reason, stackTrace, "Unhandled promise rejection:",
-                  isDiscarded);
 }
 
 void NativeScriptException::ReportFatalTail(Isolate* isolate,
@@ -389,6 +413,38 @@ void NativeScriptException::ReportFatalTail(Isolate* isolate,
   }
 }
 
+/*
+ * Marks a JS error value whose report already ran (event + hook + log), via
+ * an isolate-private symbol. ReThrowToJava carries the mark over to the Java
+ * com.tns.NativeScriptException so the post-mortem uncaught-exception path
+ * does not report the same failure a second time.
+ */
+static Local<Private> GetReportedToJsBrand(Isolate* isolate) {
+  return Private::ForApi(
+      isolate, ArgConverter::ConvertToV8String(isolate, "tns::reportedToJs"));
+}
+
+static void MarkReportedToJs(Isolate* isolate, Local<Value> error) {
+  if (!error->IsObject()) {
+    return;
+  }
+  auto context = isolate->GetCurrentContext();
+  error.As<Object>()
+      ->SetPrivate(context, GetReportedToJsBrand(isolate),
+                   v8::True(isolate))
+      .FromMaybe(false);
+}
+
+static bool IsMarkedReportedToJs(Isolate* isolate, Local<Value> error) {
+  if (!error->IsObject()) {
+    return false;
+  }
+  auto context = isolate->GetCurrentContext();
+  return error.As<Object>()
+      ->HasPrivate(context, GetReportedToJsBrand(isolate))
+      .FromMaybe(false);
+}
+
 bool NativeScriptException::ContainUncaughtCallbackException(Isolate* isolate,
                                                              v8::TryCatch& tc) {
   auto runtime = GetRuntimeOrNull(isolate);
@@ -409,7 +465,7 @@ bool NativeScriptException::ContainUncaughtCallbackException(Isolate* isolate,
   }
 
   // Branded interop.escapeException: an explicit forward to the native
-  // caller - never contained.
+  // caller - never contained, never reported here.
   if (error->IsObject()) {
     JEnv env;
     Interop::EscapedExceptionInfo escapeInfo;
@@ -421,14 +477,10 @@ bool NativeScriptException::ContainUncaughtCallbackException(Isolate* isolate,
     }
   }
 
-  if (runtime->GetUncaughtErrorPolicy() == Runtime::UncaughtErrorPolicy::Throw) {
-    // Pre-9.1 semantics: the exception is thrown to the Java caller and the
-    // post-mortem uncaught-exception path performs the (single) report.
-    return false;
-  }
-
-  // Contain: report through the WHATWG pipeline (`error` event -> legacy
-  // hook -> log) and let the caller resume with a default value.
+  // Report through the WHATWG pipeline at the decision point, for both
+  // policies (same sequence as iOS): `error` event first - preventDefault()
+  // fully contains the error even under the "throw" policy - then the legacy
+  // hook and log.
   string errorMessage;
   string stackTrace;
   auto message = tc.Message();
@@ -440,18 +492,40 @@ bool NativeScriptException::ContainUncaughtCallbackException(Isolate* isolate,
     stackTrace = GetStackTraceOfValue(isolate, error);
   }
 
+  // Populate the legacy `stackTrace` property before dispatch so event
+  // listeners see the same shape the hooks do.
+  if (error->IsObject() && !stackTrace.empty()) {
+    auto context = isolate->GetCurrentContext();
+    error.As<Object>()
+        ->Set(context, V8StringConstants::GetStackTrace(isolate),
+              ArgConverter::ConvertToV8String(isolate, stackTrace))
+        .FromMaybe(false);
+  }
+
+  bool discard = runtime->GetDiscardUncaughtJsExceptions();
   {
     // A throwing listener or hook must not escape into the caller.
     v8::TryCatch reportTc(isolate);
-    if (!ErrorEvents::DispatchError(isolate, error, errorMessage, stackTrace)) {
-      jboolean isDiscarded =
-          runtime->GetDiscardUncaughtJsExceptions() ? JNI_TRUE : JNI_FALSE;
-      ReportFatalTail(isolate, error, stackTrace, "", isDiscarded);
+    if (ErrorEvents::DispatchError(isolate, error, errorMessage, stackTrace)) {
+      tc.Reset();
+      return true;
     }
+    ReportFatalTail(isolate, error, stackTrace, "",
+                    discard ? JNI_TRUE : JNI_FALSE);
     if (reportTc.HasCaught()) {
       DEBUG_WRITE_FORCE(
           "ContainUncaughtCallbackException: exception while reporting");
     }
+  }
+
+  // The report is complete (exactly once). Under the "throw" policy the
+  // exception is additionally propagated to the Java caller, marked so the
+  // post-mortem uncaught path skips re-reporting. The deprecated discard
+  // flag disables the throw, matching iOS.
+  if (!discard &&
+      runtime->GetUncaughtErrorPolicy() == Runtime::UncaughtErrorPolicy::Throw) {
+    MarkReportedToJs(isolate, error);
+    return false;
   }
 
   tc.Reset();
@@ -636,6 +710,16 @@ void PromiseRejectionTracker::Drain() {
                                 : entry.reason.Get(isolate);
 
       string stackTrace = GetStackTraceOfValue(isolate, reason);
+
+      // Populate the legacy `stackTrace` property before dispatch so event
+      // listeners see it - covers both the worker and main branches below
+      // (ReportUnhandledRejection's own set is idempotent).
+      if (reason->IsObject() && !stackTrace.empty()) {
+        reason.As<Object>()
+            ->Set(context, V8StringConstants::GetStackTrace(isolate),
+                  ArgConverter::ConvertToV8String(isolate, stackTrace))
+            .FromMaybe(false);
+      }
 
       if (workerWrapper != nullptr) {
         // Dispatch the rejection event on the worker's own global first;

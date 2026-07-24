@@ -12,9 +12,26 @@ public class NativeScriptException extends RuntimeException {
      * discardUncaughtJsExceptions handling.
      */
     private boolean escapedFromJs = false;
+    /*
+     * Set (natively or by the runtime) when this exception's failure was
+     * already reported to JS (error/unhandledrejection event, hooks, log) at
+     * the uncaughtErrorPolicy: "throw" decision point. Custom
+     * Thread.UncaughtExceptionHandler implementations should skip
+     * Runtime.passUncaughtExceptionToJs for such exceptions so the failure
+     * is not reported twice.
+     */
+    private boolean reportedToJs = false;
 
     boolean isEscapedFromJs() {
         return escapedFromJs;
+    }
+
+    void markReportedToJs() {
+        reportedToJs = true;
+    }
+
+    public boolean isReportedToJs() {
+        return reportedToJs;
     }
 
     public NativeScriptException() {
