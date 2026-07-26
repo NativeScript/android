@@ -1,7 +1,8 @@
 # V8 10.3 → 14.9 migration notes (Android)
 
-Pinned version: **14.9.207.39** (`branch-heads/14.9`), see `tools/v8/fetch_v8.sh`.
-Built with `tools/v8/build_v8_source.sh`. The iOS runtime moved to the same
+Pinned version: **14.9.207.39** (`branch-heads/14.9`).
+The libraries are built by [NativeScript/v8-buildscripts](https://github.com/NativeScript/v8-buildscripts)
+and installed here by `download_v8.sh` from the release pinned in `V8_RELEASE`. The iOS runtime moved to the same
 version; where the two runtimes hit the same API change the notes are kept in
 sync.
 
@@ -10,8 +11,8 @@ sync.
 `libv8_monolith.a` per ABI under `test-app/runtime/src/main/libs/<abi>/`, plus
 the public headers under `test-app/runtime/src/main/cpp/include/` and the
 vendored V8 internals under `test-app/runtime/src/main/cpp/v8_inspector/`.
-All three come out of `build_v8_source.sh`; they are a matched set and must be
-updated together.
+All three come from the same release artifact; they are a matched set and
+must never be updated separately.
 
 ## Build configuration
 
@@ -46,7 +47,7 @@ new, and why:
 - **`android_ndk_root`** pinned to the NDK the runtime is built with — see
   below.
 
-`build_v8_source.sh` deletes the output directory before each build. ninja never
+The build deletes its output directory before each run. ninja never
 removes outputs orphaned by a config change, so reusing one across V8 versions
 silently keeps stale objects, and the packaging step would vendor them.
 
@@ -76,14 +77,14 @@ the assert. It also lowers `min_supported_sdk_version` from 23 to 21; that floor
 exists for Java/dex tooling and this build produces only the native
 `v8_monolith` target.
 
-Two things the macOS clang package does not carry, both handled by `fetch_v8.sh`:
+Two things the macOS clang package does not carry, both handled by buildscripts' `fetch_v8.sh`:
 
 - the Android **compiler-rt builtins** (`libclang_rt.builtins-*-android.a`),
   which only the Linux clang package bundles — they are extracted from it;
 - a `darwin-x86_64` directory in the CIPD NDK, which only ships `linux-x86_64` —
   symlinked (only relevant when `android_ndk_root` is left at its default).
 
-Because two of the four ABIs cannot be rebuilt locally, the gradle builds accept
+Because not every ABI can be rebuilt on every host, the gradle builds accept
 `-Pabis=arm64-v8a,x86_64` to restrict `abiFilters` to the ones that have a
 current `libv8_monolith.a`.
 
@@ -187,8 +188,8 @@ read the flags out of the Java config by then.
 
 - **Resurrecting finalizers.** `ObjectManager` uses
   `WeakCallbackType::kFinalizer` in four places. Upstream removed it right after
-  10.3.22; `tools/v8/v8_resurrecting_finalizers.patch` restores it. See the iOS
-  runtime's `V8_RESURRECTING_FINALIZERS.md` for the patch design.
+  10.3.22; buildscripts' `v8_resurrecting_finalizers.patch` restores it. See
+  the iOS runtime's `V8_RESURRECTING_FINALIZERS.md` for the patch design.
 - **Teardown disposal.** The runtime never used
   `Isolate::VisitHandlesWithClassIds` or `SetWrapperClassId`, so the registry
   the iOS runtime had to grow is not needed here.
