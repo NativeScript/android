@@ -5,7 +5,11 @@
 #ifndef INCLUDE_V8_TEMPLATE_H_
 #define INCLUDE_V8_TEMPLATE_H_
 
+#include <cstddef>
+#include <string_view>
+
 #include "v8-data.h"               // NOLINT(build/include_directory)
+#include "v8-exception.h"          // NOLINT(build/include_directory)
 #include "v8-function-callback.h"  // NOLINT(build/include_directory)
 #include "v8-local-handle.h"       // NOLINT(build/include_directory)
 #include "v8-memory-span.h"        // NOLINT(build/include_directory)
@@ -14,7 +18,6 @@
 
 namespace v8 {
 
-class AccessorSignature;
 class CFunction;
 class FunctionTemplate;
 class ObjectTemplate;
@@ -31,7 +34,9 @@ class Signature;
   F(AsyncIteratorPrototype, initial_async_iterator_prototype) \
   F(ErrorPrototype, initial_error_prototype)                  \
   F(IteratorPrototype, initial_iterator_prototype)            \
-  F(ObjProto_valueOf, object_value_of_function)
+  F(MapIteratorPrototype, initial_map_iterator_prototype)     \
+  F(ObjProto_valueOf, object_value_of_function)               \
+  F(SetIteratorPrototype, initial_set_iterator_prototype)
 
 enum Intrinsic {
 #define V8_DECL_INTRINSIC(name, iname) k##name,
@@ -56,69 +61,71 @@ class V8_EXPORT Template : public Data {
   V8_INLINE void Set(Isolate* isolate, const char* name, Local<Data> value,
                      PropertyAttribute attributes = None);
 
-  void SetAccessorProperty(
-      Local<Name> name,
-      Local<FunctionTemplate> getter = Local<FunctionTemplate>(),
-      Local<FunctionTemplate> setter = Local<FunctionTemplate>(),
-      PropertyAttribute attribute = None, AccessControl settings = DEFAULT);
-
   /**
+   * Sets an "accessor property" on the object template, see
+   * https://tc39.es/ecma262/#sec-object-type.
+   *
    * Whenever the property with the given name is accessed on objects
-   * created from this Template the getter and setter callbacks
-   * are called instead of getting and setting the property directly
-   * on the JavaScript object.
+   * created from this ObjectTemplate the getter and setter functions
+   * are called.
    *
    * \param name The name of the property for which an accessor is added.
    * \param getter The callback to invoke when getting the property.
    * \param setter The callback to invoke when setting the property.
-   * \param data A piece of data that will be passed to the getter and setter
-   *   callbacks whenever they are invoked.
-   * \param settings Access control settings for the accessor. This is a bit
-   *   field consisting of one of more of
-   *   DEFAULT = 0, ALL_CAN_READ = 1, or ALL_CAN_WRITE = 2.
-   *   The default is to not allow cross-context access.
-   *   ALL_CAN_READ means that all cross-context reads are allowed.
-   *   ALL_CAN_WRITE means that all cross-context writes are allowed.
-   *   The combination ALL_CAN_READ | ALL_CAN_WRITE can be used to allow all
-   *   cross-context access.
    * \param attribute The attributes of the property for which an accessor
    *   is added.
-   * \param signature The signature describes valid receivers for the accessor
-   *   and is used to perform implicit instance checks against them. If the
-   *   receiver is incompatible (i.e. is not an instance of the constructor as
-   *   defined by FunctionTemplate::HasInstance()), an implicit TypeError is
-   *   thrown and no callback is invoked.
    */
-  V8_DEPRECATED("Do signature check in accessor")
-  void SetNativeDataProperty(
-      Local<String> name, AccessorGetterCallback getter,
-      AccessorSetterCallback setter, Local<Value> data,
-      PropertyAttribute attribute, Local<AccessorSignature> signature,
-      AccessControl settings = DEFAULT,
-      SideEffectType getter_side_effect_type = SideEffectType::kHasSideEffect,
-      SideEffectType setter_side_effect_type = SideEffectType::kHasSideEffect);
-  V8_DEPRECATED("Do signature check in accessor")
+  void SetAccessorProperty(
+      Local<Name> name,
+      Local<FunctionTemplate> getter = Local<FunctionTemplate>(),
+      Local<FunctionTemplate> setter = Local<FunctionTemplate>(),
+      PropertyAttribute attribute = None);
+
+  /**
+   * Sets a "data property" on the object template, see
+   * https://tc39.es/ecma262/#sec-object-type.
+   *
+   * Whenever the property with the given name is accessed on objects
+   * created from this Template the getter and setter callbacks
+   * are called instead of getting and setting the property directly
+   * on the JavaScript object.
+   * Note that in case a property is written via a "child" object, the setter
+   * will not be called according to the JavaScript specification. See
+   * https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-set-p-v-receiver.
+   *
+   * \param name The name of the data property for which an accessor is added.
+   * \param getter The callback to invoke when getting the property.
+   * \param setter The callback to invoke when setting the property.
+   * \param data A piece of data that will be passed to the getter and setter
+   *   callbacks whenever they are invoked.
+   * \param attribute The attributes of the property for which an accessor
+   *   is added.
+   */
   void SetNativeDataProperty(
       Local<Name> name, AccessorNameGetterCallback getter,
-      AccessorNameSetterCallback setter, Local<Value> data,
-      PropertyAttribute attribute, Local<AccessorSignature> signature,
-      AccessControl settings = DEFAULT,
+      AccessorNameSetterCallbackV2 setter, Local<Value> data = Local<Value>(),
+      PropertyAttribute attribute = None,
       SideEffectType getter_side_effect_type = SideEffectType::kHasSideEffect,
       SideEffectType setter_side_effect_type = SideEffectType::kHasSideEffect);
-  void SetNativeDataProperty(
-      Local<String> name, AccessorGetterCallback getter,
-      AccessorSetterCallback setter = nullptr,
-      Local<Value> data = Local<Value>(), PropertyAttribute attribute = None,
-      AccessControl settings = DEFAULT,
-      SideEffectType getter_side_effect_type = SideEffectType::kHasSideEffect,
-      SideEffectType setter_side_effect_type = SideEffectType::kHasSideEffect);
+  V8_DEPRECATE_SOON("Use AccessorNameSetterCallbackV2 setter instead")
   void SetNativeDataProperty(
       Local<Name> name, AccessorNameGetterCallback getter,
-      AccessorNameSetterCallback setter = nullptr,
-      Local<Value> data = Local<Value>(), PropertyAttribute attribute = None,
-      AccessControl settings = DEFAULT,
+      AccessorNameSetterCallback setter, Local<Value> data = Local<Value>(),
+      PropertyAttribute attribute = None,
       SideEffectType getter_side_effect_type = SideEffectType::kHasSideEffect,
       SideEffectType setter_side_effect_type = SideEffectType::kHasSideEffect);
+  // TODO(https://crbug.com/348660658): remove once AccessorNameSetterCallback
+  // is removed.
+  void SetNativeDataProperty(
+      Local<Name> name, AccessorNameGetterCallback getter,
+      std::nullptr_t setter = nullptr, Local<Value> data = Local<Value>(),
+      PropertyAttribute attribute = None,
+      SideEffectType getter_side_effect_type = SideEffectType::kHasSideEffect,
+      SideEffectType setter_side_effect_type = SideEffectType::kHasSideEffect) {
+    SetNativeDataProperty(
+        name, getter, static_cast<AccessorNameSetterCallbackV2>(setter), data,
+        attribute, getter_side_effect_type, setter_side_effect_type);
+  }
 
   /**
    * Like SetNativeDataProperty, but V8 will replace the native data property
@@ -144,26 +151,39 @@ class V8_EXPORT Template : public Data {
   friend class FunctionTemplate;
 };
 
-// TODO(dcarney): Replace GenericNamedPropertyFooCallback with just
-// NamedPropertyFooCallback.
+/**
+ * Interceptor callbacks use this value to indicate whether the request was
+ * intercepted or not.
+ *
+ * The values for constants and type are chosen this way for better
+ * performance.
+ */
+enum class Intercepted : uint32_t { kNo = 1, kYes = 0 };
 
 /**
- * Interceptor for get requests on an object.
+ * Interceptor for [[Get]] requests on an object.
  *
- * Use `info.GetReturnValue().Set()` to set the return value of the
- * intercepted get request.
+ * If the interceptor handles the request (i.e. the property should not be
+ * looked up beyond the interceptor or in case an exception was thrown) it
+ * should
+ *  - (optionally) use info.GetReturnValue().Set()` to set the return value
+ *    (by default the result is set to v8::Undefined),
+ *  - return `Intercepted::kYes`.
+ * If the interceptor does not handle the request it must return
+ * `Intercepted::kNo` and it must not produce side effects.
  *
  * \param property The name of the property for which the request was
  * intercepted.
  * \param info Information about the intercepted request, such as
- * isolate, receiver, return value, or whether running in `'use strict`' mode.
- * See `PropertyCallbackInfo`.
+ * isolate, object holding the property, return value. See
+ * `PropertyCallbackInfo`.
  *
  * \code
- *  void GetterCallback(
- *    Local<Name> name,
- *    const v8::PropertyCallbackInfo<v8::Value>& info) {
- *      info.GetReturnValue().Set(v8_num(42));
+ *  Intercepted GetterCallback(
+ *      Local<Name> name, const v8::PropertyCallbackInfo<v8::Value>& info) {
+ *    if (!IsKnownProperty(info.GetIsolate(), name)) return Intercepted::kNo;
+ *    info.GetReturnValue().Set(v8_num(42));
+ *    return Intercepted::kYes;
  *  }
  *
  *  v8::Local<v8::FunctionTemplate> templ =
@@ -183,41 +203,56 @@ class V8_EXPORT Template : public Data {
  *
  * See also `ObjectTemplate::SetHandler`.
  */
-using GenericNamedPropertyGetterCallback =
-    void (*)(Local<Name> property, const PropertyCallbackInfo<Value>& info);
+using NamedPropertyGetterCallback = Intercepted (*)(
+    Local<Name> property, const PropertyCallbackInfo<Value>& info);
 
 /**
- * Interceptor for set requests on an object.
+ * Interceptor for [[Set]] requests on an object.
  *
- * Use `info.GetReturnValue()` to indicate whether the request was intercepted
- * or not. If the setter successfully intercepts the request, i.e., if the
- * request should not be further executed, call
- * `info.GetReturnValue().Set(value)`. If the setter
- * did not intercept the request, i.e., if the request should be handled as
- * if no interceptor is present, do not not call `Set()`.
+ * If the interceptor handles the request (i.e. the property should not be
+ * looked up beyond the interceptor or in case an exception was thrown) it
+ * should
+ *  - use `info.GetReturnValue().Set(false)` to indicate that the operation
+ *    failed,
+ *  - (optionally) upon operation failure and info.ShouldThrowOnError()
+ *    is true (indicating execution in `'use strict'` mode) the callback can
+ *    throw TypeError if the error message needs to include more details than
+ *    a TypeError thrown by V8 in this case,
+ *  - return `Intercepted::kYes`.
+ * If the interceptor does not handle the request it must return
+ * `Intercepted::kNo` and it must not produce side effects.
  *
  * \param property The name of the property for which the request was
  * intercepted.
  * \param value The value which the property will have if the request
  * is not intercepted.
  * \param info Information about the intercepted request, such as
- * isolate, receiver, return value, or whether running in `'use strict'` mode.
- * See `PropertyCallbackInfo`.
+ * isolate, object holding the property, return value, or whether running in
+ * `'use strict'` mode. See `PropertyCallbackInfo`.
  *
- * See also
- * `ObjectTemplate::SetHandler.`
+ * See also `ObjectTemplate::SetHandler.`
  */
-using GenericNamedPropertySetterCallback =
-    void (*)(Local<Name> property, Local<Value> value,
-             const PropertyCallbackInfo<Value>& info);
+using NamedPropertySetterCallbackV2 =
+    Intercepted (*)(Local<Name> property, Local<Value> value,
+                    const PropertyCallbackInfo<Boolean>& info);
+// TODO(https://crbug.com/348660658): deprecate and remove.
+using NamedPropertySetterCallback =
+    Intercepted (*)(Local<Name> property, Local<Value> value,
+                    const PropertyCallbackInfo<void>& info);
 
 /**
- * Intercepts all requests that query the attributes of the
- * property, e.g., getOwnPropertyDescriptor(), propertyIsEnumerable(), and
- * defineProperty().
+ * Intercepts all requests that query the attributes of the property,
+ * e.g. [[GetOwnProperty]], [[DefineOwnProperty]], [[Set]] and derived ones
+ * like Object.prototype.propertyIsEnumerable() and similar.
  *
- * Use `info.GetReturnValue().Set(value)` to set the property attributes. The
- * value is an integer encoding a `v8::PropertyAttribute`.
+ * If the interceptor handles the request (i.e. the property should not be
+ * looked up beyond the interceptor or in case an exception was thrown) it
+ * should
+ *  - (optionally) use `info.GetReturnValue().Set()` to set to an Integer
+ *    value encoding a `v8::PropertyAttribute` bits,
+ *  - return `Intercepted::kYes`.
+ * If the interceptor does not handle the request it must return
+ * `Intercepted::kNo` and it must not produce side effects.
  *
  * \param property The name of the property for which the request was
  * intercepted.
@@ -229,35 +264,37 @@ using GenericNamedPropertySetterCallback =
  * they do not return the attributes. For example, `hasOwnProperty()` can
  * trigger this interceptor depending on the state of the object.
  *
- * See also
- * `ObjectTemplate::SetHandler.`
+ * See also `ObjectTemplate::SetHandler.`
  */
-using GenericNamedPropertyQueryCallback =
-    void (*)(Local<Name> property, const PropertyCallbackInfo<Integer>& info);
+using NamedPropertyQueryCallback = Intercepted (*)(
+    Local<Name> property, const PropertyCallbackInfo<Integer>& info);
 
 /**
- * Interceptor for delete requests on an object.
+ * Interceptor for [[Delete]] requests on an object.
  *
- * Use `info.GetReturnValue()` to indicate whether the request was intercepted
- * or not. If the deleter successfully intercepts the request, i.e., if the
- * request should not be further executed, call
- * `info.GetReturnValue().Set(value)` with a boolean `value`. The `value` is
- * used as the return value of `delete`.
+ * If the interceptor handles the request (i.e. the property should not be
+ * looked up beyond the interceptor or in case an exception was thrown) it
+ * should
+ *  - use `info.GetReturnValue().Set(false)` to indicate that the operation
+ *    failed,
+ *  - (optionally) upon operation failure and info.ShouldThrowOnError()
+ *    is true (indicating execution in `'use strict'` mode) the callback can
+ *    throw TypeError if the error message needs to include more details than
+ *    a TypeError thrown by V8 in this case,
+ *  - return `Intercepted::kYes`.
+ * If the interceptor does not handle the request it must return
+ * `Intercepted::kNo` and it must not produce side effects.
  *
  * \param property The name of the property for which the request was
  * intercepted.
  * \param info Information about the intercepted request, such as
- * isolate, receiver, return value, or whether running in `'use strict'` mode.
- * See `PropertyCallbackInfo`.
- *
- * \note If you need to mimic the behavior of `delete`, i.e., throw in strict
- * mode instead of returning false, use `info.ShouldThrowOnError()` to determine
- * if you are in strict mode.
+ * isolate, object holding the property, return value, or whether running in
+ * `'use strict'` mode. See `PropertyCallbackInfo`.
  *
  * See also `ObjectTemplate::SetHandler.`
  */
-using GenericNamedPropertyDeleterCallback =
-    void (*)(Local<Name> property, const PropertyCallbackInfo<Boolean>& info);
+using NamedPropertyDeleterCallback = Intercepted (*)(
+    Local<Name> property, const PropertyCallbackInfo<Boolean>& info);
 
 /**
  * Returns an array containing the names of the properties the named
@@ -265,40 +302,55 @@ using GenericNamedPropertyDeleterCallback =
  *
  * Note: The values in the array must be of type v8::Name.
  */
-using GenericNamedPropertyEnumeratorCallback =
+using NamedPropertyEnumeratorCallback =
     void (*)(const PropertyCallbackInfo<Array>& info);
 
 /**
- * Interceptor for defineProperty requests on an object.
+ * Interceptor for [[DefineOwnProperty]] requests on an object.
  *
- * Use `info.GetReturnValue()` to indicate whether the request was intercepted
- * or not. If the definer successfully intercepts the request, i.e., if the
- * request should not be further executed, call
- * `info.GetReturnValue().Set(value)`. If the definer
- * did not intercept the request, i.e., if the request should be handled as
- * if no interceptor is present, do not not call `Set()`.
+ * If the interceptor handles the request (i.e. the property should not be
+ * looked up beyond the interceptor or in case an exception was thrown) it
+ * should
+ *  - use `info.GetReturnValue().Set(false)` to indicate that the operation
+ *    failed,
+ *  - (optionally) upon operation failure and info.ShouldThrowOnError()
+ *    is true (indicating execution in `'use strict'` mode) the callback can
+ *    throw TypeError if the error message needs to include more details than
+ *    a TypeError thrown by V8 in this case,
+ *  - return `Intercepted::kYes`.
+ * If the interceptor does not handle the request it must return
+ * `Intercepted::kNo` and it must not produce side effects.
  *
  * \param property The name of the property for which the request was
  * intercepted.
  * \param desc The property descriptor which is used to define the
  * property if the request is not intercepted.
  * \param info Information about the intercepted request, such as
- * isolate, receiver, return value, or whether running in `'use strict'` mode.
- * See `PropertyCallbackInfo`.
+ * isolate, object holding the property, return value, or whether running in
+ * `'use strict'` mode. See `PropertyCallbackInfo`.
  *
  * See also `ObjectTemplate::SetHandler`.
  */
-using GenericNamedPropertyDefinerCallback =
-    void (*)(Local<Name> property, const PropertyDescriptor& desc,
-             const PropertyCallbackInfo<Value>& info);
+using NamedPropertyDefinerCallbackV2 =
+    Intercepted (*)(Local<Name> property, const PropertyDescriptor& desc,
+                    const PropertyCallbackInfo<Boolean>& info);
+// TODO(https://crbug.com/348660658): deprecate and remove.
+using NamedPropertyDefinerCallback =
+    Intercepted (*)(Local<Name> property, const PropertyDescriptor& desc,
+                    const PropertyCallbackInfo<void>& info);
 
 /**
- * Interceptor for getOwnPropertyDescriptor requests on an object.
+ * Interceptor for [[GetOwnProperty]] requests on an object.
  *
- * Use `info.GetReturnValue().Set()` to set the return value of the
- * intercepted request. The return value must be an object that
- * can be converted to a PropertyDescriptor, e.g., a `v8::value` returned from
- * `v8::Object::getOwnPropertyDescriptor`.
+ * If the interceptor handles the request (i.e. the property should not be
+ * looked up beyond the interceptor or in case an exception was thrown) it
+ * should
+ *  - (optionally) use `info.GetReturnValue().Set()` to set the return value
+ *    which must be object that can be converted to a PropertyDescriptor (for
+ *    example, a value returned by `v8::Object::getOwnPropertyDescriptor`),
+ *  - return `Intercepted::kYes`.
+ * If the interceptor does not handle the request it must return
+ * `Intercepted::kNo` and it must not produce side effects.
  *
  * \param property The name of the property for which the request was
  * intercepted.
@@ -306,38 +358,44 @@ using GenericNamedPropertyDefinerCallback =
  * isolate, receiver, return value, or whether running in `'use strict'` mode.
  * See `PropertyCallbackInfo`.
  *
- * \note If GetOwnPropertyDescriptor is intercepted, it will
- * always return true, i.e., indicate that the property was found.
- *
  * See also `ObjectTemplate::SetHandler`.
  */
-using GenericNamedPropertyDescriptorCallback =
-    void (*)(Local<Name> property, const PropertyCallbackInfo<Value>& info);
+using NamedPropertyDescriptorCallback = Intercepted (*)(
+    Local<Name> property, const PropertyCallbackInfo<Value>& info);
 
 /**
- * See `v8::GenericNamedPropertyGetterCallback`.
+ * See `v8::NamedPropertyGetterCallback`.
  */
 using IndexedPropertyGetterCallback =
-    void (*)(uint32_t index, const PropertyCallbackInfo<Value>& info);
+    Intercepted (*)(uint32_t index, const PropertyCallbackInfo<Value>& info);
+// TODO(https://crbug.com/348660658): deprecate and remove.
+using IndexedPropertyGetterCallbackV2 = IndexedPropertyGetterCallback;
 
 /**
- * See `v8::GenericNamedPropertySetterCallback`.
+ * See `v8::NamedPropertySetterCallback`.
  */
 using IndexedPropertySetterCallback =
-    void (*)(uint32_t index, Local<Value> value,
-             const PropertyCallbackInfo<Value>& info);
+    Intercepted (*)(uint32_t index, Local<Value> value,
+                    const PropertyCallbackInfo<Boolean>& info);
+// TODO(https://crbug.com/348660658): deprecate and remove.
+using IndexedPropertySetterCallbackV2 = Intercepted (*)(
+    uint32_t index, Local<Value> value, const PropertyCallbackInfo<void>& info);
 
 /**
- * See `v8::GenericNamedPropertyQueryCallback`.
+ * See `v8::NamedPropertyQueryCallback`.
  */
 using IndexedPropertyQueryCallback =
-    void (*)(uint32_t index, const PropertyCallbackInfo<Integer>& info);
+    Intercepted (*)(uint32_t index, const PropertyCallbackInfo<Integer>& info);
+// TODO(https://crbug.com/348660658): deprecate and remove.
+using IndexedPropertyQueryCallbackV2 = IndexedPropertyQueryCallback;
 
 /**
- * See `v8::GenericNamedPropertyDeleterCallback`.
+ * See `v8::NamedPropertyDeleterCallback`.
  */
 using IndexedPropertyDeleterCallback =
-    void (*)(uint32_t index, const PropertyCallbackInfo<Boolean>& info);
+    Intercepted (*)(uint32_t index, const PropertyCallbackInfo<Boolean>& info);
+// TODO(https://crbug.com/348660658): deprecate and remove.
+using IndexedPropertyDeleterCallbackV2 = IndexedPropertyDeleterCallback;
 
 /**
  * Returns an array containing the indices of the properties the indexed
@@ -349,17 +407,30 @@ using IndexedPropertyEnumeratorCallback =
     void (*)(const PropertyCallbackInfo<Array>& info);
 
 /**
- * See `v8::GenericNamedPropertyDefinerCallback`.
+ * See `v8::NamedPropertyDefinerCallback`.
  */
 using IndexedPropertyDefinerCallback =
-    void (*)(uint32_t index, const PropertyDescriptor& desc,
-             const PropertyCallbackInfo<Value>& info);
+    Intercepted (*)(uint32_t index, const PropertyDescriptor& desc,
+                    const PropertyCallbackInfo<Boolean>& info);
+// TODO(https://crbug.com/348660658): deprecate and remove.
+using IndexedPropertyDefinerCallbackV2 =
+    Intercepted (*)(uint32_t index, const PropertyDescriptor& desc,
+                    const PropertyCallbackInfo<void>& info);
 
 /**
- * See `v8::GenericNamedPropertyDescriptorCallback`.
+ * See `v8::NamedPropertyDescriptorCallback`.
  */
 using IndexedPropertyDescriptorCallback =
-    void (*)(uint32_t index, const PropertyCallbackInfo<Value>& info);
+    Intercepted (*)(uint32_t index, const PropertyCallbackInfo<Value>& info);
+// TODO(https://crbug.com/348660658): deprecate and remove.
+using IndexedPropertyDescriptorCallbackV2 = IndexedPropertyDescriptorCallback;
+
+/**
+ * Experimental API, do not use!
+ */
+using IndexedPropertyIndexOfCallback =
+    uint32_t (*)(Local<Value> value, uint32_t start_index, uint32_t end_index,
+                 uint32_t* out_length, const PropertyCallbackInfo<void>& info);
 
 /**
  * Returns true if the given context should be allowed to access the given
@@ -406,8 +477,8 @@ enum class ConstructorBehavior { kThrow, kAllow };
  *    proto_t->Set(isolate, "proto_const", v8::Number::New(isolate, 2));
  *
  *    v8::Local<v8::ObjectTemplate> instance_t = t->InstanceTemplate();
- *    instance_t->SetAccessor(
-          String::NewFromUtf8Literal(isolate, "instance_accessor"),
+ *    instance_t->SetNativeDataProperty(
+ *        String::NewFromUtf8Literal(isolate, "instance_accessor"),
  *        InstanceAccessorCallback);
  *    instance_t->SetHandler(
  *        NamedPropertyHandlerConfiguration(PropertyHandlerCallback));
@@ -529,7 +600,7 @@ class V8_EXPORT FunctionTemplate : public Template {
    * API call, see the comment above the class declaration.
    */
   void SetCallHandler(
-      FunctionCallback callback, Local<Value> data = Local<Value>(),
+      FunctionCallback callback, Local<Data> data = {},
       SideEffectType side_effect_type = SideEffectType::kHasSideEffect,
       const MemorySpan<const CFunction>& c_function_overloads = {});
 
@@ -568,6 +639,18 @@ class V8_EXPORT FunctionTemplate : public Template {
   void SetClassName(Local<String> name);
 
   /**
+   * Set the interface name of the FunctionTemplate. This is provided as
+   * contextual information in an ExceptionPropagationMessage to the embedder.
+   */
+  void SetInterfaceName(Local<String> name);
+
+  /**
+   * Provides information on the type of FunctionTemplate for embedder
+   * exception handling.
+   */
+  void SetExceptionContext(ExceptionContext context);
+
+  /**
    * When set to true, no access check will be performed on the receiver of a
    * function call.  Currently defaults to true, but this is subject to change.
    */
@@ -600,6 +683,14 @@ class V8_EXPORT FunctionTemplate : public Template {
    */
   bool IsLeafTemplateForApiObject(v8::Local<v8::Value> value) const;
 
+  /**
+   * Seal the object and mark it for promotion to read only space during
+   * context snapshot creation.
+   *
+   * This is an experimental feature and may still change significantly.
+   */
+  void SealAndPrepareForPromotionToReadOnly();
+
   V8_INLINE static FunctionTemplate* Cast(Data* data);
 
  private:
@@ -621,60 +712,116 @@ enum class PropertyHandlerFlags {
   kNone = 0,
 
   /**
-   * See ALL_CAN_READ above.
-   */
-  kAllCanRead = 1,
-
-  /** Will not call into interceptor for properties on the receiver or prototype
+   * Will not call into interceptor for properties on the receiver or prototype
    * chain, i.e., only call into interceptor for properties that do not exist.
    * Currently only valid for named interceptors.
    */
-  kNonMasking = 1 << 1,
+  kNonMasking = 1,
 
   /**
    * Will not call into interceptor for symbol lookup.  Only meaningful for
    * named interceptors.
    */
-  kOnlyInterceptStrings = 1 << 2,
+  kOnlyInterceptStrings = 1 << 1,
 
   /**
    * The getter, query, enumerator callbacks do not produce side effects.
    */
-  kHasNoSideEffect = 1 << 3,
+  kHasNoSideEffect = 1 << 2,
+
+  /**
+   * This flag is used to distinguish which callbacks were provided -
+   * GenericNamedPropertyXXXCallback (old signature) or
+   * NamedPropertyXXXCallback (new signature).
+   * DO NOT use this flag, it'll be removed once embedders migrate to new
+   * callbacks signatures.
+   */
+  kInternalNewCallbacksSignatures = 1 << 10,
 };
 
 struct NamedPropertyHandlerConfiguration {
+ private:
+  static constexpr PropertyHandlerFlags WithNewSignatureFlag(
+      PropertyHandlerFlags flags) {
+    return static_cast<PropertyHandlerFlags>(
+        static_cast<int>(flags) |
+        static_cast<int>(
+            PropertyHandlerFlags::kInternalNewCallbacksSignatures));
+  }
+
+  static NamedPropertySetterCallbackV2 ConvertSetter(std::nullptr_t) {
+    return nullptr;
+  }
+  static NamedPropertySetterCallbackV2 ConvertSetter(
+      NamedPropertySetterCallbackV2 value) {
+    return value;
+  }
+  V8_DEPRECATE_SOON("Use NamedPropertySetterCallbackV2 setter instead")
+  static NamedPropertySetterCallbackV2 ConvertSetter(
+      NamedPropertySetterCallback value) {
+    return NamedPropertySetterCallbackV2(value);
+  }
+
+  static NamedPropertyDefinerCallbackV2 ConvertDefiner(std::nullptr_t) {
+    return nullptr;
+  }
+  static NamedPropertyDefinerCallbackV2 ConvertDefiner(
+      NamedPropertyDefinerCallbackV2 value) {
+    return value;
+  }
+  V8_DEPRECATE_SOON("Use NamedPropertyDefinerCallbackV2 definer instead")
+  static NamedPropertyDefinerCallbackV2 ConvertDefiner(
+      NamedPropertyDefinerCallback value) {
+    return NamedPropertyDefinerCallbackV2(value);
+  }
+
+ public:
+  // TODO(https://crbug.com/348660658): cleanup once migration to
+  // NamedPropertySetterCallbackV2/NamedPropertyDefinerCallbackV2 is done.
+  template <typename TSetter = std::nullptr_t,
+            typename TDefiner = std::nullptr_t>
+    requires((std::is_same_v<TSetter, std::nullptr_t> ||
+              std::is_same_v<TSetter, NamedPropertySetterCallback> ||
+              std::is_same_v<TSetter, NamedPropertySetterCallbackV2>) &&
+             (std::is_same_v<TDefiner, std::nullptr_t> ||
+              std::is_same_v<TDefiner, NamedPropertyDefinerCallback> ||
+              std::is_same_v<TDefiner, NamedPropertyDefinerCallbackV2>))
   NamedPropertyHandlerConfiguration(
-      GenericNamedPropertyGetterCallback getter,
-      GenericNamedPropertySetterCallback setter,
-      GenericNamedPropertyQueryCallback query,
-      GenericNamedPropertyDeleterCallback deleter,
-      GenericNamedPropertyEnumeratorCallback enumerator,
-      GenericNamedPropertyDefinerCallback definer,
-      GenericNamedPropertyDescriptorCallback descriptor,
+      NamedPropertyGetterCallback getter,          //
+      TSetter setter,                              //
+      NamedPropertyQueryCallback query,            //
+      NamedPropertyDeleterCallback deleter,        //
+      NamedPropertyEnumeratorCallback enumerator,  //
+      TDefiner definer,                            //
+      NamedPropertyDescriptorCallback descriptor,  //
       Local<Value> data = Local<Value>(),
       PropertyHandlerFlags flags = PropertyHandlerFlags::kNone)
       : getter(getter),
-        setter(setter),
+        setter(ConvertSetter(setter)),
         query(query),
         deleter(deleter),
         enumerator(enumerator),
-        definer(definer),
+        definer(ConvertDefiner(definer)),
         descriptor(descriptor),
         data(data),
         flags(flags) {}
 
-  NamedPropertyHandlerConfiguration(
-      /** Note: getter is required */
-      GenericNamedPropertyGetterCallback getter = nullptr,
-      GenericNamedPropertySetterCallback setter = nullptr,
-      GenericNamedPropertyQueryCallback query = nullptr,
-      GenericNamedPropertyDeleterCallback deleter = nullptr,
-      GenericNamedPropertyEnumeratorCallback enumerator = nullptr,
+  // TODO(https://crbug.com/348660658): cleanup once migration to
+  // NamedPropertySetterCallbackV2/NamedPropertyDefinerCallbackV2 is done.
+  template <typename TSetter = std::nullptr_t>
+    requires(std::is_same_v<TSetter, std::nullptr_t> ||
+             std::is_same_v<TSetter, NamedPropertySetterCallback> ||
+             std::is_same_v<TSetter, NamedPropertySetterCallbackV2>)
+  explicit NamedPropertyHandlerConfiguration(
+      NamedPropertyGetterCallback getter,                    //
+      TSetter setter = nullptr,                              //
+      NamedPropertyQueryCallback query = nullptr,            //
+      NamedPropertyDeleterCallback deleter = nullptr,        //
+      NamedPropertyEnumeratorCallback enumerator = nullptr,  //
       Local<Value> data = Local<Value>(),
       PropertyHandlerFlags flags = PropertyHandlerFlags::kNone)
       : getter(getter),
-        setter(setter),
+        setter(ConvertSetter(setter)),
         query(query),
         deleter(deleter),
         enumerator(enumerator),
@@ -683,67 +830,129 @@ struct NamedPropertyHandlerConfiguration {
         data(data),
         flags(flags) {}
 
+  // TODO(https://crbug.com/348660658): cleanup once migration to
+  // NamedPropertySetterCallbackV2/NamedPropertyDefinerCallbackV2 is done.
+  template <typename TSetter = std::nullptr_t,
+            typename TDefiner = std::nullptr_t>
+    requires((std::is_same_v<TSetter, std::nullptr_t> ||
+              std::is_same_v<TSetter, NamedPropertySetterCallback> ||
+              std::is_same_v<TSetter, NamedPropertySetterCallbackV2>) &&
+             (std::is_same_v<TDefiner, std::nullptr_t> ||
+              std::is_same_v<TDefiner, NamedPropertyDefinerCallback> ||
+              std::is_same_v<TDefiner, NamedPropertyDefinerCallbackV2>))
   NamedPropertyHandlerConfiguration(
-      GenericNamedPropertyGetterCallback getter,
-      GenericNamedPropertySetterCallback setter,
-      GenericNamedPropertyDescriptorCallback descriptor,
-      GenericNamedPropertyDeleterCallback deleter,
-      GenericNamedPropertyEnumeratorCallback enumerator,
-      GenericNamedPropertyDefinerCallback definer,
+      NamedPropertyGetterCallback getter,          //
+      TSetter setter,                              //
+      NamedPropertyDescriptorCallback descriptor,  //
+      NamedPropertyDeleterCallback deleter,        //
+      NamedPropertyEnumeratorCallback enumerator,  //
+      TDefiner definer,                            //
       Local<Value> data = Local<Value>(),
       PropertyHandlerFlags flags = PropertyHandlerFlags::kNone)
       : getter(getter),
-        setter(setter),
+        setter(ConvertSetter(setter)),
         query(nullptr),
         deleter(deleter),
         enumerator(enumerator),
-        definer(definer),
+        definer(ConvertDefiner(definer)),
         descriptor(descriptor),
         data(data),
         flags(flags) {}
 
-  GenericNamedPropertyGetterCallback getter;
-  GenericNamedPropertySetterCallback setter;
-  GenericNamedPropertyQueryCallback query;
-  GenericNamedPropertyDeleterCallback deleter;
-  GenericNamedPropertyEnumeratorCallback enumerator;
-  GenericNamedPropertyDefinerCallback definer;
-  GenericNamedPropertyDescriptorCallback descriptor;
+  NamedPropertyGetterCallback getter;
+  NamedPropertySetterCallbackV2 setter;
+  NamedPropertyQueryCallback query;
+  NamedPropertyDeleterCallback deleter;
+  NamedPropertyEnumeratorCallback enumerator;
+  NamedPropertyDefinerCallbackV2 definer;
+  NamedPropertyDescriptorCallback descriptor;
   Local<Value> data;
   PropertyHandlerFlags flags;
 };
 
 struct IndexedPropertyHandlerConfiguration {
+ private:
+  static constexpr PropertyHandlerFlags WithNewSignatureFlag(
+      PropertyHandlerFlags flags) {
+    return static_cast<PropertyHandlerFlags>(
+        static_cast<int>(flags) |
+        static_cast<int>(
+            PropertyHandlerFlags::kInternalNewCallbacksSignatures));
+  }
+
+  static IndexedPropertySetterCallback ConvertSetter(std::nullptr_t) {
+    return nullptr;
+  }
+  static IndexedPropertySetterCallback ConvertSetter(
+      IndexedPropertySetterCallback value) {
+    return value;
+  }
+  V8_DEPRECATE_SOON("Use IndexedPropertySetterCallback setter instead")
+  static IndexedPropertySetterCallback ConvertSetter(
+      IndexedPropertySetterCallbackV2 value) {
+    return IndexedPropertySetterCallback(value);
+  }
+
+  static IndexedPropertyDefinerCallback ConvertDefiner(std::nullptr_t) {
+    return nullptr;
+  }
+  static IndexedPropertyDefinerCallback ConvertDefiner(
+      IndexedPropertyDefinerCallback value) {
+    return value;
+  }
+  V8_DEPRECATE_SOON("Use IndexedPropertyDefinerCallback definer instead")
+  static IndexedPropertyDefinerCallback ConvertDefiner(
+      IndexedPropertyDefinerCallbackV2 value) {
+    return IndexedPropertyDefinerCallback(value);
+  }
+
+ public:
+  // TODO(https://crbug.com/348660658): cleanup once migration to
+  // IndexedPropertySetterCallback/IndexedPropertyDefinerCallback is done.
+  template <typename TSetter = std::nullptr_t,
+            typename TDefiner = std::nullptr_t>
+    requires((std::is_same_v<TSetter, std::nullptr_t> ||
+              std::is_same_v<TSetter, IndexedPropertySetterCallback> ||
+              std::is_same_v<TSetter, IndexedPropertySetterCallbackV2>) &&
+             (std::is_same_v<TDefiner, std::nullptr_t> ||
+              std::is_same_v<TDefiner, IndexedPropertyDefinerCallback> ||
+              std::is_same_v<TDefiner, IndexedPropertyDefinerCallbackV2>))
   IndexedPropertyHandlerConfiguration(
-      IndexedPropertyGetterCallback getter,
-      IndexedPropertySetterCallback setter, IndexedPropertyQueryCallback query,
-      IndexedPropertyDeleterCallback deleter,
-      IndexedPropertyEnumeratorCallback enumerator,
-      IndexedPropertyDefinerCallback definer,
-      IndexedPropertyDescriptorCallback descriptor,
+      IndexedPropertyGetterCallback getter,          //
+      TSetter setter,                                //
+      IndexedPropertyQueryCallback query,            //
+      IndexedPropertyDeleterCallback deleter,        //
+      IndexedPropertyEnumeratorCallback enumerator,  //
+      TDefiner definer,                              //
+      IndexedPropertyDescriptorCallback descriptor,  //
       Local<Value> data = Local<Value>(),
       PropertyHandlerFlags flags = PropertyHandlerFlags::kNone)
       : getter(getter),
-        setter(setter),
+        setter(ConvertSetter(setter)),
         query(query),
         deleter(deleter),
         enumerator(enumerator),
-        definer(definer),
+        definer(ConvertDefiner(definer)),
         descriptor(descriptor),
         data(data),
         flags(flags) {}
 
-  IndexedPropertyHandlerConfiguration(
-      /** Note: getter is required */
-      IndexedPropertyGetterCallback getter = nullptr,
-      IndexedPropertySetterCallback setter = nullptr,
-      IndexedPropertyQueryCallback query = nullptr,
-      IndexedPropertyDeleterCallback deleter = nullptr,
-      IndexedPropertyEnumeratorCallback enumerator = nullptr,
-      Local<Value> data = Local<Value>(),
+  // TODO(https://crbug.com/348660658): cleanup once migration to
+  // IndexedPropertySetterCallback/IndexedPropertyDefinerCallback is done.
+  template <typename TSetter = std::nullptr_t>
+    requires(std::is_same_v<TSetter, std::nullptr_t> ||
+             std::is_same_v<TSetter, IndexedPropertySetterCallback> ||
+             std::is_same_v<TSetter, IndexedPropertySetterCallbackV2>)
+  explicit IndexedPropertyHandlerConfiguration(
+      IndexedPropertyGetterCallback getter = nullptr,          //
+      TSetter setter = nullptr,                                //
+      IndexedPropertyQueryCallback query = nullptr,            //
+      IndexedPropertyDeleterCallback deleter = nullptr,        //
+      IndexedPropertyEnumeratorCallback enumerator = nullptr,  //
+      Local<Value> data = Local<Value>(),                      //
       PropertyHandlerFlags flags = PropertyHandlerFlags::kNone)
       : getter(getter),
-        setter(setter),
+        setter(ConvertSetter(setter)),
         query(query),
         deleter(deleter),
         enumerator(enumerator),
@@ -752,22 +961,64 @@ struct IndexedPropertyHandlerConfiguration {
         data(data),
         flags(flags) {}
 
+  // TODO(https://crbug.com/348660658): cleanup once migration to
+  // IndexedPropertySetterCallback/IndexedPropertyDefinerCallback is done.
+  template <typename TSetter = std::nullptr_t,
+            typename TDefiner = std::nullptr_t>
+    requires((std::is_same_v<TSetter, std::nullptr_t> ||
+              std::is_same_v<TSetter, IndexedPropertySetterCallback> ||
+              std::is_same_v<TSetter, IndexedPropertySetterCallbackV2>) &&
+             (std::is_same_v<TDefiner, std::nullptr_t> ||
+              std::is_same_v<TDefiner, IndexedPropertyDefinerCallback> ||
+              std::is_same_v<TDefiner, IndexedPropertyDefinerCallbackV2>))
   IndexedPropertyHandlerConfiguration(
-      IndexedPropertyGetterCallback getter,
-      IndexedPropertySetterCallback setter,
-      IndexedPropertyDescriptorCallback descriptor,
-      IndexedPropertyDeleterCallback deleter,
-      IndexedPropertyEnumeratorCallback enumerator,
-      IndexedPropertyDefinerCallback definer,
+      IndexedPropertyGetterCallback getter,          //
+      TSetter setter,                                //
+      IndexedPropertyDescriptorCallback descriptor,  //
+      IndexedPropertyDeleterCallback deleter,        //
+      IndexedPropertyEnumeratorCallback enumerator,  //
+      TDefiner definer,                              //
       Local<Value> data = Local<Value>(),
       PropertyHandlerFlags flags = PropertyHandlerFlags::kNone)
       : getter(getter),
-        setter(setter),
+        setter(ConvertSetter(setter)),
         query(nullptr),
         deleter(deleter),
         enumerator(enumerator),
-        definer(definer),
+        definer(ConvertDefiner(definer)),
         descriptor(descriptor),
+        data(data),
+        flags(flags) {}
+
+  // TODO(https://crbug.com/348660658): cleanup once migration to
+  // IndexedPropertySetterCallback/IndexedPropertyDefinerCallback is done.
+  template <typename TSetter = std::nullptr_t,
+            typename TDefiner = std::nullptr_t>
+    requires((std::is_same_v<TSetter, std::nullptr_t> ||
+              std::is_same_v<TSetter, IndexedPropertySetterCallback> ||
+              std::is_same_v<TSetter, IndexedPropertySetterCallbackV2>) &&
+             (std::is_same_v<TDefiner, std::nullptr_t> ||
+              std::is_same_v<TDefiner, IndexedPropertyDefinerCallback> ||
+              std::is_same_v<TDefiner, IndexedPropertyDefinerCallbackV2>))
+  IndexedPropertyHandlerConfiguration(
+      IndexedPropertyGetterCallback getter,          //
+      TSetter setter,                                //
+      IndexedPropertyQueryCallback query,            //
+      IndexedPropertyDeleterCallback deleter,        //
+      IndexedPropertyEnumeratorCallback enumerator,  //
+      TDefiner definer,                              //
+      IndexedPropertyDescriptorCallback descriptor,  //
+      IndexedPropertyIndexOfCallback index_of,       //
+      Local<Value> data = Local<Value>(),
+      PropertyHandlerFlags flags = PropertyHandlerFlags::kNone)
+      : getter(getter),
+        setter(ConvertSetter(setter)),
+        query(query),
+        deleter(deleter),
+        enumerator(enumerator),
+        definer(ConvertDefiner(definer)),
+        descriptor(descriptor),
+        index_of(index_of),
         data(data),
         flags(flags) {}
 
@@ -778,6 +1029,7 @@ struct IndexedPropertyHandlerConfiguration {
   IndexedPropertyEnumeratorCallback enumerator;
   IndexedPropertyDefinerCallback definer;
   IndexedPropertyDescriptorCallback descriptor;
+  IndexedPropertyIndexOfCallback index_of = nullptr;
   Local<Value> data;
   PropertyHandlerFlags flags;
 };
@@ -795,67 +1047,12 @@ class V8_EXPORT ObjectTemplate : public Template {
       Isolate* isolate,
       Local<FunctionTemplate> constructor = Local<FunctionTemplate>());
 
-  /** Creates a new instance of this template.*/
-  V8_WARN_UNUSED_RESULT MaybeLocal<Object> NewInstance(Local<Context> context);
-
   /**
-   * Sets an accessor on the object template.
+   * Creates a new instance of this template.
    *
-   * Whenever the property with the given name is accessed on objects
-   * created from this ObjectTemplate the getter and setter callbacks
-   * are called instead of getting and setting the property directly
-   * on the JavaScript object.
-   *
-   * \param name The name of the property for which an accessor is added.
-   * \param getter The callback to invoke when getting the property.
-   * \param setter The callback to invoke when setting the property.
-   * \param data A piece of data that will be passed to the getter and setter
-   *   callbacks whenever they are invoked.
-   * \param settings Access control settings for the accessor. This is a bit
-   *   field consisting of one of more of
-   *   DEFAULT = 0, ALL_CAN_READ = 1, or ALL_CAN_WRITE = 2.
-   *   The default is to not allow cross-context access.
-   *   ALL_CAN_READ means that all cross-context reads are allowed.
-   *   ALL_CAN_WRITE means that all cross-context writes are allowed.
-   *   The combination ALL_CAN_READ | ALL_CAN_WRITE can be used to allow all
-   *   cross-context access.
-   * \param attribute The attributes of the property for which an accessor
-   *   is added.
-   * \param signature The signature describes valid receivers for the accessor
-   *   and is used to perform implicit instance checks against them. If the
-   *   receiver is incompatible (i.e. is not an instance of the constructor as
-   *   defined by FunctionTemplate::HasInstance()), an implicit TypeError is
-   *   thrown and no callback is invoked.
+   * \param context The context in which the instance is created.
    */
-  V8_DEPRECATED("Do signature check in accessor")
-  void SetAccessor(
-      Local<String> name, AccessorGetterCallback getter,
-      AccessorSetterCallback setter, Local<Value> data, AccessControl settings,
-      PropertyAttribute attribute, Local<AccessorSignature> signature,
-      SideEffectType getter_side_effect_type = SideEffectType::kHasSideEffect,
-      SideEffectType setter_side_effect_type = SideEffectType::kHasSideEffect);
-  V8_DEPRECATED("Do signature check in accessor")
-  void SetAccessor(
-      Local<Name> name, AccessorNameGetterCallback getter,
-      AccessorNameSetterCallback setter, Local<Value> data,
-      AccessControl settings, PropertyAttribute attribute,
-      Local<AccessorSignature> signature,
-      SideEffectType getter_side_effect_type = SideEffectType::kHasSideEffect,
-      SideEffectType setter_side_effect_type = SideEffectType::kHasSideEffect);
-  void SetAccessor(
-      Local<String> name, AccessorGetterCallback getter,
-      AccessorSetterCallback setter = nullptr,
-      Local<Value> data = Local<Value>(), AccessControl settings = DEFAULT,
-      PropertyAttribute attribute = None,
-      SideEffectType getter_side_effect_type = SideEffectType::kHasSideEffect,
-      SideEffectType setter_side_effect_type = SideEffectType::kHasSideEffect);
-  void SetAccessor(
-      Local<Name> name, AccessorNameGetterCallback getter,
-      AccessorNameSetterCallback setter = nullptr,
-      Local<Value> data = Local<Value>(), AccessControl settings = DEFAULT,
-      PropertyAttribute attribute = None,
-      SideEffectType getter_side_effect_type = SideEffectType::kHasSideEffect,
-      SideEffectType setter_side_effect_type = SideEffectType::kHasSideEffect);
+  V8_WARN_UNUSED_RESULT MaybeLocal<Object> NewInstance(Local<Context> context);
 
   /**
    * Sets a named property handler on the object template.
@@ -869,34 +1066,6 @@ class V8_EXPORT ObjectTemplate : public Template {
    * callbacks to invoke when accessing a property.
    */
   void SetHandler(const NamedPropertyHandlerConfiguration& configuration);
-
-  /**
-   * Sets an indexed property handler on the object template.
-   *
-   * Whenever an indexed property is accessed on objects created from
-   * this object template, the provided callback is invoked instead of
-   * accessing the property directly on the JavaScript object.
-   *
-   * \param getter The callback to invoke when getting a property.
-   * \param setter The callback to invoke when setting a property.
-   * \param query The callback to invoke to check if an object has a property.
-   * \param deleter The callback to invoke when deleting a property.
-   * \param enumerator The callback to invoke to enumerate all the indexed
-   *   properties of an object.
-   * \param data A piece of data that will be passed to the callbacks
-   *   whenever they are invoked.
-   */
-  // TODO(dcarney): deprecate
-  void SetIndexedPropertyHandler(
-      IndexedPropertyGetterCallback getter,
-      IndexedPropertySetterCallback setter = nullptr,
-      IndexedPropertyQueryCallback query = nullptr,
-      IndexedPropertyDeleterCallback deleter = nullptr,
-      IndexedPropertyEnumeratorCallback enumerator = nullptr,
-      Local<Value> data = Local<Value>()) {
-    SetHandler(IndexedPropertyHandlerConfiguration(getter, setter, query,
-                                                   deleter, enumerator, data));
-  }
 
   /**
    * Sets an indexed property handler on the object template.
@@ -987,14 +1156,56 @@ class V8_EXPORT ObjectTemplate : public Template {
   void SetCodeLike();
   bool IsCodeLike() const;
 
+  /**
+   * Seal the object and mark it for promotion to read only space during
+   * context snapshot creation.
+   *
+   * This is an experimental feature and may still change significantly.
+   */
+  void SealAndPrepareForPromotionToReadOnly();
+
   V8_INLINE static ObjectTemplate* Cast(Data* data);
 
  private:
   ObjectTemplate();
-  static Local<ObjectTemplate> New(internal::Isolate* isolate,
-                                   Local<FunctionTemplate> constructor);
+
   static void CheckCast(Data* that);
   friend class FunctionTemplate;
+};
+
+/**
+ * A template to create dictionary objects at runtime.
+ */
+class V8_EXPORT DictionaryTemplate final : public Data {
+ public:
+  /** Creates a new template. Also declares data properties that can be passed
+   * on instantiation of the template. Properties can only be declared on
+   * construction and are then immutable. The values are passed on creating the
+   * object via `NewInstance()`.
+   *
+   * \param names the keys that can be passed on instantiation.
+   */
+  static Local<DictionaryTemplate> New(
+      Isolate* isolate, MemorySpan<const std::string_view> names);
+
+  /**
+   * Creates a new instance of this template.
+   *
+   * \param context The context used to create the dictionary object.
+   * \param property_values Values of properties that were declared using
+   *   `DeclareDataProperties()`. The span only passes values and expectes the
+   *   order to match the declaration. Non-existent properties are signaled via
+   *   empty `MaybeLocal`s.
+   */
+  V8_WARN_UNUSED_RESULT Local<Object> NewInstance(
+      Local<Context> context, MemorySpan<MaybeLocal<Value>> property_values);
+
+  V8_INLINE static DictionaryTemplate* Cast(Data* data);
+
+ private:
+  static void CheckCast(Data* that);
+
+  DictionaryTemplate();
 };
 
 /**
@@ -1015,24 +1226,6 @@ class V8_EXPORT Signature : public Data {
 
  private:
   Signature();
-
-  static void CheckCast(Data* that);
-};
-
-/**
- * An AccessorSignature specifies which receivers are valid parameters
- * to an accessor callback.
- */
-class V8_EXPORT AccessorSignature : public Data {
- public:
-  static Local<AccessorSignature> New(
-      Isolate* isolate,
-      Local<FunctionTemplate> receiver = Local<FunctionTemplate>());
-
-  V8_INLINE static AccessorSignature* Cast(Data* data);
-
- private:
-  AccessorSignature();
 
   static void CheckCast(Data* that);
 };
@@ -1060,18 +1253,18 @@ ObjectTemplate* ObjectTemplate::Cast(Data* data) {
   return reinterpret_cast<ObjectTemplate*>(data);
 }
 
+DictionaryTemplate* DictionaryTemplate::Cast(Data* data) {
+#ifdef V8_ENABLE_CHECKS
+  CheckCast(data);
+#endif
+  return reinterpret_cast<DictionaryTemplate*>(data);
+}
+
 Signature* Signature::Cast(Data* data) {
 #ifdef V8_ENABLE_CHECKS
   CheckCast(data);
 #endif
   return reinterpret_cast<Signature*>(data);
-}
-
-AccessorSignature* AccessorSignature::Cast(Data* data) {
-#ifdef V8_ENABLE_CHECKS
-  CheckCast(data);
-#endif
-  return reinterpret_cast<AccessorSignature*>(data);
 }
 
 }  // namespace v8

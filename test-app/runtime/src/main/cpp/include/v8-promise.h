@@ -14,12 +14,12 @@ namespace v8 {
 class Context;
 
 #ifndef V8_PROMISE_INTERNAL_FIELD_COUNT
-// The number of required internal fields can be defined by embedder.
+// Defined using gn arg `v8_promise_internal_field_count`.
 #define V8_PROMISE_INTERNAL_FIELD_COUNT 0
 #endif
 
 /**
- * An instance of the built-in Promise constructor (ES6 draft).
+ * An instance of the built-in Promise constructor.
  */
 class V8_EXPORT Promise : public Object {
  public:
@@ -65,10 +65,21 @@ class V8_EXPORT Promise : public Object {
   };
 
   /**
-   * Register a resolution/rejection handler with a promise.
-   * The handler is given the respective resolution/rejection value as
-   * an argument. If the promise is already resolved/rejected, the handler is
-   * invoked at the end of turn.
+   * Register a resolution/rejection handler with a promise. The handler is
+   * given the respective resolution/rejection value as an argument. If the
+   * promise is already resolved/rejected, the handler is invoked at the end of
+   * turn.
+   *
+   * This performs the PerformPromiseThen abstract operation with a fresh native
+   * promise as result, rather than the similar Promise.prototype.then
+   * operation. In particular, it does not do species lookup on the Promise
+   * constructor, and is therefore guaranteed to return a Promise.
+   *
+   * https://tc39.es/ecma262/#sec-performpromisethen
+   *
+   * This is consistent with Promise reactions in WebIDL:
+   *
+   * https://webidl.spec.whatwg.org/#dfn-perform-steps-once-promise-is-settled
    */
   V8_WARN_UNUSED_RESULT MaybeLocal<Promise> Catch(Local<Context> context,
                                                   Local<Function> handler);
@@ -115,7 +126,7 @@ class V8_EXPORT Promise : public Object {
     return static_cast<Promise*>(value);
   }
 
-  static const int kEmbedderFieldCount = V8_PROMISE_INTERNAL_FIELD_COUNT;
+  static constexpr int kEmbedderFieldCount = V8_PROMISE_INTERNAL_FIELD_COUNT;
 
  private:
   Promise();

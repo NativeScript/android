@@ -9,17 +9,21 @@
 #include <stdint.h>
 
 #include <memory>
+#include <tuple>
 #include <vector>
 
+#include "v8-callbacks.h"     // NOLINT(build/include_directory)
 #include "v8-data.h"          // NOLINT(build/include_directory)
 #include "v8-local-handle.h"  // NOLINT(build/include_directory)
 #include "v8-maybe.h"         // NOLINT(build/include_directory)
+#include "v8-memory-span.h"   // NOLINT(build/include_directory)
 #include "v8-message.h"       // NOLINT(build/include_directory)
 #include "v8config.h"         // NOLINT(build/include_directory)
 
 namespace v8 {
 
 class Function;
+class Message;
 class Object;
 class PrimitiveArray;
 class Script;
@@ -47,22 +51,26 @@ class V8_EXPORT ScriptOrModule {
    * The options that were passed by the embedder as HostDefinedOptions to
    * the ScriptOrigin.
    */
-  V8_DEPRECATED("Use HostDefinedOptions")
-  Local<PrimitiveArray> GetHostDefinedOptions();
   Local<Data> HostDefinedOptions();
 };
 
 /**
  * A compiled JavaScript script, not yet tied to a Context.
  */
-class V8_EXPORT UnboundScript {
+class V8_EXPORT UnboundScript : public Data {
  public:
   /**
    * Binds the script to the currently entered context.
    */
   Local<Script> BindToCurrentContext();
 
+  /*
+   * A unique id.
+   */
+  int ScriptId() const;
+  V8_DEPRECATE_SOON("Use ScriptId")
   int GetId() const;
+
   Local<Value> GetScriptName();
 
   /**
@@ -78,7 +86,13 @@ class V8_EXPORT UnboundScript {
    * Returns zero based line number of the code_pos location in the script.
    * -1 will be returned if no information available.
    */
-  int GetLineNumber(int code_pos);
+  int GetLineNumber(int code_pos = 0);
+
+  /**
+   * Returns zero based column number of the code_pos location in the script.
+   * -1 will be returned if no information available.
+   */
+  int GetColumnNumber(int code_pos = 0);
 
   static const int kNoScriptId = 0;
 };
@@ -87,8 +101,25 @@ class V8_EXPORT UnboundScript {
  * A compiled JavaScript module, not yet tied to a Context.
  */
 class V8_EXPORT UnboundModuleScript : public Data {
-  // Only used as a container for code caching.
+ public:
+  /**
+   * Data read from magic sourceURL comments.
+   */
+  Local<Value> GetSourceURL();
+  /**
+   * Data read from magic sourceMappingURL comments.
+   */
+  Local<Value> GetSourceMappingURL();
+
+  /*
+   * A unique id.
+   */
+  int ScriptId() const;
+
+  static const int kNoScriptId = 0;
 };
+
+static_assert(UnboundModuleScript::kNoScriptId == UnboundScript::kNoScriptId);
 
 /**
  * A location in JavaScript source.
@@ -114,26 +145,35 @@ class V8_EXPORT ModuleRequest : public Data {
   Local<String> GetSpecifier() const;
 
   /**
+   * Returns the module import phase for this ModuleRequest.
+   */
+  ModuleImportPhase GetPhase() const;
+
+  /**
    * Returns the source code offset of this module request.
    * Use Module::SourceOffsetToLocation to convert this to line/column numbers.
    */
   int GetSourceOffset() const;
 
   /**
-   * Contains the import assertions for this request in the form:
+   * Contains the import attributes for this request in the form:
    * [key1, value1, source_offset1, key2, value2, source_offset2, ...].
    * The keys and values are of type v8::String, and the source offsets are of
    * type Int32. Use Module::SourceOffsetToLocation to convert the source
    * offsets to Locations with line/column numbers.
    *
-   * All assertions present in the module request will be supplied in this
+   * All attributes present in the module request will be supplied in this
    * list, regardless of whether they are supported by the host. Per
-   * https://tc39.es/proposal-import-assertions/#sec-hostgetsupportedimportassertions,
-   * hosts are expected to ignore assertions that they do not support (as
-   * opposed to, for example, triggering an error if an unsupported assertion is
-   * present).
+   * https://tc39.es/proposal-import-attributes/#sec-hostgetsupportedimportattributes,
+   * hosts are expected to throw for attributes that they do not support (as
+   * opposed to, for example, ignoring them).
    */
-  Local<FixedArray> GetImportAssertions() const;
+  Local<FixedArray> GetImportAttributes() const;
+
+  V8_DEPRECATED("Use GetImportAttributes instead")
+  Local<FixedArray> GetImportAssertions() const {
+    return GetImportAttributes();
+  }
 
   V8_INLINE static ModuleRequest* Cast(Data* data);
 
@@ -163,6 +203,13 @@ class V8_EXPORT Module : public Data {
   };
 
   /**
+   * If the module is a Source Text Module, returns the name that was passed
+   * by the embedder as resource_name to the ScriptOrigin. If it's a Synthetic
+   * Module, returns the module_name passed to CreateSyntheticModule().
+   */
+  Local<Value> GetResourceName() const;
+
+  /**
    * Returns the module's current status.
    */
   Status GetStatus() const;
@@ -190,7 +237,17 @@ class V8_EXPORT Module : public Data {
 
   using ResolveModuleCallback = MaybeLocal<Module> (*)(
       Local<Context> context, Local<String> specifier,
-      Local<FixedArray> import_assertions, Local<Module> referrer);
+      Local<FixedArray> import_attributes, Local<Module> referrer);
+  using ResolveSourceCallback = MaybeLocal<Object> (*)(
+      Local<Context> context, Local<String> specifier,
+      Local<FixedArray> import_attributes, Local<Module> referrer);
+
+  using ResolveModuleByIndexCallback = MaybeLocal<Module> (*)(
+      Local<Context> context, size_t module_request_index,
+      Local<Module> referrer);
+  using ResolveSourceByIndexCallback = MaybeLocal<Object> (*)(
+      Local<Context> context, size_t module_request_index,
+      Local<Module> referrer);
 
   /**
    * Instantiates the module and its dependencies.
@@ -200,7 +257,18 @@ class V8_EXPORT Module : public Data {
    * exception is propagated.)
    */
   V8_WARN_UNUSED_RESULT Maybe<bool> InstantiateModule(
-      Local<Context> context, ResolveModuleCallback callback);
+      Local<Context> context, ResolveModuleCallback module_callback,
+      ResolveSourceCallback source_callback = nullptr);
+
+  /**
+   * Similar to the variant that takes ResolveModuleCallback and
+   * ResolveSourceCallback, but uses the index into the array that is returned
+   * by GetModuleRequests() instead of the specifier and import attributes to
+   * identify the requests.
+   */
+  V8_WARN_UNUSED_RESULT Maybe<bool> InstantiateModule(
+      Local<Context> context, ResolveModuleByIndexCallback module_callback,
+      ResolveSourceByIndexCallback source_callback = nullptr);
 
   /**
    * Evaluates the module and its dependencies.
@@ -215,11 +283,25 @@ class V8_EXPORT Module : public Data {
   V8_WARN_UNUSED_RESULT MaybeLocal<Value> Evaluate(Local<Context> context);
 
   /**
+   * Evaluates async dependencies of a module and defer its evaluation
+   *
+   * It implements 13.3.10.4.1 ContinueDynamicImport, Step 6.e.
+   * (https://tc39.es/proposal-defer-import-eval/#sec-ContinueDynamicImport).
+   * This will gather all async dependencies of this module and trigger their
+   * evaluation. It returns a Promise that is similar to a Promise.all for all
+   * modules that are going to be evaluated. This module and its sync
+   * dependencies are not going to be evaluated.
+   */
+  V8_WARN_UNUSED_RESULT MaybeLocal<Value> EvaluateForImportDefer(
+      Local<Context> context);
+
+  /**
    * Returns the namespace object of this module.
    *
    * The module's status must be at least kInstantiated.
    */
-  Local<Value> GetModuleNamespace();
+  Local<Value> GetModuleNamespace(
+      v8::ModuleImportPhase phase = v8::ModuleImportPhase::kEvaluation);
 
   /**
    * Returns the corresponding context-unbound module script.
@@ -243,6 +325,13 @@ class V8_EXPORT Module : public Data {
    * The module's status must be at least kInstantiated.
    */
   bool IsGraphAsync() const;
+
+  /**
+   * Returns whether this module is individually asynchronous (for example,
+   * if it's a Source Text Module Record containing a top-level await).
+   * See [[HasTLA]] in https://tc39.es/ecma262/#sec-cyclic-module-records
+   */
+  bool HasTopLevelAwait() const;
 
   /**
    * Returns whether the module is a SourceTextModule.
@@ -273,7 +362,7 @@ class V8_EXPORT Module : public Data {
    */
   static Local<Module> CreateSyntheticModule(
       Isolate* isolate, Local<String> module_name,
-      const std::vector<Local<String>>& export_names,
+      const MemorySpan<const Local<String>>& export_names,
       SyntheticModuleEvaluationSteps evaluation_steps);
 
   /**
@@ -286,17 +375,35 @@ class V8_EXPORT Module : public Data {
   V8_WARN_UNUSED_RESULT Maybe<bool> SetSyntheticModuleExport(
       Isolate* isolate, Local<String> export_name, Local<Value> export_value);
 
+  /**
+   * Search the modules requested directly or indirectly by the module for
+   * any top-level await that has not yet resolved. If there is any, the
+   * returned pair of vectors (of equal size) contain the unresolved module
+   * and corresponding message with the pending top-level await.
+   * An embedder may call this before exiting to improve error messages.
+   */
+  std::pair<LocalVector<Module>, LocalVector<Message>>
+  GetStalledTopLevelAwaitMessages(Isolate* isolate);
+
   V8_INLINE static Module* Cast(Data* data);
 
  private:
   static void CheckCast(Data* obj);
 };
 
+class V8_EXPORT CompileHintsCollector : public Data {
+ public:
+  /**
+   * Returns the positions of lazy functions which were compiled and executed.
+   */
+  std::vector<int> GetCompileHints(Isolate* isolate) const;
+};
+
 /**
  * A compiled JavaScript script, tied to a Context which was active when the
  * script was compiled.
  */
-class V8_EXPORT Script {
+class V8_EXPORT Script : public Data {
  public:
   /**
    * A shorthand for ScriptCompiler::Compile().
@@ -320,10 +427,29 @@ class V8_EXPORT Script {
   Local<UnboundScript> GetUnboundScript();
 
   /**
+   * Returns the id of the corresponding context-unbound script.
+   */
+  int ScriptId() const;
+
+  /**
    * The name that was passed by the embedder as ResourceName to the
    * ScriptOrigin. This can be either a v8::String or v8::Undefined.
    */
   Local<Value> GetResourceName();
+
+  /**
+   * If the script was compiled, returns the positions of lazy functions which
+   * were eventually compiled and executed.
+   */
+  V8_DEPRECATE_SOON("Use GetCompileHintsCollector instead")
+  std::vector<int> GetProducedCompileHints() const;
+
+  /**
+   * Get a compile hints collector object which we can use later for retrieving
+   * compile hints (= positions of lazy functions which were compiled and
+   * executed).
+   */
+  Local<CompileHintsCollector> GetCompileHintsCollector() const;
 };
 
 enum class ScriptType { kClassic, kModule };
@@ -358,6 +484,27 @@ class V8_EXPORT ScriptCompiler {
     CachedData(const uint8_t* data, int length,
                BufferPolicy buffer_policy = BufferNotOwned);
     ~CachedData();
+
+    enum CompatibilityCheckResult {
+      // Don't change order/existing values of this enum since it keys into the
+      // `code_cache_reject_reason` histogram. Append-only!
+      kSuccess = 0,
+      kMagicNumberMismatch = 1,
+      kVersionMismatch = 2,
+      kSourceMismatch = 3,
+      kFlagsMismatch = 5,
+      kChecksumMismatch = 6,
+      kInvalidHeader = 7,
+      kLengthMismatch = 8,
+      kReadOnlySnapshotChecksumMismatch = 9,
+
+      // This should always point at the last real enum value.
+      kLast = kReadOnlySnapshotChecksumMismatch
+    };
+
+    // Check if the CachedData can be loaded in the given isolate.
+    CompatibilityCheckResult CompatibilityCheck(Isolate* isolate);
+
     // TODO(marja): Async compilation; add constructors which take a callback
     // which will be called when V8 no longer needs the data.
     const uint8_t* data;
@@ -368,6 +515,33 @@ class V8_EXPORT ScriptCompiler {
     // Prevent copying.
     CachedData(const CachedData&) = delete;
     CachedData& operator=(const CachedData&) = delete;
+  };
+
+  enum class InMemoryCacheResult {
+    // V8 did not attempt to find this script in its in-memory cache.
+    kNotAttempted,
+
+    // V8 found a previously compiled copy of this script in its in-memory
+    // cache. Any data generated by a streaming compilation or background
+    // deserialization was abandoned.
+    kHit,
+
+    // V8 didn't have any previously compiled data for this script.
+    kMiss,
+
+    // V8 had some previously compiled data for an identical script, but the
+    // data was incomplete.
+    kPartial,
+  };
+
+  // Details about what happened during a compilation.
+  struct CompilationDetails {
+    InMemoryCacheResult in_memory_cache_result =
+        InMemoryCacheResult::kNotAttempted;
+
+    static constexpr int64_t kTimeNotMeasured = -1;
+    int64_t foreground_time_in_microseconds = kTimeNotMeasured;
+    int64_t background_time_in_microseconds = kTimeNotMeasured;
   };
 
   /**
@@ -384,6 +558,8 @@ class V8_EXPORT ScriptCompiler {
     V8_INLINE explicit Source(
         Local<String> source_string, CachedData* cached_data = nullptr,
         ConsumeCodeCacheTask* consume_cache_task = nullptr);
+    V8_INLINE Source(Local<String> source_string, const ScriptOrigin& origin,
+                     CompileHintCallback callback, void* callback_data);
     V8_INLINE ~Source() = default;
 
     // Ownership of the CachedData or its buffers is *not* transferred to the
@@ -393,6 +569,8 @@ class V8_EXPORT ScriptCompiler {
 
     V8_INLINE const ScriptOriginOptions& GetResourceOptions() const;
 
+    V8_INLINE const CompilationDetails& GetCompilationDetails() const;
+
    private:
     friend class ScriptCompiler;
 
@@ -400,8 +578,8 @@ class V8_EXPORT ScriptCompiler {
 
     // Origin information
     Local<Value> resource_name;
-    int resource_line_offset;
-    int resource_column_offset;
+    int resource_line_offset = -1;
+    int resource_column_offset = -1;
     ScriptOriginOptions resource_options;
     Local<Value> source_map_url;
     Local<Data> host_defined_options;
@@ -411,6 +589,14 @@ class V8_EXPORT ScriptCompiler {
     // set when calling a compile method.
     std::unique_ptr<CachedData> cached_data;
     std::unique_ptr<ConsumeCodeCacheTask> consume_cache_task;
+
+    // For requesting compile hints from the embedder.
+    CompileHintCallback compile_hint_callback = nullptr;
+    void* compile_hint_callback_data = nullptr;
+
+    // V8 writes this data and never reads it. It exists only to be informative
+    // to the embedder.
+    CompilationDetails compilation_details;
   };
 
   /**
@@ -465,8 +651,14 @@ class V8_EXPORT ScriptCompiler {
     StreamedSource(const StreamedSource&) = delete;
     StreamedSource& operator=(const StreamedSource&) = delete;
 
+    CompilationDetails& compilation_details() { return compilation_details_; }
+
    private:
     std::unique_ptr<internal::ScriptStreamingData> impl_;
+
+    // V8 writes this data and never reads it. It exists only to be informative
+    // to the embedder.
+    CompilationDetails compilation_details_;
   };
 
   /**
@@ -489,13 +681,43 @@ class V8_EXPORT ScriptCompiler {
   /**
    * A task which the embedder must run on a background thread to
    * consume a V8 code cache. Returned by
-   * ScriptCompiler::StarConsumingCodeCache.
+   * ScriptCompiler::StartConsumingCodeCache.
    */
   class V8_EXPORT ConsumeCodeCacheTask final {
    public:
     ~ConsumeCodeCacheTask();
 
     void Run();
+
+    /**
+     * Provides the source text string and origin information to the consumption
+     * task. May be called before, during, or after Run(). This step checks
+     * whether the script matches an existing script in the Isolate's
+     * compilation cache. To check whether such a script was found, call
+     * ShouldMergeWithExistingScript.
+     *
+     * The Isolate provided must be the same one used during
+     * StartConsumingCodeCache and must be currently entered on the thread that
+     * calls this function. The source text and origin provided in this step
+     * must precisely match those used later in the ScriptCompiler::Source that
+     * will contain this ConsumeCodeCacheTask.
+     */
+    void SourceTextAvailable(Isolate* isolate, Local<String> source_text,
+                             const ScriptOrigin& origin);
+
+    /**
+     * Returns whether the embedder should call MergeWithExistingScript. This
+     * function may be called from any thread, any number of times, but its
+     * return value is only meaningful after SourceTextAvailable has completed.
+     */
+    bool ShouldMergeWithExistingScript() const;
+
+    /**
+     * Merges newly deserialized data into an existing script which was found
+     * during SourceTextAvailable. May be called only after Run() has completed.
+     * Can execute on any thread, like Run().
+     */
+    void MergeWithExistingScript();
 
    private:
     friend class ScriptCompiler;
@@ -508,9 +730,33 @@ class V8_EXPORT ScriptCompiler {
 
   enum CompileOptions {
     kNoCompileOptions = 0,
-    kConsumeCodeCache,
-    kEagerCompile
+    kConsumeCodeCache = 1 << 0,
+    kEagerCompile = 1 << 1,
+    kProduceCompileHints = 1 << 2,
+    kConsumeCompileHints = 1 << 3,
+    kFollowCompileHintsMagicComment = 1 << 4,
+    kFollowCompileHintsPerFunctionMagicComment = 1 << 5,
   };
+
+  static inline bool CompileOptionsIsValid(CompileOptions compile_options) {
+    // kConsumeCodeCache is mutually exclusive with all other flag bits.
+    if ((compile_options & kConsumeCodeCache) &&
+        compile_options != kConsumeCodeCache) {
+      return false;
+    }
+    // kEagerCompile is mutually exclusive with all other flag bits.
+    if ((compile_options & kEagerCompile) && compile_options != kEagerCompile) {
+      return false;
+    }
+    // We don't currently support producing and consuming compile hints at the
+    // same time.
+    constexpr int produce_and_consume = CompileOptions::kProduceCompileHints |
+                                        CompileOptions::kConsumeCompileHints;
+    if ((compile_options & produce_and_consume) == produce_and_consume) {
+      return false;
+    }
+    return true;
+  }
 
   /**
    * The reason for which we are not requesting or providing a code cache.
@@ -530,7 +776,9 @@ class V8_EXPORT ScriptCompiler {
     kNoCacheBecausePacScript,
     kNoCacheBecauseInDocumentWrite,
     kNoCacheBecauseResourceWithNoCacheHandler,
-    kNoCacheBecauseDeferredProduceCodeCache
+    kNoCacheBecauseDeferredProduceCodeCache,
+    kNoCacheBecauseStaticCodeCache,
+    kNoCacheBecauseInlineScriptCacheTooCold,
   };
 
   /**
@@ -581,9 +829,14 @@ class V8_EXPORT ScriptCompiler {
    */
   static ScriptStreamingTask* StartStreaming(
       Isolate* isolate, StreamedSource* source,
-      ScriptType type = ScriptType::kClassic);
+      ScriptType type = ScriptType::kClassic,
+      CompileOptions options = kNoCompileOptions,
+      CompileHintCallback compile_hint_callback = nullptr,
+      void* compile_hint_callback_data = nullptr);
 
   static ConsumeCodeCacheTask* StartConsumingCodeCache(
+      Isolate* isolate, std::unique_ptr<CachedData> source);
+  static ConsumeCodeCacheTask* StartConsumingCodeCacheOnBackground(
       Isolate* isolate, std::unique_ptr<CachedData> source);
 
   /**
@@ -650,14 +903,6 @@ class V8_EXPORT ScriptCompiler {
    * It is possible to specify multiple context extensions (obj in the above
    * example).
    */
-  V8_DEPRECATED("Use CompileFunction")
-  static V8_WARN_UNUSED_RESULT MaybeLocal<Function> CompileFunctionInContext(
-      Local<Context> context, Source* source, size_t arguments_count,
-      Local<String> arguments[], size_t context_extension_count,
-      Local<Object> context_extensions[],
-      CompileOptions options = kNoCompileOptions,
-      NoCacheReason no_cache_reason = kNoCacheNoReason,
-      Local<ScriptOrModule>* script_or_module_out = nullptr);
   static V8_WARN_UNUSED_RESULT MaybeLocal<Function> CompileFunction(
       Local<Context> context, Source* source, size_t arguments_count = 0,
       Local<String> arguments[] = nullptr, size_t context_extension_count = 0,
@@ -720,6 +965,19 @@ ScriptCompiler::Source::Source(Local<String> string, CachedData* data,
       cached_data(data),
       consume_cache_task(consume_cache_task) {}
 
+ScriptCompiler::Source::Source(Local<String> string, const ScriptOrigin& origin,
+                               CompileHintCallback callback,
+                               void* callback_data)
+    : source_string(string),
+      resource_name(origin.ResourceName()),
+      resource_line_offset(origin.LineOffset()),
+      resource_column_offset(origin.ColumnOffset()),
+      resource_options(origin.Options()),
+      source_map_url(origin.SourceMapUrl()),
+      host_defined_options(origin.GetHostDefinedOptions()),
+      compile_hint_callback(callback),
+      compile_hint_callback_data(callback_data) {}
+
 const ScriptCompiler::CachedData* ScriptCompiler::Source::GetCachedData()
     const {
   return cached_data.get();
@@ -727,6 +985,11 @@ const ScriptCompiler::CachedData* ScriptCompiler::Source::GetCachedData()
 
 const ScriptOriginOptions& ScriptCompiler::Source::GetResourceOptions() const {
   return resource_options;
+}
+
+const ScriptCompiler::CompilationDetails&
+ScriptCompiler::Source::GetCompilationDetails() const {
+  return compilation_details;
 }
 
 ModuleRequest* ModuleRequest::Cast(Data* data) {

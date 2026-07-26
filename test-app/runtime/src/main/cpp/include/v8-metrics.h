@@ -8,10 +8,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <optional>
 #include <vector>
 
 #include "v8-internal.h"      // NOLINT(build/include_directory)
+#include "v8-isolate.h"       // NOLINT(build/include_directory)
 #include "v8-local-handle.h"  // NOLINT(build/include_directory)
+#include "v8config.h"         // NOLINT(build/include_directory)
 
 namespace v8 {
 
@@ -34,8 +37,23 @@ struct GarbageCollectionSizes {
   int64_t bytes_freed = -1;
 };
 
+struct GarbageCollectionLimits {
+  int64_t bytes_baseline = -1;
+  int64_t bytes_limit = -1;
+  int64_t bytes_current = -1;
+  int64_t bytes_max = -1;
+};
+
 struct GarbageCollectionFullCycle {
   int reason = -1;
+  int incremental_marking_reason = -1;
+  // The priority of the isolate during the GC cycle. A nullopt value denotes a
+  // mixed priority cycle, meaning the Isolate's priority was changed while the
+  // cycle was in progress.
+  std::optional<v8::Isolate::Priority> priority = std::nullopt;
+  bool reduce_memory = false;
+  bool is_loading = false;
+  bool is_input_handling = false;
   GarbageCollectionPhases total;
   GarbageCollectionPhases total_cpp;
   GarbageCollectionPhases main_thread;
@@ -48,12 +66,21 @@ struct GarbageCollectionFullCycle {
   GarbageCollectionSizes objects_cpp;
   GarbageCollectionSizes memory;
   GarbageCollectionSizes memory_cpp;
+  GarbageCollectionLimits old_generation_consumed;
+  GarbageCollectionLimits global_consumed;
+  int64_t external_memory_bytes = -1;
   double collection_rate_in_percent = -1.0;
   double collection_rate_cpp_in_percent = -1.0;
   double efficiency_in_bytes_per_us = -1.0;
   double efficiency_cpp_in_bytes_per_us = -1.0;
   double main_thread_efficiency_in_bytes_per_us = -1.0;
   double main_thread_efficiency_cpp_in_bytes_per_us = -1.0;
+  double collection_weight_in_percent = -1.0;
+  double collection_weight_cpp_in_percent = -1.0;
+  double main_thread_collection_weight_in_percent = -1.0;
+  double main_thread_collection_weight_cpp_in_percent = -1.0;
+  int64_t incremental_marking_start_stop_wall_clock_duration_in_us = -1;
+  int64_t total_duration_since_last_mark_compact = -1;
 };
 
 struct GarbageCollectionFullMainThreadIncrementalMark {
@@ -80,6 +107,10 @@ using GarbageCollectionFullMainThreadBatchedIncrementalSweep =
 
 struct GarbageCollectionYoungCycle {
   int reason = -1;
+  // The priority of the isolate during the GC cycle. A nullopt value denotes a
+  // mixed priority cycle, meaning the Isolate's priority was changed while the
+  // cycle was in progress.
+  std::optional<v8::Isolate::Priority> priority = std::nullopt;
   int64_t total_wall_clock_duration_in_us = -1;
   int64_t main_thread_wall_clock_duration_in_us = -1;
   double collection_rate_in_percent = -1.0;
@@ -95,60 +126,44 @@ struct GarbageCollectionYoungCycle {
 #endif  // defined(CPPGC_YOUNG_GENERATION)
 };
 
+// Note: These structs do not define any constructor, and declare most fields as
+// const, to force initializing them when using aggregate (designated)
+// initialization.
+// Those structs are meant to be created in V8 and read by embedders.
 struct WasmModuleDecoded {
-  bool async = false;
-  bool streamed = false;
-  bool success = false;
-  size_t module_size_in_bytes = 0;
-  size_t function_count = 0;
+  const bool async;
+  const bool streamed;
+  const bool success;
+  const size_t module_size_in_bytes;
+  const size_t function_count;
+  // Optional field; only set if a high-resolution clock is available.
   int64_t wall_clock_duration_in_us = -1;
-  int64_t cpu_duration_in_us = -1;
 };
 
 struct WasmModuleCompiled {
-  bool async = false;
-  bool streamed = false;
-  bool cached = false;
-  bool deserialized = false;
-  bool lazy = false;
-  bool success = false;
-  size_t code_size_in_bytes = 0;
-  size_t liftoff_bailout_count = 0;
+  const bool async;
+  const bool streamed;
+  const bool cached;
+  const bool deserialized;
+  const bool lazy;
+  const bool success;
+  const size_t code_size_in_bytes;
+  const size_t liftoff_bailout_count;
+  // Optional field; only set if a high-resolution clock is available.
   int64_t wall_clock_duration_in_us = -1;
-  int64_t cpu_duration_in_us = -1;
 };
 
 struct WasmModuleInstantiated {
-  bool async = false;
-  bool success = false;
-  size_t imported_function_count = 0;
+  const bool async;
+  const bool success;
+  const size_t imported_function_count;
+  // Optional field; only set if a high-resolution clock is available.
   int64_t wall_clock_duration_in_us = -1;
-};
-
-struct WasmModuleTieredUp {
-  bool lazy = false;
-  size_t code_size_in_bytes = 0;
-  int64_t wall_clock_duration_in_us = -1;
-  int64_t cpu_duration_in_us = -1;
 };
 
 struct WasmModulesPerIsolate {
-  size_t count = 0;
+  const size_t count;
 };
-
-#define V8_MAIN_THREAD_METRICS_EVENTS(V)                    \
-  V(GarbageCollectionFullCycle)                             \
-  V(GarbageCollectionFullMainThreadIncrementalMark)         \
-  V(GarbageCollectionFullMainThreadBatchedIncrementalMark)  \
-  V(GarbageCollectionFullMainThreadIncrementalSweep)        \
-  V(GarbageCollectionFullMainThreadBatchedIncrementalSweep) \
-  V(GarbageCollectionYoungCycle)                            \
-  V(WasmModuleDecoded)                                      \
-  V(WasmModuleCompiled)                                     \
-  V(WasmModuleInstantiated)                                 \
-  V(WasmModuleTieredUp)
-
-#define V8_THREAD_SAFE_METRICS_EVENTS(V) V(WasmModulesPerIsolate)
 
 /**
  * This class serves as a base class for recording event-based metrics in V8.
@@ -158,19 +173,6 @@ struct WasmModulesPerIsolate {
  * executable on the main thread. If such an event is triggered from a
  * background thread, it will be delayed and executed by the foreground task
  * runner.
- *
- * The thread-safe events are listed in the V8_THREAD_SAFE_METRICS_EVENTS
- * macro above while the main thread event are listed in
- * V8_MAIN_THREAD_METRICS_EVENTS above. For the former, a virtual method
- * AddMainThreadEvent(const E& event, v8::Context::Token token) will be
- * generated and for the latter AddThreadSafeEvent(const E& event).
- *
- * Thread-safe events are not allowed to access the context and therefore do
- * not carry a context ID with them. These IDs can be generated using
- * Recorder::GetContextId() and the ID will be valid throughout the lifetime
- * of the isolate. It is not guaranteed that the ID will still resolve to
- * a valid context using Recorder::GetContext() at the time the metric is
- * recorded. In this case, an empty handle will be returned.
  *
  * The embedder is expected to call v8::Isolate::SetMetricsRecorder()
  * providing its implementation and have the virtual methods overwritten
@@ -202,14 +204,30 @@ class V8_EXPORT Recorder {
 
   virtual ~Recorder() = default;
 
+  // Main thread events. Those are only triggered on the main thread, and hence
+  // can access the context.
 #define ADD_MAIN_THREAD_EVENT(E) \
-  virtual void AddMainThreadEvent(const E& event, ContextId context_id) {}
-  V8_MAIN_THREAD_METRICS_EVENTS(ADD_MAIN_THREAD_EVENT)
+  virtual void AddMainThreadEvent(const E&, ContextId) {}
+  ADD_MAIN_THREAD_EVENT(GarbageCollectionFullCycle)
+  ADD_MAIN_THREAD_EVENT(GarbageCollectionFullMainThreadIncrementalMark)
+  ADD_MAIN_THREAD_EVENT(GarbageCollectionFullMainThreadBatchedIncrementalMark)
+  ADD_MAIN_THREAD_EVENT(GarbageCollectionFullMainThreadIncrementalSweep)
+  ADD_MAIN_THREAD_EVENT(GarbageCollectionFullMainThreadBatchedIncrementalSweep)
+  ADD_MAIN_THREAD_EVENT(GarbageCollectionYoungCycle)
+  ADD_MAIN_THREAD_EVENT(WasmModuleDecoded)
+  ADD_MAIN_THREAD_EVENT(WasmModuleCompiled)
+  ADD_MAIN_THREAD_EVENT(WasmModuleInstantiated)
 #undef ADD_MAIN_THREAD_EVENT
 
+  // Thread-safe events are not allowed to access the context and therefore do
+  // not carry a context ID with them. These IDs can be generated using
+  // Recorder::GetContextId() and the ID will be valid throughout the lifetime
+  // of the isolate. It is not guaranteed that the ID will still resolve to
+  // a valid context using Recorder::GetContext() at the time the metric is
+  // recorded. In this case, an empty handle will be returned.
 #define ADD_THREAD_SAFE_EVENT(E) \
-  virtual void AddThreadSafeEvent(const E& event) {}
-  V8_THREAD_SAFE_METRICS_EVENTS(ADD_THREAD_SAFE_EVENT)
+  virtual void AddThreadSafeEvent(const E&) {}
+  ADD_THREAD_SAFE_EVENT(WasmModulesPerIsolate)
 #undef ADD_THREAD_SAFE_EVENT
 
   virtual void NotifyIsolateDisposal() {}
