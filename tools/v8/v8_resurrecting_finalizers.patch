@@ -1,0 +1,367 @@
+diff --git a/include/v8-weak-callback-info.h b/include/v8-weak-callback-info.h
+index ad2ae1f4517..c2c76af2830 100644
+--- a/include/v8-weak-callback-info.h
++++ b/include/v8-weak-callback-info.h
+@@ -71,6 +71,17 @@ enum class WeakCallbackType {
+    * Passes the first two internal fields of the object back to the callback.
+    */
+   kInternalFields,
++  /**
++   * Passes a user-defined void* parameter back to the callback. The callback
++   * runs after the garbage collection pause with the object still alive and
++   * fully accessible, and may keep it alive for another cycle ("resurrect" it)
++   * by re-arming the handle with ClearWeak() followed by SetWeak(). A callback
++   * that does neither is a fatal error.
++   *
++   * Unlike the other weakness types, JavaScript execution and V8 API calls are
++   * permitted in the callback, and a second-pass callback cannot be scheduled.
++   */
++  kFinalizer,
+ };
+ 
+ template <class T>
+diff --git a/src/handles/global-handles.cc b/src/handles/global-handles.cc
+index e03603371cd..481e317df87 100644
+--- a/src/handles/global-handles.cc
++++ b/src/handles/global-handles.cc
+@@ -55,6 +55,11 @@ enum class WeaknessType {
+   // Weakness where the handle is automatically reset in the garbage collector
+   // when the object is no longer reachable.
+   kNoCallback,
++  // Weakness with custom callback that receives the object still alive and may
++  // resurrect it by re-arming the handle. Unlike the types above, the callback
++  // runs after the pause with JS execution allowed. See
++  // `v8::WeakCallbackType::kFinalizer`.
++  kFinalizer,
+ };
+ 
+ template <class _NodeType>
+@@ -476,6 +481,19 @@ class GlobalHandles::Node final : public NodeBase<GlobalHandles::Node> {
+     return weakness_type() == WeaknessType::kNoCallback;
+   }
+ 
++  bool IsFinalizerHandle() const {
++    return weakness_type() == WeaknessType::kFinalizer;
++  }
++
++  // Set between the point the GC finds a finalizer handle's object dead and
++  // the point its callback has run. While set, the node is treated as a strong
++  // root so that a nested GC cannot reclaim the object the callback is about
++  // to inspect, and re-identification is suppressed so the callback runs once.
++  bool pending_finalizer() const { return IsPendingFinalizer::decode(flags_); }
++  void set_pending_finalizer(bool v) {
++    flags_ = IsPendingFinalizer::update(flags_, v);
++  }
++
+   bool IsWeakOrStrongRetainer() const {
+     return state() == NORMAL || state() == WEAK;
+   }
+@@ -499,6 +517,8 @@ class GlobalHandles::Node final : public NodeBase<GlobalHandles::Node> {
+     DCHECK(IsInUse());
+     CHECK_NE(object_, kGlobalHandleZapValue);
+     set_state(WEAK);
++    // Re-arming from a finalizer callback ends that finalization.
++    set_pending_finalizer(false);
+     switch (type) {
+       case v8::WeakCallbackType::kParameter:
+         set_weakness_type(WeaknessType::kCallback);
+@@ -506,6 +526,9 @@ class GlobalHandles::Node final : public NodeBase<GlobalHandles::Node> {
+       case v8::WeakCallbackType::kInternalFields:
+         set_weakness_type(WeaknessType::kCallbackWithTwoEmbedderFields);
+         break;
++      case v8::WeakCallbackType::kFinalizer:
++        set_weakness_type(WeaknessType::kFinalizer);
++        break;
+     }
+     set_parameter(parameter);
+     weak_callback_ = phantom_callback;
+@@ -515,6 +538,7 @@ class GlobalHandles::Node final : public NodeBase<GlobalHandles::Node> {
+     DCHECK(IsInUse());
+     CHECK_NE(object_, kGlobalHandleZapValue);
+     set_state(WEAK);
++    set_pending_finalizer(false);
+     set_weakness_type(WeaknessType::kNoCallback);
+     set_parameter(location_addr);
+     weak_callback_ = nullptr;
+@@ -524,6 +548,8 @@ class GlobalHandles::Node final : public NodeBase<GlobalHandles::Node> {
+     DCHECK(IsInUse());
+     void* p = parameter();
+     set_state(NORMAL);
++    // Re-arming from a finalizer callback ends that finalization.
++    set_pending_finalizer(false);
+     set_parameter(nullptr);
+     return p;
+   }
+@@ -566,6 +592,26 @@ class GlobalHandles::Node final : public NodeBase<GlobalHandles::Node> {
+     NodeSpace<Node>::Release(this);
+   }
+ 
++  // Invokes a finalizer callback. The name is load-bearing:
++  // tools/cfi/ignores.txt blocklists
++  // `*GlobalHandles*PostGarbageCollectionProcessing*` because `weak_callback_`
++  // is invoked on the wrong type. Renaming requires updating that blocklist.
++  void PostGarbageCollectionProcessing(Isolate* isolate) {
++    DCHECK(IsFinalizerHandle());
++    DCHECK(pending_finalizer());
++    DCHECK_NOT_NULL(weak_callback_);
++    // Leaving V8.
++    VMState<EXTERNAL> vmstate(isolate);
++    HandleScope handle_scope(isolate);
++    void* embedder_fields[v8::kEmbedderFieldsInWeakCallback] = {nullptr,
++                                                                nullptr};
++    // No second-pass callback slot: resurrection and second-pass processing are
++    // mutually exclusive.
++    v8::WeakCallbackInfo<void> data(reinterpret_cast<v8::Isolate*>(isolate),
++                                    parameter(), embedder_fields, nullptr);
++    weak_callback_(data);
++  }
++
+   void MarkAsFree() { set_state(FREE); }
+   void MarkAsUsed() { set_state(NORMAL); }
+ 
+@@ -575,7 +621,12 @@ class GlobalHandles::Node final : public NodeBase<GlobalHandles::Node> {
+ 
+  private:
+   // Fields that are not used for managing node memory.
+-  void ClearImplFields() { weak_callback_ = nullptr; }
++  void ClearImplFields() {
++    weak_callback_ = nullptr;
++    // Must not survive into a reallocated node: a freed node carries a zapped
++    // location and must never be visited as a pending-finalizer root.
++    set_pending_finalizer(false);
++  }
+ 
+   void CheckNodeIsFreeNodeImpl() const {
+     DCHECK_EQ(nullptr, weak_callback_);
+@@ -590,6 +641,7 @@ class GlobalHandles::Node final : public NodeBase<GlobalHandles::Node> {
+   // when young nodes are proccessed.
+   using IsInYoungList = NodeState::Next<bool, 1>;
+   using NodeWeaknessType = IsInYoungList::Next<WeaknessType, 2>;
++  using IsPendingFinalizer = NodeWeaknessType::Next<bool, 1>;
+ 
+   // Handle specific callback - might be a weak reference in disguise.
+   WeakCallbackInfo<void>::Callback weak_callback_;
+@@ -694,6 +746,14 @@ V8_INLINE bool GlobalHandles::ResetWeakNodeIfDead(
+     Node* node, WeakSlotCallbackWithHeap should_reset_handle) {
+   DCHECK(node->IsWeakRetainer());
+ 
++  // Finalizer handles are never reclaimed here.
++  // `IdentifyDeadFinalizerHandles()` queues and re-roots the dead ones earlier
++  // in the same GC, so reporting one alive is accurate. It also keeps passes
++  // that run without that keep-alive (client isolates of a shared space) from
++  // dropping a handle whose callback has not run, at worst deferring
++  // collection by a cycle.
++  if (node->IsFinalizerHandle()) return false;
++
+   if (!should_reset_handle(isolate()->heap(), node->location())) return false;
+ 
+   switch (node->weakness_type()) {
+@@ -705,10 +765,32 @@ V8_INLINE bool GlobalHandles::ResetWeakNodeIfDead(
+     case WeaknessType::kCallbackWithTwoEmbedderFields:
+       node->CollectPhantomCallbackData(&pending_phantom_callbacks_);
+       break;
++    case WeaknessType::kFinalizer:
++      UNREACHABLE();
+   }
+   return true;
+ }
+ 
++void GlobalHandles::IdentifyDeadFinalizerHandles(
++    WeakSlotCallbackWithHeap should_reset_handle) {
++  for (Node* node : *regular_nodes_) {
++    if (!node->IsWeakRetainer() || !node->IsFinalizerHandle()) continue;
++    // Already queued by an earlier GC whose callbacks have not run yet.
++    if (node->pending_finalizer()) continue;
++    if (!should_reset_handle(isolate()->heap(), node->location())) continue;
++
++    node->set_pending_finalizer(true);
++    pending_finalizers_.push_back(node);
++  }
++}
++
++DISABLE_CFI_PERF
++void GlobalHandles::IterateFinalizerHandlesAsRoots(RootVisitor* v) {
++  for (Node* node : pending_finalizers_) {
++    v->VisitRootPointer(Root::kGlobalHandles, node->label(), node->location());
++  }
++}
++
+ DISABLE_CFI_PERF
+ void GlobalHandles::IterateWeakRootsForPhantomHandles(
+     WeakSlotCallbackWithHeap should_reset_handle) {
+@@ -719,7 +801,10 @@ void GlobalHandles::IterateWeakRootsForPhantomHandles(
+ 
+ void GlobalHandles::IterateYoungStrongAndDependentRoots(RootVisitor* v) {
+   for (Node* node : young_nodes_) {
+-    if (node->IsStrongRetainer()) {
++    // Finalizer handles are strong for young GC: young collections never
++    // finalize, they just promote. Collection is deferred to a full GC.
++    if (node->IsStrongRetainer() ||
++        (node->IsWeakRetainer() && node->IsFinalizerHandle())) {
+       v->VisitRootPointer(Root::kGlobalHandles, node->label(),
+                           node->location());
+     }
+@@ -731,6 +816,9 @@ void GlobalHandles::ProcessWeakYoungObjects(
+   for (Node* node : young_nodes_) {
+     DCHECK(node->is_in_young_list());
+ 
++    // Already visited as a strong root above.
++    if (node->IsWeakRetainer() && node->IsFinalizerHandle()) continue;
++
+     if (node->IsWeakRetainer() &&
+         !ResetWeakNodeIfDead(node, should_reset_handle)) {
+       // Node is weak and alive, so it should be passed onto the visitor if
+@@ -867,6 +955,30 @@ void GlobalHandles::PendingPhantomCallback::Invoke(Isolate* isolate,
+   callback(data);
+ }
+ 
++void GlobalHandles::InvokeFinalizerCallbacks() {
++  // Finalizers may allocate, execute JS and trigger nested GCs. A nested GC
++  // observes the remaining entries as still pending, so it re-roots rather than
++  // re-queues them; it may append newly dead handles, which this loop drains
++  // too. The node is popped before its callback runs, so a nested drain cannot
++  // invoke it twice.
++  while (!pending_finalizers_.empty()) {
++    Node* node = pending_finalizers_.back();
++    pending_finalizers_.pop_back();
++    // The queue can outlive its entries: GC epilogue callbacks run before this
++    // drain and may reset a queued handle, and a nested drain may have handled
++    // it already. Freeing or re-arming a node clears the bit, and node memory
++    // is only released with the isolate, so this stays a valid read.
++    if (!node->pending_finalizer()) continue;
++    node->PostGarbageCollectionProcessing(isolate_);
++    // Both legal outcomes clear the pending bit: resetting the handle frees the
++    // node, re-arming it goes through ClearWeakness()/MakeWeak(). Anything else
++    // would leave the handle rooted forever.
++    CHECK_WITH_MSG(!node->pending_finalizer(),
++                   "Finalizer callback must either reset its handle or re-arm "
++                   "it. See |v8::WeakCallbackType::kFinalizer|.");
++  }
++}
++
+ void GlobalHandles::PostGarbageCollectionProcessing(
+     v8::GCCallbackFlags gc_callback_flags) {
+   // Process weak global handle callbacks. This must be done after the
+@@ -874,6 +986,8 @@ void GlobalHandles::PostGarbageCollectionProcessing(
+   // API functions.
+   DCHECK_EQ(Heap::NOT_IN_GC, isolate_->heap()->gc_state());
+ 
++  InvokeFinalizerCallbacks();
++
+   if (second_pass_callbacks_.empty()) return;
+ 
+   const bool synchronous_second_pass =
+@@ -902,7 +1016,10 @@ void GlobalHandles::PostGarbageCollectionProcessing(
+ 
+ void GlobalHandles::IterateStrongRoots(RootVisitor* v) {
+   for (Node* node : *regular_nodes_) {
+-    if (node->IsStrongRetainer()) {
++    // A handle queued for finalization is rooted until its callback has run, so
++    // that a GC nested inside a finalizer cannot reclaim the object that
++    // callback is inspecting.
++    if (node->IsStrongRetainer() || node->pending_finalizer()) {
+       v->VisitRootPointer(Root::kGlobalHandles, node->label(),
+                           node->location());
+     }
+diff --git a/src/handles/global-handles.h b/src/handles/global-handles.h
+index f53b1d87ccb..ce88410c543 100644
+--- a/src/handles/global-handles.h
++++ b/src/handles/global-handles.h
+@@ -95,6 +95,16 @@ class V8_EXPORT_PRIVATE GlobalHandles final {
+   void IterateWeakRootsForPhantomHandles(
+       WeakSlotCallbackWithHeap should_reset_handle);
+ 
++  // Queues finalizer handles whose objects |should_reset_handle| reports dead.
++  // Must run before any weakness is processed, and be paired with
++  // `IterateFinalizerHandlesAsRoots()` plus a re-drained marking closure in the
++  // same GC: queued objects must end the cycle marked live so their callbacks
++  // can inspect them afterwards.
++  void IdentifyDeadFinalizerHandles(
++      WeakSlotCallbackWithHeap should_reset_handle);
++  // Visits all queued finalizer handles so their objects survive this GC.
++  void IterateFinalizerHandlesAsRoots(RootVisitor* v);
++
+   //  Note: The following *Young* methods are used for the Scavenger to
+   //  identify and process handles in the young generation. The set of young
+   //  handles is complete but the methods may encounter handles that are
+@@ -151,6 +161,9 @@ class V8_EXPORT_PRIVATE GlobalHandles final {
+   bool ResetWeakNodeIfDead(Node* node,
+                            WeakSlotCallbackWithHeap should_reset_node);
+ 
++  // Runs queued finalizer callbacks. Requires JS execution to be allowed.
++  void InvokeFinalizerCallbacks();
++
+   Isolate* const isolate_;
+ 
+   std::unique_ptr<NodeSpace<Node>> regular_nodes_;
+@@ -159,6 +172,9 @@ class V8_EXPORT_PRIVATE GlobalHandles final {
+   std::vector<Node*> young_nodes_;
+   std::vector<std::pair<Node*, PendingPhantomCallback>>
+       pending_phantom_callbacks_;
++  // Finalizer handles found dead but not yet finalized. Kept as roots until
++  // their callbacks run.
++  std::vector<Node*> pending_finalizers_;
+   std::vector<PendingPhantomCallback> second_pass_callbacks_;
+   bool second_pass_callbacks_task_posted_ = false;
+   size_t last_gc_custom_callbacks_ = 0;
+diff --git a/src/heap/gc-tracer.cc b/src/heap/gc-tracer.cc
+index e3c3844c0ef..b5e7935010e 100644
+--- a/src/heap/gc-tracer.cc
++++ b/src/heap/gc-tracer.cc
+@@ -1138,6 +1138,8 @@ void GCTracer::PrintNVP() const {
+              current_scope(Scope::MC_MARK_WEAK_CLOSURE_EPHEMERON_MARKING))
+           .p("mark.ephemeron.linear",
+              current_scope(Scope::MC_MARK_WEAK_CLOSURE_EPHEMERON_LINEAR))
++          .p("mark.finalizers",
++             current_scope(Scope::MC_MARK_WEAK_CLOSURE_FINALIZERS))
+           .p("mark.embedder_prologue",
+              current_scope(Scope::MC_MARK_EMBEDDER_PROLOGUE))
+           .p("mark.embedder_tracing",
+diff --git a/src/heap/mark-compact.cc b/src/heap/mark-compact.cc
+index b65cd3af3e0..d81667a115e 100644
+--- a/src/heap/mark-compact.cc
++++ b/src/heap/mark-compact.cc
+@@ -2661,6 +2661,31 @@ void MarkCompactCollector::MarkLiveObjects() {
+     VerifyEphemeronMarking();
+   }
+ 
++  {
++    // Objects held only by finalizer handles cannot be reclaimed yet: their
++    // callbacks run after the pause and may resurrect them. Queue them and mark
++    // them, along with everything they reach, so the rest of this GC sees them
++    // as live.
++    //
++    // This must stay inside the atomic pause and before
++    // `ClearNonLiveReferences()` so that (a) every weakness pass observes the
++    // resurrected closure as live, and (b) cppgc pointers found here are still
++    // drained by the marker, which `CppHeap::FinishMarkingAndProcessWeakness()`
++    // shuts down afterwards.
++    TRACE_GC(heap_->tracer(), GCTracer::Scope::MC_MARK_WEAK_CLOSURE_FINALIZERS);
++    heap_->isolate()->global_handles()->IdentifyDeadFinalizerHandles(
++        &IsUnmarkedHeapObject);
++    heap_->isolate()->global_handles()->IterateFinalizerHandlesAsRoots(
++        &root_visitor);
++    if (!MarkTransitiveClosureFixpoint()) {
++      MarkTransitiveClosureLinear();
++    }
++    CHECK(local_marking_worklists_->IsEmpty());
++    CHECK(
++        local_weak_objects()->current_ephemerons_local.IsLocalAndGlobalEmpty());
++    CHECK(IsCppHeapMarkingFinished(heap_, local_marking_worklists_.get()));
++  }
++
+   if (was_marked_incrementally) {
+     // Disable the marking barrier after concurrent/parallel marking has
+     // finished as it will reset page flags that share the same bitmap as
+diff --git a/src/init/heap-symbols.h b/src/init/heap-symbols.h
+index b33d2002e53..90aa4b6550b 100644
+--- a/src/init/heap-symbols.h
++++ b/src/init/heap-symbols.h
+@@ -1115,6 +1115,7 @@
+   F(MC_MARK_FULL_CLOSURE)                       \
+   F(MC_MARK_WEAK_CLOSURE_EPHEMERON_MARKING)     \
+   F(MC_MARK_WEAK_CLOSURE_EPHEMERON_LINEAR)      \
++  F(MC_MARK_WEAK_CLOSURE_FINALIZERS)            \
+   F(MC_MARK_VERIFY)                             \
+   F(MC_SWEEP_CODE)                              \
+   F(MC_SWEEP_CODE_LO)                           \
