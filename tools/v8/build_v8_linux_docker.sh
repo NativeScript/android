@@ -78,10 +78,15 @@ set -e
 
 echo "### installing host packages"
 export DEBIAN_FRONTEND=noninteractive
+# i386 multiarch is required, not optional: building a 32-bit Android target
+# makes mksnapshot and the bytecode-builtins generator 32-bit x86 host binaries,
+# and without the i386 runtime they link fine and then fail to execute.
+dpkg --add-architecture i386
 apt-get update -qq
 apt-get install -y -qq --no-install-recommends \
     git python3 python3-setuptools curl ca-certificates xz-utils zip unzip \
-    rsync file lsb-release build-essential pkg-config > /dev/null
+    rsync file lsb-release build-essential pkg-config \
+    libc6:i386 libstdc++6:i386 libatomic1:i386 zlib1g:i386 > /dev/null
 
 if [ ! -d /v8/depot_tools ]; then
     echo "### fetching depot_tools"
