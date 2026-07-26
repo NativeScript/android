@@ -25,3 +25,19 @@ android-runtime.iml
 test-app/build-tools/*.log
 test-app/analytics/build-statistics.json
 package-lock.json
+
+# V8 prebuilts and the headers that must match them, installed by
+# tools/v8/fetch_prebuilt_v8.sh from the release pinned in tools/v8/V8_RELEASE.
+#
+# The headers are ignored along with the libraries on purpose: keeping a
+# vendored copy in git is how it drifts out of step with the binaries it
+# describes. Sourcing both from one verified artifact makes that impossible.
+/.v8-prebuilt/
+test-app/runtime/src/main/libs/*/libv8_monolith.a
+test-app/runtime/src/main/libs/.v8-release-stamp
+test-app/runtime/src/main/cpp/include/**
+!test-app/runtime/src/main/cpp/include/zip.h
+!test-app/runtime/src/main/cpp/include/zipconf.h
+test-app/runtime/src/main/cpp/v8_inspector/src/
+test-app/runtime/src/main/cpp/v8_inspector/third_party/
+test-app/runtime/src/main/cpp/v8_inspector/absl/
