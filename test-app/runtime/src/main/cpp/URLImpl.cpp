@@ -10,7 +10,7 @@ using namespace ada;
 URLImpl::URLImpl(url_aggregator url) : url_(url) {}
 
 URLImpl *URLImpl::GetPointer(v8::Local<v8::Object> object) {
-    auto ptr = object->GetAlignedPointerFromInternalField(0);
+    auto ptr = object->GetAlignedPointerFromInternalField(0, v8::kEmbedderDataTypeTagDefault);
     if (ptr == nullptr) {
         return nullptr;
     }
@@ -27,47 +27,47 @@ v8::Local<v8::FunctionTemplate> URLImpl::GetCtor(v8::Isolate *isolate) {
 
     auto tmpl = ctorTmpl->InstanceTemplate();
     tmpl->SetInternalFieldCount(1);
-    tmpl->SetAccessor(
+    tmpl->SetNativeDataProperty(
             ArgConverter::ConvertToV8String(isolate, "hash"),
             GetHash, SetHash);
-    tmpl->SetAccessor(
+    tmpl->SetNativeDataProperty(
             ArgConverter::ConvertToV8String(isolate, "host"),
             GetHost, SetHost);
-    tmpl->SetAccessor(
+    tmpl->SetNativeDataProperty(
             ArgConverter::ConvertToV8String(isolate, "hash"),
             GetHash, SetHash);
-    tmpl->SetAccessor(
+    tmpl->SetNativeDataProperty(
             ArgConverter::ConvertToV8String(isolate, "hostname"),
             GetHostName, SetHostName);
-    tmpl->SetAccessor(
+    tmpl->SetNativeDataProperty(
             ArgConverter::ConvertToV8String(isolate, "href"),
             GetHref, SetHref);
 
-    tmpl->SetAccessor(
+    tmpl->SetNativeDataProperty(
             ArgConverter::ConvertToV8String(isolate, "origin"),
             GetOrigin);
 
-    tmpl->SetAccessor(
+    tmpl->SetNativeDataProperty(
             ArgConverter::ConvertToV8String(isolate, "password"),
             GetPassword, SetPassword);
 
-    tmpl->SetAccessor(
+    tmpl->SetNativeDataProperty(
             ArgConverter::ConvertToV8String(isolate, "pathname"),
             GetPathName, SetPathName);
 
-    tmpl->SetAccessor(
+    tmpl->SetNativeDataProperty(
             ArgConverter::ConvertToV8String(isolate, "port"),
             GetPort, SetPort);
 
-    tmpl->SetAccessor(
+    tmpl->SetNativeDataProperty(
             ArgConverter::ConvertToV8String(isolate, "protocol"),
             GetProtocol, SetProtocol);
 
-    tmpl->SetAccessor(
+    tmpl->SetNativeDataProperty(
             ArgConverter::ConvertToV8String(isolate, "search"),
             GetSearch, SetSearch);
 
-    tmpl->SetAccessor(
+    tmpl->SetNativeDataProperty(
             ArgConverter::ConvertToV8String(isolate, "username"),
             GetUserName, SetUserName);
 
@@ -168,7 +168,7 @@ void URLImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto urlImpl = new URLImpl(url);
 
 
-    ret->SetAlignedPointerInInternalField(0, urlImpl);
+    ret->SetAlignedPointerInInternalField(0, urlImpl, v8::kEmbedderDataTypeTagDefault);
 
     urlImpl->BindFinalizer(isolate, ret);
 
@@ -176,9 +176,9 @@ void URLImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value> &args) {
 }
 
 
-void URLImpl::GetHash(v8::Local<v8::String> property,
+void URLImpl::GetHash(v8::Local<v8::Name> property,
                       const v8::PropertyCallbackInfo<v8::Value> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         info.GetReturnValue().SetEmptyString();
         return;
@@ -190,10 +190,10 @@ void URLImpl::GetHash(v8::Local<v8::String> property,
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
 }
 
-void URLImpl::SetHash(v8::Local<v8::String> property,
+void URLImpl::SetHash(v8::Local<v8::Name> property,
                       v8::Local<v8::Value> value,
                       const v8::PropertyCallbackInfo<void> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         return;
     }
@@ -204,9 +204,9 @@ void URLImpl::SetHash(v8::Local<v8::String> property,
 }
 
 
-void URLImpl::GetHost(v8::Local<v8::String> property,
+void URLImpl::GetHost(v8::Local<v8::Name> property,
                       const v8::PropertyCallbackInfo<v8::Value> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         info.GetReturnValue().SetEmptyString();
         return;
@@ -218,10 +218,10 @@ void URLImpl::GetHost(v8::Local<v8::String> property,
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
 }
 
-void URLImpl::SetHost(v8::Local<v8::String> property,
+void URLImpl::SetHost(v8::Local<v8::Name> property,
                       v8::Local<v8::Value> value,
                       const v8::PropertyCallbackInfo<void> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         return;
     }
@@ -232,9 +232,9 @@ void URLImpl::SetHost(v8::Local<v8::String> property,
 }
 
 
-void URLImpl::GetHostName(v8::Local<v8::String> property,
+void URLImpl::GetHostName(v8::Local<v8::Name> property,
                           const v8::PropertyCallbackInfo<v8::Value> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         info.GetReturnValue().SetEmptyString();
         return;
@@ -246,10 +246,10 @@ void URLImpl::GetHostName(v8::Local<v8::String> property,
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
 }
 
-void URLImpl::SetHostName(v8::Local<v8::String> property,
+void URLImpl::SetHostName(v8::Local<v8::Name> property,
                           v8::Local<v8::Value> value,
                           const v8::PropertyCallbackInfo<void> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         return;
     }
@@ -260,9 +260,9 @@ void URLImpl::SetHostName(v8::Local<v8::String> property,
 }
 
 
-void URLImpl::GetHref(v8::Local<v8::String> property,
+void URLImpl::GetHref(v8::Local<v8::Name> property,
                       const v8::PropertyCallbackInfo<v8::Value> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         info.GetReturnValue().SetEmptyString();
         return;
@@ -275,10 +275,10 @@ void URLImpl::GetHref(v8::Local<v8::String> property,
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
 }
 
-void URLImpl::SetHref(v8::Local<v8::String> property,
+void URLImpl::SetHref(v8::Local<v8::Name> property,
                       v8::Local<v8::Value> value,
                       const v8::PropertyCallbackInfo<void> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         return;
     }
@@ -288,9 +288,9 @@ void URLImpl::SetHref(v8::Local<v8::String> property,
     ptr->GetURL()->set_href(val.c_str());
 }
 
-void URLImpl::GetOrigin(v8::Local<v8::String> property,
+void URLImpl::GetOrigin(v8::Local<v8::Name> property,
                         const v8::PropertyCallbackInfo<v8::Value> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         info.GetReturnValue().SetEmptyString();
         return;
@@ -303,9 +303,9 @@ void URLImpl::GetOrigin(v8::Local<v8::String> property,
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
 }
 
-void URLImpl::GetPassword(v8::Local<v8::String> property,
+void URLImpl::GetPassword(v8::Local<v8::Name> property,
                           const v8::PropertyCallbackInfo<v8::Value> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         info.GetReturnValue().SetEmptyString();
         return;
@@ -318,10 +318,10 @@ void URLImpl::GetPassword(v8::Local<v8::String> property,
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
 }
 
-void URLImpl::SetPassword(v8::Local<v8::String> property,
+void URLImpl::SetPassword(v8::Local<v8::Name> property,
                           v8::Local<v8::Value> value,
                           const v8::PropertyCallbackInfo<void> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         return;
     }
@@ -331,9 +331,9 @@ void URLImpl::SetPassword(v8::Local<v8::String> property,
     ptr->GetURL()->set_password(val.c_str());
 }
 
-void URLImpl::GetPathName(v8::Local<v8::String> property,
+void URLImpl::GetPathName(v8::Local<v8::Name> property,
                           const v8::PropertyCallbackInfo<v8::Value> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         info.GetReturnValue().SetEmptyString();
         return;
@@ -346,10 +346,10 @@ void URLImpl::GetPathName(v8::Local<v8::String> property,
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
 }
 
-void URLImpl::SetPathName(v8::Local<v8::String> property,
+void URLImpl::SetPathName(v8::Local<v8::Name> property,
                           v8::Local<v8::Value> value,
                           const v8::PropertyCallbackInfo<void> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         return;
     }
@@ -359,9 +359,9 @@ void URLImpl::SetPathName(v8::Local<v8::String> property,
     ptr->GetURL()->set_pathname(val.c_str());
 }
 
-void URLImpl::GetPort(v8::Local<v8::String> property,
+void URLImpl::GetPort(v8::Local<v8::Name> property,
                       const v8::PropertyCallbackInfo<v8::Value> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         info.GetReturnValue().SetEmptyString();
         return;
@@ -374,10 +374,10 @@ void URLImpl::GetPort(v8::Local<v8::String> property,
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
 }
 
-void URLImpl::SetPort(v8::Local<v8::String> property,
+void URLImpl::SetPort(v8::Local<v8::Name> property,
                       v8::Local<v8::Value> value,
                       const v8::PropertyCallbackInfo<void> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         return;
     }
@@ -387,9 +387,9 @@ void URLImpl::SetPort(v8::Local<v8::String> property,
     ptr->GetURL()->set_port(val.c_str());
 }
 
-void URLImpl::GetProtocol(v8::Local<v8::String> property,
+void URLImpl::GetProtocol(v8::Local<v8::Name> property,
                           const v8::PropertyCallbackInfo<v8::Value> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         info.GetReturnValue().SetEmptyString();
         return;
@@ -402,10 +402,10 @@ void URLImpl::GetProtocol(v8::Local<v8::String> property,
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
 }
 
-void URLImpl::SetProtocol(v8::Local<v8::String> property,
+void URLImpl::SetProtocol(v8::Local<v8::Name> property,
                           v8::Local<v8::Value> value,
                           const v8::PropertyCallbackInfo<void> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         return;
     }
@@ -416,9 +416,9 @@ void URLImpl::SetProtocol(v8::Local<v8::String> property,
 }
 
 
-void URLImpl::GetSearch(v8::Local<v8::String> property,
+void URLImpl::GetSearch(v8::Local<v8::Name> property,
                         const v8::PropertyCallbackInfo<v8::Value> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         info.GetReturnValue().SetEmptyString();
         return;
@@ -431,10 +431,10 @@ void URLImpl::GetSearch(v8::Local<v8::String> property,
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
 }
 
-void URLImpl::SetSearch(v8::Local<v8::String> property,
+void URLImpl::SetSearch(v8::Local<v8::Name> property,
                         v8::Local<v8::Value> value,
                         const v8::PropertyCallbackInfo<void> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         return;
     }
@@ -445,9 +445,9 @@ void URLImpl::SetSearch(v8::Local<v8::String> property,
 }
 
 
-void URLImpl::GetUserName(v8::Local<v8::String> property,
+void URLImpl::GetUserName(v8::Local<v8::Name> property,
                           const v8::PropertyCallbackInfo<v8::Value> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         info.GetReturnValue().SetEmptyString();
         return;
@@ -460,10 +460,10 @@ void URLImpl::GetUserName(v8::Local<v8::String> property,
             ArgConverter::ConvertToV8String(isolate, value.data(), value.length()));
 }
 
-void URLImpl::SetUserName(v8::Local<v8::String> property,
+void URLImpl::SetUserName(v8::Local<v8::Name> property,
                           v8::Local<v8::Value> value,
                           const v8::PropertyCallbackInfo<void> &info) {
-    URLImpl *ptr = GetPointer(info.This());
+    URLImpl *ptr = GetPointer(info.Holder());
     if (ptr == nullptr) {
         return;
     }

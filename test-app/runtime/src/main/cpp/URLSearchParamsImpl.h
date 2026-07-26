@@ -41,7 +41,7 @@ namespace tns {
         static void Set(const v8::FunctionCallbackInfo<v8::Value> &args);
 
         static void
-        GetSize(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+        GetSize(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
 
         static void Sort(const v8::FunctionCallbackInfo<v8::Value> &args);
 

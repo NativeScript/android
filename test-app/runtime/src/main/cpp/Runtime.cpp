@@ -365,8 +365,7 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
   TryCatch tc(isolate);
 
   Local<Script> script;
-  ScriptOrigin origin(isolate,
-                      ArgConverter::ConvertToV8String(isolate, filename));
+  ScriptOrigin origin(ArgConverter::ConvertToV8String(isolate, filename));
   auto maybeScript = Script::Compile(context, source, &origin).ToLocal(&script);
 
   if (tc.HasCaught()) {
@@ -586,6 +585,11 @@ jboolean Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj,
 }
 
 static void InitializeV8() {
+  // V8::Initialize() freezes the flag list, and changing a flag afterwards
+  // aborts the process, so the app's flags have to be applied here rather than
+  // per isolate. Runtime::Init has already read them out of the Java config.
+  V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(),
+                         Constants::V8_STARTUP_FLAGS.size());
   Runtime::platform = v8::platform::NewDefaultPlatform().release();
   V8::InitializePlatform(Runtime::platform);
   V8::Initialize();
@@ -636,8 +640,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   isolate->SetData((uint32_t)Runtime::IsolateData::RUNTIME, this);
   isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, consts);
 
-  V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(),
-                         Constants::V8_STARTUP_FLAGS.size());
   isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100,
                                                      StackTrace::kOverview);
 

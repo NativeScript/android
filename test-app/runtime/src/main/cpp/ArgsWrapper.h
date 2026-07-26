@@ -22,7 +22,7 @@ struct ArgsWrapper {
             :
             args(a), type(t) {
         }
-        v8::FunctionCallbackInfo<v8::Value> args;
+        const v8::FunctionCallbackInfo<v8::Value>& args;
         ArgType type;
 };
 }

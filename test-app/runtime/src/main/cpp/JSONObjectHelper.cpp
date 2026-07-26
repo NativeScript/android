@@ -25,7 +25,7 @@ void JSONObjectHelper::RegisterFromFunction(Isolate *isolate, Local<Value>& json
     }
 
     Persistent<Function>* serializeFunc = new Persistent<Function>(isolate, CreateSerializeFunc(context));
-    Local<External> extData = External::New(isolate, serializeFunc);
+    Local<External> extData = External::New(isolate, serializeFunc, v8::kExternalPointerTypeTagDefault);
     Local<Function> fromFunc;
     bool ok = FunctionTemplate::New(isolate, ConvertCallbackStatic, extData)->GetFunction(context).ToLocal(&fromFunc);
     assert(ok);
@@ -35,7 +35,7 @@ void JSONObjectHelper::RegisterFromFunction(Isolate *isolate, Local<Value>& json
 void JSONObjectHelper::ConvertCallbackStatic(const FunctionCallbackInfo<Value>& info) {
     try {
         Local<External> extData = info.Data().As<External>();
-        auto poSerializeFunc = reinterpret_cast<Persistent<Function>*>(extData->Value());
+        auto poSerializeFunc = reinterpret_cast<Persistent<Function>*>(extData->Value(v8::kExternalPointerTypeTagDefault));
         Isolate* isolate = info.GetIsolate();
         Local<Function> serializeFunc = poSerializeFunc->Get(isolate);
 
@@ -102,7 +102,7 @@ Local<Function> JSONObjectHelper::CreateSerializeFunc(Local<Context> context) {
         "    }"
         "})()";
 
-    Isolate* isolate = context->GetIsolate();
+    Isolate* isolate = v8::Isolate::GetCurrent();
 
     Local<Script> script = Script::Compile(context, ArgConverter::ConvertToV8String(isolate, source)).ToLocalChecked();
 

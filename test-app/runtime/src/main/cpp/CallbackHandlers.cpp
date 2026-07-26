@@ -593,8 +593,8 @@ CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &imple
     }
 
     vector<jstring> interfacesToImplement;
-    auto isolate = implementationObject->GetIsolate();
-    auto context = implementationObject->CreationContext();
+    auto isolate = v8::Isolate::GetCurrent();
+    auto context = implementationObject->GetCreationContext(isolate).ToLocalChecked();
     Local<String> interfacesName = String::NewFromUtf8Literal(isolate, "interfaces");
     Local<Value> prop;
     if (implementationObject->Get(context, interfacesName).ToLocal(&prop) && !prop.IsEmpty() && prop->IsArray()) {
@@ -639,8 +639,8 @@ CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object> &implementat
     }
 
     vector<jstring> methodNames;
-    auto isolate = implementationObject->GetIsolate();
-    auto context = implementationObject->CreationContext();
+    auto isolate = v8::Isolate::GetCurrent();
+    auto context = implementationObject->GetCreationContext(isolate).ToLocalChecked();
     auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(context, i).ToLocalChecked().As<String>();
@@ -1100,7 +1100,7 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         }
 
         auto thiz = args.This();
-        auto isolate = thiz->GetIsolate();
+        auto isolate = v8::Isolate::GetCurrent();
         auto context = isolate->GetCurrentContext();
 
         std::string workerPath;

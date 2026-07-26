@@ -16,7 +16,7 @@ namespace tns {
         if (object->InternalFieldCount() < 1) {
             return nullptr;
         }
-        auto ptr = object->GetAlignedPointerFromInternalField(0);
+        auto ptr = object->GetAlignedPointerFromInternalField(0, v8::kEmbedderDataTypeTagDefault);
         if (ptr == nullptr) {
             return nullptr;
         }
@@ -66,7 +66,7 @@ namespace tns {
                 ArgConverter::ConvertToV8String(isolate, "set"),
                 v8::FunctionTemplate::New(isolate, Set));
 
-        tmpl->SetAccessor(
+        tmpl->SetNativeDataProperty(
                 ArgConverter::ConvertToV8String(isolate, "size"),
                 GetSize
         );
@@ -257,7 +257,7 @@ namespace tns {
         bool OpenIterator(v8::Local<v8::Context> context, v8::Local<v8::Value> receiver,
                           v8::Local<v8::Function> iterMethod, v8::Local<v8::Object> &outIterator,
                           v8::Local<v8::Function> &outNext) {
-            auto isolate = context->GetIsolate();
+            auto isolate = v8::Isolate::GetCurrent();
             v8::Local<v8::Value> iteratorValue;
             if (!iterMethod->Call(context, receiver, 0, nullptr).ToLocal(&iteratorValue)) {
                 return false;
@@ -287,7 +287,7 @@ namespace tns {
         bool StepIterator(v8::Local<v8::Context> context, v8::Local<v8::Object> iterator,
                           v8::Local<v8::Function> next, v8::Local<v8::Value> &outValue,
                           bool &outDone) {
-            auto isolate = context->GetIsolate();
+            auto isolate = v8::Isolate::GetCurrent();
             v8::Local<v8::Value> resultValue;
             if (!next->Call(context, iterator, 0, nullptr).ToLocal(&resultValue)) {
                 return false;
@@ -318,7 +318,7 @@ namespace tns {
         // Must be called with no pending JS exception: the caller captures and
         // re-throws the triggering exception around this call.
         void CloseIterator(v8::Local<v8::Context> context, v8::Local<v8::Object> iterator) {
-            auto isolate = context->GetIsolate();
+            auto isolate = v8::Isolate::GetCurrent();
             v8::TryCatch tryCatch(isolate);
             v8::Local<v8::Value> returnMethod;
             if (iterator->Get(context, ArgConverter::ConvertToV8String(isolate, "return"))
@@ -340,7 +340,7 @@ namespace tns {
         // iterator is closed before the exception propagates.
         bool MaterializeInnerSequence(v8::Local<v8::Context> context, v8::Local<v8::Value> value,
                                       std::vector<std::string> &out) {
-            auto isolate = context->GetIsolate();
+            auto isolate = v8::Isolate::GetCurrent();
             // Per WebIDL "convert to sequence<T>": if Type(V) is not Object, throw a
             // TypeError. Primitives (including strings) are NOT boxed here — boxing
             // would wrongly accept e.g. ["ab"] as the pair ("a","b") instead of
@@ -407,7 +407,7 @@ namespace tns {
         // is skipped for a done iterator, which is also how for..of behaves.
         bool BuildFromSequence(v8::Local<v8::Context> context, v8::Local<v8::Object> object,
                                v8::Local<v8::Function> iterMethod, ada::url_search_params &params) {
-            auto isolate = context->GetIsolate();
+            auto isolate = v8::Isolate::GetCurrent();
             v8::Local<v8::Object> iterator;
             v8::Local<v8::Function> next;
             if (!OpenIterator(context, object, iterMethod, iterator, next)) {
@@ -541,7 +541,7 @@ namespace tns {
 
         auto searchParams = new URLSearchParamsImpl(params);
 
-        ret->SetAlignedPointerInInternalField(0, searchParams);
+        ret->SetAlignedPointerInInternalField(0, searchParams, v8::kEmbedderDataTypeTagDefault);
 
         searchParams->BindFinalizer(isolate, ret);
 
@@ -744,9 +744,9 @@ namespace tns {
         ptr->GetURLSearchParams()->set(key, value);
     }
 
-    void URLSearchParamsImpl::GetSize(v8::Local<v8::String> property,
+    void URLSearchParamsImpl::GetSize(v8::Local<v8::Name> property,
                                       const v8::PropertyCallbackInfo<v8::Value> &info) {
-        URLSearchParamsImpl *ptr = GetPointer(info.This());
+        URLSearchParamsImpl *ptr = GetPointer(info.Holder());
         if (ptr == nullptr) {
             ThrowTypeError(info.GetIsolate(), "Illegal invocation");
             return;

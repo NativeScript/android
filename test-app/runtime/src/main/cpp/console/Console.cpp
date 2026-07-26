@@ -23,7 +23,7 @@ v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, Con
     m_callback = callback;
     m_maxLogcatObjectSize = maxLogcatObjectSize;
     v8::Context::Scope contextScope(context);
-    v8::Isolate* isolate = context->GetIsolate();
+    v8::Isolate* isolate = v8::Isolate::GetCurrent();
 
     v8::Local<v8::Object> console = v8::Object::New(isolate);
     bool success = console->SetPrototype(context, v8::Object::New(isolate)).FromMaybe(false);
@@ -31,7 +31,8 @@ v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, Con
     assert(success);
 
     std::map<std::string, double> timersMap;
-    Console::s_isolateToConsoleTimersMap.insert(std::make_pair(context->GetIsolate(), timersMap));
+    Console::s_isolateToConsoleTimersMap.insert(
+        std::make_pair(v8::Isolate::GetCurrent(), timersMap));
 
     bindFunctionProperty(context, console, "assert", assertCallback);
     bindFunctionProperty(context, console, "error", errorCallback);

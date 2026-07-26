@@ -25,84 +25,84 @@ namespace tns {
 
 
         static void
-        GetHash(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+        GetHash(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
 
-        static void SetHash(v8::Local<v8::String> property,
+        static void SetHash(v8::Local<v8::Name> property,
                             v8::Local<v8::Value> value,
                             const v8::PropertyCallbackInfo<void> &info);
 
 
         static void
-        GetHost(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+        GetHost(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
 
-        static void SetHost(v8::Local<v8::String> property,
+        static void SetHost(v8::Local<v8::Name> property,
                             v8::Local<v8::Value> value,
                             const v8::PropertyCallbackInfo<void> &info);
 
 
         static void
-        GetHostName(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+        GetHostName(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
 
-        static void SetHostName(v8::Local<v8::String> property,
+        static void SetHostName(v8::Local<v8::Name> property,
                                 v8::Local<v8::Value> value,
                                 const v8::PropertyCallbackInfo<void> &info);
 
 
         static void
-        GetHref(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+        GetHref(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
 
-        static void SetHref(v8::Local<v8::String> property,
+        static void SetHref(v8::Local<v8::Name> property,
                             v8::Local<v8::Value> value,
                             const v8::PropertyCallbackInfo<void> &info);
 
 
         static void
-        GetOrigin(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+        GetOrigin(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
 
 
         static void
-        GetPassword(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+        GetPassword(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
 
-        static void SetPassword(v8::Local<v8::String> property,
+        static void SetPassword(v8::Local<v8::Name> property,
                                 v8::Local<v8::Value> value,
                                 const v8::PropertyCallbackInfo<void> &info);
 
 
         static void
-        GetPathName(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+        GetPathName(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
 
-        static void SetPathName(v8::Local<v8::String> property,
+        static void SetPathName(v8::Local<v8::Name> property,
                                 v8::Local<v8::Value> value,
                                 const v8::PropertyCallbackInfo<void> &info);
 
 
         static void
-        GetPort(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+        GetPort(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
 
-        static void SetPort(v8::Local<v8::String> property,
+        static void SetPort(v8::Local<v8::Name> property,
                             v8::Local<v8::Value> value,
                             const v8::PropertyCallbackInfo<void> &info);
 
 
         static void
-        GetProtocol(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+        GetProtocol(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
 
-        static void SetProtocol(v8::Local<v8::String> property,
+        static void SetProtocol(v8::Local<v8::Name> property,
                                 v8::Local<v8::Value> value,
                                 const v8::PropertyCallbackInfo<void> &info);
 
         static void
-        GetSearch(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+        GetSearch(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
 
-        static void SetSearch(v8::Local<v8::String> property,
+        static void SetSearch(v8::Local<v8::Name> property,
                               v8::Local<v8::Value> value,
                               const v8::PropertyCallbackInfo<void> &info);
 
 
         static void
-        GetUserName(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+        GetUserName(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
 
-        static void SetUserName(v8::Local<v8::String> property,
+        static void SetUserName(v8::Local<v8::Name> property,
                                 v8::Local<v8::Value> value,
                                 const v8::PropertyCallbackInfo<void> &info);
 

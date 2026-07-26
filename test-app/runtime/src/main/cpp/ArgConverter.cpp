@@ -14,7 +14,7 @@ using namespace std;
 using namespace tns;
 
 void ArgConverter::Init(Local<Context> context) {
-    Isolate* isolate = context->GetIsolate();
+    Isolate* isolate = v8::Isolate::GetCurrent();
     auto cache = GetTypeLongCache(isolate);
 
     auto ft = FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongFunctionCallback);
@@ -92,7 +92,7 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Local<Context> context, jobje
     JEnv env;
 
     int argc = env.GetArrayLength(args) / 3;
-    auto isolate = context->GetIsolate();
+    auto isolate = v8::Isolate::GetCurrent();
     Local<Array> arr(Array::New(isolate, argc));
 
     auto runtime = Runtime::GetRuntime(isolate);

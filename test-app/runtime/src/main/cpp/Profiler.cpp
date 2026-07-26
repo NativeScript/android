@@ -13,7 +13,7 @@ Profiler::Profiler() {
 void Profiler::Init(Isolate* isolate, const Local<Object>& globalObj, const string& appName, const string& outputDir) {
     m_appName = appName;
     m_outputDir = outputDir;
-    auto extData = External::New(isolate, this);
+    auto extData = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
     Local<Context> context = isolate->GetCurrentContext();
     globalObj->Set(context, ArgConverter::ConvertToV8String(isolate, "__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback, extData)->GetFunction(context).ToLocalChecked());
     globalObj->Set(context, ArgConverter::ConvertToV8String(isolate, "__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback, extData)->GetFunction(context).ToLocalChecked());
@@ -24,7 +24,7 @@ void Profiler::StartCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value
     try {
         auto isolate = args.GetIsolate();
         auto extData = args.Data().As<External>();
-        auto thiz = static_cast<Profiler*>(extData->Value());
+        auto thiz = static_cast<Profiler*>(extData->Value(v8::kExternalPointerTypeTagDefault));
         thiz->StartCPUProfilerCallbackImpl(args);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -55,7 +55,7 @@ void Profiler::StopCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>
     try {
         auto isolate = args.GetIsolate();
         auto extData = args.Data().As<External>();
-        auto thiz = static_cast<Profiler*>(extData->Value());
+        auto thiz = static_cast<Profiler*>(extData->Value(v8::kExternalPointerTypeTagDefault));
         thiz->StopCPUProfilerCallbackImpl(args);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -225,7 +225,7 @@ void Profiler::HeapSnapshotMethodCallback(const v8::FunctionCallbackInfo<v8::Val
     try {
         auto isolate = args.GetIsolate();
         auto extData = args.Data().As<External>();
-        auto thiz = static_cast<Profiler*>(extData->Value());
+        auto thiz = static_cast<Profiler*>(extData->Value(v8::kExternalPointerTypeTagDefault));
         thiz->HeapSnapshotMethodCallbackImpl(args);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();

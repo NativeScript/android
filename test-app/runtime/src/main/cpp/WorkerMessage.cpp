@@ -11,7 +11,7 @@ namespace worker {
 namespace {
 
 void ThrowDataCloneException(Local<Context> context, Local<v8::String> message) {
-    Isolate* isolate = context->GetIsolate();
+    Isolate* isolate = v8::Isolate::GetCurrent();
     std::string msg = "DataCloneError: " + ArgConverter::ConvertToString(message);
     isolate->ThrowException(
             Exception::Error(ArgConverter::ConvertToV8String(isolate, msg)));

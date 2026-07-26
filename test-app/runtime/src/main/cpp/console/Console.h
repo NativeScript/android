@@ -46,7 +46,7 @@ class Console {
                                          v8::Local<v8::Object> consoleInstance,
                                          const std::string& functionName,
                                          v8::FunctionCallback callback) {
-            v8::Local<v8::String> funcName = ArgConverter::ConvertToV8String(context->GetIsolate(), functionName);
+            v8::Local<v8::String> funcName = ArgConverter::ConvertToV8String(v8::Isolate::GetCurrent(), functionName);
 
             v8::Local<v8::Function> func;
             if (!v8::Function::New(context, callback, consoleInstance, 0, v8::ConstructorBehavior::kThrow).ToLocal(&func)) {

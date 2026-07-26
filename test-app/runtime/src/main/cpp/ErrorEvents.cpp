@@ -141,7 +141,7 @@ void ErrorEvents::Init(Local<Context> context) {
     })
     )js";
 
-    auto isolate = context->GetIsolate();
+    auto isolate = v8::Isolate::GetCurrent();
     auto runtime = GetRuntimeOrNull(isolate);
     if (runtime == nullptr) {
         throw NativeScriptException("ErrorEvents::Init: no runtime for isolate");

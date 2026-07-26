@@ -261,7 +261,7 @@ void NativeScriptException::OnUncaughtError(Local<Message> message,
 
   // Give WHATWG `error` event listeners a chance first; preventDefault()
   // fully handles the report and nothing is raised to Java.
-  auto isolate = message->GetIsolate();
+  auto isolate = v8::Isolate::GetCurrent();
   if (ErrorEvents::DispatchError(isolate, error, errorMessage, stackTrace)) {
     return;
   }
@@ -314,7 +314,7 @@ static void LogLines(const string& text) {
 
 void NativeScriptException::OnPromiseRejected(v8::PromiseRejectMessage message) {
   auto promise = message.GetPromise();
-  auto isolate = promise->GetIsolate();
+  auto isolate = v8::Isolate::GetCurrent();
   auto runtime = GetRuntimeOrNull(isolate);
   if (runtime == nullptr || runtime->PromiseRejections() == nullptr) {
     return;
@@ -545,7 +545,7 @@ void NativeScriptException::ThrowUncaughtJsErrorToJava(const string& message,
 
 void PromiseRejectionTracker::OnReject(Local<Promise> promise,
                                        Local<Value> reason) {
-  auto isolate = promise->GetIsolate();
+  auto isolate = v8::Isolate::GetCurrent();
   for (auto& entry : pending_) {
     if (entry.promise.Get(isolate)->SameValue(promise)) {
       // Already tracked; refresh the reason for the latest rejection.
@@ -562,7 +562,7 @@ void PromiseRejectionTracker::OnReject(Local<Promise> promise,
 }
 
 void PromiseRejectionTracker::OnHandlerAdded(Local<Promise> promise) {
-  auto isolate = promise->GetIsolate();
+  auto isolate = v8::Isolate::GetCurrent();
 
   // A handler attached before the rejection was drained cancels the report.
   for (auto it = pending_.begin(); it != pending_.end(); ++it) {
@@ -912,7 +912,7 @@ JniLocalRef NativeScriptException::TryGetJavaThrowableObject(
   if (!javaObj.IsNull()) {
     objClass = JniLocalRef(env.GetObjectClass(javaObj));
   } else {
-    auto isolate = jsObj->GetIsolate();
+    auto isolate = v8::Isolate::GetCurrent();
     auto context = isolate->GetCurrentContext();
     Local<Value> nativeEx;
     jsObj->Get(context, V8StringConstants::GetNativeException(isolate))

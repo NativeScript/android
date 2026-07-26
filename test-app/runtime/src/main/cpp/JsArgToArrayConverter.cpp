@@ -65,7 +65,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
     JEnv env;
 
     Type returnType = JType::getClassType(m_return_type);
-    auto isolate = context->GetIsolate();
+    auto isolate = v8::Isolate::GetCurrent();
 
     if (arg.IsEmpty()) {
         s << "Cannot convert empty JavaScript object";
@@ -348,7 +348,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                                   castValue);
 
                 if (!castValue.IsEmpty()) {
-                    auto node = reinterpret_cast<MetadataNode *>(castValue.As<External>()->Value());
+                    auto node = reinterpret_cast<MetadataNode *>(castValue.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
                     if (node == nullptr) {
                         s << "Cannot get type of the null argument at index " << index;
