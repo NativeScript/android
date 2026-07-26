@@ -57,7 +57,7 @@ libc++ exports symbols the runtime's `libc++_static.a` does not — the link fai
 on `std::__ndk1::__hash_memory`, referenced from `liveedit.cc`. `libc++` is only
 ABI-compatible with itself across a static link, so V8 is built against the same
 NDK the runtime uses, via the `android_ndk_root` gn arg (made overridable by
-`android_build_on_macos.patch`).
+`android_build.patch`).
 
 **The runtime moved from NDK r27d to r29.** This is forced, not optional: V8
 14.9's `src/base/atomicops.h` uses `std::atomic_ref` unconditionally, and
@@ -71,7 +71,7 @@ libc++ new enough. `minSdk` is unchanged at 21.
 Chromium asserts a Linux host for Android targets. Everything below that assert
 still handles macOS — the host-arch block maps arm64 hosts to the
 `darwin-x86_64` NDK tag deliberately, and `android_toolchain_root` is only read
-for the (host-independent) sysroot — so `android_build_on_macos.patch` relaxes
+for the (host-independent) sysroot — so `android_build.patch` relaxes
 the assert. It also lowers `min_supported_sdk_version` from 23 to 21; that floor
 exists for Java/dex tooling and this build produces only the native
 `v8_monolith` target.

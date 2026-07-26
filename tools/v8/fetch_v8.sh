@@ -61,10 +61,12 @@ checkpoint "Patching V8"
 # ObjectManager relies on resurrecting finalizers for its dead-object pass.
 git -C v8 apply "$SCRIPT_DIR/v8_resurrecting_finalizers.patch"
 
-if [ "$(uname)" = "Darwin" ]; then
-    checkpoint "Enabling the Android build on this macOS host"
+# API 21 and a selectable android_ndk_root are needed on every host; the
+# host-assert change in the same patch is a no-op on Linux.
+git -C v8/build apply "$SCRIPT_DIR/android_build.patch"
 
-    git -C v8/build apply "$SCRIPT_DIR/android_build_on_macos.patch"
+if [ "$(uname)" = "Darwin" ]; then
+    checkpoint "Supplying the bits the macOS toolchain package omits"
 
     # android_toolchain_root is only read for the sysroot, which is
     # host-independent -- but the path is tagged with the host OS and CIPD only

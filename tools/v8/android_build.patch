@@ -1,15 +1,17 @@
-Allow building V8 for Android from a macOS host, at Android API 21, against a
-chosen NDK.
+Build V8 for Android at API 21, against a chosen NDK, from either a Linux or a
+macOS host.
 
 Applies to //build (the chromium build tree pulled in by DEPS), not to V8
-itself. Three changes:
+itself. Only the first change is host-specific; the other two are needed
+everywhere, so this patch is applied on every host.
 
 1. build/config/BUILDCONFIG.gn -- Chromium hard-asserts a Linux host for
    Android targets. Everything below that assert still handles macOS: the
    host-arch block maps arm64 hosts to the "darwin-x86_64" NDK tag on purpose,
    and android_toolchain_root is only consumed for the (host-independent)
-   sysroot. See fetch_v8.sh for the darwin-x86_64 NDK symlink and the Android
-   compiler-rt builtins that the macOS clang package omits.
+   sysroot. Widening the assert is a no-op on Linux. See fetch_v8.sh for the
+   darwin-x86_64 NDK symlink and the Android compiler-rt builtins that the
+   macOS clang package omits.
 
 2. build/config/android/config.gni -- the minimum supported SDK is 21 rather
    than 23. The 23 floor exists for Java/dex tooling ("no longer supports
