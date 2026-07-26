@@ -72,8 +72,7 @@ docker rm -f "$CONTAINER" > /dev/null 2>&1 || true
 # container dies whenever the invoking shell does. Logs are followed separately
 # below, so interrupting this script leaves the build running -- re-run it with
 # --attach to pick the stream back up.
-SCRIPT_TMP="$(mktemp)"
-trap 'rm -f "$SCRIPT_TMP"' EXIT
+SCRIPT_TMP="${TMPDIR:-/tmp}/v8-android-32bit-build.sh"
 cat > "$SCRIPT_TMP" <<'INNER'
 set -e
 
@@ -84,19 +83,19 @@ apt-get install -y -qq --no-install-recommends \
     git python3 python3-setuptools curl ca-certificates xz-utils zip unzip \
     rsync file lsb-release build-essential pkg-config > /dev/null
 
-if [ ! -d /depot_tools ]; then
+if [ ! -d /v8/depot_tools ]; then
     echo "### fetching depot_tools"
     git clone -q --depth 1 \
-        https://chromium.googlesource.com/chromium/tools/depot_tools.git /depot_tools
+        https://chromium.googlesource.com/chromium/tools/depot_tools.git /v8/depot_tools
 fi
-export PATH="/depot_tools:$PATH"
+export PATH="/v8/depot_tools:$PATH"
 export DEPOT_TOOLS_UPDATE=1
 
-if [ ! -d "/opt/android-ndk-$NDK_RELEASE" ]; then
+if [ ! -d "/v8/android-ndk-$NDK_RELEASE" ]; then
     echo "### fetching Android NDK $NDK_RELEASE"
     curl -fsSL -o /tmp/ndk.zip \
         "https://dl.google.com/android/repository/android-ndk-$NDK_RELEASE-linux.zip"
-    unzip -q /tmp/ndk.zip -d /opt
+    unzip -q /tmp/ndk.zip -d /v8
     rm -f /tmp/ndk.zip
 fi
 
@@ -106,7 +105,7 @@ bash /repo/tools/v8/fetch_v8.sh --v8-dir /v8
 echo "### building"
 bash /repo/tools/v8/build_v8_source.sh \
     --v8-dir /v8/v8 \
-    --ndk-root "/opt/android-ndk-$NDK_RELEASE" \
+    --ndk-root "/v8/android-ndk-$NDK_RELEASE" \
     $ABI_ARGS
 
 echo "### done"
