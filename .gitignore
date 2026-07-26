@@ -27,7 +27,7 @@ test-app/analytics/build-statistics.json
 package-lock.json
 
 # V8 prebuilts and the headers that must match them, installed by
-# tools/v8/fetch_prebuilt_v8.sh from the release pinned in tools/v8/V8_RELEASE.
+# download_v8.sh from the release pinned in V8_RELEASE.
 #
 # The headers are ignored along with the libraries on purpose: keeping a
 # vendored copy in git is how it drifts out of step with the binaries it

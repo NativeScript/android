@@ -8,12 +8,19 @@ set -euo pipefail
 # monoliths exceed GitHub's 100 MiB per-file push limit, and because the full
 # matrix cannot be produced on any single machine.
 #
-# Usage: fetch_prebuilt_v8.sh [--release <tag>] [--abi <abi>]... [--force]
+# Deliberately a standalone script rather than a Gradle task: it is a
+# prerequisite you run once, trivial to skip when you already have the
+# artifacts, and easy to override with a local V8 build.
+#
+# Set V8_SKIP_DOWNLOAD=1 to make it a no-op -- use that when you have built V8
+# yourself and do not want a pinned release overwriting it.
+#
+# Usage: download_v8.sh [--release <tag>] [--abi <abi>]... [--force]
 #
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 UPSTREAM="NativeScript/v8-buildscripts"
-RELEASE_FILE="$REPO_ROOT/tools/v8/V8_RELEASE"
+RELEASE_FILE="$REPO_ROOT/V8_RELEASE"
 CACHE_DIR="${V8_PREBUILT_CACHE:-$REPO_ROOT/.v8-prebuilt}"
 
 CPP_DIR="$REPO_ROOT/test-app/runtime/src/main/cpp"
@@ -28,7 +35,7 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [--release <tag>] [--abi <abi>]... [--force]
 
-  --release <tag>  Release to install (default: contents of tools/v8/V8_RELEASE)
+  --release <tag>  Release to install (default: contents of V8_RELEASE)
   --abi <abi>      Repeatable. armeabi-v7a, arm64-v8a, x86, x86_64
                    (default: all four)
   --force          Reinstall even if the pinned release is already in place
@@ -48,6 +55,11 @@ while [ $# -gt 0 ]; do
         *)           echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
     esac
 done
+
+if [ "${V8_SKIP_DOWNLOAD:-0}" != "0" ]; then
+    echo "V8_SKIP_DOWNLOAD is set; leaving the libraries and headers alone."
+    exit 0
+fi
 
 if [ -z "$RELEASE" ]; then
     [ -f "$RELEASE_FILE" ] || { echo "Missing $RELEASE_FILE" >&2; exit 1; }

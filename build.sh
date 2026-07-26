@@ -11,6 +11,9 @@ adb version
 echo "Update submodule"
 git submodule update --init
 
+echo "Fetch the prebuilt V8 (no-op once in place; V8_SKIP_DOWNLOAD=1 to skip)"
+./download_v8.sh
+
 echo "Cleanup old build and test artefacts"
 rm -rf consoleLog.txt
 rm -rf test-app/dist/*.xml
