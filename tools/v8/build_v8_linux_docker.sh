@@ -17,7 +17,9 @@ set -e
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 VOLUME="v8linux"
+CONTAINER="v8-android-32bit"
 ABIS=()
+ATTACH=0
 
 usage() {
     cat <<EOF
@@ -26,6 +28,8 @@ Usage: $(basename "$0") [--abi <abi>]... [--volume <name>]
   --abi <abi>      Repeatable. armeabi-v7a and/or x86 (default: both).
   --volume <name>  Docker volume holding the V8 checkout (default: $VOLUME).
                    Reused across runs so a rebuild does not re-sync.
+  --attach         Do not start anything; just follow the logs of a build that
+                   is already running.
 EOF
 }
 
@@ -35,6 +39,7 @@ while [ $# -gt 0 ]; do
         --abi=*)    ABIS+=("${1#*=}"); shift ;;
         --volume)   VOLUME="$2"; shift 2 ;;
         --volume=*) VOLUME="${1#*=}"; shift ;;
+        --attach)   ATTACH=1; shift ;;
         -h|--help)  usage; exit 0 ;;
         *)          echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
     esac
@@ -56,14 +61,20 @@ done
 # the runtime must be built against the same NDK, see docs/V8_14_MIGRATION.md.
 NDK_RELEASE="r29"
 
-docker volume create "$VOLUME" > /dev/null
+if [ "$ATTACH" = "1" ]; then
+    exec docker logs -f "$CONTAINER"
+fi
 
-exec docker run --rm -i --platform linux/amd64 \
-    -v "$VOLUME:/v8" \
-    -v "$REPO_ROOT:/repo" \
-    -e "ABI_ARGS=$ABI_ARGS" \
-    -e "NDK_RELEASE=$NDK_RELEASE" \
-    debian:bookworm bash -s <<'INNER'
+docker volume create "$VOLUME" > /dev/null
+docker rm -f "$CONTAINER" > /dev/null 2>&1 || true
+
+# Detached on purpose: the build runs for hours, and with stdin attached the
+# container dies whenever the invoking shell does. Logs are followed separately
+# below, so interrupting this script leaves the build running -- re-run it with
+# --attach to pick the stream back up.
+SCRIPT_TMP="$(mktemp)"
+trap 'rm -f "$SCRIPT_TMP"' EXIT
+cat > "$SCRIPT_TMP" <<'INNER'
 set -e
 
 echo "### installing host packages"
@@ -101,3 +112,15 @@ bash /repo/tools/v8/build_v8_source.sh \
 echo "### done"
 ls -la /repo/test-app/runtime/src/main/libs/*/libv8_monolith.a
 INNER
+
+docker run -d --name "$CONTAINER" --platform linux/amd64 \
+    -v "$VOLUME:/v8" \
+    -v "$REPO_ROOT:/repo" \
+    -v "$SCRIPT_TMP:/build.sh:ro" \
+    -e "ABI_ARGS=$ABI_ARGS" \
+    -e "NDK_RELEASE=$NDK_RELEASE" \
+    debian:bookworm bash /build.sh > /dev/null
+
+echo "Started container '$CONTAINER'. Following logs; ^C leaves it running."
+echo "Reattach with:  docker logs -f $CONTAINER"
+docker logs -f "$CONTAINER"
