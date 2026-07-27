@@ -74,6 +74,10 @@ require('./tests/testURLImpl.js');
 require('./tests/testURLSearchParamsImpl.js');
 require('./tests/testPerformanceNow');
 require('./tests/testQueueMicrotask');
+require('./tests/testErrorEvents');
+require('./tests/testUnhandledRejections');
+require('./tests/testEscapeException');
+require('./tests/testUncaughtErrorPolicy');
 require("./tests/testConcurrentAccess");
 
 require("./tests/testESModules.mjs");

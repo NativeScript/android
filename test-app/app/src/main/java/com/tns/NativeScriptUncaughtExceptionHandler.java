@@ -18,35 +18,65 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 
     @Override
     public void uncaughtException(Thread thread, Throwable ex) {
-        String currentThreadMessage = String.format("An uncaught Exception occurred on \"%s\" thread.\n%s\n", thread.getName(), ex.getMessage());
-        String stackTraceErrorMessage = Runtime.getStackTraceErrorMessage(ex);
-        String errorMessage = String.format("%s\nStackTrace:\n%s", currentThreadMessage, stackTraceErrorMessage);
+        // An uncaughtErrorPolicy: "throw" exception was already fully reported
+        // to JS (event + hook + log) at the throw decision point - reporting
+        // it again here would double-dispatch the same failure. Checked first
+        // so the already-reported path does no work at all: no JS roundtrip
+        // and no eager stack rendering (the message strings below are built
+        // lazily, only when something actually consumes them).
+        boolean alreadyReportedToJs = ex instanceof NativeScriptException && ((NativeScriptException) ex).isReportedToJs();
 
-        if (Runtime.isInitialized()) {
-            try {
-                if (Util.isDebuggableApp(context)) {
-                    System.err.println(errorMessage);
-                }
+        String errorMessage = null;
+        boolean handledByJs = false;
 
-                Runtime runtime = Runtime.getCurrentRuntime();
+        if (!alreadyReportedToJs) {
+            // Resolve the reporting runtime FIRST: Runtime.isInitialized() is
+            // thread-local, so gating on it would silently skip reporting for
+            // crashes on threads with no runtime of their own. Those fall back
+            // to the main runtime's isolate (the JNI layer takes the
+            // v8::Locker, so entering it cross-thread is safe).
+            Runtime runtime = Runtime.getCurrentRuntime();
+            if (runtime == null) {
+                runtime = Runtime.getMainRuntime();
+            }
 
-                if (runtime != null) {
-                    runtime.passUncaughtExceptionToJs(ex, ex.getMessage(), stackTraceErrorMessage, Runtime.getJSStackTrace(ex));
-                }
-            } catch (Throwable t) {
-                if (Util.isDebuggableApp(context)) {
-                    t.printStackTrace();
+            if (runtime != null && runtime.isInitializedImpl()) {
+                try {
+                    String stackTraceErrorMessage = Runtime.getStackTraceErrorMessage(ex);
+                    errorMessage = buildErrorMessage(thread, ex, stackTraceErrorMessage);
+
+                    if (Util.isDebuggableApp(context)) {
+                        System.err.println(errorMessage);
+                    }
+
+                    handledByJs = runtime.passUncaughtExceptionToJs(ex, ex.getMessage(), stackTraceErrorMessage, Runtime.getJSStackTrace(ex));
+                } catch (Throwable t) {
+                    if (Util.isDebuggableApp(context)) {
+                        t.printStackTrace();
+                    }
                 }
             }
         }
 
         if (logger.isEnabled()) {
+            if (errorMessage == null) {
+                errorMessage = buildErrorMessage(thread, ex, Runtime.getStackTraceErrorMessage(ex));
+            }
             logger.write("Uncaught Exception Message=" + errorMessage);
+        }
+
+        if (handledByJs) {
+            // A JS `nativeuncaughterror` listener called preventDefault() -
+            // the exception is fully handled: no error activity, no crash.
+            return;
         }
 
         boolean res = false;
 
         if (Util.isDebuggableApp(context)) {
+            if (errorMessage == null) {
+                errorMessage = buildErrorMessage(thread, ex, Runtime.getStackTraceErrorMessage(ex));
+            }
             try {
                 Class<?> ErrReport = null;
                 java.lang.reflect.Method startActivity = null;
@@ -68,5 +98,10 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
         if (!res && defaultHandler != null) {
             defaultHandler.uncaughtException(thread, ex);
         }
+    }
+
+    private static String buildErrorMessage(Thread thread, Throwable ex, String stackTraceErrorMessage) {
+        String currentThreadMessage = String.format("An uncaught Exception occurred on \"%s\" thread.\n%s\n", thread.getName(), ex.getMessage());
+        return String.format("%s\nStackTrace:\n%s", currentThreadMessage, stackTraceErrorMessage);
     }
 }

@@ -340,7 +340,8 @@ namespace tns {
                     }
 
 
-                    if(tc.HasCaught()){
+                    if (tc.HasCaught() &&
+                        !NativeScriptException::ContainUncaughtCallbackException(isolate, tc)) {
                         throw NativeScriptException(tc);
                     }
 

@@ -2,6 +2,7 @@
 #define NATIVESCRIPTEXCEPTION_H_
 
 #include <exception>
+#include <vector>
 
 #include "JEnv.h"
 #include "JniLocalRef.h"
@@ -10,6 +11,8 @@
 #include "v8.h"
 
 namespace tns {
+class Runtime;
+
 class NativeScriptException : public std::exception {
  public:
   /*
@@ -50,11 +53,71 @@ class NativeScriptException : public std::exception {
                               v8::Local<v8::Value> error);
 
   /*
+   * Isolate-level promise rejection callback (SetPromiseRejectCallback).
+   * Feeds the per-isolate PromiseRejectionTracker owned by Runtime.
+   */
+  static void OnPromiseRejected(v8::PromiseRejectMessage message);
+
+  /*
+   * Reports an unhandled promise rejection on a non-worker isolate:
+   * dispatches `unhandledrejection` and, when unprevented, falls through to
+   * ReportFatalTail with the "Unhandled promise rejection:" prefix.
+   */
+  static void ReportUnhandledRejection(v8::Isolate* isolate,
+                                       v8::Local<v8::Promise> promise,
+                                       v8::Local<v8::Value> reason,
+                                       const std::string& stackTrace);
+
+  /*
+   * The terminal tail shared by reportError, listener-thrown errors, the
+   * rejection path and contained callback exceptions: calls the
+   * __onUncaughtError shim (or __onDiscardedError under the deprecated
+   * discardUncaughtJsExceptions flag) and logs. Does NOT dispatch any event
+   * (the caller already has), preventing recursion, and never crashes the
+   * process itself.
+   */
+  static void ReportFatalTail(v8::Isolate* isolate, v8::Local<v8::Value> error,
+                              const std::string& stackOverride = "",
+                              const std::string& logPrefix = "",
+                              jboolean isDiscarded = JNI_FALSE);
+
+  /*
+   * Policy-aware handling of an uncaught JS exception at a native->JS
+   * callback boundary (overridden method invoked by native code, timer,
+   * __runOnMainThread / frame callback). Returns true when the error was
+   * CONTAINED - reported through the WHATWG pipeline (`error` event ->
+   * legacy hook -> log) with the TryCatch reset, and the caller should
+   * proceed with a default value. Returns false when the caller must
+   * propagate the exception to Java: the chain is JS-initiated (a JS frame
+   * is waiting for it below the boundary), the throw is a branded
+   * interop.escapeException (explicit forward), or uncaughtErrorPolicy is
+   * "throw".
+   */
+  static bool ContainUncaughtCallbackException(v8::Isolate* isolate,
+                                               v8::TryCatch& tc);
+
+  /*
+   * Hands an unhandled promise rejection to the native layer under
+   * uncaughtErrorPolicy: "throw": schedules a com.tns.NativeScriptException
+   * throw from a clean Java frame on this thread's looper, so the thread's
+   * uncaught-exception handler (and its reporting) runs exactly as for a
+   * sync uncaught error.
+   */
+  static void ThrowUncaughtJsErrorToJava(const std::string& message,
+                                         const std::string& stackTrace);
+
+  /*
    * Calls the global "__onUncaughtError" or "__onDiscardedError" if such is
    * provided
    */
   static void CallJsFuncWithErr(v8::Local<v8::Value> errObj,
                                 jboolean isDiscarded);
+
+  /*
+   * Generates string stack trace from js StackTrace
+   */
+  static std::string GetErrorStackTrace(
+      const v8::Local<v8::StackTrace>& stackTrace);
 
  private:
   /*
@@ -95,12 +158,6 @@ class NativeScriptException : public std::exception {
                                      const std::string& prependMessage = "");
 
   /*
-   * Generates string stack trace from js StackTrace
-   */
-  static std::string GetErrorStackTrace(
-      const v8::Local<v8::StackTrace>& stackTrace);
-
-  /*
    *	Adds a prepend message to the normal message process
    */
   std::string GetFullMessage(const v8::TryCatch& tc,
@@ -123,6 +180,72 @@ class NativeScriptException : public std::exception {
 
   static void PrintErrorMessage(const std::string& errorMessage);
 };
+
+/*
+ * Per-isolate tracker for unhandled promise rejections (ported from the iOS
+ * runtime's PromiseRejectionTracker). All members are touched only while the
+ * v8::Locker for the runtime's isolate is held: OnReject/OnHandlerAdded run
+ * inside V8 callbacks and Drain runs in a LooperTasks task that acquires the
+ * lock, so no extra synchronization is required.
+ */
+class PromiseRejectionTracker {
+ public:
+  explicit PromiseRejectionTracker(Runtime* runtime) : runtime_(runtime) {}
+
+  void OnReject(v8::Local<v8::Promise> promise, v8::Local<v8::Value> reason);
+  void OnHandlerAdded(v8::Local<v8::Promise> promise);
+  /*
+   * Reports every still-unhandled rejection and fires queued
+   * `rejectionhandled` events. Runs on the runtime's own looper turn, after
+   * the microtask checkpoint of the turn that produced the rejection, so a
+   * handler attached in the same turn always cancels the report.
+   */
+  void Drain();
+
+ private:
+  /*
+   * Posts a Drain task to the owning runtime's LooperTasks queue (at most one
+   * outstanding). Tasks posted during runtime teardown are dropped by
+   * LooperTasks itself.
+   */
+  void ScheduleDrain();
+  /* Drop weak handles the GC has already cleared. */
+  void PruneReportedOutstanding();
+
+  /* A promise that was rejected without a handler. */
+  struct PendingRejection {
+    v8::Global<v8::Promise> promise;
+    v8::Global<v8::Value> reason;
+  };
+
+  /*
+   * A rejection that was already reported (`unhandledrejection` fired,
+   * prevented or not). The original reason is retained so a late
+   * `rejectionhandled` event carries it per spec.
+   */
+  struct ReportedRejection {
+    v8::Global<v8::Promise> promise;
+    v8::Global<v8::Value> reason;
+  };
+
+  Runtime* runtime_;
+  std::vector<PendingRejection> pending_;
+  /*
+   * Reported rejections still outstanding. The promise handle is weak
+   * (SetWeak) so a GC'd promise drops the whole entry; a handler added later
+   * moves the entry into pendingRejectionHandled_.
+   */
+  std::vector<ReportedRejection> reportedOutstanding_;
+  /*
+   * `rejectionhandled` events queued by OnHandlerAdded (which runs during a
+   * microtask checkpoint) to fire as a task on the next drain, per spec. Held
+   * strong so the promise survives until the event fires.
+   */
+  std::vector<ReportedRejection> pendingRejectionHandled_;
+  bool drainScheduled_ = false;
+  bool draining_ = false;
+};
+
 }  // namespace tns
 
 #endif /* NATIVESCRIPTEXCEPTION_H_ */

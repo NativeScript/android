@@ -75,7 +75,7 @@ public class Runtime {
 
     private native void unlock(int runtimeId);
 
-    private native void passExceptionToJsNative(int runtimeId, Throwable ex, String message, String fullStackTrace, String jsStackTrace, boolean isDiscarded);
+    private native boolean passExceptionToJsNative(int runtimeId, Throwable ex, String message, String fullStackTrace, String jsStackTrace, boolean isDiscarded);
 
     @CriticalNative
     private static native int getCurrentRuntimeIdCritical();
@@ -107,8 +107,14 @@ public class Runtime {
 
     private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
-    void passUncaughtExceptionToJs(Throwable ex, String message, String fullStackTrace, String jsStackTrace) {
-        passExceptionToJsNative(getRuntimeId(), ex, message, fullStackTrace, jsStackTrace, false);
+    /**
+     * Reports an uncaught exception to JS (WHATWG `error` event, then the
+     * `__onUncaughtError` hook). Returns true when an `error` event listener
+     * called preventDefault(), i.e. the exception is fully handled and the
+     * caller should not crash the process.
+     */
+    boolean passUncaughtExceptionToJs(Throwable ex, String message, String fullStackTrace, String jsStackTrace) {
+        return passExceptionToJsNative(getRuntimeId(), ex, message, fullStackTrace, jsStackTrace, false);
     }
 
     void passDiscardedExceptionToJs(Throwable ex, String prefix) {
@@ -195,6 +201,13 @@ public class Runtime {
 
     private static AtomicInteger nextRuntimeId = new AtomicInteger(0);
     private final static ThreadLocal<Runtime> currentRuntime = new ThreadLocal<Runtime>();
+    /*
+     * The main (workerId 0) runtime. Fallback reporting target for uncaught
+     * exceptions on threads that have no runtime of their own (see
+     * NativeScriptUncaughtExceptionHandler): entering the main isolate from an
+     * arbitrary crashing thread is safe - the JNI layer takes the v8::Locker.
+     */
+    private static volatile Runtime mainRuntime;
     private final static Map<Integer, Runtime> runtimeCache = new ConcurrentHashMap<>();
     public static boolean nativeLibraryLoaded;
 
@@ -571,10 +584,22 @@ public class Runtime {
             throw t;
         }
 
+        if (runtime.workerId == 0) {
+            mainRuntime = runtime;
+        }
+
         return runtime;
     }
 
-    private boolean isInitializedImpl() {
+    /**
+     * The main runtime, or null before initialization. Used as the reporting
+     * fallback for uncaught exceptions on threads with no runtime of their own.
+     */
+    public static Runtime getMainRuntime() {
+        return mainRuntime;
+    }
+
+    boolean isInitializedImpl() {
         return initialized;
     }
 
@@ -1267,7 +1292,7 @@ public class Runtime {
             try {
                 ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
             } catch (NativeScriptException e) {
-                if (discardUncaughtJsExceptions) {
+                if (discardUncaughtJsExceptions && !e.isEscapedFromJs()) {
                     String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
                     android.util.Log.w("Warning", "NativeScript discarding uncaught JS exception!");
                     passDiscardedExceptionToJs(e, errorMessage);
@@ -1288,7 +1313,7 @@ public class Runtime {
                             final Object[] packagedArgs = packageArgs(tmpArgs);
                             arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs);
                         } catch (NativeScriptException e) {
-                            if (discardUncaughtJsExceptions) {
+                            if (discardUncaughtJsExceptions && !e.isEscapedFromJs()) {
                                 String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
                                 passDiscardedExceptionToJs(e, errorMessage);
                                 android.util.Log.w("Warning", "NativeScript discarding uncaught JS exception!");
@@ -1327,7 +1352,62 @@ public class Runtime {
             ret = arr[0];
         }
 
+        // A contained uncaught JS error (or a discarded one) yields null; for
+        // primitive return types the generated binding would NPE unboxing it,
+        // so substitute the type's default value.
+        if (ret == null && retType != null && retType.isPrimitive() && retType != void.class) {
+            ret = defaultPrimitiveValue(retType);
+        }
+
         return ret;
+    }
+
+    private static Object defaultPrimitiveValue(Class<?> type) {
+        if (type == boolean.class) {
+            return Boolean.FALSE;
+        } else if (type == byte.class) {
+            return (byte) 0;
+        } else if (type == char.class) {
+            return (char) 0;
+        } else if (type == short.class) {
+            return (short) 0;
+        } else if (type == int.class) {
+            return 0;
+        } else if (type == long.class) {
+            return 0L;
+        } else if (type == float.class) {
+            return 0f;
+        } else if (type == double.class) {
+            return 0d;
+        }
+        return null;
+    }
+
+    /*
+     * Called by the native runtime under uncaughtErrorPolicy: "throw" for
+     * errors with no Java caller to unwind into (unhandled promise
+     * rejections): throws from a clean Java frame on this thread's looper so
+     * the thread's uncaught-exception handler (and its reporting) runs
+     * exactly as for a sync uncaught error.
+     */
+    @RuntimeCallable
+    private static void throwUncaughtJsErrorOnCurrentThread(String message, String stackTrace) {
+        final NativeScriptException ex = new NativeScriptException(message, stackTrace, 0);
+        JavaScriptStackTrace.applyFrames(ex, stackTrace, null);
+        // The failure was already reported (event + hook + log) at the throw
+        // decision point - the uncaught-exception handler must not report it
+        // a second time.
+        ex.markReportedToJs();
+        android.os.Looper looper = android.os.Looper.myLooper();
+        if (looper == null) {
+            throw ex;
+        }
+        new android.os.Handler(looper).post(new Runnable() {
+            @Override
+            public void run() {
+                throw ex;
+            }
+        });
     }
 
     @RuntimeCallable

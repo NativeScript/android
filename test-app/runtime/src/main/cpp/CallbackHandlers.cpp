@@ -63,6 +63,24 @@ void CallbackHandlers::Init(Isolate *isolate) {
     MethodCache::Init();
 }
 
+/*
+ * Marks a JS -> Java call in flight on the runtime (see
+ * Runtime::JavaCallDepth): a JS callback that throws while the depth is
+ * non-zero is part of a JS-initiated chain and must propagate back to the
+ * outer JS catch instead of being contained at the boundary.
+ */
+namespace {
+struct JavaCallScope {
+    explicit JavaCallScope(Runtime* runtime) : runtime_(runtime) {
+        runtime_->EnterJavaCall();
+    }
+    ~JavaCallScope() {
+        runtime_->LeaveJavaCall();
+    }
+    Runtime* runtime_;
+};
+}  // namespace
+
 bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &jsObject,
                                         const std::string &fullClassName,
                                         const ArgsWrapper &argWrapper,
@@ -75,6 +93,10 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
+
+    // The Java constructor may synchronously call back into JS (extended
+    // class init) - that whole window is a JS-initiated chain.
+    JavaCallScope javaCallScope(runtime);
 
     JEnv env;
 
@@ -210,6 +232,10 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
     MethodCache::CacheMethodInfo mi;
 
     auto isolate = args.GetIsolate();
+
+    // The Java method may synchronously call back into JS (an overridden
+    // method on the receiver) - that whole window is a JS-initiated chain.
+    JavaCallScope javaCallScope(Runtime::GetRuntime(isolate));
 
     if ((entry != nullptr) && entry->getIsResolved()) {
         auto &entrySignature = entry->getSig();
@@ -694,7 +720,8 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
 
     cb->Call(context, context->Global(), 0, nullptr);  // ignore JS return value
 
-    if(tc.HasCaught()){
+    if (tc.HasCaught() &&
+        !NativeScriptException::ContainUncaughtCallbackException(isolate, tc)) {
         throw NativeScriptException(tc);
     }
 
@@ -931,9 +958,15 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
         //TODO: if javaResult is a pure js object create a java object that represents this object in java land
 
         if (tc.HasCaught()) {
-            stringstream ss;
-            ss << "Calling js method " << methodName << " failed";
-            throw NativeScriptException(tc, ss.str());
+            if (NativeScriptException::ContainUncaughtCallbackException(isolate, tc)) {
+                // Reported per uncaughtErrorPolicy; the native caller resumes
+                // with a default value.
+                jsResult = v8::Undefined(isolate);
+            } else {
+                stringstream ss;
+                ss << "Calling js method " << methodName << " failed";
+                throw NativeScriptException(tc, ss.str());
+            }
         }
 
         result = handleScope.Escape(jsResult);

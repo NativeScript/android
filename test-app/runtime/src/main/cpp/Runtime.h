@@ -19,12 +19,26 @@
 #include <fcntl.h>
 
 namespace tns {
+class PromiseRejectionTracker;
+
 class Runtime {
     public:
         enum IsolateData {
             RUNTIME = 0,
             CONSTANTS = 1,
             WORKER_WRAPPER = 2
+        };
+
+        /*
+         * What happens to an unprevented uncaught JS error (sync throw in a
+         * native-initiated callback, or an unhandled promise rejection):
+         * Report (default) - report and continue, never crash; Throw - hand
+         * it to the native layer as a real Java exception (pre-9.1 behavior).
+         * Configured via `uncaughtErrorPolicy` in the app's package.json.
+         */
+        enum class UncaughtErrorPolicy {
+            Report,
+            Throw
         };
 
         ~Runtime();
@@ -62,7 +76,14 @@ class Runtime {
         void AdjustAmountOfExternalAllocatedMemory();
         bool NotifyGC(JNIEnv* env, jobject obj);
         bool TryCallGC();
-        void PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring message, jstring fullStackTrace, jstring jsStackTrace, jboolean isDiscarded);
+        /*
+         * Reports a Java-side exception to JS: dispatches the WHATWG `error`
+         * event first and, unless a listener called preventDefault(), calls
+         * the __onUncaughtError/__onDiscardedError shim. Returns JNI_TRUE
+         * when a listener prevented the default, so the Java caller can treat
+         * the exception as fully handled (e.g. skip crashing the process).
+         */
+        jboolean PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring message, jstring fullStackTrace, jstring jsStackTrace, jboolean isDiscarded);
         void DestroyRuntime();
 
         void Lock();
@@ -94,6 +115,68 @@ class Runtime {
             return m_looperTasks;
         }
 
+        /*
+         * WHATWG events state, the Android analogue of the iOS runtime's
+         * Caches members of the same names. The backing event target is set
+         * by Events::Init, the three dispatch closures by ErrorEvents::Init,
+         * and the rejection tracker is created in PrepareV8Runtime. All are
+         * released in DestroyRuntime before the isolate is disposed.
+         *
+         * Internal EventTarget instance backing the global. Holds the real
+         * listener store, so native layers dispatch through it without going
+         * through overwritable globals (future native consumers like
+         * AbortSignal dispatch through it too).
+         */
+        v8::Global<v8::Object>& GlobalEventTarget() {
+            return m_globalEventTarget;
+        }
+        /*
+         * Error-events dispatch closures returned by the bootstrap IIFE
+         * (ErrorEvents::Init). They close over the internal listener store,
+         * so native dispatch keeps working even if app code overwrites
+         * globalThis.dispatchEvent.
+         */
+        v8::Global<v8::Function>& DispatchErrorEventFunc() {
+            return m_dispatchErrorEventFunc;
+        }
+        v8::Global<v8::Function>& DispatchUnhandledRejectionFunc() {
+            return m_dispatchUnhandledRejectionFunc;
+        }
+        v8::Global<v8::Function>& DispatchRejectionHandledFunc() {
+            return m_dispatchRejectionHandledFunc;
+        }
+        v8::Global<v8::Function>& DispatchNativeUncaughtErrorFunc() {
+            return m_dispatchNativeUncaughtErrorFunc;
+        }
+        PromiseRejectionTracker* PromiseRejections() const {
+            return m_promiseRejections.get();
+        }
+
+        UncaughtErrorPolicy GetUncaughtErrorPolicy() const {
+            return m_uncaughtErrorPolicy;
+        }
+        bool GetDiscardUncaughtJsExceptions() const {
+            return m_discardUncaughtJsExceptions;
+        }
+
+        /*
+         * Depth of in-flight JS->Java calls on this runtime's thread. When a
+         * JS callback invoked from Java throws while the depth is non-zero,
+         * the whole chain is JS-initiated (JS -> Java -> JS), so the throw
+         * must propagate back to the outer JS catch instead of being
+         * contained at the boundary. Maintained by CallbackHandlers around
+         * the JS->Java invocation sites.
+         */
+        int JavaCallDepth() const {
+            return m_javaCallDepth;
+        }
+        void EnterJavaCall() {
+            ++m_javaCallDepth;
+        }
+        void LeaveJavaCall() {
+            --m_javaCallDepth;
+        }
+
     private:
         Runtime(JNIEnv* env, jobject runtime, int id);
 
@@ -114,6 +197,17 @@ class Runtime {
         MessageLoopTimer* m_loopTimer;
 
         std::shared_ptr<LooperTasks> m_looperTasks;
+
+        v8::Global<v8::Object> m_globalEventTarget;
+        v8::Global<v8::Function> m_dispatchErrorEventFunc;
+        v8::Global<v8::Function> m_dispatchUnhandledRejectionFunc;
+        v8::Global<v8::Function> m_dispatchRejectionHandledFunc;
+        v8::Global<v8::Function> m_dispatchNativeUncaughtErrorFunc;
+        std::unique_ptr<PromiseRejectionTracker> m_promiseRejections;
+
+        UncaughtErrorPolicy m_uncaughtErrorPolicy = UncaughtErrorPolicy::Report;
+        bool m_discardUncaughtJsExceptions = false;
+        int m_javaCallDepth = 0;
 
         int64_t m_lastUsedMemory;
 

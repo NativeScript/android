@@ -298,7 +298,8 @@ void Timers::FireTimer() {
         nesting = 0;
 #endif
 
-        if (tc.HasCaught()) {
+        if (tc.HasCaught() &&
+            !NativeScriptException::ContainUncaughtCallbackException(isolate, tc)) {
             NativeScriptException(tc).ReThrowToJava();
         }
 

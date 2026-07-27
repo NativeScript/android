@@ -24,7 +24,9 @@ class AppConfig {
         DiscardUncaughtJsExceptions("discardUncaughtJsExceptions", false),
         EnableLineBreakpoins("enableLineBreakpoints", false),
         EnableMultithreadedJavascript("enableMultithreadedJavascript", false),
-        LogScriptLoading("logScriptLoading", false);
+        LogScriptLoading("logScriptLoading", false),
+        // Appended last: native code reads this array by ordinal.
+        UncaughtErrorPolicy("uncaughtErrorPolicy", "report");
 
         private final String name;
         private final Object defaultValue;
@@ -87,7 +89,25 @@ class AppConfig {
                     values[KnownKeys.LogScriptLoading.ordinal()] = rootObject.getBoolean(KnownKeys.LogScriptLoading.getName());
                 }
                 if (rootObject.has(KnownKeys.DiscardUncaughtJsExceptions.getName())) {
-                    values[KnownKeys.DiscardUncaughtJsExceptions.ordinal()] = rootObject.getBoolean(KnownKeys.DiscardUncaughtJsExceptions.getName());
+                    boolean discard = rootObject.getBoolean(KnownKeys.DiscardUncaughtJsExceptions.getName());
+                    if (discard) {
+                        // Legacy routing (__onDiscardedError) is preserved for the transition.
+                        values[KnownKeys.DiscardUncaughtJsExceptions.ordinal()] = true;
+                        Log.w("JS", "discardUncaughtJsExceptions is deprecated: uncaught JS errors no longer crash the app by default. Remove the flag, or use uncaughtErrorPolicy.");
+                    } else {
+                        // `false` used to mean "crash on uncaught errors" (the old
+                        // default). It is NOT mapped to uncaughtErrorPolicy: "throw" -
+                        // set that explicitly if crashing is desired.
+                        Log.w("JS", "discardUncaughtJsExceptions is deprecated and `false` is ignored: uncaught JS errors are reported without crashing by default. Set uncaughtErrorPolicy: \"throw\" to restore the old crashing behavior.");
+                    }
+                }
+                if (rootObject.has(KnownKeys.UncaughtErrorPolicy.getName())) {
+                    String policy = rootObject.getString(KnownKeys.UncaughtErrorPolicy.getName());
+                    if ("report".equals(policy) || "throw".equals(policy)) {
+                        values[KnownKeys.UncaughtErrorPolicy.ordinal()] = policy;
+                    } else {
+                        Log.w("JS", String.format("Unknown uncaughtErrorPolicy \"%s\" - expected \"report\" or \"throw\". The default \"report\" will be used.", policy));
+                    }
                 }
                 if (rootObject.has(AndroidKey)) {
                     JSONObject androidObject = rootObject.getJSONObject(AndroidKey);
@@ -195,6 +215,10 @@ class AppConfig {
 
     public boolean getDiscardUncaughtJsExceptions() {
         return (boolean)values[KnownKeys.DiscardUncaughtJsExceptions.ordinal()];
+    }
+
+    public String getUncaughtErrorPolicy() {
+        return (String)values[KnownKeys.UncaughtErrorPolicy.ordinal()];
     }
 
     public boolean getEnableMultithreadedJavascript() {

@@ -5,6 +5,34 @@ public class NativeScriptException extends RuntimeException {
     @SuppressWarnings("unused")
     private long jsValueAddress = 0;
     private String incomingStackTrace;
+    /*
+     * Set by the native side when this exception is a branded
+     * interop.escapeException(...) forward. An explicit forward always
+     * reaches the Java caller - it is exempt from the (deprecated)
+     * discardUncaughtJsExceptions handling.
+     */
+    private boolean escapedFromJs = false;
+    /*
+     * Set (natively or by the runtime) when this exception's failure was
+     * already reported to JS (error/unhandledrejection event, hooks, log) at
+     * the uncaughtErrorPolicy: "throw" decision point. Custom
+     * Thread.UncaughtExceptionHandler implementations should skip
+     * Runtime.passUncaughtExceptionToJs for such exceptions so the failure
+     * is not reported twice.
+     */
+    private boolean reportedToJs = false;
+
+    boolean isEscapedFromJs() {
+        return escapedFromJs;
+    }
+
+    void markReportedToJs() {
+        reportedToJs = true;
+    }
+
+    public boolean isReportedToJs() {
+        return reportedToJs;
+    }
 
     public NativeScriptException() {
         super();

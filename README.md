@@ -11,6 +11,7 @@ Contains the source code for the NativeScript's Android Runtime. [NativeScript](
 - [Build Prerequisites](#build-prerequisites)
 - [How to build](#how-to-build)
 - [How to run tests](#how-to-run-tests)
+- [Documentation](#documentation)
 - [Misc](#misc)
 - [Get Help](#get-help)
 
@@ -123,6 +124,10 @@ npx ns debug android --start
 ## Contribute
 We love PRs! Check out the [contributing guidelines](CONTRIBUTING.md). If you want to contribute, but you are not sure where to start - look for [issues labeled `help wanted`](https://github.com/NativeScript/android-runtime/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22).
 
+
+## Documentation
+
+Runtime feature documentation lives in the [docs](docs/README.md) folder — see [Error handling](docs/error-handling.md) for the global error events, Java exception round-tripping and `interop.escapeException`.
 
 ## Misc
 
