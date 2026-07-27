@@ -67,8 +67,19 @@ if [ -z "$RELEASE" ]; then
 fi
 [ ${#ABIS[@]} -gt 0 ] || ABIS=(arm64-v8a armeabi-v7a x86_64 x86)
 
-if [ "$FORCE" = "0" ] && [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$RELEASE" ]; then
-    echo "V8 $RELEASE already installed. Use --force to reinstall."
+# The stamp records which release was installed, not which ABIs were asked for,
+# so a previous --abi run must not satisfy a later request for the full set.
+# The installed files are the source of truth.
+installed() {
+    [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$RELEASE" ] || return 1
+    [ -f "$CPP_DIR/include/v8.h" ] && [ -d "$CPP_DIR/v8_inspector/src" ] || return 1
+    for abi in "${ABIS[@]}"; do
+        [ -f "$LIBS_DIR/$abi/libv8_monolith.a" ] || return 1
+    done
+}
+
+if [ "$FORCE" = "0" ] && installed; then
+    echo "V8 $RELEASE already installed for ${ABIS[*]}. Use --force to reinstall."
     exit 0
 fi
 
