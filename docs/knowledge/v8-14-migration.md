@@ -213,8 +213,9 @@ against V8 internals rather than the public API.
 
 ## Known follow-ups
 
-- `armeabi-v7a` and `x86` still hold 10.3 libraries; they need a Linux x64
-  builder (see above).
+- All four ABIs now come from the pinned release, but only buildscripts' CI can
+  produce the 32-bit two: they need an ia32-capable Linux x64 host (see above),
+  so a local macOS build cannot regenerate them.
 - **`V8_STATIC_ROOTS` is deliberately not defined by the runtime.** V8 is built
   with it, and it would let `Value::IsUndefined()`/`IsNull()` and friends use
   the inline static-root comparison instead of reading the map. It is left off
