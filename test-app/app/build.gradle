@@ -44,7 +44,13 @@ apply plugin: 'kotlin-parcelize'
 def onlyX86 = project.hasProperty("onlyX86")
 // -Pabis=arm64-v8a,x86_64 restricts the build to those ABIs. Needed because the
 // 32-bit V8 monoliths can only be produced on a Linux x64 host.
-def selectedAbis = project.hasProperty("abis") ? project.property("abis").split(",").collect { it.trim() } : null
+def selectedAbis = null
+if (project.hasProperty("abis")) {
+    selectedAbis = project.property("abis").split(",")*.trim().findAll { it }
+    if (selectedAbis.isEmpty()) {
+        throw new GradleException("-Pabis was given no ABIs. Omit it to build the default set.")
+    }
+}
 if (onlyX86) {
     outLogger.withStyle(Style.Info).println "OnlyX86 build triggered."
 }
