@@ -100,8 +100,15 @@ done
 
 # Verify before unpacking anything. A release is only trustworthy because the
 # archive matches the checksum published with it.
+#
+# Linux has sha256sum, macOS has shasum; neither has both reliably.
+if command -v sha256sum > /dev/null 2>&1; then
+    SHA256_CHECK="sha256sum -c -"
+else
+    SHA256_CHECK="shasum -a 256 -c -"
+fi
 echo "Verifying checksums"
-( cd "$DL" && grep -E "$(printf '%s|' "${ASSETS[@]}" | sed 's/|$//')" SHA256SUMS | shasum -a 256 -c - ) \
+( cd "$DL" && grep -E "$(printf '%s|' "${ASSETS[@]}" | sed 's/|$//')" SHA256SUMS | $SHA256_CHECK ) \
     || { echo "Checksum verification FAILED for $RELEASE" >&2; exit 1; }
 
 STAGE="$(mktemp -d)"
