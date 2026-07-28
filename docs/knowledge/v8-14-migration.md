@@ -189,7 +189,17 @@ read the flags out of the Java config by then.
 - **Resurrecting finalizers.** `ObjectManager` uses
   `WeakCallbackType::kFinalizer` in four places. Upstream removed it right after
   10.3.22; buildscripts' `v8_resurrecting_finalizers.patch` restores it. See
-  the iOS runtime's `V8_RESURRECTING_FINALIZERS.md` for the patch design.
+  the iOS runtime's `docs/knowledge/v8-resurrecting-finalizers.md` for the patch
+  design.
+
+  From `v8-14.9.207.39-2` that patch also lifts the
+  `DisallowJavascriptExecution` scope `Heap::CollectGarbage` now holds across
+  the whole collection, because entering JS from a GC callback is a
+  `GRACEFUL_FATAL` in 14.9 where 10.3 allowed it. This runtime does not depend
+  on the lift — `JSObjectFinalizer` makes one runtime-internal JNI call
+  (`makeInstanceWeakAndCheckIfAlive`) and Java has no synchronous destructor
+  that could re-enter JS — but it shares the patch, so pin a release that
+  carries it.
 - **Teardown disposal.** The runtime never used
   `Isolate::VisitHandlesWithClassIds` or `SetWrapperClassId`, so the registry
   the iOS runtime had to grow is not needed here.
