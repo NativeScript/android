@@ -1,14 +1,36 @@
-/* auto-generated on 2025-09-23 12:57:35 -0400. Do not edit! */
+/* auto-generated on 2026-07-27 16:10:09 -0400. Do not edit! */
 /* begin file include/ada.h */
 /**
  * @file ada.h
- * @brief Includes all definitions for Ada.
+ * @brief Main header for the Ada URL parser library.
+ *
+ * This is the primary entry point for the Ada URL parser library. Including
+ * this single header provides access to the complete Ada API, including:
+ *
+ * - URL parsing via `ada::parse()` function
+ * - Two URL representations: `ada::url` and `ada::url_aggregator`
+ * - URL search parameters via `ada::url_search_params`
+ * - URL pattern matching via `ada::url_pattern` (URLPattern API)
+ * - IDNA (Internationalized Domain Names) support
+ *
+ * @example
+ * ```cpp
+ *
+ * // Parse a URL
+ * auto url = ada::parse("https://example.com/path?query=1");
+ * if (url) {
+ *     std::cout << url->get_hostname(); // "example.com"
+ * }
+ * ```
+ *
+ * @see https://url.spec.whatwg.org/ - WHATWG URL Standard
+ * @see https://github.com/ada-url/ada - Ada URL Parser GitHub Repository
  */
 #ifndef ADA_H
 #define ADA_H
 
 /* begin file include/ada/ada_idna.h */
-/* auto-generated on 2025-03-08 13:17:11 -0500. Do not edit! */
+/* auto-generated on 2026-07-12 20:34:08 -0400. Do not edit! */
 /* begin file include/idna.h */
 #ifndef ADA_IDNA_H
 #define ADA_IDNA_H
@@ -47,6 +69,10 @@ namespace ada::idna {
 void ascii_map(char* input, size_t length);
 // Map the characters according to IDNA, returning the empty string on error.
 std::u32string map(std::u32string_view input);
+// Map into an existing buffer (cleared on entry). Returns false if any code
+// point is disallowed. Reusing the buffer avoids repeated heap allocations
+// when called in a loop over multiple labels.
+bool map(std::u32string_view input, std::u32string& out);
 
 }  // namespace ada::idna
 
@@ -61,8 +87,15 @@ std::u32string map(std::u32string_view input);
 
 namespace ada::idna {
 
+// Returns true if `input` is already in Unicode Normalization Form C.
+// Requires that internal tables have been loaded (call ensure via normalize
+// or map first, or this returns false if tables are unavailable).
+[[nodiscard]] bool is_already_nfc(std::u32string_view input) noexcept;
+
 // Normalize the characters according to IDNA (Unicode Normalization Form C).
-void normalize(std::u32string& input);
+// Returns false if the internal Unicode tables could not be loaded; in that
+// case `input` is left unchanged. Skips work when the string is already NFC.
+[[nodiscard]] bool normalize(std::u32string& input);
 
 }  // namespace ada::idna
 #endif
@@ -109,6 +142,24 @@ bool is_label_valid(std::u32string_view label);
 #include <string>
 #include <string_view>
 
+/* begin file include/ada/idna/limits.h */
+#ifndef ADA_IDNA_LIMITS_H
+#define ADA_IDNA_LIMITS_H
+
+#include <cstddef>
+
+namespace ada::idna {
+
+// Maximum accepted UTF-8 domain length for to_ascii / to_unicode.
+// Bounds heap growth under untrusted input (DoS resistance). DNS wire limits
+// are smaller; this allows long Unicode labels used in URL tests/fixtures.
+inline constexpr size_t max_domain_input_bytes = 16384;
+
+}  // namespace ada::idna
+
+#endif  // ADA_IDNA_LIMITS_H
+/* end file include/ada/idna/limits.h */
+
 namespace ada::idna {
 
 // Converts a domain (e.g., www.google.com) possibly containing international
@@ -116,11 +167,15 @@ namespace ada::idna {
 // decoding: percent decoding should be done prior to calling this function. We
 // do not remove tabs and spaces, they should have been removed prior to calling
 // this function. We also do not trim control characters. We also assume that
-// the input is not empty. We return "" on error.
+// the input is not empty. We return "" on error. Inputs longer than
+// max_domain_input_bytes are rejected.
 //
-//
-// This function may accept or even produce invalid domains.
+// This function may accept or even produce invalid domains (WHATWG carve-outs).
 std::string to_ascii(std::string_view ut8_string);
+
+// Same as to_ascii, but writes into `out` and returns false on error without
+// relying on empty-string ambiguity.
+[[nodiscard]] bool to_ascii(std::string_view ut8_string, std::string& out);
 
 // Returns true if the string contains a forbidden code point according to the
 // WHATGL URL specification:
@@ -135,15 +190,23 @@ bool constexpr is_ascii(std::string_view view);
 #endif  // ADA_IDNA_TO_ASCII_H
 /* end file include/ada/idna/to_ascii.h */
 /* begin file include/ada/idna/to_unicode.h */
-
 #ifndef ADA_IDNA_TO_UNICODE_H
 #define ADA_IDNA_TO_UNICODE_H
 
+#include <string>
 #include <string_view>
 
 namespace ada::idna {
 
+// UTS #46 ToUnicode. Never fails per the standard: on step failure the original
+// label is kept. Inputs longer than max_domain_input_bytes are returned
+// unchanged as a safety measure under untrusted input.
 std::string to_unicode(std::string_view input);
+
+// Writes into `out`. Returns false only if the input exceeds
+// max_domain_input_bytes (out is left empty). Otherwise always returns true
+// (ToUnicode does not fail).
+[[nodiscard]] bool to_unicode(std::string_view input, std::string& out);
 
 }  // namespace ada::idna
 
@@ -188,7 +251,11 @@ bool valid_name_code_point(char32_t code_point, bool first);
 /* begin file include/ada/common_defs.h */
 /**
  * @file common_defs.h
- * @brief Common definitions for cross-platform compiler support.
+ * @brief Cross-platform compiler macros and common definitions.
+ *
+ * This header provides compiler-specific macros for optimization hints,
+ * platform detection, SIMD support detection, and development/debug utilities.
+ * It ensures consistent behavior across different compilers (GCC, Clang, MSVC).
  */
 #ifndef ADA_COMMON_DEFS_H
 #define ADA_COMMON_DEFS_H
@@ -228,10 +295,10 @@ bool valid_name_code_point(char32_t code_point, bool first);
 #endif
 
 // Align to N-byte boundary
-#define ADA_ROUNDUP_N(a, n) (((a) + ((n)-1)) & ~((n)-1))
-#define ADA_ROUNDDOWN_N(a, n) ((a) & ~((n)-1))
+#define ADA_ROUNDUP_N(a, n) (((a) + ((n) - 1)) & ~((n) - 1))
+#define ADA_ROUNDDOWN_N(a, n) ((a) & ~((n) - 1))
 
-#define ADA_ISALIGNED_N(ptr, n) (((uintptr_t)(ptr) & ((n)-1)) == 0)
+#define ADA_ISALIGNED_N(ptr, n) (((uintptr_t)(ptr) & ((n) - 1)) == 0)
 
 #if defined(ADA_REGULAR_VISUAL_STUDIO)
 
@@ -421,10 +488,20 @@ namespace ada {
   } while (0)
 #endif
 
+#if defined(__SSSE3__)
+#define ADA_SSSE3 1
+#endif
+
 #if defined(__SSE2__) || defined(__x86_64__) || defined(__x86_64) || \
     (defined(_M_AMD64) || defined(_M_X64) ||                         \
      (defined(_M_IX86_FP) && _M_IX86_FP == 2))
 #define ADA_SSE2 1
+#endif
+
+// AVX-512 byte/word ops + 128/256-bit vectors of AVX-512 instructions.
+// Used for optional high-performance IP address parsing kernels.
+#if defined(__AVX512BW__) && defined(__AVX512VL__)
+#define ADA_AVX512 1
 #endif
 
 #if defined(__aarch64__) || defined(_M_ARM64)
@@ -433,6 +510,11 @@ namespace ada {
 
 #if defined(__loongarch_sx)
 #define ADA_LSX 1
+#endif
+
+#if defined(__riscv_v) && __riscv_v_intrinsic >= 11000
+// Support RVV intrinsics v0.11 and above
+#define ADA_RVV 1
 #endif
 
 #ifndef __has_cpp_attribute
@@ -1006,7 +1088,146 @@ ada_really_inline constexpr bool bit_at(const uint8_t a[], const uint8_t i) {
 #define ADA_CHECKERS_INL_H
 
 #include <bit>
+#include <cstdint>
+#include <cstring>
 #include <string_view>
+/* begin file include/ada/checkers.h */
+/**
+ * @file checkers.h
+ * @brief Declarations for URL specific checkers used within Ada.
+ */
+#ifndef ADA_CHECKERS_H
+#define ADA_CHECKERS_H
+
+
+#include <cstring>
+#include <string_view>
+
+/**
+ * These functions are not part of our public API and may
+ * change at any time.
+ * @private
+ * @namespace ada::checkers
+ * @brief Includes the definitions for validation functions
+ */
+namespace ada::checkers {
+
+/**
+ * @private
+ * Assuming that x is an ASCII letter, this function returns the lower case
+ * equivalent.
+ * @details More likely to be inlined by the compiler and constexpr.
+ */
+constexpr char to_lower(char x) noexcept;
+
+/**
+ * @private
+ * Returns true if the character is an ASCII letter. Equivalent to std::isalpha
+ * but more likely to be inlined by the compiler.
+ *
+ * @attention std::isalpha is not constexpr generally.
+ */
+constexpr bool is_alpha(char x) noexcept;
+
+/**
+ * @private
+ * Check whether a string starts with 0x or 0X. The function is only
+ * safe if input.size() >=2.
+ *
+ * @see has_hex_prefix
+ */
+constexpr bool has_hex_prefix_unsafe(std::string_view input);
+/**
+ * @private
+ * Check whether a string starts with 0x or 0X.
+ */
+constexpr bool has_hex_prefix(std::string_view input);
+
+/**
+ * @private
+ * Check whether x is an ASCII digit. More likely to be inlined than
+ * std::isdigit.
+ */
+constexpr bool is_digit(char x) noexcept;
+
+/**
+ * @private
+ * @details A string starts with a Windows drive letter if all of the following
+ * are true:
+ *
+ *   - its length is greater than or equal to 2
+ *   - its first two code points are a Windows drive letter
+ *   - its length is 2 or its third code point is U+002F (/), U+005C (\), U+003F
+ * (?), or U+0023 (#).
+ *
+ * https://url.spec.whatwg.org/#start-with-a-windows-drive-letter
+ */
+inline constexpr bool is_windows_drive_letter(std::string_view input) noexcept;
+
+/**
+ * @private
+ * @details A normalized Windows drive letter is a Windows drive letter of which
+ * the second code point is U+003A (:).
+ */
+inline constexpr bool is_normalized_windows_drive_letter(
+    std::string_view input) noexcept;
+
+/**
+ * @private
+ * Returns true if an input is an ipv4 address. It is assumed that the string
+ * does not contain uppercase ASCII characters (the input should have been
+ * lowered cased before calling this function) and is not empty.
+ */
+ada_really_inline constexpr bool is_ipv4(std::string_view view) noexcept;
+
+/**
+ * @private
+ * Returns a bitset. If the first bit is set, then at least one character needs
+ * percent encoding. If the second bit is set, a \\ is found. If the third bit
+ * is set then we have a dot. If the fourth bit is set, then we have a percent
+ * character.
+ */
+ada_really_inline constexpr uint8_t path_signature(
+    std::string_view input) noexcept;
+
+/**
+ * @private
+ * Returns true if the length of the domain name and its labels are according to
+ * the specifications. The length of the domain must be 255 octets (253
+ * characters not including the last 2 which are the empty label reserved at the
+ * end). When the empty label is included (a dot at the end), the domain name
+ * can have 254 characters. The length of a label must be at least 1 and at most
+ * 63 characters.
+ * @see section 3.1. of https://www.rfc-editor.org/rfc/rfc1034
+ * @see https://www.unicode.org/reports/tr46/#ToASCII
+ */
+ada_really_inline constexpr bool verify_dns_length(
+    std::string_view input) noexcept;
+
+/**
+ * @private
+ * Fast-path parser for pure decimal IPv4 addresses (e.g., "192.168.1.1").
+ * Returns the packed 32-bit IPv4 address on success, or a value > 0xFFFFFFFF
+ * to indicate failure (caller should fall back to general parser).
+ * This is optimized for the common case where the input is a well-formed
+ * decimal IPv4 address with exactly 4 octets.
+ */
+ada_really_inline uint64_t try_parse_ipv4_fast(std::string_view input) noexcept;
+
+/**
+ * Sentinel value indicating try_parse_ipv4_fast() did not succeed.
+ * Any value > 0xFFFFFFFF indicates the fast path should not be used.
+ */
+constexpr uint64_t ipv4_fast_fail = uint64_t(1) << 32;
+
+}  // namespace ada::checkers
+
+#endif  // ADA_CHECKERS_H
+/* end file include/ada/checkers.h */
+
+#if defined(ADA_AVX512)
+#include <immintrin.h>
+#endif
 
 namespace ada::checkers {
 
@@ -1046,7 +1267,151 @@ constexpr bool is_windows_drive_letter(std::string_view input) noexcept {
 
 constexpr bool is_normalized_windows_drive_letter(
     std::string_view input) noexcept {
-  return input.size() >= 2 && (is_alpha(input[0]) && (input[1] == ':'));
+  return input.size() == 2 && (is_alpha(input[0]) && (input[1] == ':'));
+}
+
+namespace detail {
+
+// Unrolled pure-decimal IPv4. The common portable path for 7-16 byte hosts.
+ada_really_inline uint64_t
+parse_ipv4_decimal_scalar(const char* p, const char* pend) noexcept {
+  uint32_t ipv4 = 0;
+  for (int i = 0; i < 4; ++i) {
+    if (p == pend) [[unlikely]] {
+      return ipv4_fast_fail;
+    }
+    uint32_t val;
+    char c = *p;
+    if (c >= '0' && c <= '9') [[likely]] {
+      val = static_cast<uint32_t>(c - '0');
+      ++p;
+    } else {
+      return ipv4_fast_fail;
+    }
+    if (p < pend) {
+      c = *p;
+      if (c >= '0' && c <= '9') {
+        if (val == 0) [[unlikely]] {
+          return ipv4_fast_fail;
+        }
+        val = val * 10u + static_cast<uint32_t>(c - '0');
+        ++p;
+        if (p < pend) {
+          c = *p;
+          if (c >= '0' && c <= '9') {
+            val = val * 10u + static_cast<uint32_t>(c - '0');
+            ++p;
+            if (val > 255u) [[unlikely]] {
+              return ipv4_fast_fail;
+            }
+          }
+        }
+      }
+    }
+    ipv4 = (ipv4 << 8) | val;
+    if (i < 3) {
+      if (p == pend || *p != '.') [[unlikely]] {
+        return ipv4_fast_fail;
+      }
+      ++p;
+    }
+  }
+  if (p != pend) {
+    if (p == pend - 1 && *p == '.') {
+      return ipv4;
+    }
+    return ipv4_fast_fail;
+  }
+  return ipv4;
+}
+
+#if defined(ADA_AVX512)
+// After SIMD validation: fewer rejection branches on convert.
+ada_really_inline uint64_t
+parse_ipv4_decimal_trusted(const char* p, const char* pend) noexcept {
+  uint32_t ipv4 = 0;
+  for (int i = 0; i < 4; ++i) {
+    uint32_t val = static_cast<uint32_t>(*p - '0');
+    ++p;
+    if (p < pend && static_cast<unsigned char>(*p - '0') <= 9) {
+      if (val == 0) [[unlikely]] {
+        return ipv4_fast_fail;
+      }
+      val = val * 10u + static_cast<uint32_t>(*p - '0');
+      ++p;
+      if (p < pend && static_cast<unsigned char>(*p - '0') <= 9) {
+        val = val * 10u + static_cast<uint32_t>(*p - '0');
+        ++p;
+        if (val > 255u) [[unlikely]] {
+          return ipv4_fast_fail;
+        }
+      }
+    }
+    ipv4 = (ipv4 << 8) | val;
+    if (i < 3) {
+      ++p;  // trusted '.'
+    }
+  }
+  return ipv4;  // trailing-dot already accounted for by caller via pend
+}
+
+// AVX-512 pure-decimal IPv4 (Lemire/Mula-style masked load + parallel checks).
+// No over-read of the source string. Wins when the binary is built with
+// -mavx512bw -mavx512vl (or -march that enables them).
+ada_really_inline uint64_t try_parse_ipv4_avx512(const char* data,
+                                                 size_t len) noexcept {
+  const __mmask16 live = static_cast<__mmask16>((1u << len) - 1u);
+  const __m128i input =
+      _mm_maskz_loadu_epi8(live, reinterpret_cast<const void*>(data));
+  const __mmask16 is_dot =
+      _mm_mask_cmpeq_epi8_mask(live, input, _mm_set1_epi8('.'));
+  const __m128i shifted = _mm_sub_epi8(input, _mm_set1_epi8('0'));
+  const __mmask16 is_digit =
+      _mm_mask_cmplt_epu8_mask(live, shifted, _mm_set1_epi8(10));
+  if ((is_digit | is_dot) != live) {
+    return ipv4_fast_fail;
+  }
+  const unsigned dot_count =
+      static_cast<unsigned>(_mm_popcnt_u32(static_cast<unsigned>(is_dot)));
+  size_t effective_len = len;
+  if (dot_count == 3) {
+    // ok
+  } else if (dot_count == 4 && data[len - 1] == '.') {
+    effective_len = len - 1;  // strip trailing dot for convert
+  } else {
+    return ipv4_fast_fail;
+  }
+  // Convert from a tiny stack copy so trusted peeks stay in-bounds.
+  alignas(16) char buf[16]{};
+  std::memcpy(buf, data, effective_len);
+  return parse_ipv4_decimal_trusted(buf, buf + effective_len);
+}
+#endif  // ADA_AVX512
+
+}  // namespace detail
+
+/**
+ * Fast pure-decimal IPv4 parse. Returns packed address or ipv4_fast_fail.
+ * Accepts an optional single trailing dot.
+ *
+ * On AVX-512BW+VL targets, uses a masked-load SIMD kernel (no source
+ * over-read) inspired by Lemire/Mula. Otherwise uses an unrolled scalar path
+ * (typically faster than SSE2/NEON pre-validation for these 7-16 byte hosts).
+ */
+ada_really_inline uint64_t
+try_parse_ipv4_fast(std::string_view input) noexcept {
+  const size_t len = input.size();
+  // Shortest pure decimal: "0.0.0.0" (7). Longest + trailing dot: 16.
+  if (len < 7 || len > 16) [[unlikely]] {
+    return ipv4_fast_fail;
+  }
+  const char* data = input.data();
+
+#if defined(ADA_AVX512)
+  return detail::try_parse_ipv4_avx512(data, len);
+#else
+  return detail::parse_ipv4_decimal_scalar(data, data + len);
+#endif
 }
 
 }  // namespace ada::checkers
@@ -1102,7 +1467,11 @@ constexpr ada_really_inline void log([[maybe_unused]] Args... args) {
 /* begin file include/ada/encoding_type.h */
 /**
  * @file encoding_type.h
- * @brief Definition for supported encoding types.
+ * @brief Character encoding type definitions.
+ *
+ * Defines the encoding types supported for URL processing.
+ *
+ * @see https://encoding.spec.whatwg.org/
  */
 #ifndef ADA_ENCODING_TYPE_H
 #define ADA_ENCODING_TYPE_H
@@ -1112,19 +1481,23 @@ constexpr ada_really_inline void log([[maybe_unused]] Args... args) {
 namespace ada {
 
 /**
- * This specification defines three encodings with the same names as encoding
- * schemes defined in the Unicode standard: UTF-8, UTF-16LE, and UTF-16BE.
+ * @brief Character encoding types for URL processing.
+ *
+ * Specifies the character encoding used for percent-decoding and other
+ * string operations. UTF-8 is the most commonly used encoding for URLs.
  *
  * @see https://encoding.spec.whatwg.org/#encodings
  */
 enum class encoding_type {
-  UTF8,
-  UTF_16LE,
-  UTF_16BE,
+  UTF8,     /**< UTF-8 encoding (default for URLs) */
+  UTF_16LE, /**< UTF-16 Little Endian encoding */
+  UTF_16BE, /**< UTF-16 Big Endian encoding */
 };
 
 /**
- * Convert a encoding_type to string.
+ * Converts an encoding_type to its string representation.
+ * @param type The encoding type to convert.
+ * @return A string view of the encoding name.
  */
 ada_warn_unused std::string_view to_string(encoding_type type);
 
@@ -1143,7 +1516,11 @@ ada_warn_unused std::string_view to_string(encoding_type type);
 /* begin file include/ada/url_base.h */
 /**
  * @file url_base.h
- * @brief Declaration for the basic URL definitions
+ * @brief Base class and common definitions for URL types.
+ *
+ * This file defines the `url_base` abstract base class from which both
+ * `ada::url` and `ada::url_aggregator` inherit. It also defines common
+ * enumerations like `url_host_type`.
  */
 #ifndef ADA_URL_BASE_H
 #define ADA_URL_BASE_H
@@ -1151,7 +1528,13 @@ ada_warn_unused std::string_view to_string(encoding_type type);
 /* begin file include/ada/scheme.h */
 /**
  * @file scheme.h
- * @brief Declarations for the URL scheme.
+ * @brief URL scheme type definitions and utilities.
+ *
+ * This header defines the URL scheme types (http, https, etc.) and provides
+ * functions to identify special schemes and their default ports according
+ * to the WHATWG URL Standard.
+ *
+ * @see https://url.spec.whatwg.org/#special-scheme
  */
 #ifndef ADA_SCHEME_H
 #define ADA_SCHEME_H
@@ -1161,62 +1544,65 @@ ada_warn_unused std::string_view to_string(encoding_type type);
 
 /**
  * @namespace ada::scheme
- * @brief Includes the scheme declarations
+ * @brief URL scheme utilities and constants.
+ *
+ * Provides functions for working with URL schemes, including identification
+ * of special schemes and retrieval of default port numbers.
  */
 namespace ada::scheme {
 
 /**
- * Type of the scheme as an enum.
- * Using strings to represent a scheme type is not ideal because
- * checking for types involves string comparisons. It is faster to use
- * a simple integer.
- * In C++11, we are allowed to specify the underlying type of the enum.
- * We pick an 8-bit integer (which allows up to 256 types). Specifying the
- * type of the enum may help integration with other systems if the type
- * variable is exposed (since its value will not depend on the compiler).
+ * @brief Enumeration of URL scheme types.
+ *
+ * Special schemes have specific parsing rules and default ports.
+ * Using an enum allows efficient scheme comparisons without string operations.
+ *
+ * Default ports:
+ * - HTTP: 80
+ * - HTTPS: 443
+ * - WS: 80
+ * - WSS: 443
+ * - FTP: 21
+ * - FILE: (none)
  */
 enum type : uint8_t {
-  HTTP = 0,
-  NOT_SPECIAL = 1,
-  HTTPS = 2,
-  WS = 3,
-  FTP = 4,
-  WSS = 5,
-  FILE = 6
+  HTTP = 0,        /**< http:// scheme (port 80) */
+  NOT_SPECIAL = 1, /**< Non-special scheme (no default port) */
+  HTTPS = 2,       /**< https:// scheme (port 443) */
+  WS = 3,          /**< ws:// WebSocket scheme (port 80) */
+  FTP = 4,         /**< ftp:// scheme (port 21) */
+  WSS = 5,         /**< wss:// secure WebSocket scheme (port 443) */
+  FILE = 6         /**< file:// scheme (no default port) */
 };
 
 /**
- * A special scheme is an ASCII string that is listed in the first column of the
- * following table. The default port for a special scheme is listed in the
- * second column on the same row. The default port for any other ASCII string is
- * null.
- *
- * @see https://url.spec.whatwg.org/#url-miscellaneous
- * @param scheme
- * @return If scheme is a special scheme
+ * Checks if a scheme string is a special scheme.
+ * @param scheme The scheme string to check (e.g., "http", "https").
+ * @return `true` if the scheme is special, `false` otherwise.
+ * @see https://url.spec.whatwg.org/#special-scheme
  */
 ada_really_inline constexpr bool is_special(std::string_view scheme);
 
 /**
- * A special scheme is an ASCII string that is listed in the first column of the
- * following table. The default port for a special scheme is listed in the
- * second column on the same row. The default port for any other ASCII string is
- * null.
- *
- * @see https://url.spec.whatwg.org/#url-miscellaneous
- * @param scheme
- * @return The special port
+ * Returns the default port for a special scheme string.
+ * @param scheme The scheme string (e.g., "http", "https").
+ * @return The default port number, or 0 if not a special scheme.
+ * @see https://url.spec.whatwg.org/#special-scheme
  */
 constexpr uint16_t get_special_port(std::string_view scheme) noexcept;
 
 /**
- * Returns the port number of a special scheme.
+ * Returns the default port for a scheme type.
+ * @param type The scheme type enum value.
+ * @return The default port number, or 0 if not applicable.
  * @see https://url.spec.whatwg.org/#special-scheme
  */
 constexpr uint16_t get_special_port(ada::scheme::type type) noexcept;
+
 /**
- * Returns the scheme of an input, or NOT_SPECIAL if it's not a special scheme
- * defined by the spec.
+ * Converts a scheme string to its type enum.
+ * @param scheme The scheme string to convert.
+ * @return The corresponding scheme type, or NOT_SPECIAL if not recognized.
  */
 constexpr ada::scheme::type get_scheme_type(std::string_view scheme) noexcept;
 
@@ -1231,112 +1617,112 @@ constexpr ada::scheme::type get_scheme_type(std::string_view scheme) noexcept;
 namespace ada {
 
 /**
- * Type of URL host as an enum.
+ * @brief Enum representing the type of host in a URL.
+ *
+ * Used to distinguish between regular domain names, IPv4 addresses,
+ * and IPv6 addresses for proper parsing and serialization.
  */
 enum url_host_type : uint8_t {
-  /**
-   * Represents common URLs such as "https://www.google.com"
-   */
+  /** Regular domain name (e.g., "www.example.com") */
   DEFAULT = 0,
-  /**
-   * Represents ipv4 addresses such as "http://127.0.0.1"
-   */
+  /** IPv4 address (e.g., "127.0.0.1") */
   IPV4 = 1,
-  /**
-   * Represents ipv6 addresses such as
-   * "http://[2001:db8:3333:4444:5555:6666:7777:8888]"
-   */
+  /** IPv6 address (e.g., "[::1]" or "[2001:db8::1]") */
   IPV6 = 2,
 };
 
 /**
- * @brief Base class of URL implementations
+ * @brief Abstract base class for URL representations.
  *
- * @details A url_base contains a few attributes: is_valid, has_opaque_path and
- * type. All non-trivial implementation details are in derived classes such as
- * ada::url and ada::url_aggregator.
+ * The `url_base` class provides the common interface and state shared by
+ * both `ada::url` and `ada::url_aggregator`. It contains basic URL attributes
+ * like validity status and scheme type, but delegates component storage and
+ * access to derived classes.
  *
- * It is an abstract class that cannot be instantiated directly.
+ * @note This is an abstract class and cannot be instantiated directly.
+ *       Use `ada::url` or `ada::url_aggregator` instead.
+ *
+ * @see url
+ * @see url_aggregator
  */
 struct url_base {
   virtual ~url_base() = default;
 
   /**
-   * Used for returning the validity from the result of the URL parser.
+   * Indicates whether the URL was successfully parsed.
+   * Set to `false` if parsing failed (e.g., invalid URL syntax).
    */
   bool is_valid{true};
 
   /**
-   * A URL has an opaque path if its path is a string.
+   * Indicates whether the URL has an opaque path (non-hierarchical).
+   * Opaque paths occur in non-special URLs like `mailto:` or `javascript:`.
    */
   bool has_opaque_path{false};
 
   /**
-   * URL hosts type
+   * The type of the URL's host (domain, IPv4, or IPv6).
    */
   url_host_type host_type = url_host_type::DEFAULT;
 
   /**
    * @private
+   * Internal representation of the URL's scheme type.
    */
   ada::scheme::type type{ada::scheme::type::NOT_SPECIAL};
 
   /**
-   * A URL is special if its scheme is a special scheme. A URL is not special if
-   * its scheme is not a special scheme.
+   * Checks if the URL has a special scheme (http, https, ws, wss, ftp, file).
+   * Special schemes have specific parsing rules and default ports.
+   * @return `true` if the scheme is special, `false` otherwise.
    */
   [[nodiscard]] ada_really_inline constexpr bool is_special() const noexcept;
 
   /**
-   * The origin getter steps are to return the serialization of this's URL's
-   * origin. [HTML]
-   * @return a newly allocated string.
+   * Returns the URL's origin (scheme + host + port for special URLs).
+   * @return A newly allocated string containing the serialized origin.
    * @see https://url.spec.whatwg.org/#concept-url-origin
    */
-  [[nodiscard]] virtual std::string get_origin() const noexcept = 0;
+  [[nodiscard]] virtual std::string get_origin() const = 0;
 
   /**
-   * Returns true if this URL has a valid domain as per RFC 1034 and
-   * corresponding specifications. Among other things, it requires
-   * that the domain string has fewer than 255 octets.
+   * Validates whether the hostname is a valid domain according to RFC 1034.
+   * Checks that the domain and its labels have valid lengths.
+   * @return `true` if the domain is valid, `false` otherwise.
    */
   [[nodiscard]] virtual bool has_valid_domain() const noexcept = 0;
 
   /**
    * @private
-   *
-   * Return the 'special port' if the URL is special and not 'file'.
-   * Returns 0 otherwise.
+   * Returns the default port for special schemes (e.g., 443 for https).
+   * Returns 0 for file:// URLs or non-special schemes.
    */
   [[nodiscard]] inline uint16_t get_special_port() const noexcept;
 
   /**
    * @private
-   *
-   * Get the default port if the url's scheme has one, returns 0 otherwise.
+   * Returns the default port for the URL's scheme, or 0 if none.
    */
   [[nodiscard]] ada_really_inline uint16_t scheme_default_port() const noexcept;
 
   /**
    * @private
-   *
-   * Parse a port (16-bit decimal digit) from the provided input.
-   * We assume that the input does not contain spaces or tabs
-   * within the ASCII digits.
-   * It returns how many bytes were consumed when a number is successfully
-   * parsed.
-   * @return On failure, it returns zero.
-   * @see https://url.spec.whatwg.org/#host-parsing
+   * Parses a port number from the input string.
+   * @param view The string containing the port to parse.
+   * @param check_trailing_content Whether to validate no trailing characters.
+   * @return Number of bytes consumed on success, 0 on failure.
    */
   virtual size_t parse_port(std::string_view view,
-                            bool check_trailing_content) noexcept = 0;
+                            bool check_trailing_content) = 0;
 
-  virtual ada_really_inline size_t parse_port(std::string_view view) noexcept {
+  /** @private */
+  virtual ada_really_inline size_t parse_port(std::string_view view) {
     return this->parse_port(view, false);
   }
 
   /**
-   * Returns a JSON string representation of this URL.
+   * Returns a JSON string representation of this URL for debugging.
+   * @return A JSON-formatted string with URL information.
    */
   [[nodiscard]] virtual std::string to_string() const = 0;
 
@@ -1405,8 +1791,7 @@ ada_really_inline std::optional<std::string_view> prune_hash(
  * @see https://url.spec.whatwg.org/#shorten-a-urls-path
  * @returns Returns true if path is shortened.
  */
-ada_really_inline bool shorten_path(std::string& path,
-                                    ada::scheme::type type) noexcept;
+ada_really_inline bool shorten_path(std::string& path, ada::scheme::type type);
 
 /**
  * @private
@@ -1415,7 +1800,7 @@ ada_really_inline bool shorten_path(std::string& path,
  * @returns Returns true if path is shortened.
  */
 ada_really_inline bool shorten_path(std::string_view& path,
-                                    ada::scheme::type type) noexcept;
+                                    ada::scheme::type type);
 
 /**
  * @private
@@ -1436,15 +1821,14 @@ ada_really_inline void parse_prepared_path(std::string_view input,
  * @private
  * Remove and mutate all ASCII tab or newline characters from an input.
  */
-ada_really_inline void remove_ascii_tab_or_newline(std::string& input) noexcept;
+ada_really_inline void remove_ascii_tab_or_newline(std::string& input);
 
 /**
  * @private
  * Return the substring from input going from index pos to the end.
- * This function cannot throw.
  */
 ada_really_inline constexpr std::string_view substring(std::string_view input,
-                                                       size_t pos) noexcept;
+                                                       size_t pos);
 
 /**
  * @private
@@ -1459,7 +1843,7 @@ bool overlaps(std::string_view input1, const std::string& input2) noexcept;
  */
 ada_really_inline constexpr std::string_view substring(std::string_view input,
                                                        size_t pos1,
-                                                       size_t pos2) noexcept {
+                                                       size_t pos2) {
 #if ADA_DEVELOPMENT_CHECKS
   if (pos2 < pos1) {
     std::cerr << "Negative-length substring: [" << pos1 << " to " << pos2 << ")"
@@ -1498,8 +1882,7 @@ void trim_c0_whitespace(std::string_view& input) noexcept;
  * https://url.spec.whatwg.org/#potentially-strip-trailing-spaces-from-an-opaque-path
  */
 template <class url_type>
-ada_really_inline void strip_trailing_spaces_from_opaque_path(
-    url_type& url) noexcept;
+ada_really_inline void strip_trailing_spaces_from_opaque_path(url_type& url);
 
 /**
  * @private
@@ -1589,7 +1972,13 @@ inline int fast_digit_count(uint32_t x) noexcept {
 /* begin file include/ada/parser.h */
 /**
  * @file parser.h
- * @brief Definitions for the parser.
+ * @brief Low-level URL parsing functions.
+ *
+ * This header provides the internal URL parsing implementation. Most users
+ * should use `ada::parse()` from implementation.h instead of these functions
+ * directly.
+ *
+ * @see implementation.h for the recommended public API
  */
 #ifndef ADA_PARSER_H
 #define ADA_PARSER_H
@@ -1751,25 +2140,25 @@ class unexpected {
   static_assert(!std::is_same<E, void>::value, "E must not be void");
 
   unexpected() = delete;
-  constexpr explicit unexpected(const E &e) : m_val(e) {}
+  constexpr explicit unexpected(const E& e) : m_val(e) {}
 
-  constexpr explicit unexpected(E &&e) : m_val(std::move(e)) {}
+  constexpr explicit unexpected(E&& e) : m_val(std::move(e)) {}
 
   template <class... Args, typename std::enable_if<std::is_constructible<
-                               E, Args &&...>::value>::type * = nullptr>
-  constexpr explicit unexpected(Args &&...args)
+                               E, Args&&...>::value>::type* = nullptr>
+  constexpr explicit unexpected(Args&&... args)
       : m_val(std::forward<Args>(args)...) {}
   template <
       class U, class... Args,
       typename std::enable_if<std::is_constructible<
-          E, std::initializer_list<U> &, Args &&...>::value>::type * = nullptr>
-  constexpr explicit unexpected(std::initializer_list<U> l, Args &&...args)
+          E, std::initializer_list<U>&, Args&&...>::value>::type* = nullptr>
+  constexpr explicit unexpected(std::initializer_list<U> l, Args&&... args)
       : m_val(l, std::forward<Args>(args)...) {}
 
-  constexpr const E &value() const & { return m_val; }
-  TL_EXPECTED_11_CONSTEXPR E &value() & { return m_val; }
-  TL_EXPECTED_11_CONSTEXPR E &&value() && { return std::move(m_val); }
-  constexpr const E &&value() const && { return std::move(m_val); }
+  constexpr const E& value() const& { return m_val; }
+  TL_EXPECTED_11_CONSTEXPR E& value() & { return m_val; }
+  TL_EXPECTED_11_CONSTEXPR E&& value() && { return std::move(m_val); }
+  constexpr const E&& value() const&& { return std::move(m_val); }
 
  private:
   E m_val;
@@ -1781,32 +2170,32 @@ unexpected(E) -> unexpected<E>;
 #endif
 
 template <class E>
-constexpr bool operator==(const unexpected<E> &lhs, const unexpected<E> &rhs) {
+constexpr bool operator==(const unexpected<E>& lhs, const unexpected<E>& rhs) {
   return lhs.value() == rhs.value();
 }
 template <class E>
-constexpr bool operator!=(const unexpected<E> &lhs, const unexpected<E> &rhs) {
+constexpr bool operator!=(const unexpected<E>& lhs, const unexpected<E>& rhs) {
   return lhs.value() != rhs.value();
 }
 template <class E>
-constexpr bool operator<(const unexpected<E> &lhs, const unexpected<E> &rhs) {
+constexpr bool operator<(const unexpected<E>& lhs, const unexpected<E>& rhs) {
   return lhs.value() < rhs.value();
 }
 template <class E>
-constexpr bool operator<=(const unexpected<E> &lhs, const unexpected<E> &rhs) {
+constexpr bool operator<=(const unexpected<E>& lhs, const unexpected<E>& rhs) {
   return lhs.value() <= rhs.value();
 }
 template <class E>
-constexpr bool operator>(const unexpected<E> &lhs, const unexpected<E> &rhs) {
+constexpr bool operator>(const unexpected<E>& lhs, const unexpected<E>& rhs) {
   return lhs.value() > rhs.value();
 }
 template <class E>
-constexpr bool operator>=(const unexpected<E> &lhs, const unexpected<E> &rhs) {
+constexpr bool operator>=(const unexpected<E>& lhs, const unexpected<E>& rhs) {
   return lhs.value() >= rhs.value();
 }
 
 template <class E>
-unexpected<typename std::decay<E>::type> make_unexpected(E &&e) {
+unexpected<typename std::decay<E>::type> make_unexpected(E&& e) {
   return unexpected<typename std::decay<E>::type>(std::forward<E>(e));
 }
 
@@ -1817,7 +2206,7 @@ static constexpr unexpect_t unexpect{};
 
 namespace detail {
 template <typename E>
-[[noreturn]] TL_EXPECTED_11_CONSTEXPR void throw_exception(E &&e) {
+[[noreturn]] TL_EXPECTED_11_CONSTEXPR void throw_exception(E&& e) {
 #ifdef TL_EXPECTED_EXCEPTIONS_ENABLED
   throw std::forward<E>(e);
 #else
@@ -1876,16 +2265,16 @@ template <class T, class Ret, class... Args>
 struct is_pointer_to_non_const_member_func<Ret (T::*)(Args...) volatile>
     : std::true_type {};
 template <class T, class Ret, class... Args>
-struct is_pointer_to_non_const_member_func<Ret (T::*)(Args...) volatile &>
+struct is_pointer_to_non_const_member_func<Ret (T::*)(Args...) volatile&>
     : std::true_type {};
 template <class T, class Ret, class... Args>
-struct is_pointer_to_non_const_member_func<Ret (T::*)(Args...) volatile &&>
+struct is_pointer_to_non_const_member_func<Ret (T::*)(Args...) volatile&&>
     : std::true_type {};
 
 template <class T>
 struct is_const_or_const_ref : std::false_type {};
 template <class T>
-struct is_const_or_const_ref<T const &> : std::true_type {};
+struct is_const_or_const_ref<T const&> : std::true_type {};
 template <class T>
 struct is_const_or_const_ref<T const> : std::true_type {};
 #endif
@@ -1899,7 +2288,7 @@ template <
                              is_const_or_const_ref<Args...>::value)>,
 #endif
     typename = enable_if_t<std::is_member_pointer<decay_t<Fn>>::value>, int = 0>
-constexpr auto invoke(Fn &&f, Args &&...args) noexcept(
+constexpr auto invoke(Fn&& f, Args&&... args) noexcept(
     noexcept(std::mem_fn(f)(std::forward<Args>(args)...)))
     -> decltype(std::mem_fn(f)(std::forward<Args>(args)...)) {
   return std::mem_fn(f)(std::forward<Args>(args)...);
@@ -1907,7 +2296,7 @@ constexpr auto invoke(Fn &&f, Args &&...args) noexcept(
 
 template <typename Fn, typename... Args,
           typename = enable_if_t<!std::is_member_pointer<decay_t<Fn>>::value>>
-constexpr auto invoke(Fn &&f, Args &&...args) noexcept(
+constexpr auto invoke(Fn&& f, Args&&... args) noexcept(
     noexcept(std::forward<Fn>(f)(std::forward<Args>(args)...)))
     -> decltype(std::forward<Fn>(f)(std::forward<Args>(args)...)) {
   return std::forward<Fn>(f)(std::forward<Args>(args)...);
@@ -1947,7 +2336,7 @@ namespace swap_adl_tests {
 struct tag {};
 
 template <class T>
-tag swap(T &, T &);
+tag swap(T&, T&);
 template <class T, std::size_t N>
 tag swap(T (&a)[N], T (&b)[N]);
 
@@ -1956,14 +2345,14 @@ tag swap(T (&a)[N], T (&b)[N]);
 template <class, class>
 std::false_type can_swap(...) noexcept(false);
 template <class T, class U,
-          class = decltype(swap(std::declval<T &>(), std::declval<U &>()))>
-std::true_type can_swap(int) noexcept(noexcept(swap(std::declval<T &>(),
-                                                    std::declval<U &>())));
+          class = decltype(swap(std::declval<T&>(), std::declval<U&>()))>
+std::true_type can_swap(int) noexcept(noexcept(swap(std::declval<T&>(),
+                                                    std::declval<U&>())));
 
 template <class, class>
 std::false_type uses_std(...);
 template <class T, class U>
-std::is_same<decltype(swap(std::declval<T &>(), std::declval<U &>())), tag>
+std::is_same<decltype(swap(std::declval<T&>(), std::declval<U&>())), tag>
 uses_std(int);
 
 template <class T>
@@ -2020,7 +2409,7 @@ using is_expected = is_expected_impl<decay_t<T>>;
 
 template <class T, class E, class U>
 using expected_enable_forward_value = detail::enable_if_t<
-    std::is_constructible<T, U &&>::value &&
+    std::is_constructible<T, U&&>::value &&
     !std::is_same<detail::decay_t<U>, in_place_t>::value &&
     !std::is_same<expected<T, E>, detail::decay_t<U>>::value &&
     !std::is_same<unexpected<E>, detail::decay_t<U>>::value>;
@@ -2029,14 +2418,14 @@ template <class T, class E, class U, class G, class UR, class GR>
 using expected_enable_from_other = detail::enable_if_t<
     std::is_constructible<T, UR>::value &&
     std::is_constructible<E, GR>::value &&
-    !std::is_constructible<T, expected<U, G> &>::value &&
-    !std::is_constructible<T, expected<U, G> &&>::value &&
-    !std::is_constructible<T, const expected<U, G> &>::value &&
-    !std::is_constructible<T, const expected<U, G> &&>::value &&
-    !std::is_convertible<expected<U, G> &, T>::value &&
-    !std::is_convertible<expected<U, G> &&, T>::value &&
-    !std::is_convertible<const expected<U, G> &, T>::value &&
-    !std::is_convertible<const expected<U, G> &&, T>::value>;
+    !std::is_constructible<T, expected<U, G>&>::value &&
+    !std::is_constructible<T, expected<U, G>&&>::value &&
+    !std::is_constructible<T, const expected<U, G>&>::value &&
+    !std::is_constructible<T, const expected<U, G>&&>::value &&
+    !std::is_convertible<expected<U, G>&, T>::value &&
+    !std::is_convertible<expected<U, G>&&, T>::value &&
+    !std::is_convertible<const expected<U, G>&, T>::value &&
+    !std::is_convertible<const expected<U, G>&&, T>::value>;
 
 template <class T, class U>
 using is_void_or = conditional_t<std::is_void<T>::value, std::true_type, U>;
@@ -2074,29 +2463,29 @@ struct expected_storage_base {
   constexpr expected_storage_base(no_init_t) : m_no_init(), m_has_val(false) {}
 
   template <class... Args,
-            detail::enable_if_t<std::is_constructible<T, Args &&...>::value> * =
+            detail::enable_if_t<std::is_constructible<T, Args&&...>::value>* =
                 nullptr>
-  constexpr expected_storage_base(in_place_t, Args &&...args)
+  constexpr expected_storage_base(in_place_t, Args&&... args)
       : m_val(std::forward<Args>(args)...), m_has_val(true) {}
 
   template <class U, class... Args,
             detail::enable_if_t<std::is_constructible<
-                T, std::initializer_list<U> &, Args &&...>::value> * = nullptr>
+                T, std::initializer_list<U>&, Args&&...>::value>* = nullptr>
   constexpr expected_storage_base(in_place_t, std::initializer_list<U> il,
-                                  Args &&...args)
+                                  Args&&... args)
       : m_val(il, std::forward<Args>(args)...), m_has_val(true) {}
   template <class... Args,
-            detail::enable_if_t<std::is_constructible<E, Args &&...>::value> * =
+            detail::enable_if_t<std::is_constructible<E, Args&&...>::value>* =
                 nullptr>
-  constexpr explicit expected_storage_base(unexpect_t, Args &&...args)
+  constexpr explicit expected_storage_base(unexpect_t, Args&&... args)
       : m_unexpect(std::forward<Args>(args)...), m_has_val(false) {}
 
   template <class U, class... Args,
             detail::enable_if_t<std::is_constructible<
-                E, std::initializer_list<U> &, Args &&...>::value> * = nullptr>
+                E, std::initializer_list<U>&, Args&&...>::value>* = nullptr>
   constexpr explicit expected_storage_base(unexpect_t,
                                            std::initializer_list<U> il,
-                                           Args &&...args)
+                                           Args&&... args)
       : m_unexpect(il, std::forward<Args>(args)...), m_has_val(false) {}
 
   ~expected_storage_base() {
@@ -2122,29 +2511,29 @@ struct expected_storage_base<T, E, true, true> {
   constexpr expected_storage_base(no_init_t) : m_no_init(), m_has_val(false) {}
 
   template <class... Args,
-            detail::enable_if_t<std::is_constructible<T, Args &&...>::value> * =
+            detail::enable_if_t<std::is_constructible<T, Args&&...>::value>* =
                 nullptr>
-  constexpr expected_storage_base(in_place_t, Args &&...args)
+  constexpr expected_storage_base(in_place_t, Args&&... args)
       : m_val(std::forward<Args>(args)...), m_has_val(true) {}
 
   template <class U, class... Args,
             detail::enable_if_t<std::is_constructible<
-                T, std::initializer_list<U> &, Args &&...>::value> * = nullptr>
+                T, std::initializer_list<U>&, Args&&...>::value>* = nullptr>
   constexpr expected_storage_base(in_place_t, std::initializer_list<U> il,
-                                  Args &&...args)
+                                  Args&&... args)
       : m_val(il, std::forward<Args>(args)...), m_has_val(true) {}
   template <class... Args,
-            detail::enable_if_t<std::is_constructible<E, Args &&...>::value> * =
+            detail::enable_if_t<std::is_constructible<E, Args&&...>::value>* =
                 nullptr>
-  constexpr explicit expected_storage_base(unexpect_t, Args &&...args)
+  constexpr explicit expected_storage_base(unexpect_t, Args&&... args)
       : m_unexpect(std::forward<Args>(args)...), m_has_val(false) {}
 
   template <class U, class... Args,
             detail::enable_if_t<std::is_constructible<
-                E, std::initializer_list<U> &, Args &&...>::value> * = nullptr>
+                E, std::initializer_list<U>&, Args&&...>::value>* = nullptr>
   constexpr explicit expected_storage_base(unexpect_t,
                                            std::initializer_list<U> il,
-                                           Args &&...args)
+                                           Args&&... args)
       : m_unexpect(il, std::forward<Args>(args)...), m_has_val(false) {}
 
   ~expected_storage_base() = default;
@@ -2164,29 +2553,29 @@ struct expected_storage_base<T, E, true, false> {
       : m_no_init(), m_has_val(false) {}
 
   template <class... Args,
-            detail::enable_if_t<std::is_constructible<T, Args &&...>::value> * =
+            detail::enable_if_t<std::is_constructible<T, Args&&...>::value>* =
                 nullptr>
-  constexpr expected_storage_base(in_place_t, Args &&...args)
+  constexpr expected_storage_base(in_place_t, Args&&... args)
       : m_val(std::forward<Args>(args)...), m_has_val(true) {}
 
   template <class U, class... Args,
             detail::enable_if_t<std::is_constructible<
-                T, std::initializer_list<U> &, Args &&...>::value> * = nullptr>
+                T, std::initializer_list<U>&, Args&&...>::value>* = nullptr>
   constexpr expected_storage_base(in_place_t, std::initializer_list<U> il,
-                                  Args &&...args)
+                                  Args&&... args)
       : m_val(il, std::forward<Args>(args)...), m_has_val(true) {}
   template <class... Args,
-            detail::enable_if_t<std::is_constructible<E, Args &&...>::value> * =
+            detail::enable_if_t<std::is_constructible<E, Args&&...>::value>* =
                 nullptr>
-  constexpr explicit expected_storage_base(unexpect_t, Args &&...args)
+  constexpr explicit expected_storage_base(unexpect_t, Args&&... args)
       : m_unexpect(std::forward<Args>(args)...), m_has_val(false) {}
 
   template <class U, class... Args,
             detail::enable_if_t<std::is_constructible<
-                E, std::initializer_list<U> &, Args &&...>::value> * = nullptr>
+                E, std::initializer_list<U>&, Args&&...>::value>* = nullptr>
   constexpr explicit expected_storage_base(unexpect_t,
                                            std::initializer_list<U> il,
-                                           Args &&...args)
+                                           Args&&... args)
       : m_unexpect(il, std::forward<Args>(args)...), m_has_val(false) {}
 
   ~expected_storage_base() {
@@ -2210,29 +2599,29 @@ struct expected_storage_base<T, E, false, true> {
   constexpr expected_storage_base(no_init_t) : m_no_init(), m_has_val(false) {}
 
   template <class... Args,
-            detail::enable_if_t<std::is_constructible<T, Args &&...>::value> * =
+            detail::enable_if_t<std::is_constructible<T, Args&&...>::value>* =
                 nullptr>
-  constexpr expected_storage_base(in_place_t, Args &&...args)
+  constexpr expected_storage_base(in_place_t, Args&&... args)
       : m_val(std::forward<Args>(args)...), m_has_val(true) {}
 
   template <class U, class... Args,
             detail::enable_if_t<std::is_constructible<
-                T, std::initializer_list<U> &, Args &&...>::value> * = nullptr>
+                T, std::initializer_list<U>&, Args&&...>::value>* = nullptr>
   constexpr expected_storage_base(in_place_t, std::initializer_list<U> il,
-                                  Args &&...args)
+                                  Args&&... args)
       : m_val(il, std::forward<Args>(args)...), m_has_val(true) {}
   template <class... Args,
-            detail::enable_if_t<std::is_constructible<E, Args &&...>::value> * =
+            detail::enable_if_t<std::is_constructible<E, Args&&...>::value>* =
                 nullptr>
-  constexpr explicit expected_storage_base(unexpect_t, Args &&...args)
+  constexpr explicit expected_storage_base(unexpect_t, Args&&... args)
       : m_unexpect(std::forward<Args>(args)...), m_has_val(false) {}
 
   template <class U, class... Args,
             detail::enable_if_t<std::is_constructible<
-                E, std::initializer_list<U> &, Args &&...>::value> * = nullptr>
+                E, std::initializer_list<U>&, Args&&...>::value>* = nullptr>
   constexpr explicit expected_storage_base(unexpect_t,
                                            std::initializer_list<U> il,
-                                           Args &&...args)
+                                           Args&&... args)
       : m_unexpect(il, std::forward<Args>(args)...), m_has_val(false) {}
 
   ~expected_storage_base() {
@@ -2263,17 +2652,17 @@ struct expected_storage_base<void, E, false, true> {
   constexpr expected_storage_base(in_place_t) : m_has_val(true) {}
 
   template <class... Args,
-            detail::enable_if_t<std::is_constructible<E, Args &&...>::value> * =
+            detail::enable_if_t<std::is_constructible<E, Args&&...>::value>* =
                 nullptr>
-  constexpr explicit expected_storage_base(unexpect_t, Args &&...args)
+  constexpr explicit expected_storage_base(unexpect_t, Args&&... args)
       : m_unexpect(std::forward<Args>(args)...), m_has_val(false) {}
 
   template <class U, class... Args,
             detail::enable_if_t<std::is_constructible<
-                E, std::initializer_list<U> &, Args &&...>::value> * = nullptr>
+                E, std::initializer_list<U>&, Args&&...>::value>* = nullptr>
   constexpr explicit expected_storage_base(unexpect_t,
                                            std::initializer_list<U> il,
-                                           Args &&...args)
+                                           Args&&... args)
       : m_unexpect(il, std::forward<Args>(args)...), m_has_val(false) {}
 
   ~expected_storage_base() = default;
@@ -2294,17 +2683,17 @@ struct expected_storage_base<void, E, false, false> {
   constexpr expected_storage_base(in_place_t) : m_dummy(), m_has_val(true) {}
 
   template <class... Args,
-            detail::enable_if_t<std::is_constructible<E, Args &&...>::value> * =
+            detail::enable_if_t<std::is_constructible<E, Args&&...>::value>* =
                 nullptr>
-  constexpr explicit expected_storage_base(unexpect_t, Args &&...args)
+  constexpr explicit expected_storage_base(unexpect_t, Args&&... args)
       : m_unexpect(std::forward<Args>(args)...), m_has_val(false) {}
 
   template <class U, class... Args,
             detail::enable_if_t<std::is_constructible<
-                E, std::initializer_list<U> &, Args &&...>::value> * = nullptr>
+                E, std::initializer_list<U>&, Args&&...>::value>* = nullptr>
   constexpr explicit expected_storage_base(unexpect_t,
                                            std::initializer_list<U> il,
-                                           Args &&...args)
+                                           Args&&... args)
       : m_unexpect(il, std::forward<Args>(args)...), m_has_val(false) {}
 
   ~expected_storage_base() {
@@ -2327,19 +2716,20 @@ struct expected_operations_base : expected_storage_base<T, E> {
   using expected_storage_base<T, E>::expected_storage_base;
 
   template <class... Args>
-  void construct(Args &&...args) noexcept {
+  void construct(Args&&... args) noexcept {
     new (std::addressof(this->m_val)) T(std::forward<Args>(args)...);
     this->m_has_val = true;
   }
 
   template <class Rhs>
-  void construct_with(Rhs &&rhs) noexcept {
+  // NOLINTNEXTLINE(bugprone-exception-escape)
+  void construct_with(Rhs&& rhs) noexcept {
     new (std::addressof(this->m_val)) T(std::forward<Rhs>(rhs).get());
     this->m_has_val = true;
   }
 
   template <class... Args>
-  void construct_error(Args &&...args) noexcept {
+  void construct_error(Args&&... args) noexcept {
     new (std::addressof(this->m_unexpect))
         unexpected<E>(std::forward<Args>(args)...);
     this->m_has_val = false;
@@ -2354,9 +2744,9 @@ struct expected_operations_base : expected_storage_base<T, E> {
   // This overload handles the case where we can just copy-construct `T`
   // directly into place without throwing.
   template <class U = T,
-            detail::enable_if_t<std::is_nothrow_copy_constructible<U>::value>
-                * = nullptr>
-  void assign(const expected_operations_base &rhs) noexcept {
+            detail::enable_if_t<std::is_nothrow_copy_constructible<U>::value>* =
+                nullptr>
+  void assign(const expected_operations_base& rhs) noexcept {
     if (!this->m_has_val && rhs.m_has_val) {
       geterr().~unexpected<E>();
       construct(rhs.get());
@@ -2369,9 +2759,9 @@ struct expected_operations_base : expected_storage_base<T, E> {
   // `T`, then no-throw move it into place if the copy was successful.
   template <class U = T,
             detail::enable_if_t<!std::is_nothrow_copy_constructible<U>::value &&
-                                std::is_nothrow_move_constructible<U>::value>
-                * = nullptr>
-  void assign(const expected_operations_base &rhs) noexcept {
+                                std::is_nothrow_move_constructible<U>::value>* =
+                nullptr>
+  void assign(const expected_operations_base& rhs) noexcept {
     if (!this->m_has_val && rhs.m_has_val) {
       T tmp = rhs.get();
       geterr().~unexpected<E>();
@@ -2387,10 +2777,10 @@ struct expected_operations_base : expected_storage_base<T, E> {
   // then we move the old unexpected value back into place before rethrowing the
   // exception.
   template <class U = T,
-            detail::enable_if_t<!std::is_nothrow_copy_constructible<U>::value &&
-                                !std::is_nothrow_move_constructible<U>::value>
-                * = nullptr>
-  void assign(const expected_operations_base &rhs) {
+            detail::enable_if_t<
+                !std::is_nothrow_copy_constructible<U>::value &&
+                !std::is_nothrow_move_constructible<U>::value>* = nullptr>
+  void assign(const expected_operations_base& rhs) {
     if (!this->m_has_val && rhs.m_has_val) {
       auto tmp = std::move(geterr());
       geterr().~unexpected<E>();
@@ -2412,9 +2802,9 @@ struct expected_operations_base : expected_storage_base<T, E> {
 
   // These overloads do the same as above, but for rvalues
   template <class U = T,
-            detail::enable_if_t<std::is_nothrow_move_constructible<U>::value>
-                * = nullptr>
-  void assign(expected_operations_base &&rhs) noexcept {
+            detail::enable_if_t<std::is_nothrow_move_constructible<U>::value>* =
+                nullptr>
+  void assign(expected_operations_base&& rhs) noexcept {
     if (!this->m_has_val && rhs.m_has_val) {
       geterr().~unexpected<E>();
       construct(std::move(rhs).get());
@@ -2424,9 +2814,9 @@ struct expected_operations_base : expected_storage_base<T, E> {
   }
 
   template <class U = T,
-            detail::enable_if_t<!std::is_nothrow_move_constructible<U>::value>
-                * = nullptr>
-  void assign(expected_operations_base &&rhs) {
+            detail::enable_if_t<
+                !std::is_nothrow_move_constructible<U>::value>* = nullptr>
+  void assign(expected_operations_base&& rhs) {
     if (!this->m_has_val && rhs.m_has_val) {
       auto tmp = std::move(geterr());
       geterr().~unexpected<E>();
@@ -2448,7 +2838,7 @@ struct expected_operations_base : expected_storage_base<T, E> {
 #else
 
   // If exceptions are disabled then we can just copy-construct
-  void assign(const expected_operations_base &rhs) noexcept {
+  void assign(const expected_operations_base& rhs) noexcept {
     if (!this->m_has_val && rhs.m_has_val) {
       geterr().~unexpected<E>();
       construct(rhs.get());
@@ -2457,7 +2847,7 @@ struct expected_operations_base : expected_storage_base<T, E> {
     }
   }
 
-  void assign(expected_operations_base &&rhs) noexcept {
+  void assign(expected_operations_base&& rhs) noexcept {
     if (!this->m_has_val && rhs.m_has_val) {
       geterr().~unexpected<E>();
       construct(std::move(rhs).get());
@@ -2470,7 +2860,7 @@ struct expected_operations_base : expected_storage_base<T, E> {
 
   // The common part of move/copy assigning
   template <class Rhs>
-  void assign_common(Rhs &&rhs) {
+  void assign_common(Rhs&& rhs) {
     if (this->m_has_val) {
       if (rhs.m_has_val) {
         get() = std::forward<Rhs>(rhs).get();
@@ -2487,22 +2877,22 @@ struct expected_operations_base : expected_storage_base<T, E> {
 
   bool has_value() const { return this->m_has_val; }
 
-  TL_EXPECTED_11_CONSTEXPR T &get() & { return this->m_val; }
-  constexpr const T &get() const & { return this->m_val; }
-  TL_EXPECTED_11_CONSTEXPR T &&get() && { return std::move(this->m_val); }
+  TL_EXPECTED_11_CONSTEXPR T& get() & { return this->m_val; }
+  constexpr const T& get() const& { return this->m_val; }
+  TL_EXPECTED_11_CONSTEXPR T&& get() && { return std::move(this->m_val); }
 #ifndef TL_EXPECTED_NO_CONSTRR
-  constexpr const T &&get() const && { return std::move(this->m_val); }
+  constexpr const T&& get() const&& { return std::move(this->m_val); }
 #endif
 
-  TL_EXPECTED_11_CONSTEXPR unexpected<E> &geterr() & {
+  TL_EXPECTED_11_CONSTEXPR unexpected<E>& geterr() & {
     return this->m_unexpect;
   }
-  constexpr const unexpected<E> &geterr() const & { return this->m_unexpect; }
-  TL_EXPECTED_11_CONSTEXPR unexpected<E> &&geterr() && {
+  constexpr const unexpected<E>& geterr() const& { return this->m_unexpect; }
+  TL_EXPECTED_11_CONSTEXPR unexpected<E>&& geterr() && {
     return std::move(this->m_unexpect);
   }
 #ifndef TL_EXPECTED_NO_CONSTRR
-  constexpr const unexpected<E> &&geterr() const && {
+  constexpr const unexpected<E>&& geterr() const&& {
     return std::move(this->m_unexpect);
   }
 #endif
@@ -2524,19 +2914,19 @@ struct expected_operations_base<void, E> : expected_storage_base<void, E> {
   // This function doesn't use its argument, but needs it so that code in
   // levels above this can work independently of whether T is void
   template <class Rhs>
-  void construct_with(Rhs &&) noexcept {
+  void construct_with(Rhs&&) noexcept {
     this->m_has_val = true;
   }
 
   template <class... Args>
-  void construct_error(Args &&...args) noexcept {
+  void construct_error(Args&&... args) noexcept {
     new (std::addressof(this->m_unexpect))
         unexpected<E>(std::forward<Args>(args)...);
     this->m_has_val = false;
   }
 
   template <class Rhs>
-  void assign(Rhs &&rhs) noexcept {
+  void assign(Rhs&& rhs) noexcept {
     if (!this->m_has_val) {
       if (rhs.m_has_val) {
         geterr().~unexpected<E>();
@@ -2553,15 +2943,15 @@ struct expected_operations_base<void, E> : expected_storage_base<void, E> {
 
   bool has_value() const { return this->m_has_val; }
 
-  TL_EXPECTED_11_CONSTEXPR unexpected<E> &geterr() & {
+  TL_EXPECTED_11_CONSTEXPR unexpected<E>& geterr() & {
     return this->m_unexpect;
   }
-  constexpr const unexpected<E> &geterr() const & { return this->m_unexpect; }
-  TL_EXPECTED_11_CONSTEXPR unexpected<E> &&geterr() && {
+  constexpr const unexpected<E>& geterr() const& { return this->m_unexpect; }
+  TL_EXPECTED_11_CONSTEXPR unexpected<E>&& geterr() && {
     return std::move(this->m_unexpect);
   }
 #ifndef TL_EXPECTED_NO_CONSTRR
-  constexpr const unexpected<E> &&geterr() const && {
+  constexpr const unexpected<E>&& geterr() const&& {
     return std::move(this->m_unexpect);
   }
 #endif
@@ -2587,7 +2977,7 @@ struct expected_copy_base<T, E, false> : expected_operations_base<T, E> {
   using expected_operations_base<T, E>::expected_operations_base;
 
   expected_copy_base() = default;
-  expected_copy_base(const expected_copy_base &rhs)
+  expected_copy_base(const expected_copy_base& rhs)
       : expected_operations_base<T, E>(no_init) {
     if (rhs.has_value()) {
       this->construct_with(rhs);
@@ -2596,9 +2986,9 @@ struct expected_copy_base<T, E, false> : expected_operations_base<T, E> {
     }
   }
 
-  expected_copy_base(expected_copy_base &&rhs) = default;
-  expected_copy_base &operator=(const expected_copy_base &rhs) = default;
-  expected_copy_base &operator=(expected_copy_base &&rhs) = default;
+  expected_copy_base(expected_copy_base&& rhs) = default;
+  expected_copy_base& operator=(const expected_copy_base& rhs) = default;
+  expected_copy_base& operator=(expected_copy_base&& rhs) = default;
 };
 
 // This class manages conditionally having a trivial move constructor
@@ -2623,9 +3013,9 @@ struct expected_move_base<T, E, false> : expected_copy_base<T, E> {
   using expected_copy_base<T, E>::expected_copy_base;
 
   expected_move_base() = default;
-  expected_move_base(const expected_move_base &rhs) = default;
+  expected_move_base(const expected_move_base& rhs) = default;
 
-  expected_move_base(expected_move_base &&rhs) noexcept(
+  expected_move_base(expected_move_base&& rhs) noexcept(
       std::is_nothrow_move_constructible<T>::value)
       : expected_copy_base<T, E>(no_init) {
     if (rhs.has_value()) {
@@ -2634,8 +3024,8 @@ struct expected_move_base<T, E, false> : expected_copy_base<T, E> {
       this->construct_error(std::move(rhs.geterr()));
     }
   }
-  expected_move_base &operator=(const expected_move_base &rhs) = default;
-  expected_move_base &operator=(expected_move_base &&rhs) = default;
+  expected_move_base& operator=(const expected_move_base& rhs) = default;
+  expected_move_base& operator=(expected_move_base&& rhs) = default;
 };
 
 // This class manages conditionally having a trivial copy assignment operator
@@ -2658,14 +3048,14 @@ struct expected_copy_assign_base<T, E, false> : expected_move_base<T, E> {
   using expected_move_base<T, E>::expected_move_base;
 
   expected_copy_assign_base() = default;
-  expected_copy_assign_base(const expected_copy_assign_base &rhs) = default;
+  expected_copy_assign_base(const expected_copy_assign_base& rhs) = default;
 
-  expected_copy_assign_base(expected_copy_assign_base &&rhs) = default;
-  expected_copy_assign_base &operator=(const expected_copy_assign_base &rhs) {
+  expected_copy_assign_base(expected_copy_assign_base&& rhs) = default;
+  expected_copy_assign_base& operator=(const expected_copy_assign_base& rhs) {
     this->assign(rhs);
     return *this;
   }
-  expected_copy_assign_base &operator=(expected_copy_assign_base &&rhs) =
+  expected_copy_assign_base& operator=(expected_copy_assign_base&& rhs) =
       default;
 };
 
@@ -2698,17 +3088,17 @@ struct expected_move_assign_base<T, E, false>
   using expected_copy_assign_base<T, E>::expected_copy_assign_base;
 
   expected_move_assign_base() = default;
-  expected_move_assign_base(const expected_move_assign_base &rhs) = default;
+  expected_move_assign_base(const expected_move_assign_base& rhs) = default;
 
-  expected_move_assign_base(expected_move_assign_base &&rhs) = default;
+  expected_move_assign_base(expected_move_assign_base&& rhs) = default;
 
-  expected_move_assign_base &operator=(const expected_move_assign_base &rhs) =
+  expected_move_assign_base& operator=(const expected_move_assign_base& rhs) =
       default;
 
-  expected_move_assign_base &operator=(
-      expected_move_assign_base
-          &&rhs) noexcept(std::is_nothrow_move_constructible<T>::value &&
-                          std::is_nothrow_move_assignable<T>::value) {
+  expected_move_assign_base&
+  operator=(expected_move_assign_base&& rhs) noexcept(
+      std::is_nothrow_move_constructible<T>::value &&
+      std::is_nothrow_move_assignable<T>::value) {
     this->assign(std::move(rhs));
     return *this;
   }
@@ -2723,44 +3113,44 @@ template <class T, class E,
                              std::is_move_constructible<E>::value)>
 struct expected_delete_ctor_base {
   expected_delete_ctor_base() = default;
-  expected_delete_ctor_base(const expected_delete_ctor_base &) = default;
-  expected_delete_ctor_base(expected_delete_ctor_base &&) noexcept = default;
-  expected_delete_ctor_base &operator=(const expected_delete_ctor_base &) =
+  expected_delete_ctor_base(const expected_delete_ctor_base&) = default;
+  expected_delete_ctor_base(expected_delete_ctor_base&&) noexcept = default;
+  expected_delete_ctor_base& operator=(const expected_delete_ctor_base&) =
       default;
-  expected_delete_ctor_base &operator=(expected_delete_ctor_base &&) noexcept =
+  expected_delete_ctor_base& operator=(expected_delete_ctor_base&&) noexcept =
       default;
 };
 
 template <class T, class E>
 struct expected_delete_ctor_base<T, E, true, false> {
   expected_delete_ctor_base() = default;
-  expected_delete_ctor_base(const expected_delete_ctor_base &) = default;
-  expected_delete_ctor_base(expected_delete_ctor_base &&) noexcept = delete;
-  expected_delete_ctor_base &operator=(const expected_delete_ctor_base &) =
+  expected_delete_ctor_base(const expected_delete_ctor_base&) = default;
+  expected_delete_ctor_base(expected_delete_ctor_base&&) noexcept = delete;
+  expected_delete_ctor_base& operator=(const expected_delete_ctor_base&) =
       default;
-  expected_delete_ctor_base &operator=(expected_delete_ctor_base &&) noexcept =
+  expected_delete_ctor_base& operator=(expected_delete_ctor_base&&) noexcept =
       default;
 };
 
 template <class T, class E>
 struct expected_delete_ctor_base<T, E, false, true> {
   expected_delete_ctor_base() = default;
-  expected_delete_ctor_base(const expected_delete_ctor_base &) = delete;
-  expected_delete_ctor_base(expected_delete_ctor_base &&) noexcept = default;
-  expected_delete_ctor_base &operator=(const expected_delete_ctor_base &) =
+  expected_delete_ctor_base(const expected_delete_ctor_base&) = delete;
+  expected_delete_ctor_base(expected_delete_ctor_base&&) noexcept = default;
+  expected_delete_ctor_base& operator=(const expected_delete_ctor_base&) =
       default;
-  expected_delete_ctor_base &operator=(expected_delete_ctor_base &&) noexcept =
+  expected_delete_ctor_base& operator=(expected_delete_ctor_base&&) noexcept =
       default;
 };
 
 template <class T, class E>
 struct expected_delete_ctor_base<T, E, false, false> {
   expected_delete_ctor_base() = default;
-  expected_delete_ctor_base(const expected_delete_ctor_base &) = delete;
-  expected_delete_ctor_base(expected_delete_ctor_base &&) noexcept = delete;
-  expected_delete_ctor_base &operator=(const expected_delete_ctor_base &) =
+  expected_delete_ctor_base(const expected_delete_ctor_base&) = delete;
+  expected_delete_ctor_base(expected_delete_ctor_base&&) noexcept = delete;
+  expected_delete_ctor_base& operator=(const expected_delete_ctor_base&) =
       default;
-  expected_delete_ctor_base &operator=(expected_delete_ctor_base &&) noexcept =
+  expected_delete_ctor_base& operator=(expected_delete_ctor_base&&) noexcept =
       default;
 };
 
@@ -2778,49 +3168,45 @@ template <class T, class E,
                              std::is_move_assignable<E>::value)>
 struct expected_delete_assign_base {
   expected_delete_assign_base() = default;
-  expected_delete_assign_base(const expected_delete_assign_base &) = default;
-  expected_delete_assign_base(expected_delete_assign_base &&) noexcept =
+  expected_delete_assign_base(const expected_delete_assign_base&) = default;
+  expected_delete_assign_base(expected_delete_assign_base&&) noexcept = default;
+  expected_delete_assign_base& operator=(const expected_delete_assign_base&) =
       default;
-  expected_delete_assign_base &operator=(const expected_delete_assign_base &) =
-      default;
-  expected_delete_assign_base &operator=(
-      expected_delete_assign_base &&) noexcept = default;
+  expected_delete_assign_base& operator=(
+      expected_delete_assign_base&&) noexcept = default;
 };
 
 template <class T, class E>
 struct expected_delete_assign_base<T, E, true, false> {
   expected_delete_assign_base() = default;
-  expected_delete_assign_base(const expected_delete_assign_base &) = default;
-  expected_delete_assign_base(expected_delete_assign_base &&) noexcept =
+  expected_delete_assign_base(const expected_delete_assign_base&) = default;
+  expected_delete_assign_base(expected_delete_assign_base&&) noexcept = default;
+  expected_delete_assign_base& operator=(const expected_delete_assign_base&) =
       default;
-  expected_delete_assign_base &operator=(const expected_delete_assign_base &) =
-      default;
-  expected_delete_assign_base &operator=(
-      expected_delete_assign_base &&) noexcept = delete;
+  expected_delete_assign_base& operator=(
+      expected_delete_assign_base&&) noexcept = delete;
 };
 
 template <class T, class E>
 struct expected_delete_assign_base<T, E, false, true> {
   expected_delete_assign_base() = default;
-  expected_delete_assign_base(const expected_delete_assign_base &) = default;
-  expected_delete_assign_base(expected_delete_assign_base &&) noexcept =
-      default;
-  expected_delete_assign_base &operator=(const expected_delete_assign_base &) =
+  expected_delete_assign_base(const expected_delete_assign_base&) = default;
+  expected_delete_assign_base(expected_delete_assign_base&&) noexcept = default;
+  expected_delete_assign_base& operator=(const expected_delete_assign_base&) =
       delete;
-  expected_delete_assign_base &operator=(
-      expected_delete_assign_base &&) noexcept = default;
+  expected_delete_assign_base& operator=(
+      expected_delete_assign_base&&) noexcept = default;
 };
 
 template <class T, class E>
 struct expected_delete_assign_base<T, E, false, false> {
   expected_delete_assign_base() = default;
-  expected_delete_assign_base(const expected_delete_assign_base &) = default;
-  expected_delete_assign_base(expected_delete_assign_base &&) noexcept =
-      default;
-  expected_delete_assign_base &operator=(const expected_delete_assign_base &) =
+  expected_delete_assign_base(const expected_delete_assign_base&) = default;
+  expected_delete_assign_base(expected_delete_assign_base&&) noexcept = default;
+  expected_delete_assign_base& operator=(const expected_delete_assign_base&) =
       delete;
-  expected_delete_assign_base &operator=(
-      expected_delete_assign_base &&) noexcept = delete;
+  expected_delete_assign_base& operator=(
+      expected_delete_assign_base&&) noexcept = delete;
 };
 
 // This is needed to be able to construct the expected_default_ctor_base which
@@ -2838,13 +3224,13 @@ template <class T, class E,
 struct expected_default_ctor_base {
   constexpr expected_default_ctor_base() noexcept = default;
   constexpr expected_default_ctor_base(
-      expected_default_ctor_base const &) noexcept = default;
-  constexpr expected_default_ctor_base(expected_default_ctor_base &&) noexcept =
+      expected_default_ctor_base const&) noexcept = default;
+  constexpr expected_default_ctor_base(expected_default_ctor_base&&) noexcept =
       default;
-  expected_default_ctor_base &operator=(
-      expected_default_ctor_base const &) noexcept = default;
-  expected_default_ctor_base &operator=(
-      expected_default_ctor_base &&) noexcept = default;
+  expected_default_ctor_base& operator=(
+      expected_default_ctor_base const&) noexcept = default;
+  expected_default_ctor_base& operator=(expected_default_ctor_base&&) noexcept =
+      default;
 
   constexpr explicit expected_default_ctor_base(default_constructor_tag) {}
 };
@@ -2854,13 +3240,13 @@ template <class T, class E>
 struct expected_default_ctor_base<T, E, false> {
   constexpr expected_default_ctor_base() noexcept = delete;
   constexpr expected_default_ctor_base(
-      expected_default_ctor_base const &) noexcept = default;
-  constexpr expected_default_ctor_base(expected_default_ctor_base &&) noexcept =
+      expected_default_ctor_base const&) noexcept = default;
+  constexpr expected_default_ctor_base(expected_default_ctor_base&&) noexcept =
       default;
-  expected_default_ctor_base &operator=(
-      expected_default_ctor_base const &) noexcept = default;
-  expected_default_ctor_base &operator=(
-      expected_default_ctor_base &&) noexcept = default;
+  expected_default_ctor_base& operator=(
+      expected_default_ctor_base const&) noexcept = default;
+  expected_default_ctor_base& operator=(expected_default_ctor_base&&) noexcept =
+      default;
 
   constexpr explicit expected_default_ctor_base(default_constructor_tag) {}
 };
@@ -2871,14 +3257,14 @@ class bad_expected_access : public std::exception {
  public:
   explicit bad_expected_access(E e) : m_val(std::move(e)) {}
 
-  virtual const char *what() const noexcept override {
+  virtual const char* what() const noexcept override {
     return "Bad expected access";
   }
 
-  const E &error() const & { return m_val; }
-  E &error() & { return m_val; }
-  const E &&error() const && { return std::move(m_val); }
-  E &&error() && { return std::move(m_val); }
+  const E& error() const& { return m_val; }
+  E& error() & { return m_val; }
+  const E&& error() const&& { return std::move(m_val); }
+  E&& error() && { return std::move(m_val); }
 
  private:
   E m_val;
@@ -2906,26 +3292,26 @@ class expected : private detail::expected_move_assign_base<T, E>,
       "T must not be unexpected<E>");
   static_assert(!std::is_reference<E>::value, "E must not be a reference");
 
-  T *valptr() { return std::addressof(this->m_val); }
-  const T *valptr() const { return std::addressof(this->m_val); }
-  unexpected<E> *errptr() { return std::addressof(this->m_unexpect); }
-  const unexpected<E> *errptr() const {
+  T* valptr() { return std::addressof(this->m_val); }
+  const T* valptr() const { return std::addressof(this->m_val); }
+  unexpected<E>* errptr() { return std::addressof(this->m_unexpect); }
+  const unexpected<E>* errptr() const {
     return std::addressof(this->m_unexpect);
   }
 
   template <class U = T,
-            detail::enable_if_t<!std::is_void<U>::value> * = nullptr>
-  TL_EXPECTED_11_CONSTEXPR U &val() {
+            detail::enable_if_t<!std::is_void<U>::value>* = nullptr>
+  TL_EXPECTED_11_CONSTEXPR U& val() {
     return this->m_val;
   }
-  TL_EXPECTED_11_CONSTEXPR unexpected<E> &err() { return this->m_unexpect; }
+  TL_EXPECTED_11_CONSTEXPR unexpected<E>& err() { return this->m_unexpect; }
 
   template <class U = T,
-            detail::enable_if_t<!std::is_void<U>::value> * = nullptr>
-  constexpr const U &val() const {
+            detail::enable_if_t<!std::is_void<U>::value>* = nullptr>
+  constexpr const U& val() const {
     return this->m_val;
   }
-  constexpr const unexpected<E> &err() const { return this->m_unexpect; }
+  constexpr const unexpected<E>& err() const { return this->m_unexpect; }
 
   using impl_base = detail::expected_move_assign_base<T, E>;
   using ctor_base = detail::expected_default_ctor_base<T, E>;
@@ -2938,46 +3324,46 @@ class expected : private detail::expected_move_assign_base<T, E>,
 #if defined(TL_EXPECTED_CXX14) && !defined(TL_EXPECTED_GCC49) && \
     !defined(TL_EXPECTED_GCC54) && !defined(TL_EXPECTED_GCC55)
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR auto and_then(F &&f) & {
+  TL_EXPECTED_11_CONSTEXPR auto and_then(F&& f) & {
     return and_then_impl(*this, std::forward<F>(f));
   }
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR auto and_then(F &&f) && {
+  TL_EXPECTED_11_CONSTEXPR auto and_then(F&& f) && {
     return and_then_impl(std::move(*this), std::forward<F>(f));
   }
   template <class F>
-  constexpr auto and_then(F &&f) const & {
+  constexpr auto and_then(F&& f) const& {
     return and_then_impl(*this, std::forward<F>(f));
   }
 
 #ifndef TL_EXPECTED_NO_CONSTRR
   template <class F>
-  constexpr auto and_then(F &&f) const && {
+  constexpr auto and_then(F&& f) const&& {
     return and_then_impl(std::move(*this), std::forward<F>(f));
   }
 #endif
 
 #else
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR auto and_then(F &&f) & -> decltype(and_then_impl(
-      std::declval<expected &>(), std::forward<F>(f))) {
+  TL_EXPECTED_11_CONSTEXPR auto and_then(F&& f) & -> decltype(and_then_impl(
+      std::declval<expected&>(), std::forward<F>(f))) {
     return and_then_impl(*this, std::forward<F>(f));
   }
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR auto and_then(F &&f) && -> decltype(and_then_impl(
-      std::declval<expected &&>(), std::forward<F>(f))) {
+  TL_EXPECTED_11_CONSTEXPR auto and_then(F&& f) && -> decltype(and_then_impl(
+      std::declval<expected&&>(), std::forward<F>(f))) {
     return and_then_impl(std::move(*this), std::forward<F>(f));
   }
   template <class F>
-  constexpr auto and_then(F &&f) const & -> decltype(and_then_impl(
-      std::declval<expected const &>(), std::forward<F>(f))) {
+  constexpr auto and_then(F&& f) const& -> decltype(and_then_impl(
+      std::declval<expected const&>(), std::forward<F>(f))) {
     return and_then_impl(*this, std::forward<F>(f));
   }
 
 #ifndef TL_EXPECTED_NO_CONSTRR
   template <class F>
-  constexpr auto and_then(F &&f) const && -> decltype(and_then_impl(
-      std::declval<expected const &&>(), std::forward<F>(f))) {
+  constexpr auto and_then(F&& f) const&& -> decltype(and_then_impl(
+      std::declval<expected const&&>(), std::forward<F>(f))) {
     return and_then_impl(std::move(*this), std::forward<F>(f));
   }
 #endif
@@ -2986,46 +3372,45 @@ class expected : private detail::expected_move_assign_base<T, E>,
 #if defined(TL_EXPECTED_CXX14) && !defined(TL_EXPECTED_GCC49) && \
     !defined(TL_EXPECTED_GCC54) && !defined(TL_EXPECTED_GCC55)
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR auto map(F &&f) & {
+  TL_EXPECTED_11_CONSTEXPR auto map(F&& f) & {
     return expected_map_impl(*this, std::forward<F>(f));
   }
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR auto map(F &&f) && {
+  TL_EXPECTED_11_CONSTEXPR auto map(F&& f) && {
     return expected_map_impl(std::move(*this), std::forward<F>(f));
   }
   template <class F>
-  constexpr auto map(F &&f) const & {
+  constexpr auto map(F&& f) const& {
     return expected_map_impl(*this, std::forward<F>(f));
   }
   template <class F>
-  constexpr auto map(F &&f) const && {
+  constexpr auto map(F&& f) const&& {
     return expected_map_impl(std::move(*this), std::forward<F>(f));
   }
 #else
   template <class F>
   TL_EXPECTED_11_CONSTEXPR decltype(expected_map_impl(
-      std::declval<expected &>(), std::declval<F &&>()))
-  map(F &&f) & {
+      std::declval<expected&>(), std::declval<F&&>())) map(F&& f) & {
     return expected_map_impl(*this, std::forward<F>(f));
   }
   template <class F>
   TL_EXPECTED_11_CONSTEXPR decltype(expected_map_impl(std::declval<expected>(),
-                                                      std::declval<F &&>()))
-  map(F &&f) && {
+                                                      std::declval<F&&>()))
+  map(F&& f) && {
     return expected_map_impl(std::move(*this), std::forward<F>(f));
   }
   template <class F>
-  constexpr decltype(expected_map_impl(std::declval<const expected &>(),
-                                       std::declval<F &&>()))
-  map(F &&f) const & {
+  constexpr decltype(expected_map_impl(std::declval<const expected&>(),
+                                       std::declval<F&&>()))
+  map(F&& f) const& {
     return expected_map_impl(*this, std::forward<F>(f));
   }
 
 #ifndef TL_EXPECTED_NO_CONSTRR
   template <class F>
-  constexpr decltype(expected_map_impl(std::declval<const expected &&>(),
-                                       std::declval<F &&>()))
-  map(F &&f) const && {
+  constexpr decltype(expected_map_impl(std::declval<const expected&&>(),
+                                       std::declval<F&&>())) map(F&& f)
+      const&& {
     return expected_map_impl(std::move(*this), std::forward<F>(f));
   }
 #endif
@@ -3034,46 +3419,45 @@ class expected : private detail::expected_move_assign_base<T, E>,
 #if defined(TL_EXPECTED_CXX14) && !defined(TL_EXPECTED_GCC49) && \
     !defined(TL_EXPECTED_GCC54) && !defined(TL_EXPECTED_GCC55)
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR auto transform(F &&f) & {
+  TL_EXPECTED_11_CONSTEXPR auto transform(F&& f) & {
     return expected_map_impl(*this, std::forward<F>(f));
   }
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR auto transform(F &&f) && {
+  TL_EXPECTED_11_CONSTEXPR auto transform(F&& f) && {
     return expected_map_impl(std::move(*this), std::forward<F>(f));
   }
   template <class F>
-  constexpr auto transform(F &&f) const & {
+  constexpr auto transform(F&& f) const& {
     return expected_map_impl(*this, std::forward<F>(f));
   }
   template <class F>
-  constexpr auto transform(F &&f) const && {
+  constexpr auto transform(F&& f) const&& {
     return expected_map_impl(std::move(*this), std::forward<F>(f));
   }
 #else
   template <class F>
   TL_EXPECTED_11_CONSTEXPR decltype(expected_map_impl(
-      std::declval<expected &>(), std::declval<F &&>()))
-  transform(F &&f) & {
+      std::declval<expected&>(), std::declval<F&&>())) transform(F&& f) & {
     return expected_map_impl(*this, std::forward<F>(f));
   }
   template <class F>
   TL_EXPECTED_11_CONSTEXPR decltype(expected_map_impl(std::declval<expected>(),
-                                                      std::declval<F &&>()))
-  transform(F &&f) && {
+                                                      std::declval<F&&>()))
+  transform(F&& f) && {
     return expected_map_impl(std::move(*this), std::forward<F>(f));
   }
   template <class F>
-  constexpr decltype(expected_map_impl(std::declval<const expected &>(),
-                                       std::declval<F &&>()))
-  transform(F &&f) const & {
+  constexpr decltype(expected_map_impl(std::declval<const expected&>(),
+                                       std::declval<F&&>()))
+  transform(F&& f) const& {
     return expected_map_impl(*this, std::forward<F>(f));
   }
 
 #ifndef TL_EXPECTED_NO_CONSTRR
   template <class F>
-  constexpr decltype(expected_map_impl(std::declval<const expected &&>(),
-                                       std::declval<F &&>()))
-  transform(F &&f) const && {
+  constexpr decltype(expected_map_impl(std::declval<const expected&&>(),
+                                       std::declval<F&&>())) transform(F&& f)
+      const&& {
     return expected_map_impl(std::move(*this), std::forward<F>(f));
   }
 #endif
@@ -3082,46 +3466,45 @@ class expected : private detail::expected_move_assign_base<T, E>,
 #if defined(TL_EXPECTED_CXX14) && !defined(TL_EXPECTED_GCC49) && \
     !defined(TL_EXPECTED_GCC54) && !defined(TL_EXPECTED_GCC55)
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR auto map_error(F &&f) & {
+  TL_EXPECTED_11_CONSTEXPR auto map_error(F&& f) & {
     return map_error_impl(*this, std::forward<F>(f));
   }
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR auto map_error(F &&f) && {
+  TL_EXPECTED_11_CONSTEXPR auto map_error(F&& f) && {
     return map_error_impl(std::move(*this), std::forward<F>(f));
   }
   template <class F>
-  constexpr auto map_error(F &&f) const & {
+  constexpr auto map_error(F&& f) const& {
     return map_error_impl(*this, std::forward<F>(f));
   }
   template <class F>
-  constexpr auto map_error(F &&f) const && {
+  constexpr auto map_error(F&& f) const&& {
     return map_error_impl(std::move(*this), std::forward<F>(f));
   }
 #else
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR decltype(map_error_impl(std::declval<expected &>(),
-                                                   std::declval<F &&>()))
-  map_error(F &&f) & {
+  TL_EXPECTED_11_CONSTEXPR decltype(map_error_impl(
+      std::declval<expected&>(), std::declval<F&&>())) map_error(F&& f) & {
     return map_error_impl(*this, std::forward<F>(f));
   }
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR decltype(map_error_impl(std::declval<expected &&>(),
-                                                   std::declval<F &&>()))
-  map_error(F &&f) && {
+  TL_EXPECTED_11_CONSTEXPR decltype(map_error_impl(std::declval<expected&&>(),
+                                                   std::declval<F&&>()))
+  map_error(F&& f) && {
     return map_error_impl(std::move(*this), std::forward<F>(f));
   }
   template <class F>
-  constexpr decltype(map_error_impl(std::declval<const expected &>(),
-                                    std::declval<F &&>()))
-  map_error(F &&f) const & {
+  constexpr decltype(map_error_impl(std::declval<const expected&>(),
+                                    std::declval<F&&>()))
+  map_error(F&& f) const& {
     return map_error_impl(*this, std::forward<F>(f));
   }
 
 #ifndef TL_EXPECTED_NO_CONSTRR
   template <class F>
-  constexpr decltype(map_error_impl(std::declval<const expected &&>(),
-                                    std::declval<F &&>()))
-  map_error(F &&f) const && {
+  constexpr decltype(map_error_impl(std::declval<const expected&&>(),
+                                    std::declval<F&&>())) map_error(F&& f)
+      const&& {
     return map_error_impl(std::move(*this), std::forward<F>(f));
   }
 #endif
@@ -3129,164 +3512,147 @@ class expected : private detail::expected_move_assign_base<T, E>,
 #if defined(TL_EXPECTED_CXX14) && !defined(TL_EXPECTED_GCC49) && \
     !defined(TL_EXPECTED_GCC54) && !defined(TL_EXPECTED_GCC55)
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR auto transform_error(F &&f) & {
+  TL_EXPECTED_11_CONSTEXPR auto transform_error(F&& f) & {
     return map_error_impl(*this, std::forward<F>(f));
   }
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR auto transform_error(F &&f) && {
+  TL_EXPECTED_11_CONSTEXPR auto transform_error(F&& f) && {
     return map_error_impl(std::move(*this), std::forward<F>(f));
   }
   template <class F>
-  constexpr auto transform_error(F &&f) const & {
+  constexpr auto transform_error(F&& f) const& {
     return map_error_impl(*this, std::forward<F>(f));
   }
   template <class F>
-  constexpr auto transform_error(F &&f) const && {
+  constexpr auto transform_error(F&& f) const&& {
     return map_error_impl(std::move(*this), std::forward<F>(f));
   }
 #else
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR decltype(map_error_impl(std::declval<expected &>(),
-                                                   std::declval<F &&>()))
-  transform_error(F &&f) & {
+  TL_EXPECTED_11_CONSTEXPR decltype(map_error_impl(
+      std::declval<expected&>(),
+      std::declval<F&&>())) transform_error(F&& f) & {
     return map_error_impl(*this, std::forward<F>(f));
   }
   template <class F>
-  TL_EXPECTED_11_CONSTEXPR decltype(map_error_impl(std::declval<expected &&>(),
-                                                   std::declval<F &&>()))
-  transform_error(F &&f) && {
+  TL_EXPECTED_11_CONSTEXPR decltype(map_error_impl(std::declval<expected&&>(),
+                                                   std::declval<F&&>()))
+  transform_error(F&& f) && {
     return map_error_impl(std::move(*this), std::forward<F>(f));
   }
   template <class F>
-  constexpr decltype(map_error_impl(std::declval<const expected &>(),
-                                    std::declval<F &&>()))
-  transform_error(F &&f) const & {
+  constexpr decltype(map_error_impl(std::declval<const expected&>(),
+                                    std::declval<F&&>()))
+  transform_error(F&& f) const& {
     return map_error_impl(*this, std::forward<F>(f));
   }
 
 #ifndef TL_EXPECTED_NO_CONSTRR
   template <class F>
-  constexpr decltype(map_error_impl(std::declval<const expected &&>(),
-                                    std::declval<F &&>()))
-  transform_error(F &&f) const && {
+  constexpr decltype(map_error_impl(std::declval<const expected&&>(),
+                                    std::declval<F&&>())) transform_error(F&& f)
+      const&& {
     return map_error_impl(std::move(*this), std::forward<F>(f));
   }
 #endif
 #endif
   template <class F>
-  expected TL_EXPECTED_11_CONSTEXPR or_else(F &&f) & {
+  expected TL_EXPECTED_11_CONSTEXPR or_else(F&& f) & {
     return or_else_impl(*this, std::forward<F>(f));
   }
 
   template <class F>
-  expected TL_EXPECTED_11_CONSTEXPR or_else(F &&f) && {
+  expected TL_EXPECTED_11_CONSTEXPR or_else(F&& f) && {
     return or_else_impl(std::move(*this), std::forward<F>(f));
   }
 
   template <class F>
-  expected constexpr or_else(F &&f) const & {
+  expected constexpr or_else(F&& f) const& {
     return or_else_impl(*this, std::forward<F>(f));
   }
 
 #ifndef TL_EXPECTED_NO_CONSTRR
   template <class F>
-  expected constexpr or_else(F &&f) const && {
+  expected constexpr or_else(F&& f) const&& {
     return or_else_impl(std::move(*this), std::forward<F>(f));
   }
 #endif
   constexpr expected() = default;
-  constexpr expected(const expected &rhs) = default;
-  constexpr expected(expected &&rhs) = default;
-  expected &operator=(const expected &rhs) = default;
-  expected &operator=(expected &&rhs) = default;
+  constexpr expected(const expected& rhs) = default;
+  constexpr expected(expected&& rhs) = default;
+  expected& operator=(const expected& rhs) = default;
+  expected& operator=(expected&& rhs) = default;
 
   template <class... Args,
-            detail::enable_if_t<std::is_constructible<T, Args &&...>::value> * =
+            detail::enable_if_t<std::is_constructible<T, Args&&...>::value>* =
                 nullptr>
-  constexpr expected(in_place_t, Args &&...args)
+  constexpr expected(in_place_t, Args&&... args)
       : impl_base(in_place, std::forward<Args>(args)...),
         ctor_base(detail::default_constructor_tag{}) {}
 
   template <class U, class... Args,
             detail::enable_if_t<std::is_constructible<
-                T, std::initializer_list<U> &, Args &&...>::value> * = nullptr>
-  constexpr expected(in_place_t, std::initializer_list<U> il, Args &&...args)
+                T, std::initializer_list<U>&, Args&&...>::value>* = nullptr>
+  constexpr expected(in_place_t, std::initializer_list<U> il, Args&&... args)
       : impl_base(in_place, il, std::forward<Args>(args)...),
         ctor_base(detail::default_constructor_tag{}) {}
 
-  template <class G = E,
-            detail::enable_if_t<std::is_constructible<E, const G &>::value> * =
-                nullptr,
-            detail::enable_if_t<!std::is_convertible<const G &, E>::value> * =
-                nullptr>
-  explicit constexpr expected(const unexpected<G> &e)
+  template <
+      class G = E,
+      detail::enable_if_t<std::is_constructible<E, const G&>::value>* = nullptr,
+      detail::enable_if_t<!std::is_convertible<const G&, E>::value>* = nullptr>
+  explicit constexpr expected(const unexpected<G>& e)
       : impl_base(unexpect, e.value()),
         ctor_base(detail::default_constructor_tag{}) {}
 
   template <
       class G = E,
-      detail::enable_if_t<std::is_constructible<E, const G &>::value> * =
-          nullptr,
-      detail::enable_if_t<std::is_convertible<const G &, E>::value> * = nullptr>
-  constexpr expected(unexpected<G> const &e)
+      detail::enable_if_t<std::is_constructible<E, const G&>::value>* = nullptr,
+      detail::enable_if_t<std::is_convertible<const G&, E>::value>* = nullptr>
+  constexpr expected(unexpected<G> const& e)
       : impl_base(unexpect, e.value()),
         ctor_base(detail::default_constructor_tag{}) {}
 
   template <
       class G = E,
-      detail::enable_if_t<std::is_constructible<E, G &&>::value> * = nullptr,
-      detail::enable_if_t<!std::is_convertible<G &&, E>::value> * = nullptr>
-  explicit constexpr expected(unexpected<G> &&e) noexcept(
-      std::is_nothrow_constructible<E, G &&>::value)
+      detail::enable_if_t<std::is_constructible<E, G&&>::value>* = nullptr,
+      detail::enable_if_t<!std::is_convertible<G&&, E>::value>* = nullptr>
+  explicit constexpr expected(unexpected<G>&& e) noexcept(
+      std::is_nothrow_constructible<E, G&&>::value)
       : impl_base(unexpect, std::move(e.value())),
         ctor_base(detail::default_constructor_tag{}) {}
 
   template <
       class G = E,
-      detail::enable_if_t<std::is_constructible<E, G &&>::value> * = nullptr,
-      detail::enable_if_t<std::is_convertible<G &&, E>::value> * = nullptr>
-  constexpr expected(unexpected<G> &&e) noexcept(
-      std::is_nothrow_constructible<E, G &&>::value)
+      detail::enable_if_t<std::is_constructible<E, G&&>::value>* = nullptr,
+      detail::enable_if_t<std::is_convertible<G&&, E>::value>* = nullptr>
+  constexpr expected(unexpected<G>&& e) noexcept(
+      std::is_nothrow_constructible<E, G&&>::value)
       : impl_base(unexpect, std::move(e.value())),
         ctor_base(detail::default_constructor_tag{}) {}
 
   template <class... Args,
-            detail::enable_if_t<std::is_constructible<E, Args &&...>::value> * =
+            detail::enable_if_t<std::is_constructible<E, Args&&...>::value>* =
                 nullptr>
-  constexpr explicit expected(unexpect_t, Args &&...args)
+  constexpr explicit expected(unexpect_t, Args&&... args)
       : impl_base(unexpect, std::forward<Args>(args)...),
         ctor_base(detail::default_constructor_tag{}) {}
 
   template <class U, class... Args,
             detail::enable_if_t<std::is_constructible<
-                E, std::initializer_list<U> &, Args &&...>::value> * = nullptr>
+                E, std::initializer_list<U>&, Args&&...>::value>* = nullptr>
   constexpr explicit expected(unexpect_t, std::initializer_list<U> il,
-                              Args &&...args)
+                              Args&&... args)
       : impl_base(unexpect, il, std::forward<Args>(args)...),
         ctor_base(detail::default_constructor_tag{}) {}
 
   template <class U, class G,
-            detail::enable_if_t<!(std::is_convertible<U const &, T>::value &&
-                                  std::is_convertible<G const &, E>::value)> * =
+            detail::enable_if_t<!(std::is_convertible<U const&, T>::value &&
+                                  std::is_convertible<G const&, E>::value)>* =
                 nullptr,
-            detail::expected_enable_from_other<T, E, U, G, const U &, const G &>
-                * = nullptr>
-  explicit TL_EXPECTED_11_CONSTEXPR expected(const expected<U, G> &rhs)
-      : ctor_base(detail::default_constructor_tag{}) {
-    if (rhs.has_value()) {
-      this->construct(*rhs);
-    } else {
-      this->construct_error(rhs.error());
-    }
-  }
-
-  template <class U, class G,
-            detail::enable_if_t<(std::is_convertible<U const &, T>::value &&
-                                 std::is_convertible<G const &, E>::value)> * =
-                nullptr,
-            detail::expected_enable_from_other<T, E, U, G, const U &, const G &>
-                * = nullptr>
-  TL_EXPECTED_11_CONSTEXPR expected(const expected<U, G> &rhs)
+            detail::expected_enable_from_other<T, E, U, G, const U&,
+                                               const G&>* = nullptr>
+  explicit TL_EXPECTED_11_CONSTEXPR expected(const expected<U, G>& rhs)
       : ctor_base(detail::default_constructor_tag{}) {
     if (rhs.has_value()) {
       this->construct(*rhs);
@@ -3297,10 +3663,25 @@ class expected : private detail::expected_move_assign_base<T, E>,
 
   template <
       class U, class G,
-      detail::enable_if_t<!(std::is_convertible<U &&, T>::value &&
-                            std::is_convertible<G &&, E>::value)> * = nullptr,
-      detail::expected_enable_from_other<T, E, U, G, U &&, G &&> * = nullptr>
-  explicit TL_EXPECTED_11_CONSTEXPR expected(expected<U, G> &&rhs)
+      detail::enable_if_t<(std::is_convertible<U const&, T>::value &&
+                           std::is_convertible<G const&, E>::value)>* = nullptr,
+      detail::expected_enable_from_other<T, E, U, G, const U&, const G&>* =
+          nullptr>
+  TL_EXPECTED_11_CONSTEXPR expected(const expected<U, G>& rhs)
+      : ctor_base(detail::default_constructor_tag{}) {
+    if (rhs.has_value()) {
+      this->construct(*rhs);
+    } else {
+      this->construct_error(rhs.error());
+    }
+  }
+
+  template <
+      class U, class G,
+      detail::enable_if_t<!(std::is_convertible<U&&, T>::value &&
+                            std::is_convertible<G&&, E>::value)>* = nullptr,
+      detail::expected_enable_from_other<T, E, U, G, U&&, G&&>* = nullptr>
+  explicit TL_EXPECTED_11_CONSTEXPR expected(expected<U, G>&& rhs)
       : ctor_base(detail::default_constructor_tag{}) {
     if (rhs.has_value()) {
       this->construct(std::move(*rhs));
@@ -3311,10 +3692,10 @@ class expected : private detail::expected_move_assign_base<T, E>,
 
   template <
       class U, class G,
-      detail::enable_if_t<(std::is_convertible<U &&, T>::value &&
-                           std::is_convertible<G &&, E>::value)> * = nullptr,
-      detail::expected_enable_from_other<T, E, U, G, U &&, G &&> * = nullptr>
-  TL_EXPECTED_11_CONSTEXPR expected(expected<U, G> &&rhs)
+      detail::enable_if_t<(std::is_convertible<U&&, T>::value &&
+                           std::is_convertible<G&&, E>::value)>* = nullptr,
+      detail::expected_enable_from_other<T, E, U, G, U&&, G&&>* = nullptr>
+  TL_EXPECTED_11_CONSTEXPR expected(expected<U, G>&& rhs)
       : ctor_base(detail::default_constructor_tag{}) {
     if (rhs.has_value()) {
       this->construct(std::move(*rhs));
@@ -3323,33 +3704,31 @@ class expected : private detail::expected_move_assign_base<T, E>,
     }
   }
 
-  template <
-      class U = T,
-      detail::enable_if_t<!std::is_convertible<U &&, T>::value> * = nullptr,
-      detail::expected_enable_forward_value<T, E, U> * = nullptr>
-  explicit TL_EXPECTED_MSVC2015_CONSTEXPR expected(U &&v)
+  template <class U = T,
+            detail::enable_if_t<!std::is_convertible<U&&, T>::value>* = nullptr,
+            detail::expected_enable_forward_value<T, E, U>* = nullptr>
+  explicit TL_EXPECTED_MSVC2015_CONSTEXPR expected(U&& v)
       : expected(in_place, std::forward<U>(v)) {}
 
-  template <
-      class U = T,
-      detail::enable_if_t<std::is_convertible<U &&, T>::value> * = nullptr,
-      detail::expected_enable_forward_value<T, E, U> * = nullptr>
-  TL_EXPECTED_MSVC2015_CONSTEXPR expected(U &&v)
+  template <class U = T,
+            detail::enable_if_t<std::is_convertible<U&&, T>::value>* = nullptr,
+            detail::expected_enable_forward_value<T, E, U>* = nullptr>
+  TL_EXPECTED_MSVC2015_CONSTEXPR expected(U&& v)
       : expected(in_place, std::forward<U>(v)) {}
 
   template <
       class U = T, class G = T,
-      detail::enable_if_t<std::is_nothrow_constructible<T, U &&>::value> * =
+      detail::enable_if_t<std::is_nothrow_constructible<T, U&&>::value>* =
           nullptr,
-      detail::enable_if_t<!std::is_void<G>::value> * = nullptr,
+      detail::enable_if_t<!std::is_void<G>::value>* = nullptr,
       detail::enable_if_t<
           (!std::is_same<expected<T, E>, detail::decay_t<U>>::value &&
            !detail::conjunction<std::is_scalar<T>,
                                 std::is_same<T, detail::decay_t<U>>>::value &&
            std::is_constructible<T, U>::value &&
-           std::is_assignable<G &, U>::value &&
-           std::is_nothrow_move_constructible<E>::value)> * = nullptr>
-  expected &operator=(U &&v) {
+           std::is_assignable<G&, U>::value &&
+           std::is_nothrow_move_constructible<E>::value)>* = nullptr>
+  expected& operator=(U&& v) {
     if (has_value()) {
       val() = std::forward<U>(v);
     } else {
@@ -3363,17 +3742,17 @@ class expected : private detail::expected_move_assign_base<T, E>,
 
   template <
       class U = T, class G = T,
-      detail::enable_if_t<!std::is_nothrow_constructible<T, U &&>::value> * =
+      detail::enable_if_t<!std::is_nothrow_constructible<T, U&&>::value>* =
           nullptr,
-      detail::enable_if_t<!std::is_void<U>::value> * = nullptr,
+      detail::enable_if_t<!std::is_void<U>::value>* = nullptr,
       detail::enable_if_t<
           (!std::is_same<expected<T, E>, detail::decay_t<U>>::value &&
            !detail::conjunction<std::is_scalar<T>,
                                 std::is_same<T, detail::decay_t<U>>>::value &&
            std::is_constructible<T, U>::value &&
-           std::is_assignable<G &, U>::value &&
-           std::is_nothrow_move_constructible<E>::value)> * = nullptr>
-  expected &operator=(U &&v) {
+           std::is_assignable<G&, U>::value &&
+           std::is_nothrow_move_constructible<E>::value)>* = nullptr>
+  expected& operator=(U&& v) {
     if (has_value()) {
       val() = std::forward<U>(v);
     } else {
@@ -3399,8 +3778,8 @@ class expected : private detail::expected_move_assign_base<T, E>,
 
   template <class G = E,
             detail::enable_if_t<std::is_nothrow_copy_constructible<G>::value &&
-                                std::is_assignable<G &, G>::value> * = nullptr>
-  expected &operator=(const unexpected<G> &rhs) {
+                                std::is_assignable<G&, G>::value>* = nullptr>
+  expected& operator=(const unexpected<G>& rhs) {
     if (!has_value()) {
       err() = rhs;
     } else {
@@ -3414,8 +3793,8 @@ class expected : private detail::expected_move_assign_base<T, E>,
 
   template <class G = E,
             detail::enable_if_t<std::is_nothrow_move_constructible<G>::value &&
-                                std::is_move_assignable<G>::value> * = nullptr>
-  expected &operator=(unexpected<G> &&rhs) noexcept {
+                                std::is_move_assignable<G>::value>* = nullptr>
+  expected& operator=(unexpected<G>&& rhs) noexcept {
     if (!has_value()) {
       err() = std::move(rhs);
     } else {
@@ -3428,8 +3807,8 @@ class expected : private detail::expected_move_assign_base<T, E>,
   }
 
   template <class... Args, detail::enable_if_t<std::is_nothrow_constructible<
-                               T, Args &&...>::value> * = nullptr>
-  void emplace(Args &&...args) {
+                               T, Args&&...>::value>* = nullptr>
+  void emplace(Args&&... args) {
     if (has_value()) {
       val().~T();
     } else {
@@ -3440,8 +3819,8 @@ class expected : private detail::expected_move_assign_base<T, E>,
   }
 
   template <class... Args, detail::enable_if_t<!std::is_nothrow_constructible<
-                               T, Args &&...>::value> * = nullptr>
-  void emplace(Args &&...args) {
+                               T, Args&&...>::value>* = nullptr>
+  void emplace(Args&&... args) {
     if (has_value()) {
       val().~T();
       ::new (valptr()) T(std::forward<Args>(args)...);
@@ -3466,8 +3845,8 @@ class expected : private detail::expected_move_assign_base<T, E>,
 
   template <class U, class... Args,
             detail::enable_if_t<std::is_nothrow_constructible<
-                T, std::initializer_list<U> &, Args &&...>::value> * = nullptr>
-  void emplace(std::initializer_list<U> il, Args &&...args) {
+                T, std::initializer_list<U>&, Args&&...>::value>* = nullptr>
+  void emplace(std::initializer_list<U> il, Args&&... args) {
     if (has_value()) {
       T t(il, std::forward<Args>(args)...);
       val() = std::move(t);
@@ -3480,8 +3859,8 @@ class expected : private detail::expected_move_assign_base<T, E>,
 
   template <class U, class... Args,
             detail::enable_if_t<!std::is_nothrow_constructible<
-                T, std::initializer_list<U> &, Args &&...>::value> * = nullptr>
-  void emplace(std::initializer_list<U> il, Args &&...args) {
+                T, std::initializer_list<U>&, Args&&...>::value>* = nullptr>
+  void emplace(std::initializer_list<U> il, Args&&... args) {
     if (has_value()) {
       T t(il, std::forward<Args>(args)...);
       val() = std::move(t);
@@ -3512,30 +3891,30 @@ class expected : private detail::expected_move_assign_base<T, E>,
   using e_is_nothrow_move_constructible = std::true_type;
   using move_constructing_e_can_throw = std::false_type;
 
-  void swap_where_both_have_value(expected & /*rhs*/, t_is_void) noexcept {
+  void swap_where_both_have_value(expected& /*rhs*/, t_is_void) noexcept {
     // swapping void is a no-op
   }
 
-  void swap_where_both_have_value(expected &rhs, t_is_not_void) {
+  void swap_where_both_have_value(expected& rhs, t_is_not_void) {
     using std::swap;
     swap(val(), rhs.val());
   }
 
-  void swap_where_only_one_has_value(expected &rhs, t_is_void) noexcept(
+  void swap_where_only_one_has_value(expected& rhs, t_is_void) noexcept(
       std::is_nothrow_move_constructible<E>::value) {
     ::new (errptr()) unexpected_type(std::move(rhs.err()));
     rhs.err().~unexpected_type();
     std::swap(this->m_has_val, rhs.m_has_val);
   }
 
-  void swap_where_only_one_has_value(expected &rhs, t_is_not_void) {
+  void swap_where_only_one_has_value(expected& rhs, t_is_not_void) {
     swap_where_only_one_has_value_and_t_is_not_void(
         rhs, typename std::is_nothrow_move_constructible<T>::type{},
         typename std::is_nothrow_move_constructible<E>::type{});
   }
 
   void swap_where_only_one_has_value_and_t_is_not_void(
-      expected &rhs, t_is_nothrow_move_constructible,
+      expected& rhs, t_is_nothrow_move_constructible,
       e_is_nothrow_move_constructible) noexcept {
     auto temp = std::move(val());
     val().~T();
@@ -3546,7 +3925,7 @@ class expected : private detail::expected_move_assign_base<T, E>,
   }
 
   void swap_where_only_one_has_value_and_t_is_not_void(
-      expected &rhs, t_is_nothrow_move_constructible,
+      expected& rhs, t_is_nothrow_move_constructible,
       move_constructing_e_can_throw) {
     auto temp = std::move(val());
     val().~T();
@@ -3569,7 +3948,7 @@ class expected : private detail::expected_move_assign_base<T, E>,
   }
 
   void swap_where_only_one_has_value_and_t_is_not_void(
-      expected &rhs, move_constructing_t_can_throw,
+      expected& rhs, move_constructing_t_can_throw,
       e_is_nothrow_move_constructible) {
     auto temp = std::move(rhs.err());
     rhs.err().~unexpected_type();
@@ -3597,7 +3976,7 @@ class expected : private detail::expected_move_assign_base<T, E>,
                       detail::is_swappable<OE>::value &&
                       (std::is_nothrow_move_constructible<OT>::value ||
                        std::is_nothrow_move_constructible<OE>::value)>
-  swap(expected &rhs) noexcept(std::is_nothrow_move_constructible<T>::value &&
+  swap(expected& rhs) noexcept(std::is_nothrow_move_constructible<T>::value &&
                                detail::is_nothrow_swappable<T>::value &&
                                std::is_nothrow_move_constructible<E>::value &&
                                detail::is_nothrow_swappable<E>::value) {
@@ -3613,36 +3992,36 @@ class expected : private detail::expected_move_assign_base<T, E>,
     }
   }
 
-  constexpr const T *operator->() const {
+  constexpr const T* operator->() const {
     TL_ASSERT(has_value());
     return valptr();
   }
-  TL_EXPECTED_11_CONSTEXPR T *operator->() {
+  TL_EXPECTED_11_CONSTEXPR T* operator->() {
     TL_ASSERT(has_value());
     return valptr();
   }
 
   template <class U = T,
-            detail::enable_if_t<!std::is_void<U>::value> * = nullptr>
-  constexpr const U &operator*() const & {
+            detail::enable_if_t<!std::is_void<U>::value>* = nullptr>
+  constexpr const U& operator*() const& {
     TL_ASSERT(has_value());
     return val();
   }
   template <class U = T,
-            detail::enable_if_t<!std::is_void<U>::value> * = nullptr>
-  TL_EXPECTED_11_CONSTEXPR U &operator*() & {
+            detail::enable_if_t<!std::is_void<U>::value>* = nullptr>
+  TL_EXPECTED_11_CONSTEXPR U& operator*() & {
     TL_ASSERT(has_value());
     return val();
   }
   template <class U = T,
-            detail::enable_if_t<!std::is_void<U>::value> * = nullptr>
-  constexpr const U &&operator*() const && {
+            detail::enable_if_t<!std::is_void<U>::value>* = nullptr>
+  constexpr const U&& operator*() const&& {
     TL_ASSERT(has_value());
     return std::move(val());
   }
   template <class U = T,
-            detail::enable_if_t<!std::is_void<U>::value> * = nullptr>
-  TL_EXPECTED_11_CONSTEXPR U &&operator*() && {
+            detail::enable_if_t<!std::is_void<U>::value>* = nullptr>
+  TL_EXPECTED_11_CONSTEXPR U&& operator*() && {
     TL_ASSERT(has_value());
     return std::move(val());
   }
@@ -3651,62 +4030,62 @@ class expected : private detail::expected_move_assign_base<T, E>,
   constexpr explicit operator bool() const noexcept { return this->m_has_val; }
 
   template <class U = T,
-            detail::enable_if_t<!std::is_void<U>::value> * = nullptr>
-  TL_EXPECTED_11_CONSTEXPR const U &value() const & {
+            detail::enable_if_t<!std::is_void<U>::value>* = nullptr>
+  TL_EXPECTED_11_CONSTEXPR const U& value() const& {
     if (!has_value())
       detail::throw_exception(bad_expected_access<E>(err().value()));
     return val();
   }
   template <class U = T,
-            detail::enable_if_t<!std::is_void<U>::value> * = nullptr>
-  TL_EXPECTED_11_CONSTEXPR U &value() & {
+            detail::enable_if_t<!std::is_void<U>::value>* = nullptr>
+  TL_EXPECTED_11_CONSTEXPR U& value() & {
     if (!has_value())
       detail::throw_exception(bad_expected_access<E>(err().value()));
     return val();
   }
   template <class U = T,
-            detail::enable_if_t<!std::is_void<U>::value> * = nullptr>
-  TL_EXPECTED_11_CONSTEXPR const U &&value() const && {
+            detail::enable_if_t<!std::is_void<U>::value>* = nullptr>
+  TL_EXPECTED_11_CONSTEXPR const U&& value() const&& {
     if (!has_value())
       detail::throw_exception(bad_expected_access<E>(std::move(err()).value()));
     return std::move(val());
   }
   template <class U = T,
-            detail::enable_if_t<!std::is_void<U>::value> * = nullptr>
-  TL_EXPECTED_11_CONSTEXPR U &&value() && {
+            detail::enable_if_t<!std::is_void<U>::value>* = nullptr>
+  TL_EXPECTED_11_CONSTEXPR U&& value() && {
     if (!has_value())
       detail::throw_exception(bad_expected_access<E>(std::move(err()).value()));
     return std::move(val());
   }
 
-  constexpr const E &error() const & {
+  constexpr const E& error() const& {
     TL_ASSERT(!has_value());
     return err().value();
   }
-  TL_EXPECTED_11_CONSTEXPR E &error() & {
+  TL_EXPECTED_11_CONSTEXPR E& error() & {
     TL_ASSERT(!has_value());
     return err().value();
   }
-  constexpr const E &&error() const && {
+  constexpr const E&& error() const&& {
     TL_ASSERT(!has_value());
     return std::move(err().value());
   }
-  TL_EXPECTED_11_CONSTEXPR E &&error() && {
+  TL_EXPECTED_11_CONSTEXPR E&& error() && {
     TL_ASSERT(!has_value());
     return std::move(err().value());
   }
 
   template <class U>
-  constexpr T value_or(U &&v) const & {
+  constexpr T value_or(U&& v) const& {
     static_assert(std::is_copy_constructible<T>::value &&
-                      std::is_convertible<U &&, T>::value,
+                      std::is_convertible<U&&, T>::value,
                   "T must be copy-constructible and convertible to from U&&");
     return bool(*this) ? **this : static_cast<T>(std::forward<U>(v));
   }
   template <class U>
-  TL_EXPECTED_11_CONSTEXPR T value_or(U &&v) && {
+  TL_EXPECTED_11_CONSTEXPR T value_or(U&& v) && {
     static_assert(std::is_move_constructible<T>::value &&
-                      std::is_convertible<U &&, T>::value,
+                      std::is_convertible<U&&, T>::value,
                   "T must be move-constructible and convertible to from U&&");
     return bool(*this) ? std::move(**this) : static_cast<T>(std::forward<U>(v));
   }
@@ -3722,10 +4101,10 @@ using ret_t = expected<Ret, err_t<Exp>>;
 
 #ifdef TL_EXPECTED_CXX14
 template <class Exp, class F,
-          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               *std::declval<Exp>()))>
-constexpr auto and_then_impl(Exp &&exp, F &&f) {
+constexpr auto and_then_impl(Exp&& exp, F&& f) {
   static_assert(detail::is_expected<Ret>::value, "F must return an expected");
 
   return exp.has_value()
@@ -3734,9 +4113,9 @@ constexpr auto and_then_impl(Exp &&exp, F &&f) {
 }
 
 template <class Exp, class F,
-          detail::enable_if_t<std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>()))>
-constexpr auto and_then_impl(Exp &&exp, F &&f) {
+constexpr auto and_then_impl(Exp&& exp, F&& f) {
   static_assert(detail::is_expected<Ret>::value, "F must return an expected");
 
   return exp.has_value() ? detail::invoke(std::forward<F>(f))
@@ -3748,8 +4127,8 @@ struct TC;
 template <class Exp, class F,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               *std::declval<Exp>())),
-          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value> * = nullptr>
-auto and_then_impl(Exp &&exp, F &&f) -> Ret {
+          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value>* = nullptr>
+auto and_then_impl(Exp&& exp, F&& f) -> Ret {
   static_assert(detail::is_expected<Ret>::value, "F must return an expected");
 
   return exp.has_value()
@@ -3759,8 +4138,8 @@ auto and_then_impl(Exp &&exp, F &&f) -> Ret {
 
 template <class Exp, class F,
           class Ret = decltype(detail::invoke(std::declval<F>())),
-          detail::enable_if_t<std::is_void<exp_t<Exp>>::value> * = nullptr>
-constexpr auto and_then_impl(Exp &&exp, F &&f) -> Ret {
+          detail::enable_if_t<std::is_void<exp_t<Exp>>::value>* = nullptr>
+constexpr auto and_then_impl(Exp&& exp, F&& f) -> Ret {
   static_assert(detail::is_expected<Ret>::value, "F must return an expected");
 
   return exp.has_value() ? detail::invoke(std::forward<F>(f))
@@ -3770,11 +4149,11 @@ constexpr auto and_then_impl(Exp &&exp, F &&f) -> Ret {
 
 #ifdef TL_EXPECTED_CXX14
 template <class Exp, class F,
-          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               *std::declval<Exp>())),
-          detail::enable_if_t<!std::is_void<Ret>::value> * = nullptr>
-constexpr auto expected_map_impl(Exp &&exp, F &&f) {
+          detail::enable_if_t<!std::is_void<Ret>::value>* = nullptr>
+constexpr auto expected_map_impl(Exp&& exp, F&& f) {
   using result = ret_t<Exp, detail::decay_t<Ret>>;
   return exp.has_value() ? result(detail::invoke(std::forward<F>(f),
                                                  *std::forward<Exp>(exp)))
@@ -3782,11 +4161,11 @@ constexpr auto expected_map_impl(Exp &&exp, F &&f) {
 }
 
 template <class Exp, class F,
-          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               *std::declval<Exp>())),
-          detail::enable_if_t<std::is_void<Ret>::value> * = nullptr>
-auto expected_map_impl(Exp &&exp, F &&f) {
+          detail::enable_if_t<std::is_void<Ret>::value>* = nullptr>
+auto expected_map_impl(Exp&& exp, F&& f) {
   using result = expected<void, err_t<Exp>>;
   if (exp.has_value()) {
     detail::invoke(std::forward<F>(f), *std::forward<Exp>(exp));
@@ -3797,20 +4176,20 @@ auto expected_map_impl(Exp &&exp, F &&f) {
 }
 
 template <class Exp, class F,
-          detail::enable_if_t<std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>())),
-          detail::enable_if_t<!std::is_void<Ret>::value> * = nullptr>
-constexpr auto expected_map_impl(Exp &&exp, F &&f) {
+          detail::enable_if_t<!std::is_void<Ret>::value>* = nullptr>
+constexpr auto expected_map_impl(Exp&& exp, F&& f) {
   using result = ret_t<Exp, detail::decay_t<Ret>>;
   return exp.has_value() ? result(detail::invoke(std::forward<F>(f)))
                          : result(unexpect, std::forward<Exp>(exp).error());
 }
 
 template <class Exp, class F,
-          detail::enable_if_t<std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>())),
-          detail::enable_if_t<std::is_void<Ret>::value> * = nullptr>
-auto expected_map_impl(Exp &&exp, F &&f) {
+          detail::enable_if_t<std::is_void<Ret>::value>* = nullptr>
+auto expected_map_impl(Exp&& exp, F&& f) {
   using result = expected<void, err_t<Exp>>;
   if (exp.has_value()) {
     detail::invoke(std::forward<F>(f));
@@ -3821,12 +4200,12 @@ auto expected_map_impl(Exp &&exp, F &&f) {
 }
 #else
 template <class Exp, class F,
-          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               *std::declval<Exp>())),
-          detail::enable_if_t<!std::is_void<Ret>::value> * = nullptr>
+          detail::enable_if_t<!std::is_void<Ret>::value>* = nullptr>
 
-constexpr auto expected_map_impl(Exp &&exp, F &&f)
+constexpr auto expected_map_impl(Exp&& exp, F&& f)
     -> ret_t<Exp, detail::decay_t<Ret>> {
   using result = ret_t<Exp, detail::decay_t<Ret>>;
 
@@ -3836,12 +4215,12 @@ constexpr auto expected_map_impl(Exp &&exp, F &&f)
 }
 
 template <class Exp, class F,
-          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               *std::declval<Exp>())),
-          detail::enable_if_t<std::is_void<Ret>::value> * = nullptr>
+          detail::enable_if_t<std::is_void<Ret>::value>* = nullptr>
 
-auto expected_map_impl(Exp &&exp, F &&f) -> expected<void, err_t<Exp>> {
+auto expected_map_impl(Exp&& exp, F&& f) -> expected<void, err_t<Exp>> {
   if (exp.has_value()) {
     detail::invoke(std::forward<F>(f), *std::forward<Exp>(exp));
     return {};
@@ -3851,11 +4230,11 @@ auto expected_map_impl(Exp &&exp, F &&f) -> expected<void, err_t<Exp>> {
 }
 
 template <class Exp, class F,
-          detail::enable_if_t<std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>())),
-          detail::enable_if_t<!std::is_void<Ret>::value> * = nullptr>
+          detail::enable_if_t<!std::is_void<Ret>::value>* = nullptr>
 
-constexpr auto expected_map_impl(Exp &&exp, F &&f)
+constexpr auto expected_map_impl(Exp&& exp, F&& f)
     -> ret_t<Exp, detail::decay_t<Ret>> {
   using result = ret_t<Exp, detail::decay_t<Ret>>;
 
@@ -3864,11 +4243,11 @@ constexpr auto expected_map_impl(Exp &&exp, F &&f)
 }
 
 template <class Exp, class F,
-          detail::enable_if_t<std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>())),
-          detail::enable_if_t<std::is_void<Ret>::value> * = nullptr>
+          detail::enable_if_t<std::is_void<Ret>::value>* = nullptr>
 
-auto expected_map_impl(Exp &&exp, F &&f) -> expected<void, err_t<Exp>> {
+auto expected_map_impl(Exp&& exp, F&& f) -> expected<void, err_t<Exp>> {
   if (exp.has_value()) {
     detail::invoke(std::forward<F>(f));
     return {};
@@ -3881,11 +4260,11 @@ auto expected_map_impl(Exp &&exp, F &&f) -> expected<void, err_t<Exp>> {
 #if defined(TL_EXPECTED_CXX14) && !defined(TL_EXPECTED_GCC49) && \
     !defined(TL_EXPECTED_GCC54) && !defined(TL_EXPECTED_GCC55)
 template <class Exp, class F,
-          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               std::declval<Exp>().error())),
-          detail::enable_if_t<!std::is_void<Ret>::value> * = nullptr>
-constexpr auto map_error_impl(Exp &&exp, F &&f) {
+          detail::enable_if_t<!std::is_void<Ret>::value>* = nullptr>
+constexpr auto map_error_impl(Exp&& exp, F&& f) {
   using result = expected<exp_t<Exp>, detail::decay_t<Ret>>;
   return exp.has_value()
              ? result(*std::forward<Exp>(exp))
@@ -3893,11 +4272,11 @@ constexpr auto map_error_impl(Exp &&exp, F &&f) {
                                                std::forward<Exp>(exp).error()));
 }
 template <class Exp, class F,
-          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               std::declval<Exp>().error())),
-          detail::enable_if_t<std::is_void<Ret>::value> * = nullptr>
-auto map_error_impl(Exp &&exp, F &&f) {
+          detail::enable_if_t<std::is_void<Ret>::value>* = nullptr>
+auto map_error_impl(Exp&& exp, F&& f) {
   using result = expected<exp_t<Exp>, monostate>;
   if (exp.has_value()) {
     return result(*std::forward<Exp>(exp));
@@ -3907,11 +4286,11 @@ auto map_error_impl(Exp &&exp, F &&f) {
   return result(unexpect, monostate{});
 }
 template <class Exp, class F,
-          detail::enable_if_t<std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               std::declval<Exp>().error())),
-          detail::enable_if_t<!std::is_void<Ret>::value> * = nullptr>
-constexpr auto map_error_impl(Exp &&exp, F &&f) {
+          detail::enable_if_t<!std::is_void<Ret>::value>* = nullptr>
+constexpr auto map_error_impl(Exp&& exp, F&& f) {
   using result = expected<exp_t<Exp>, detail::decay_t<Ret>>;
   return exp.has_value()
              ? result()
@@ -3919,11 +4298,11 @@ constexpr auto map_error_impl(Exp &&exp, F &&f) {
                                                std::forward<Exp>(exp).error()));
 }
 template <class Exp, class F,
-          detail::enable_if_t<std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               std::declval<Exp>().error())),
-          detail::enable_if_t<std::is_void<Ret>::value> * = nullptr>
-auto map_error_impl(Exp &&exp, F &&f) {
+          detail::enable_if_t<std::is_void<Ret>::value>* = nullptr>
+auto map_error_impl(Exp&& exp, F&& f) {
   using result = expected<exp_t<Exp>, monostate>;
   if (exp.has_value()) {
     return result();
@@ -3934,11 +4313,11 @@ auto map_error_impl(Exp &&exp, F &&f) {
 }
 #else
 template <class Exp, class F,
-          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               std::declval<Exp>().error())),
-          detail::enable_if_t<!std::is_void<Ret>::value> * = nullptr>
-constexpr auto map_error_impl(Exp &&exp, F &&f)
+          detail::enable_if_t<!std::is_void<Ret>::value>* = nullptr>
+constexpr auto map_error_impl(Exp&& exp, F&& f)
     -> expected<exp_t<Exp>, detail::decay_t<Ret>> {
   using result = expected<exp_t<Exp>, detail::decay_t<Ret>>;
 
@@ -3949,11 +4328,11 @@ constexpr auto map_error_impl(Exp &&exp, F &&f)
 }
 
 template <class Exp, class F,
-          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<!std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               std::declval<Exp>().error())),
-          detail::enable_if_t<std::is_void<Ret>::value> * = nullptr>
-auto map_error_impl(Exp &&exp, F &&f) -> expected<exp_t<Exp>, monostate> {
+          detail::enable_if_t<std::is_void<Ret>::value>* = nullptr>
+auto map_error_impl(Exp&& exp, F&& f) -> expected<exp_t<Exp>, monostate> {
   using result = expected<exp_t<Exp>, monostate>;
   if (exp.has_value()) {
     return result(*std::forward<Exp>(exp));
@@ -3964,11 +4343,11 @@ auto map_error_impl(Exp &&exp, F &&f) -> expected<exp_t<Exp>, monostate> {
 }
 
 template <class Exp, class F,
-          detail::enable_if_t<std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               std::declval<Exp>().error())),
-          detail::enable_if_t<!std::is_void<Ret>::value> * = nullptr>
-constexpr auto map_error_impl(Exp &&exp, F &&f)
+          detail::enable_if_t<!std::is_void<Ret>::value>* = nullptr>
+constexpr auto map_error_impl(Exp&& exp, F&& f)
     -> expected<exp_t<Exp>, detail::decay_t<Ret>> {
   using result = expected<exp_t<Exp>, detail::decay_t<Ret>>;
 
@@ -3979,11 +4358,11 @@ constexpr auto map_error_impl(Exp &&exp, F &&f)
 }
 
 template <class Exp, class F,
-          detail::enable_if_t<std::is_void<exp_t<Exp>>::value> * = nullptr,
+          detail::enable_if_t<std::is_void<exp_t<Exp>>::value>* = nullptr,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               std::declval<Exp>().error())),
-          detail::enable_if_t<std::is_void<Ret>::value> * = nullptr>
-auto map_error_impl(Exp &&exp, F &&f) -> expected<exp_t<Exp>, monostate> {
+          detail::enable_if_t<std::is_void<Ret>::value>* = nullptr>
+auto map_error_impl(Exp&& exp, F&& f) -> expected<exp_t<Exp>, monostate> {
   using result = expected<exp_t<Exp>, monostate>;
   if (exp.has_value()) {
     return result();
@@ -3998,8 +4377,8 @@ auto map_error_impl(Exp &&exp, F &&f) -> expected<exp_t<Exp>, monostate> {
 template <class Exp, class F,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               std::declval<Exp>().error())),
-          detail::enable_if_t<!std::is_void<Ret>::value> * = nullptr>
-constexpr auto or_else_impl(Exp &&exp, F &&f) {
+          detail::enable_if_t<!std::is_void<Ret>::value>* = nullptr>
+constexpr auto or_else_impl(Exp&& exp, F&& f) {
   static_assert(detail::is_expected<Ret>::value, "F must return an expected");
   return exp.has_value() ? std::forward<Exp>(exp)
                          : detail::invoke(std::forward<F>(f),
@@ -4009,8 +4388,8 @@ constexpr auto or_else_impl(Exp &&exp, F &&f) {
 template <class Exp, class F,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               std::declval<Exp>().error())),
-          detail::enable_if_t<std::is_void<Ret>::value> * = nullptr>
-detail::decay_t<Exp> or_else_impl(Exp &&exp, F &&f) {
+          detail::enable_if_t<std::is_void<Ret>::value>* = nullptr>
+detail::decay_t<Exp> or_else_impl(Exp&& exp, F&& f) {
   return exp.has_value() ? std::forward<Exp>(exp)
                          : (detail::invoke(std::forward<F>(f),
                                            std::forward<Exp>(exp).error()),
@@ -4020,8 +4399,8 @@ detail::decay_t<Exp> or_else_impl(Exp &&exp, F &&f) {
 template <class Exp, class F,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               std::declval<Exp>().error())),
-          detail::enable_if_t<!std::is_void<Ret>::value> * = nullptr>
-auto or_else_impl(Exp &&exp, F &&f) -> Ret {
+          detail::enable_if_t<!std::is_void<Ret>::value>* = nullptr>
+auto or_else_impl(Exp&& exp, F&& f) -> Ret {
   static_assert(detail::is_expected<Ret>::value, "F must return an expected");
   return exp.has_value() ? std::forward<Exp>(exp)
                          : detail::invoke(std::forward<F>(f),
@@ -4031,8 +4410,8 @@ auto or_else_impl(Exp &&exp, F &&f) -> Ret {
 template <class Exp, class F,
           class Ret = decltype(detail::invoke(std::declval<F>(),
                                               std::declval<Exp>().error())),
-          detail::enable_if_t<std::is_void<Ret>::value> * = nullptr>
-detail::decay_t<Exp> or_else_impl(Exp &&exp, F &&f) {
+          detail::enable_if_t<std::is_void<Ret>::value>* = nullptr>
+detail::decay_t<Exp> or_else_impl(Exp&& exp, F&& f) {
   return exp.has_value() ? std::forward<Exp>(exp)
                          : (detail::invoke(std::forward<F>(f),
                                            std::forward<Exp>(exp).error()),
@@ -4042,65 +4421,65 @@ detail::decay_t<Exp> or_else_impl(Exp &&exp, F &&f) {
 }  // namespace detail
 
 template <class T, class E, class U, class F>
-constexpr bool operator==(const expected<T, E> &lhs,
-                          const expected<U, F> &rhs) {
+constexpr bool operator==(const expected<T, E>& lhs,
+                          const expected<U, F>& rhs) {
   return (lhs.has_value() != rhs.has_value())
              ? false
              : (!lhs.has_value() ? lhs.error() == rhs.error() : *lhs == *rhs);
 }
 template <class T, class E, class U, class F>
-constexpr bool operator!=(const expected<T, E> &lhs,
-                          const expected<U, F> &rhs) {
+constexpr bool operator!=(const expected<T, E>& lhs,
+                          const expected<U, F>& rhs) {
   return (lhs.has_value() != rhs.has_value())
              ? true
              : (!lhs.has_value() ? lhs.error() != rhs.error() : *lhs != *rhs);
 }
 template <class E, class F>
-constexpr bool operator==(const expected<void, E> &lhs,
-                          const expected<void, F> &rhs) {
+constexpr bool operator==(const expected<void, E>& lhs,
+                          const expected<void, F>& rhs) {
   return (lhs.has_value() != rhs.has_value())
              ? false
              : (!lhs.has_value() ? lhs.error() == rhs.error() : true);
 }
 template <class E, class F>
-constexpr bool operator!=(const expected<void, E> &lhs,
-                          const expected<void, F> &rhs) {
+constexpr bool operator!=(const expected<void, E>& lhs,
+                          const expected<void, F>& rhs) {
   return (lhs.has_value() != rhs.has_value())
              ? true
              : (!lhs.has_value() ? lhs.error() == rhs.error() : false);
 }
 
 template <class T, class E, class U>
-constexpr bool operator==(const expected<T, E> &x, const U &v) {
+constexpr bool operator==(const expected<T, E>& x, const U& v) {
   return x.has_value() ? *x == v : false;
 }
 template <class T, class E, class U>
-constexpr bool operator==(const U &v, const expected<T, E> &x) {
+constexpr bool operator==(const U& v, const expected<T, E>& x) {
   return x.has_value() ? *x == v : false;
 }
 template <class T, class E, class U>
-constexpr bool operator!=(const expected<T, E> &x, const U &v) {
+constexpr bool operator!=(const expected<T, E>& x, const U& v) {
   return x.has_value() ? *x != v : true;
 }
 template <class T, class E, class U>
-constexpr bool operator!=(const U &v, const expected<T, E> &x) {
+constexpr bool operator!=(const U& v, const expected<T, E>& x) {
   return x.has_value() ? *x != v : true;
 }
 
 template <class T, class E>
-constexpr bool operator==(const expected<T, E> &x, const unexpected<E> &e) {
+constexpr bool operator==(const expected<T, E>& x, const unexpected<E>& e) {
   return x.has_value() ? false : x.error() == e.value();
 }
 template <class T, class E>
-constexpr bool operator==(const unexpected<E> &e, const expected<T, E> &x) {
+constexpr bool operator==(const unexpected<E>& e, const expected<T, E>& x) {
   return x.has_value() ? false : x.error() == e.value();
 }
 template <class T, class E>
-constexpr bool operator!=(const expected<T, E> &x, const unexpected<E> &e) {
+constexpr bool operator!=(const expected<T, E>& x, const unexpected<E>& e) {
   return x.has_value() ? true : x.error() != e.value();
 }
 template <class T, class E>
-constexpr bool operator!=(const unexpected<E> &e, const expected<T, E> &x) {
+constexpr bool operator!=(const unexpected<E>& e, const expected<T, E>& x) {
   return x.has_value() ? true : x.error() != e.value();
 }
 
@@ -4109,9 +4488,9 @@ template <class T, class E,
                                std::is_move_constructible<T>::value) &&
                               detail::is_swappable<T>::value &&
                               std::is_move_constructible<E>::value &&
-                              detail::is_swappable<E>::value> * = nullptr>
-void swap(expected<T, E> &lhs,
-          expected<T, E> &rhs) noexcept(noexcept(lhs.swap(rhs))) {
+                              detail::is_swappable<E>::value>* = nullptr>
+void swap(expected<T, E>& lhs,
+          expected<T, E>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
   lhs.swap(rhs);
 }
 }  // namespace tl
@@ -4193,14 +4572,23 @@ class std_regex_provider final {
 /* begin file include/ada/errors.h */
 /**
  * @file errors.h
- * @brief Definitions for the errors.
+ * @brief Error type definitions for URL parsing.
+ *
+ * Defines the error codes that can be returned when URL parsing fails.
  */
 #ifndef ADA_ERRORS_H
 #define ADA_ERRORS_H
 
 #include <cstdint>
 namespace ada {
-enum class errors : uint8_t { type_error };
+/**
+ * @brief Error codes for URL parsing operations.
+ *
+ * Used with `tl::expected` to indicate why a URL parsing operation failed.
+ */
+enum class errors : uint8_t {
+  type_error /**< A type error occurred (e.g., invalid URL syntax). */
+};
 }  // namespace ada
 #endif  // ADA_ERRORS_H
 /* end file include/ada/errors.h */
@@ -4333,9 +4721,7 @@ struct url_pattern_init {
 #endif  // ADA_URL_PATTERN_INIT_H
 /* end file include/ada/url_pattern_init.h */
 
-/**
- * @private
- */
+/** @private Forward declarations */
 namespace ada {
 struct url_aggregator;
 struct url;
@@ -4349,14 +4735,24 @@ enum class errors : uint8_t;
 
 /**
  * @namespace ada::parser
- * @brief Includes the definitions for supported parsers
+ * @brief Internal URL parsing implementation.
+ *
+ * Contains the core URL parsing algorithm as specified by the WHATWG URL
+ * Standard. These functions are used internally by `ada::parse()`.
  */
 namespace ada::parser {
 /**
- * Parses a url. The parameter user_input is the input to be parsed:
- * it should be a valid UTF-8 string. The parameter base_url is an optional
- * parameter that can be used to resolve relative URLs. If the base_url is
- * provided, the user_input is resolved against the base_url.
+ * Parses a URL string into a URL object.
+ *
+ * @tparam result_type The type of URL object to create (url or url_aggregator).
+ *
+ * @param user_input The URL string to parse (must be valid UTF-8).
+ * @param base_url Optional base URL for resolving relative URLs.
+ *
+ * @return The parsed URL object. Check `is_valid` to determine if parsing
+ *         succeeded.
+ *
+ * @see https://url.spec.whatwg.org/#concept-basic-url-parser
  */
 template <typename result_type = url_aggregator>
 result_type parse_url(std::string_view user_input,
@@ -4371,10 +4767,16 @@ template <typename result_type = url_aggregator, bool store_values = true>
 result_type parse_url_impl(std::string_view user_input,
                            const result_type* base_url = nullptr);
 
-extern template url_aggregator parse_url_impl<url_aggregator>(
+extern template url_aggregator parse_url_impl<url_aggregator, true>(
     std::string_view user_input, const url_aggregator* base_url);
-extern template url parse_url_impl<url>(std::string_view user_input,
-                                        const url* base_url);
+extern template url_aggregator parse_url_impl<url_aggregator, false>(
+    std::string_view user_input, const url_aggregator* base_url);
+extern template url parse_url_impl<url, true>(std::string_view user_input,
+                                              const url* base_url);
+
+/** @private */
+template <class result_type>
+bool try_parse_simple_absolute(std::string_view input, result_type& out);
 
 #if ADA_INCLUDE_URL_PATTERN
 template <url_pattern_regex::regex_concept regex_provider>
@@ -4397,7 +4799,14 @@ tl::expected<url_pattern<regex_provider>, errors> parse_url_pattern_impl(
 /* begin file include/ada/url_pattern.h */
 /**
  * @file url_pattern.h
- * @brief Declaration for the URLPattern implementation.
+ * @brief URLPattern API implementation.
+ *
+ * This header provides the URLPattern API as specified by the WHATWG URL
+ * Pattern Standard. URLPattern allows matching URLs against patterns with
+ * wildcards and named groups, similar to how regular expressions match strings.
+ *
+ * @see https://urlpattern.spec.whatwg.org/
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/URL_Pattern_API
  */
 #ifndef ADA_URL_PATTERN_H
 #define ADA_URL_PATTERN_H
@@ -4405,8 +4814,13 @@ tl::expected<url_pattern<regex_provider>, errors> parse_url_pattern_impl(
 /* begin file include/ada/implementation.h */
 /**
  * @file implementation.h
- * @brief Definitions for user facing functions for parsing URL and it's
- * components.
+ * @brief User-facing functions for URL parsing and manipulation.
+ *
+ * This header provides the primary public API for parsing URLs in Ada.
+ * It includes the main `ada::parse()` function which is the recommended
+ * entry point for most users.
+ *
+ * @see https://url.spec.whatwg.org/#api
  */
 #ifndef ADA_IMPLEMENTATION_H
 #define ADA_IMPLEMENTATION_H
@@ -4418,7 +4832,13 @@ tl::expected<url_pattern<regex_provider>, errors> parse_url_pattern_impl(
 /* begin file include/ada/url.h */
 /**
  * @file url.h
- * @brief Declaration for the URL
+ * @brief Declaration for the `ada::url` class.
+ *
+ * This file contains the `ada::url` struct which represents a parsed URL
+ * using separate `std::string` instances for each component. This
+ * representation is more flexible but uses more memory than `url_aggregator`.
+ *
+ * @see url_aggregator.h for a more memory-efficient alternative
  */
 #ifndef ADA_URL_H
 #define ADA_URL_H
@@ -4429,127 +4849,14 @@ tl::expected<url_pattern<regex_provider>, errors> parse_url_pattern_impl(
 #include <string>
 #include <string_view>
 
-/* begin file include/ada/checkers.h */
-/**
- * @file checkers.h
- * @brief Declarations for URL specific checkers used within Ada.
- */
-#ifndef ADA_CHECKERS_H
-#define ADA_CHECKERS_H
-
-
-#include <cstring>
-#include <string_view>
-
-/**
- * These functions are not part of our public API and may
- * change at any time.
- * @private
- * @namespace ada::checkers
- * @brief Includes the definitions for validation functions
- */
-namespace ada::checkers {
-
-/**
- * @private
- * Assuming that x is an ASCII letter, this function returns the lower case
- * equivalent.
- * @details More likely to be inlined by the compiler and constexpr.
- */
-constexpr char to_lower(char x) noexcept;
-
-/**
- * @private
- * Returns true if the character is an ASCII letter. Equivalent to std::isalpha
- * but more likely to be inlined by the compiler.
- *
- * @attention std::isalpha is not constexpr generally.
- */
-constexpr bool is_alpha(char x) noexcept;
-
-/**
- * @private
- * Check whether a string starts with 0x or 0X. The function is only
- * safe if input.size() >=2.
- *
- * @see has_hex_prefix
- */
-constexpr bool has_hex_prefix_unsafe(std::string_view input);
-/**
- * @private
- * Check whether a string starts with 0x or 0X.
- */
-constexpr bool has_hex_prefix(std::string_view input);
-
-/**
- * @private
- * Check whether x is an ASCII digit. More likely to be inlined than
- * std::isdigit.
- */
-constexpr bool is_digit(char x) noexcept;
-
-/**
- * @private
- * @details A string starts with a Windows drive letter if all of the following
- * are true:
- *
- *   - its length is greater than or equal to 2
- *   - its first two code points are a Windows drive letter
- *   - its length is 2 or its third code point is U+002F (/), U+005C (\), U+003F
- * (?), or U+0023 (#).
- *
- * https://url.spec.whatwg.org/#start-with-a-windows-drive-letter
- */
-inline constexpr bool is_windows_drive_letter(std::string_view input) noexcept;
-
-/**
- * @private
- * @details A normalized Windows drive letter is a Windows drive letter of which
- * the second code point is U+003A (:).
- */
-inline constexpr bool is_normalized_windows_drive_letter(
-    std::string_view input) noexcept;
-
-/**
- * @private
- * Returns true if an input is an ipv4 address. It is assumed that the string
- * does not contain uppercase ASCII characters (the input should have been
- * lowered cased before calling this function) and is not empty.
- */
-ada_really_inline constexpr bool is_ipv4(std::string_view view) noexcept;
-
-/**
- * @private
- * Returns a bitset. If the first bit is set, then at least one character needs
- * percent encoding. If the second bit is set, a \\ is found. If the third bit
- * is set then we have a dot. If the fourth bit is set, then we have a percent
- * character.
- */
-ada_really_inline constexpr uint8_t path_signature(
-    std::string_view input) noexcept;
-
-/**
- * @private
- * Returns true if the length of the domain name and its labels are according to
- * the specifications. The length of the domain must be 255 octets (253
- * characters not including the last 2 which are the empty label reserved at the
- * end). When the empty label is included (a dot at the end), the domain name
- * can have 254 characters. The length of a label must be at least 1 and at most
- * 63 characters.
- * @see section 3.1. of https://www.rfc-editor.org/rfc/rfc1034
- * @see https://www.unicode.org/reports/tr46/#ToASCII
- */
-ada_really_inline constexpr bool verify_dns_length(
-    std::string_view input) noexcept;
-
-}  // namespace ada::checkers
-
-#endif  // ADA_CHECKERS_H
-/* end file include/ada/checkers.h */
 /* begin file include/ada/url_components.h */
 /**
  * @file url_components.h
- * @brief Declaration for the URL Components
+ * @brief URL component offset representation for url_aggregator.
+ *
+ * This file defines the `url_components` struct which stores byte offsets
+ * into a URL string buffer. It is used internally by `url_aggregator` to
+ * efficiently locate URL components without storing separate strings.
  */
 #ifndef ADA_URL_COMPONENTS_H
 #define ADA_URL_COMPONENTS_H
@@ -4557,64 +4864,78 @@ ada_really_inline constexpr bool verify_dns_length(
 namespace ada {
 
 /**
- * @brief URL Component representations using offsets.
+ * @brief Stores byte offsets for URL components within a buffer.
  *
- * @details We design the url_components struct so that it is as small
- * and simple as possible. This version uses 32 bytes.
+ * The `url_components` struct uses 32-bit offsets to track the boundaries
+ * of each URL component within a single string buffer. This enables efficient
+ * component extraction without additional memory allocations.
  *
- * This struct is used to extract components from a single 'href'.
+ * Component layout in a URL:
+ * ```
+ * https://user:pass@example.com:1234/foo/bar?baz#quux
+ *       |     |    |          | ^^^^|       |   |
+ *       |     |    |          | |   |       |   `----- hash_start
+ *       |     |    |          | |   |       `--------- search_start
+ *       |     |    |          | |   `----------------- pathname_start
+ *       |     |    |          | `--------------------- port
+ *       |     |    |          `----------------------- host_end
+ *       |     |    `---------------------------------- host_start
+ *       |     `--------------------------------------- username_end
+ *       `--------------------------------------------- protocol_end
+ * ```
+ *
+ * @note The 32-bit offsets limit URLs to 4GB in length.
+ * @note A value of `omitted` (UINT32_MAX) indicates the component is not
+ * present.
  */
 struct url_components {
+  /** Sentinel value indicating a component is not present. */
   constexpr static uint32_t omitted = uint32_t(-1);
 
   url_components() = default;
-  url_components(const url_components &u) = default;
-  url_components(url_components &&u) noexcept = default;
-  url_components &operator=(url_components &&u) noexcept = default;
-  url_components &operator=(const url_components &u) = default;
+  url_components(const url_components& u) = default;
+  url_components(url_components&& u) noexcept = default;
+  url_components& operator=(url_components&& u) noexcept = default;
+  url_components& operator=(const url_components& u) = default;
   ~url_components() = default;
 
-  /*
-   * By using 32-bit integers, we implicitly assume that the URL string
-   * cannot exceed 4 GB.
-   *
-   * https://user:pass@example.com:1234/foo/bar?baz#quux
-   *       |     |    |          | ^^^^|       |   |
-   *       |     |    |          | |   |       |   `----- hash_start
-   *       |     |    |          | |   |       `--------- search_start
-   *       |     |    |          | |   `----------------- pathname_start
-   *       |     |    |          | `--------------------- port
-   *       |     |    |          `----------------------- host_end
-   *       |     |    `---------------------------------- host_start
-   *       |     `--------------------------------------- username_end
-   *       `--------------------------------------------- protocol_end
-   */
+  /** Offset of the end of the protocol/scheme (position of ':'). */
   uint32_t protocol_end{0};
+
   /**
-   * Username end is not `omitted` by default to make username and password
-   * getters less costly to implement.
+   * Offset of the end of the username.
+   * Initialized to 0 (not `omitted`) to simplify username/password getters.
    */
   uint32_t username_end{0};
+
+  /** Offset of the start of the host. */
   uint32_t host_start{0};
+
+  /** Offset of the end of the host. */
   uint32_t host_end{0};
+
+  /** Port number, or `omitted` if no port is specified. */
   uint32_t port{omitted};
+
+  /** Offset of the start of the pathname. */
   uint32_t pathname_start{0};
+
+  /** Offset of the '?' starting the query, or `omitted` if no query. */
   uint32_t search_start{omitted};
+
+  /** Offset of the '#' starting the fragment, or `omitted` if no fragment. */
   uint32_t hash_start{omitted};
 
   /**
-   * Check the following conditions:
-   * protocol_end < username_end < ... < hash_start,
-   * expect when a value is omitted. It also computes
-   * a lower bound on  the possible string length that may match these
-   * offsets.
-   * @return true if the offset values are
-   *  consistent with a possible URL string
+   * Validates that offsets are in ascending order and consistent.
+   * Useful for debugging to detect internal corruption.
+   * @return `true` if offsets are consistent, `false` otherwise.
    */
   [[nodiscard]] constexpr bool check_offset_consistency() const noexcept;
 
   /**
-   * Converts a url_components to JSON stringified version.
+   * Returns a JSON string representation of the offsets for debugging.
+   * @return A JSON-formatted string with all offset values.
    */
   [[nodiscard]] std::string to_string() const;
 
@@ -4637,51 +4958,49 @@ struct url_aggregator;
 // }
 
 /**
- * @brief Generic URL struct reliant on std::string instantiation.
+ * @brief Represents a parsed URL with individual string components.
  *
- * @details To disambiguate from a valid URL string it can also be referred to
- * as a URL record. A URL is a struct that represents a universal identifier.
- * Unlike the url_aggregator, the ada::url represents the different components
- * of a parsed URL as independent std::string instances. This makes the
- * structure heavier and more reliant on memory allocations. When getting
- * components from the parsed URL, a new std::string is typically constructed.
+ * The `url` struct stores each URL component (scheme, username, password,
+ * host, port, path, query, fragment) as a separate `std::string`. This
+ * provides flexibility but incurs more memory allocations compared to
+ * `url_aggregator`.
  *
+ * **When to use `ada::url`:**
+ * - When you need to frequently modify individual URL components
+ * - When you want independent ownership of component strings
+ *
+ * **When to use `ada::url_aggregator` instead:**
+ * - For read-mostly operations on parsed URLs
+ * - When memory efficiency is important
+ * - When you only need string_view access to components
+ *
+ * @note This type is returned when parsing with `ada::parse<ada::url>()`.
+ *       By default, `ada::parse()` returns `ada::url_aggregator`.
+ *
+ * @see url_aggregator For a more memory-efficient URL representation
  * @see https://url.spec.whatwg.org/#url-representation
  */
 struct url : url_base {
   url() = default;
-  url(const url &u) = default;
-  url(url &&u) noexcept = default;
-  url &operator=(url &&u) noexcept = default;
-  url &operator=(const url &u) = default;
+  url(const url& u) = default;
+  url(url&& u) noexcept = default;
+  url& operator=(url&& u) noexcept = default;
+  url& operator=(const url& u) = default;
   ~url() override = default;
 
-  /**
-   * @private
-   * A URL's username is an ASCII string identifying a username. It is initially
-   * the empty string.
-   */
-  std::string username{};
-
-  /**
-   * @private
-   * A URL's password is an ASCII string identifying a password. It is initially
-   * the empty string.
-   */
-  std::string password{};
+  // Fields are ordered so that the most frequently accessed components
+  // tend to occupy earlier cache lines and remain close together in memory.
+  //
+  // Note: The exact object layout (including cache-line boundaries, byte
+  // offsets, and member sizes) is implementation- and platform-dependent.
+  // This ordering expresses an intent for better cache locality but does not
+  // guarantee any specific in-memory layout.
 
   /**
    * @private
    * A URL's host is null or a host. It is initially null.
    */
   std::optional<std::string> host{};
-
-  /**
-   * @private
-   * A URL's port is either null or a 16-bit unsigned integer that identifies a
-   * networking port. It is initially null.
-   */
-  std::optional<uint16_t> port{};
 
   /**
    * @private
@@ -4704,177 +5023,244 @@ struct url : url_base {
    */
   std::optional<std::string> hash{};
 
-  /** @return true if it has an host but it is the empty string */
+  /**
+   * @private
+   * A URL's port is either null or a 16-bit unsigned integer that identifies a
+   * networking port. It is initially null.
+   */
+  std::optional<uint16_t> port{};
+
+  /**
+   * @private
+   * A URL's username is an ASCII string identifying a username. It is initially
+   * the empty string.
+   */
+  std::string username{};
+
+  /**
+   * @private
+   * A URL's password is an ASCII string identifying a password. It is initially
+   * the empty string.
+   */
+  std::string password{};
+
+  /**
+   * Checks if the URL has an empty hostname (host is set but empty string).
+   * @return `true` if host exists but is empty, `false` otherwise.
+   */
   [[nodiscard]] inline bool has_empty_hostname() const noexcept;
-  /** @return true if the URL has a (non default) port */
+
+  /**
+   * Checks if the URL has a non-default port explicitly specified.
+   * @return `true` if a port is present, `false` otherwise.
+   */
   [[nodiscard]] inline bool has_port() const noexcept;
-  /** @return true if it has a host (included an empty host) */
+
+  /**
+   * Checks if the URL has a hostname (including empty hostnames).
+   * @return `true` if host is present, `false` otherwise.
+   */
   [[nodiscard]] inline bool has_hostname() const noexcept;
+
+  /**
+   * Validates whether the hostname is a valid domain according to RFC 1034.
+   * Checks that the domain and its labels have valid lengths (max 255 octets
+   * total, max 63 octets per label).
+   * @return `true` if the domain is valid, `false` otherwise.
+   */
   [[nodiscard]] bool has_valid_domain() const noexcept override;
 
   /**
-   * Returns a JSON string representation of this URL.
+   * Returns a JSON string representation of this URL for debugging.
+   * @return A JSON-formatted string with all URL components.
    */
   [[nodiscard]] std::string to_string() const override;
 
   /**
+   * Returns the full serialized URL (the href).
+   * @return The complete URL string (allocates a new string).
    * @see https://url.spec.whatwg.org/#dom-url-href
-   * @see https://url.spec.whatwg.org/#concept-url-serializer
    */
-  [[nodiscard]] ada_really_inline std::string get_href() const noexcept;
+  [[nodiscard]] ada_really_inline std::string get_href() const;
 
   /**
-   * The origin getter steps are to return the serialization of this's URL's
-   * origin. [HTML]
-   * @return a newly allocated string.
+   * Returns the byte length of the serialized URL without allocating a string.
+   * @return Size of the href in bytes.
+   */
+  [[nodiscard]] size_t get_href_size() const noexcept;
+
+  /**
+   * Returns the URL's origin as a string (scheme + host + port for special
+   * URLs).
+   * @return A newly allocated string containing the serialized origin.
    * @see https://url.spec.whatwg.org/#concept-url-origin
    */
-  [[nodiscard]] std::string get_origin() const noexcept override;
+  [[nodiscard]] std::string get_origin() const override;
 
   /**
-   * The protocol getter steps are to return this's URL's scheme, followed by
-   * U+003A (:).
-   * @return a newly allocated string.
+   * Returns the URL's scheme followed by a colon (e.g., "https:").
+   * @return A newly allocated string with the protocol.
    * @see https://url.spec.whatwg.org/#dom-url-protocol
    */
-  [[nodiscard]] std::string get_protocol() const noexcept;
+  [[nodiscard]] std::string get_protocol() const;
 
   /**
-   * Return url's host, serialized, followed by U+003A (:) and url's port,
-   * serialized.
-   * When there is no host, this function returns the empty string.
-   * @return a newly allocated string.
+   * Returns the URL's host and port (e.g., "example.com:8080").
+   * If no port is set, returns just the host. Returns empty string if no host.
+   * @return A newly allocated string with host:port.
    * @see https://url.spec.whatwg.org/#dom-url-host
    */
-  [[nodiscard]] std::string get_host() const noexcept;
+  [[nodiscard]] std::string get_host() const;
 
   /**
-   * Return this's URL's host, serialized.
-   * When there is no host, this function returns the empty string.
-   * @return a newly allocated string.
+   * Returns the URL's hostname (without port).
+   * Returns empty string if no host is set.
+   * @return A newly allocated string with the hostname.
    * @see https://url.spec.whatwg.org/#dom-url-hostname
    */
-  [[nodiscard]] std::string get_hostname() const noexcept;
+  [[nodiscard]] std::string get_hostname() const;
 
   /**
-   * The pathname getter steps are to return the result of URL path serializing
-   * this's URL.
-   * @return a newly allocated string.
+   * Returns the URL's path component.
+   * @return A string_view pointing to the path.
    * @see https://url.spec.whatwg.org/#dom-url-pathname
    */
   [[nodiscard]] constexpr std::string_view get_pathname() const noexcept;
 
   /**
-   * Compute the pathname length in bytes without instantiating a view or a
-   * string.
-   * @return size of the pathname in bytes
+   * Returns the byte length of the pathname without creating a string.
+   * @return Size of the pathname in bytes.
    * @see https://url.spec.whatwg.org/#dom-url-pathname
    */
   [[nodiscard]] ada_really_inline size_t get_pathname_length() const noexcept;
 
   /**
-   * Return U+003F (?), followed by this's URL's query.
-   * @return a newly allocated string.
+   * Returns the URL's query string prefixed with '?' (e.g., "?foo=bar").
+   * Returns empty string if no query is set.
+   * @return A newly allocated string with the search/query.
    * @see https://url.spec.whatwg.org/#dom-url-search
    */
-  [[nodiscard]] std::string get_search() const noexcept;
+  [[nodiscard]] std::string get_search() const;
 
   /**
-   * The username getter steps are to return this's URL's username.
-   * @return a constant reference to the underlying string.
+   * Returns the URL's username component.
+   * @return A constant reference to the username string.
    * @see https://url.spec.whatwg.org/#dom-url-username
    */
-  [[nodiscard]] const std::string &get_username() const noexcept;
+  [[nodiscard]] const std::string& get_username() const noexcept;
 
   /**
-   * @return Returns true on successful operation.
+   * Sets the URL's username, percent-encoding special characters.
+   * @param input The new username value.
+   * @return `true` on success, `false` if the URL cannot have credentials.
    * @see https://url.spec.whatwg.org/#dom-url-username
    */
   bool set_username(std::string_view input);
 
   /**
-   * @return Returns true on success.
+   * Sets the URL's password, percent-encoding special characters.
+   * @param input The new password value.
+   * @return `true` on success, `false` if the URL cannot have credentials.
    * @see https://url.spec.whatwg.org/#dom-url-password
    */
   bool set_password(std::string_view input);
 
   /**
-   * @return Returns true on success.
+   * Sets the URL's port from a string (e.g., "8080").
+   * @param input The port string. Empty string removes the port.
+   * @return `true` on success, `false` if the URL cannot have a port.
    * @see https://url.spec.whatwg.org/#dom-url-port
    */
   bool set_port(std::string_view input);
 
   /**
-   * This function always succeeds.
+   * Sets the URL's fragment/hash (the part after '#').
+   * @param input The new hash value (with or without leading '#').
    * @see https://url.spec.whatwg.org/#dom-url-hash
    */
   void set_hash(std::string_view input);
 
   /**
-   * This function always succeeds.
+   * Sets the URL's query string (the part after '?').
+   * @param input The new query value (with or without leading '?').
    * @see https://url.spec.whatwg.org/#dom-url-search
    */
   void set_search(std::string_view input);
 
   /**
-   * @return Returns true on success.
-   * @see https://url.spec.whatwg.org/#dom-url-search
+   * Sets the URL's pathname.
+   * @param input The new path value.
+   * @return `true` on success, `false` if the URL has an opaque path.
+   * @see https://url.spec.whatwg.org/#dom-url-pathname
    */
   bool set_pathname(std::string_view input);
 
   /**
-   * @return Returns true on success.
+   * Sets the URL's host (hostname and optionally port).
+   * @param input The new host value (e.g., "example.com:8080").
+   * @return `true` on success, `false` if parsing fails.
    * @see https://url.spec.whatwg.org/#dom-url-host
    */
   bool set_host(std::string_view input);
 
   /**
-   * @return Returns true on success.
+   * Sets the URL's hostname (without port).
+   * @param input The new hostname value.
+   * @return `true` on success, `false` if parsing fails.
    * @see https://url.spec.whatwg.org/#dom-url-hostname
    */
   bool set_hostname(std::string_view input);
 
   /**
-   * @return Returns true on success.
+   * Sets the URL's protocol/scheme.
+   * @param input The new protocol (with or without trailing ':').
+   * @return `true` on success, `false` if the scheme is invalid.
    * @see https://url.spec.whatwg.org/#dom-url-protocol
    */
   bool set_protocol(std::string_view input);
 
   /**
+   * Replaces the entire URL by parsing a new href string.
+   * @param input The new URL string to parse.
+   * @return `true` on success, `false` if parsing fails.
    * @see https://url.spec.whatwg.org/#dom-url-href
    */
   bool set_href(std::string_view input);
 
   /**
-   * The password getter steps are to return this's URL's password.
-   * @return a constant reference to the underlying string.
+   * Returns the URL's password component.
+   * @return A constant reference to the password string.
    * @see https://url.spec.whatwg.org/#dom-url-password
    */
-  [[nodiscard]] const std::string &get_password() const noexcept;
+  [[nodiscard]] const std::string& get_password() const noexcept;
 
   /**
-   * Return this's URL's port, serialized.
-   * @return a newly constructed string representing the port.
+   * Returns the URL's port as a string (e.g., "8080").
+   * Returns empty string if no port is set.
+   * @return A newly allocated string with the port.
    * @see https://url.spec.whatwg.org/#dom-url-port
    */
-  [[nodiscard]] std::string get_port() const noexcept;
+  [[nodiscard]] std::string get_port() const;
 
   /**
-   * Return U+0023 (#), followed by this's URL's fragment.
-   * @return a newly constructed string representing the hash.
+   * Returns the URL's fragment prefixed with '#' (e.g., "#section").
+   * Returns empty string if no fragment is set.
+   * @return A newly allocated string with the hash.
    * @see https://url.spec.whatwg.org/#dom-url-hash
    */
-  [[nodiscard]] std::string get_hash() const noexcept;
+  [[nodiscard]] std::string get_hash() const;
 
   /**
-   * A URL includes credentials if its username or password is not the empty
-   * string.
+   * Checks if the URL has credentials (non-empty username or password).
+   * @return `true` if username or password is non-empty, `false` otherwise.
    */
   [[nodiscard]] ada_really_inline bool has_credentials() const noexcept;
 
   /**
-   * Useful for implementing efficient serialization for the URL.
+   * Returns the URL component offsets for efficient serialization.
    *
+   * The components represent byte offsets into the serialized URL:
+   * ```
    * https://user:pass@example.com:1234/foo/bar?baz#quux
    *       |     |    |          | ^^^^|       |   |
    *       |     |    |          | |   |       |   `----- hash_start
@@ -4885,39 +5271,47 @@ struct url : url_base {
    *       |     |    `---------------------------------- host_start
    *       |     `--------------------------------------- username_end
    *       `--------------------------------------------- protocol_end
-   *
-   * Inspired after servo/url
-   *
-   * @return a newly constructed component.
-   *
-   * @see
-   * https://github.com/servo/rust-url/blob/b65a45515c10713f6d212e6726719a020203cc98/url/src/quirks.rs#L31
+   * ```
+   * @return A newly constructed url_components struct.
+   * @see https://github.com/servo/rust-url
    */
-  [[nodiscard]] ada_really_inline ada::url_components get_components()
-      const noexcept;
-  /** @return true if the URL has a hash component */
+  [[nodiscard]] ada_really_inline ada::url_components get_components() const;
+
+  /**
+   * Checks if the URL has a fragment/hash component.
+   * @return `true` if hash is present, `false` otherwise.
+   */
   [[nodiscard]] constexpr bool has_hash() const noexcept override;
-  /** @return true if the URL has a search component */
+
+  /**
+   * Checks if the URL has a query/search component.
+   * @return `true` if query is present, `false` otherwise.
+   */
   [[nodiscard]] constexpr bool has_search() const noexcept override;
 
  private:
   friend ada::url ada::parser::parse_url<ada::url>(std::string_view,
-                                                   const ada::url *);
+                                                   const ada::url*);
   friend ada::url_aggregator ada::parser::parse_url<ada::url_aggregator>(
-      std::string_view, const ada::url_aggregator *);
+      std::string_view, const ada::url_aggregator*);
   friend void ada::helpers::strip_trailing_spaces_from_opaque_path<ada::url>(
-      ada::url &url) noexcept;
+      ada::url& url);
 
   friend ada::url ada::parser::parse_url_impl<ada::url, true>(std::string_view,
-                                                              const ada::url *);
+                                                              const ada::url*);
   friend ada::url_aggregator ada::parser::parse_url_impl<
-      ada::url_aggregator, true>(std::string_view, const ada::url_aggregator *);
+      ada::url_aggregator, true>(std::string_view, const ada::url_aggregator*);
+  friend ada::url_aggregator ada::parser::parse_url_impl<
+      ada::url_aggregator, false>(std::string_view, const ada::url_aggregator*);
+  template <class result_type>
+  friend bool ada::parser::try_parse_simple_absolute(std::string_view,
+                                                     result_type&);
 
   inline void update_unencoded_base_hash(std::string_view input);
   inline void update_base_hostname(std::string_view input);
   inline void update_base_search(std::string_view input,
                                  const uint8_t query_percent_encode_set[]);
-  inline void update_base_search(std::optional<std::string> &&input);
+  inline void update_base_search(std::optional<std::string>&& input);
   inline void update_base_pathname(std::string_view input);
   inline void update_base_username(std::string_view input);
   inline void update_base_password(std::string_view input);
@@ -5007,23 +5401,23 @@ struct url : url_base {
    * scheme string, be lower-cased, not contain spaces or tabs. It should
    * have no spurious trailing or leading content.
    */
-  inline void set_scheme(std::string &&new_scheme) noexcept;
+  inline void set_scheme(std::string&& new_scheme) noexcept;
 
   /**
    * Take the scheme from another URL. The scheme string is moved from the
    * provided url.
    */
-  constexpr void copy_scheme(ada::url &&u) noexcept;
+  constexpr void copy_scheme(ada::url&& u);
 
   /**
    * Take the scheme from another URL. The scheme string is copied from the
    * provided url.
    */
-  constexpr void copy_scheme(const ada::url &u);
+  constexpr void copy_scheme(const ada::url& u);
 
 };  // struct url
 
-inline std::ostream &operator<<(std::ostream &out, const ada::url &u);
+inline std::ostream& operator<<(std::ostream& out, const ada::url& u);
 }  // namespace ada
 
 #endif  // ADA_URL_H
@@ -5031,17 +5425,75 @@ inline std::ostream &operator<<(std::ostream &out, const ada::url &u);
 
 namespace ada {
 
+/**
+ * Result type for URL parsing operations.
+ *
+ * Uses `tl::expected` to represent either a successfully parsed URL or an
+ * error. This allows for exception-free error handling.
+ *
+ * @tparam result_type The URL type to return (default: `ada::url_aggregator`)
+ *
+ * @example
+ * ```cpp
+ * ada::result<ada::url_aggregator> result = ada::parse("https://example.com");
+ * if (result) {
+ *     // Success: use result.value() or *result
+ * } else {
+ *     // Error: handle result.error()
+ * }
+ * ```
+ */
 template <class result_type = ada::url_aggregator>
 using result = tl::expected<result_type, ada::errors>;
 
 /**
- * The URL parser takes a scalar value string input, with an optional null or
- * base URL base (default null). The parser assumes the input is a valid ASCII
- * or UTF-8 string.
+ * Parses a URL string according to the WHATWG URL Standard.
  *
- * @param input the string input to analyze (must be valid ASCII or UTF-8)
- * @param base_url the optional URL input to use as a base url.
- * @return a parsed URL.
+ * This is the main entry point for URL parsing in Ada. The function takes
+ * a string input and optionally a base URL for resolving relative URLs.
+ *
+ * @tparam result_type The URL type to return. Can be either `ada::url` or
+ *         `ada::url_aggregator` (default). The `url_aggregator` type is more
+ *         memory-efficient as it stores components as offsets into a single
+ *         buffer.
+ *
+ * @param input The URL string to parse. Must be valid ASCII or UTF-8 encoded.
+ *        Leading and trailing whitespace is automatically trimmed.
+ * @param base_url Optional pointer to a base URL for resolving relative URLs.
+ *        If nullptr (default), only absolute URLs can be parsed successfully.
+ *
+ * @return A `result<result_type>` containing either the parsed URL on success,
+ *         or an error code on failure. Use the boolean conversion or
+ *         `has_value()` to check for success.
+ *
+ * @note The parser is fully compliant with the WHATWG URL Standard.
+ *
+ * Parsing fails if the input or the resulting normalized URL exceeds
+ * `get_max_input_length()` bytes (default ~4 GB, configurable via
+ * `set_max_input_length()`). This accounts for percent-encoding expansion:
+ * a short input that normalizes into a long URL is still rejected.
+ *
+ * @example
+ * ```cpp
+ * // Parse an absolute URL
+ * auto url = ada::parse("https://user:pass@example.com:8080/path?query#hash");
+ * if (url) {
+ *     std::cout << url->get_hostname(); // "example.com"
+ *     std::cout << url->get_pathname(); // "/path"
+ * }
+ *
+ * // Parse a relative URL with a base
+ * auto base = ada::parse("https://example.com/dir/");
+ * if (base) {
+ *     auto relative = ada::parse("../other/page", &*base);
+ *     if (relative) {
+ *         std::cout << relative->get_href(); //
+ * "https://example.com/other/page"
+ *     }
+ * }
+ * ```
+ *
+ * @see https://url.spec.whatwg.org/#url-parsing
  */
 template <class result_type = ada::url_aggregator>
 ada_warn_unused ada::result<result_type> parse(
@@ -5053,23 +5505,39 @@ extern template ada::result<url_aggregator> parse<url_aggregator>(
     std::string_view input, const url_aggregator* base_url);
 
 /**
- * Verifies whether the URL strings can be parsed. The function assumes
- * that the inputs are valid ASCII or UTF-8 strings.
+ * Checks whether a URL string can be successfully parsed.
+ *
+ * Equivalent to `parse(input, base).has_value()` for every input, including
+ * when `set_max_input_length` rejects a normalized href that exceeds the limit.
+ *
+ * @param input The URL string to validate. Must be valid ASCII or UTF-8.
+ * @param base_input Optional base URL string for relative inputs.
+ * @return `true` if parsing would succeed, `false` otherwise.
  * @see https://url.spec.whatwg.org/#dom-url-canparse
- * @return If URL can be parsed or not.
  */
 bool can_parse(std::string_view input,
                const std::string_view* base_input = nullptr);
 
 #if ADA_INCLUDE_URL_PATTERN
 /**
- * Implementation of the URL pattern parsing algorithm.
- * @see https://urlpattern.spec.whatwg.org
+ * Parses a URL pattern according to the URLPattern specification.
  *
- * @param input valid UTF-8 string or URLPatternInit struct
- * @param base_url an optional valid UTF-8 string
- * @param options an optional url_pattern_options struct
- * @return url_pattern instance
+ * URL patterns provide a syntax for matching URLs against patterns, similar
+ * to how regular expressions match strings. This is useful for routing and
+ * URL-based dispatching.
+ *
+ * @tparam regex_provider The regex implementation to use for pattern matching.
+ *
+ * @param input Either a URL pattern string (valid UTF-8) or a URLPatternInit
+ *        struct specifying individual component patterns.
+ * @param base_url Optional pointer to a base URL string (valid UTF-8) for
+ *        resolving relative patterns.
+ * @param options Optional pointer to configuration options (e.g., ignore_case).
+ *
+ * @return A `tl::expected` containing either the parsed url_pattern on success,
+ *         or an error code on failure.
+ *
+ * @see https://urlpattern.spec.whatwg.org
  */
 template <url_pattern_regex::regex_concept regex_provider>
 ada_warn_unused tl::expected<url_pattern<regex_provider>, errors>
@@ -5079,11 +5547,42 @@ parse_url_pattern(std::variant<std::string_view, url_pattern_init>&& input,
 #endif  // ADA_INCLUDE_URL_PATTERN
 
 /**
- * Computes a href string from a file path. The function assumes
- * that the input is a valid ASCII or UTF-8 string.
- * @return a href string (starts with file:://)
+ * Converts a file system path to a file:// URL.
+ *
+ * Creates a properly formatted file URL from a local file system path.
+ * Handles platform-specific path separators and percent-encoding.
+ *
+ * Respects `get_max_input_length()`: if the input path or the resulting
+ * `file://` href would exceed the limit, returns an empty string.
+ *
+ * @param path The file system path to convert. Must be valid ASCII or UTF-8.
+ *
+ * @return A file:// URL string representing the given path, or empty on
+ *         length-limit rejection.
  */
 std::string href_from_file(std::string_view path);
+
+/**
+ * Sets the maximum allowed length for URLs.
+ *
+ * Both the raw input and the resulting normalized URL (the href) are checked
+ * against this limit. Parsing or setter calls that would produce a URL
+ * exceeding this length are rejected. The same limit also applies to
+ * `href_from_file` and to query strings passed to `url_search_params`
+ * construction / `reset`. The value must fit in a uint32_t.
+ * The default is std::numeric_limits<uint32_t>::max() (approximately 4 GB).
+ *
+ * @param length The new maximum URL length in bytes.
+ */
+void set_max_input_length(uint32_t length);
+
+/**
+ * Returns the current maximum allowed length for URLs.
+ *
+ * @return The current maximum URL length in bytes.
+ */
+uint32_t get_max_input_length();
+
 }  // namespace ada
 
 #endif  // ADA_IMPLEMENTATION_H
@@ -5115,6 +5614,19 @@ enum class url_pattern_part_type : uint8_t {
   // The part represents a matching group that greedily matches all code points.
   // This is typically used for the "*" wildcard matching group.
   FULL_WILDCARD,
+};
+
+// Pattern type for fast-path matching optimization.
+// This allows skipping expensive regex evaluation for common simple patterns.
+enum class url_pattern_component_type : uint8_t {
+  // Pattern is "^$" - only matches empty string
+  EMPTY,
+  // Pattern is "^<literal>$" - exact string match (no regex needed)
+  EXACT_MATCH,
+  // Pattern is "^(.*)$" - matches anything (full wildcard)
+  FULL_WILDCARD,
+  // Pattern requires actual regex evaluation
+  REGEXP,
 };
 
 enum class url_pattern_part_modifier : uint8_t {
@@ -5168,7 +5680,7 @@ struct url_pattern_compile_component_options {
   url_pattern_compile_component_options() = default;
   explicit url_pattern_compile_component_options(
       std::optional<char> new_delimiter = std::nullopt,
-      std::optional<char> new_prefix = std::nullopt)
+      std::optional<char> new_prefix = std::nullopt) noexcept
       : delimiter(new_delimiter), prefix(new_prefix) {}
 
   inline std::string_view get_delimiter() const ada_warn_unused;
@@ -5236,11 +5748,15 @@ class url_pattern_component {
   url_pattern_component(std::string&& new_pattern,
                         typename regex_provider::regex_type&& new_regexp,
                         std::vector<std::string>&& new_group_name_list,
-                        bool new_has_regexp_groups)
+                        bool new_has_regexp_groups,
+                        url_pattern_component_type new_type,
+                        std::string&& new_exact_match_value = {})
       : regexp(std::move(new_regexp)),
         pattern(std::move(new_pattern)),
         group_name_list(std::move(new_group_name_list)),
-        has_regexp_groups(new_has_regexp_groups) {}
+        exact_match_value(std::move(new_exact_match_value)),
+        has_regexp_groups(new_has_regexp_groups),
+        type(new_type) {}
 
   // @see https://urlpattern.spec.whatwg.org/#compile-a-component
   template <url_pattern_encoding_callback F>
@@ -5252,6 +5768,16 @@ class url_pattern_component {
   url_pattern_component_result create_component_match_result(
       std::string&& input,
       std::vector<std::optional<std::string>>&& exec_result);
+
+  // Fast path test that returns true/false without constructing result groups.
+  // Uses cached pattern type to skip regex evaluation for simple patterns.
+  bool fast_test(std::string_view input) const noexcept;
+
+  // Fast path match that returns capture groups without regex for simple
+  // patterns. Returns nullopt if pattern doesn't match, otherwise returns
+  // capture groups.
+  std::optional<std::vector<std::optional<std::string>>> fast_match(
+      std::string_view input) const;
 
 #if ADA_TESTING
   friend void PrintTo(const url_pattern_component& component,
@@ -5268,7 +5794,11 @@ class url_pattern_component {
   typename regex_provider::regex_type regexp{};
   std::string pattern{};
   std::vector<std::string> group_name_list{};
+  // For EXACT_MATCH type: the literal string to compare against
+  std::string exact_match_value{};
   bool has_regexp_groups = false;
+  // Cached pattern type for fast-path optimization
+  url_pattern_component_type type = url_pattern_component_type::REGEXP;
 };
 
 // A URLPattern input can be either a string or a URLPatternInit object.
@@ -5300,14 +5830,28 @@ struct url_pattern_options {
 #endif  // ADA_TESTING
 };
 
-// URLPattern is a Web Platform standard API for matching URLs against a
-// pattern syntax (think of it as a regular expression for URLs). It is
-// defined in https://wicg.github.io/urlpattern.
-// More information about the URL Pattern syntax can be found at
-// https://developer.mozilla.org/en-US/docs/Web/API/URL_Pattern_API
-//
-// We require all strings to be valid UTF-8: it is the user's responsibility
-// to ensure that the provided strings are valid UTF-8.
+/**
+ * @brief URL pattern matching class implementing the URLPattern API.
+ *
+ * URLPattern provides a way to match URLs against patterns with wildcards
+ * and named capture groups. It's useful for routing, URL-based dispatching,
+ * and URL validation.
+ *
+ * Pattern syntax supports:
+ * - Literal text matching
+ * - Named groups: `:name` (matches up to the next separator)
+ * - Wildcards: `*` (matches everything)
+ * - Custom regex: `(pattern)`
+ * - Optional segments: `:name?`
+ * - Repeated segments: `:name+`, `:name*`
+ *
+ * @tparam regex_provider The regex implementation to use for pattern matching.
+ *         Must satisfy the url_pattern_regex::regex_concept.
+ *
+ * @note All string inputs must be valid UTF-8.
+ *
+ * @see https://urlpattern.spec.whatwg.org/
+ */
 template <url_pattern_regex::regex_concept regex_provider>
 class url_pattern {
  public:
@@ -5359,6 +5903,13 @@ class url_pattern {
 
   // @see https://urlpattern.spec.whatwg.org/#url-pattern-has-regexp-groups
   [[nodiscard]] bool has_regexp_groups() const;
+
+  // Helper to test all components at once. Returns true if all match.
+  [[nodiscard]] bool test_components(
+      std::string_view protocol, std::string_view username,
+      std::string_view password, std::string_view hostname,
+      std::string_view port, std::string_view pathname, std::string_view search,
+      std::string_view hash) const;
 
 #if ADA_TESTING
   friend void PrintTo(const url_pattern& c, std::ostream* os) {
@@ -5484,8 +6035,8 @@ enum class token_policy {
 // @see https://urlpattern.spec.whatwg.org/#tokens
 class token {
  public:
-  token(token_type _type, size_t _index, std::string&& _value)
-      : type(_type), index(_index), value(std::move(_value)) {}
+  token(token_type _type, size_t _index, std::string_view _value)
+      : type(_type), index(_index), value(_value) {}
 
   // A token has an associated type, a string, initially "invalid-char".
   token_type type = token_type::INVALID_CHAR;
@@ -5496,7 +6047,7 @@ class token {
 
   // A token has an associated value, a string, initially the empty string. It
   // contains the code points from the pattern string represented by the token.
-  std::string value{};
+  std::string_view value{};
 };
 
 // @see https://urlpattern.spec.whatwg.org/#pattern-parser
@@ -5549,6 +6100,9 @@ class Tokenizer {
   // @see https://urlpattern.spec.whatwg.org/#get-the-next-code-point
   constexpr void get_next_code_point();
 
+  // True when the most recent decoded unit was malformed UTF-8.
+  bool had_invalid_code_point() const { return invalid_code_point; }
+
   // @see https://urlpattern.spec.whatwg.org/#seek-and-get-the-next-code-point
   constexpr void seek_and_get_next_code_point(size_t index);
 
@@ -5574,7 +6128,7 @@ class Tokenizer {
 
  private:
   // has an associated input, a pattern string, initially the empty string.
-  std::string input;
+  std::string_view input;
   // has an associated policy, a tokenize policy, initially "strict".
   token_policy policy;
   // has an associated token list, a token list, initially an empty list.
@@ -5585,6 +6139,8 @@ class Tokenizer {
   size_t next_index = 0;
   // has an associated code point, a Unicode code point, initially null.
   char32_t code_point{};
+  // Tracks whether the last decoded code point was malformed UTF-8.
+  bool invalid_code_point = false;
 };
 
 // @see https://urlpattern.spec.whatwg.org/#constructor-string-parser
@@ -5668,7 +6224,7 @@ struct constructor_string_parser {
   // @see https://urlpattern.spec.whatwg.org/#make-a-component-string
   std::string make_component_string();
   // has an associated input, a string, which must be set upon creation.
-  std::string input;
+  std::string_view input;
   // has an associated token list, a token list, which must be set upon
   // creation.
   std::vector<token> token_list;
@@ -5775,7 +6331,7 @@ bool protocol_component_matches_special_scheme(
     ada::url_pattern_component<regex_provider>& input);
 
 // @see https://urlpattern.spec.whatwg.org/#convert-a-modifier-to-a-string
-std::string convert_modifier_to_string(url_pattern_part_modifier modifier);
+std::string_view convert_modifier_to_string(url_pattern_part_modifier modifier);
 
 // @see https://urlpattern.spec.whatwg.org/#generate-a-segment-wildcard-regexp
 std::string generate_segment_wildcard_regexp(
@@ -6072,6 +6628,39 @@ constexpr std::string_view is_special_list[] = {"http", " ",   "https", "ws",
                                                 "ftp",  "wss", "file",  " "};
 // for use with get_special_port
 constexpr uint16_t special_ports[] = {80, 0, 443, 80, 21, 443, 0, 0};
+
+// @private
+// convert a string_view to a 64-bit integer key for fast comparison
+constexpr uint64_t make_key(std::string_view sv) {
+  uint64_t val = 0;
+  for (size_t i = 0; i < sv.size(); i++)
+    val |= (uint64_t)(uint8_t)sv[i] << (i * 8);
+  return val;
+}
+// precomputed keys for the special schemes, indexed by a hash of the input
+// string
+constexpr uint64_t scheme_keys[] = {
+    make_key("http"),   // 0: HTTP
+    0,                  // 1: sentinel
+    make_key("https"),  // 2: HTTPS
+    make_key("ws"),     // 3: WS
+    make_key("ftp"),    // 4: FTP
+    make_key("wss"),    // 5: WSS
+    make_key("file"),   // 6: FILE
+    0,                  // 7: sentinel
+};
+
+// @private
+// branchless load of up to 5 characters into a uint64_t, padding with zeros if
+// n < 5
+inline uint64_t branchless_load5(const char* p, size_t n) {
+  uint64_t input = (uint8_t)p[0];
+  input |= ((uint64_t)(uint8_t)p[n > 1] << 8) & (0 - (uint64_t)(n > 1));
+  input |= ((uint64_t)(uint8_t)p[(n > 2) * 2] << 16) & (0 - (uint64_t)(n > 2));
+  input |= ((uint64_t)(uint8_t)p[(n > 3) * 3] << 24) & (0 - (uint64_t)(n > 3));
+  input |= ((uint64_t)(uint8_t)p[(n > 4) * 4] << 32) & (0 - (uint64_t)(n > 4));
+  return input;
+}
 }  // namespace details
 
 /****
@@ -6112,7 +6701,9 @@ constexpr uint16_t get_special_port(std::string_view scheme) noexcept {
   }
   int hash_value = (2 * scheme.size() + (unsigned)(scheme[0])) & 7;
   const std::string_view target = details::is_special_list[hash_value];
-  if ((target[0] == scheme[0]) && (target.substr(1) == scheme.substr(1))) {
+  if (scheme.size() == target.size() &&
+      details::branchless_load5(scheme.data(), scheme.size()) ==
+          details::scheme_keys[hash_value]) {
     return details::special_ports[hash_value];
   } else {
     return 0;
@@ -6127,7 +6718,9 @@ constexpr ada::scheme::type get_scheme_type(std::string_view scheme) noexcept {
   }
   int hash_value = (2 * scheme.size() + (unsigned)(scheme[0])) & 7;
   const std::string_view target = details::is_special_list[hash_value];
-  if ((target[0] == scheme[0]) && (target.substr(1) == scheme.substr(1))) {
+  if (scheme.size() == target.size() &&
+      details::branchless_load5(scheme.data(), scheme.size()) ==
+          details::scheme_keys[hash_value]) {
     return ada::scheme::type(hash_value);
   } else {
     return ada::scheme::NOT_SPECIAL;
@@ -6141,7 +6734,10 @@ constexpr ada::scheme::type get_scheme_type(std::string_view scheme) noexcept {
 /* begin file include/ada/serializers.h */
 /**
  * @file serializers.h
- * @brief Definitions for the URL serializers.
+ * @brief IP address serialization utilities.
+ *
+ * This header provides functions for converting IP addresses to their
+ * string representations according to the WHATWG URL Standard.
  */
 #ifndef ADA_SERIALIZERS_H
 #define ADA_SERIALIZERS_H
@@ -6152,32 +6748,41 @@ constexpr ada::scheme::type get_scheme_type(std::string_view scheme) noexcept {
 
 /**
  * @namespace ada::serializers
- * @brief Includes the definitions for URL serializers
+ * @brief IP address serialization functions.
+ *
+ * Contains utilities for serializing IPv4 and IPv6 addresses to strings.
  */
 namespace ada::serializers {
 
 /**
- * Finds and returns the longest sequence of 0 values in a ipv6 input.
+ * Finds the longest consecutive sequence of zero pieces in an IPv6 address.
+ * Used for :: compression in IPv6 serialization.
+ *
+ * @param address The 8 16-bit pieces of the IPv6 address.
+ * @param[out] compress Index of the start of the longest zero sequence.
+ * @param[out] compress_length Length of the longest zero sequence.
  */
 void find_longest_sequence_of_ipv6_pieces(
     const std::array<uint16_t, 8>& address, size_t& compress,
     size_t& compress_length) noexcept;
 
 /**
- * Serializes an ipv6 address.
- * @details An IPv6 address is a 128-bit unsigned integer that identifies a
- * network address.
+ * Serializes an IPv6 address to its string representation.
+ *
+ * @param address The 8 16-bit pieces of the IPv6 address.
+ * @return The serialized IPv6 string (e.g., "2001:db8::1").
  * @see https://url.spec.whatwg.org/#concept-ipv6-serializer
  */
-std::string ipv6(const std::array<uint16_t, 8>& address) noexcept;
+std::string ipv6(const std::array<uint16_t, 8>& address);
 
 /**
- * Serializes an ipv4 address.
- * @details An IPv4 address is a 32-bit unsigned integer that identifies a
- * network address.
+ * Serializes an IPv4 address to its dotted-decimal string representation.
+ *
+ * @param address The 32-bit IPv4 address as an integer.
+ * @return The serialized IPv4 string (e.g., "192.168.1.1").
  * @see https://url.spec.whatwg.org/#concept-ipv4-serializer
  */
-std::string ipv4(uint64_t address) noexcept;
+std::string ipv4(uint64_t address);
 
 }  // namespace ada::serializers
 
@@ -6186,7 +6791,12 @@ std::string ipv4(uint64_t address) noexcept;
 /* begin file include/ada/state.h */
 /**
  * @file state.h
- * @brief Definitions for the states of the URL state machine.
+ * @brief URL parser state machine states.
+ *
+ * Defines the states used by the URL parsing state machine as specified
+ * in the WHATWG URL Standard.
+ *
+ * @see https://url.spec.whatwg.org/#url-parsing
  */
 #ifndef ADA_STATE_H
 #define ADA_STATE_H
@@ -6197,6 +6807,11 @@ std::string ipv4(uint64_t address) noexcept;
 namespace ada {
 
 /**
+ * @brief States in the URL parsing state machine.
+ *
+ * The URL parser processes input through a sequence of states, each handling
+ * a specific part of the URL syntax.
+ *
  * @see https://url.spec.whatwg.org/#url-parsing
  */
 enum class state {
@@ -6302,7 +6917,9 @@ enum class state {
 };
 
 /**
- * Stringify a URL state machine state.
+ * Converts a parser state to its string name for debugging.
+ * @param s The state to convert.
+ * @return A string representation of the state.
  */
 ada_warn_unused std::string to_string(ada::state s);
 
@@ -6509,6 +7126,16 @@ ada_really_inline unsigned constexpr convert_hex_to_binary(char c) noexcept;
 std::string percent_decode(std::string_view input, size_t first_percent);
 
 /**
+ * Decode an application/x-www-form-urlencoded component: map '+' to space,
+ * then percent-decode. Single allocation; no intermediate string.
+ *
+ * @param input A form-urlencoded component (key or value).
+ * @return The decoded string.
+ * @see https://url.spec.whatwg.org/#concept-urlencoded-parser
+ */
+std::string form_urlencoded_decode(std::string_view input);
+
+/**
  * @private
  * Returns a percent-encoding string whether percent encoding was needed or not.
  * @see https://github.com/nodejs/node/blob/main/src/node_url.cc#L226
@@ -6595,6 +7222,7 @@ url_base::scheme_default_port() const noexcept {
 
 
 #include <charconv>
+#include <cstring>
 #include <optional>
 #include <string>
 #if ADA_REGULAR_VISUAL_STUDIO
@@ -6609,19 +7237,18 @@ namespace ada {
   return port.has_value();
 }
 [[nodiscard]] inline bool url::cannot_have_credentials_or_port() const {
-  return !host.has_value() || host.value().empty() ||
-         type == ada::scheme::type::FILE;
+  return !host.has_value() || host->empty() || type == ada::scheme::type::FILE;
 }
 [[nodiscard]] inline bool url::has_empty_hostname() const noexcept {
   if (!host.has_value()) {
     return false;
   }
-  return host.value().empty();
+  return host->empty();
 }
 [[nodiscard]] inline bool url::has_hostname() const noexcept {
   return host.has_value();
 }
-inline std::ostream &operator<<(std::ostream &out, const ada::url &u) {
+inline std::ostream& operator<<(std::ostream& out, const ada::url& u) {
   return out << u.to_string();
 }
 
@@ -6634,7 +7261,7 @@ inline std::ostream &operator<<(std::ostream &out, const ada::url &u) {
 }
 
 [[nodiscard]] ada_really_inline ada::url_components url::get_components()
-    const noexcept {
+    const {
   url_components out{};
 
   // protocol ends with ':'. for example: "https:"
@@ -6657,12 +7284,12 @@ inline std::ostream &operator<<(std::ostream &out, const ada::url &u) {
         out.host_start += uint32_t(password.size() + 1);
       }
 
-      out.host_end = uint32_t(out.host_start + host.value().size());
+      out.host_end = uint32_t(out.host_start + host->size());
     } else {
       out.username_end = out.host_start;
 
       // Host does not start with "@" if it does not include credentials.
-      out.host_end = uint32_t(out.host_start + host.value().size()) - 1;
+      out.host_end = uint32_t(out.host_start + host->size()) - 1;
     }
 
     running_index = out.host_end + 1;
@@ -6719,7 +7346,7 @@ inline void url::update_base_search(std::string_view input,
   query = ada::unicode::percent_encode(input, query_percent_encode_set);
 }
 
-inline void url::update_base_search(std::optional<std::string> &&input) {
+inline void url::update_base_search(std::optional<std::string>&& input) {
   query = std::move(input);
 }
 
@@ -6753,7 +7380,7 @@ constexpr void url::clear_search() { query = std::nullopt; }
 
 constexpr void url::set_protocol_as_file() { type = ada::scheme::type::FILE; }
 
-inline void url::set_scheme(std::string &&new_scheme) noexcept {
+inline void url::set_scheme(std::string&& new_scheme) noexcept {
   type = ada::scheme::get_scheme_type(new_scheme);
   // We only move the 'scheme' if it is non-special.
   if (!is_special()) {
@@ -6761,46 +7388,140 @@ inline void url::set_scheme(std::string &&new_scheme) noexcept {
   }
 }
 
-constexpr void url::copy_scheme(ada::url &&u) noexcept {
+constexpr void url::copy_scheme(ada::url&& u) {
   non_special_scheme = u.non_special_scheme;
   type = u.type;
 }
 
-constexpr void url::copy_scheme(const ada::url &u) {
+constexpr void url::copy_scheme(const ada::url& u) {
   non_special_scheme = u.non_special_scheme;
   type = u.type;
 }
 
-[[nodiscard]] ada_really_inline std::string url::get_href() const noexcept {
-  std::string output = get_protocol();
+[[nodiscard]] ada_really_inline std::string url::get_href() const {
+  if (is_special() && host.has_value() && username.empty() &&
+      password.empty() && !port.has_value()) [[likely]] {
+    const std::string_view scheme = ada::scheme::details::is_special_list[type];
+    const size_t host_size = host->size();
+    const size_t path_size = path.size();
+    const size_t query_size = query.has_value() ? query->size() : 0;
+    const size_t hash_size = hash.has_value() ? hash->size() : 0;
+    const size_t total = scheme.size() + 3 + host_size + path_size +
+                         (query.has_value() ? query_size + 1 : 0) +
+                         (hash.has_value() ? hash_size + 1 : 0);
+    std::string output(total, '\0');
+    char* p = output.data();
+    std::memcpy(p, scheme.data(), scheme.size());
+    p += scheme.size();
+    p[0] = ':';
+    p[1] = '/';
+    p[2] = '/';
+    p += 3;
+    // NOLINTNEXTLINE(bugprone-not-null-terminated-result)
+    std::memcpy(p, host->data(), host_size);
+    p += host_size;
+    std::memcpy(p, path.data(), path_size);
+    p += path_size;
+    if (query.has_value()) {
+      *p++ = '?';
+      // NOLINTNEXTLINE(bugprone-not-null-terminated-result)
+      std::memcpy(p, query->data(), query_size);
+      p += query_size;
+    }
+    if (hash.has_value()) {
+      *p++ = '#';
+      // NOLINTNEXTLINE(bugprone-not-null-terminated-result)
+      std::memcpy(p, hash->data(), hash_size);
+    }
+    return output;
+  }
+
+  std::string output;
+  output.reserve(get_href_size());
+
+  if (is_special()) {
+    output.append(ada::scheme::details::is_special_list[type]);
+    output += ':';
+  } else {
+    output.append(non_special_scheme);
+    output += ':';
+  }
 
   if (host.has_value()) {
-    output += "//";
+    output += '/';
+    output += '/';
     if (has_credentials()) {
-      output += username;
+      output.append(username);
       if (!password.empty()) {
-        output += ":" + get_password();
+        output += ':';
+        output.append(password);
       }
-      output += "@";
+      output += '@';
     }
-    output += host.value();
+    output.append(*host);
     if (port.has_value()) {
-      output += ":" + get_port();
+      output += ':';
+      char port_buf[5];
+      auto [ptr, ec] = std::to_chars(port_buf, port_buf + 5, *port);
+      (void)ec;
+      output.append(port_buf, static_cast<size_t>(ptr - port_buf));
     }
   } else if (!has_opaque_path && path.starts_with("//")) {
     // If url's host is null, url does not have an opaque path, url's path's
     // size is greater than 1, and url's path[0] is the empty string, then
     // append U+002F (/) followed by U+002E (.) to output.
-    output += "/.";
+    output += '/';
+    output += '.';
   }
-  output += path;
+  output.append(path);
   if (query.has_value()) {
-    output += "?" + query.value();
+    output += '?';
+    output.append(*query);
   }
   if (hash.has_value()) {
-    output += "#" + hash.value();
+    output += '#';
+    output.append(*hash);
   }
   return output;
+}
+
+[[nodiscard]] inline size_t url::get_href_size() const noexcept {
+  size_t size = 0;
+  if (is_special()) {
+    size += ada::scheme::details::is_special_list[type].size() + 1;
+  } else {
+    size += non_special_scheme.size() + 1;
+  }
+  if (host.has_value()) {
+    size += host->size();
+    size += 2;
+    if (has_credentials()) {
+      size += username.size();
+      if (!password.empty()) {
+        size += 1 + password.size();
+      }
+      size += 1;
+    }
+    if (port.has_value()) {
+      size += 1;
+      uint16_t p = *port;
+      size += (p >= 10000)  ? 5
+              : (p >= 1000) ? 4
+              : (p >= 100)  ? 3
+              : (p >= 10)   ? 2
+                            : 1;
+    }
+  } else if (!has_opaque_path && path.starts_with("//")) {
+    size += 2;
+  }
+  size += path.size();
+  if (query.has_value()) {
+    size += 1 + query->size();
+  }
+  if (hash.has_value()) {
+    size += 1 + hash->size();
+  }
+  return size;
 }
 
 ada_really_inline size_t url::parse_port(std::string_view view,
@@ -6930,7 +7651,13 @@ namespace ada {
 /* begin file include/ada/url_aggregator.h */
 /**
  * @file url_aggregator.h
- * @brief Declaration for the basic URL definitions
+ * @brief Declaration for the `ada::url_aggregator` class.
+ *
+ * This file contains the `ada::url_aggregator` struct which represents a parsed
+ * URL using a single buffer with component offsets. This is the default and
+ * most memory-efficient URL representation in Ada.
+ *
+ * @see url.h for an alternative representation using separate strings
  */
 #ifndef ADA_URL_AGGREGATOR_H
 #define ADA_URL_AGGREGATOR_H
@@ -6946,21 +7673,51 @@ namespace ada {
 namespace parser {}
 
 /**
- * @brief Lightweight URL struct.
+ * @brief Memory-efficient URL representation using a single buffer.
  *
- * @details The url_aggregator class aims to minimize temporary memory
- * allocation while representing a parsed URL. Internally, it contains a single
- * normalized URL (the href), and it makes available the components, mostly
- * using std::string_view.
+ * The `url_aggregator` stores the entire normalized URL in a single string
+ * buffer and tracks component boundaries using offsets. This design minimizes
+ * memory allocations and is ideal for read-mostly access patterns.
+ *
+ * Getter methods return `std::string_view` pointing into the internal buffer.
+ * These views are lightweight (no allocation) but become invalid if the
+ * url_aggregator is modified or destroyed.
+ *
+ * @warning Views returned by getters (e.g., `get_pathname()`) are invalidated
+ * when any setter is called. Do not use a getter's result as input to a
+ * setter on the same object without copying first.
+ *
+ * @note This is the default URL type returned by `ada::parse()`.
+ *
+ * @see url For an alternative using separate std::string instances
  */
 struct url_aggregator : url_base {
   url_aggregator() = default;
-  url_aggregator(const url_aggregator &u) = default;
-  url_aggregator(url_aggregator &&u) noexcept = default;
-  url_aggregator &operator=(url_aggregator &&u) noexcept = default;
-  url_aggregator &operator=(const url_aggregator &u) = default;
+  url_aggregator(const url_aggregator& u) = default;
+  url_aggregator(url_aggregator&& u) noexcept = default;
+  url_aggregator& operator=(url_aggregator&& u) noexcept = default;
+  url_aggregator& operator=(const url_aggregator& u) = default;
   ~url_aggregator() override = default;
 
+  /**
+   * The setter functions follow the steps defined in the URL Standard.
+   *
+   * The url_aggregator has a single buffer that contains the entire normalized
+   * URL. The various components are represented as offsets into that buffer.
+   * When you call get_pathname(), for example, you get a std::string_view that
+   * points into that buffer. If the url_aggregator is modified, the buffer may
+   * be reallocated, and the std::string_view you obtained earlier may become
+   * invalid. In particular, this implies that you cannot modify the URL using
+   * a setter function with a std::string_view that points into the
+   * url_aggregator E.g., the following is incorrect:
+   * url->set_hostname(url->get_pathname()).
+   * You must first copy the pathname to a separate string.
+   * std::string pathname(url->get_pathname());
+   * url->set_hostname(pathname);
+   *
+   * The caller is responsible for ensuring that the url_aggregator is not
+   * modified while any std::string_view obtained from it is in use.
+   */
   bool set_href(std::string_view input);
   bool set_host(std::string_view input);
   bool set_hostname(std::string_view input);
@@ -6972,115 +7729,136 @@ struct url_aggregator : url_base {
   void set_search(std::string_view input);
   void set_hash(std::string_view input);
 
-  [[nodiscard]] bool has_valid_domain() const noexcept override;
   /**
-   * The origin getter steps are to return the serialization of this's URL's
-   * origin. [HTML]
-   * @return a newly allocated string.
+   * Validates whether the hostname is a valid domain according to RFC 1034.
+   * @return `true` if the domain is valid, `false` otherwise.
+   */
+  [[nodiscard]] bool has_valid_domain() const noexcept override;
+
+  /**
+   * Returns the URL's origin (scheme + host + port for special URLs).
+   * @return A newly allocated string containing the serialized origin.
    * @see https://url.spec.whatwg.org/#concept-url-origin
    */
-  [[nodiscard]] std::string get_origin() const noexcept override;
+  [[nodiscard]] std::string get_origin() const override;
+
   /**
-   * Return the normalized string.
-   * This function does not allocate memory.
-   * It is highly efficient.
-   * @return a constant reference to the underlying normalized URL.
+   * Returns the full serialized URL (the href) as a string_view.
+   * Does not allocate memory. The returned view becomes invalid if this
+   * url_aggregator is modified or destroyed.
+   * @return A string_view into the internal buffer.
    * @see https://url.spec.whatwg.org/#dom-url-href
-   * @see https://url.spec.whatwg.org/#concept-url-serializer
    */
   [[nodiscard]] constexpr std::string_view get_href() const noexcept
       ada_lifetime_bound;
+
   /**
-   * The username getter steps are to return this's URL's username.
-   * This function does not allocate memory.
-   * @return a lightweight std::string_view.
+   * Returns the byte length of the serialized URL without allocating a string.
+   * @return Size of the href in bytes.
+   */
+  [[nodiscard]] constexpr size_t get_href_size() const noexcept;
+
+  /**
+   * Returns the URL's username component.
+   * Does not allocate memory. The returned view becomes invalid if this
+   * url_aggregator is modified or destroyed.
+   * @return A string_view of the username.
    * @see https://url.spec.whatwg.org/#dom-url-username
    */
-  [[nodiscard]] std::string_view get_username() const noexcept
-      ada_lifetime_bound;
+  [[nodiscard]] std::string_view get_username() const ada_lifetime_bound;
+
   /**
-   * The password getter steps are to return this's URL's password.
-   * This function does not allocate memory.
-   * @return a lightweight std::string_view.
+   * Returns the URL's password component.
+   * Does not allocate memory. The returned view becomes invalid if this
+   * url_aggregator is modified or destroyed.
+   * @return A string_view of the password.
    * @see https://url.spec.whatwg.org/#dom-url-password
    */
-  [[nodiscard]] std::string_view get_password() const noexcept
-      ada_lifetime_bound;
+  [[nodiscard]] std::string_view get_password() const ada_lifetime_bound;
+
   /**
-   * Return this's URL's port, serialized.
-   * This function does not allocate memory.
-   * @return a lightweight std::string_view.
+   * Returns the URL's port as a string (e.g., "8080").
+   * Does not allocate memory. Returns empty view if no port is set.
+   * The returned view becomes invalid if this url_aggregator is modified.
+   * @return A string_view of the port.
    * @see https://url.spec.whatwg.org/#dom-url-port
    */
-  [[nodiscard]] std::string_view get_port() const noexcept ada_lifetime_bound;
+  [[nodiscard]] std::string_view get_port() const ada_lifetime_bound;
+
   /**
-   * Return U+0023 (#), followed by this's URL's fragment.
-   * This function does not allocate memory.
-   * @return a lightweight std::string_view..
+   * Returns the URL's fragment prefixed with '#' (e.g., "#section").
+   * Does not allocate memory. Returns empty view if no fragment is set.
+   * The returned view becomes invalid if this url_aggregator is modified.
+   * @return A string_view of the hash.
    * @see https://url.spec.whatwg.org/#dom-url-hash
    */
-  [[nodiscard]] std::string_view get_hash() const noexcept ada_lifetime_bound;
+  [[nodiscard]] std::string_view get_hash() const ada_lifetime_bound;
+
   /**
-   * Return url's host, serialized, followed by U+003A (:) and url's port,
-   * serialized.
-   * This function does not allocate memory.
-   * When there is no host, this function returns the empty view.
-   * @return a lightweight std::string_view.
+   * Returns the URL's host and port (e.g., "example.com:8080").
+   * Does not allocate memory. Returns empty view if no host is set.
+   * The returned view becomes invalid if this url_aggregator is modified.
+   * @return A string_view of host:port.
    * @see https://url.spec.whatwg.org/#dom-url-host
    */
-  [[nodiscard]] std::string_view get_host() const noexcept ada_lifetime_bound;
+  [[nodiscard]] std::string_view get_host() const ada_lifetime_bound;
+
   /**
-   * Return this's URL's host, serialized.
-   * This function does not allocate memory.
-   * When there is no host, this function returns the empty view.
-   * @return a lightweight std::string_view.
+   * Returns the URL's hostname (without port).
+   * Does not allocate memory. Returns empty view if no host is set.
+   * The returned view becomes invalid if this url_aggregator is modified.
+   * @return A string_view of the hostname.
    * @see https://url.spec.whatwg.org/#dom-url-hostname
    */
-  [[nodiscard]] std::string_view get_hostname() const noexcept
-      ada_lifetime_bound;
+  [[nodiscard]] std::string_view get_hostname() const ada_lifetime_bound;
+
   /**
-   * The pathname getter steps are to return the result of URL path serializing
-   * this's URL.
-   * This function does not allocate memory.
-   * @return a lightweight std::string_view.
+   * Returns the URL's path component.
+   * Does not allocate memory. The returned view becomes invalid if this
+   * url_aggregator is modified or destroyed.
+   * @return A string_view of the pathname.
    * @see https://url.spec.whatwg.org/#dom-url-pathname
    */
-  [[nodiscard]] constexpr std::string_view get_pathname() const noexcept
-      ada_lifetime_bound;
-  /**
-   * Compute the pathname length in bytes without instantiating a view or a
-   * string.
-   * @return size of the pathname in bytes
-   * @see https://url.spec.whatwg.org/#dom-url-pathname
-   */
-  [[nodiscard]] ada_really_inline uint32_t get_pathname_length() const noexcept;
-  /**
-   * Return U+003F (?), followed by this's URL's query.
-   * This function does not allocate memory.
-   * @return a lightweight std::string_view.
-   * @see https://url.spec.whatwg.org/#dom-url-search
-   */
-  [[nodiscard]] std::string_view get_search() const noexcept ada_lifetime_bound;
-  /**
-   * The protocol getter steps are to return this's URL's scheme, followed by
-   * U+003A (:).
-   * This function does not allocate memory.
-   * @return a lightweight std::string_view.
-   * @see https://url.spec.whatwg.org/#dom-url-protocol
-   */
-  [[nodiscard]] std::string_view get_protocol() const noexcept
+  [[nodiscard]] constexpr std::string_view get_pathname() const
       ada_lifetime_bound;
 
   /**
-   * A URL includes credentials if its username or password is not the empty
-   * string.
+   * Returns the byte length of the pathname without creating a string.
+   * @return Size of the pathname in bytes.
+   * @see https://url.spec.whatwg.org/#dom-url-pathname
+   */
+  [[nodiscard]] ada_really_inline uint32_t get_pathname_length() const noexcept;
+
+  /**
+   * Returns the URL's query string prefixed with '?' (e.g., "?foo=bar").
+   * Does not allocate memory. Returns empty view if no query is set.
+   * The returned view becomes invalid if this url_aggregator is modified.
+   * @return A string_view of the search/query.
+   * @see https://url.spec.whatwg.org/#dom-url-search
+   */
+  [[nodiscard]] std::string_view get_search() const ada_lifetime_bound;
+
+  /**
+   * Returns the URL's scheme followed by a colon (e.g., "https:").
+   * Does not allocate memory. The returned view becomes invalid if this
+   * url_aggregator is modified or destroyed.
+   * @return A string_view of the protocol.
+   * @see https://url.spec.whatwg.org/#dom-url-protocol
+   */
+  [[nodiscard]] std::string_view get_protocol() const ada_lifetime_bound;
+
+  /**
+   * Checks if the URL has credentials (non-empty username or password).
+   * @return `true` if username or password is non-empty, `false` otherwise.
    */
   [[nodiscard]] ada_really_inline constexpr bool has_credentials()
       const noexcept;
 
   /**
-   * Useful for implementing efficient serialization for the URL.
+   * Returns the URL component offsets for efficient serialization.
    *
+   * The components represent byte offsets into the serialized URL:
+   * ```
    * https://user:pass@example.com:1234/foo/bar?baz#quux
    *       |     |    |          | ^^^^|       |   |
    *       |     |    |          | |   |       |   `----- hash_start
@@ -7091,77 +7869,124 @@ struct url_aggregator : url_base {
    *       |     |    `---------------------------------- host_start
    *       |     `--------------------------------------- username_end
    *       `--------------------------------------------- protocol_end
-   *
-   * Inspired after servo/url
-   *
-   * @return a constant reference to the underlying component attribute.
-   *
-   * @see
-   * https://github.com/servo/rust-url/blob/b65a45515c10713f6d212e6726719a020203cc98/url/src/quirks.rs#L31
+   * ```
+   * @return A constant reference to the url_components struct.
+   * @see https://github.com/servo/rust-url
    */
-  [[nodiscard]] ada_really_inline const url_components &get_components()
+  [[nodiscard]] ada_really_inline const url_components& get_components()
       const noexcept;
+
   /**
-   * Returns a string representation of this URL.
+   * Returns a JSON string representation of this URL for debugging.
+   * @return A JSON-formatted string with all URL components.
    */
   [[nodiscard]] std::string to_string() const override;
+
   /**
-   * Returns a string diagram of this URL.
+   * Returns a visual diagram showing component boundaries in the URL.
+   * Useful for debugging and understanding URL structure.
+   * @return A multi-line string diagram.
    */
   [[nodiscard]] std::string to_diagram() const;
 
   /**
-   * Verifies that the parsed URL could be valid. Useful for debugging purposes.
-   * @return true if the URL is valid, otherwise return true of the offsets are
-   * possible.
+   * Validates internal consistency of component offsets (for debugging).
+   * @return `true` if offsets are consistent, `false` if corrupted.
    */
   [[nodiscard]] constexpr bool validate() const noexcept;
 
-  /** @return true if it has an host but it is the empty string */
+  /**
+   * Checks if the URL has an empty hostname (host is set but empty string).
+   * @return `true` if host exists but is empty, `false` otherwise.
+   */
   [[nodiscard]] constexpr bool has_empty_hostname() const noexcept;
-  /** @return true if it has a host (included an empty host) */
+
+  /**
+   * Checks if the URL has a hostname (including empty hostnames).
+   * @return `true` if host is present, `false` otherwise.
+   */
   [[nodiscard]] constexpr bool has_hostname() const noexcept;
-  /** @return true if the URL has a non-empty username */
+
+  /**
+   * Checks if the URL has a non-empty username.
+   * @return `true` if username is non-empty, `false` otherwise.
+   */
   [[nodiscard]] constexpr bool has_non_empty_username() const noexcept;
-  /** @return true if the URL has a non-empty password */
+
+  /**
+   * Checks if the URL has a non-empty password.
+   * @return `true` if password is non-empty, `false` otherwise.
+   */
   [[nodiscard]] constexpr bool has_non_empty_password() const noexcept;
-  /** @return true if the URL has a (non default) port */
+
+  /**
+   * Checks if the URL has a non-default port explicitly specified.
+   * @return `true` if a port is present, `false` otherwise.
+   */
   [[nodiscard]] constexpr bool has_port() const noexcept;
-  /** @return true if the URL has a password */
+
+  /**
+   * Checks if the URL has a password component (may be empty).
+   * @return `true` if password is present, `false` otherwise.
+   */
   [[nodiscard]] constexpr bool has_password() const noexcept;
-  /** @return true if the URL has a hash component */
+
+  /**
+   * Checks if the URL has a fragment/hash component.
+   * @return `true` if hash is present, `false` otherwise.
+   */
   [[nodiscard]] constexpr bool has_hash() const noexcept override;
-  /** @return true if the URL has a search component */
+
+  /**
+   * Checks if the URL has a query/search component.
+   * @return `true` if query is present, `false` otherwise.
+   */
   [[nodiscard]] constexpr bool has_search() const noexcept override;
 
+  /**
+   * Removes the port from the URL.
+   */
   inline void clear_port();
+
+  /**
+   * Removes the hash/fragment from the URL.
+   */
   inline void clear_hash();
+
+  /**
+   * Removes the query/search string from the URL.
+   */
   inline void clear_search() override;
 
  private:
   // helper methods
   friend void helpers::strip_trailing_spaces_from_opaque_path<url_aggregator>(
-      url_aggregator &url) noexcept;
+      url_aggregator& url);
   // parse_url methods
   friend url_aggregator parser::parse_url<url_aggregator>(
-      std::string_view, const url_aggregator *);
+      std::string_view, const url_aggregator*);
 
   friend url_aggregator parser::parse_url_impl<url_aggregator, true>(
-      std::string_view, const url_aggregator *);
+      std::string_view, const url_aggregator*);
   friend url_aggregator parser::parse_url_impl<url_aggregator, false>(
-      std::string_view, const url_aggregator *);
+      std::string_view, const url_aggregator*);
+  template <class result_type>
+  friend bool parser::try_parse_simple_absolute(std::string_view, result_type&);
 
 #if ADA_INCLUDE_URL_PATTERN
   // url_pattern methods
   template <url_pattern_regex::regex_concept regex_provider>
   friend tl::expected<url_pattern<regex_provider>, errors>
   parse_url_pattern_impl(
-      std::variant<std::string_view, url_pattern_init> &&input,
-      const std::string_view *base_url, const url_pattern_options *options);
+      std::variant<std::string_view, url_pattern_init>&& input,
+      const std::string_view* base_url, const url_pattern_options* options);
 #endif  // ADA_INCLUDE_URL_PATTERN
 
-  std::string buffer{};
+  // components is declared before buffer so that the offset fields land
+  // close to url_base in memory, improving cache locality for getter calls.
+  // Note: exact cache-line placement is implementation- and platform-dependent.
   url_components components{};
+  std::string buffer{};
 
   /**
    * Returns true if neither the search, nor the hash nor the pathname
@@ -7170,7 +7995,7 @@ struct url_aggregator : url_base {
    */
   [[nodiscard]] ada_really_inline bool is_at_path() const noexcept;
 
-  inline void add_authority_slashes_if_needed() noexcept;
+  inline void add_authority_slashes_if_needed();
 
   /**
    * To optimize performance, you may indicate how much memory to allocate
@@ -7178,10 +8003,10 @@ struct url_aggregator : url_base {
    */
   constexpr void reserve(uint32_t capacity);
 
-  ada_really_inline size_t parse_port(
-      std::string_view view, bool check_trailing_content) noexcept override;
+  ada_really_inline size_t parse_port(std::string_view view,
+                                      bool check_trailing_content) override;
 
-  ada_really_inline size_t parse_port(std::string_view view) noexcept override {
+  ada_really_inline size_t parse_port(std::string_view view) override {
     return this->parse_port(view, false);
   }
 
@@ -7219,12 +8044,12 @@ struct url_aggregator : url_base {
   ada_really_inline bool parse_host(std::string_view input);
 
   inline void update_base_authority(std::string_view base_buffer,
-                                    const url_components &base);
+                                    const url_components& base);
   inline void update_unencoded_base_hash(std::string_view input);
   inline void update_base_hostname(std::string_view input);
   inline void update_base_search(std::string_view input);
   inline void update_base_search(std::string_view input,
-                                 const uint8_t *query_percent_encode_set);
+                                 const uint8_t* query_percent_encode_set);
   inline void update_base_pathname(std::string_view input);
   inline void update_base_username(std::string_view input);
   inline void append_base_username(std::string_view input);
@@ -7246,20 +8071,20 @@ struct url_aggregator : url_base {
                                                 std::string_view input);
   [[nodiscard]] constexpr bool has_authority() const noexcept;
   constexpr void set_protocol_as_file();
-  inline void set_scheme(std::string_view new_scheme) noexcept;
+  inline void set_scheme(std::string_view new_scheme);
   /**
    * Fast function to set the scheme from a view with a colon in the
    * buffer, does not change type.
    */
   inline void set_scheme_from_view_with_colon(
-      std::string_view new_scheme_with_colon) noexcept;
-  inline void copy_scheme(const url_aggregator &u) noexcept;
+      std::string_view new_scheme_with_colon);
+  inline void copy_scheme(const url_aggregator& u);
 
-  inline void update_host_to_base_host(const std::string_view input) noexcept;
+  inline void update_host_to_base_host(const std::string_view input);
 
 };  // url_aggregator
 
-inline std::ostream &operator<<(std::ostream &out, const url &u);
+inline std::ostream& operator<<(std::ostream& out, const url& u);
 }  // namespace ada
 
 #endif
@@ -7330,7 +8155,7 @@ ada_really_inline size_t percent_encode_index(const std::string_view input,
 namespace ada {
 
 inline void url_aggregator::update_base_authority(
-    std::string_view base_buffer, const ada::url_components &base) {
+    std::string_view base_buffer, const ada::url_components& base) {
   std::string_view input = base_buffer.substr(
       base.protocol_end, base.host_start - base.protocol_end);
   ada_log("url_aggregator::update_base_authority ", input);
@@ -7588,6 +8413,12 @@ inline void url_aggregator::update_base_pathname(const std::string_view input) {
     // output.
     buffer.insert(components.pathname_start, "/.");
     components.pathname_start += 2;
+    if (components.search_start != url_components::omitted) {
+      components.search_start += 2;
+    }
+    if (components.hash_start != url_components::omitted) {
+      components.hash_start += 2;
+    }
   }
 
   uint32_t difference = replace_and_resize(
@@ -8032,7 +8863,7 @@ constexpr bool url_aggregator::cannot_have_credentials_or_port() const {
          components.host_start == components.host_end;
 }
 
-[[nodiscard]] ada_really_inline const ada::url_components &
+[[nodiscard]] ada_really_inline const ada::url_components&
 url_aggregator::get_components() const noexcept {
   return components;
 }
@@ -8043,11 +8874,11 @@ url_aggregator::get_components() const noexcept {
   // Performance: instead of doing this potentially expensive check, we could
   // have a boolean in the struct.
   return components.protocol_end + 2 <= components.host_start &&
-         helpers::substring(buffer, components.protocol_end,
-                            components.protocol_end + 2) == "//";
+         buffer[components.protocol_end] == '/' &&
+         buffer[components.protocol_end + 1] == '/';
 }
 
-inline void ada::url_aggregator::add_authority_slashes_if_needed() noexcept {
+inline void ada::url_aggregator::add_authority_slashes_if_needed() {
   ada_log("url_aggregator::add_authority_slashes_if_needed");
   ADA_ASSERT_TRUE(validate());
   // Protocol setter will insert `http:` to the URL. It is up to hostname setter
@@ -8084,7 +8915,7 @@ constexpr bool url_aggregator::has_non_empty_username() const noexcept {
 
 constexpr bool url_aggregator::has_non_empty_password() const noexcept {
   ada_log("url_aggregator::has_non_empty_password");
-  return components.host_start - components.username_end > 0;
+  return components.host_start > components.username_end;
 }
 
 constexpr bool url_aggregator::has_password() const noexcept {
@@ -8156,8 +8987,12 @@ constexpr bool url_aggregator::has_port() const noexcept {
   return buffer;
 }
 
-ada_really_inline size_t url_aggregator::parse_port(
-    std::string_view view, bool check_trailing_content) noexcept {
+[[nodiscard]] constexpr size_t url_aggregator::get_href_size() const noexcept {
+  return buffer.size();
+}
+
+ada_really_inline size_t
+url_aggregator::parse_port(std::string_view view, bool check_trailing_content) {
   ada_log("url_aggregator::parse_port('", view, "') ", view.size());
   if (!view.empty() && view[0] == '-') {
     ada_log("parse_port: view[0] == '0' && view.size() > 1");
@@ -8395,8 +9230,8 @@ constexpr void url_aggregator::set_protocol_as_file() {
   return true;
 }
 
-[[nodiscard]] constexpr std::string_view url_aggregator::get_pathname()
-    const noexcept ada_lifetime_bound {
+[[nodiscard]] constexpr std::string_view url_aggregator::get_pathname() const
+    ada_lifetime_bound {
   ada_log("url_aggregator::get_pathname pathname_start = ",
           components.pathname_start, " buffer.size() = ", buffer.size(),
           " components.search_start = ", components.search_start,
@@ -8410,13 +9245,12 @@ constexpr void url_aggregator::set_protocol_as_file() {
   return helpers::substring(buffer, components.pathname_start, ending_index);
 }
 
-inline std::ostream &operator<<(std::ostream &out,
-                                const ada::url_aggregator &u) {
+inline std::ostream& operator<<(std::ostream& out,
+                                const ada::url_aggregator& u) {
   return out << u.to_string();
 }
 
-void url_aggregator::update_host_to_base_host(
-    const std::string_view input) noexcept {
+void url_aggregator::update_host_to_base_host(const std::string_view input) {
   ada_log("url_aggregator::update_host_to_base_host ", input);
   ADA_ASSERT_TRUE(validate());
   ADA_ASSERT_TRUE(!helpers::overlaps(input, buffer));
@@ -8443,7 +9277,13 @@ void url_aggregator::update_host_to_base_host(
 /* begin file include/ada/url_search_params.h */
 /**
  * @file url_search_params.h
- * @brief Declaration for the URL Search Params
+ * @brief URL query string parameter manipulation.
+ *
+ * This file provides the `url_search_params` class for parsing, manipulating,
+ * and serializing URL query strings. It implements the URLSearchParams API
+ * from the WHATWG URL Standard.
+ *
+ * @see https://url.spec.whatwg.org/#interface-urlsearchparams
  */
 #ifndef ADA_URL_SEARCH_PARAMS_H
 #define ADA_URL_SEARCH_PARAMS_H
@@ -8455,117 +9295,167 @@ void url_aggregator::update_host_to_base_host(
 
 namespace ada {
 
+/**
+ * @brief Iterator types for url_search_params iteration.
+ */
 enum class url_search_params_iter_type {
-  KEYS,
-  VALUES,
-  ENTRIES,
+  KEYS,    /**< Iterate over parameter keys only */
+  VALUES,  /**< Iterate over parameter values only */
+  ENTRIES, /**< Iterate over key-value pairs */
 };
 
 template <typename T, url_search_params_iter_type Type>
 struct url_search_params_iter;
 
+/** Type alias for a key-value pair of string views. */
 typedef std::pair<std::string_view, std::string_view> key_value_view_pair;
 
+/** Iterator over search parameter keys. */
 using url_search_params_keys_iter =
     url_search_params_iter<std::string_view, url_search_params_iter_type::KEYS>;
+/** Iterator over search parameter values. */
 using url_search_params_values_iter =
     url_search_params_iter<std::string_view,
                            url_search_params_iter_type::VALUES>;
+/** Iterator over search parameter key-value pairs. */
 using url_search_params_entries_iter =
     url_search_params_iter<key_value_view_pair,
                            url_search_params_iter_type::ENTRIES>;
 
 /**
- * We require all strings to be valid UTF-8. It is the user's responsibility to
- * ensure that the provided strings are valid UTF-8.
+ * @brief Class for parsing and manipulating URL query strings.
+ *
+ * The `url_search_params` class provides methods to parse, modify, and
+ * serialize URL query parameters (the part after '?' in a URL). It handles
+ * percent-encoding and decoding automatically.
+ *
+ * All string inputs must be valid UTF-8. The caller is responsible for
+ * ensuring UTF-8 validity.
+ *
+ * Construction and `reset` refuse query strings longer than
+ * `get_max_input_length()` (the object is left empty). Individual `append` /
+ * `set` calls are not length-capped.
+ *
  * @see https://url.spec.whatwg.org/#interface-urlsearchparams
  */
 struct url_search_params {
   url_search_params() = default;
 
   /**
-   * @see
-   * https://github.com/web-platform-tests/wpt/blob/master/url/urlsearchparams-constructor.any.js
+   * Constructs url_search_params by parsing a query string.
+   * @param input A query string (with or without leading '?'). Must be UTF-8.
+   *        If longer than `get_max_input_length()`, the object stays empty.
    */
   explicit url_search_params(const std::string_view input) {
     initialize(input);
   }
 
-  url_search_params(const url_search_params &u) = default;
-  url_search_params(url_search_params &&u) noexcept = default;
-  url_search_params &operator=(url_search_params &&u) noexcept = default;
-  url_search_params &operator=(const url_search_params &u) = default;
+  url_search_params(const url_search_params& u) = default;
+  url_search_params(url_search_params&& u) noexcept = default;
+  url_search_params& operator=(url_search_params&& u) noexcept = default;
+  url_search_params& operator=(const url_search_params& u) = default;
   ~url_search_params() = default;
 
+  /**
+   * Returns the number of key-value pairs.
+   * @return The total count of parameters.
+   */
   [[nodiscard]] inline size_t size() const noexcept;
 
   /**
-   * Both key and value must be valid UTF-8.
+   * Appends a new key-value pair to the parameter list.
+   * @param key The parameter name (must be valid UTF-8).
+   * @param value The parameter value (must be valid UTF-8).
    * @see https://url.spec.whatwg.org/#dom-urlsearchparams-append
    */
   inline void append(std::string_view key, std::string_view value);
 
   /**
+   * Removes all pairs with the given key.
+   * @param key The parameter name to remove.
    * @see https://url.spec.whatwg.org/#dom-urlsearchparams-delete
    */
   inline void remove(std::string_view key);
+
+  /**
+   * Removes all pairs with the given key and value.
+   * @param key The parameter name.
+   * @param value The parameter value to match.
+   */
   inline void remove(std::string_view key, std::string_view value);
 
   /**
+   * Returns the value of the first pair with the given key.
+   * @param key The parameter name to search for.
+   * @return The value if found, or std::nullopt if not present.
    * @see https://url.spec.whatwg.org/#dom-urlsearchparams-get
    */
   inline std::optional<std::string_view> get(std::string_view key);
 
   /**
+   * Returns all values for pairs with the given key.
+   * @param key The parameter name to search for.
+   * @return A vector of all matching values (may be empty).
    * @see https://url.spec.whatwg.org/#dom-urlsearchparams-getall
    */
   inline std::vector<std::string> get_all(std::string_view key);
 
   /**
+   * Checks if any pair has the given key.
+   * @param key The parameter name to search for.
+   * @return `true` if at least one pair has this key.
    * @see https://url.spec.whatwg.org/#dom-urlsearchparams-has
    */
   inline bool has(std::string_view key) noexcept;
+
+  /**
+   * Checks if any pair matches the given key and value.
+   * @param key The parameter name to search for.
+   * @param value The parameter value to match.
+   * @return `true` if a matching pair exists.
+   */
   inline bool has(std::string_view key, std::string_view value) noexcept;
 
   /**
-   * Both key and value must be valid UTF-8.
+   * Sets a parameter value, replacing any existing pairs with the same key.
+   * @param key The parameter name (must be valid UTF-8).
+   * @param value The parameter value (must be valid UTF-8).
    * @see https://url.spec.whatwg.org/#dom-urlsearchparams-set
    */
   inline void set(std::string_view key, std::string_view value);
 
   /**
+   * Sorts all key-value pairs by their keys using code unit comparison.
    * @see https://url.spec.whatwg.org/#dom-urlsearchparams-sort
    */
   inline void sort();
 
   /**
+   * Serializes the parameters to a query string (without leading '?').
+   * @return The percent-encoded query string.
    * @see https://url.spec.whatwg.org/#urlsearchparams-stringification-behavior
    */
   inline std::string to_string() const;
 
   /**
-   * Returns a simple JS-style iterator over all of the keys in this
-   * url_search_params. The keys in the iterator are not unique. The valid
-   * lifespan of the iterator is tied to the url_search_params. The iterator
-   * must be freed when you're done with it.
-   * @see https://url.spec.whatwg.org/#interface-urlsearchparams
+   * Returns an iterator over all parameter keys.
+   * Keys may repeat if there are duplicate parameters.
+   * @return An iterator yielding string_view keys.
+   * @note The iterator is invalidated if this object is modified.
    */
   inline url_search_params_keys_iter get_keys();
 
   /**
-   * Returns a simple JS-style iterator over all of the values in this
-   * url_search_params. The valid lifespan of the iterator is tied to the
-   * url_search_params. The iterator must be freed when you're done with it.
-   * @see https://url.spec.whatwg.org/#interface-urlsearchparams
+   * Returns an iterator over all parameter values.
+   * @return An iterator yielding string_view values.
+   * @note The iterator is invalidated if this object is modified.
    */
   inline url_search_params_values_iter get_values();
 
   /**
-   * Returns a simple JS-style iterator over all of the entries in this
-   * url_search_params. The entries are pairs of keys and corresponding values.
-   * The valid lifespan of the iterator is tied to the url_search_params. The
-   * iterator must be freed when you're done with it.
-   * @see https://url.spec.whatwg.org/#interface-urlsearchparams
+   * Returns an iterator over all key-value pairs.
+   * @return An iterator yielding key-value pair views.
+   * @note The iterator is invalidated if this object is modified.
    */
   inline url_search_params_entries_iter get_entries();
 
@@ -8602,33 +9492,43 @@ struct url_search_params {
 };  // url_search_params
 
 /**
- * Implements a non-conventional iterator pattern that is closer in style to
- * JavaScript's definition of an iterator.
+ * @brief JavaScript-style iterator for url_search_params.
+ *
+ * Provides a `next()` method that returns successive values until exhausted.
+ * This matches the iterator pattern used in the Web Platform.
+ *
+ * @tparam T The type of value returned by the iterator.
+ * @tparam Type The type of iteration (KEYS, VALUES, or ENTRIES).
  *
  * @see https://webidl.spec.whatwg.org/#idl-iterable
  */
 template <typename T, url_search_params_iter_type Type>
 struct url_search_params_iter {
   inline url_search_params_iter() : params(EMPTY) {}
-  url_search_params_iter(const url_search_params_iter &u) = default;
-  url_search_params_iter(url_search_params_iter &&u) noexcept = default;
-  url_search_params_iter &operator=(url_search_params_iter &&u) noexcept =
+  url_search_params_iter(const url_search_params_iter& u) = default;
+  url_search_params_iter(url_search_params_iter&& u) noexcept = default;
+  url_search_params_iter& operator=(url_search_params_iter&& u) noexcept =
       default;
-  url_search_params_iter &operator=(const url_search_params_iter &u) = default;
+  url_search_params_iter& operator=(const url_search_params_iter& u) = default;
   ~url_search_params_iter() = default;
 
   /**
-   * Return the next item in the iterator or std::nullopt if done.
+   * Returns the next value in the iteration sequence.
+   * @return The next value, or std::nullopt if iteration is complete.
    */
   inline std::optional<T> next();
 
+  /**
+   * Checks if more values are available.
+   * @return `true` if `next()` will return a value, `false` if exhausted.
+   */
   inline bool has_next() const;
 
  private:
   static url_search_params EMPTY;
-  inline url_search_params_iter(url_search_params &params_) : params(params_) {}
+  inline url_search_params_iter(url_search_params& params_) : params(params_) {}
 
-  url_search_params &params;
+  url_search_params& params;
   size_t pos = 0;
 
   friend struct url_search_params;
@@ -8647,6 +9547,7 @@ struct url_search_params_iter {
 
 
 #include <algorithm>
+#include <cstdint>
 #include <optional>
 #include <ranges>
 #include <string>
@@ -8654,6 +9555,10 @@ struct url_search_params_iter {
 #include <vector>
 
 namespace ada {
+
+// Declared in implementation.h; used here as a DoS bound on untrusted query
+// strings (ada.h includes both headers).
+uint32_t get_max_input_length();
 
 // A default, empty url_search_params for use with empty iterators.
 template <typename T, ada::url_search_params_iter_type Type>
@@ -8668,28 +9573,29 @@ inline void url_search_params::initialize(std::string_view input) {
   if (!input.empty() && input.front() == '?') {
     input.remove_prefix(1);
   }
+  if (input.empty()) {
+    return;
+  }
+  // Refuse overlong query strings (same process-wide cap as URL parsing).
+  if (input.size() > get_max_input_length()) {
+    return;
+  }
+
+  params.reserve(size_t(std::count(input.begin(), input.end(), '&')) + 1);
 
   auto process_key_value = [&](const std::string_view current) {
-    auto equal = current.find('=');
-
+    const auto equal = current.find('=');
     if (equal == std::string_view::npos) {
-      std::string name(current);
-      std::ranges::replace(name, '+', ' ');
-      params.emplace_back(unicode::percent_decode(name, name.find('%')), "");
+      params.emplace_back(unicode::form_urlencoded_decode(current), "");
     } else {
-      std::string name(current.substr(0, equal));
-      std::string value(current.substr(equal + 1));
-
-      std::ranges::replace(name, '+', ' ');
-      std::ranges::replace(value, '+', ' ');
-
-      params.emplace_back(unicode::percent_decode(name, name.find('%')),
-                          unicode::percent_decode(value, value.find('%')));
+      params.emplace_back(
+          unicode::form_urlencoded_decode(current.substr(0, equal)),
+          unicode::form_urlencoded_decode(current.substr(equal + 1)));
     }
   };
 
   while (!input.empty()) {
-    auto ampersand_index = input.find('&');
+    const auto ampersand_index = input.find('&');
 
     if (ampersand_index == std::string_view::npos) {
       if (!input.empty()) {
@@ -8714,7 +9620,7 @@ inline size_t url_search_params::size() const noexcept { return params.size(); }
 inline std::optional<std::string_view> url_search_params::get(
     const std::string_view key) {
   auto entry = std::ranges::find_if(
-      params, [&key](const auto &param) { return param.first == key; });
+      params, [&key](const auto& param) { return param.first == key; });
 
   if (entry == params.end()) {
     return std::nullopt;
@@ -8727,7 +9633,7 @@ inline std::vector<std::string> url_search_params::get_all(
     const std::string_view key) {
   std::vector<std::string> out{};
 
-  for (auto &param : params) {
+  for (auto& param : params) {
     if (param.first == key) {
       out.emplace_back(param.second);
     }
@@ -8738,13 +9644,13 @@ inline std::vector<std::string> url_search_params::get_all(
 
 inline bool url_search_params::has(const std::string_view key) noexcept {
   auto entry = std::ranges::find_if(
-      params, [&key](const auto &param) { return param.first == key; });
+      params, [&key](const auto& param) { return param.first == key; });
   return entry != params.end();
 }
 
 inline bool url_search_params::has(std::string_view key,
                                    std::string_view value) noexcept {
-  auto entry = std::ranges::find_if(params, [&key, &value](const auto &param) {
+  auto entry = std::ranges::find_if(params, [&key, &value](const auto& param) {
     return param.first == key && param.second == value;
   });
   return entry != params.end();
@@ -8773,7 +9679,7 @@ inline std::string url_search_params::to_string() const {
 
 inline void url_search_params::set(const std::string_view key,
                                    const std::string_view value) {
-  const auto find = [&key](const auto &param) { return param.first == key; };
+  const auto find = [&key](const auto& param) { return param.first == key; };
 
   auto it = std::ranges::find_if(params, find);
 
@@ -8788,20 +9694,21 @@ inline void url_search_params::set(const std::string_view key,
 
 inline void url_search_params::remove(const std::string_view key) {
   std::erase_if(params,
-                [&key](const auto &param) { return param.first == key; });
+                [&key](const auto& param) { return param.first == key; });
 }
 
 inline void url_search_params::remove(const std::string_view key,
                                       const std::string_view value) {
-  std::erase_if(params, [&key, &value](const auto &param) {
+  std::erase_if(params, [&key, &value](const auto& param) {
     return param.first == key && param.second == value;
   });
 }
 
 inline void url_search_params::sort() {
-  // We rely on the fact that the content is valid UTF-8.
-  std::ranges::stable_sort(params, [](const key_value_pair &lhs,
-                                      const key_value_pair &rhs) {
+  // Keys are expected to be valid UTF-8, but percent_decode can produce
+  // arbitrary byte sequences. Handle truncated/invalid sequences gracefully.
+  std::ranges::stable_sort(params, [](const key_value_pair& lhs,
+                                      const key_value_pair& rhs) {
     size_t i = 0, j = 0;
     uint32_t low_surrogate1 = 0, low_surrogate2 = 0;
     while ((i < lhs.first.size() || low_surrogate1 != 0) &&
@@ -8813,18 +9720,15 @@ inline void url_search_params::sort() {
         low_surrogate1 = 0;
       } else {
         uint8_t c1 = uint8_t(lhs.first[i]);
-        if (c1 <= 0x7F) {
-          codePoint1 = c1;
-          i++;
-        } else if (c1 <= 0xDF) {
+        if (c1 > 0x7F && c1 <= 0xDF && i + 1 < lhs.first.size()) {
           codePoint1 = ((c1 & 0x1F) << 6) | (uint8_t(lhs.first[i + 1]) & 0x3F);
           i += 2;
-        } else if (c1 <= 0xEF) {
+        } else if (c1 > 0xDF && c1 <= 0xEF && i + 2 < lhs.first.size()) {
           codePoint1 = ((c1 & 0x0F) << 12) |
                        ((uint8_t(lhs.first[i + 1]) & 0x3F) << 6) |
                        (uint8_t(lhs.first[i + 2]) & 0x3F);
           i += 3;
-        } else {
+        } else if (c1 > 0xEF && c1 <= 0xF7 && i + 3 < lhs.first.size()) {
           codePoint1 = ((c1 & 0x07) << 18) |
                        ((uint8_t(lhs.first[i + 1]) & 0x3F) << 12) |
                        ((uint8_t(lhs.first[i + 2]) & 0x3F) << 6) |
@@ -8835,6 +9739,10 @@ inline void url_search_params::sort() {
           uint16_t high_surrogate = uint16_t(0xD800 + (codePoint1 >> 10));
           low_surrogate1 = uint16_t(0xDC00 + (codePoint1 & 0x3FF));
           codePoint1 = high_surrogate;
+        } else {
+          // ASCII (c1 <= 0x7F) or truncated/invalid UTF-8: treat as raw byte
+          codePoint1 = c1;
+          i++;
         }
       }
 
@@ -8843,18 +9751,15 @@ inline void url_search_params::sort() {
         low_surrogate2 = 0;
       } else {
         uint8_t c2 = uint8_t(rhs.first[j]);
-        if (c2 <= 0x7F) {
-          codePoint2 = c2;
-          j++;
-        } else if (c2 <= 0xDF) {
+        if (c2 > 0x7F && c2 <= 0xDF && j + 1 < rhs.first.size()) {
           codePoint2 = ((c2 & 0x1F) << 6) | (uint8_t(rhs.first[j + 1]) & 0x3F);
           j += 2;
-        } else if (c2 <= 0xEF) {
+        } else if (c2 > 0xDF && c2 <= 0xEF && j + 2 < rhs.first.size()) {
           codePoint2 = ((c2 & 0x0F) << 12) |
                        ((uint8_t(rhs.first[j + 1]) & 0x3F) << 6) |
                        (uint8_t(rhs.first[j + 2]) & 0x3F);
           j += 3;
-        } else {
+        } else if (c2 > 0xEF && c2 <= 0xF7 && j + 3 < rhs.first.size()) {
           codePoint2 = ((c2 & 0x07) << 18) |
                        ((uint8_t(rhs.first[j + 1]) & 0x3F) << 12) |
                        ((uint8_t(rhs.first[j + 2]) & 0x3F) << 6) |
@@ -8864,6 +9769,10 @@ inline void url_search_params::sort() {
           uint16_t high_surrogate = uint16_t(0xD800 + (codePoint2 >> 10));
           low_surrogate2 = uint16_t(0xDC00 + (codePoint2 & 0x3FF));
           codePoint2 = high_surrogate;
+        } else {
+          // ASCII (c2 <= 0x7F) or truncated/invalid UTF-8: treat as raw byte
+          codePoint2 = c2;
+          j++;
         }
       }
 
@@ -8967,17 +9876,16 @@ url_pattern_component<regex_provider>::create_component_match_result(
   auto result =
       url_pattern_component_result{.input = std::move(input), .groups = {}};
 
-  // Optimization: Let's reserve the size.
-  result.groups.reserve(exec_result.size());
-
   // We explicitly start iterating from 0 even though the spec
   // says we should start from 1. This case is handled by the
-  // std_regex_provider.
-  for (size_t index = 0; index < exec_result.size(); index++) {
-    result.groups.insert({
-        group_name_list[index],
-        std::move(exec_result[index]),
-    });
+  // std_regex_provider which removes the full match from index 0.
+  // Use min() to guard against potential mismatches between
+  // exec_result size and group_name_list size.
+  const size_t size = std::min(exec_result.size(), group_name_list.size());
+  result.groups.reserve(size);
+  for (size_t index = 0; index < size; index++) {
+    result.groups.emplace(group_name_list[index],
+                          std::move(exec_result[index]));
   }
   return result;
 }
@@ -9083,43 +9991,113 @@ url_pattern_component<regex_provider>::compile(
     return tl::unexpected(part_list.error());
   }
 
-  // Let (regular expression string, name list) be the result of running
-  // generate a regular expression and name list given part list and options.
+  // Detect pattern type early to potentially skip expensive regex compilation
+  const auto has_regexp = [](const auto& part) { return part.is_regexp(); };
+  const bool has_regexp_groups = std::ranges::any_of(*part_list, has_regexp);
+
+  url_pattern_component_type component_type =
+      url_pattern_component_type::REGEXP;
+  std::string exact_match_value{};
+
+  if (part_list->empty()) {
+    component_type = url_pattern_component_type::EMPTY;
+  } else if (part_list->size() == 1) {
+    const auto& part = (*part_list)[0];
+    if (part.type == url_pattern_part_type::FIXED_TEXT &&
+        part.modifier == url_pattern_part_modifier::none &&
+        !options.ignore_case) {
+      component_type = url_pattern_component_type::EXACT_MATCH;
+      exact_match_value = part.value;
+    } else if (part.type == url_pattern_part_type::FULL_WILDCARD &&
+               part.modifier == url_pattern_part_modifier::none &&
+               part.prefix.empty() && part.suffix.empty()) {
+      component_type = url_pattern_component_type::FULL_WILDCARD;
+    }
+  }
+
+  // For simple patterns, skip regex generation and compilation entirely
+  if (component_type != url_pattern_component_type::REGEXP) {
+    auto pattern_string =
+        url_pattern_helpers::generate_pattern_string(*part_list, options);
+    // For FULL_WILDCARD, we need the group name from
+    // generate_regular_expression
+    std::vector<std::string> name_list;
+    if (component_type == url_pattern_component_type::FULL_WILDCARD &&
+        !part_list->empty()) {
+      name_list.push_back((*part_list)[0].name);
+    }
+    return url_pattern_component<regex_provider>(
+        std::move(pattern_string), typename regex_provider::regex_type{},
+        std::move(name_list), has_regexp_groups, component_type,
+        std::move(exact_match_value));
+  }
+
+  // Generate regex for complex patterns
   auto [regular_expression_string, name_list] =
       url_pattern_helpers::generate_regular_expression_and_name_list(*part_list,
                                                                      options);
-
-  ada_log("regular expression string: ", regular_expression_string);
-
-  // Let pattern string be the result of running generate a pattern
-  // string given part list and options.
   auto pattern_string =
       url_pattern_helpers::generate_pattern_string(*part_list, options);
 
-  // Let regular expression be RegExpCreate(regular expression string,
-  // flags). If this throws an exception, catch it, and throw a
-  // TypeError.
   std::optional<typename regex_provider::regex_type> regular_expression =
       regex_provider::create_instance(regular_expression_string,
                                       options.ignore_case);
-
   if (!regular_expression) {
     return tl::unexpected(errors::type_error);
   }
 
-  // For each part of part list:
-  // - If part's type is "regexp", then set has regexp groups to true.
-  const auto has_regexp = [](const auto& part) { return part.is_regexp(); };
-  const bool has_regexp_groups = std::ranges::any_of(*part_list, has_regexp);
-
-  ada_log("has regexp groups: ", has_regexp_groups);
-
-  // Return a new component whose pattern string is pattern string, regular
-  // expression is regular expression, group name list is name list, and has
-  // regexp groups is has regexp groups.
   return url_pattern_component<regex_provider>(
       std::move(pattern_string), std::move(*regular_expression),
-      std::move(name_list), has_regexp_groups);
+      std::move(name_list), has_regexp_groups, component_type,
+      std::move(exact_match_value));
+}
+
+template <url_pattern_regex::regex_concept regex_provider>
+bool url_pattern_component<regex_provider>::fast_test(
+    std::string_view input) const noexcept {
+  // Fast path for simple patterns - avoid regex evaluation
+  // Using if-else for better branch prediction on common cases
+  if (type == url_pattern_component_type::FULL_WILDCARD) {
+    return true;
+  }
+  if (type == url_pattern_component_type::EXACT_MATCH) {
+    return input == exact_match_value;
+  }
+  if (type == url_pattern_component_type::EMPTY) {
+    return input.empty();
+  }
+  // type == REGEXP
+  return regex_provider::regex_match(input, regexp);
+}
+
+template <url_pattern_regex::regex_concept regex_provider>
+std::optional<std::vector<std::optional<std::string>>>
+url_pattern_component<regex_provider>::fast_match(
+    std::string_view input) const {
+  // Handle each type directly without redundant checks
+  if (type == url_pattern_component_type::FULL_WILDCARD) {
+    // FULL_WILDCARD always matches - capture the input (even if empty)
+    // If there's no group name, return empty groups
+    if (group_name_list.empty()) {
+      return std::vector<std::optional<std::string>>{};
+    }
+    // Capture the matched input (including empty strings)
+    return std::vector<std::optional<std::string>>{std::string(input)};
+  }
+  if (type == url_pattern_component_type::EXACT_MATCH) {
+    if (input == exact_match_value) {
+      return std::vector<std::optional<std::string>>{};
+    }
+    return std::nullopt;
+  }
+  if (type == url_pattern_component_type::EMPTY) {
+    if (input.empty()) {
+      return std::vector<std::optional<std::string>>{};
+    }
+    return std::nullopt;
+  }
+  // type == REGEXP - use regex
+  return regex_provider::regex_search(input, regexp);
 }
 
 template <url_pattern_regex::regex_concept regex_provider>
@@ -9131,17 +10109,87 @@ result<std::optional<url_pattern_result>> url_pattern<regex_provider>::exec(
 }
 
 template <url_pattern_regex::regex_concept regex_provider>
+bool url_pattern<regex_provider>::test_components(
+    std::string_view protocol, std::string_view username,
+    std::string_view password, std::string_view hostname, std::string_view port,
+    std::string_view pathname, std::string_view search,
+    std::string_view hash) const {
+  return protocol_component.fast_test(protocol) &&
+         username_component.fast_test(username) &&
+         password_component.fast_test(password) &&
+         hostname_component.fast_test(hostname) &&
+         port_component.fast_test(port) &&
+         pathname_component.fast_test(pathname) &&
+         search_component.fast_test(search) && hash_component.fast_test(hash);
+}
+
+template <url_pattern_regex::regex_concept regex_provider>
 result<bool> url_pattern<regex_provider>::test(
-    const url_pattern_input& input, const std::string_view* base_url) {
-  // TODO: Optimization opportunity. Rather than returning `url_pattern_result`
-  // Implement a fast path just like `can_parse()` in ada_url.
-  // Let result be the result of match given this's associated URL pattern,
-  // input, and baseURL if given.
-  // If result is null, return false.
-  if (auto result = match(input, base_url); result.has_value()) {
-    return result->has_value();
+    const url_pattern_input& input, const std::string_view* base_url_string) {
+  // If input is a URLPatternInit
+  if (std::holds_alternative<url_pattern_init>(input)) {
+    if (base_url_string) {
+      return tl::unexpected(errors::type_error);
+    }
+
+    std::string protocol{}, username{}, password{}, hostname{};
+    std::string port{}, pathname{}, search{}, hash{};
+
+    auto apply_result = url_pattern_init::process(
+        std::get<url_pattern_init>(input), url_pattern_init::process_type::url,
+        protocol, username, password, hostname, port, pathname, search, hash);
+
+    if (!apply_result) {
+      return false;
+    }
+
+    std::string_view search_view = *apply_result->search;
+    if (search_view.starts_with("?")) {
+      search_view.remove_prefix(1);
+    }
+
+    return test_components(*apply_result->protocol, *apply_result->username,
+                           *apply_result->password, *apply_result->hostname,
+                           *apply_result->port, *apply_result->pathname,
+                           search_view, *apply_result->hash);
   }
-  return tl::unexpected(errors::type_error);
+
+  // URL string input path
+  result<url_aggregator> base_url;
+  if (base_url_string) {
+    base_url = ada::parse<url_aggregator>(*base_url_string, nullptr);
+    if (!base_url) {
+      return false;
+    }
+  }
+
+  auto url =
+      ada::parse<url_aggregator>(std::get<std::string_view>(input),
+                                 base_url.has_value() ? &*base_url : nullptr);
+  if (!url) {
+    return false;
+  }
+
+  // Extract components as string_view
+  auto protocol_view = url->get_protocol();
+  if (protocol_view.ends_with(":")) {
+    protocol_view.remove_suffix(1);
+  }
+
+  auto search_view = url->get_search();
+  if (search_view.starts_with("?")) {
+    search_view.remove_prefix(1);
+  }
+
+  auto hash_view = url->get_hash();
+  if (hash_view.starts_with("#")) {
+    hash_view.remove_prefix(1);
+  }
+
+  return test_components(protocol_view, url->get_username(),
+                         url->get_password(), url->get_hostname(),
+                         url->get_port(), url->get_pathname(), search_view,
+                         hash_view);
 }
 
 template <url_pattern_regex::regex_concept regex_provider>
@@ -9290,74 +10338,61 @@ result<std::optional<url_pattern_result>> url_pattern<regex_provider>::match(
     }
   }
 
+  // Use fast_match which skips regex for simple patterns (EMPTY, EXACT_MATCH,
+  // FULL_WILDCARD) and only falls back to regex for complex REGEXP patterns.
+
   // Let protocolExecResult be RegExpBuiltinExec(urlPattern's protocol
   // component's regular expression, protocol).
-  auto protocol_exec_result =
-      regex_provider::regex_search(protocol, protocol_component.regexp);
-
+  auto protocol_exec_result = protocol_component.fast_match(protocol);
   if (!protocol_exec_result) {
     return std::nullopt;
   }
 
   // Let usernameExecResult be RegExpBuiltinExec(urlPattern's username
   // component's regular expression, username).
-  auto username_exec_result =
-      regex_provider::regex_search(username, username_component.regexp);
-
+  auto username_exec_result = username_component.fast_match(username);
   if (!username_exec_result) {
     return std::nullopt;
   }
 
   // Let passwordExecResult be RegExpBuiltinExec(urlPattern's password
   // component's regular expression, password).
-  auto password_exec_result =
-      regex_provider::regex_search(password, password_component.regexp);
-
+  auto password_exec_result = password_component.fast_match(password);
   if (!password_exec_result) {
     return std::nullopt;
   }
 
   // Let hostnameExecResult be RegExpBuiltinExec(urlPattern's hostname
   // component's regular expression, hostname).
-  auto hostname_exec_result =
-      regex_provider::regex_search(hostname, hostname_component.regexp);
-
+  auto hostname_exec_result = hostname_component.fast_match(hostname);
   if (!hostname_exec_result) {
     return std::nullopt;
   }
 
   // Let portExecResult be RegExpBuiltinExec(urlPattern's port component's
   // regular expression, port).
-  auto port_exec_result =
-      regex_provider::regex_search(port, port_component.regexp);
-
+  auto port_exec_result = port_component.fast_match(port);
   if (!port_exec_result) {
     return std::nullopt;
   }
 
   // Let pathnameExecResult be RegExpBuiltinExec(urlPattern's pathname
   // component's regular expression, pathname).
-  auto pathname_exec_result =
-      regex_provider::regex_search(pathname, pathname_component.regexp);
-
+  auto pathname_exec_result = pathname_component.fast_match(pathname);
   if (!pathname_exec_result) {
     return std::nullopt;
   }
 
   // Let searchExecResult be RegExpBuiltinExec(urlPattern's search component's
   // regular expression, search).
-  auto search_exec_result =
-      regex_provider::regex_search(search, search_component.regexp);
-
+  auto search_exec_result = search_component.fast_match(search);
   if (!search_exec_result) {
     return std::nullopt;
   }
 
   // Let hashExecResult be RegExpBuiltinExec(urlPattern's hash component's
   // regular expression, hash).
-  auto hash_exec_result =
-      regex_provider::regex_search(hash, hash_component.regexp);
-
+  auto hash_exec_result = hash_component.fast_match(hash);
   if (!hash_exec_result) {
     return std::nullopt;
   }
@@ -9706,8 +10741,8 @@ std::string constructor_string_parser<regex_provider>::make_component_string() {
   const auto component_start_input_index = component_start_token->index;
   // Return the code point substring from component start input index to end
   // index within parser's input.
-  return input.substr(component_start_input_index,
-                      end_index - component_start_input_index);
+  return std::string(input.substr(component_start_input_index,
+                                  end_index - component_start_input_index));
 }
 
 template <url_pattern_regex::regex_concept regex_provider>
@@ -9761,9 +10796,13 @@ constexpr bool constructor_string_parser<regex_provider>::is_port_prefix()
 constexpr void Tokenizer::get_next_code_point() {
   ada_log("Tokenizer::get_next_code_point called with index=", next_index);
   ADA_ASSERT_TRUE(next_index < input.size());
-  // this assumes that we have a valid, non-truncated UTF-8 stream.
+  // Decode the next UTF-8 code point. If malformed or truncated, mark it as
+  // invalid, return the offending byte as the code point, and advance by one
+  // to guarantee forward progress.
+  invalid_code_point = false;
   code_point = 0;
   size_t number_bytes = 0;
+  const size_t initial_index = next_index;
   unsigned char first_byte = input[next_index];
 
   if ((first_byte & 0x80) == 0) {
@@ -9791,10 +10830,40 @@ constexpr void Tokenizer::get_next_code_point() {
     number_bytes = 4;
     ada_log("Tokenizer::get_next_code_point four bytes");
   }
-  ADA_ASSERT_TRUE(number_bytes + next_index <= input.size());
+
+  // Invalid leading bytes that still match a multi-byte prefix.
+  if ((number_bytes == 2 && first_byte < 0xC2) ||
+      (number_bytes == 4 && first_byte > 0xF4)) {
+    invalid_code_point = true;
+    code_point = first_byte;
+    next_index = initial_index + 1;
+    return;
+  }
+
+  // Invalid leading byte (e.g., continuation byte outside a sequence).
+  if (number_bytes == 0) {
+    invalid_code_point = true;
+    code_point = first_byte;
+    next_index = initial_index + 1;
+    return;
+  }
+
+  // Truncated UTF-8 sequence.
+  if (number_bytes + next_index > input.size()) {
+    invalid_code_point = true;
+    code_point = first_byte;
+    next_index = initial_index + 1;
+    return;
+  }
 
   for (size_t i = 1 + next_index; i < number_bytes + next_index; ++i) {
     unsigned char byte = input[i];
+    if ((byte & 0xC0) != 0x80) {
+      invalid_code_point = true;
+      code_point = first_byte;
+      next_index = initial_index + 1;
+      return;
+    }
     ada_log("Tokenizer::get_next_code_point read byte=", uint32_t(byte));
     code_point = (code_point << 6) | (byte & 0x3F);
   }
@@ -10213,13 +11282,33 @@ tl::expected<std::vector<url_pattern_part>, errors> parse_pattern_string(
 template <url_pattern_regex::regex_concept regex_provider>
 bool protocol_component_matches_special_scheme(
     url_pattern_component<regex_provider>& component) {
-  // let's avoid unnecessary copy here.
-  auto& regex = component.regexp;
-  return regex_provider::regex_match("http", regex) ||
-         regex_provider::regex_match("https", regex) ||
-         regex_provider::regex_match("ws", regex) ||
-         regex_provider::regex_match("wss", regex) ||
-         regex_provider::regex_match("ftp", regex);
+  // Optimization: Use fast_test for simple patterns to avoid regex overhead
+  switch (component.type) {
+    case url_pattern_component_type::EMPTY:
+      // Empty pattern can't match any special scheme
+      return false;
+    case url_pattern_component_type::EXACT_MATCH:
+      // Direct string comparison for exact match patterns
+      return component.exact_match_value == "http" ||
+             component.exact_match_value == "https" ||
+             component.exact_match_value == "ws" ||
+             component.exact_match_value == "wss" ||
+             component.exact_match_value == "ftp" ||
+             component.exact_match_value == "file";
+    case url_pattern_component_type::FULL_WILDCARD:
+      // Full wildcard matches everything including special schemes
+      return true;
+    case url_pattern_component_type::REGEXP:
+      // Fall back to regex matching for complex patterns
+      auto& regex = component.regexp;
+      return regex_provider::regex_match("http", regex) ||
+             regex_provider::regex_match("https", regex) ||
+             regex_provider::regex_match("ws", regex) ||
+             regex_provider::regex_match("wss", regex) ||
+             regex_provider::regex_match("ftp", regex) ||
+             regex_provider::regex_match("file", regex);
+  }
+  ada::unreachable();
 }
 
 template <url_pattern_regex::regex_concept regex_provider>
@@ -10314,6 +11403,8 @@ constructor_string_parser<regex_provider>::parse(std::string_view input) {
       parser.group_depth += 1;
       // Increment parser's token index by parser's token increment.
       parser.token_index += parser.token_increment;
+      // Continue.
+      continue;
     }
 
     // If parser's group depth is greater than 0:
@@ -10515,13 +11606,13 @@ constructor_string_parser<regex_provider>::parse(std::string_view input) {
 #ifndef ADA_ADA_VERSION_H
 #define ADA_ADA_VERSION_H
 
-#define ADA_VERSION "3.3.0"
+#define ADA_VERSION "4.0.0"
 
 namespace ada {
 
 enum {
-  ADA_VERSION_MAJOR = 3,
-  ADA_VERSION_MINOR = 3,
+  ADA_VERSION_MAJOR = 4,
+  ADA_VERSION_MINOR = 0,
   ADA_VERSION_REVISION = 0,
 };
 
