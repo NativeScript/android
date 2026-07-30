@@ -70,6 +70,8 @@ set(RUNTIME_BUILTIN_JS
         ${RUNTIME_BUILTIN_JS_DIR}/inspect.js
         ${RUNTIME_BUILTIN_JS_DIR}/json-helper.js
         ${RUNTIME_BUILTIN_JS_DIR}/message-loop-timer.js
+        ${RUNTIME_BUILTIN_JS_DIR}/node-util.js
+        ${RUNTIME_BUILTIN_JS_DIR}/ns-util.js
         ${RUNTIME_BUILTIN_JS_DIR}/primordials.js
         ${RUNTIME_BUILTIN_JS_DIR}/require-factory.js
         ${RUNTIME_BUILTIN_JS_DIR}/weak-ref.js
@@ -174,6 +176,7 @@ add_library(
         src/main/cpp/ModuleInternal.cpp
         src/main/cpp/ModuleInternalCallbacks.cpp
         src/main/cpp/NativeScriptException.cpp
+        src/main/cpp/NsBuiltinModules.cpp
         src/main/cpp/NumericCasts.cpp
         src/main/cpp/ObjectManager.cpp
         src/main/cpp/Profiler.cpp

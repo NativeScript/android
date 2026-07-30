@@ -7,6 +7,7 @@
 #include "BuiltinLoader.h"
 #include "JSONObjectHelper.h"
 #include "MetadataNode.h"
+#include "NsBuiltinModules.h"
 #include "V8GlobalHelpers.h"
 #include <console/Console.h>
 
@@ -18,6 +19,7 @@ namespace tns {
         tns::MetadataNode::onDisposeIsolate(isolate);
         tns::Console::onDisposeIsolate(isolate);
         tns::JSONObjectHelper::onDisposeIsolate(isolate);
+        tns::NsBuiltinModules::onDisposeIsolate(isolate);
         tns::BuiltinLoader::onDisposeIsolate(isolate);
         // clear all isolate bound objects
         std::lock_guard<std::mutex> lock(isolateBoundObjectsMutex_);
