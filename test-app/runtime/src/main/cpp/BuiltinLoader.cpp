@@ -125,9 +125,9 @@ MaybeLocal<Value> CallBuiltin(Local<Context> context, BuiltinId id, Local<Value>
 
 /*
  * Snapshot of the intrinsics, taken the first time any builtin runs in this
- * isolate — during runtime init, before user code can replace a global. Later
- * builtins (smart-stringify compiles lazily, on the first object logged) get
- * the same pristine snapshot.
+ * isolate — during runtime init, before user code can replace a global.
+ * Builtins compiled later in the isolate's life get the same pristine
+ * snapshot.
  */
 MaybeLocal<Object> GetPrimordials(Local<Context> context) {
     Isolate* isolate = v8::Isolate::GetCurrent();
