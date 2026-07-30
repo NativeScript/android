@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "ArgConverter.h"
+#include "NsBuiltinModules.h"
 #include "robin_hood.h"
 
 using namespace v8;
@@ -22,22 +23,74 @@ std::vector<uint8_t> builtinCache[static_cast<unsigned>(BuiltinId::kCount)];
 /*
  * Every builtin is compiled as a function body receiving these fixed
  * parameters, mirroring Node's module wrapper: a file exports through
- * `module.exports`/`exports`, natives arrive as properties of the `binding`
- * bag (Node's internalBinding idiom) and intrinsics as properties of
- * `primordials`; each file destructures what it needs.
+ * `module.exports`/`exports`, reaches sibling builtin modules through
+ * `require`, natives arrive as properties of the `binding` bag (Node's
+ * internalBinding idiom) and intrinsics as properties of `primordials`; each
+ * file destructures what it needs.
  */
 constexpr const char* kExportsParamName = "exports";
+constexpr const char* kRequireParamName = "require";
 constexpr const char* kModuleParamName = "module";
 constexpr const char* kBindingParamName = "binding";
 constexpr const char* kPrimordialsParamName = "primordials";
-constexpr size_t kParamCount = 4;
+constexpr size_t kParamCount = 5;
 
 /*
- * Per-isolate intrinsics snapshot. Worker runtimes initialize on their own
- * threads, so every access is under the mutex.
+ * Per-isolate intrinsics snapshot and builtin require. Worker runtimes
+ * initialize on their own threads, so every access is under the mutex.
  */
 std::mutex primordialsMutex;
 robin_hood::unordered_map<Isolate*, Persistent<Object>*> isolateToPrimordials;
+std::mutex builtinRequireMutex;
+robin_hood::unordered_map<Isolate*, Persistent<v8::Function>*> isolateToBuiltinRequire;
+
+/*
+ * The `require` every builtin receives: builtin specifiers only, so a builtin
+ * can never reach application code or the filesystem.
+ */
+void BuiltinRequireCallback(const FunctionCallbackInfo<Value>& info) {
+    Isolate* isolate = info.GetIsolate();
+    if (info.Length() < 1 || !info[0]->IsString()) {
+        isolate->ThrowException(Exception::TypeError(ArgConverter::ConvertToV8String(
+                isolate, "require() expects a specifier string")));
+        return;
+    }
+
+    Local<Context> context = isolate->GetCurrentContext();
+    std::string specifier = ArgConverter::ConvertToString(info[0].As<v8::String>());
+    Local<Object> exports;
+    if (NsBuiltinModules::GetExports(context, specifier).ToLocal(&exports)) {
+        info.GetReturnValue().Set(exports);
+    } else if (!NsBuiltinModules::IsRegistered(specifier)) {
+        isolate->ThrowException(Exception::Error(ArgConverter::ConvertToV8String(
+                isolate, NsBuiltinModules::NotFoundMessage(specifier))));
+    }
+}
+
+MaybeLocal<v8::Function> GetBuiltinRequire(Local<Context> context) {
+    Isolate* isolate = v8::Isolate::GetCurrent();
+
+    {
+        std::lock_guard<std::mutex> lock(builtinRequireMutex);
+        auto it = isolateToBuiltinRequire.find(isolate);
+        if (it != isolateToBuiltinRequire.end()) {
+            return it->second->Get(isolate);
+        }
+    }
+
+    Local<v8::Function> require;
+    if (!v8::Function::New(context, BuiltinRequireCallback, Local<Value>(), 1,
+                           ConstructorBehavior::kThrow)
+                 .ToLocal(&require)) {
+        return MaybeLocal<v8::Function>();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(builtinRequireMutex);
+        isolateToBuiltinRequire.emplace(isolate, new Persistent<v8::Function>(isolate, require));
+    }
+    return require;
+}
 
 MaybeLocal<v8::Function> CompileBuiltin(Local<Context> context, BuiltinId id) {
     Isolate* isolate = v8::Isolate::GetCurrent();
@@ -57,6 +110,7 @@ MaybeLocal<v8::Function> CompileBuiltin(Local<Context> context, BuiltinId id) {
             isolate, builtin.source, static_cast<int>(builtin.length));
     Local<v8::String> params[] = {
             ArgConverter::ConvertToV8String(isolate, kExportsParamName),
+            ArgConverter::ConvertToV8String(isolate, kRequireParamName),
             ArgConverter::ConvertToV8String(isolate, kModuleParamName),
             ArgConverter::ConvertToV8String(isolate, kBindingParamName),
             ArgConverter::ConvertToV8String(isolate, kPrimordialsParamName)};
@@ -106,6 +160,11 @@ MaybeLocal<Value> CallBuiltin(Local<Context> context, BuiltinId id, Local<Value>
         return MaybeLocal<Value>();
     }
 
+    Local<v8::Function> require;
+    if (!GetBuiltinRequire(context).ToLocal(&require)) {
+        return MaybeLocal<Value>();
+    }
+
     Local<Object> exportsObj = Object::New(isolate);
     Local<Object> moduleObj = Object::New(isolate);
     Local<v8::String> exportsKey = ArgConverter::ConvertToV8String(isolate, kExportsParamName);
@@ -113,7 +172,7 @@ MaybeLocal<Value> CallBuiltin(Local<Context> context, BuiltinId id, Local<Value>
         return MaybeLocal<Value>();
     }
 
-    Local<Value> args[] = {exportsObj, moduleObj,
+    Local<Value> args[] = {exportsObj, require, moduleObj,
                            binding.IsEmpty() ? Undefined(isolate).As<Value>() : binding,
                            primordials};
     if (fn->Call(context, Undefined(isolate), static_cast<int>(kParamCount), args).IsEmpty()) {
@@ -168,11 +227,20 @@ MaybeLocal<Value> BuiltinLoader::RunBuiltin(Local<Context> context, BuiltinId id
 }
 
 void BuiltinLoader::onDisposeIsolate(Isolate* isolate) {
-    std::lock_guard<std::mutex> lock(primordialsMutex);
-    auto it = isolateToPrimordials.find(isolate);
-    if (it != isolateToPrimordials.end()) {
+    {
+        std::lock_guard<std::mutex> lock(primordialsMutex);
+        auto it = isolateToPrimordials.find(isolate);
+        if (it != isolateToPrimordials.end()) {
+            delete it->second;
+            isolateToPrimordials.erase(it);
+        }
+    }
+
+    std::lock_guard<std::mutex> lock(builtinRequireMutex);
+    auto it = isolateToBuiltinRequire.find(isolate);
+    if (it != isolateToBuiltinRequire.end()) {
         delete it->second;
-        isolateToPrimordials.erase(it);
+        isolateToBuiltinRequire.erase(it);
     }
 }
 

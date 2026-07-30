@@ -76,6 +76,7 @@ for (const file of inputs) {
   }
   if (!file.endsWith('.js')) {
     console.error(`error: builtins must be .js function bodies, got: ${file}`);
+    console.error('(.mjs/source-text modules are deliberately unsupported — see docs/ns-builtin-modules.md)');
     process.exit(1);
   }
   const stem = basename(file).replace(/\.js$/, '');

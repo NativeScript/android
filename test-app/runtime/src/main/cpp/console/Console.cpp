@@ -18,6 +18,7 @@
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
 #include "Console.h"
+#include "NsBuiltinModules.h"
 #include "robin_hood.h"
 
 namespace tns {
@@ -81,6 +82,12 @@ static void getNativeWrapperHintCallback(const v8::FunctionCallbackInfo<v8::Valu
 void Console::initInspect(v8::Local<v8::Context> context) {
     auto isolate = v8::Isolate::GetCurrent();
 
+    if (!getInspectFunction(isolate).IsEmpty()) {
+        // inspect.js installs a non-configurable global.__inspect, so a second
+        // run in the same realm would throw.
+        return;
+    }
+
     v8::Local<v8::Function> hintFunc;
     if (!v8::Function::New(context, getNativeWrapperHintCallback).ToLocal(&hintFunc)) {
         __android_log_write(ANDROID_LOG_WARN, LOG_TAG,
@@ -107,6 +114,11 @@ void Console::initInspect(v8::Local<v8::Context> context) {
 
     std::lock_guard<std::mutex> lock(inspectMutex);
     isolateToInspect.emplace(isolate, new v8::Persistent<v8::Function>(isolate, result.As<v8::Function>()));
+}
+
+v8::Local<v8::Function> Console::getInspect(v8::Local<v8::Context> context) {
+    initInspect(context);
+    return getInspectFunction(v8::Isolate::GetCurrent());
 }
 
 // depth < 0 leaves the builtin's own default (2); console.dir passes 4.
@@ -212,9 +224,32 @@ std::string buildStringFromArg(v8::Isolate* isolate, const v8::Local<v8::Value>&
 std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info, int startingIndex = 0) {
     auto isolate = info.GetIsolate();
     v8::HandleScope scope(isolate);
+    auto context = isolate->GetCurrentContext();
+    auto argLen = info.Length();
+
+    // console.* follows Node: the arguments go through util.format, so the
+    // first one may carry %-substitutions and the rest are appended
+    // space-separated.
+    auto format = argLen > startingIndex ? NsBuiltinModules::GetFormatFunc(context)
+                                         : v8::Local<v8::Function>();
+    if (!format.IsEmpty()) {
+        std::vector<v8::Local<v8::Value>> formatArgs;
+        formatArgs.reserve(argLen - startingIndex);
+        for (int i = startingIndex; i < argLen; i++) {
+            formatArgs.push_back(info[i]);
+        }
+        v8::TryCatch tc(isolate);
+        v8::Local<v8::Value> result;
+        if (format->Call(context, v8::Undefined(isolate), static_cast<int>(formatArgs.size()),
+                         formatArgs.data()).ToLocal(&result) &&
+                result->IsString()) {
+            return ArgConverter::ConvertToString(result.As<v8::String>());
+        }
+    }
+
+    // ns:util unavailable or the formatter threw: per-argument rendering.
     std::stringstream ss;
 
-    auto argLen = info.Length();
     if (argLen) {
         for (int i = startingIndex; i < argLen; i++) {
             // separate args with a space

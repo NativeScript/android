@@ -9,17 +9,24 @@ build time a CMake custom command runs `tools/js2c.mjs`, which embeds them into
 ## Contract (Node's module wrapper + internalBinding idiom)
 
 Every file is compiled as a **function body** via `v8::ScriptCompiler::CompileFunction`
-with the fixed parameters `exports`, `module`, `binding` and `primordials`:
+with the fixed parameters `exports`, `require`, `module`, `binding` and
+`primordials`:
 
 ```js
 const { someNative, anotherNative } = binding;
 const { ArrayPrototypeSlice, ObjectCreate } = primordials;
+const { inspect } = require("ns:util");
 
 module.exports = somethingTheCallSiteNeeds;
 ```
 
 - `binding` is a plain object of natives built by the C++ call site; a file
   that needs nothing from C++ simply doesn't mention it.
+- `require` resolves **builtin specifiers only** (`ns:util`, `node:util`, …),
+  never a path or a package; an unknown one throws
+  `No such built-in module: <specifier>`. It is how a `node:` shim consumes the
+  `ns:` module it adapts, and it materializes that module on first use.
+  Requiring a module that is still loading throws rather than recursing.
 - `primordials` is the frozen intrinsics snapshot built by `primordials.js`
   (see below), the same object for every builtin in an isolate.
 - **`module.exports` is the export channel** — whatever it holds when the file
@@ -35,6 +42,10 @@ module.exports = somethingTheCallSiteNeeds;
   internal `__inspect` global): budgeted output, no getter invocation,
   tamper-immune via primordials. Console routes all object formatting
   through it.
+- `ns-util.js` is the `ns:util` module app code requires and `node-util.js` the
+  `node:util` shim: one source file per specifier, the shim owning every bit of
+  Node compatibility. See `docs/ns-builtin-modules.md` for the cross-runtime
+  contract.
 - Destructure `binding` and `primordials` once, at the top of the file, so the
   file's dependencies are visible and greppable.
 
@@ -46,8 +57,8 @@ module.exports = somethingTheCallSiteNeeds;
   (`URLSearchParams`, …) capture it into a file-level `const`.
 - No `import`/`export` — these are classic function bodies, not modules.
 - ESLint (`eslint.config.mjs` at the repo root, `npm run lint`) declares
-  `exports`, `module`, `binding`, `primordials` and the reachable native
-  globals; `no-undef` is the typo net. If a builtin starts using a new native
+  `exports`, `require`, `module`, `binding`, `primordials` and the reachable
+  native globals; `no-undef` is the typo net. If a builtin starts using a new native
   global, add it there. `no-restricted-properties` fails the lint on direct use
   of the captured statics (`JSON.stringify`, `Object.defineProperty`, …).
   Uncurried instance methods can't be matched that way, so `list.slice()`

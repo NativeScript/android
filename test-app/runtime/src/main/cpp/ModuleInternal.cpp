@@ -14,6 +14,7 @@
 #include "NativeScriptAssert.h"
 #include "Constants.h"
 #include "NativeScriptException.h"
+#include "NsBuiltinModules.h"
 #include "Util.h"
 #include "SimpleProfiler.h"
 #include "include/v8.h"
@@ -174,6 +175,23 @@ void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Valu
     }
 
     string moduleName = ArgConverter::ConvertToString(args[0].As<String>());
+
+    // Builtin modules resolve before any path handling, so they can never be
+    // shadowed by a file or a package, and an unknown one fails as a missing
+    // builtin rather than as a missing file. Only prefixed specifiers get
+    // here: a bare `util` still resolves through npm.
+    if (NsBuiltinModules::IsBuiltinScheme(moduleName)) {
+        auto context = isolate->GetCurrentContext();
+        Local<Object> exports;
+        if (NsBuiltinModules::GetExports(context, moduleName).ToLocal(&exports)) {
+            args.GetReturnValue().Set(exports);
+        } else if (!NsBuiltinModules::IsRegistered(moduleName)) {
+            isolate->ThrowException(Exception::Error(ArgConverter::ConvertToV8String(
+                    isolate, NsBuiltinModules::NotFoundMessage(moduleName))));
+        }
+        return;
+    }
+
     tns::instrumentation::Frame frame("RequireCallback " + moduleName);
     string callingModuleDirName = ArgConverter::ConvertToString(args[1].As<String>());
     auto isData = false;
