@@ -22,6 +22,10 @@ thumbs.db
 
 .classpath
 android-runtime.iml
+
+# Emitted by tools/js2c.mjs from test-app/runtime/src/main/cpp/js during the build.
+test-app/runtime/src/main/cpp/generated/
+
 test-app/build-tools/*.log
 test-app/analytics/build-statistics.json
 package-lock.json

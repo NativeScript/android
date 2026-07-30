@@ -12,7 +12,6 @@ private:
     bool m_isRunning;
     int m_fd[2];
 
-    void RegisterStartStopFunctions(v8::Local<v8::Context> context);
     static void StartCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void StopCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static int PumpMessageLoopCallback(int fd, int events, void* data);
