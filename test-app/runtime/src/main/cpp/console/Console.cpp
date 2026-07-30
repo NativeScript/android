@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <chrono>
 #include <iomanip>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -15,9 +16,25 @@
 #include <NativeScriptException.h>
 
 #include "ArgConverter.h"
+#include "BuiltinLoader.h"
 #include "Console.h"
+#include "robin_hood.h"
 
 namespace tns {
+
+// internal/inspect.js, one compiled instance per isolate. Worker runtimes
+// initialize on their own threads, so every access is under the mutex.
+static std::mutex inspectMutex;
+static robin_hood::unordered_map<v8::Isolate*, v8::Persistent<v8::Function>*> isolateToInspect;
+
+static v8::Local<v8::Function> getInspectFunction(v8::Isolate* isolate) {
+    std::lock_guard<std::mutex> lock(inspectMutex);
+    auto it = isolateToInspect.find(isolate);
+    if (it == isolateToInspect.end()) {
+        return v8::Local<v8::Function>();
+    }
+    return it->second->Get(isolate);
+}
 
 v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, ConsoleCallback callback, const int maxLogcatObjectSize, const bool forceLog) {
     m_callback = callback;
@@ -44,7 +61,87 @@ v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, Con
     bindFunctionProperty(context, console, "time", timeCallback);
     bindFunctionProperty(context, console, "timeEnd", timeEndCallback);
 
+    initInspect(context);
+
     return console;
+}
+
+static void getNativeWrapperHintCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    auto isolate = info.GetIsolate();
+    if (info.Length() < 1) {
+        return;
+    }
+
+    std::string hint = GetNativeWrapperHint(isolate, info[0]);
+    if (!hint.empty()) {
+        info.GetReturnValue().Set(ArgConverter::ConvertToV8String(isolate, hint));
+    }
+}
+
+void Console::initInspect(v8::Local<v8::Context> context) {
+    auto isolate = v8::Isolate::GetCurrent();
+
+    v8::Local<v8::Function> hintFunc;
+    if (!v8::Function::New(context, getNativeWrapperHintCallback).ToLocal(&hintFunc)) {
+        __android_log_write(ANDROID_LOG_WARN, LOG_TAG,
+                            "Warning: Console failed to create the native-hint binding");
+        return;
+    }
+
+    auto binding = v8::Object::New(isolate);
+    if (!binding->Set(context, ArgConverter::ConvertToV8String(isolate, "getNativeWrapperHint"),
+                      hintFunc).FromMaybe(false)) {
+        __android_log_write(ANDROID_LOG_WARN, LOG_TAG,
+                            "Warning: Console failed to populate the inspect binding");
+        return;
+    }
+
+    v8::TryCatch tc(isolate);
+    v8::Local<v8::Value> result;
+    if (!BuiltinLoader::RunBuiltin(context, BuiltinId::kInspect, binding).ToLocal(&result) ||
+            !result->IsFunction()) {
+        __android_log_write(ANDROID_LOG_WARN, LOG_TAG,
+                            "Warning: Console failed to initialize the inspect builtin");
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(inspectMutex);
+    isolateToInspect.emplace(isolate, new v8::Persistent<v8::Function>(isolate, result.As<v8::Function>()));
+}
+
+// depth < 0 leaves the builtin's own default (2); console.dir passes 4.
+static std::string inspectValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val, int depth = -1) {
+    auto context = isolate->GetCurrentContext();
+
+    auto inspect = getInspectFunction(isolate);
+    if (!inspect.IsEmpty()) {
+        v8::Local<v8::Value> args[2];
+        int argc = 1;
+        args[0] = val;
+        if (depth >= 0) {
+            auto options = v8::Object::New(isolate);
+            if (options->Set(context, ArgConverter::ConvertToV8String(isolate, "depth"),
+                             v8::Number::New(isolate, depth)).FromMaybe(false)) {
+                args[1] = options;
+                argc = 2;
+            }
+        }
+
+        v8::TryCatch tc(isolate);
+        v8::Local<v8::Value> result;
+        if (inspect->Call(context, v8::Undefined(isolate), argc, args).ToLocal(&result) &&
+                result->IsString()) {
+            return ArgConverter::ConvertToString(result.As<v8::String>());
+        }
+    }
+
+    // Init failed or the formatter threw: degrade to V8's own short description.
+    v8::TryCatch tc(isolate);
+    v8::Local<v8::String> fallback;
+    if (val->ToDetailString(context).ToLocal(&fallback)) {
+        return ArgConverter::ConvertToString(fallback);
+    }
+    return "";
 }
 
 void Console::sendToADBLogcat(const std::string& message, android_LogPriority logPriority) {
@@ -94,59 +191,22 @@ void Console::sendToDevToolsFrontEnd(v8::Isolate* isolate, ConsoleAPIType method
     m_callback(isolate, method, args);
 }
 
-std::string transformJSObject(v8::Isolate* isolate, v8::Local<v8::Object> object) {
-    auto context = isolate->GetCurrentContext();
-    auto objToString = object->ToString(context).ToLocalChecked();
-    auto objToCppString = ArgConverter::ConvertToString(objToString);
-
-    auto hasCustomToStringImplementation = objToCppString.find("[object Object]") == std::string::npos;
-
-    if (hasCustomToStringImplementation) {
-        return objToCppString;
-    } else {
-        return JsonStringifyObject(isolate, object);
-    }
-}
-
 std::string buildStringFromArg(v8::Isolate* isolate, const v8::Local<v8::Value>& val) {
-    if (val->IsFunction()) {
-        auto v8FunctionString = val->ToDetailString(isolate->GetCurrentContext()).ToLocalChecked();
-        return ArgConverter::ConvertToString(v8FunctionString);
-    } else if (val->IsArray()) {
-        auto context = isolate->GetCurrentContext();
-        auto cachedSelf = val;
-        auto array = val->ToObject(context).ToLocalChecked();
-        auto arrayEntryKeys = array->GetPropertyNames(isolate->GetCurrentContext()).ToLocalChecked();
-
-        auto arrayLength = arrayEntryKeys->Length();
-        std::string argString = "[";
-
-        for (int i = 0; i < arrayLength; i++) {
-            auto propertyName = arrayEntryKeys->Get(context, i).ToLocalChecked();
-            auto propertyValue = array->Get(context, propertyName).ToLocalChecked();
-
-            // avoid bottomless recursion with cyclic reference to the same array
-            if (propertyValue->StrictEquals(cachedSelf)) {
-                argString.append("[Circular]");
-                continue;
-            }
-
-            auto objectString = buildStringFromArg(isolate, propertyValue);
-            argString.append(objectString);
-
-            if (i != arrayLength - 1) {
-                argString.append(", ");
-            }
-        }
-
-        return argString.append("]");
-    } else if (val->IsObject()) {
-        v8::Local<v8::Object> obj = val.As<v8::Object>();
-        return transformJSObject(isolate, obj);
-    } else {
-        auto v8DefaultToString = val->ToDetailString(isolate->GetCurrentContext()).ToLocalChecked();
-        return ArgConverter::ConvertToString(v8DefaultToString);
+    // Top-level strings print raw (console.log("hi") -> hi); everything else
+    // that can carry structure goes through the inspect builtin.
+    if (val->IsString()) {
+        return ArgConverter::ConvertToString(val.As<v8::String>());
     }
+    if (val->IsObject()) {
+        return inspectValue(isolate, val);
+    }
+
+    v8::TryCatch tc(isolate);
+    v8::Local<v8::String> detail;
+    if (val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&detail)) {
+        return ArgConverter::ConvertToString(detail);
+    }
+    return "";
 }
 
 std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info, int startingIndex = 0) {
@@ -290,7 +350,6 @@ void Console::warnCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     try {
         auto isolate = info.GetIsolate();
-        auto context = isolate->GetCurrentContext();
 
         v8::HandleScope scope(isolate);
 
@@ -300,40 +359,7 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
         if (argLen) {
             if (info[0]->IsObject()) {
                 ss << "==== object dump start ====" << std::endl;
-                v8::Local<v8::Object> argObject = info[0].As<v8::Object>();
-
-                v8::Local<v8::Array> propNames;
-                argObject->GetPropertyNames(context).ToLocal(&propNames);
-
-                auto propertiesLen = propNames->Length();
-                for (int i = 0; i < propertiesLen; i++) {
-                    auto propertyName = propNames->Get(context, i).ToLocalChecked();
-                    auto propertyValue = argObject->Get(context, propertyName).ToLocalChecked();
-
-                    auto propIsFunction = propertyValue->IsFunction();
-
-                    ss << ArgConverter::ConvertToString(propertyName->ToString(context).ToLocalChecked());
-
-                    if (propIsFunction) {
-                        ss << "()";
-                    } else if (propertyValue->IsArray()) {
-                        std::string jsonStringifiedArray = buildStringFromArg(isolate, propertyValue);
-                        ss << ": " << jsonStringifiedArray;
-                    } else if (propertyValue->IsObject()) {
-                        auto obj = propertyValue->ToObject(context).ToLocalChecked();
-                        auto jsonStringifiedObject = transformJSObject(isolate, obj);
-                        // if object prints out as the error string for circular references, replace with #CR instead for brevity
-                        if (jsonStringifiedObject.find("circular structure") != std::string::npos) {
-                            jsonStringifiedObject = "#CR";
-                        }
-                        ss << ": " << jsonStringifiedObject;
-                    } else {
-                        ss << ": \"" << ArgConverter::ConvertToString(propertyValue->ToDetailString(context).ToLocalChecked()) << "\"";
-                    }
-
-                    ss << std::endl;
-                }
-
+                ss << inspectValue(isolate, info[0], 4) << std::endl;
                 ss << "==== object dump end ====" << std::endl;
             } else {
                 std::string logString = buildLogString(info);
@@ -537,6 +563,13 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
 void Console::onDisposeIsolate(v8::Isolate* isolate) {
     s_isolateToConsoleTimersMap.erase(isolate);
+
+    std::lock_guard<std::mutex> lock(inspectMutex);
+    auto it = isolateToInspect.find(isolate);
+    if (it != isolateToInspect.end()) {
+        delete it->second;
+        isolateToInspect.erase(it);
+    }
 }
 
 const char* Console::LOG_TAG = "JS";

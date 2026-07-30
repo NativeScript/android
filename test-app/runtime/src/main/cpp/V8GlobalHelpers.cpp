@@ -1,79 +1,67 @@
 #include "V8GlobalHelpers.h"
 #include "ArgConverter.h"
-#include "BuiltinLoader.h"
 #include "CallbackHandlers.h"
 #include "include/v8.h"
 #include "JEnv.h"
+#include "MetadataNode.h"
 #include "NativeScriptException.h"
+#include "ObjectManager.h"
+#include "Runtime.h"
+#include <algorithm>
 #include <sstream>
-#include "robin_hood.h"
 
 using namespace v8;
 using namespace std;
 
-static robin_hood::unordered_map<v8::Isolate*, v8::Persistent<v8::Function>*> isolateToPersistentSmartJSONStringify = robin_hood::unordered_map<v8::Isolate*, v8::Persistent<v8::Function>*>();
-
-Local<Function> GetSmartJSONStringifyFunction(Isolate* isolate) {
-    auto it = isolateToPersistentSmartJSONStringify.find(isolate);
-    if (it != isolateToPersistentSmartJSONStringify.end()) {
-        auto smartStringifyPersistentFunction = it->second;
-
-        return smartStringifyPersistentFunction->Get(isolate);
-    }
-
-    auto context = isolate->GetCurrentContext();
-
-    Local<Value> result;
-    if (!tns::BuiltinLoader::RunBuiltin(context, tns::BuiltinId::kSmartStringify).ToLocal(&result) ||
-            !result->IsFunction()) {
-        return Local<Function>();
-    }
-
-    auto smartStringifyFunction = result.As<Function>();
-
-    auto smartStringifyPersistentFunction = new Persistent<Function>(isolate, smartStringifyFunction);
-
-    isolateToPersistentSmartJSONStringify.emplace(isolate, smartStringifyPersistentFunction);
-
-    return smartStringifyPersistentFunction->Get(isolate);
+// Metadata carries slashed JNI names; logs read better dotted.
+static std::string ToDottedName(std::string name) {
+    std::replace(name.begin(), name.end(), '/', '.');
+    return name;
 }
 
-std::string tns::JsonStringifyObject(Isolate* isolate, v8::Local<v8::Object> value, bool handleCircularReferences) {
-    if (value.IsEmpty()) {
+// A JS object linked to a Java counterpart holds a JSInstanceInfo External in
+// its first internal field. The field count alone does not identify one: V8
+// hands typed arrays and array buffers the same number of embedder fields.
+static bool HasJavaCounterpart(Isolate* isolate, const Local<Object>& object) {
+    auto objectManager = tns::Runtime::GetObjectManager(isolate);
+    if (objectManager == nullptr || !objectManager->IsJsRuntimeObject(object)) {
+        return false;
+    }
+
+    const int jsInfoIdx = static_cast<int>(tns::ObjectManager::MetadataNodeKeys::JsInfo);
+    return object->GetInternalField(jsInfoIdx).As<Value>()->IsExternal();
+}
+
+std::string tns::GetNativeWrapperHint(Isolate* isolate, const Local<Value>& value) {
+    if (isolate == nullptr || value.IsEmpty() || !value->IsObject() || value->IsFunction()) {
         return "";
     }
 
-    auto context = isolate->GetCurrentContext();
-    if (handleCircularReferences) {
-        Local<Function> smartJSONStringifyFunction = GetSmartJSONStringifyFunction(isolate);
+    auto object = value.As<Object>();
+    std::string name;
 
-        if (!smartJSONStringifyFunction.IsEmpty()) {
-            if (value->IsObject()) {
-                v8::Local<v8::Value> resultValue;
-                v8::TryCatch tc(isolate);
-
-                Local<Value> args[] = { value };
-                auto success = smartJSONStringifyFunction
-                        ->Call(context, Undefined(isolate), 1, args)
-                        .ToLocal(&resultValue);
-
-                if (success && !tc.HasCaught()) {
-                    auto res = resultValue.As<v8::String>();
-                    return ArgConverter::ConvertToString(res);
-                }
-            }
-        }
+    if (MetadataNode::TryGetPackageName(isolate, object, name)) {
+        return "package " + ToDottedName(name);
     }
 
-    v8::Local<v8::String> resultString;
-    v8::TryCatch tc(isolate);
-    auto success = v8::JSON::Stringify(context, value).ToLocal(&resultString);
-
-    if (!success && tc.HasCaught()) {
-        throw NativeScriptException(tc);
+    if (MetadataNode::TryGetInstanceTypeName(isolate, object, name)) {
+        return ToDottedName(name);
     }
 
-    return ArgConverter::ConvertToString(resultString);
+    if (!HasJavaCounterpart(isolate, object)) {
+        return "";
+    }
+
+    // TypeScript instances sit one level below the registered instance, which
+    // is where the metadata lives (see the object layout notes in
+    // MetadataNode.h).
+    auto prototype = object->GetPrototype();
+    if (prototype->IsObject() &&
+            MetadataNode::TryGetInstanceTypeName(isolate, prototype.As<Object>(), name)) {
+        return ToDottedName(name);
+    }
+
+    return "JavaObject";
 }
 
 bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<String>& propName, Local<Value>& out) {
@@ -115,8 +103,4 @@ bool tns::V8SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Lo
     }
 
     return res.FromMaybe(false);
-}
-
-void tns::V8GlobalHelpers::onDisposeIsolate(Isolate* isolate) {
-    isolateToPersistentSmartJSONStringify.erase(isolate);
 }

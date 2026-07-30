@@ -30,6 +30,52 @@ void MetadataNode::Init(Isolate* isolate) {
     auto key = ArgConverter::ConvertToV8String(isolate, "tns::MetadataKey");
     auto cache = GetMetadataNodeCache(isolate);
     cache->MetadataKey = new Persistent<String>(isolate, key);
+    cache->PackageKey = new Persistent<String>(
+        isolate, ArgConverter::ConvertToV8String(isolate, "tns::PackageKey"));
+}
+
+// Deliberately not V8GetPrivateValue: that one resolves the creation context,
+// which hard-crashes on values that have none (a revoked proxy), and throws
+// when the lookup comes back Nothing. Callers here take arbitrary values.
+static void* TryReadPrivateExternal(Isolate* isolate, const Local<Object>& value, Persistent<String>* key) {
+    if (key == nullptr) {
+        return nullptr;
+    }
+
+    auto context = isolate->GetCurrentContext();
+    if (context.IsEmpty()) {
+        return nullptr;
+    }
+
+    Local<Value> hidden;
+    auto privateKey = Private::ForApi(isolate, Local<String>::New(isolate, *key));
+    if (!value->GetPrivate(context, privateKey).ToLocal(&hidden) || !hidden->IsExternal()) {
+        return nullptr;
+    }
+
+    return hidden.As<External>()->Value(v8::kExternalPointerTypeTagDefault);
+}
+
+bool MetadataNode::TryGetInstanceTypeName(Isolate* isolate, const Local<Object>& value, std::string& out) {
+    auto cache = GetMetadataNodeCache(isolate);
+    auto node = static_cast<MetadataNode*>(TryReadPrivateExternal(isolate, value, cache->MetadataKey));
+    if (node == nullptr) {
+        return false;
+    }
+
+    out = node->m_name;
+    return true;
+}
+
+bool MetadataNode::TryGetPackageName(Isolate* isolate, const Local<Object>& value, std::string& out) {
+    auto cache = GetMetadataNodeCache(isolate);
+    auto node = static_cast<MetadataNode*>(TryReadPrivateExternal(isolate, value, cache->PackageKey));
+    if (node == nullptr) {
+        return false;
+    }
+
+    out = node->m_name;
+    return true;
 }
 
 Local<ObjectTemplate> MetadataNode::GetOrCreateArrayObjectTemplate(Isolate* isolate) {
@@ -234,10 +280,20 @@ Local<Object> MetadataNode::CreateArrayWrapper(Isolate* isolate) {
 
 Local<Object> MetadataNode::CreatePackageObject(Isolate* isolate) {
     auto packageObj = Object::New(isolate);
+    auto ctx = isolate->GetCurrentContext();
+    auto extData = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
+
+    // Every child is a native data property, so anything that reads a property
+    // descriptor off a package object - console formatting, most notably -
+    // would materialize the whole subtree. The marker lets such callers
+    // recognize a package and stop.
+    auto cache = GetMetadataNodeCache(isolate);
+    packageObj->SetPrivate(ctx,
+                           Private::ForApi(isolate, Local<String>::New(isolate, *cache->PackageKey)),
+                           extData).ToChecked();
+
     auto ptrChildren = this->m_treeNode->children;
     if (ptrChildren != nullptr) {
-        auto ctx = isolate->GetCurrentContext();
-        auto extData = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
         const auto& children = *ptrChildren;
         for (auto childNode: children) {
             packageObj->SetNativeDataProperty(ctx,

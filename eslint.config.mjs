@@ -13,15 +13,20 @@ import globals from 'globals';
 // review rule.
 const capturedStatics = [
   ['Array', 'isArray', 'ArrayIsArray'],
+  ['ArrayBuffer', 'isView', 'ArrayBufferIsView'],
   ['JSON', 'stringify', 'JSONStringify'],
   ['Object', 'create', 'ObjectCreate'],
   ['Object', 'defineProperty', 'ObjectDefineProperty'],
+  ['Object', 'getOwnPropertyDescriptor', 'ObjectGetOwnPropertyDescriptor'],
+  ['Object', 'getOwnPropertySymbols', 'ObjectGetOwnPropertySymbols'],
+  ['Object', 'getPrototypeOf', 'ObjectGetPrototypeOf'],
+  ['Object', 'is', 'ObjectIs'],
   ['Object', 'keys', 'ObjectKeys'],
 ];
 
 // Captured constructors. A destructure from `primordials` shadows the global,
 // so these only fire on the unguarded reference.
-const restrictedGlobals = ['Date', 'Map', 'Proxy', 'String', 'TypeError'].map((name) => ({
+const restrictedGlobals = ['Date', 'Map', 'Proxy', 'Set', 'String', 'TypeError'].map((name) => ({
   name,
   message: `Destructure ${name} from primordials — builtins must not read intrinsics off globals user code can replace.`,
 }));
