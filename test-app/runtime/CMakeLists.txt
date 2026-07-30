@@ -69,6 +69,7 @@ set(RUNTIME_BUILTIN_JS
         ${RUNTIME_BUILTIN_JS_DIR}/events.js
         ${RUNTIME_BUILTIN_JS_DIR}/json-helper.js
         ${RUNTIME_BUILTIN_JS_DIR}/message-loop-timer.js
+        ${RUNTIME_BUILTIN_JS_DIR}/primordials.js
         ${RUNTIME_BUILTIN_JS_DIR}/require-factory.js
         ${RUNTIME_BUILTIN_JS_DIR}/smart-stringify.js
         ${RUNTIME_BUILTIN_JS_DIR}/weak-ref.js

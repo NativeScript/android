@@ -10,9 +10,12 @@ class BuiltinLoader {
 public:
     /*
      * Compiles the builtin identified by id as a function body with the fixed
-     * parameters `exports`, `module` and `binding` (Node's module wrapper plus
-     * its internalBinding idiom), calls it with the given bag of natives (or
-     * undefined when omitted), and returns the resulting `module.exports`.
+     * parameters `exports`, `module`, `binding` (Node's module wrapper plus
+     * its internalBinding idiom) and `primordials`, calls it with the given
+     * bag of natives (or undefined when omitted) plus this isolate's frozen
+     * intrinsics snapshot, and returns the resulting `module.exports`. The
+     * snapshot is produced by the kPrimordials builtin on first use and cached
+     * per isolate, so it is taken before any user code can replace a global.
      * Scripts carry an "internal/<name>.js" origin so runtime frames are
      * identifiable in stack traces. Compilation goes through a process-wide
      * bytecode cache: the first run in the process compiles eagerly and
@@ -22,6 +25,8 @@ public:
     static v8::MaybeLocal<v8::Value> RunBuiltin(
             v8::Local<v8::Context> context, BuiltinId id,
             v8::Local<v8::Value> binding = v8::Local<v8::Value>());
+
+    static void onDisposeIsolate(v8::Isolate* isolate);
 };
 
 }  // namespace tns

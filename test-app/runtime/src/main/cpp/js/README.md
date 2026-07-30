@@ -9,16 +9,19 @@ build time a CMake custom command runs `tools/js2c.mjs`, which embeds them into
 ## Contract (Node's module wrapper + internalBinding idiom)
 
 Every file is compiled as a **function body** via `v8::ScriptCompiler::CompileFunction`
-with the fixed parameters `exports`, `module` and `binding`:
+with the fixed parameters `exports`, `module`, `binding` and `primordials`:
 
 ```js
 const { someNative, anotherNative } = binding;
+const { ArrayPrototypeSlice, ObjectCreate } = primordials;
 
 module.exports = somethingTheCallSiteNeeds;
 ```
 
 - `binding` is a plain object of natives built by the C++ call site; a file
   that needs nothing from C++ simply doesn't mention it.
+- `primordials` is the frozen intrinsics snapshot built by `primordials.js`
+  (see below), the same object for every builtin in an isolate.
 - **`module.exports` is the export channel** — whatever it holds when the file
   finishes is what `RunBuiltin` hands back to C++ (used for factory functions
   and init results). Both CommonJS styles work: replace the whole export with
@@ -28,19 +31,53 @@ module.exports = somethingTheCallSiteNeeds;
   every tool that isn't reading this repo's ESLint config (editors' TS server,
   prettier, review bots) rejects the file as invalid JavaScript.
 - Strict mode is per-file: start the file with `"use strict";` to opt in.
-- Destructure `binding` once, at the top of the file, so the file's native
-  dependencies are visible and greppable.
+- Destructure `binding` and `primordials` once, at the top of the file, so the
+  file's dependencies are visible and greppable.
 
 ## Rules
 
 - Run at isolate init, before any user code: capture any global you rely on
   (e.g. `globalThis.Event`) eagerly so later monkey-patching can't break you.
+  For intrinsics that is what `primordials` is; for everything else
+  (`URLSearchParams`, …) capture it into a file-level `const`.
 - No `import`/`export` — these are classic function bodies, not modules.
 - ESLint (`eslint.config.mjs` at the repo root, `npm run lint`) declares
-  `exports`, `module`, `binding` and the reachable native globals; `no-undef`
-  is the typo net. If a builtin starts using a new native global, add it there.
+  `exports`, `module`, `binding`, `primordials` and the reachable native
+  globals; `no-undef` is the typo net. If a builtin starts using a new native
+  global, add it there. `no-restricted-properties` fails the lint on direct use
+  of the captured statics (`JSON.stringify`, `Object.defineProperty`, …).
+  Uncurried instance methods can't be matched that way, so `list.slice()`
+  instead of `ArrayPrototypeSlice(list)` is caught by review, not by the
+  linter.
 - File names are kebab-case; the name determines the `BuiltinId` enum value
   (`weak-ref.js` → `kWeakRef`) and the script origin. New files must also be
   added to `RUNTIME_BUILTIN_JS` in `test-app/runtime/CMakeLists.txt` — the
   build fails with an explicit message if that list drifts out of sync
   (`js2c.mjs --check-dir`).
+
+## primordials
+
+`primordials.js` runs first in every isolate — lazily, on the first
+`RunBuiltin` call, which happens during runtime init — and its frozen,
+null-prototype export is cached per isolate (`BuiltinLoader`, released from
+`disposeIsolate`) and handed to every other builtin. Builtins that compile
+late (`smart-stringify` is compiled on the first object logged) therefore
+still see intrinsics as they were before user code ran.
+
+Naming follows Node: statics keep their path (`JSONStringify`,
+`ObjectDefineProperty`), instance methods are **uncurried** so the receiver
+becomes the first argument:
+
+```js
+ArrayPrototypeSlice(list, 1)     // not list.slice(1)
+FunctionPrototypeCall(cb, this, event)  // not cb.call(this, event)
+```
+
+Uncurrying is `Function.prototype.bind.bind(Function.prototype.call)`, which is
+both faster than a captured `fn.call(...)` and immune to a replaced
+`Function.prototype.call`.
+
+Add only what a builtin actually needs; this is not a mirror of Node's list.
+Plain constructor calls made once at init time (`new Map()` while
+bootstrapping) may stay direct — the rule targets code in closures that
+outlive init.

@@ -1,28 +1,29 @@
 "use strict";
 
 const { globalTarget, nativeReportFatal } = binding;
+const { FunctionPrototypeCall, ObjectCreate, String, TypeError } = primordials;
 var g = globalThis;
 var Event = g.Event;
 
 function ErrorEvent(type, opts) {
   opts = opts || {};
-  Event.call(this, type, opts);
+  FunctionPrototypeCall(Event, this, type, opts);
   this.message = opts.message !== undefined ? String(opts.message) : "";
   this.filename = opts.filename !== undefined ? String(opts.filename) : "";
   this.lineno = opts.lineno !== undefined ? (opts.lineno | 0) : 0;
   this.colno = opts.colno !== undefined ? (opts.colno | 0) : 0;
   this.error = opts.error !== undefined ? opts.error : null;
 }
-ErrorEvent.prototype = Object.create(Event.prototype);
+ErrorEvent.prototype = ObjectCreate(Event.prototype);
 ErrorEvent.prototype.constructor = ErrorEvent;
 
 function PromiseRejectionEvent(type, opts) {
   opts = opts || {};
-  Event.call(this, type, opts);
+  FunctionPrototypeCall(Event, this, type, opts);
   this.promise = opts.promise;
   this.reason = opts.reason;
 }
-PromiseRejectionEvent.prototype = Object.create(Event.prototype);
+PromiseRejectionEvent.prototype = ObjectCreate(Event.prototype);
 PromiseRejectionEvent.prototype.constructor = PromiseRejectionEvent;
 
 // A listener that throws must not stop other listeners: route the thrown

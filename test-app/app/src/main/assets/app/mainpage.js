@@ -78,6 +78,8 @@ require('./tests/testErrorEvents');
 require('./tests/testUnhandledRejections');
 require('./tests/testEscapeException');
 require('./tests/testUncaughtErrorPolicy');
+// Runtime builtins keep working when app code replaces the intrinsics they use
+require('./tests/testPrimordials');
 require("./tests/testConcurrentAccess");
 
 require("./tests/testESModules.mjs");

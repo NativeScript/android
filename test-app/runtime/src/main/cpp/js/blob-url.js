@@ -1,10 +1,24 @@
+const {
+    Map,
+    MapPrototypeDelete,
+    MapPrototypeGet,
+    MapPrototypeSet,
+    ObjectDefineProperty,
+} = primordials;
+
+// The searchParams accessor below outlives init, so the constructor it reaches
+// for is captured now rather than looked up on the global at call time.
+const URLSearchParamsCtor = URLSearchParams;
+
 const BLOB_STORE = new Map();
 URL.createObjectURL = function (object, options = null) {
     try {
+        // Blob/File come from the app layer, not the runtime, so these stay
+        // live lookups; the catch below covers them not existing yet.
         if (object instanceof Blob || object instanceof File) {
             const id = java.util.UUID.randomUUID().toString();
             const ret = `blob:nativescript/${id}`;
-            BLOB_STORE.set(ret, {
+            MapPrototypeSet(BLOB_STORE, ret, {
                 blob: object,
                 type: object?.type,
                 ext: options?.ext,
@@ -17,18 +31,18 @@ URL.createObjectURL = function (object, options = null) {
     return null;
 };
 URL.revokeObjectURL = function (url) {
-    BLOB_STORE.delete(url);
+    MapPrototypeDelete(BLOB_STORE, url);
 };
 const InternalAccessor = class {};
 InternalAccessor.getData = function (url) {
-    return BLOB_STORE.get(url);
+    return MapPrototypeGet(BLOB_STORE, url);
 };
 URL.InternalAccessor = InternalAccessor;
-Object.defineProperty(URL.prototype, 'searchParams', {
+ObjectDefineProperty(URL.prototype, 'searchParams', {
     get() {
         if (this._searchParams == null) {
-            this._searchParams = new URLSearchParams(this.search);
-            Object.defineProperty(this._searchParams, '_url', {
+            this._searchParams = new URLSearchParamsCtor(this.search);
+            ObjectDefineProperty(this._searchParams, '_url', {
                 enumerable: false,
                 writable: false,
                 value: this,
