@@ -1496,12 +1496,14 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate *isolate, TryCatch &
         auto globalObject = context->Global();
 
         // execute onerror handle if one is implemented
-        auto callback = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate,
-                                                                                   "onerror")).ToLocalChecked();
-        auto isEmpty = callback.IsEmpty();
+        Local<Value> callback;
+        if (!globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "onerror"))
+                     .ToLocal(&callback)) {
+            return;
+        }
         auto isFunction = callback->IsFunction();
 
-        if (!isEmpty && isFunction && !tc.Message().IsEmpty()) {
+        if (isFunction && !tc.Message().IsEmpty()) {
             auto msg = tc.Message()->Get();
             Local<Value> args1[] = {msg};
 
