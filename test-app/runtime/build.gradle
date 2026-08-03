@@ -111,10 +111,10 @@ android {
                 if (optimized) {
                     arguments.add("-DOPTIMIZED_BUILD=true")
                 }
-//
-//                if (optimizedWithInspector) {
-//                    arguments.add("-DOPTIMIZED_WITH_INSPECTOR_BUILD=true")
-//                }
+
+                if (optimizedWithInspector) {
+                    arguments.add("-DOPTIMIZED_WITH_INSPECTOR_BUILD=true")
+                }
 //
 //                if (useCCache) {
 //                    arguments.add("-DUSE_CCACHE=true")
