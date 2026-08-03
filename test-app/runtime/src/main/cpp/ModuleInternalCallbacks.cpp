@@ -212,7 +212,7 @@ static std::string ResolveFileRelative(const std::string& referrerUrl, const std
 
 // Import meta callback to support import.meta.url and import.meta.dirname
 void InitializeImportMetaObject(Local<Context> context, Local<Module> module, Local<Object> meta) {
-    Isolate* isolate = context->GetIsolate();
+    Isolate* isolate = v8::Isolate::GetCurrent();
     
     // Look up the module path in the global module registry (with safety checks)
     std::string modulePath;
@@ -330,7 +330,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
                                                  v8::Local<v8::String> specifier,
                                                  v8::Local<v8::FixedArray> import_assertions,
                                                  v8::Local<v8::Module> referrer) {
-    v8::Isolate* isolate = context->GetIsolate();
+    v8::Isolate* isolate = v8::Isolate::GetCurrent();
 
     // 1) Convert specifier to std::string
     v8::String::Utf8Value specUtf8(isolate, specifier);
@@ -430,7 +430,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
         v8::Local<v8::String> sourceText = ArgConverter::ConvertToV8String(isolate, body);
         v8::Local<v8::String> urlString = ArgConverter::ConvertToV8String(isolate, canonical);
-        v8::ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true);
+        v8::ScriptOrigin origin(urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true);
         v8::ScriptCompiler::Source src(sourceText, origin);
         v8::Local<v8::Module> mod;
         {
@@ -723,7 +723,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
             std::string moduleUrl = "node:" + builtinName;
             v8::Local<v8::String> urlString = ArgConverter::ConvertToV8String(isolate, moduleUrl);
             
-            v8::ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true /* is_module */);
+            v8::ScriptOrigin origin(urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true /* is_module */);
             v8::ScriptCompiler::Source src(sourceText, origin);
             
             v8::Local<v8::Module> polyfillModule;
@@ -791,7 +791,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
             return v8::MaybeLocal<v8::Module>();
         }
 
-        v8::ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false,
+        v8::ScriptOrigin origin(urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false,
                                 false, true /* is_module */);
 
         v8::ScriptCompiler::Source src(sourceText, origin);
@@ -861,7 +861,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     v8::Local<v8::Context> context, v8::Local<v8::Data> host_defined_options,
     v8::Local<v8::Value> resource_name, v8::Local<v8::String> specifier,
     v8::Local<v8::FixedArray> import_assertions) {
-    v8::Isolate* isolate = context->GetIsolate();
+    v8::Isolate* isolate = v8::Isolate::GetCurrent();
     
     // Convert specifier to std::string for logging
     v8::String::Utf8Value specUtf8(isolate, specifier);
@@ -931,7 +931,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
             }
             v8::Local<v8::String> sourceText = ArgConverter::ConvertToV8String(isolate, body);
             v8::Local<v8::String> urlString = ArgConverter::ConvertToV8String(isolate, canonical);
-            v8::ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true);
+            v8::ScriptOrigin origin(urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true);
             v8::ScriptCompiler::Source src(sourceText, origin);
             {
                 v8::TryCatch tc(isolate);

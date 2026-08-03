@@ -10,10 +10,10 @@
     "**/*"
   ],
   "version_info": {
-    "v8": "10.3.22.0",
+    "v8": "14.9.207.39",
     "gradle": "8.14.3",
     "gradleAndroid": "8.12.1",
-    "ndk": "r27d",
+    "ndk": "r29",
     "ndkApiLevel": "21",
     "minSdk": "21",
     "compileSdk": "35",

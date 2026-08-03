@@ -233,7 +233,8 @@ void JsV8InspectorClient::scheduleBreak() {
 }
 
 void JsV8InspectorClient::createInspectorSession() {
-    session_ = inspector_->connect(JsV8InspectorClient::contextGroupId, this, {});
+    session_ = inspector_->connect(JsV8InspectorClient::contextGroupId, this, {},
+                                  v8_inspector::V8Inspector::kFullyTrusted);
 }
 
 void JsV8InspectorClient::disconnect() {
@@ -947,7 +948,7 @@ void JsV8InspectorClient::consoleLogCallback(Isolate* isolate, ConsoleAPIType me
     std::unique_ptr<v8_inspector::V8ConsoleMessage> msg =
         v8_inspector::V8ConsoleMessage::createForConsoleAPI(
             context, contextId, contextGroupId, impl, client->currentTimeMS(),
-            method, args, String16{}, std::move(stack));
+            method, {args.data(), args.size()}, String16{}, std::move(stack));
 
     // Going through the message storage both reports to the session when the
     // frontend has enabled the Runtime agent AND keeps the message for replay
@@ -1007,7 +1008,7 @@ void JsV8InspectorClient::registerModules() {
     assert(success);
 
     // __inspectorSendEvent
-    Local<External> data = External::New(isolate, this);
+    Local<External> data = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
     success = v8::Function::New(context, inspectorSendEventCallback, data).ToLocal(&func);
     assert(success);
     success = global->Set(context, ArgConverter::ConvertToV8String(isolate, "__inspectorSendEvent"), func).FromMaybe(false);

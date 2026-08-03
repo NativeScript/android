@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <utime.h>
+#include <unistd.h>
 
 using namespace v8;
 using namespace std;
@@ -114,7 +115,7 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
 
     m_requireFactoryFunction = new Persistent<Function>(isolate, requireFactoryFunction);
 
-    auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback, External::New(isolate, this));
+    auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
     auto requireFunc = requireFuncTemplate->GetFunction(context).ToLocalChecked();
     global->Set(context, ArgConverter::ConvertToV8String(isolate, "__nativeRequire"), requireFunc);
     m_requireFunction = new Persistent<Function>(isolate, requireFunc);
@@ -165,7 +166,7 @@ Local<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const strin
 
 void ModuleInternal::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
-        auto thiz = static_cast<ModuleInternal*>(args.Data().As<External>()->Value());
+        auto thiz = static_cast<ModuleInternal*>(args.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
         thiz->RequireCallbackImpl(args);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -219,7 +220,7 @@ void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Valu
 void ModuleInternal::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     TNSPERF();
     auto ext = args.Data().As<External>();
-    auto funcPtr = reinterpret_cast<FunctionCallback>(ext->Value());
+    auto funcPtr = reinterpret_cast<FunctionCallback>(ext->Value(v8::kExternalPointerTypeTagDefault));
     funcPtr(args);
 }
 
@@ -389,7 +390,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
             string errMsg("Cannot find 'NSMain' in " + modulePath);
             throw NativeScriptException(errMsg);
         }
-        auto extFunc = External::New(isolate, func);
+        auto extFunc = External::New(isolate, func, v8::kExternalPointerTypeTagDefault);
         auto ft = FunctionTemplate::New(isolate, RequireNativeCallback, extFunc);
         auto maybeFunc = ft->GetFunction(context);
         if (maybeFunc.IsEmpty() || tc.HasCaught()) {
@@ -451,7 +452,7 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, c
     auto cacheData = TryLoadScriptCache(path);
 
     auto fullRequiredModulePathWithSchema = ArgConverter::ConvertToV8String(isolate, "file://" + path);
-    ScriptOrigin origin(isolate, fullRequiredModulePathWithSchema);
+    ScriptOrigin origin(fullRequiredModulePathWithSchema);
     ScriptCompiler::Source source(scriptText, origin, cacheData);
     ScriptCompiler::CompileOptions option = ScriptCompiler::kNoCompileOptions;
 
@@ -528,7 +529,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         throw NativeScriptException(string("Failed to create URL string for ES module ") + path);
     }
 
-    ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, Local<Value>(), false, false,
+    ScriptOrigin origin(urlString, 0, 0, false, -1, Local<Value>(), false, false,
                         true  // ← is_module
     );
     ScriptCompiler::Source source(sourceText, origin, cacheData);

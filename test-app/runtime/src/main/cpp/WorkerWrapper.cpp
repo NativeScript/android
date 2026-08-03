@@ -13,6 +13,8 @@
 #include "NativeScriptException.h"
 #include "Runtime.h"
 
+#include <unistd.h>
+
 #ifdef APPLICATION_IN_DEBUG
 #include "JsV8InspectorClient.h"
 #include "WorkerInspectorClient.h"

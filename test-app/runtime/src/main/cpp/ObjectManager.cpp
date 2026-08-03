@@ -143,7 +143,7 @@ ObjectManager::GetJSInstanceInfoFromRuntimeObject(const Local<Object>& object) {
   HandleScope handleScope(m_isolate);
 
   const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-  auto jsInfo = object->GetInternalField(jsInfoIdx);
+  auto jsInfo = object->GetInternalField(jsInfoIdx).As<Value>();
   if (jsInfo->IsUndefined()) {
     // Typescript object layout has an object instance as child of the actual
     // registered instance. checking for that
@@ -153,14 +153,14 @@ ObjectManager::GetJSInstanceInfoFromRuntimeObject(const Local<Object>& object) {
       DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d",
                   prototypeObject->GetIdentityHash());
       if (IsJsRuntimeObject(prototypeObject)) {
-        jsInfo = prototypeObject->GetInternalField(jsInfoIdx);
+        jsInfo = prototypeObject->GetInternalField(jsInfoIdx).As<Value>();
       }
     }
   }
 
   if (!jsInfo.IsEmpty() && jsInfo->IsExternal()) {
     auto external = jsInfo.As<External>();
-    return static_cast<JSInstanceInfo*>(external->Value());
+    return static_cast<JSInstanceInfo*>(external->Value(v8::kExternalPointerTypeTagDefault));
   }
 
   return nullptr;
@@ -291,7 +291,7 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
 
   auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
 
-  auto jsInfo = External::New(isolate, jsInstanceInfo);
+  auto jsInfo = External::New(isolate, jsInstanceInfo, v8::kExternalPointerTypeTagDefault);
 
   // link
   object->SetInternalField(jsInfoIdx, jsInfo);

@@ -20,7 +20,7 @@ void ArrayHelper::Init(const Local<Context>& context) {
     CREATE_ARRAY_HELPER = env.GetStaticMethodID(RUNTIME_CLASS, "createArrayHelper", "(Ljava/lang/String;I)Ljava/lang/Object;");
     assert(CREATE_ARRAY_HELPER != nullptr);
 
-    auto isolate = context->GetIsolate();
+    auto isolate = v8::Isolate::GetCurrent();
     auto global = context->Global();
     auto arr = global->Get(context, ArgConverter::ConvertToV8String(isolate, "Array"));
 

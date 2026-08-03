@@ -12,7 +12,7 @@ using namespace tns;
 Local<Value> ArrayElementAccessor::GetArrayElement(Local<Context> context, const Local<Object>& array, uint32_t index, const string& arraySignature) {
     JEnv env;
 
-    Isolate* isolate = context->GetIsolate();
+    Isolate* isolate = v8::Isolate::GetCurrent();
     EscapableHandleScope handleScope(isolate);
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
@@ -83,7 +83,7 @@ Local<Value> ArrayElementAccessor::GetArrayElement(Local<Context> context, const
 void ArrayElementAccessor::SetArrayElement(Local<Context> context, const Local<Object>& array, uint32_t index, const string& arraySignature, Local<Value>& value) {
     JEnv env;
 
-    Isolate* isolate = context->GetIsolate();
+    Isolate* isolate = v8::Isolate::GetCurrent();
     HandleScope handleScope(isolate);
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();

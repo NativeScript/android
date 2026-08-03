@@ -151,7 +151,7 @@ void Events::Init(Local<Context> context) {
     })
     )js";
 
-    auto isolate = context->GetIsolate();
+    auto isolate = v8::Isolate::GetCurrent();
     auto runtime = static_cast<Runtime*>(
             isolate->GetData((uint32_t) Runtime::IsolateData::RUNTIME));
     if (runtime == nullptr) {

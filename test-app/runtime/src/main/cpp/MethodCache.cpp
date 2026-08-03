@@ -124,7 +124,7 @@ string MethodCache::GetType(Isolate* isolate, const v8::Local<v8::Value>& value)
         V8GetPrivateValue(isolate, objVal, V8StringConstants::GetNullNodeName(isolate), nullNode);
 
         if (!nullNode.IsEmpty()) {
-            auto treeNode = reinterpret_cast<MetadataNode*>(nullNode.As<External>()->Value());
+            auto treeNode = reinterpret_cast<MetadataNode*>(nullNode.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
             type = (treeNode != nullptr) ? treeNode->GetName() : "<unknown>";
 

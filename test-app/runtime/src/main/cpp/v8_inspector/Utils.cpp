@@ -15,7 +15,7 @@ tns::inspector::GetDebuggerFunction(Local<Context> context, std::string domain,
         return Local<v8::Function>();
     }
 
-    Isolate *isolate = context->GetIsolate();
+    Isolate *isolate = v8::Isolate::GetCurrent();
     domainDebugger = it->second->Get(isolate);
 
     Local<Value> value;
@@ -33,7 +33,7 @@ tns::inspector::GetDebuggerFunction(Local<Context> context, std::string domain,
 Local<v8::Function>
 tns::inspector::GetDebuggerFunctionFromObject(Local<Context> context, const Local<Object> &object,
                                               Local<Object> &domainDebugger) {
-    Isolate *isolate = context->GetIsolate();
+    Isolate *isolate = v8::Isolate::GetCurrent();
     auto methodKey = v8::String::NewFromUtf8(isolate, "method",
                                              v8::NewStringType::kNormal).ToLocalChecked();
     auto method = object->Get(context, methodKey).ToLocalChecked();

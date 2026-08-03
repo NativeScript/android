@@ -32,7 +32,7 @@ static Local<Private> GetBrand(Isolate* isolate) {
  * `value` is an Error carrying one. Empty handle otherwise.
  */
 static Local<Value> GetWrappedJavaThrowable(Local<Context> context, Local<Value> value) {
-    auto isolate = context->GetIsolate();
+    auto isolate = v8::Isolate::GetCurrent();
 
     auto isWrappedThrowable = [&](Local<Value> v) -> bool {
         if (v.IsEmpty() || !v->IsObject()) {
@@ -174,7 +174,7 @@ static void EscapeExceptionCallback(const FunctionCallbackInfo<Value>& info) {
 }
 
 void Interop::Init(Local<Context> context) {
-    auto isolate = context->GetIsolate();
+    auto isolate = v8::Isolate::GetCurrent();
     auto global = context->Global();
 
     auto interop = Object::New(isolate);

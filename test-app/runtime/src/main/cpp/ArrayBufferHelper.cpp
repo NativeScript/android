@@ -14,8 +14,8 @@ ArrayBufferHelper::ArrayBufferHelper()
 
 void ArrayBufferHelper::CreateConvertFunctions(Local<Context> context, const Local<Object>& global, ObjectManager* objectManager) {
     m_objectManager = objectManager;
-    Isolate* isolate = context->GetIsolate();
-    auto extData = External::New(isolate, this);
+    Isolate* isolate = v8::Isolate::GetCurrent();
+    auto extData = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
     auto fromFunc = FunctionTemplate::New(isolate, CreateFromCallbackStatic, extData)->GetFunction(context).ToLocalChecked();
     auto arrBufferCtorFunc = global->Get(context, ArgConverter::ConvertToV8String(isolate, "ArrayBuffer")).ToLocalChecked().As<Function>();
     arrBufferCtorFunc->Set(context, ArgConverter::ConvertToV8String(isolate, "from"), fromFunc);
@@ -24,7 +24,7 @@ void ArrayBufferHelper::CreateConvertFunctions(Local<Context> context, const Loc
 void ArrayBufferHelper::CreateFromCallbackStatic(const FunctionCallbackInfo<Value>& info) {
     try {
         auto extData = info.Data().As<External>();
-        auto thiz = reinterpret_cast<ArrayBufferHelper*>(extData->Value());
+        auto thiz = reinterpret_cast<ArrayBufferHelper*>(extData->Value(v8::kExternalPointerTypeTagDefault));
         thiz->CreateFromCallbackImpl(info);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();

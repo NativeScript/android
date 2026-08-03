@@ -12,7 +12,7 @@ using namespace std;
 using namespace tns;
 
 void NumericCasts::CreateGlobalCastFunctions(Isolate* isolate, const Local<ObjectTemplate>& globalTemplate) {
-    auto ext = External::New(isolate, this);
+    auto ext = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
 
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "long"), FunctionTemplate::New(isolate, NumericCasts::MarkAsLongCallbackStatic, ext));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "byte"), FunctionTemplate::New(isolate, NumericCasts::MarkAsByteCallbackStatic, ext));
@@ -36,8 +36,8 @@ CastType NumericCasts::GetCastType(Isolate* isolate, const Local<Object>& object
 }
 
 Local<Value> NumericCasts::GetCastValue(const Local<Object>& object) {
-    auto isolate = object->GetIsolate();
-    auto context = object->CreationContext();
+    auto isolate = v8::Isolate::GetCurrent();
+    auto context = object->GetCreationContext(isolate).ToLocalChecked();
     Local<Value> value;
     object->Get(context, V8StringConstants::GetValue(isolate)).ToLocal(&value);
     return value;
@@ -50,7 +50,7 @@ void NumericCasts::MarkAsLong(Isolate* isolate, const v8::Local<v8::Object>& obj
 NumericCasts* NumericCasts::GetThis(const v8::FunctionCallbackInfo<Value>& args) {
     auto ext = args.Data().As<External>();
 
-    auto thisPtr = reinterpret_cast<NumericCasts*>(ext->Value());
+    auto thisPtr = reinterpret_cast<NumericCasts*>(ext->Value(v8::kExternalPointerTypeTagDefault));
 
     return thisPtr;
 }
@@ -364,7 +364,7 @@ void NumericCasts::MarkJsObject(Isolate* isolate, const Local<Object>& object, C
     auto key = ArgConverter::ConvertToV8String(isolate, s_castMarker);
     auto type = Integer::New(isolate, static_cast<int>(castType));
     V8SetPrivateValue(isolate, object, key, type);
-    auto context = object->CreationContext();
+    auto context = object->GetCreationContext(isolate).ToLocalChecked();
     object->Set(context, V8StringConstants::GetValue(isolate), value);
 
     DEBUG_WRITE("MarkJsObject: Marking js object: %d with cast type: %d", object->GetIdentityHash(), castType);

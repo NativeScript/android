@@ -65,10 +65,10 @@ jmethodID Timers::TIMER_HANDLER_RELEASE = nullptr;
 void Timers::Init(v8::Isolate *isolate, v8::Local<v8::ObjectTemplate> &globalObjectTemplate) {
     isolate_ = isolate;
     // TODO: remove the __ns__ prefix once this is validated
-    SetMethod(isolate, globalObjectTemplate, "__ns__setTimeout", SetTimeoutCallback, External::New(isolate, this));
-    SetMethod(isolate, globalObjectTemplate, "__ns__setInterval", SetIntervalCallback, External::New(isolate, this));
-    SetMethod(isolate, globalObjectTemplate, "__ns__clearTimeout", ClearTimer, External::New(isolate, this));
-    SetMethod(isolate, globalObjectTemplate, "__ns__clearInterval", ClearTimer, External::New(isolate, this));
+    SetMethod(isolate, globalObjectTemplate, "__ns__setTimeout", SetTimeoutCallback, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
+    SetMethod(isolate, globalObjectTemplate, "__ns__setInterval", SetIntervalCallback, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
+    SetMethod(isolate, globalObjectTemplate, "__ns__clearTimeout", ClearTimer, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
+    SetMethod(isolate, globalObjectTemplate, "__ns__clearInterval", ClearTimer, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
 
     JEnv env;
     if (TIMER_HANDLER_CLASS == nullptr) {
@@ -180,7 +180,7 @@ void Timers::SetIntervalCallback(const v8::FunctionCallbackInfo<v8::Value> &args
 void Timers::ClearTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto argLength = args.Length();
     auto extData = args.Data().As<External>();
-    auto thiz = reinterpret_cast<Timers *>(extData->Value());
+    auto thiz = reinterpret_cast<Timers *>(extData->Value(v8::kExternalPointerTypeTagDefault));
     int id = -1;
     if (argLength > 0) {
         auto isolate = args.GetIsolate();
@@ -196,7 +196,7 @@ void Timers::ClearTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
 void Timers::SetTimer(const v8::FunctionCallbackInfo<v8::Value> &args, bool repeatable) {
     auto argLength = args.Length();
     auto extData = args.Data().As<External>();
-    auto thiz = reinterpret_cast<Timers *>(extData->Value());
+    auto thiz = reinterpret_cast<Timers *>(extData->Value(v8::kExternalPointerTypeTagDefault));
     int id = ++thiz->currentTimerId;
     if (argLength >= 1) {
         if (!args[0]->IsFunction()) {

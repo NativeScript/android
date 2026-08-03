@@ -69,7 +69,8 @@ WorkerInspectorClient::WorkerInspectorClient(int workerId, Isolate* isolate, ALo
     contextInfo.origin = Make8BitStringView(url_);
     inspector_->contextCreated(contextInfo);
     context_.Reset(isolate_, context);
-    session_ = inspector_->connect(contextGroupId, this, {});
+    session_ = inspector_->connect(contextGroupId, this, {},
+                                  v8_inspector::V8Inspector::kFullyTrusted);
 }
 
 WorkerInspectorClient::~WorkerInspectorClient() {
@@ -192,7 +193,8 @@ void WorkerInspectorClient::DoResetSession() {
         session_->resume();
         session_.reset();
     }
-    session_ = inspector_->connect(contextGroupId, this, {});
+    session_ = inspector_->connect(contextGroupId, this, {},
+                                  v8_inspector::V8Inspector::kFullyTrusted);
 }
 
 void WorkerInspectorClient::MaybeResetSession() {
@@ -312,7 +314,8 @@ void WorkerInspectorClient::consoleLog(ConsoleAPIType method,
     const int contextId = V8ContextInfo::executionContextId(context);
 
     std::unique_ptr<V8ConsoleMessage> msg = V8ConsoleMessage::createForConsoleAPI(
-        context, contextId, contextGroupId, impl, this->currentTimeMS(), method, args, String16{},
+        context, contextId, contextGroupId, impl, this->currentTimeMS(), method,
+        {args.data(), args.size()}, String16{},
         std::move(stackImpl));
 
     // Going through the message storage both reports to the session when the

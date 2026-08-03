@@ -139,23 +139,23 @@ class MetadataNode {
         static bool ValidateExtendArguments(const v8::FunctionCallbackInfo<v8::Value>& info, bool extendLocationFound, std::string& extendLocation, v8::Local<v8::String>& extendName, v8::Local<v8::Object>& implementationObject, bool isTypeScriptExtend);
         static void ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-        static void NullObjectAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static void NullObjectAccessorGetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void NullValueOfCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-        static void FieldAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
-        static void FieldAccessorSetterCallback(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
-        static void PropertyAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
-        static void PropertyAccessorSetterCallback(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
+        static void FieldAccessorGetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+        static void FieldAccessorSetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+        static void PropertyAccessorGetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+        static void PropertyAccessorSetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-        static void ClassAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static void ClassAccessorGetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void SetClassAccessor(v8::Local<v8::Function>& ctorFunction);
-        static void SuperAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static void SuperAccessorGetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void ArrayLengthGetterCallack(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
         static void PackageGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
-        static void ArrayIndexedPropertyGetterCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& info);
-        static void ArrayIndexedPropertySetterCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static v8::Intercepted ArrayIndexedPropertyGetterCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static v8::Intercepted ArrayIndexedPropertySetterCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Boolean>& info);
 
         static bool IsValidExtendName(const v8::Local<v8::String>& name);
         static bool GetExtendLocation(v8::Isolate* isolate, std::string& extendLocation, bool isTypeScriptExtend);
@@ -220,7 +220,7 @@ class MetadataNode {
             ExtendedClassCallbackData(MetadataNode* _node, const std::string& _extendedName, const v8::Local<v8::Object>& _implementationObject, std::string _fullClassName)
                 :
                 node(_node), extendedName(_extendedName), fullClassName(_fullClassName) {
-                implementationObject = new v8::Persistent<v8::Object>(_implementationObject->GetIsolate(), _implementationObject);
+                implementationObject = new v8::Persistent<v8::Object>(v8::Isolate::GetCurrent(), _implementationObject);
             }
 
             MetadataNode* node;
@@ -257,7 +257,7 @@ class MetadataNode {
             ExtendedClassCacheData(const v8::Local<v8::Function>& extCtorFunc, const std::string& _extendedName, MetadataNode* _node)
                 :
                 extendedName(_extendedName), node(_node) {
-                extendedCtorFunction = new v8::Persistent<v8::Function>(extCtorFunc->GetIsolate(), extCtorFunc);
+                extendedCtorFunction = new v8::Persistent<v8::Function>(v8::Isolate::GetCurrent(), extCtorFunc);
             }
             v8::Persistent<v8::Function>* extendedCtorFunction;
             std::string extendedName;

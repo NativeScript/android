@@ -144,7 +144,7 @@ namespace tns {
         })();
     )";
 
-            v8::Isolate* isolate = context->GetIsolate();
+            v8::Isolate* isolate = v8::Isolate::GetCurrent();
             v8::Locker locker(isolate);
             v8::Isolate::Scope isolate_scope(isolate);
             v8::HandleScope handle_scope(isolate);

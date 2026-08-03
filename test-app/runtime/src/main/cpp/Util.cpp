@@ -161,7 +161,7 @@ namespace tns {
                    const char *name,
                    v8::FunctionCallback callback,
                    Local <v8::Value> data) {
-        Isolate *isolate = context->GetIsolate();
+        Isolate *isolate = v8::Isolate::GetCurrent();
         Local<v8::Function> function =
                 NewFunctionTemplate(isolate,
                                     callback,
@@ -225,7 +225,7 @@ namespace tns {
                        v8::FunctionCallback slow_callback,
                        const v8::CFunction *c_function,
                        Local <v8::Value> data) {
-        Isolate *isolate = context->GetIsolate();
+        Isolate *isolate = v8::Isolate::GetCurrent();
         Local<v8::Function> function =
                 NewFunctionTemplate(isolate,
                                     slow_callback,
@@ -248,7 +248,7 @@ namespace tns {
                                    v8::FunctionCallback slow_callback,
                                    const v8::CFunction *c_function,
                                    Local <v8::Value> data) {
-        Isolate *isolate = context->GetIsolate();
+        Isolate *isolate = v8::Isolate::GetCurrent();
         Local<v8::Function> function =
                 NewFunctionTemplate(isolate,
                                     slow_callback,
@@ -291,7 +291,7 @@ namespace tns {
                                const char *name,
                                v8::FunctionCallback callback,
                                Local <v8::Value> data) {
-        Isolate *isolate = context->GetIsolate();
+        Isolate *isolate = v8::Isolate::GetCurrent();
         Local<v8::Function> function =
                 NewFunctionTemplate(isolate,
                                     callback,
@@ -396,7 +396,7 @@ namespace tns {
                                 const char *name,
                                 Local <v8::FunctionTemplate> tmpl,
                                 SetConstructorFunctionFlag flag) {
-        Isolate *isolate = context->GetIsolate();
+        Isolate *isolate = v8::Isolate::GetCurrent();
         SetConstructorFunction(
                 context, that, tns::OneByteString(isolate, name), tmpl, flag);
     }
