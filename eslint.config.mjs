@@ -1,8 +1,8 @@
 // Lint setup for the runtime's builtin JavaScript
 // (test-app/runtime/src/main/cpp/js). Each file is compiled by BuiltinLoader
-// as a FUNCTION BODY with the fixed parameters `exports`, `module`, `binding`
-// and `primordials` (see that directory's README.md), which are declared as
-// globals here. no-undef is the typo net for binding-bag destructures and
+// as a FUNCTION BODY with the fixed parameters `exports`, `require`, `module`,
+// `binding` and `primordials` (see that directory's README.md), which are
+// declared as globals here. no-undef is the typo net for binding-bag destructures and
 // native-global usage alike; no-restricted-properties keeps the captured
 // intrinsics from being read off the live globals again.
 import globals from 'globals';
@@ -15,8 +15,11 @@ const capturedStatics = [
   ['Array', 'isArray', 'ArrayIsArray'],
   ['ArrayBuffer', 'isView', 'ArrayBufferIsView'],
   ['JSON', 'stringify', 'JSONStringify'],
+  ['Number', 'parseFloat', 'NumberParseFloat'],
+  ['Number', 'parseInt', 'NumberParseInt'],
   ['Object', 'create', 'ObjectCreate'],
   ['Object', 'defineProperty', 'ObjectDefineProperty'],
+  ['Object', 'freeze', 'ObjectFreeze'],
   ['Object', 'getOwnPropertyDescriptor', 'ObjectGetOwnPropertyDescriptor'],
   ['Object', 'getOwnPropertySymbols', 'ObjectGetOwnPropertySymbols'],
   ['Object', 'getPrototypeOf', 'ObjectGetPrototypeOf'],
@@ -26,7 +29,7 @@ const capturedStatics = [
 
 // Captured constructors. A destructure from `primordials` shadows the global,
 // so these only fire on the unguarded reference.
-const restrictedGlobals = ['Date', 'Map', 'Proxy', 'Set', 'String', 'TypeError'].map((name) => ({
+const restrictedGlobals = ['Date', 'Map', 'Number', 'Proxy', 'Set', 'String', 'TypeError'].map((name) => ({
   name,
   message: `Destructure ${name} from primordials — builtins must not read intrinsics off globals user code can replace.`,
 }));
@@ -46,6 +49,7 @@ export default [
       globals: {
         ...globals.es2021,
         exports: 'readonly',
+        require: 'readonly',
         module: 'readonly',
         binding: 'readonly',
         primordials: 'readonly',

@@ -33,6 +33,10 @@ class Console {
 
         static void onDisposeIsolate(v8::Isolate* isolate);
 
+        // Builds this realm's inspect function if it isn't there yet. Public
+        // so ns:util can re-export the same instance.
+        static v8::Local<v8::Function> getInspect(v8::Local<v8::Context> context);
+
     private:
         using ConsoleAPIType = v8_inspector::ConsoleAPIType;
 

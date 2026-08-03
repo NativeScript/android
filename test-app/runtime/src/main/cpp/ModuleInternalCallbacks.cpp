@@ -2,6 +2,7 @@
 #include "ArgConverter.h"
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
+#include "NsBuiltinModules.h"
 #include "Runtime.h"
 #include "Util.h"
 #include <sys/stat.h>
@@ -342,6 +343,20 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     // Debug logging
     if (IsScriptLoadingLogEnabled()) {
         DEBUG_WRITE("ResolveModuleCallback: Resolving '%s'", spec.c_str());
+    }
+
+    // Builtin modules resolve before any path handling. Unshimmed "node:"
+    // names fall through to the legacy polyfills below.
+    if (NsBuiltinModules::IsRegistered(spec) || NsBuiltinModules::IsNsScheme(spec)) {
+        v8::Local<v8::Module> builtin;
+        if (NsBuiltinModules::GetModule(context, spec).ToLocal(&builtin)) {
+            return v8::MaybeLocal<v8::Module>(builtin);
+        }
+        if (!NsBuiltinModules::IsRegistered(spec)) {
+            isolate->ThrowException(v8::Exception::Error(
+                    ArgConverter::ConvertToV8String(isolate, NsBuiltinModules::NotFoundMessage(spec))));
+        }
+        return v8::MaybeLocal<v8::Module>();
     }
 
     // Normalize malformed http:/ and https:/ prefixes
@@ -691,29 +706,10 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
                                 "}\n"
                                 "\n"
                                 "export default { basename, dirname, extname, join, resolve, isAbsolute, sep, delimiter };\n";
-            } else if (builtinName == "fs") {
-                // Create a basic polyfill for node:fs
-                polyfillContent = "// Polyfill for node:fs\n"
-                                "console.warn('Node.js fs module is not supported in NativeScript. Use @nativescript/core File APIs instead.');\n"
-                                "\n"
-                                "export function readFileSync() {\n"
-                                "  throw new Error('fs.readFileSync is not supported in NativeScript. Use @nativescript/core File APIs.');\n"
-                                "}\n"
-                                "\n"
-                                "export function writeFileSync() {\n"
-                                "  throw new Error('fs.writeFileSync is not supported in NativeScript. Use @nativescript/core File APIs.');\n"
-                                "}\n"
-                                "\n"
-                                "export function existsSync() {\n"
-                                "  throw new Error('fs.existsSync is not supported in NativeScript. Use @nativescript/core File APIs.');\n"
-                                "}\n"
-                                "\n"
-                                "export default { readFileSync, writeFileSync, existsSync };\n";
             } else {
-                // Generic polyfill for other Node.js built-in modules
-                polyfillContent = "// Polyfill for node:" + builtinName + "\n"
-                                "console.warn('Node.js built-in module \\'node:" + builtinName + "\\' is not fully supported in NativeScript');\n"
-                                "export default {};\n";
+                isolate->ThrowException(v8::Exception::Error(
+                        ArgConverter::ConvertToV8String(isolate, NsBuiltinModules::NotFoundMessage(spec))));
+                return v8::MaybeLocal<v8::Module>();
             }
             
             // Create module source and compile it in-memory
@@ -880,6 +876,23 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         return v8::MaybeLocal<v8::Promise>();
     }
 
+    // Builtin modules never reach the loader below; the namespace comes
+    // straight from the realm's synthetic module.
+    if (NsBuiltinModules::IsRegistered(spec) || NsBuiltinModules::IsNsScheme(spec)) {
+        v8::TryCatch tc(isolate);
+        v8::Local<v8::Module> builtin;
+        if (NsBuiltinModules::GetModule(context, spec).ToLocal(&builtin)) {
+            resolver->Resolve(context, builtin->GetModuleNamespace()).FromMaybe(false);
+        } else {
+            v8::Local<v8::Value> error =
+                    tc.HasCaught() ? tc.Exception()
+                                   : v8::Exception::Error(ArgConverter::ConvertToV8String(
+                                             isolate, NsBuiltinModules::NotFoundMessage(spec)));
+            resolver->Reject(context, error).FromMaybe(false);
+        }
+        return scope.Escape(resolver->GetPromise());
+    }
+
     // Resolve relative or root-absolute dynamic imports against the referrer's URL when provided
     auto isHttpLike = [](const std::string& s) -> bool {
         return s.rfind("http://", 0) == 0 || s.rfind("https://", 0) == 0;
@@ -984,19 +997,29 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         // ScriptOrModule, and the specifier above is already absolute when needed.
         v8::Local<v8::Module> refMod;
 
-        v8::MaybeLocal<v8::Module> maybeModule =
-            ResolveModuleCallback(context, resolvedSpecifier, import_assertions, refMod);
-
         v8::Local<v8::Module> module;
-        if (!maybeModule.ToLocal(&module)) {
-            // Resolution failed; reject to avoid leaving a pending Promise (white screen)
-            if (IsScriptLoadingLogEnabled()) {
-                DEBUG_WRITE("ImportModuleDynamicallyCallback: Resolution failed for '%s'", spec.c_str());
+        {
+            v8::TryCatch resolveTc(isolate);
+            v8::MaybeLocal<v8::Module> maybeModule =
+                ResolveModuleCallback(context, resolvedSpecifier, import_assertions, refMod);
+
+            if (!maybeModule.ToLocal(&module)) {
+                // Resolution failed; reject to avoid leaving a pending Promise (white screen)
+                if (IsScriptLoadingLogEnabled()) {
+                    DEBUG_WRITE("ImportModuleDynamicallyCallback: Resolution failed for '%s'", spec.c_str());
+                }
+                // The resolver's own error carries the reason (a missing
+                // builtin names the exact contract message); only invent one
+                // when resolution failed without throwing.
+                v8::Local<v8::Value> ex =
+                    resolveTc.HasCaught()
+                        ? resolveTc.Exception()
+                        : v8::Exception::Error(ArgConverter::ConvertToV8String(
+                              isolate, std::string("Failed to resolve module: ") + spec));
+                resolveTc.Reset();
+                resolver->Reject(context, ex).Check();
+                return scope.Escape(resolver->GetPromise());
             }
-            v8::Local<v8::Value> ex = v8::Exception::Error(
-                ArgConverter::ConvertToV8String(isolate, std::string("Failed to resolve module: ") + spec));
-            resolver->Reject(context, ex).Check();
-            return scope.Escape(resolver->GetPromise());
         }
 
         // If not yet instantiated/evaluated, do it now

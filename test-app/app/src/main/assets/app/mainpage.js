@@ -81,6 +81,8 @@ require('./tests/testUncaughtErrorPolicy');
 // Runtime builtins keep working when app code replaces the intrinsics they use
 require('./tests/testPrimordials');
 require('./tests/testInspect');
+// The ns:/node: builtin modules
+require('./tests/testNsUtil');
 require("./tests/testConcurrentAccess");
 
 require("./tests/testESModules.mjs");
