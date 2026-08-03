@@ -1,0 +1,23 @@
+/*
+ * V8's public API lives directly under v8:: with an uppercase first letter
+ * (v8::Isolate, v8::Context, ...) while everything private is nested in
+ * v8::internal::. The split has to be made by case here: lld resolves a symbol
+ * matched by both a global: and a local: pattern in favour of global:, so the
+ * internals cannot be carved back out with a "local: v8::internal::*" entry.
+ *
+ * Patterns must stay unquoted -- a quoted string is matched literally, not as a
+ * wildcard.
+ */
+{
+  global:
+    Java_*;
+    JNI_OnLoad;
+    extern "C++" {
+      v8::[A-Z]*;
+      v8::api_internal::*;
+      v8::platform::*;
+      cppgc::[A-Z]*;
+    };
+  local:
+    *;
+};

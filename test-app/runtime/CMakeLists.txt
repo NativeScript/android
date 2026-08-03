@@ -174,7 +174,9 @@ set(NATIVES_BLOB_INCLUDE_DIRECTORIES ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDRO
 if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
     set_target_properties(
             NativeScript
-            PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition -Wl,--exclude-libs=ALL -Wl,--gc-sections
+            # The version script keeps V8's public API linkable for plugins while hiding
+            # the ~60k v8::internal:: symbols the static monolith would otherwise export.
+            PROPERTIES LINK_FLAGS "-Wl,--allow-multiple-definition -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exported-symbols.map"
             INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
     )
 else ()
