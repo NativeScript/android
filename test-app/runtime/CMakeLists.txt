@@ -58,6 +58,41 @@ include_directories(
         src/main/cpp/ada
 )
 
+# The runtime's builtin JavaScript (src/main/cpp/js) embedded into a generated
+# C++ table by tools/js2c.mjs. The list is explicit rather than globbed so that
+# adding a file is a visible build change; --check-dir fails the build when it
+# drifts from the directory contents.
+set(RUNTIME_BUILTIN_JS_DIR ${PROJECT_SOURCE_DIR}/src/main/cpp/js)
+set(RUNTIME_BUILTIN_JS
+        ${RUNTIME_BUILTIN_JS_DIR}/blob-url.js
+        ${RUNTIME_BUILTIN_JS_DIR}/error-events.js
+        ${RUNTIME_BUILTIN_JS_DIR}/events.js
+        ${RUNTIME_BUILTIN_JS_DIR}/json-helper.js
+        ${RUNTIME_BUILTIN_JS_DIR}/message-loop-timer.js
+        ${RUNTIME_BUILTIN_JS_DIR}/require-factory.js
+        ${RUNTIME_BUILTIN_JS_DIR}/smart-stringify.js
+        ${RUNTIME_BUILTIN_JS_DIR}/weak-ref.js
+)
+set(RUNTIME_BUILTINS_GENERATED_DIR ${PROJECT_SOURCE_DIR}/src/main/cpp/generated)
+get_filename_component(RUNTIME_BUILTINS_JS2C ${PROJECT_SOURCE_DIR}/../../tools/js2c.mjs ABSOLUTE)
+
+find_program(NODE_EXECUTABLE NAMES node nodejs)
+if (NOT NODE_EXECUTABLE)
+    message(FATAL_ERROR "node was not found on PATH; it is required to generate RuntimeBuiltins")
+endif ()
+
+add_custom_command(
+        OUTPUT ${RUNTIME_BUILTINS_GENERATED_DIR}/RuntimeBuiltins.h
+               ${RUNTIME_BUILTINS_GENERATED_DIR}/RuntimeBuiltins.cpp
+        COMMAND ${NODE_EXECUTABLE} ${RUNTIME_BUILTINS_JS2C}
+                --out-dir ${RUNTIME_BUILTINS_GENERATED_DIR}
+                --check-dir ${RUNTIME_BUILTIN_JS_DIR}
+                ${RUNTIME_BUILTIN_JS}
+        DEPENDS ${RUNTIME_BUILTIN_JS} ${RUNTIME_BUILTINS_JS2C}
+        COMMENT "Generating RuntimeBuiltins from src/main/cpp/js"
+        VERBATIM
+)
+
 # This branch also produces runtime-regular-release.aar, shipped as
 # nativescript-regular.aar and selected for apps that set useV8Symbols, so it
 # must carry the release flags. Only a local Debug build keeps plain -g.
@@ -106,6 +141,7 @@ add_library(
         src/main/cpp/ArrayElementAccessor.cpp
         src/main/cpp/ArrayHelper.cpp
         src/main/cpp/AssetExtractor.cpp
+        src/main/cpp/BuiltinLoader.cpp
         src/main/cpp/CallbackHandlers.cpp
         src/main/cpp/ConcurrentQueue.cpp
         src/main/cpp/Constants.cpp
@@ -164,6 +200,8 @@ add_library(
         src/main/cpp/URLPatternImpl.cpp
         src/main/cpp/HMRSupport.cpp
         src/main/cpp/DevFlags.cpp
+
+        ${RUNTIME_BUILTINS_GENERATED_DIR}/RuntimeBuiltins.cpp
 
         # V8 inspector source files will be included only in Release mode
         ${INSPECTOR_SOURCES}

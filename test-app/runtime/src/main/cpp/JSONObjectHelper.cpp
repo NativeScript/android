@@ -1,11 +1,15 @@
 #include "NativeScriptException.h"
 #include "JSONObjectHelper.h"
 #include "ArgConverter.h"
+#include "BuiltinLoader.h"
+#include "robin_hood.h"
 #include <sstream>
 #include <string>
 
 using namespace v8;
 using namespace tns;
+
+static robin_hood::unordered_map<Isolate*, Persistent<Function>*> isolateToSerializeFunc;
 
 void JSONObjectHelper::RegisterFromFunction(Isolate *isolate, Local<Value>& jsonObject) {
     if (!jsonObject->IsFunction()) {
@@ -24,7 +28,11 @@ void JSONObjectHelper::RegisterFromFunction(Isolate *isolate, Local<Value>& json
         return;
     }
 
-    Persistent<Function>* serializeFunc = new Persistent<Function>(isolate, CreateSerializeFunc(context));
+    Persistent<Function>* serializeFunc = GetSerializeFunc(context);
+    if (serializeFunc == nullptr) {
+        return;
+    }
+
     Local<External> extData = External::New(isolate, serializeFunc, v8::kExternalPointerTypeTagDefault);
     Local<Function> fromFunc;
     bool ok = FunctionTemplate::New(isolate, ConvertCallbackStatic, extData)->GetFunction(context).ToLocal(&fromFunc);
@@ -68,47 +76,35 @@ void JSONObjectHelper::ConvertCallbackStatic(const FunctionCallbackInfo<Value>& 
     }
 }
 
-Local<Function> JSONObjectHelper::CreateSerializeFunc(Local<Context> context) {
-    std::string source =
-        "(() => function serialize(data) {"
-        "    let store;"
-        "    switch (typeof data) {"
-        "        case \"string\":"
-        "        case \"boolean\":"
-        "        case \"number\": {"
-        "            return data;"
-        "        }"
-        "        case \"object\": {"
-        "            if (!data) {"
-        "                return null;"
-        "            }"
-        ""
-        "            if (data instanceof Date) {"
-        "                return data.toJSON();"
-        "            }"
-        ""
-        "            if (Array.isArray(data)) {"
-        "                store = new org.json.JSONArray();"
-        "                data.forEach((item) => store.put(serialize(item)));"
-        "                return store;"
-        "            }"
-        ""
-        "            store = new org.json.JSONObject();"
-        "            Object.keys(data).forEach((key) => store.put(key, serialize(data[key])));"
-        "            return store;"
-        "        }"
-        "        default:"
-        "            return null;"
-        "    }"
-        "})()";
-
+/*
+ * The JS->org.json serializer is shared by every `from` function created on
+ * this isolate; it holds no per-call state, so it is compiled once and kept
+ * alive for the isolate's lifetime.
+ */
+Persistent<Function>* JSONObjectHelper::GetSerializeFunc(Local<Context> context) {
     Isolate* isolate = v8::Isolate::GetCurrent();
 
-    Local<Script> script = Script::Compile(context, ArgConverter::ConvertToV8String(isolate, source)).ToLocalChecked();
+    auto it = isolateToSerializeFunc.find(isolate);
+    if (it != isolateToSerializeFunc.end()) {
+        return it->second;
+    }
 
-    Local<Value> result = script->Run(context).ToLocalChecked();
+    Local<Value> result;
+    if (!BuiltinLoader::RunBuiltin(context, BuiltinId::kJsonHelper).ToLocal(&result) ||
+            !result->IsFunction()) {
+        return nullptr;
+    }
 
-    Local<Function> serializeFunc = result.As<Function>();
+    auto* serializeFunc = new Persistent<Function>(isolate, result.As<Function>());
+    isolateToSerializeFunc.emplace(isolate, serializeFunc);
 
     return serializeFunc;
+}
+
+void JSONObjectHelper::onDisposeIsolate(Isolate* isolate) {
+    auto it = isolateToSerializeFunc.find(isolate);
+    if (it != isolateToSerializeFunc.end()) {
+        delete it->second;
+        isolateToSerializeFunc.erase(it);
+    }
 }

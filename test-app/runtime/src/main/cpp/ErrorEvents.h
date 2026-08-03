@@ -15,12 +15,12 @@ public:
      * (subclassing the Event installed by Events::Init, captured off
      * globalThis at init time) and global reportError. Evaluated once per
      * isolate during PrepareV8Runtime, right after Events::Init, for both the
-     * main and worker isolates. The bootstrap IIFE is invoked with the backing
+     * main and worker isolates. internal/error-events.js receives the backing
      * event target (Runtime::GlobalEventTarget()) and the native
-     * nativeReportFatal(error, stack) function, and returns three closures
-     * bound to the internal listener store; they are stashed on the Runtime
-     * so native dispatch survives app code overwriting
-     * globalThis.dispatchEvent.
+     * nativeReportFatal(error, stack) function through its binding bag, and
+     * exports the dispatch closures bound to the internal listener store; they
+     * are stashed on the Runtime so native dispatch survives app code
+     * overwriting globalThis.dispatchEvent.
      */
     static void Init(v8::Local<v8::Context> context);
 

@@ -6,6 +6,7 @@
  */
 #include "ModuleInternal.h"
 #include "ModuleInternalCallbacks.h"
+#include "BuiltinLoader.h"
 #include "File.h"
 #include "JniLocalRef.h"
 #include "ArgConverter.h"
@@ -80,36 +81,14 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
 
     m_isolate = isolate;
 
-    string requireFactoryScript =
-        "(function () { "
-        "	function require_factory(requireInternal, dirName) { "
-        "		return function require(modulePath) { "
-        "			if(global.__requireOverride) { "
-        "				var result = global.__requireOverride(modulePath, dirName); "
-        "				if(result) { "
-        "					return result; "
-        "				} "
-        "			} "
-        "			return requireInternal(modulePath, dirName); "
-        "		} "
-        "	} "
-        "	return require_factory; "
-        "})()";
-
-    auto source = ArgConverter::ConvertToV8String(isolate, requireFactoryScript);
     auto context = isolate->GetCurrentContext();
 
     auto global = context->Global();
 
-    Local<Script> script;
-    auto maybeScript = Script::Compile(context, source).ToLocal(&script);
-
-    assert(!script.IsEmpty());
-
     Local<Value> result;
-    auto maybeResult = script->Run(context).ToLocal(&result);
+    auto success = BuiltinLoader::RunBuiltin(context, BuiltinId::kRequireFactory).ToLocal(&result);
 
-    assert(!result.IsEmpty() && result->IsFunction());
+    assert(success && result->IsFunction());
 
     auto requireFactoryFunction = result.As<Function>();
 
