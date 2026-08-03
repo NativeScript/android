@@ -63,6 +63,11 @@ include_directories(
 # must carry the release flags. Only a local Debug build keeps plain -g.
 if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD OR NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections")
+    # CMake appends CMAKE_CXX_FLAGS_<CONFIG> after CMAKE_CXX_FLAGS and clang honours the
+    # last -O, so the -O3 above only survives in configs that carry no -O of their own
+    # (Debug). AGP builds the release variant as RelWithDebInfo, whose default -O2 would
+    # otherwise win.
+    string(APPEND CMAKE_CXX_FLAGS_RELWITHDEBINFO " -O3")
 else ()
     set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -g")
 endif ()
