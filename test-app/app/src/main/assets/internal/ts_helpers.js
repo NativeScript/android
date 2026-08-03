@@ -166,6 +166,14 @@
 		}
 	}
 
+	// No-op decorator for plain ES classes extending native types.
+	// The runtime registers such classes lazily (on first construction, static usage or when
+	// passed to native APIs), so the decorator only exists so shared iOS/Android sources and
+	// non-transformed code keep working.
+	function NativeClass(target) {
+		return target;
+	}
+
 	Object.defineProperty(global, "__native", { value: __native });
 	Object.defineProperty(global, "__extends", { value: __extends });
 	Object.defineProperty(global, "__decorate", { value: __decorate });
@@ -174,4 +182,7 @@
 		global.JavaProxy = JavaProxy;
 	}
 	global.Interfaces = Interfaces;
+	if (!global.NativeClass) {
+		global.NativeClass = NativeClass;
+	}
 })()
