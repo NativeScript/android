@@ -59,6 +59,17 @@ class MetadataNode {
 
         static std::string GetTypeMetadataName(v8::Isolate* isolate, v8::Local<v8::Value>& value);
 
+        /*
+         * Non-throwing metadata lookups for the console formatter. They read
+         * private symbols only, so they never re-enter JS or trip an
+         * interceptor, and they tolerate values carrying no metadata at all
+         * (unlike GetNodeFromHandle/GetTypeMetadataName, which assume it is
+         * there). Names come back in the metadata's slashed JNI form.
+         */
+        static bool TryGetInstanceTypeName(v8::Isolate* isolate, const v8::Local<v8::Object>& value, std::string& out);
+
+        static bool TryGetPackageName(v8::Isolate* isolate, const v8::Local<v8::Object>& value, std::string& out);
+
         static void onDisposeIsolate(v8::Isolate* isolate);
 
         static MetadataReader* getMetadataReader();
@@ -266,6 +277,8 @@ class MetadataNode {
 
         struct MetadataNodeCache {
             v8::Persistent<v8::String>* MetadataKey;
+
+            v8::Persistent<v8::String>* PackageKey;
 
             robin_hood::unordered_map<MetadataTreeNode*, CtorCacheData> CtorFuncCache;
 

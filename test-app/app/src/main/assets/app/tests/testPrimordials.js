@@ -118,11 +118,10 @@ describe("primordials", function () {
     });
 
     it("console.log of a circular object neither throws nor crashes with JSON.stringify tampered", function () {
-        // The smart-stringify builtin both calls JSON.stringify and tracks
-        // already-visited objects with Array.prototype.indexOf/push. Its output
-        // is not reachable from JS and JsonStringifyObject swallows a throwing
-        // stringify, so this only pins down that the tampered path stays
-        // non-fatal; the primordial routing itself is covered by review.
+        // The inspect builtin quotes strings through JSON.stringify and builds
+        // its parts list with Array.prototype.push. Its logcat output is not
+        // reachable from JS, so this only pins down that the tampered path
+        // stays non-fatal; testInspect covers the formatting itself.
         const circular = { name: "primordials" };
         circular.self = circular;
 
