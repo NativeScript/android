@@ -58,11 +58,13 @@ include_directories(
         src/main/cpp/ada
 )
 
-if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
+# This branch also produces runtime-regular-release.aar, shipped as
+# nativescript-regular.aar and selected for apps that set useV8Symbols, so it
+# must carry the release flags. Only a local Debug build keeps plain -g.
+if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD OR NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections")
 else ()
     set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -g")
-#    set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections")
 endif ()
 
 if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
