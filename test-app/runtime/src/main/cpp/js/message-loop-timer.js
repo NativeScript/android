@@ -1,4 +1,11 @@
 const { messageLoopTimerStart, messageLoopTimerStop } = binding;
+const {
+    ArrayPrototypeIndexOf,
+    FunctionPrototypeApply,
+    PromisePrototypeCatch,
+    PromisePrototypeThen,
+    Proxy,
+} = primordials;
 
 // We proxy the WebAssembly's compile, compileStreaming, instantiate and
 // instantiateStreaming methods so that they can start and stop a
@@ -16,17 +23,18 @@ global.WebAssembly = new Proxy(WebAssembly, {
             "instantiateStreaming"
         ];
 
-        if (proxyMethods.indexOf(name) < 0) {
+        if (ArrayPrototypeIndexOf(proxyMethods, name) < 0) {
             return origMethod;
         }
 
         return function (...args) {
             messageLoopTimerStart();
-            let result = origMethod.apply(this, args);
-            return result.then(x => {
+            let result = FunctionPrototypeApply(origMethod, this, args);
+            let settled = PromisePrototypeThen(result, x => {
                 messageLoopTimerStop();
                 return x;
-            }).catch(e => {
+            });
+            return PromisePrototypeCatch(settled, e => {
                 messageLoopTimerStop();
                 throw e;
             });

@@ -1,9 +1,13 @@
-global.WeakRef.prototype.get = global.WeakRef.prototype.deref;
-global.WeakRef.prototype.__hasWarnedAboutClear = false;
-global.WeakRef.prototype.clear = () => {
-    if(global.WeakRef.prototype.__hasWarnedAboutClear) {
+// `clear` outlives init, so the prototype it flags is captured now rather than
+// reached through the global at call time.
+const WeakRefPrototype = global.WeakRef.prototype;
+
+WeakRefPrototype.get = WeakRefPrototype.deref;
+WeakRefPrototype.__hasWarnedAboutClear = false;
+WeakRefPrototype.clear = () => {
+    if (WeakRefPrototype.__hasWarnedAboutClear) {
         return;
     }
-    global.WeakRef.prototype.__hasWarnedAboutClear = true;
+    WeakRefPrototype.__hasWarnedAboutClear = true;
     console.warn('WeakRef.clear() is non-standard and has been deprecated. It does nothing and the call can be safely removed.');
 }

@@ -1,3 +1,11 @@
+const {
+    ArrayIsArray,
+    ArrayPrototypeForEach,
+    Date,
+    DatePrototypeToJSON,
+    ObjectKeys,
+} = primordials;
+
 function serialize(data) {
     let store;
     switch (typeof data) {
@@ -12,17 +20,17 @@ function serialize(data) {
             }
 
             if (data instanceof Date) {
-                return data.toJSON();
+                return DatePrototypeToJSON(data);
             }
 
-            if (Array.isArray(data)) {
+            if (ArrayIsArray(data)) {
                 store = new org.json.JSONArray();
-                data.forEach((item) => store.put(serialize(item)));
+                ArrayPrototypeForEach(data, (item) => store.put(serialize(item)));
                 return store;
             }
 
             store = new org.json.JSONObject();
-            Object.keys(data).forEach((key) => store.put(key, serialize(data[key])));
+            ArrayPrototypeForEach(ObjectKeys(data), (key) => store.put(key, serialize(data[key])));
             return store;
         }
         default:

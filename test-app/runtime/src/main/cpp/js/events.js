@@ -1,4 +1,13 @@
 "use strict";
+const {
+  ArrayPrototypeIndexOf,
+  ArrayPrototypePush,
+  ArrayPrototypeSlice,
+  ArrayPrototypeSplice,
+  FunctionPrototypeCall,
+  ObjectCreate,
+  String,
+} = primordials;
 var g = globalThis;
 
 function Event(type, opts) {
@@ -29,7 +38,7 @@ Event.prototype.stopImmediatePropagation = function () {
 // user code runs); until then a thrown listener is swallowed.
 var reportListenerError = function (e) {};
 
-function EventTargetImpl() { this._listeners = Object.create(null); }
+function EventTargetImpl() { this._listeners = ObjectCreate(null); }
 EventTargetImpl.prototype.addEventListener = function (type, callback, options) {
   if (callback === null || callback === undefined) { return; }
   type = String(type);
@@ -45,7 +54,7 @@ EventTargetImpl.prototype.addEventListener = function (type, callback, options) 
   for (var i = 0; i < list.length; i++) {
     if (list[i].callback === callback && list[i].capture === capture) { return; }
   }
-  list.push({ callback: callback, once: once, capture: capture });
+  ArrayPrototypePush(list, { callback: callback, once: once, capture: capture });
 };
 EventTargetImpl.prototype.removeEventListener = function (type, callback, options) {
   type = String(type);
@@ -59,7 +68,7 @@ EventTargetImpl.prototype.removeEventListener = function (type, callback, option
   if (!list) { return; }
   for (var i = 0; i < list.length; i++) {
     if (list[i].callback === callback && list[i].capture === capture) {
-      list.splice(i, 1);
+      ArrayPrototypeSplice(list, i, 1);
       return;
     }
   }
@@ -71,16 +80,16 @@ EventTargetImpl.prototype.dispatchEvent = function (event) {
   if (list) {
     // Snapshot so listeners added during dispatch are not invoked and
     // registration order is preserved.
-    var snapshot = list.slice();
+    var snapshot = ArrayPrototypeSlice(list);
     for (var i = 0; i < snapshot.length; i++) {
       var entry = snapshot[i];
-      var idx = list.indexOf(entry);
+      var idx = ArrayPrototypeIndexOf(list, entry);
       if (idx === -1) { continue; }  // removed since snapshot
-      if (entry.once) { list.splice(idx, 1); }
+      if (entry.once) { ArrayPrototypeSplice(list, idx, 1); }
       var cb = entry.callback;
       try {
         if (typeof cb === "function") {
-          cb.call(this, event);
+          FunctionPrototypeCall(cb, this, event);
         } else if (cb && typeof cb.handleEvent === "function") {
           cb.handleEvent(event);
         }
@@ -116,7 +125,7 @@ g.dispatchEvent = function (event) {
   return globalTarget.dispatchEvent(event);
 };
 
-function EventTarget() { EventTargetImpl.call(this); }
+function EventTarget() { FunctionPrototypeCall(EventTargetImpl, this); }
 EventTarget.prototype.addEventListener = EventTargetImpl.prototype.addEventListener;
 EventTarget.prototype.removeEventListener = EventTargetImpl.prototype.removeEventListener;
 EventTarget.prototype.dispatchEvent = EventTargetImpl.prototype.dispatchEvent;
