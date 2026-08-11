@@ -192,9 +192,17 @@ describe("frame callback timestamps", function () {
           // the timeline's monotonic origin. System.nanoTime() is on that same
           // clock, so the pair (nanoTime, now) must yield the same origin --
           // this is what would break if either argument moved off the base.
+          // The two clocks cannot be read at once, so nanoTime is bracketed
+          // and compared against the midpoint: the tolerance then only has to
+          // cover the sampling window, not whatever pause lands between them.
+          const beforeNow = performance.now();
+          const sampledNanos = java.lang.System.nanoTime();
+          const afterNow = performance.now();
           const originFromFrame = frameTimeNanos / 1e6 - performanceMillis;
-          const originFromClock = java.lang.System.nanoTime() / 1e6 - performance.now();
-          expect(Math.abs(originFromFrame - originFromClock)).toBeLessThan(5);
+          const originFromClock = sampledNanos / 1e6 - (beforeNow + afterNow) / 2;
+          expect(Math.abs(originFromFrame - originFromClock)).toBeLessThan(
+            5 + (afterNow - beforeNow)
+          );
           done();
         });
       });

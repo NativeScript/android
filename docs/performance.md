@@ -36,7 +36,7 @@ in main and worker isolates alike): `performance`, `Performance`,
   ties).
 - Observers: `new PerformanceObserver(cb)`, `observe({entryTypes})` or
   `observe({type, buffered})`, `disconnect()`, `takeRecords()`, static frozen
-  `PerformanceObserver.supportedEntryTypes === ["mark", "measure"]`.
+  `PerformanceObserver.supportedEntryTypes`, which is `["mark", "measure"]`.
 
 ## Architecture
 

@@ -529,9 +529,13 @@ class Performance extends EventTarget {
       }
     } else {
       endTime = endMark !== undefined ? convertMarkToTimestamp(endMark) : now();
-      // A members-free options object means "no start given", not a mark name.
+      // A members-free options object means "no start given", not a mark name,
+      // and so does null: the WebIDL union converts it to an empty dictionary
+      // rather than to the string "null".
       startTime =
-        startOrMeasureOptions !== undefined && !isOptionsObject
+        startOrMeasureOptions !== undefined &&
+        startOrMeasureOptions !== null &&
+        !isOptionsObject
           ? convertMarkToTimestamp(startOrMeasureOptions)
           : 0;
     }

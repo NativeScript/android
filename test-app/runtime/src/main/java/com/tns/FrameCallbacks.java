@@ -10,13 +10,15 @@ import android.view.Choreographer;
  * from native code (FrameCallbacks.cpp).
  */
 final class FrameCallbacks implements Choreographer.FrameCallback {
-    private final long nativeEntryPtr;
+    private final long entryId;
     private final Choreographer choreographer;
-    private boolean released;
+    // Read on the frame thread, set from Runtime teardown, which is not
+    // guaranteed to be that thread.
+    private volatile boolean released;
 
-    // constructed from native code (FrameCallbacks::PostJavaCallback)
-    FrameCallbacks(long nativeEntryPtr) {
-        this.nativeEntryPtr = nativeEntryPtr;
+    // constructed from native code (FrameCallbacks::PostJava)
+    FrameCallbacks(long entryId) {
+        this.entryId = entryId;
         this.choreographer = Choreographer.getInstance();
     }
 
@@ -30,10 +32,9 @@ final class FrameCallbacks implements Choreographer.FrameCallback {
     }
 
     /**
-     * Called from native when the entry is dropped, on this callback's own
-     * thread. A frame already queued for this instance still arrives, so the
-     * flag -- not removeFrameCallback -- is what keeps it from reaching the
-     * freed native entry.
+     * Called from native when the entry is dropped. A frame already queued for
+     * this instance still arrives, so the flag -- not removeFrameCallback --
+     * is what keeps it from reaching a retired native entry.
      */
     @RuntimeCallable
     void release() {
@@ -46,8 +47,8 @@ final class FrameCallbacks implements Choreographer.FrameCallback {
         if (released) {
             return;
         }
-        nativeDoFrame(nativeEntryPtr, frameTimeNanos);
+        nativeDoFrame(entryId, frameTimeNanos);
     }
 
-    private static native void nativeDoFrame(long nativeEntryPtr, long frameTimeNanos);
+    private static native void nativeDoFrame(long entryId, long frameTimeNanos);
 }
