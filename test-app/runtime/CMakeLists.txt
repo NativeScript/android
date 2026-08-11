@@ -74,6 +74,7 @@ set(RUNTIME_BUILTIN_JS
         ${RUNTIME_BUILTIN_JS_DIR}/ns-util.js
         ${RUNTIME_BUILTIN_JS_DIR}/primordials.js
         ${RUNTIME_BUILTIN_JS_DIR}/require-factory.js
+        ${RUNTIME_BUILTIN_JS_DIR}/structured-clone.js
         ${RUNTIME_BUILTIN_JS_DIR}/weak-ref.js
 )
 set(RUNTIME_BUILTINS_GENERATED_DIR ${PROJECT_SOURCE_DIR}/src/main/cpp/generated)
@@ -184,11 +185,12 @@ add_library(
         src/main/cpp/Runtime.cpp
         src/main/cpp/SimpleAllocator.cpp
         src/main/cpp/SimpleProfiler.cpp
+        src/main/cpp/StructuredClone.cpp
+        src/main/cpp/StructuredSerialization.cpp
         src/main/cpp/Util.cpp
         src/main/cpp/V8GlobalHelpers.cpp
         src/main/cpp/V8StringConstants.cpp
         src/main/cpp/WeakRef.cpp
-        src/main/cpp/WorkerMessage.cpp
         src/main/cpp/WorkerWrapper.cpp
         src/main/cpp/Timers.cpp
         src/main/cpp/com_tns_AssetExtractor.cpp

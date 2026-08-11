@@ -32,6 +32,7 @@
 #include "NativeScriptException.h"
 #include "SimpleAllocator.h"
 #include "SimpleProfiler.h"
+#include "StructuredClone.h"
 #include "URLImpl.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
@@ -852,6 +853,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   // installed for both the main and worker isolates.
   Events::Init(context);
   ErrorEvents::Init(context);
+
+  StructuredClone::Init(context);
 
   // The `interop` global (interop.escapeException), mirroring iOS.
   Interop::Init(context);
