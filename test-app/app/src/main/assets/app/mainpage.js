@@ -21,6 +21,7 @@ shared.runWorkerTests();
 shared.runStructuredCloneTests();
 require("./tests/testWebAssembly");
 require("./tests/testMultithreadedJavascript");
+require("./tests/testWorkerTerminateDuringLoad");
 require("./tests/testInterfaceDefaultMethods");
 require("./tests/testInterfaceStaticMethods");
 require("./tests/testMetadata");

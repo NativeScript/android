@@ -371,10 +371,11 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
     if (Util::EndsWith(modulePath, ".js")) {
         auto script = LoadScript(isolate, modulePath, fullRequiredModulePath);
 
-        moduleFunc = script->Run(context).ToLocalChecked().As<Function>();
-        if (tc.HasCaught()) {
+        Local<Value> moduleFuncValue;
+        if (!script->Run(context).ToLocal(&moduleFuncValue) || tc.HasCaught()) {
             throw NativeScriptException(tc, "Error running script " + modulePath);
         }
+        moduleFunc = moduleFuncValue.As<Function>();
     } else if (Util::EndsWith(modulePath, ".so")) {
         auto handle = dlopen(modulePath.c_str(), RTLD_LAZY);
         if (handle == nullptr) {
@@ -422,7 +423,11 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
 
     auto thiz = Object::New(isolate);
     auto extendsName = ArgConverter::ConvertToV8String(isolate, "__extends");
-    thiz->Set(context, extendsName, context->Global()->Get(context, extendsName).ToLocalChecked());
+    Local<Value> extendsFunc;
+    if (!context->Global()->Get(context, extendsName).ToLocal(&extendsFunc) || tc.HasCaught()) {
+        throw NativeScriptException(tc, "Cannot read '__extends' while loading " + modulePath);
+    }
+    thiz->Set(context, extendsName, extendsFunc);
     moduleFunc->Call(context, thiz, sizeof(requireArgs) / sizeof(Local<Value> ), requireArgs);
 
     if (tc.HasCaught()) {

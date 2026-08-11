@@ -44,8 +44,19 @@ NativeScriptException::NativeScriptException(TryCatch& tc,
                                              const string& message)
     : m_javaException(JniLocalRef()) {
   auto isolate = Isolate::GetCurrent();
-  m_javascriptException = new Persistent<Value>(isolate, tc.Exception());
   auto ex = tc.Exception();
+  m_javascriptException =
+      ex.IsEmpty() ? nullptr : new Persistent<Value>(isolate, ex);
+
+  // A terminated isolate carries no message object and no inspectable
+  // exception - every accessor below hands back an empty handle. Resetting
+  // does not cancel the isolate's pending termination.
+  if (tc.HasTerminated() || tc.Message().IsEmpty()) {
+    m_message = message.empty() ? "Execution terminated." : message;
+    tc.Reset();
+    return;
+  }
+
   m_message = GetErrorMessage(tc.Message(), ex, message);
   m_stackTrace = GetErrorStackTrace(tc.Message()->GetStackTrace());
   m_fullMessage = GetFullMessage(tc, m_message);

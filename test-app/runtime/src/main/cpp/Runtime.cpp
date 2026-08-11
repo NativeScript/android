@@ -112,8 +112,9 @@ void Runtime::Init(JavaVM* vm, void* reserved) {
   // handle SIGABRT/SIGSEGV only on API level > 20 as the handling is not so
   // efficient in older versions
   if (m_androidVersion > 20) {
-    struct sigaction action;
+    struct sigaction action = {};
     action.sa_handler = SIG_handler;
+    sigemptyset(&action.sa_mask);
     sigaction(SIGABRT, &action, NULL);
     sigaction(SIGSEGV, &action, NULL);
   }
