@@ -31,6 +31,7 @@
 #include "ModuleInternalCallbacks.h"
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
+#include "NativeScriptPlatform.h"
 #include "Performance.h"
 #include "SimpleAllocator.h"
 #include "SimpleProfiler.h"
@@ -145,7 +146,6 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
       m_runGC(false) {
   m_runtime = env->NewGlobalRef(runtime);
   m_objectManager = new ObjectManager(m_runtime);
-  m_loopTimer = new MessageLoopTimer();
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_id2RuntimeCache.emplace(id, this);
@@ -300,7 +300,9 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
 
 Runtime::~Runtime() {
   delete this->m_objectManager;
-  delete this->m_loopTimer;
+  // the isolate pointer may be reused by a future isolate once disposed, so
+  // the platform's runner entry has to go before this Runtime is forgotten
+  NativeScriptPlatform::Instance()->IsolateDisposed(m_isolate);
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
   FrameCallbacks::RemoveIsolateEntries(m_isolate);
   if (m_isMainThread) {
@@ -596,7 +598,10 @@ static void InitializeV8() {
   // per isolate. Runtime::Init has already read them out of the Java config.
   V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(),
                          Constants::V8_STARTUP_FLAGS.size());
-  Runtime::platform = v8::platform::NewDefaultPlatform().release();
+  // wrap the default platform so foreground tasks ride each runtime thread's
+  // Java Looper instead of sitting in never-pumped libplatform queues
+  Runtime::platform =
+      new NativeScriptPlatform(v8::platform::NewDefaultPlatform());
   V8::InitializePlatform(Runtime::platform);
   V8::Initialize();
 }
@@ -633,6 +638,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_isolate2RuntimesCache[isolate] = this;
   }
+  // attach the isolate's foreground task runner to this thread's looper;
+  // tasks v8 buffered during Isolate::New start flowing from here on
+  NativeScriptPlatform::Instance()
+      ->GetForegroundRunner(isolate)
+      ->BindToCurrentThread();
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
   HandleScope handleScope(isolate);
@@ -910,8 +920,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   m_arrayBufferHelper.CreateConvertFunctions(context, global, m_objectManager);
 
-  m_loopTimer->Init(context);
-
   this->m_context = new Persistent<Context>(isolate, context);
 
   s_mainThreadInitialized = true;
@@ -957,6 +965,9 @@ void Runtime::DestroyRuntime() {
     // will have their posts dropped from now on
     m_looperTasks->Terminate();
   }
+  // stop the foreground task runner before the isolate goes away; v8 posts
+  // made during teardown are dropped
+  NativeScriptPlatform::Instance()->RuntimeDestroyed(m_isolate);
   // The events state holds v8::Global handles (backing event target, dispatch
   // closures and tracked promise rejections) - reset them while the isolate
   // is still alive.

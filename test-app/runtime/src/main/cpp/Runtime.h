@@ -9,7 +9,6 @@
 #include "ArrayBufferHelper.h"
 #include "Profiler.h"
 #include "ModuleInternal.h"
-#include "MessageLoopTimer.h"
 #include "File.h"
 #include "Timers.h"
 #include "LooperTasks.h"
@@ -219,8 +218,6 @@ class Runtime {
         WeakRef m_weakRef;
 
         Profiler m_profiler;
-
-        MessageLoopTimer* m_loopTimer;
 
         std::shared_ptr<LooperTasks> m_looperTasks;
 
