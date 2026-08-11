@@ -1222,9 +1222,15 @@ CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo
     HandleScope scope(isolate);
 
     try {
-        if (args.Length() != 1) {
+        if (args.Length() < 1) {
             isolate->ThrowException(ArgConverter::ConvertToV8String(isolate,
                                                                     "Failed to execute 'postMessage' on 'Worker': 1 argument required."));
+            return;
+        }
+
+        if (args.Length() > 2) {
+            isolate->ThrowException(ArgConverter::ConvertToV8String(isolate,
+                                                                    "Failed to execute 'postMessage' on 'Worker': no more than 2 arguments accepted."));
             return;
         }
 
@@ -1249,9 +1255,15 @@ CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo
             return;
         }
 
+        Local<Value> transferList = args.Length() > 1
+                                            ? args[1]
+                                            : v8::Undefined(isolate).As<Value>();
         auto message = std::make_shared<worker::Message>();
-        if (message->Serialize(isolate, context, args[0]).IsNothing()) {
-            // a DataCloneError is already pending on the isolate
+        if (message->Serialize(isolate, context, args[0], transferList,
+                               serialization::HostObjectPolicy::kDegrade)
+                    .IsNothing()) {
+            // The transfer list was rejected or the value could not be cloned;
+            // the exception is already pending and nothing may be posted.
             return;
         }
 
@@ -1283,9 +1295,12 @@ CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbackInfo
         TryCatch tc(isolate);
 
         // TODO: Pete: Discuss whether this is the way to go
-        if (args.Length() != 1) {
+        if (args.Length() < 1) {
             isolate->ThrowException(ArgConverter::ConvertToV8String(isolate,
                                                                     "Failed to execute 'postMessage' on WorkerGlobalScope: 1 argument required."));
+        } else if (args.Length() > 2) {
+            isolate->ThrowException(ArgConverter::ConvertToV8String(isolate,
+                                                                    "Failed to execute 'postMessage' on WorkerGlobalScope: no more than 2 arguments accepted."));
         }
 
         if (tc.HasCaught()) {
@@ -1301,9 +1316,15 @@ CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbackInfo
         }
 
         auto context = isolate->GetCurrentContext();
+        Local<Value> transferList = args.Length() > 1
+                                            ? args[1]
+                                            : v8::Undefined(isolate).As<Value>();
         auto message = std::make_shared<worker::Message>();
-        if (message->Serialize(isolate, context, args[0]).IsNothing()) {
-            // a DataCloneError is already pending on the isolate
+        if (message->Serialize(isolate, context, args[0], transferList,
+                               serialization::HostObjectPolicy::kDegrade)
+                    .IsNothing()) {
+            // The transfer list was rejected or the value could not be cloned;
+            // the exception is already pending and nothing may be posted.
             return;
         }
 

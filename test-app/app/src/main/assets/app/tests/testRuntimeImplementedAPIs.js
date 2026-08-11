@@ -31,3 +31,12 @@ describe("Runtime exposes", function () {
     expect(ok).toBe(true, "__time delta " + timeDelta + "ms diverged from Date.now delta " + dateDelta + "ms (tolerance " + tolerance + "ms) on all " + attempts + " attempts");
   });
 });
+
+// The shared StructuredClone suite skips itself where the API is missing, which
+// would turn this runtime losing structuredClone into a green run. This spec is
+// deliberately unguarded so that regression fails instead.
+describe("structuredClone canary", function () {
+  it("is implemented by this runtime", function () {
+    expect(typeof structuredClone).toBe("function");
+  });
+});

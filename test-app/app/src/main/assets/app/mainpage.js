@@ -18,6 +18,7 @@ shared.runRequireTests();
 shared.runWeakRefTests();
 shared.runRuntimeTests();
 shared.runWorkerTests();
+shared.runStructuredCloneTests();
 require("./tests/testWebAssembly");
 require("./tests/testMultithreadedJavascript");
 require("./tests/testInterfaceDefaultMethods");

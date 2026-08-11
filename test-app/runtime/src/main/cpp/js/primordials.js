@@ -22,12 +22,16 @@ const uncurryThis = FunctionPrototypeBind.bind(FunctionPrototypeCall);
 const intrinsics = {
   // Constructors.
   Date,
+  Error,
   Map,
   Number,
   Proxy,
   Set,
   String,
   TypeError,
+
+  // Well-known symbols.
+  SymbolIterator: Symbol.iterator,
 
   // Namespaces / prototypes.
   ObjectPrototype: Object.prototype,
