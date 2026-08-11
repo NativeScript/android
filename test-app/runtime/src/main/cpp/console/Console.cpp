@@ -107,13 +107,21 @@ void Console::initInspect(v8::Local<v8::Context> context) {
     v8::Local<v8::Value> result;
     if (!BuiltinLoader::RunBuiltin(context, BuiltinId::kInspect, binding).ToLocal(&result) ||
             !result->IsFunction()) {
-        __android_log_write(ANDROID_LOG_WARN, LOG_TAG,
-                            "Warning: Console failed to initialize the inspect builtin");
+        std::string detail;
+        v8::Local<v8::String> exStr;
+        if (!tc.Exception().IsEmpty() && tc.Exception()->ToDetailString(context).ToLocal(&exStr)) {
+            detail = ": " + ArgConverter::ConvertToString(exStr);
+        }
+        __android_log_print(ANDROID_LOG_WARN, LOG_TAG,
+                            "Warning: Console failed to initialize the inspect builtin%s",
+                            detail.c_str());
         return;
     }
 
     std::lock_guard<std::mutex> lock(inspectMutex);
-    isolateToInspect.emplace(isolate, new v8::Persistent<v8::Function>(isolate, result.As<v8::Function>()));
+    auto& slot = isolateToInspect[isolate];
+    delete slot;
+    slot = new v8::Persistent<v8::Function>(isolate, result.As<v8::Function>());
 }
 
 v8::Local<v8::Function> Console::getInspect(v8::Local<v8::Context> context) {

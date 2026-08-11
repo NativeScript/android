@@ -36,7 +36,8 @@ void MetadataNode::Init(Isolate* isolate) {
 
 // Deliberately not V8GetPrivateValue: that one resolves the creation context,
 // which hard-crashes on values that have none (a revoked proxy), and throws
-// when the lookup comes back Nothing. Callers here take arbitrary values.
+// when the lookup comes back Nothing. Callers here take arbitrary values, so a
+// failed read must also leave no exception pending for whoever calls next.
 static void* TryReadPrivateExternal(Isolate* isolate, const Local<Object>& value, Persistent<String>* key) {
     if (key == nullptr) {
         return nullptr;
@@ -47,9 +48,11 @@ static void* TryReadPrivateExternal(Isolate* isolate, const Local<Object>& value
         return nullptr;
     }
 
+    TryCatch tc(isolate);
     Local<Value> hidden;
     auto privateKey = Private::ForApi(isolate, Local<String>::New(isolate, *key));
     if (!value->GetPrivate(context, privateKey).ToLocal(&hidden) || !hidden->IsExternal()) {
+        tc.Reset();
         return nullptr;
     }
 

@@ -6,6 +6,11 @@
 // than constructors, and getters are NEVER invoked. Output is budgeted: depth,
 // per-collection entry caps, string caps, and a hard total-size cap make it
 // impossible for a single console.log to hang the app on a huge graph.
+//
+// Proxies are the one structural exception to "never runs user code": a proxy
+// is indistinguishable from its target here, so the key and descriptor reads
+// below fire its traps. Trap output is spent against the same budget as any
+// other value and whatever a trap throws is caught by inspect().
 
 const { getNativeWrapperHint } = binding;
 const {
@@ -20,6 +25,8 @@ const {
   JSONStringify,
   MapIteratorPrototypeNext,
   MapPrototypeEntries,
+  MapPrototypeGetSize,
+  NumberIsNaN,
   ObjectDefineProperty,
   ObjectGetOwnPropertyDescriptor,
   ObjectGetOwnPropertySymbols,
@@ -36,6 +43,7 @@ const {
   SetIteratorPrototypeNext,
   SetPrototypeAdd,
   SetPrototypeDelete,
+  SetPrototypeGetSize,
   SetPrototypeHas,
   SetPrototypeValues,
   String,
@@ -189,7 +197,7 @@ function formatObject(ctx, value, depth) {
   }
   if (brand === "[object Date]") {
     const time = DatePrototypeGetTime(value);
-    return time !== time ? "Invalid Date" : DatePrototypeToISOString(value);
+    return NumberIsNaN(time) ? "Invalid Date" : DatePrototypeToISOString(value);
   }
   if (brand === "[object RegExp]") {
     return RegExpPrototypeToString(value);
@@ -308,27 +316,25 @@ function formatArray(ctx, arr, depth) {
 
 function formatMapLike(ctx, coll, depth, isMap) {
   const parts = [];
-  let count = 0;
-  let total = 0;
+  // The count comes from the size accessor so that iteration can stop at the
+  // cap: walking a million-entry Map just to label it would defeat the budget.
+  const total = isMap ? MapPrototypeGetSize(coll) : SetPrototypeGetSize(coll);
+  const shown = total > MAX_ENTRIES ? MAX_ENTRIES : total;
   const iter = isMap ? MapPrototypeEntries(coll) : SetPrototypeValues(coll);
   const next = isMap ? MapIteratorPrototypeNext : SetIteratorPrototypeNext;
-  for (;;) {
+  for (let i = 0; i < shown; i++) {
     const step = next(iter);
     if (step.done) break;
-    total++;
-    if (count < MAX_ENTRIES) {
-      count++;
-      if (isMap) {
-        const entry = step.value;
-        ArrayPrototypePush(parts,
-            formatValue(ctx, entry[0], depth + 1) + " => " + formatValue(ctx, entry[1], depth + 1));
-      } else {
-        ArrayPrototypePush(parts, formatValue(ctx, step.value, depth + 1));
-      }
+    if (isMap) {
+      const entry = step.value;
+      ArrayPrototypePush(parts,
+          formatValue(ctx, entry[0], depth + 1) + " => " + formatValue(ctx, entry[1], depth + 1));
+    } else {
+      ArrayPrototypePush(parts, formatValue(ctx, step.value, depth + 1));
     }
   }
-  if (total > count) {
-    ArrayPrototypePush(parts, "... " + (total - count) + " more items");
+  if (total > shown) {
+    ArrayPrototypePush(parts, "... " + (total - shown) + " more items");
   }
   const label = (isMap ? "Map(" : "Set(") + total + ")";
   return spend(ctx, parts.length === 0 ? label + " {}" : label + " { " + join(parts) + " }");
@@ -351,6 +357,7 @@ function formatPlainObject(ctx, value, depth) {
   for (let i = 0; i < symbols.length && i < MAX_ENTRIES; i++) {
     if (ObjectPrototypePropertyIsEnumerable(value, symbols[i])) {
       const desc = ObjectGetOwnPropertyDescriptor(value, symbols[i]);
+      if (desc === undefined) continue;
       ArrayPrototypePush(parts,
           "[" + SymbolPrototypeToString(symbols[i]) + "]: " + formatProperty(ctx, desc, depth));
     }

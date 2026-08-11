@@ -60,6 +60,53 @@ describe("inspect", function () {
         expect(invoked).toBe(false);
     });
 
+    it("never invokes toJSON", function () {
+        var invoked = false;
+        var obj = {
+            a: 1,
+            toJSON: function () {
+                invoked = true;
+                throw new Error("toJSON must not run");
+            }
+        };
+        expect(__inspect(obj)).toBe("{ a: 1, toJSON: [Function: toJSON] }");
+        expect(invoked).toBe(false);
+    });
+
+    it("caps map and set entries", function () {
+        var map = new Map();
+        var set = new Set();
+        for (var i = 0; i < 150; i++) {
+            map.set("k" + i, i);
+            set.add(i);
+        }
+
+        var mapOut = __inspect(map);
+        expect(mapOut.indexOf("Map(150) { ")).toBe(0);
+        expect(mapOut.indexOf('"k99" => 99')).toBeGreaterThan(-1);
+        expect(mapOut.indexOf('"k100" => 100')).toBe(-1);
+        expect(mapOut.indexOf("... 50 more items")).toBeGreaterThan(-1);
+
+        var setOut = __inspect(set);
+        expect(setOut.indexOf("Set(150) { ")).toBe(0);
+        expect(setOut.indexOf("... 50 more items")).toBeGreaterThan(-1);
+    });
+
+    it("does not iterate a large collection past the entry cap", function () {
+        var map = new Map();
+        for (var i = 0; i < 100000; i++) {
+            map.set(i, i);
+        }
+        var start = Date.now();
+        var out = __inspect(map);
+        var elapsed = Date.now() - start;
+        expect(out.indexOf("Map(100000) { ")).toBe(0);
+        expect(out.indexOf("... 99900 more items")).toBeGreaterThan(-1);
+        // The entry count comes from the size accessor, so only the first 100
+        // entries are ever walked.
+        expect(elapsed).toBeLessThan(1000);
+    });
+
     it("formats collections, dates, regexes, errors and functions", function () {
         expect(__inspect(new Map([["k", 1]]))).toBe('Map(1) { "k" => 1 }');
         expect(__inspect(new Set([1, 2]))).toBe("Set(2) { 1, 2 }");

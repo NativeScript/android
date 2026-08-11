@@ -36,6 +36,7 @@ const intrinsics = {
   ArrayBufferIsView: ArrayBuffer.isView,
   ArrayIsArray: Array.isArray,
   JSONStringify: JSON.stringify,
+  NumberIsNaN: Number.isNaN,
   NumberParseFloat: Number.parseFloat,
   NumberParseInt: Number.parseInt,
   ObjectCreate: Object.create,
@@ -86,8 +87,13 @@ const intrinsics = {
   SetIteratorPrototypeNext: uncurryThis(
       Object.getPrototypeOf(new Set()[Symbol.iterator]()).next),
 
-  // Captured accessor getters: reading .length/.byteLength off a view via the
-  // prototype would invoke whatever getter user code installed there.
+  // Captured accessor getters: reading .length/.byteLength/.size off an
+  // instance via the prototype would invoke whatever getter user code
+  // installed there.
+  MapPrototypeGetSize: uncurryThis(
+      Object.getOwnPropertyDescriptor(Map.prototype, "size").get),
+  SetPrototypeGetSize: uncurryThis(
+      Object.getOwnPropertyDescriptor(Set.prototype, "size").get),
   TypedArrayPrototypeGetLength: uncurryThis(
       Object.getOwnPropertyDescriptor(
           Object.getPrototypeOf(Uint8Array.prototype), "length").get),
