@@ -116,6 +116,22 @@ class Runtime {
         }
 
         /*
+         * Milliseconds since this runtime's time origin, on the monotonic
+         * clock. Not inline: v8::Platform is only forward-declared through
+         * v8.h here.
+         */
+        double PerformanceNowMillis();
+
+        /*
+         * Wall-clock milliseconds since the Unix epoch at the moment the time
+         * origin was captured, on the same base as Date.now(); this is
+         * performance.timeOrigin.
+         */
+        double TimeOriginMillis() const {
+            return m_timeOriginRealtimeMs;
+        }
+
+        /*
          * WHATWG events state, the Android analogue of the iOS runtime's
          * Caches members of the same names. The backing event target is set
          * by Events::Init, the three dispatch closures by ErrorEvents::Init,
@@ -218,14 +234,11 @@ class Runtime {
 
         bool m_isMainThread;
 
-        // High resolution timing origin values
-        // m_startTime: monotonic clock time captured at isolate creation
-        // m_realtimeOrigin: wall-clock time origin (milliseconds) captured at isolate creation
-        double m_startTime {0};
-        double m_realtimeOrigin {0};
-
-        // performance.now() callback
-        static void PerformanceNowCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+        // This isolate's performance time origin, captured at isolate
+        // creation: the monotonic clock reading now() is relative to, and the
+        // wall-clock milliseconds that reading corresponds to.
+        double m_timeOriginMonotonic {0};
+        double m_timeOriginRealtimeMs {0};
 
         v8::Isolate* PrepareV8Runtime(const std::string& filesPath, const std::string& nativeLibsDir, const std::string& packageName, bool isDebuggable, const std::string& callingDir, const std::string& profilerOutputDir, const int maxLogcatObjectSize, const bool forceLog);
         jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
