@@ -96,10 +96,13 @@ class Runtime {
 
         std::string ReadFileText(const std::string& filePath);
 
-        static int GetWriter();
-        static int GetReader();
-        static ALooper* GetMainLooper() {
-            return m_mainLooper;
+        /*
+         * The main runtime's event loop, set once when the main runtime
+         * initializes. __runOnMainThread posts its (own-isolate) closures
+         * here from any runtime's thread.
+         */
+        static std::shared_ptr<EventLoop> GetMainEventLoop() {
+            return s_mainEventLoop;
         }
         static JavaVM* GetJVM() {
             return s_jvm;
@@ -268,9 +271,7 @@ class Runtime {
 
         static bool s_mainThreadInitialized;
 
-        static ALooper* m_mainLooper;
-
-        static int m_mainLooper_fd[2];
+        static std::shared_ptr<EventLoop> s_mainEventLoop;
 
 #ifdef APPLICATION_IN_DEBUG
         std::mutex m_fileWriteMutex;

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <map>
+#include <mutex>
 #include <vector>
 #include "JEnv.h"
 #include "ArgsWrapper.h"
@@ -73,7 +74,9 @@ namespace tns {
 
         static void RunOnMainThreadCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
-        static int RunOnMainThreadFdCallback(int fd, int events, void* data);
+        // runs one cached __runOnMainThread callback on the main thread,
+        // entering the CALLER's isolate (posted as a bare event-loop entry)
+        static void RunMainThreadEntry(uint64_t key);
 
         static void LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
@@ -241,6 +244,10 @@ namespace tns {
         };
 
         static robin_hood::unordered_map<uint64_t, CacheEntry> cache_;
+        // guards cache_: __runOnMainThread is callable from any runtime's
+        // thread (multithreaded JS, workers), each under a different
+        // isolate's Locker, so the Lockers provide no mutual exclusion
+        static std::mutex cacheMutex_;
 
 
     };

@@ -8,10 +8,34 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <vector>
 #include "v8.h"
 #include "v8-platform.h"
 
 namespace tns {
+
+/**
+ * A producer of ordered-lane work that keeps its own bookkeeping (Timers).
+ * The EventLoop's token drain consults it so timers and ordered entries form
+ * ONE due-ordered domain: each anonymous token runs the earliest due item
+ * across both. Home-thread only.
+ */
+class OrderedTaskSource {
+public:
+    /**
+     * If the source's earliest item is due at `now` and is earlier-or-equal
+     * to `otherDue` (a negative otherDue means no competitor), consumes that
+     * slot - running the item, or nothing if the slot is a tombstone
+     * (cancelled item) - and returns true. Consumes exactly one slot per call
+     * so tokens and slots stay 1:1. Check and run form a single call so the
+     * source can do both under one acquisition of whatever guards its state
+     * (Timers' bookkeeping is guarded by the isolate Locker: background
+     * threads mutate it through setTimeout under multithreaded JS).
+     */
+    virtual bool RunIfEarliest(double now, double otherDue) = 0;
+
+    virtual ~OrderedTaskSource() = default;
+};
 
 /**
  * Per-runtime scheduler for work that must run on the runtime's home thread -
@@ -68,9 +92,33 @@ public:
     void PostOrdered(std::function<void()> fn);
     void PostOrderedDelayed(std::function<void()> fn, double delayMs);
 
+    /**
+     * Posts a bare ordered token at an absolute uptime for an item the
+     * OrderedTaskSource keeps in its own bookkeeping (Timers). One token per
+     * item; the drain picks the earliest due item across the source and the
+     * ordered entries, so the token needn't name what it will run.
+     */
+    void PostOrderedToken(jlong uptimeMillis);
+
+    /**
+     * Registers the ordered lane's external source. Home thread only; pass
+     * nullptr to unregister (the source is being destroyed).
+     */
+    void SetTimerSource(OrderedTaskSource* source);
+
     // internal lane: runs on the home thread as soon as the looper polls
     void PostInternal(std::function<void()> fn);
     void PostInternalDelayed(std::function<void()> fn, double delayMs);
+
+    /**
+     * Internal-lane post whose fn does its OWN isolate ceremony: RunEntry
+     * skips the loop's Locker/scopes/microtask checkpoint. Required when the
+     * fn locks a different isolate than this loop's (__runOnMainThread
+     * closures lock the caller's isolate) - taking this loop's Locker first
+     * would nest Lockers across isolates and can deadlock against
+     * multithreaded-JS entry paths.
+     */
+    void PostInternalBare(std::function<void()> fn);
 
     /**
      * Posts a v8 foreground task into the internal lane. Called by the
@@ -108,6 +156,9 @@ private:
         std::unique_ptr<v8::Task> task;
         std::function<void()> fn;
         bool nestable;
+        // bare entries run without the loop's Locker/scopes/checkpoint (see
+        // PostInternalBare)
+        bool bare = false;
         // enqueue time for immediate entries, due time for delayed ones (both
         // CLOCK_MONOTONIC ms) so one comparison orders both queues
         double time;
@@ -133,6 +184,8 @@ private:
     void PostOrderedLocked(Entry entry, double delayMs);
     static std::unique_ptr<Entry> TakeDueLocked(Lane& lane, bool nestableOnly, bool v8Only,
                                                 bool requireSignaledDelayed, double now);
+    // earliest due entry time in the lane, or a negative value if none is due
+    static double PeekDueLocked(Lane& lane, double now);
     void ArmTimerLocked(double now);
     void RunEntry(Entry& entry);
     void RunOneInternal();
@@ -144,6 +197,10 @@ private:
     std::mutex mutex_;
     Lane internal_;
     Lane ordered_;
+    // ordered-lane source with its own bookkeeping (Timers); home-thread only
+    OrderedTaskSource* timerSource_ = nullptr;
+    // bare ordered tokens posted before the bind; flushed by Bind
+    std::vector<jlong> pendingTokens_;
     // ordered lane: global ref to this thread's com.tns.EventLoopHandler
     jobject handler_ = nullptr;
     // internal lane: EFD_SEMAPHORE eventfd (one unit = run one due entry) and

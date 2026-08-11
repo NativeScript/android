@@ -116,6 +116,10 @@ void EventLoop::BindToCurrentThread() {
     for (auto& pair : ordered_.delayed) {
         env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_POST, (jlong) std::ceil(pair.first));
     }
+    for (auto when : pendingTokens_) {
+        env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_POST, when);
+    }
+    pendingTokens_.clear();
 }
 
 void EventLoop::Shutdown() {
@@ -216,7 +220,7 @@ void EventLoop::PostInternal(std::function<void()> fn) {
     if (stopped_) {
         return;
     }
-    PostInternalLocked(Entry{nullptr, std::move(fn), true, 0}, 0);
+    PostInternalLocked(Entry{nullptr, std::move(fn), true, false, 0}, 0);
 }
 
 void EventLoop::PostInternalDelayed(std::function<void()> fn, double delayMs) {
@@ -224,7 +228,15 @@ void EventLoop::PostInternalDelayed(std::function<void()> fn, double delayMs) {
     if (stopped_) {
         return;
     }
-    PostInternalLocked(Entry{nullptr, std::move(fn), true, 0}, delayMs);
+    PostInternalLocked(Entry{nullptr, std::move(fn), true, false, 0}, delayMs);
+}
+
+void EventLoop::PostInternalBare(std::function<void()> fn) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) {
+        return;
+    }
+    PostInternalLocked(Entry{nullptr, std::move(fn), true, true, 0}, 0);
 }
 
 void EventLoop::PostOrdered(std::function<void()> fn) {
@@ -232,7 +244,7 @@ void EventLoop::PostOrdered(std::function<void()> fn) {
     if (stopped_) {
         return;
     }
-    PostOrderedLocked(Entry{nullptr, std::move(fn), true, 0}, 0);
+    PostOrderedLocked(Entry{nullptr, std::move(fn), true, false, 0}, 0);
 }
 
 void EventLoop::PostOrderedDelayed(std::function<void()> fn, double delayMs) {
@@ -240,7 +252,25 @@ void EventLoop::PostOrderedDelayed(std::function<void()> fn, double delayMs) {
     if (stopped_) {
         return;
     }
-    PostOrderedLocked(Entry{nullptr, std::move(fn), true, 0}, delayMs);
+    PostOrderedLocked(Entry{nullptr, std::move(fn), true, false, 0}, delayMs);
+}
+
+void EventLoop::PostOrderedToken(jlong uptimeMillis) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) {
+        return;
+    }
+    if (handler_ != nullptr) {
+        JEnv env;
+        env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_POST, uptimeMillis);
+    } else {
+        pendingTokens_.push_back(uptimeMillis);
+    }
+}
+
+void EventLoop::SetTimerSource(OrderedTaskSource* source) {
+    // home thread only, like every consumer of timerSource_
+    timerSource_ = source;
 }
 
 void EventLoop::PostV8Task(std::unique_ptr<Task> task, bool nestable, double delaySeconds) {
@@ -248,7 +278,7 @@ void EventLoop::PostV8Task(std::unique_ptr<Task> task, bool nestable, double del
     if (stopped_) {
         return;
     }
-    PostInternalLocked(Entry{std::move(task), nullptr, nestable, 0},
+    PostInternalLocked(Entry{std::move(task), nullptr, nestable, false, 0},
                        delaySeconds * 1000.0);
 }
 
@@ -288,6 +318,17 @@ std::unique_ptr<EventLoop::Entry> EventLoop::TakeDueLocked(Lane& lane, bool nest
     return nullptr;
 }
 
+double EventLoop::PeekDueLocked(Lane& lane, double now) {
+    // immediate entries are enqueued with monotonically increasing times, so
+    // the front is the earliest
+    double due = lane.immediate.empty() ? -1 : lane.immediate.front().time;
+    if (!lane.delayed.empty() && lane.delayed.begin()->first <= now &&
+        (due < 0 || lane.delayed.begin()->first < due)) {
+        due = lane.delayed.begin()->first;
+    }
+    return due;
+}
+
 void EventLoop::ArmTimerLocked(double now) {
     if (timerFd_ == -1) {
         return;
@@ -313,6 +354,12 @@ void EventLoop::ArmTimerLocked(double now) {
 }
 
 void EventLoop::RunEntry(Entry& entry) {
+    if (entry.bare) {
+        // the fn locks its own (possibly different) isolate; taking this
+        // loop's Locker here would nest Lockers across isolates
+        entry.fn();
+        return;
+    }
     v8::Locker locker(isolate_);
     v8::Isolate::Scope isolate_scope(isolate_);
     v8::HandleScope handleScope(isolate_);
@@ -370,6 +417,27 @@ void EventLoop::RunNestableV8Tasks() {
 }
 
 void EventLoop::RunOrderedTask() {
+    // one anonymous token = one due slot across the whole ordered domain:
+    // pick the earliest due item among the ordered entries and the timer
+    // source, whichever it is. Timers and entries only ever run on this
+    // thread, so the peeked winner can't be taken by anyone else before we
+    // re-lock (a concurrent post can only add later work).
+    auto now = now_ms();
+    double entryDue;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (stopped_) {
+            return;
+        }
+        entryDue = PeekDueLocked(ordered_, now);
+    }
+    if (timerSource_ != nullptr && timerSource_->RunIfEarliest(now, entryDue)) {
+        return;
+    }
+    if (entryDue < 0) {
+        // leftover token: nothing in the domain is due yet
+        return;
+    }
     std::unique_ptr<Entry> entry;
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -378,11 +446,9 @@ void EventLoop::RunOrderedTask() {
         }
         entry = TakeDueLocked(ordered_, false, false, false, now_ms());
     }
-    if (entry == nullptr) {
-        // leftover token: the earliest delayed entry isn't due yet
-        return;
+    if (entry != nullptr) {
+        RunEntry(*entry);
     }
-    RunEntry(*entry);
 }
 
 int EventLoop::EventFdCallback(int fd, int events, void* data) {

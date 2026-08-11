@@ -684,37 +684,50 @@ void CallbackHandlers::RunOnMainThreadCallback(const FunctionCallbackInfo<v8::Va
     uint64_t key = ++count_;
     Local<v8::Function> callback = args[0].As<v8::Function>();
 
-    bool inserted;
-    std::tie(std::ignore, inserted) = cache_.try_emplace(key, isolate, callback);
-    assert(inserted && "Main thread callback ID should not be duplicated");
-
-    auto value = Callback(key);
-    auto size = sizeof(Callback);
-    auto wrote = write(Runtime::GetWriter(),&value , size);
-}
-
-int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) {
-    struct Callback value;
-    auto size = sizeof(Callback);
-    ssize_t nr = read(fd, &value, sizeof(value));
-
-    auto key = value.id_;
-
-    auto it = cache_.find(key);
-    if (it == cache_.end()) {
-        return 1;
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex_);
+        bool inserted;
+        std::tie(std::ignore, inserted) = cache_.try_emplace(key, isolate, callback);
+        assert(inserted && "Main thread callback ID should not be duplicated");
     }
 
-    Isolate *isolate = it->second.isolate_;
+    auto mainLoop = Runtime::GetMainEventLoop();
+    if (mainLoop == nullptr) {
+        return;
+    }
+    // bare entry: the closure locks the CALLER's isolate (possibly a
+    // worker's), so the loop must not take the main isolate's Locker first -
+    // nesting the two can deadlock against multithreaded-JS entry paths
+    mainLoop->PostInternalBare([key]() { RunMainThreadEntry(key); });
+}
+
+void CallbackHandlers::RunMainThreadEntry(uint64_t key) {
+    Isolate *isolate;
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex_);
+        auto it = cache_.find(key);
+        if (it == cache_.end()) {
+            return;
+        }
+        isolate = it->second.isolate_;
+    }
+
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
-    Local<v8::Function> cb = it->second.callback_.Get(isolate);
+    Local<v8::Function> cb;
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex_);
+        auto it = cache_.find(key);
+        if (it == cache_.end()) {
+            return;
+        }
+        cb = it->second.callback_.Get(isolate);
+        cache_.erase(it);
+    }
     Runtime* runtime = Runtime::GetRuntime(isolate);
     v8::Local<v8::Context> context = runtime->GetContext();
     Context::Scope context_scope(context);
-    // erase the it here as we're already done with its values and the callback might invalidate the iterator
-    cache_.erase(it);
 
     v8::TryCatch tc(isolate);
 
@@ -722,10 +735,9 @@ int CallbackHandlers::RunOnMainThreadFdCallback(int fd, int events, void *data) 
 
     if (tc.HasCaught() &&
         !NativeScriptException::ContainUncaughtCallbackException(isolate, tc)) {
+        // surfaces via the event loop's guard as a pending Java exception
         throw NativeScriptException(tc);
     }
-
-    return 1;
 }
 
 void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
@@ -1611,13 +1623,19 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate *isolate, TryCatch &
 }
 
 void CallbackHandlers::RemoveIsolateEntries(v8::Isolate *isolate) {
-    for (auto &item: cache_) {
-        if (item.second.isolate_ == isolate) {
-            cache_.erase(item.first);
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex_);
+        for (auto it = cache_.begin(); it != cache_.end();) {
+            if (it->second.isolate_ == isolate) {
+                it = cache_.erase(it);
+            } else {
+                ++it;
+            }
         }
     }
 }
 robin_hood::unordered_map<uint64_t, CallbackHandlers::CacheEntry> CallbackHandlers::cache_;
+std::mutex CallbackHandlers::cacheMutex_;
 
 
 std::atomic_int64_t CallbackHandlers::count_ = {0};

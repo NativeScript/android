@@ -310,20 +310,6 @@ Runtime::~Runtime() {
   }
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
   FrameCallbacks::RemoveIsolateEntries(m_isolate);
-  if (m_isMainThread) {
-    if (m_mainLooper_fd[0] != -1) {
-      ALooper_removeFd(m_mainLooper, m_mainLooper_fd[0]);
-    }
-    ALooper_release(m_mainLooper);
-
-    if (m_mainLooper_fd[0] != -1) {
-      close(m_mainLooper_fd[0]);
-    }
-
-    if (m_mainLooper_fd[1] != -1) {
-      close(m_mainLooper_fd[1]);
-    }
-  }
 }
 
 std::string Runtime::ReadFileText(const std::string& filePath) {
@@ -758,27 +744,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   if (!s_mainThreadInitialized) {
     m_isMainThread = true;
-    pipe2(m_mainLooper_fd, O_NONBLOCK | O_CLOEXEC);
-    m_mainLooper = ALooper_forThread();
-
-    ALooper_acquire(m_mainLooper);
-
-    // try using 2MB
-    int ret = fcntl(m_mainLooper_fd[1], F_SETPIPE_SZ, 2 * (1024 * 1024));
-
-    // try using 1MB
-    if (ret != 0) {
-      ret = fcntl(m_mainLooper_fd[1], F_SETPIPE_SZ, 1 * (1024 * 1024));
-    }
-
-    // try using 512KB
-    if (ret != 0) {
-      ret = fcntl(m_mainLooper_fd[1], F_SETPIPE_SZ, (512 * 1024));
-    }
-
-    ALooper_addFd(m_mainLooper, m_mainLooper_fd[0], ALOOPER_POLL_CALLBACK,
-                  ALOOPER_EVENT_INPUT,
-                  CallbackHandlers::RunOnMainThreadFdCallback, nullptr);
+    // __runOnMainThread closures from any runtime's thread land on this loop
+    s_mainEventLoop = m_eventLoop;
   }
   /*
    * Emulate a `WorkerGlobalScope`
@@ -985,9 +952,6 @@ Local<Context> Runtime::GetContext() {
 
 int Runtime::GetId() { return this->m_id; }
 
-int Runtime::GetWriter() { return m_mainLooper_fd[1]; }
-
-int Runtime::GetReader() { return m_mainLooper_fd[0]; }
 
 JavaVM* Runtime::s_jvm = nullptr;
 jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
@@ -997,5 +961,4 @@ std::mutex Runtime::s_runtimeCacheMutex;
 bool Runtime::s_mainThreadInitialized = false;
 v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
-ALooper* Runtime::m_mainLooper = nullptr;
-int Runtime::m_mainLooper_fd[2];
+std::shared_ptr<EventLoop> Runtime::s_mainEventLoop;

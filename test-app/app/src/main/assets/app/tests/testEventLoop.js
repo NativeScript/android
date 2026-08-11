@@ -86,10 +86,12 @@ describe("event loop ordered macrotasks", function () {
         Promise.resolve().then(() => order.push("microtask"));
     });
 
-    it("stays FIFO-ordered with setTimeout(0)", function (done) {
+    // native timers (__ns__*): the app-level `setTimeout` global in this test
+    // app is an old Handler-based polyfill, not the runtime timers
+    it("stays FIFO-ordered with native setTimeout(0)", function (done) {
         const order = [];
         __ns__queueMacrotask(() => order.push("macro1"));
-        setTimeout(() => order.push("timeout"), 0);
+        __ns__setTimeout(() => order.push("timeout"), 0);
         __ns__queueMacrotask(() => {
             order.push("macro2");
             expect(order).toEqual(["macro1", "timeout", "macro2"]);
@@ -113,6 +115,42 @@ describe("event loop ordered macrotasks", function () {
                 });
             }
         })).start();
+    });
+});
+
+// clearTimeout leaves a tombstone in the merged ordered domain, so the
+// cleared timer's already-queued token consumes its own slot as a no-op
+// instead of running a later-scheduled item ahead of Java messages queued
+// between the two tokens' positions.
+describe("event loop ordered tombstones", function () {
+    it("cleared timeout's token does not run a later timer ahead of java posts", function (done) {
+        const order = [];
+        const handler = new android.os.Handler(android.os.Looper.myLooper());
+        const t1 = __ns__setTimeout(() => order.push("cleared"), 0);
+        __ns__clearTimeout(t1);
+        handler.post(new java.lang.Runnable({
+            run: () => order.push("java")
+        }));
+        __ns__setTimeout(() => {
+            order.push("t2");
+            expect(order).toEqual(["java", "t2"]);
+            done();
+        }, 0);
+    });
+
+    it("cleared timeout's token does not run a queued macrotask ahead of java posts", function (done) {
+        const order = [];
+        const handler = new android.os.Handler(android.os.Looper.myLooper());
+        const t1 = __ns__setTimeout(() => order.push("cleared"), 0);
+        __ns__clearTimeout(t1);
+        handler.post(new java.lang.Runnable({
+            run: () => order.push("java")
+        }));
+        __ns__queueMacrotask(() => {
+            order.push("macro");
+            expect(order).toEqual(["java", "macro"]);
+            done();
+        });
     });
 });
 
