@@ -301,8 +301,12 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
 Runtime::~Runtime() {
   delete this->m_objectManager;
   // the isolate pointer may be reused by a future isolate once disposed, so
-  // the platform's runner entry has to go before this Runtime is forgotten
-  NativeScriptPlatform::Instance()->IsolateDisposed(m_isolate);
+  // the platform's loop entry has to go before this Runtime is forgotten;
+  // both may be null when construction failed before PrepareV8Runtime
+  auto* platformInstance = NativeScriptPlatform::Instance();
+  if (platformInstance != nullptr && m_isolate != nullptr) {
+    platformInstance->IsolateDisposed(m_isolate);
+  }
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
   FrameCallbacks::RemoveIsolateEntries(m_isolate);
   if (m_isMainThread) {
@@ -638,11 +642,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_isolate2RuntimesCache[isolate] = this;
   }
-  // attach the isolate's foreground task runner to this thread's looper;
-  // tasks v8 buffered during Isolate::New start flowing from here on
-  NativeScriptPlatform::Instance()
-      ->GetForegroundRunner(isolate)
-      ->BindToCurrentThread();
+  // attach the runtime's event loop to this thread's looper; v8 foreground
+  // tasks buffered during Isolate::New start flowing from here on
+  m_eventLoop = NativeScriptPlatform::Instance()->GetEventLoop(isolate);
+  m_eventLoop->BindToCurrentThread();
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
   HandleScope handleScope(isolate);
@@ -690,6 +693,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   globalTemplate->Set(
       ArgConverter::ConvertToV8String(isolate, "__drainMicrotaskQueue"),
       FunctionTemplate::New(isolate, CallbackHandlers::DrainMicrotaskCallback));
+  // TODO: remove the __ns__ prefix once the event loop's ordered lane backs
+  // public macrotask APIs (performance observers etc.)
+  globalTemplate->Set(
+      ArgConverter::ConvertToV8String(isolate, "__ns__queueMacrotask"),
+      FunctionTemplate::New(isolate, CallbackHandlers::QueueMacrotaskCallback));
   globalTemplate->Set(
       ArgConverter::ConvertToV8String(isolate, "__enableVerboseLogging"),
       FunctionTemplate::New(
@@ -816,17 +824,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
                         workerFuncTemplate);
   }
 
-  /*
-   * Per-runtime task queue used by child workers to deliver messages, errors
-   * and cleanup notifications to this runtime's thread. The looper exists for
-   * every runtime: Java prepares it before initNativeScript on both the main
-   * and worker threads.
-   */
-  m_looperTasks = std::make_shared<LooperTasks>();
-  m_looperTasks->Initialize(ALooper_forThread());
-
   // Unhandled-promise-rejection tracker; fed by the SetPromiseRejectCallback
-  // above and drained via a LooperTasks task once per looper turn.
+  // above and drained via an event-loop task once per looper turn.
   m_promiseRejections = std::make_unique<PromiseRejectionTracker>(this);
 
   SimpleProfiler::Init(isolate, globalTemplate);
@@ -960,14 +959,11 @@ void Runtime::DestroyRuntime() {
     s_id2RuntimeCache.erase(m_id);
     s_isolate2RuntimesCache.erase(m_isolate);
   }
-  if (m_looperTasks != nullptr) {
+  if (m_eventLoop != nullptr) {
     // runs on this runtime's own thread; children still holding a weak_ptr
-    // will have their posts dropped from now on
-    m_looperTasks->Terminate();
+    // and v8 teardown posts have their work dropped from now on
+    m_eventLoop->Shutdown();
   }
-  // stop the foreground task runner before the isolate goes away; v8 posts
-  // made during teardown are dropped
-  NativeScriptPlatform::Instance()->RuntimeDestroyed(m_isolate);
   // The events state holds v8::Global handles (backing event target, dispatch
   // closures and tracked promise rejections) - reset them while the isolate
   // is still alive.

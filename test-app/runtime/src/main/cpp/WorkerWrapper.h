@@ -21,7 +21,7 @@
 
 namespace tns {
 
-class LooperTasks;
+class EventLoop;
 class Runtime;
 #ifdef APPLICATION_IN_DEBUG
 class WorkerInspectorClient;
@@ -36,7 +36,7 @@ class WorkerInspectorClient;
  *
  * Messaging is done entirely in C++ with V8 ValueSerializer payloads:
  *  - parent -> worker: queue_ + eventfd wakeup on the worker looper
- *  - worker -> parent: the parent runtime's LooperTasks queue
+ *  - worker -> parent: the parent runtime's event loop (internal lane)
  *
  * The parent may be the main thread or another worker (nested workers); a
  * worker's children are terminated when the worker itself shuts down.
@@ -154,7 +154,7 @@ private:
     v8::Isolate* parentIsolate_;
     // The parent runtime's task queue; weak so a child outliving its parent
     // just drops its posts instead of touching a dead runtime.
-    std::weak_ptr<LooperTasks> parentTasks_;
+    std::weak_ptr<EventLoop> parentTasks_;
     std::atomic<v8::Isolate*> workerIsolate_;
     Runtime* runtime_;
 

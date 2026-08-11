@@ -5,16 +5,14 @@ import android.os.Looper;
 import android.os.Message;
 
 /**
- * Dedicated per-runtime Handler that delivers V8 platform foreground tasks
- * (and, in the future, any runtime work that must run as a macrotask) on the
- * runtime thread's Looper. One instance per isolate, created and used
- * exclusively from native code (NativeScriptPlatform.cpp).
+ * Dedicated per-runtime Handler carrying the EventLoop's ordered lane: work
+ * that must run as a macrotask on the runtime thread, strictly FIFO-ordered
+ * with Handler.post runnables and JS timers on the same looper. One instance
+ * per isolate, created and used exclusively from native code (EventLoop.cpp).
  *
  * Messages are anonymous "task due" tokens: native code owns the actual task
  * queue and runs at most one due task per token, so a token never names a
- * task and a leftover token is a cheap no-op. Riding the Java MessageQueue
- * (rather than an ALooper fd) keeps tasks strictly FIFO-ordered with
- * Handler.post runnables and JS timers on the same looper.
+ * task and a leftover token is a cheap no-op.
  */
 final class EventLoopHandler extends Handler {
     private static final int MSG_RUN_TASK = 1;
@@ -22,10 +20,19 @@ final class EventLoopHandler extends Handler {
     private final long nativeRunnerPtr;
     private boolean released;
 
-    // constructed from native code (ForegroundTaskRunner::BindToCurrentThread)
+    // constructed from native code (EventLoop::BindToCurrentThread)
     EventLoopHandler(long nativeRunnerPtr) {
-        super(Looper.myLooper());
+        super(requireLooper());
         this.nativeRunnerPtr = nativeRunnerPtr;
+    }
+
+    private static Looper requireLooper() {
+        Looper looper = Looper.myLooper();
+        if (looper == null) {
+            throw new IllegalStateException(
+                "EventLoopHandler requires a prepared Looper on the runtime thread");
+        }
+        return looper;
     }
 
     /**
@@ -39,9 +46,8 @@ final class EventLoopHandler extends Handler {
     }
 
     /**
-     * Called from ForegroundTaskRunner::Shutdown on this handler's own
-     * thread. After this no token can fire into the (about to be freed)
-     * native runner.
+     * Called from EventLoop::Shutdown on this handler's own thread. After
+     * this no token can fire into the (about to be freed) native loop.
      */
     @RuntimeCallable
     void release() {

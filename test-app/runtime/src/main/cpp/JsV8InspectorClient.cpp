@@ -384,11 +384,11 @@ void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id) {
             doDispatchMessage(inspectorMessage);
         }
 
-        // JS frames are on the stack, so only nestable foreground tasks may
-        // run; non-nestable ones fire from their queue tokens after resume
+        // JS frames are on the stack, so only nestable v8 foreground tasks
+        // may run; everything else fires from its own wakeup after resume
         tns::NativeScriptPlatform::Instance()
-                ->GetForegroundRunner(isolate_)
-                ->RunNestableTasks();
+                ->GetEventLoop(isolate_)
+                ->RunNestableV8Tasks();
     }
     isPausedNestedLoop_.store(false, std::memory_order_release);
     terminated_ = false;

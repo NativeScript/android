@@ -11,7 +11,7 @@
 #include "ModuleInternal.h"
 #include "File.h"
 #include "Timers.h"
-#include "LooperTasks.h"
+#include "EventLoop.h"
 #include <memory>
 #include <mutex>
 #include <android/looper.h>
@@ -106,12 +106,12 @@ class Runtime {
         }
 
         /*
-         * Task queue bound to this runtime's looper. Child workers hold a
-         * weak_ptr to their parent runtime's queue for worker -> parent
+         * Scheduler bound to this runtime's looper. Child workers hold a
+         * weak_ptr to their parent runtime's loop for worker -> parent
          * delivery (messages, errors, cleanup notifications).
          */
-        std::shared_ptr<LooperTasks> GetLooperTasks() const {
-            return m_looperTasks;
+        std::shared_ptr<EventLoop> GetEventLoop() const {
+            return m_eventLoop;
         }
 
         /*
@@ -219,7 +219,7 @@ class Runtime {
 
         Profiler m_profiler;
 
-        std::shared_ptr<LooperTasks> m_looperTasks;
+        std::shared_ptr<EventLoop> m_eventLoop;
 
         v8::Global<v8::Object> m_globalEventTarget;
         v8::Global<v8::Function> m_dispatchErrorEventFunc;

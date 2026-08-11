@@ -766,6 +766,47 @@ void CallbackHandlers::DrainMicrotaskCallback(const v8::FunctionCallbackInfo<v8:
     }
 }
 
+void CallbackHandlers::QueueMacrotaskCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    try {
+        auto isolate = args.GetIsolate();
+        if (args.Length() < 1 || !args[0]->IsFunction()) {
+            isolate->ThrowException(v8::Exception::TypeError(ArgConverter::ConvertToV8String(
+                    isolate, "__ns__queueMacrotask: callback must be a function")));
+            return;
+        }
+        auto eventLoop = Runtime::GetRuntime(isolate)->GetEventLoop();
+        if (eventLoop == nullptr) {
+            return;
+        }
+        auto callback = std::make_shared<Persistent<Function>>(isolate, args[0].As<Function>());
+        // the ordered lane rides the Java MessageQueue, so the callback runs
+        // as a macrotask in strict FIFO order with JS timers and Handler.post
+        eventLoop->PostOrdered([isolate, callback]() {
+            auto runtime = Runtime::GetRuntime(isolate);
+            auto context = runtime->GetContext();
+            Context::Scope context_scope(context);
+            TryCatch tc(isolate);
+            auto cb = callback->Get(isolate);
+            cb->Call(context, context->Global(), 0, nullptr);
+            callback->Reset();
+            if (tc.HasCaught() &&
+            !NativeScriptException::ContainUncaughtCallbackException(isolate, tc)) {
+                NativeScriptException(tc).ReThrowToJava();
+            }
+        });
+    } catch (NativeScriptException &e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToV8();
+    }
+}
+
 void CallbackHandlers::TimeCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto nano = std::chrono::time_point_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now());

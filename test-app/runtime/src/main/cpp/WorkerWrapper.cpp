@@ -29,7 +29,7 @@ WorkerWrapper::WorkerWrapper(Isolate* parentIsolate, int workerId, std::string w
                              Local<Object> workerObject)
         : parentIsolate_(parentIsolate),
           // runs on the parent's thread, where the parent runtime is alive
-          parentTasks_(Runtime::GetRuntime(parentIsolate)->GetLooperTasks()),
+          parentTasks_(Runtime::GetRuntime(parentIsolate)->GetEventLoop()),
           workerIsolate_(nullptr),
           runtime_(nullptr),
           workerId_(workerId),
@@ -70,7 +70,7 @@ void WorkerWrapper::PostMessageToParent(std::shared_ptr<worker::Message> message
     }
 
     int workerId = workerId_;
-    parentTasks->Post([workerId, message]() {
+    parentTasks->PostInternal([workerId, message]() {
         WorkerWrapper::FireMessageOnParentWorkerObject(workerId, message);
     });
 }
@@ -248,7 +248,7 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToParent(const std::string& m
     std::string threadName = threadName_;
     Isolate* parentIsolate = parentIsolate_;
 
-    parentTasks->Post([workerId, message, filename, stackTrace, lineno, threadName,
+    parentTasks->PostInternal([workerId, message, filename, stackTrace, lineno, threadName,
                        parentIsolate]() {
         v8::Locker locker(parentIsolate);
         Isolate::Scope isolate_scope(parentIsolate);
@@ -486,7 +486,7 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
     // own shutdown already cleared them).
     if (auto parentTasks = parentTasks_.lock()) {
         int workerId = workerId_;
-        parentTasks->Post([workerId]() {
+        parentTasks->PostInternal([workerId]() {
             WorkerWrapper::ClearWorkerOnParent(workerId);
         });
     }
