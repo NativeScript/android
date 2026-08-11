@@ -132,6 +132,16 @@ class Runtime {
         }
 
         /*
+         * The time origin as a CLOCK_MONOTONIC reading in milliseconds -- the
+         * same clock and epoch Choreographer stamps frames with. Subtracting
+         * it from such a timestamp maps it onto this isolate's performance
+         * timeline.
+         */
+        double TimeOriginMonotonicMillis() const {
+            return m_timeOriginMonotonic * 1000.0;
+        }
+
+        /*
          * WHATWG events state, the Android analogue of the iOS runtime's
          * Caches members of the same names. The backing event target is set
          * by Events::Init, the three dispatch closures by ErrorEvents::Init,

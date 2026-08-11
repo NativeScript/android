@@ -152,6 +152,7 @@ add_library(
         src/main/cpp/Constants.cpp
         src/main/cpp/DirectBuffer.cpp
         src/main/cpp/ErrorEvents.cpp
+        src/main/cpp/FrameCallbacks.cpp
         src/main/cpp/Events.cpp
         src/main/cpp/FieldAccessor.cpp
         src/main/cpp/File.cpp

@@ -18,6 +18,7 @@
 #include "ErrorEvents.h"
 #include "Events.h"
 #include "File.h"
+#include "FrameCallbacks.h"
 #include "Interop.h"
 #include "IsolateDisposer.h"
 #include "JType.h"
@@ -300,6 +301,7 @@ Runtime::~Runtime() {
   delete this->m_objectManager;
   delete this->m_loopTimer;
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
+  FrameCallbacks::RemoveIsolateEntries(m_isolate);
   if (m_isMainThread) {
     if (m_mainLooper_fd[0] != -1) {
       ALooper_removeFd(m_mainLooper, m_mainLooper_fd[0]);
@@ -723,12 +725,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
       ArgConverter::ConvertToV8String(isolate, "__runOnMainThread"),
       FunctionTemplate::New(isolate,
                             CallbackHandlers::RunOnMainThreadCallback));
-  globalTemplate->Set(
-      ArgConverter::ConvertToV8String(isolate, "__postFrameCallback"),
-      FunctionTemplate::New(isolate, CallbackHandlers::PostFrameCallback));
-  globalTemplate->Set(
-      ArgConverter::ConvertToV8String(isolate, "__removeFrameCallback"),
-      FunctionTemplate::New(isolate, CallbackHandlers::RemoveFrameCallback));
+  FrameCallbacks::Init(isolate, globalTemplate);
   globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URL"),
                       URLImpl::GetCtor(isolate));
   globalTemplate->Set(

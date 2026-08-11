@@ -47,12 +47,39 @@ file runs unchanged on both runtimes and should be kept in sync with iOS's
 copy.
 
 The native clock is owned by `Runtime` (`Runtime::PerformanceNowMillis()`,
-`Runtime::TimeOriginMillis()`, captured in `Runtime::PrepareV8Runtime`) and
-exposed to native callers through `tns::Performance::NowMillis(isolate)`
-(`test-app/runtime/src/main/cpp/Performance.h`). Any future native producer of
-JS-visible timestamps — `requestAnimationFrame` in particular — must read the
-clock through that hook rather than sampling its own, so every timestamp
-shares `performance.timeOrigin` as its base.
+`Runtime::TimeOriginMillis()`, `Runtime::TimeOriginMonotonicMillis()`,
+captured in `Runtime::PrepareV8Runtime`) and exposed to native callers through
+`tns::Performance::NowMillis(isolate)`
+(`test-app/runtime/src/main/cpp/Performance.h`). Any native producer of
+JS-visible timestamps must read the clock through that hook rather than
+sampling its own, so every timestamp shares `performance.timeOrigin` as its
+base.
+
+## Frame callbacks
+
+`__postFrameCallback(fn[, delayMillis])` / `__removeFrameCallback(fn)`
+(`test-app/runtime/src/main/cpp/FrameCallbacks.h`) schedule `fn` for the next
+display frame. `fn` receives **two** arguments:
+
+```js
+__postFrameCallback((frameTimeNanos, performanceMillis) => { … });
+```
+
+- `frameTimeNanos` — the platform's raw frame time: `CLOCK_MONOTONIC`
+  nanoseconds, the `System.nanoTime()` base. Unchanged from earlier runtimes,
+  which passed it as the only argument.
+- `performanceMillis` — the same instant on this isolate's performance
+  timeline, so it compares directly with `performance.now()`. Converted
+  natively through `Performance::MonotonicNanosToTimelineMillis()`, which
+  subtracts `Runtime::TimeOriginMonotonicMillis()` — Choreographer stamps
+  frames on the very clock the time origin is captured on, so the mapping is
+  exact rather than an approximation resampled in JS.
+
+Two implementations sit behind that one surface: the NDK's `AChoreographer`
+(API 24+, resolved with `dlsym`) and `android.view.Choreographer` through
+`com.tns.FrameCallbacks` for API 21–23, where the NDK API does not exist.
+Scheduling is per calling thread, so a worker schedules against its own looper.
+Both paths produce the same two arguments with the same exactness.
 
 ## Deviations from the specs
 

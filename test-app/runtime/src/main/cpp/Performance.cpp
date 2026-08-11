@@ -72,6 +72,16 @@ double Performance::TimeOriginMillis(Isolate* isolate) {
     return runtime->TimeOriginMillis();
 }
 
+double Performance::MonotonicNanosToTimelineMillis(Isolate* isolate,
+                                                   int64_t nanos) {
+    Runtime* runtime = GetRuntimeOrNull(isolate);
+    if (runtime == nullptr) {
+        return 0.0;
+    }
+
+    return (double) nanos / 1e6 - runtime->TimeOriginMonotonicMillis();
+}
+
 void Performance::NowCallback(const FunctionCallbackInfo<Value>& info) {
     info.GetReturnValue().Set(NowMillis(info.GetIsolate()));
 }

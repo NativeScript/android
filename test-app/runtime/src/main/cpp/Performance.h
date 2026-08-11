@@ -36,6 +36,15 @@ public:
      */
     static double TimeOriginMillis(v8::Isolate* isolate);
 
+    /*
+     * Maps a CLOCK_MONOTONIC timestamp in nanoseconds -- Choreographer's
+     * frameTimeNanos, System.nanoTime() -- onto this isolate's performance
+     * timeline, so the result is directly comparable with performance.now().
+     * Returns 0.0 for an isolate with no runtime.
+     */
+    static double MonotonicNanosToTimelineMillis(v8::Isolate* isolate,
+                                                 int64_t nanos);
+
 private:
     static void NowCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 };
