@@ -300,12 +300,13 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
 
 Runtime::~Runtime() {
   delete this->m_objectManager;
-  // the isolate pointer may be reused by a future isolate once disposed, so
-  // the platform's loop entry has to go before this Runtime is forgotten;
-  // both may be null when construction failed before PrepareV8Runtime
+  // idempotent backstop for the matched erase WorkerWrapper does right after
+  // Isolate::Dispose (the match keeps this from evicting a new isolate that
+  // reused the pointer); instance/isolate may be null when construction
+  // failed before PrepareV8Runtime
   auto* platformInstance = NativeScriptPlatform::Instance();
-  if (platformInstance != nullptr && m_isolate != nullptr) {
-    platformInstance->IsolateDisposed(m_isolate);
+  if (platformInstance != nullptr && m_isolate != nullptr && m_eventLoop != nullptr) {
+    platformInstance->IsolateDisposed(m_isolate, m_eventLoop);
   }
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
   FrameCallbacks::RemoveIsolateEntries(m_isolate);
@@ -643,8 +644,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
     s_isolate2RuntimesCache[isolate] = this;
   }
   // attach the runtime's event loop to this thread's looper; v8 foreground
-  // tasks buffered during Isolate::New start flowing from here on
-  m_eventLoop = NativeScriptPlatform::Instance()->GetEventLoop(isolate);
+  // tasks buffered during Isolate::New start flowing from here on. Refresh
+  // rather than Get: a reused isolate pointer may still map to the previous
+  // tenant's stopped loop
+  m_eventLoop = NativeScriptPlatform::Instance()->RefreshEventLoop(isolate);
   m_eventLoop->BindToCurrentThread();
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);

@@ -101,4 +101,61 @@ describe("event loop ordered macrotasks", function () {
         expect(() => __ns__queueMacrotask("nope")).toThrowError(TypeError);
         expect(() => __ns__queueMacrotask()).toThrowError(TypeError);
     });
+
+    it("runs on the main thread when posted from a background JS thread", function (done) {
+        const mainThreadId = java.lang.Thread.currentThread().getId();
+        new java.lang.Thread(new java.lang.Runnable({
+            run() {
+                expect(java.lang.Thread.currentThread().getId()).not.toEqual(mainThreadId);
+                __ns__queueMacrotask(() => {
+                    expect(java.lang.Thread.currentThread().getId()).toEqual(mainThreadId);
+                    done();
+                });
+            }
+        })).start();
+    });
+});
+
+describe("event loop internal lane", function () {
+    // Regression for the eventfd unit-accounting bug: a worker reply's wakeup
+    // arriving while an overdue waitAsync timeout is still unsignaled must not
+    // be spent on the timeout entry, or the reply starves.
+    it("delivers worker messages whose wakeup raced an overdue waitAsync timeout", function (done) {
+        const worker = new Worker("./eventLoopEchoWorker.js");
+        let warm = false;
+        worker.onmessage = function (msg) {
+            if (msg.data === "warmup") {
+                warm = true;
+                const i32 = new Int32Array(new SharedArrayBuffer(4));
+                Atomics.waitAsync(i32, 0, 0, 50);
+                worker.postMessage("ping");
+                // block the looper until both the timeout and the reply are
+                // pending, so their wakeups are serviced from the same poll
+                const start = Date.now();
+                while (Date.now() - start < 150) { }
+            } else {
+                expect(warm).toBe(true);
+                expect(msg.data).toBe("ping");
+                worker.terminate();
+                done();
+            }
+        };
+        worker.postMessage("warmup");
+    });
+
+    it("keeps event loops healthy across worker churn", function (done) {
+        let remaining = 8;
+        (function cycle() {
+            const worker = new Worker("./eventLoopEchoWorker.js");
+            worker.onmessage = function () {
+                worker.terminate();
+                if (--remaining === 0) {
+                    __ns__queueMacrotask(done);
+                } else {
+                    cycle();
+                }
+            };
+            worker.postMessage("alive");
+        })();
+    });
 });

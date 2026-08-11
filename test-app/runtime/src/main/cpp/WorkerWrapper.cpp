@@ -11,6 +11,7 @@
 #include "JniLocalRef.h"
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
+#include "NativeScriptPlatform.h"
 #include "Runtime.h"
 
 #include <unistd.h>
@@ -464,6 +465,12 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
             runtime_->DestroyRuntime();
         }
         isolate->Dispose();
+        // Dispose freed the isolate's memory, so its address can be reused by
+        // a concurrent Isolate::New - drop the platform's loop entry now, not
+        // in ~Runtime (which still runs JNI calls first). The matched erase
+        // means the late ~Runtime backstop can't evict a new tenant.
+        NativeScriptPlatform::Instance()->IsolateDisposed(isolate,
+                                                          runtime_->GetEventLoop());
 
         // The Runtime destructor still makes JNI calls - it must run before
         // DetachCurrentThread below.

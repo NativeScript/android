@@ -42,7 +42,7 @@ namespace tns {
  * terminated runtime" semantics; leftover wakeups (tokens or eventfd units
  * whose work was drained early) are no-ops.
  */
-class EventLoop : public std::enable_shared_from_this<EventLoop> {
+class EventLoop {
 public:
     explicit EventLoop(v8::Isolate* isolate) : isolate_(isolate) {}
 
@@ -73,10 +73,16 @@ public:
     void PostInternalDelayed(std::function<void()> fn, double delayMs);
 
     /**
-     * The v8::TaskRunner this isolate's foreground tasks post through; tasks
-     * land in the internal lane. Safe to call from any thread.
+     * Posts a v8 foreground task into the internal lane. Called by the
+     * platform's per-isolate v8::TaskRunner adapter, from any thread.
      */
-    std::shared_ptr<v8::TaskRunner> V8TaskRunner();
+    void PostV8Task(std::unique_ptr<v8::Task> task, bool nestable, double delaySeconds);
+
+    /**
+     * True once Shutdown ran. A stopped loop found in the platform registry
+     * for a (reused) isolate pointer is stale and must be replaced.
+     */
+    bool IsStopped();
 
     /**
      * Runs the internal-lane v8 tasks that are due and nestable, bounded to
@@ -115,14 +121,18 @@ private:
         std::multimap<double, Entry> delayed;
     };
 
-    friend class V8TaskRunnerAdapter;
-    void PostV8Task(std::unique_ptr<v8::Task> task, bool nestable, double delaySeconds);
-
-    // all *Locked members require mutex_ to be held
+    // all *Locked members require mutex_ to be held.
+    // requireSignaledDelayed must be true on the eventfd unit-consuming path:
+    // a due delayed entry whose timerfd unit hasn't been issued yet is not
+    // this unit's work - consuming it would strand the entry the unit was
+    // written for (the timerfd fire then finds nothing due and issues no
+    // replacement unit). Ordered-lane and nested (unit-free) drains pass
+    // false: ordered entries carry their token from post time, and nested
+    // drains consume no units at all.
     void PostInternalLocked(Entry entry, double delayMs);
     void PostOrderedLocked(Entry entry, double delayMs);
     static std::unique_ptr<Entry> TakeDueLocked(Lane& lane, bool nestableOnly, bool v8Only,
-                                                double now);
+                                                bool requireSignaledDelayed, double now);
     void ArmTimerLocked(double now);
     void RunEntry(Entry& entry);
     void RunOneInternal();
@@ -134,7 +144,6 @@ private:
     std::mutex mutex_;
     Lane internal_;
     Lane ordered_;
-    std::shared_ptr<v8::TaskRunner> v8Runner_;  // adapter; holds a weak_ptr back
     // ordered lane: global ref to this thread's com.tns.EventLoopHandler
     jobject handler_ = nullptr;
     // internal lane: EFD_SEMAPHORE eventfd (one unit = run one due entry) and

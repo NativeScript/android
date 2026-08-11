@@ -51,60 +51,6 @@ jmethodID EventLoop::EVENT_LOOP_HANDLER_CTOR = nullptr;
 jmethodID EventLoop::EVENT_LOOP_HANDLER_POST = nullptr;
 jmethodID EventLoop::EVENT_LOOP_HANDLER_RELEASE = nullptr;
 
-/**
- * Adapter v8 holds (via shared_ptr) as the isolate's foreground task runner.
- * Holds the EventLoop weakly: the loop is owned by the platform's registry and
- * the Runtime; once it shuts down and is released, late posts from v8 lock()
- * to nullptr and drop, matching the loop's own post-after-Shutdown behavior.
- */
-class V8TaskRunnerAdapter : public v8::TaskRunner {
-public:
-    explicit V8TaskRunnerAdapter(std::weak_ptr<EventLoop> loop) : loop_(std::move(loop)) {}
-
-    bool IdleTasksEnabled() override {
-        return false;
-    }
-
-    bool NonNestableTasksEnabled() const override {
-        return true;
-    }
-
-    bool NonNestableDelayedTasksEnabled() const override {
-        return true;
-    }
-
-protected:
-    void PostTaskImpl(std::unique_ptr<Task> task, const SourceLocation& location) override {
-        if (auto loop = loop_.lock()) {
-            loop->PostV8Task(std::move(task), true, 0);
-        }
-    }
-
-    void PostNonNestableTaskImpl(std::unique_ptr<Task> task,
-                                 const SourceLocation& location) override {
-        if (auto loop = loop_.lock()) {
-            loop->PostV8Task(std::move(task), false, 0);
-        }
-    }
-
-    void PostDelayedTaskImpl(std::unique_ptr<Task> task, double delay_in_seconds,
-                             const SourceLocation& location) override {
-        if (auto loop = loop_.lock()) {
-            loop->PostV8Task(std::move(task), true, delay_in_seconds);
-        }
-    }
-
-    void PostNonNestableDelayedTaskImpl(std::unique_ptr<Task> task, double delay_in_seconds,
-                                        const SourceLocation& location) override {
-        if (auto loop = loop_.lock()) {
-            loop->PostV8Task(std::move(task), false, delay_in_seconds);
-        }
-    }
-
-private:
-    std::weak_ptr<EventLoop> loop_;
-};
-
 void EventLoop::BindToCurrentThread() {
     JEnv env;
     std::lock_guard<std::mutex> lock(mutex_);
@@ -207,7 +153,12 @@ void EventLoop::Shutdown() {
 }
 
 EventLoop::~EventLoop() {
-    // normally a no-op: DestroyRuntime already shut the loop down
+    // Normally a no-op: DestroyRuntime already shut the loop down and this
+    // runs on the home thread via ~Runtime. In the pathological case where a
+    // transient shared_ptr taken on a v8 pool thread is the last reference,
+    // the JEnv below permanently attaches that thread to ART (which aborts if
+    // it later exits attached) - accepted, since those pool threads live for
+    // the process lifetime.
     Shutdown();
     std::lock_guard<std::mutex> lock(mutex_);
     if (handler_ != nullptr) {
@@ -301,16 +252,15 @@ void EventLoop::PostV8Task(std::unique_ptr<Task> task, bool nestable, double del
                        delaySeconds * 1000.0);
 }
 
-std::shared_ptr<v8::TaskRunner> EventLoop::V8TaskRunner() {
+bool EventLoop::IsStopped() {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (v8Runner_ == nullptr) {
-        v8Runner_ = std::make_shared<V8TaskRunnerAdapter>(weak_from_this());
-    }
-    return v8Runner_;
+    return stopped_;
 }
 
 std::unique_ptr<EventLoop::Entry> EventLoop::TakeDueLocked(Lane& lane, bool nestableOnly,
-                                                           bool v8Only, double now) {
+                                                           bool v8Only,
+                                                           bool requireSignaledDelayed,
+                                                           double now) {
     auto matches = [&](const Entry& e) {
         return (!nestableOnly || e.nestable) && (!v8Only || e.task != nullptr);
     };
@@ -319,7 +269,8 @@ std::unique_ptr<EventLoop::Entry> EventLoop::TakeDueLocked(Lane& lane, bool nest
         ++imIt;
     }
     auto delIt = lane.delayed.begin();
-    while (delIt != lane.delayed.end() && !matches(delIt->second)) {
+    while (delIt != lane.delayed.end() &&
+           (!matches(delIt->second) || (requireSignaledDelayed && !delIt->second.signaled))) {
         ++delIt;
     }
     bool hasImmediate = imIt != lane.immediate.end();
@@ -382,7 +333,7 @@ void EventLoop::RunOneInternal() {
         if (stopped_) {
             return;
         }
-        entry = TakeDueLocked(internal_, false, false, now_ms());
+        entry = TakeDueLocked(internal_, false, false, true, now_ms());
     }
     if (entry == nullptr) {
         // leftover unit: the work it represented ran early from a nested loop
@@ -407,12 +358,14 @@ void EventLoop::RunNestableV8Tasks() {
             if (stopped_) {
                 return;
             }
-            entry = TakeDueLocked(internal_, true, true, now_ms());
+            entry = TakeDueLocked(internal_, true, true, false, now_ms());
         }
         if (entry == nullptr) {
             return;
         }
-        RunEntry(*entry);
+        // the pause loops call this from inside v8 inspector frames - a C++
+        // exception must not unwind through them
+        RunGuarded([&] { RunEntry(*entry); });
     }
 }
 
@@ -423,7 +376,7 @@ void EventLoop::RunOrderedTask() {
         if (stopped_) {
             return;
         }
-        entry = TakeDueLocked(ordered_, false, false, now_ms());
+        entry = TakeDueLocked(ordered_, false, false, false, now_ms());
     }
     if (entry == nullptr) {
         // leftover token: the earliest delayed entry isn't due yet
@@ -436,15 +389,20 @@ int EventLoop::EventFdCallback(int fd, int events, void* data) {
     uint64_t value;
     // EFD_SEMAPHORE: consumes exactly one unit; while more remain the fd stays
     // readable and ALooper calls back next poll, interleaving with Java
-    // messages instead of draining in one go
-    read(fd, &value, sizeof(value));
+    // messages instead of draining in one go. A spurious wakeup with nothing
+    // to read must not consume an entry, or its real unit becomes a leftover.
+    if (read(fd, &value, sizeof(value)) != sizeof(value)) {
+        return 1;
+    }
     RunGuarded([&] { static_cast<EventLoop*>(data)->RunOneInternal(); });
     return 1;
 }
 
 int EventLoop::TimerFdCallback(int fd, int events, void* data) {
     uint64_t expirations;
-    read(fd, &expirations, sizeof(expirations));
+    if (read(fd, &expirations, sizeof(expirations)) != sizeof(expirations)) {
+        return 1;
+    }
     auto self = static_cast<EventLoop*>(data);
     {
         std::lock_guard<std::mutex> lock(self->mutex_);

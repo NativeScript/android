@@ -6,25 +6,107 @@ namespace tns {
 
 NativeScriptPlatform* NativeScriptPlatform::instance_ = nullptr;
 
+namespace {
+
+/**
+ * The v8::TaskRunner handed to v8 for one isolate. Stateless beyond the
+ * isolate pointer: every post resolves the current EventLoop through the
+ * platform registry, so a stale loop replaced by RefreshEventLoop is
+ * redirected transparently, and posts for a disposed isolate (registry entry
+ * gone) drop instead of reviving a dead pointer's entry.
+ */
+class V8TaskRunnerAdapter : public v8::TaskRunner {
+public:
+    explicit V8TaskRunnerAdapter(Isolate* isolate) : isolate_(isolate) {}
+
+    bool IdleTasksEnabled() override {
+        return false;
+    }
+
+    bool NonNestableTasksEnabled() const override {
+        return true;
+    }
+
+    bool NonNestableDelayedTasksEnabled() const override {
+        return true;
+    }
+
+protected:
+    void PostTaskImpl(std::unique_ptr<Task> task, const SourceLocation& location) override {
+        Post(std::move(task), true, 0);
+    }
+
+    void PostNonNestableTaskImpl(std::unique_ptr<Task> task,
+                                 const SourceLocation& location) override {
+        Post(std::move(task), false, 0);
+    }
+
+    void PostDelayedTaskImpl(std::unique_ptr<Task> task, double delay_in_seconds,
+                             const SourceLocation& location) override {
+        Post(std::move(task), true, delay_in_seconds);
+    }
+
+    void PostNonNestableDelayedTaskImpl(std::unique_ptr<Task> task, double delay_in_seconds,
+                                        const SourceLocation& location) override {
+        Post(std::move(task), false, delay_in_seconds);
+    }
+
+private:
+    void Post(std::unique_ptr<Task> task, bool nestable, double delaySeconds) {
+        auto loop = NativeScriptPlatform::Instance()->LookupEventLoop(isolate_);
+        if (loop != nullptr) {
+            loop->PostV8Task(std::move(task), nestable, delaySeconds);
+        }
+    }
+
+    Isolate* isolate_;
+};
+
+}  // namespace
+
 NativeScriptPlatform::NativeScriptPlatform(std::unique_ptr<Platform> defaultPlatform)
         : default_(std::move(defaultPlatform)) {
     instance_ = this;
 }
 
-std::shared_ptr<EventLoop> NativeScriptPlatform::GetEventLoop(Isolate* isolate) {
-    std::lock_guard<std::mutex> lock(loopsMutex_);
+NativeScriptPlatform::IsolateEntry& NativeScriptPlatform::GetEntryLocked(Isolate* isolate) {
     auto it = loops_.find(isolate);
     if (it != loops_.end()) {
         return it->second;
     }
-    auto loop = std::make_shared<EventLoop>(isolate);
-    loops_.emplace(isolate, loop);
-    return loop;
+    auto emplaced = loops_.emplace(
+            isolate, IsolateEntry{std::make_shared<EventLoop>(isolate),
+                                  std::make_shared<V8TaskRunnerAdapter>(isolate)});
+    return emplaced.first->second;
 }
 
-void NativeScriptPlatform::IsolateDisposed(Isolate* isolate) {
+std::shared_ptr<EventLoop> NativeScriptPlatform::GetEventLoop(Isolate* isolate) {
     std::lock_guard<std::mutex> lock(loopsMutex_);
-    loops_.erase(isolate);
+    return GetEntryLocked(isolate).loop;
+}
+
+std::shared_ptr<EventLoop> NativeScriptPlatform::RefreshEventLoop(Isolate* isolate) {
+    std::lock_guard<std::mutex> lock(loopsMutex_);
+    auto& entry = GetEntryLocked(isolate);
+    if (entry.loop->IsStopped()) {
+        entry.loop = std::make_shared<EventLoop>(isolate);
+    }
+    return entry.loop;
+}
+
+std::shared_ptr<EventLoop> NativeScriptPlatform::LookupEventLoop(Isolate* isolate) {
+    std::lock_guard<std::mutex> lock(loopsMutex_);
+    auto it = loops_.find(isolate);
+    return it != loops_.end() ? it->second.loop : nullptr;
+}
+
+void NativeScriptPlatform::IsolateDisposed(Isolate* isolate,
+                                           const std::shared_ptr<EventLoop>& loop) {
+    std::lock_guard<std::mutex> lock(loopsMutex_);
+    auto it = loops_.find(isolate);
+    if (it != loops_.end() && it->second.loop == loop) {
+        loops_.erase(it);
+    }
 }
 
 PageAllocator* NativeScriptPlatform::GetPageAllocator() {
@@ -51,7 +133,8 @@ std::shared_ptr<TaskRunner> NativeScriptPlatform::GetForegroundTaskRunner(
         Isolate* isolate, TaskPriority priority) {
     // one runner regardless of priority: the home looper's FIFO order is the
     // priority model of the runtime thread
-    return GetEventLoop(isolate)->V8TaskRunner();
+    std::lock_guard<std::mutex> lock(loopsMutex_);
+    return GetEntryLocked(isolate).runner;
 }
 
 bool NativeScriptPlatform::IdleTasksEnabled(Isolate* isolate) {
