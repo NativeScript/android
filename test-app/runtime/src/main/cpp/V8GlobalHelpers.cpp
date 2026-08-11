@@ -1,5 +1,6 @@
 #include "V8GlobalHelpers.h"
 #include "ArgConverter.h"
+#include "BuiltinLoader.h"
 #include "CallbackHandlers.h"
 #include "include/v8.h"
 #include "JEnv.h"
@@ -20,41 +21,11 @@ Local<Function> GetSmartJSONStringifyFunction(Isolate* isolate) {
         return smartStringifyPersistentFunction->Get(isolate);
     }
 
-    string smartStringifyFunctionScript =
-        "(function () {\n"
-        "    function smartStringify(object) {\n"
-        "        const seen = [];\n"
-        "        var replacer = function (key, value) {\n"
-        "            if (value != null && typeof value == \"object\") {\n"
-        "                if (seen.indexOf(value) >= 0) {\n"
-        "                    if (key) {\n"
-        "                        return \"[Circular]\";\n"
-        "                    }\n"
-        "                    return;\n"
-        "                }\n"
-        "                seen.push(value);\n"
-        "            }\n"
-        "            return value;\n"
-        "        };\n"
-        "        return JSON.stringify(object, replacer, 2);\n"
-        "    }\n"
-        "    return smartStringify;\n"
-        "})();";
-
-    auto source = tns::ArgConverter::ConvertToV8String(isolate, smartStringifyFunctionScript);
     auto context = isolate->GetCurrentContext();
 
-    Local<Script> script;
-    auto maybeScript = Script::Compile(context, source).ToLocal(&script);
-
-    if (script.IsEmpty()) {
-        return Local<Function>();
-    }
-
     Local<Value> result;
-    auto maybeResult = script->Run(context).ToLocal(&result);
-
-    if (result.IsEmpty() && !result->IsFunction()) {
+    if (!tns::BuiltinLoader::RunBuiltin(context, tns::BuiltinId::kSmartStringify).ToLocal(&result) ||
+            !result->IsFunction()) {
         return Local<Function>();
     }
 

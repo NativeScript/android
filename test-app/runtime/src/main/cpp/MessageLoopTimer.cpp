@@ -6,6 +6,7 @@
 #include "include/libplatform/libplatform.h"
 #include "NativeScriptAssert.h"
 #include "ArgConverter.h"
+#include "BuiltinLoader.h"
 #include "Runtime.h"
 
 using namespace tns;
@@ -14,61 +15,7 @@ using namespace v8;
 static const int SLEEP_INTERVAL_MS = 100;
 
 void MessageLoopTimer::Init(Local<Context> context) {
-    this->RegisterStartStopFunctions(context);
-
-    std::string proxyScript = R"(
-        (function () {
-            // We proxy the WebAssembly's compile, compileStreaming, instantiate and
-            // instantiateStreaming methods so that they can start and stop a
-            // MessageLoopTimer inside the promise callbacks. This timer will call
-            // the v8::platform::PumpMessageLoop method at regular intervals.
-            // https://github.com/NativeScript/android-runtime/issues/1558
-
-            global.WebAssembly = new Proxy(WebAssembly, {
-                get: (target, name) => {
-                    let origMethod = target[name];
-                    let proxyMethods = [
-                        "compile",
-                        "compileStreaming",
-                        "instantiate",
-                        "instantiateStreaming"
-                    ];
-
-                    if (proxyMethods.indexOf(name) < 0) {
-                        return origMethod;
-                    }
-
-                    return function (...args) {
-                        __messageLoopTimerStart();
-                        let result = origMethod.apply(this, args);
-                        return result.then(x => {
-                            __messageLoopTimerStop();
-                            return x;
-                        }).catch(e => {
-                            __messageLoopTimerStop();
-                            throw e;
-                        });
-                    };
-                }
-            });
-        })();
-    )";
-
     Isolate* isolate = v8::Isolate::GetCurrent();
-
-    auto source = ArgConverter::ConvertToV8String(isolate, proxyScript);
-    Local<Script> script;
-    bool success = Script::Compile(context, source).ToLocal(&script);
-    assert(success && !script.IsEmpty());
-
-    Local<Value> result;
-    success = script->Run(context).ToLocal(&result);
-    assert(success);
-}
-
-void MessageLoopTimer::RegisterStartStopFunctions(Local<Context> context) {
-    Isolate* isolate = v8::Isolate::GetCurrent();
-    Local<Object> global = context->Global();
 
     Local<External> ext = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
     Local<Function> startFunc;
@@ -78,8 +25,12 @@ void MessageLoopTimer::RegisterStartStopFunctions(Local<Context> context) {
     success = Function::New(context, MessageLoopTimer::StopCallback, ext).ToLocal(&stopFunc);
     assert(success);
 
-    global->Set(context, ArgConverter::ConvertToV8String(isolate, "__messageLoopTimerStart"), startFunc);
-    global->Set(context, ArgConverter::ConvertToV8String(isolate, "__messageLoopTimerStop"), stopFunc);
+    Local<Object> binding = Object::New(isolate);
+    binding->Set(context, ArgConverter::ConvertToV8String(isolate, "messageLoopTimerStart"), startFunc);
+    binding->Set(context, ArgConverter::ConvertToV8String(isolate, "messageLoopTimerStop"), stopFunc);
+
+    success = !BuiltinLoader::RunBuiltin(context, BuiltinId::kMessageLoopTimer, binding).IsEmpty();
+    assert(success);
 }
 
 void MessageLoopTimer::StartCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
