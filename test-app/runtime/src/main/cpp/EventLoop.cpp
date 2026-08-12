@@ -49,6 +49,9 @@ namespace tns {
 jclass EventLoop::EVENT_LOOP_HANDLER_CLASS = nullptr;
 jmethodID EventLoop::EVENT_LOOP_HANDLER_CTOR = nullptr;
 jmethodID EventLoop::EVENT_LOOP_HANDLER_POST = nullptr;
+jmethodID EventLoop::EVENT_LOOP_HANDLER_POST_TOKEN = nullptr;
+jmethodID EventLoop::EVENT_LOOP_HANDLER_POST_IDENTIFIED = nullptr;
+jmethodID EventLoop::EVENT_LOOP_HANDLER_CANCEL_IDENTIFIED = nullptr;
 jmethodID EventLoop::EVENT_LOOP_HANDLER_RELEASE = nullptr;
 
 void EventLoop::BindToCurrentThread() {
@@ -96,7 +99,21 @@ void EventLoop::BindToCurrentThread() {
         assert(EVENT_LOOP_HANDLER_CLASS != nullptr);
         EVENT_LOOP_HANDLER_CTOR = env.GetMethodID(EVENT_LOOP_HANDLER_CLASS, "<init>", "(J)V");
         EVENT_LOOP_HANDLER_POST = env.GetMethodID(EVENT_LOOP_HANDLER_CLASS, "post", "(J)V");
+        EVENT_LOOP_HANDLER_POST_TOKEN =
+                env.GetMethodID(EVENT_LOOP_HANDLER_CLASS, "postToken", "(JII)V");
+        EVENT_LOOP_HANDLER_POST_IDENTIFIED = env.GetMethodID(
+                EVENT_LOOP_HANDLER_CLASS, "postIdentified", "(J)Ljava/lang/Object;");
+        EVENT_LOOP_HANDLER_CANCEL_IDENTIFIED = env.GetMethodID(
+                EVENT_LOOP_HANDLER_CLASS, "cancelIdentified", "(Ljava/lang/Object;)Z");
         EVENT_LOOP_HANDLER_RELEASE = env.GetMethodID(EVENT_LOOP_HANDLER_CLASS, "release", "()V");
+        // the @CriticalNative gate must be bound explicitly (name resolution
+        // doesn't apply to the critical calling convention on older ART)
+        static const JNINativeMethod claimMethod = {
+                const_cast<char*>("nativeClaimToken"), const_cast<char*>("(JJ)Z"),
+                reinterpret_cast<void*>(EventLoop::ClaimTokenCritical)};
+        JNIEnv* rawEnv = env;
+        jint registered = rawEnv->RegisterNatives(EVENT_LOOP_HANDLER_CLASS, &claimMethod, 1);
+        assert(registered == 0);
     }
     JniLocalRef handler(env.NewObject(EVENT_LOOP_HANDLER_CLASS, EVENT_LOOP_HANDLER_CTOR,
                                       reinterpret_cast<jlong>(this)));
@@ -255,17 +272,95 @@ void EventLoop::PostOrderedDelayed(std::function<void()> fn, double delayMs) {
     PostOrderedLocked(Entry{nullptr, std::move(fn), true, false, 0}, delayMs);
 }
 
-void EventLoop::PostOrderedToken(jlong uptimeMillis) {
+uint64_t EventLoop::PostTimerToken(jlong uptimeMillis, int timerId) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (stopped_) {
-        return;
+        return 0;
     }
-    if (handler_ != nullptr) {
-        JEnv env;
-        env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_POST, uptimeMillis);
-    } else {
+    if (handler_ == nullptr) {
         pendingTokens_.push_back(uptimeMillis);
+        return 0;
     }
+    uint64_t word = 0;
+    auto& cell = claimCells_[((uint32_t) timerId) & (kClaimCells - 1)];
+    uint64_t expected = 0;
+    uint64_t candidate = (((uint64_t) (uint32_t) timerId) << 2) | kCellActive;
+    if (cell.compare_exchange_strong(expected, candidate, std::memory_order_acq_rel)) {
+        word = candidate;
+    }
+    // a busy slot (previous token of the same interval still in flight, or an
+    // id collision) downgrades this token to plain; clear then uses tombstones
+    JEnv env;
+    env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_POST_TOKEN, uptimeMillis,
+                       (jint) (word >> 32), (jint) (word & 0xffffffffull));
+    return word;
+}
+
+jobject EventLoop::PostIdentifiedTimerToken(jlong uptimeMillis) {
+    JEnv env;
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) {
+        return nullptr;
+    }
+    if (handler_ == nullptr) {
+        pendingTokens_.push_back(uptimeMillis);
+        return nullptr;
+    }
+    JniLocalRef peer(env.CallObjectMethod(handler_, EVENT_LOOP_HANDLER_POST_IDENTIFIED,
+                                          uptimeMillis));
+    if (peer.IsNull()) {
+        return nullptr;
+    }
+    return env.NewGlobalRef(peer);
+}
+
+bool EventLoop::CancelClaimCell(uint64_t cellWord) {
+    auto& cell = claimCells_[(cellWord >> 2) & (kClaimCells - 1)];
+    uint64_t expected = cellWord;  // id|ACTIVE
+    return cell.compare_exchange_strong(expected, (cellWord & ~3ull) | kCellCancelled,
+                                        std::memory_order_acq_rel);
+}
+
+bool EventLoop::CancelIdentifiedToken(jobject peer) {
+    JEnv env;
+    bool won = false;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!stopped_ && handler_ != nullptr) {
+            won = env.CallBooleanMethod(handler_, EVENT_LOOP_HANDLER_CANCEL_IDENTIFIED, peer) ==
+                  JNI_TRUE;
+        }
+    }
+    env.DeleteGlobalRef(peer);
+    return won;
+}
+
+void EventLoop::ReleaseIdentifiedToken(jobject peer) {
+    JEnv env;
+    env.DeleteGlobalRef(peer);
+}
+
+jboolean EventLoop::ClaimTokenCritical(jlong loopPtr, jlong cellWord) {
+    // @CriticalNative: no JNIEnv, thread stays runnable - a single CAS, no
+    // locks, no allocation, no exceptions. The loop pointer is valid for the
+    // same reason nativeRunTask's is: the handler is released before the loop
+    // is destroyed, and released handlers never reach this gate.
+    auto* loop = reinterpret_cast<EventLoop*>(loopPtr);
+    auto word = (uint64_t) cellWord;
+    auto& cell = loop->claimCells_[(word >> 2) & (kClaimCells - 1)];
+    uint64_t expected = word;  // id|ACTIVE
+    if (cell.compare_exchange_strong(expected, 0, std::memory_order_acq_rel)) {
+        // claimed and retired in one step: proceed to the fat path
+        return JNI_TRUE;
+    }
+    if (expected == ((word & ~3ull) | kCellCancelled)) {
+        // the timer was cleared; retire the cell and drop the token here
+        cell.store(0, std::memory_order_release);
+        return JNI_FALSE;
+    }
+    // defensive: a mismatched word can't occur while this token is in flight
+    // (only the gate retires cells), but the fat path is always safe
+    return JNI_TRUE;
 }
 
 void EventLoop::SetTimerSource(OrderedTaskSource* source) {

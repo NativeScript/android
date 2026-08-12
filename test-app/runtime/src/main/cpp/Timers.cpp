@@ -97,13 +97,38 @@ void Timers::addTask(std::shared_ptr<TimerTask> task) {
     postTimer(task, now);
 }
 
+// Above this remaining delay a timer's token gets an identified peer so a
+// clear removes the queued message outright: the stale wakeup is the cost
+// worth paying JNI to avoid (debounce-style long timers on a possibly idle
+// device). Below it the wakeup lands within two frames of the interaction
+// that scheduled it - the app is provably awake - so the timer takes the
+// zero-overhead claim-cell path instead.
+static constexpr double kIdentifiedCutoffMs = 32;
+
 void Timers::postTimer(const std::shared_ptr<TimerTask> &task, double now) {
     // uptimeMillis is the integer part of the same CLOCK_MONOTONIC clock as
     // now_ms(). Due-now timers post at (jlong) now so they tie (and FIFO) with
     // a Handler.postDelayed(0) made in the same millisecond; future timers
     // post at ceil(dueTime) so the token never arrives before the due time.
     auto when = task->dueTime_ <= now ? (jlong) now : (jlong) std::ceil(task->dueTime_);
-    eventLoop_->PostOrderedToken(when);
+    // an interval re-arm orphans the previous token's carriers: the old token
+    // stays valid anonymously, only the newest one is cancellable
+    releaseTokenCarriers(task);
+    if (task->dueTime_ - now >= kIdentifiedCutoffMs) {
+        task->tokenPeer_ = eventLoop_->PostIdentifiedTimerToken(when);
+        if (task->tokenPeer_ != nullptr) {
+            return;
+        }
+    }
+    task->tokenCell_ = eventLoop_->PostTimerToken(when, task->id_);
+}
+
+void Timers::releaseTokenCarriers(const std::shared_ptr<TimerTask> &task) {
+    if (task->tokenPeer_ != nullptr) {
+        eventLoop_->ReleaseIdentifiedToken(task->tokenPeer_);
+        task->tokenPeer_ = nullptr;
+    }
+    task->tokenCell_ = 0;
 }
 
 void Timers::removeTask(const std::shared_ptr<TimerTask> &task) {
@@ -113,11 +138,24 @@ void Timers::removeTask(const std::shared_ptr<TimerTask> &task) {
 void Timers::removeTask(const int &taskId) {
     auto it = timerMap_.find(taskId);
     if (it != timerMap_.end()) {
-        // if still scheduled, tombstone the sorted entry: its token then
-        // consumes this slot as a no-op instead of running whatever item
-        // happens to be due next, which could jump foreign Java messages
-        // queued between the two tokens' positions
         if (it->second->queued_) {
+            // First try to neutralize the pending token itself. Winning the
+            // claim means the token is guaranteed dead wherever it is, so the
+            // sorted entry can be erased outright - token and slot leave
+            // together and no wakeup work remains. Losing means dispatch
+            // already owns the token (in flight past the claim gate), so
+            // leave a tombstone: the owned token consumes it as a no-op
+            // instead of running whatever item happens to be due next, which
+            // could jump foreign Java messages queued between the two tokens'
+            // positions.
+            bool tokenNeutralized = false;
+            if (it->second->tokenPeer_ != nullptr) {
+                tokenNeutralized = eventLoop_->CancelIdentifiedToken(it->second->tokenPeer_);
+                it->second->tokenPeer_ = nullptr;  // ref released by the cancel
+            } else if (it->second->tokenCell_ != 0) {
+                tokenNeutralized = eventLoop_->CancelClaimCell(it->second->tokenCell_);
+                it->second->tokenCell_ = 0;
+            }
             auto dueTime = it->second->dueTime_;
             auto sit = std::lower_bound(sortedTimers_.begin(), sortedTimers_.end(), dueTime,
                                         [](const TimerReference &ref, const double &value) {
@@ -125,12 +163,17 @@ void Timers::removeTask(const int &taskId) {
                                         });
             while (sit != sortedTimers_.end() && sit->dueTime == dueTime) {
                 if (sit->id == taskId) {
-                    sit->cancelled = true;
+                    if (tokenNeutralized) {
+                        sortedTimers_.erase(sit);
+                    } else {
+                        sit->cancelled = true;
+                    }
                     break;
                 }
                 ++sit;
             }
         }
+        releaseTokenCarriers(it->second);
         it->second->Unschedule();
         timerMap_.erase(it);
     }
@@ -142,6 +185,9 @@ void Timers::Destroy() {
     }
     stopped_ = true;
     if (eventLoop_ != nullptr) {
+        for (auto &pair : timerMap_) {
+            releaseTokenCarriers(pair.second);
+        }
         // the loop is already shut down by DestroyRuntime at this point (its
         // handler dropped every pending token), but the source pointer must
         // not outlive this object
@@ -214,7 +260,14 @@ void Timers::SetTimer(const v8::FunctionCallbackInfo<v8::Value> &args, bool repe
 
         auto task = std::make_shared<TimerTask>(isolate, ctx, handler, timeout, repeatable,
                                                 argArray, id, now_ms());
-        thiz->addTask(task);
+        try {
+            thiz->addTask(task);
+        } catch (NativeScriptException &e) {
+            // a failed JNI token post must surface as a JS exception, not
+            // unwind through the V8 callback frame
+            e.ReThrowToV8();
+            return;
+        }
     }
     args.GetReturnValue().Set(id);
 

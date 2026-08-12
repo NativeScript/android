@@ -50,6 +50,17 @@ namespace tns {
 #ifdef NS_TIMERS_NESTING_CLAMP
         int nestingLevel_ = 0;
 #endif
+        /**
+         * Cancellation carrier of this task's NEWEST pending token (at most
+         * one is set): a claim-cell word for short timers, or a global ref to
+         * the Java AtomicBoolean peer for long ones. An older token orphaned
+         * by an interval re-arm keeps functioning anonymously through its own
+         * carrier - only the newest token is cancellable, matching clear
+         * semantics. The peer ref is released by Timers (needs JEnv), never
+         * by Unschedule.
+         */
+        uint64_t tokenCell_ = 0;
+        jobject tokenPeer_ = nullptr;
         v8::Isolate *isolate_;
         v8::Persistent<v8::Function> callback_;
         std::shared_ptr<std::vector<std::shared_ptr<v8::Persistent<v8::Value>>>> args_;
@@ -122,6 +133,9 @@ namespace tns {
         static void ClearTimer(const v8::FunctionCallbackInfo<v8::Value> &args);
 
         void addTask(std::shared_ptr<TimerTask> task);
+
+        // releases the task's peer ref (if any) without cancelling
+        void releaseTokenCarriers(const std::shared_ptr<TimerTask> &task);
 
         void removeTask(const std::shared_ptr<TimerTask> &task);
 

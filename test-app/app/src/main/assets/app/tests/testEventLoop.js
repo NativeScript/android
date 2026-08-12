@@ -154,6 +154,64 @@ describe("event loop ordered tombstones", function () {
     });
 });
 
+// Long (>=32ms) timers carry an identified token whose clear removes the
+// queued wakeup; short timers carry a native claim cell whose clear is a
+// single CAS. Both must keep exact clear semantics under any thread.
+describe("event loop token cancellation", function () {
+    it("cleared identified (long) timeout never fires and later timers are unaffected", function (done) {
+        let fired = false;
+        const t = __ns__setTimeout(() => { fired = true; }, 100);
+        __ns__clearTimeout(t);
+        __ns__setTimeout(() => {
+            expect(fired).toBe(false);
+            done();
+        }, 150);
+    });
+
+    it("background-thread clear racing dispatch neither jumps java posts nor ghost-fires", function (done) {
+        let remaining = 30;
+        (function iter() {
+            const order = [];
+            const handler = new android.os.Handler(android.os.Looper.myLooper());
+            const t1 = __ns__setTimeout(() => order.push("t1"), 0);
+            new java.lang.Thread(new java.lang.Runnable({
+                run() {
+                    __ns__clearTimeout(t1);
+                }
+            })).start();
+            handler.post(new java.lang.Runnable({
+                run: () => order.push("java")
+            }));
+            __ns__setTimeout(() => {
+                order.push("t2");
+                const observed = order.join(">");
+                // t1 either fired before the clear landed (at its own legal
+                // slot, ahead of "java") or never; t2 must never jump "java"
+                expect(observed === "java>t2" || observed === "t1>java>t2").toBe(true);
+                if (--remaining === 0) {
+                    done();
+                } else {
+                    iter();
+                }
+            }, 5);
+        })();
+    });
+
+    it("clearing an identified interval stops it", function (done) {
+        let ticks = 0;
+        const iv = __ns__setInterval(() => {
+            ticks++;
+            if (ticks === 2) {
+                __ns__clearInterval(iv);
+                __ns__setTimeout(() => {
+                    expect(ticks).toBe(2);
+                    done();
+                }, 120);
+            }
+        }, 40);
+    });
+});
+
 describe("event loop internal lane", function () {
     // Regression for the eventfd unit-accounting bug: a worker reply's wakeup
     // arriving while an overdue waitAsync timeout is still unsignaled must not

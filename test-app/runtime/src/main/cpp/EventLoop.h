@@ -3,6 +3,8 @@
 
 #include <jni.h>
 #include <android/looper.h>
+#include <atomic>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <map>
@@ -97,8 +99,48 @@ public:
      * OrderedTaskSource keeps in its own bookkeeping (Timers). One token per
      * item; the drain picks the earliest due item across the source and the
      * ordered entries, so the token needn't name what it will run.
+     *
+     * The token carries a claim cell when one is free for `timerId` (returns
+     * the non-zero cell word to cancel with): EventLoopHandler claims the
+     * cell through a @CriticalNative CAS before entering the runtime, so a
+     * token whose timer was cancelled dies in Java without acquiring the
+     * isolate Locker, and CancelClaimCell neutralizes a queued token with no
+     * JNI at all. Returns 0 when the token is plain (cell slot busy, or the
+     * loop is unbound/stopped) - the caller must then use tombstones.
      */
-    void PostOrderedToken(jlong uptimeMillis);
+    uint64_t PostTimerToken(jlong uptimeMillis, int timerId);
+
+    /**
+     * Posts an ordered token carrying a Java AtomicBoolean claim peer, for
+     * timers long enough that the stale wakeup itself is worth removing.
+     * Returns a global ref to the peer (null when unbound/stopped - caller
+     * falls back to tombstones). CancelIdentifiedToken later CASes the peer
+     * and, on winning, removeMessages()es the queued token: a cleared long
+     * timer produces no wakeup. The peer and its Message are GC-owned, which
+     * is what makes the remove-vs-in-flight-dispatch race harmless.
+     */
+    jobject PostIdentifiedTimerToken(jlong uptimeMillis);
+
+    /**
+     * Neutralizes a cell-carrying token (no JNI, single CAS). True = the
+     * token is guaranteed dead wherever it is, so the caller may delete the
+     * item outright; false = dispatch already claimed it, so the caller must
+     * leave a tombstone for it to consume.
+     */
+    bool CancelClaimCell(uint64_t cellWord);
+
+    /**
+     * Neutralizes an identified token (one JNI crossing; releases the peer
+     * ref). Same true/false contract as CancelClaimCell.
+     */
+    bool CancelIdentifiedToken(jobject peer);
+
+    /**
+     * Releases an identified token's peer ref without cancelling (the timer
+     * fired or is being torn down; the Java Message keeps the peer alive for
+     * its own dispatch).
+     */
+    void ReleaseIdentifiedToken(jobject peer);
 
     /**
      * Registers the ordered lane's external source. Home thread only; pass
@@ -193,10 +235,35 @@ private:
     static int EventFdCallback(int fd, int events, void* data);
     static int TimerFdCallback(int fd, int events, void* data);
 
+    /**
+     * Claim cells for cell-carrying timer tokens, indexed by timer id. A cell
+     * word is (id << 2) | state so a token can prove the cell is still its
+     * own; a busy slot (>kClaimCells timers in flight, or an interval's
+     * previous token still pending) just downgrades the new token to plain.
+     * Lifecycle: 0 (free) -> id|ACTIVE (posted, under mutex_) ->
+     * id|CANCELLED (by CancelClaimCell, any thread) -> 0 (retired by the
+     * dispatch gate, which runs exactly once per cell token since cell tokens
+     * are never removeMessages()ed). Only the gate stores 0, so a cell is
+     * never reused while its token is in flight, and cancellation can never
+     * hit a recycled cell.
+     */
+    static constexpr int kClaimCells = 1024;
+    static constexpr uint64_t kCellActive = 1;
+    static constexpr uint64_t kCellCancelled = 2;
+
+    /**
+     * The @CriticalNative body behind EventLoopHandler.nativeClaimToken: one
+     * CAS, no JNIEnv, and the thread stays runnable - it must never block,
+     * allocate or throw. Returns false when the token's timer was cancelled
+     * (token dies in Java); true otherwise (proceed to nativeRunTask).
+     */
+    static jboolean ClaimTokenCritical(jlong loopPtr, jlong cellWord);
+
     v8::Isolate* isolate_;
     std::mutex mutex_;
     Lane internal_;
     Lane ordered_;
+    std::atomic<uint64_t> claimCells_[kClaimCells] = {};
     // ordered-lane source with its own bookkeeping (Timers); home-thread only
     OrderedTaskSource* timerSource_ = nullptr;
     // bare ordered tokens posted before the bind; flushed by Bind
@@ -215,6 +282,9 @@ private:
     static jclass EVENT_LOOP_HANDLER_CLASS;
     static jmethodID EVENT_LOOP_HANDLER_CTOR;
     static jmethodID EVENT_LOOP_HANDLER_POST;
+    static jmethodID EVENT_LOOP_HANDLER_POST_TOKEN;
+    static jmethodID EVENT_LOOP_HANDLER_POST_IDENTIFIED;
+    static jmethodID EVENT_LOOP_HANDLER_CANCEL_IDENTIFIED;
     static jmethodID EVENT_LOOP_HANDLER_RELEASE;
 };
 
