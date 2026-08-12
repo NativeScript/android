@@ -18,6 +18,7 @@
 #include "ErrorEvents.h"
 #include "Events.h"
 #include "File.h"
+#include "FrameCallbacks.h"
 #include "Interop.h"
 #include "IsolateDisposer.h"
 #include "JType.h"
@@ -30,6 +31,7 @@
 #include "ModuleInternalCallbacks.h"
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
+#include "Performance.h"
 #include "SimpleAllocator.h"
 #include "SimpleProfiler.h"
 #include "StructuredClone.h"
@@ -300,6 +302,7 @@ Runtime::~Runtime() {
   delete this->m_objectManager;
   delete this->m_loopTimer;
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
+  FrameCallbacks::RemoveIsolateEntries(m_isolate);
   if (m_isMainThread) {
     if (m_mainLooper_fd[0] != -1) {
       ALooper_removeFd(m_mainLooper, m_mainLooper_fd[0]);
@@ -621,11 +624,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   tns::instrumentation::Frame isolateFrame;
   auto isolate = Isolate::New(create_params);
-  // Capture start and realtime origin
-  // MonotonicallyIncreasingTime returns seconds as double; store for
-  // performance.now()
-  m_startTime = platform->MonotonicallyIncreasingTime();
-  m_realtimeOrigin = platform->CurrentClockTimeMillis();
+  // MonotonicallyIncreasingTime returns seconds as a double.
+  m_timeOriginMonotonic = platform->MonotonicallyIncreasingTime();
+  m_timeOriginRealtimeMs = platform->CurrentClockTimeMillis();
   isolateFrame.log("Isolate.New");
 
   {
@@ -698,19 +699,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
       ArgConverter::ConvertToV8String(isolate, "__time"),
       FunctionTemplate::New(isolate, CallbackHandlers::TimeCallback));
 
-  // performance object (performance.now() + timeOrigin)
-  {
-    auto performanceTemplate = ObjectTemplate::New(isolate);
-    auto nowFunc =
-        FunctionTemplate::New(isolate, Runtime::PerformanceNowCallback);
-    performanceTemplate->Set(ArgConverter::ConvertToV8String(isolate, "now"),
-                             nowFunc);
-    performanceTemplate->Set(
-        ArgConverter::ConvertToV8String(isolate, "timeOrigin"),
-        Number::New(isolate, m_realtimeOrigin));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "performance"),
-                        performanceTemplate);
-  }
   // queueMicrotask(callback) per spec:
   // https://developer.mozilla.org/en-US/docs/Web/API/Window/queueMicrotask
   globalTemplate->Set(
@@ -738,12 +726,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
       ArgConverter::ConvertToV8String(isolate, "__runOnMainThread"),
       FunctionTemplate::New(isolate,
                             CallbackHandlers::RunOnMainThreadCallback));
-  globalTemplate->Set(
-      ArgConverter::ConvertToV8String(isolate, "__postFrameCallback"),
-      FunctionTemplate::New(isolate, CallbackHandlers::PostFrameCallback));
-  globalTemplate->Set(
-      ArgConverter::ConvertToV8String(isolate, "__removeFrameCallback"),
-      FunctionTemplate::New(isolate, CallbackHandlers::RemoveFrameCallback));
+  FrameCallbacks::Init(isolate, globalTemplate);
   globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URL"),
                       URLImpl::GetCtor(isolate));
   globalTemplate->Set(
@@ -857,6 +840,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   StructuredClone::Init(context);
 
+  // The WHATWG performance surface. After StructuredClone::Init:
+  // mark/measure `detail` is cloned through the structuredClone global.
+  Performance::Init(context);
+
   // The `interop` global (interop.escapeException), mirroring iOS.
   Interop::Init(context);
 
@@ -954,14 +941,9 @@ void Runtime::SetManualInstrumentationMode(jstring mode) {
   }
 }
 
-void Runtime::PerformanceNowCallback(
-    const v8::FunctionCallbackInfo<v8::Value>& args) {
-  auto isolate = args.GetIsolate();
-  auto runtime = Runtime::GetRuntime(isolate);
-  // Difference in seconds * 1000 for ms
-  double ms =
-      (platform->MonotonicallyIncreasingTime() - runtime->m_startTime) * 1000.0;
-  args.GetReturnValue().Set(ms);
+double Runtime::PerformanceNowMillis() {
+  return (platform->MonotonicallyIncreasingTime() - m_timeOriginMonotonic) *
+         1000.0;
 }
 
 void Runtime::DestroyRuntime() {

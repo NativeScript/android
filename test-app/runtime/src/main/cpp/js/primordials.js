@@ -32,6 +32,7 @@ const intrinsics = {
 
   // Well-known symbols.
   SymbolIterator: Symbol.iterator,
+  SymbolToStringTag: Symbol.toStringTag,
 
   // Namespaces / prototypes.
   ObjectPrototype: Object.prototype,
@@ -40,6 +41,7 @@ const intrinsics = {
   ArrayBufferIsView: ArrayBuffer.isView,
   ArrayIsArray: Array.isArray,
   JSONStringify: JSON.stringify,
+  NumberIsFinite: Number.isFinite,
   NumberIsNaN: Number.isNaN,
   NumberParseFloat: Number.parseFloat,
   NumberParseInt: Number.parseInt,
@@ -57,6 +59,7 @@ const intrinsics = {
   ArrayPrototypeIndexOf: uncurryThis(Array.prototype.indexOf),
   ArrayPrototypePush: uncurryThis(Array.prototype.push),
   ArrayPrototypeSlice: uncurryThis(Array.prototype.slice),
+  ArrayPrototypeSort: uncurryThis(Array.prototype.sort),
   ArrayPrototypeSplice: uncurryThis(Array.prototype.splice),
   DatePrototypeGetTime: uncurryThis(Date.prototype.getTime),
   DatePrototypeToISOString: uncurryThis(Date.prototype.toISOString),

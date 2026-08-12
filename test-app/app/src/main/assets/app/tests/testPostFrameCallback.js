@@ -140,3 +140,98 @@ describe("test PostFrameCallback", function () {
     }, defaultWaitTime);
   });
 });
+
+// The two implementations behind __postFrameCallback (NDK AChoreographer,
+// android.view.Choreographer for API < 24) must be indistinguishable from JS.
+// A modern device always selects the NDK one, so the Java bridge is only
+// reachable through __setFrameCallbackImpl, which debug runtimes expose for
+// exactly this.
+describe("frame callback timestamps", function () {
+  const defaultWaitTime = 300;
+  const impls = ["native", "java"];
+
+  afterEach(() => {
+    if (typeof global.__setFrameCallbackImpl === "function") {
+      global.__setFrameCallbackImpl("auto");
+    }
+  });
+
+  function withImpl(impl) {
+    if (typeof global.__setFrameCallbackImpl !== "function") {
+      return impl === "native";
+    }
+    return global.__setFrameCallbackImpl(impl) === impl;
+  }
+
+  impls.forEach((impl) => {
+    describe(impl + " implementation", function () {
+      it("passes the raw frame time and a performance-timeline timestamp", (done) => {
+        if (!withImpl(impl)) {
+          pending("this runtime cannot select the " + impl + " implementation");
+          return;
+        }
+
+        global.__postFrameCallback((frameTimeNanos, performanceMillis) => {
+          const now = performance.now();
+
+          expect(typeof frameTimeNanos).toBe("number");
+          expect(typeof performanceMillis).toBe("number");
+
+          // Uptime-scale nanoseconds, not epoch-scale milliseconds.
+          expect(frameTimeNanos).toBeGreaterThan(1e9);
+          expect(frameTimeNanos / 1e6).toBeLessThan(Date.now());
+
+          // The frame is stamped just before the callback runs, so its
+          // timeline position sits a frame or two behind the reading taken
+          // inside it, never ahead of it.
+          expect(performanceMillis).toBeGreaterThan(0);
+          expect(performanceMillis).not.toBeGreaterThan(now);
+          expect(now - performanceMillis).toBeLessThan(250);
+
+          // Both arguments describe the same instant, so their difference is
+          // the timeline's monotonic origin. System.nanoTime() is on that same
+          // clock, so the pair (nanoTime, now) must yield the same origin --
+          // this is what would break if either argument moved off the base.
+          // The two clocks cannot be read at once, so nanoTime is bracketed
+          // and compared against the midpoint: the tolerance then only has to
+          // cover the sampling window, not whatever pause lands between them.
+          const beforeNow = performance.now();
+          const sampledNanos = java.lang.System.nanoTime();
+          const afterNow = performance.now();
+          const originFromFrame = frameTimeNanos / 1e6 - performanceMillis;
+          const originFromClock = sampledNanos / 1e6 - (beforeNow + afterNow) / 2;
+          expect(Math.abs(originFromFrame - originFromClock)).toBeLessThan(
+            5 + (afterNow - beforeNow)
+          );
+          done();
+        });
+      });
+
+      it("advances across consecutive frames", (done) => {
+        if (!withImpl(impl)) {
+          pending("this runtime cannot select the " + impl + " implementation");
+          return;
+        }
+
+        const frames = [];
+        const callback = (frameTimeNanos, performanceMillis) => {
+          frames.push({ nanos: frameTimeNanos, millis: performanceMillis });
+          if (frames.length === 1) {
+            global.__postFrameCallback(callback);
+          }
+        };
+        global.__postFrameCallback(callback);
+
+        setTimeout(() => {
+          expect(frames.length).toBe(2);
+          expect(frames[1].nanos).not.toBeLessThan(frames[0].nanos);
+          expect(frames[1].millis).not.toBeLessThan(frames[0].millis);
+          // The origin the two arguments imply is a constant of the isolate.
+          const origin = (f) => f.nanos / 1e6 - f.millis;
+          expect(Math.abs(origin(frames[1]) - origin(frames[0]))).toBeLessThan(1);
+          done();
+        }, defaultWaitTime);
+      });
+    });
+  });
+});

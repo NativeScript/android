@@ -32,6 +32,16 @@ describe("Runtime exposes", function () {
   });
 });
 
+// The shared Performance suite (submodule) gates itself on the API being
+// present and skips otherwise; this unguarded canary makes absence on THIS
+// runtime a failure rather than a silent skip.
+describe("Performance API canary", function () {
+  it("implements the Performance API", function () {
+    expect(typeof performance.mark).toBe("function");
+    expect(typeof PerformanceObserver).toBe("function");
+  });
+});
+
 // The shared StructuredClone suite skips itself where the API is missing, which
 // would turn this runtime losing structuredClone into a green run. This spec is
 // deliberately unguarded so that regression fails instead.
