@@ -35,6 +35,9 @@ describe("Performance measure argument coercion", function () {
   // endMark is a plain optional DOMString, not a union and not nullable, so
   // null stringifies and names a mark that does not exist.
   it("Should reject a null end mark", function () {
+    // Present so the only mark this can fail to resolve is the null one.
+    performance.mark("the-start");
+
     let thrown = null;
     try {
       performance.measure("null-end", "the-start", null);
