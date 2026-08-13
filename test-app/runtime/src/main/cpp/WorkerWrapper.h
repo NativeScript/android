@@ -142,6 +142,7 @@ public:
 private:
     void BackgroundLooper(std::shared_ptr<WorkerWrapper> self);
     void DrainPendingTasks();
+    void SignalMessageDrain();
     void QuitLooper();
     static int DrainCallback(int fd, int events, void* data);
     static void FireMessageOnParentWorkerObject(int workerId,
@@ -169,6 +170,7 @@ private:
     std::atomic_bool isClosing_;
     std::atomic_bool isTerminating_;
     std::atomic_bool isDisposed_;
+    std::atomic_bool drainRetryPending_;
 
     ConcurrentQueue queue_;
 
