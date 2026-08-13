@@ -58,7 +58,9 @@ addon.add(1, 2); // 3
 
 ## Building an addon (plugin authors)
 
-The runtime `.aar` publishes a [Prefab](https://google.github.io/prefab/) package carrying the Node-API headers and the `libNativeScript.so` link target. In the plugin's (or app's) Android library module:
+Two pieces: headers come from the runtime's prefab package; linking follows the same convention native V8 plugins (e.g. `@nativescript/canvas`) already use.
+
+**Headers.** The runtime `.aar` embeds a header-only [Prefab](https://google.github.io/prefab/) package. In the plugin's (or app's) Android library module:
 
 ```groovy
 android {
@@ -81,15 +83,21 @@ That puts the headers on the include path — so the ecosystem-standard bare inc
 #include <node_api.h>
 ```
 
-This is the portable form: the same source compiles against Node itself, the iOS runtime and this runtime, and it is required if you use the `node-addon-api` C++ wrapper (its `napi.h` hard-codes `#include <node_api.h>`). Linking `NativeScript::NativeScript` also gives the addon `.so` a `DT_NEEDED` entry on `libNativeScript.so`, so the dynamic linker resolves every `napi_*` symbol from the runtime already loaded in the process.
+This is the portable form: the same source compiles against Node itself, the iOS runtime and this runtime, and it is required if you use the `node-addon-api` C++ wrapper (its `napi.h` hard-codes `#include <node_api.h>`). The exported headers are `node_api.h`, `node_api_types.h`, `js_native_api.h`, `js_native_api_types.h` and `NapiRuntime.h` (the NativeScript-specific `NativeScriptNapiEnv()` declaration, see below).
 
-The exported headers are `node_api.h`, `node_api_types.h`, `js_native_api.h`, `js_native_api_types.h` and `NapiRuntime.h` (the NativeScript-specific `NativeScriptNapiEnv()` declaration, see below).
+**Linking.** The prefab package is deliberately header-only, so the addon `.so` links against the runtime the way native V8 plugins do today: against a local copy of `libNativeScript.so` that exists *only* to satisfy the linker at build time and is never shipped.
+
+1. Extract `libNativeScript.so` per ABI from the runtime `.aar` in the `@nativescript/android` npm package (`framework/app/libs/runtime-libs/nativescript-optimized.aar` → `jni/<abi>/`), into e.g. `src/main/libs/<abi>/`.
+2. Link it: `target_link_libraries(myaddon ${CMAKE_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libNativeScript.so)`. This gives full link-time symbol checking and a `DT_NEEDED libNativeScript.so` entry.
+3. Exclude the copy from the plugin's own packaging: `packagingOptions { jniLibs { excludes += "**/libNativeScript.so" } }`.
+
+At runtime the addon's `DT_NEEDED` binds against the runtime library the app already loaded. Unlike direct-V8 plugins, a Node-API addon does **not** need the app to set `useV8Symbols`: every runtime flavor exports the full `napi_*`/`node_api_*` surface and `NativeScriptNapiEnv`.
 
 ## Registering a module
 
-**Do not rely on the `NAPI_MODULE` / `NAPI_MODULE_INIT` macros for registration.** They are present in the vendored `node_api.h` and they compile, but all they do is emit the exported symbols (`napi_register_module_v1`, `node_api_module_get_api_version_v1`) that Node's `.node` loader looks for; nothing here scans for them, the symbols carry no module name, and only one of each can exist per binary.
+**Prefer constructor registration over the `NAPI_MODULE` / `NAPI_MODULE_INIT` macros.** The macros emit the exported symbols (`napi_register_module_v1`, `node_api_module_get_api_version_v1`) that a dlopen loader scans for — and the `.so` require path here does scan for them — but the symbols carry no module name (so a macro-registered addon is only reachable by path, never by bare `require("name")`) and only one of each can exist per binary.
 
-The working pattern is the one above: fill in a `napi_module` and call `napi_module_register` from a constructor.
+The pattern that supports both loading forms is the one above: fill in a `napi_module` and call `napi_module_register` from a constructor.
 
 - `nm_version` must be `NAPI_MODULE_VERSION`.
 - `nm_modname` is the name JS passes to `require()`. It is the key in a process-wide registry, so it must be unique across every addon loaded into the app.
@@ -108,7 +116,7 @@ The constructor runs when the addon's library is loaded — at app start if the 
 
 An unregistered name is not a Node-API error; it falls through to step 3 and fails (or succeeds) as any other package name would.
 
-An addon shipped as its own `.so` can also be loaded by path: `require("path/to/libmyaddon.so")` (or `require("system_lib://libmyaddon.so")` for a library packaged in the APK's `jniLibs`) `dlopen`s the library, and if its constructors registered a Node-API module, the call returns that module's exports — the same `modpending` dance Node's own `.node` loader does. After that first load, the bare `require("myaddon")` also resolves. Libraries that do not self-register keep the pre-existing `NSMain` protocol.
+An addon shipped as its own `.so` can also be loaded by path: `require("path/to/libmyaddon.so")` (or `require("system_lib://libmyaddon.so")` for a library packaged in the APK's `jniLibs`) `dlopen`s the library and initializes it Node's way — if its constructors registered a Node-API module, the call returns that module's exports (Node's `modpending` dance); otherwise, if the library carries the `napi_register_module_v1` symbol that the `NAPI_MODULE` / `node-addon-api` registration macros emit, that entry point is called instead, so stock ecosystem addons load unmodified by path. After a constructor-registered addon's first load, the bare `require("myaddon")` also resolves (macro-registered addons carry no name, so they are only reachable by path). Libraries that do neither keep the pre-existing `NSMain` protocol.
 
 Exports are cached **per environment**, not per process. `require("myaddon") === require("myaddon")` within one isolate, but a `Worker` gets its own environment, runs `nm_register_func` again, and receives a different exports object with different native state. Anything an addon keeps in file-scope statics is shared across every environment in the process; anything it wants to keep per-environment belongs in `napi_set_instance_data`.
 
@@ -127,6 +135,8 @@ if (env != NULL) {
 
 The lookup is thread-local: it returns the env of the runtime running **on the calling thread**, and `NULL` on any other thread, before the runtime finishes initializing, or after it has torn down. There is no way to obtain another thread's env, by design — see below.
 
+A `Worker`'s env is destroyed when the worker terminates: cleanup hooks run, threadsafe functions are aborted, and every finalizer fires. The **main** runtime's env lives for the process — nothing invokes the runtime's teardown path (`DestroyRuntime`, which is where env destruction is wired) for the main runtime today, so its cleanup hooks and instance-data finalizers only run if an embedder drives that path; on a normal Android app, process death does the reaping.
+
 ## Threading
 
 **Every Node-API call must happen on the thread that owns the env.** That thread holds the isolate's lock and drives the looper; entering the isolate from anywhere else deadlocks against the runtime's cross-isolate locking. The API does not check this for you (`napi_make_callback` and blocking threadsafe-function calls are the only two that do), so a wrong-thread call is undefined behaviour rather than an error status.
@@ -136,9 +146,9 @@ Two supported ways to get work off that thread:
 - **`napi_create_async_work` / `napi_queue_async_work`** for background compute. The `execute` callback runs on a shared worker pool bounded at 4 concurrent tasks — matching Node's default libuv pool, so an addon that fans out more than 4 *interdependent* blocking executes deadlocks here exactly as it would on Node — and must not touch the isolate or the `napi_env` at all; the `complete` callback is posted to the env's event loop and may. The pool threads are plain native threads, not attached to the JVM. Every completion entry ends with a microtask checkpoint, so a promise resolved from `complete` settles promptly even if nothing else enters JS. Note the divergence on `napi_delete_async_work` below.
 - **Threadsafe functions** for calling into JS from a thread you own. `napi_create_threadsafe_function` on the JS thread, then `napi_call_threadsafe_function` from anywhere. Calls are queued and drained on the env's event loop, at most 64 per entry so a fast producer cannot starve timers or the UI.
 
-Finalizer drains, threadsafe-function callbacks and async-work completions ride the runtime's event loop (the internal lane added in the per-runtime EventLoop work), which drops everything still queued when the runtime shuts down — so work in flight when a `Worker` terminates is dropped rather than delivered to a dead isolate.
+Finalizer drains, threadsafe-function callbacks and async-work completions ride the runtime's event loop (the internal lane added in the per-runtime EventLoop work), which drops everything still queued when the runtime shuts down — so work in flight when a `Worker` terminates is dropped rather than delivered to a dead isolate. For async work specifically: an `execute` that has not started when the worker terminates is skipped, an in-flight completion is dropped, and the work item is parked in the completed state so a cleanup hook's `napi_delete_async_work` still succeeds; the addon's `data` for dropped items is never handed back (the same trade Node makes at environment shutdown).
 
-An exception thrown by JS during one of these entries is routed through the runtime's error pipeline (`error` event, then the uncaught-error hooks), honoring `uncaughtErrorPolicy` — the same containment every other native-initiated callback gets.
+An exception thrown by JS during one of these entries is always **contained**: it is routed through the runtime's error pipeline (`error` event, then the uncaught-error hooks). It never propagates out of the entry — including under `uncaughtErrorPolicy: "throw"`, where the error is still fully reported but there is no native caller beneath a loop entry to hand it to.
 
 ## Finalizers
 

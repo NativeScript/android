@@ -79,8 +79,15 @@ class NapiEnv : public napi_env__ {
   // teardown sweep in DeleteMe, whichever gets there first.
   void RegisterExternalFinalizer(
       const std::shared_ptr<NapiExternalFinalizer>& finalizer);
-  void RunExternalFinalizer(
-      const std::shared_ptr<NapiExternalFinalizer>& finalizer);
+  void RunExternalFinalizer(std::shared_ptr<NapiExternalFinalizer> finalizer);
+
+  // Flips to false at the head of DeleteMe. Held (shared) by async work
+  // queued to the background pool, whose threads outlive any single env: a
+  // pool job that finds it false must not run the execute callback — the raw
+  // env it captured is gone.
+  const std::shared_ptr<std::atomic<bool>>& AliveFlag() const {
+    return aliveFlag_;
+  }
 
  private:
   NapiEnv(v8::Local<v8::Context> context,
@@ -91,6 +98,7 @@ class NapiEnv : public napi_env__ {
 
   std::thread::id homeThread_;
   std::weak_ptr<EventLoop> eventLoop_;
+  std::shared_ptr<std::atomic<bool>> aliveFlag_;
   bool tearingDown_ = false;
   v8::Eternal<v8::Private> privateKeys_[2];
   std::unordered_map<std::string, v8::Global<v8::Object>> moduleExports_;

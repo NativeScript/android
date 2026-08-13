@@ -72,7 +72,17 @@ void NAPI_CDECL napi_module_register(napi_module* mod) {
 
   ModuleRegistry& registry = Registry();
   std::lock_guard<std::mutex> lock(registry.mutex);
-  registry.modules[mod->nm_modname] = mod;
+  // First registration wins: exports are cached per env under this name, so
+  // letting a late duplicate replace the module would hand different callers
+  // different addons under one identity.
+  auto inserted = registry.modules.emplace(mod->nm_modname, mod);
+  if (!inserted.second && inserted.first->second != mod) {
+    __android_log_print(ANDROID_LOG_WARN, "TNS.Napi",
+                        "Ignoring duplicate Node-API module registration for "
+                        "'%s'",
+                        mod->nm_modname);
+    return;
+  }
   ModuleRegistry::pending = mod;
 }
 
@@ -95,21 +105,25 @@ std::string NapiModules::ClaimPendingModule() {
   return mod == nullptr ? std::string() : std::string(mod->nm_modname);
 }
 
-v8::MaybeLocal<v8::Object> NapiModules::GetExports(
-    v8::Local<v8::Context> context, const std::string& name) {
-  napi_module* mod = FindModule(name);
-  if (mod == nullptr || mod->nm_register_func == nullptr) {
+namespace {
+
+// The shared instantiation core: runs an addon's register function against
+// the context's env, caching the exports per env under `cacheKey`.
+v8::MaybeLocal<v8::Object> InstantiateAddon(v8::Local<v8::Context> context,
+                                            napi_addon_register_func registerFunc,
+                                            const std::string& cacheKey) {
+  if (registerFunc == nullptr) {
     return v8::MaybeLocal<v8::Object>();
   }
 
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  NapiEnv* env = NapiEnv::ForIsolate(isolate);
+  tns::NapiEnv* env = tns::NapiEnv::ForIsolate(isolate);
   if (env == nullptr) {
     return v8::MaybeLocal<v8::Object>();
   }
 
   v8::Local<v8::Object> cached;
-  if (env->CachedModuleExports(name).ToLocal(&cached)) {
+  if (env->CachedModuleExports(cacheKey).ToLocal(&cached)) {
     return cached;
   }
 
@@ -120,7 +134,7 @@ v8::MaybeLocal<v8::Object> NapiModules::GetExports(
   v8::TryCatch tc(isolate);
 
   napi_value returned =
-      mod->nm_register_func(env, v8impl::JsValueFromV8LocalValue(exports));
+      registerFunc(env, v8impl::JsValueFromV8LocalValue(exports));
   if (tc.HasCaught()) {
     tc.ReThrow();
     return v8::MaybeLocal<v8::Object>();
@@ -135,8 +149,28 @@ v8::MaybeLocal<v8::Object> NapiModules::GetExports(
     }
   }
 
-  env->CacheModuleExports(name, exports);
+  env->CacheModuleExports(cacheKey, exports);
   return exports;
+}
+
+}  // namespace
+
+v8::MaybeLocal<v8::Object> NapiModules::GetExports(
+    v8::Local<v8::Context> context, const std::string& name) {
+  napi_module* mod = FindModule(name);
+  if (mod == nullptr) {
+    return v8::MaybeLocal<v8::Object>();
+  }
+
+  return InstantiateAddon(context, mod->nm_register_func, name);
+}
+
+v8::MaybeLocal<v8::Object> NapiModules::InitAddonFromSymbol(
+    v8::Local<v8::Context> context, void* initSymbol,
+    const std::string& cacheKey) {
+  return InstantiateAddon(
+      context, reinterpret_cast<napi_addon_register_func>(initSymbol),
+      cacheKey);
 }
 
 }  // namespace tns
@@ -545,6 +579,12 @@ void CompleteAsyncWork(napi_async_work work, napi_status status) {
     return;
   }
 
+  // The loop entry supplies Locker/Isolate::Scope/HandleScope but no context;
+  // the complete callback runs with the env's context entered (Node's
+  // contract), and the exception handler below needs one too.
+  v8::HandleScope handle_scope(env->isolate);
+  v8::Context::Scope context_scope(env->context());
+
   void* data = work->data;
   env->CallIntoModule(
       [&](napi_env moduleEnv) { complete(moduleEnv, status, data); },
@@ -589,7 +629,23 @@ class AsyncWorkPool {
         job = std::move(jobs_.front());
         jobs_.pop();
       }
-      job();
+      try {
+        job();
+      } catch (const std::exception& e) {
+        // An exception escaping an execute callback would otherwise
+        // std::terminate with no diagnostic. It is still fatal (there is no
+        // one to hand it to, matching Node), but it dies with a name.
+        __android_log_print(ANDROID_LOG_FATAL, "TNS.Napi",
+                            "Uncaught C++ exception in napi_async_work "
+                            "execute callback: %s",
+                            e.what());
+        abort();
+      } catch (...) {
+        __android_log_print(ANDROID_LOG_FATAL, "TNS.Napi",
+                            "Uncaught C++ exception in napi_async_work "
+                            "execute callback");
+        abort();
+      }
     }
   }
 
@@ -671,7 +727,21 @@ napi_status NAPI_CDECL napi_queue_async_work(node_api_basic_env basic_env,
     work->cancelled = false;
   }
 
-  AsyncWorkPool::Instance().Submit([work]() {
+  std::shared_ptr<std::atomic<bool>> envAlive =
+      static_cast<tns::NapiEnv*>(env)->AliveFlag();
+  AsyncWorkPool::Instance().Submit([work, envAlive]() {
+    // The env can die (Worker terminated) while this job waits in the pool;
+    // the flag flip happens-before the queued-entry drop in
+    // EventLoop::Shutdown, so a false read here means the raw `work->env` must
+    // not be dereferenced. The work is parked in `completed` so a cleanup
+    // hook's napi_delete_async_work still succeeds; execute/complete are
+    // dropped — the same trade Node makes at environment shutdown.
+    if (!envAlive->load()) {
+      std::lock_guard<std::mutex> lock(work->mutex);
+      work->state = napi_async_work__::State::completed;
+      return;
+    }
+
     napi_status status = napi_ok;
     {
       std::lock_guard<std::mutex> lock(work->mutex);
@@ -691,6 +761,10 @@ napi_status NAPI_CDECL napi_queue_async_work(node_api_basic_env basic_env,
     std::shared_ptr<tns::EventLoop> loop = work->eventLoop.lock();
     if (loop != nullptr && !loop->IsStopped()) {
       loop->PostInternal([work, status]() { CompleteAsyncWork(work, status); });
+    } else {
+      // Completion cannot be delivered; park the work so it stays deletable.
+      std::lock_guard<std::mutex> lock(work->mutex);
+      work->state = napi_async_work__::State::completed;
     }
   });
 
@@ -720,6 +794,7 @@ napi_status NAPI_CDECL napi_get_uv_event_loop(node_api_basic_env env,
   // This runtime drives an Android Looper; there is no uv_loop_t to hand out,
   // and inventing one would be worse than saying so.
   CHECK_ENV(env);
+  CHECK_ARG(env, loop);
   return napi_set_last_error(env, napi_generic_failure);
 }
 
@@ -917,5 +992,6 @@ napi_status NAPI_CDECL node_api_get_module_file_name(node_api_basic_env env,
   // Addons are linked into the app or loaded through the runtime's own `.so`
   // require path; nothing identifies the calling module at this point.
   CHECK_ENV(env);
+  CHECK_ARG(env, result);
   return napi_set_last_error(env, napi_generic_failure);
 }

@@ -211,6 +211,9 @@ void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Valu
         Local<Object> exports;
         if (NapiModules::GetExports(context, moduleName).ToLocal(&exports)) {
             args.GetReturnValue().Set(exports);
+        } else if (!isolate->HasPendingException()) {
+            isolate->ThrowException(Exception::Error(ArgConverter::ConvertToV8String(
+                    isolate, "Node-API module '" + moduleName + "' failed to initialize")));
         }
         return;
     }
@@ -414,13 +417,23 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
 
         // A library whose constructors registered a Node-API module is a
         // Node-API addon: its exports come from the addon registry (Node's
-        // dlopen consumes `modpending` the same way). NSMain remains the
-        // protocol for plain native modules.
+        // dlopen consumes `modpending` the same way). A library carrying the
+        // NAPI_MODULE / node-addon-api registration symbol instead is
+        // initialized through it — this is also the path a *re*-dlopen of an
+        // already-loaded addon takes, since constructors only run on first
+        // load. NSMain remains the protocol for plain native modules.
         string napiModuleName = NapiModules::ClaimPendingModule();
-        if (!napiModuleName.empty()) {
+        void* napiInitSymbol = napiModuleName.empty()
+                ? dlsym(handle, "napi_register_module_v1")
+                : nullptr;
+        if (!napiModuleName.empty() || napiInitSymbol != nullptr) {
             Local<Object> napiExports;
-            if (!NapiModules::GetExports(context, napiModuleName).ToLocal(&napiExports) || tc.HasCaught()) {
-                throw NativeScriptException(tc, "Error initializing Node-API module " + napiModuleName);
+            bool initialized = napiModuleName.empty()
+                    ? NapiModules::InitAddonFromSymbol(context, napiInitSymbol, modulePath).ToLocal(&napiExports)
+                    : NapiModules::GetExports(context, napiModuleName).ToLocal(&napiExports);
+            if (!initialized || tc.HasCaught()) {
+                throw NativeScriptException(tc, "Error initializing Node-API module " +
+                        (napiModuleName.empty() ? modulePath : napiModuleName));
             }
             moduleObj->Set(context, exportsPropName, napiExports);
             tempModule.SaveToCache();

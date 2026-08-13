@@ -251,9 +251,9 @@ void PostDispatch(const TsfnRef& tsfn) {
   // loop's Locker/scopes, and EventLoop::Shutdown drops queued entries before
   // the env dies, so no liveness re-check is needed inside.
   //
-  // A post that lands between IsStopped and Shutdown is silently dropped; the
-  // stuck dispatchPosted flag is harmless because the abort path that follows
-  // Shutdown never consults it.
+  // If Shutdown runs between the IsStopped check and the post, the post is
+  // silently dropped and dispatchPosted stays latched; that is harmless
+  // because the abort path that follows Shutdown never consults it.
   TsfnRef ref = tsfn;
 
   std::shared_ptr<tns::EventLoop> loop = weakLoop.lock();
@@ -271,18 +271,25 @@ void PostDispatch(const TsfnRef& tsfn) {
 namespace tns {
 
 void NapiAbortThreadSafeFunctions(NapiEnv* env) {
-  std::vector<TsfnRef> victims;
-  {
-    TsfnRegistry& registry = Registry();
-    std::lock_guard<std::mutex> lock(registry.mutex);
-    for (auto& entry : registry.live) {
-      if (entry.second->env == env) {
-        victims.push_back(entry.second);
+  // Looped rather than a single sweep: teardown finalizers running after the
+  // first pass may create new threadsafe functions on this env, and those
+  // must be closed too or they leak holding a dangling env pointer.
+  for (;;) {
+    std::vector<TsfnRef> victims;
+    {
+      TsfnRegistry& registry = Registry();
+      std::lock_guard<std::mutex> lock(registry.mutex);
+      for (auto& entry : registry.live) {
+        if (entry.second->env == env) {
+          victims.push_back(entry.second);
+        }
       }
     }
-  }
+    if (victims.empty()) {
+      return;
+    }
 
-  for (const TsfnRef& tsfn : victims) {
+    for (const TsfnRef& tsfn : victims) {
     {
       std::lock_guard<std::mutex> lock(tsfn->mutex);
       tsfn->closing = true;
@@ -306,6 +313,7 @@ void NapiAbortThreadSafeFunctions(NapiEnv* env) {
     }
 
     DropHandleRefIfDone(tsfn);
+    }
   }
 }
 

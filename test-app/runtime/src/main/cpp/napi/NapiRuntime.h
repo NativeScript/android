@@ -13,7 +13,11 @@ extern "C" {
 // The Node-API environment of the runtime on the calling thread, or NULL when
 // this thread has no runtime (or its runtime has torn down). Each runtime —
 // the main one and every Worker — owns a separate env.
-napi_env NativeScriptNapiEnv(void);
+//
+// The explicit visibility attribute keeps the symbol exported under the
+// -fvisibility=hidden the release builds compile with (a version script
+// cannot resurrect a hidden symbol).
+__attribute__((visibility("default"))) napi_env NativeScriptNapiEnv(void);
 
 #ifdef __cplusplus
 }

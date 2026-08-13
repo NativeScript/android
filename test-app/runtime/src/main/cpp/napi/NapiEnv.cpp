@@ -19,7 +19,8 @@ NapiEnv::NapiEnv(Local<Context> context,
                  const std::shared_ptr<EventLoop>& eventLoop)
     : napi_env__(context, NODE_API_DEFAULT_MODULE_API_VERSION),
       homeThread_(std::this_thread::get_id()),
-      eventLoop_(eventLoop) {}
+      eventLoop_(eventLoop),
+      aliveFlag_(std::make_shared<std::atomic<bool>>(true)) {}
 
 NapiEnv::~NapiEnv() = default;
 
@@ -43,7 +44,11 @@ NapiEnv* NapiEnv::ForIsolate(Isolate* isolate) {
     return nullptr;
   }
 
-  Runtime* runtime = Runtime::GetRuntime(isolate);
+  // Read the isolate slot directly: the Runtime::GetRuntime* accessors throw
+  // NativeScriptException when the slot is unset, and a C++ exception must
+  // not cross the extern "C" Node-API surface this is called under.
+  Runtime* runtime = static_cast<Runtime*>(
+      isolate->GetData((uint32_t)Runtime::IsolateData::RUNTIME));
   if (runtime == nullptr) {
     return nullptr;
   }
@@ -93,7 +98,8 @@ void NapiEnv::RegisterExternalFinalizer(
 }
 
 void NapiEnv::RunExternalFinalizer(
-    const std::shared_ptr<NapiExternalFinalizer>& finalizer) {
+    std::shared_ptr<NapiExternalFinalizer> finalizer) {
+  // By value: the argument may alias the registry entry erased below.
   if (finalizer->claimed.exchange(true)) {
     return;
   }
@@ -111,11 +117,13 @@ void NapiEnv::DrainFinalizers() {
 }
 
 void NapiEnv::DeleteMe() {
-  // DestroyRuntime holds the Locker but has not entered the isolate, so
-  // teardown enters it here before anything below touches handles or the
-  // context.
+  // DestroyRuntime holds the Locker but may not have entered the isolate
+  // (the worker teardown path has, entering again is free), so teardown
+  // enters it here before anything below touches handles or the context.
   Isolate::Scope isolate_scope(this->isolate);
   HandleScope handle_scope(this->isolate);
+
+  aliveFlag_->store(false);
 
   // From here on can_call_into_js() is false: hooks and finalizers still run
   // and may release env-bound resources (delete refs, release threadsafe
@@ -184,8 +192,17 @@ void NapiReportModuleException(napi_env env, Local<Value> exception) {
   TryCatch tc(isolate);
   isolate->ThrowException(exception);
   if (!NativeScriptException::ContainUncaughtCallbackException(isolate, tc)) {
-    NativeScriptException e(tc);
-    e.ReThrowToJava();
+    // Node-API entries always contain. These run from event-loop entries with
+    // no Java caller below them, so propagating (what a false return asks
+    // for) would leave a pending JNI exception under a loop that keeps
+    // executing. Under uncaughtErrorPolicy "throw" the error was already
+    // fully reported before containment declined; the remaining false paths
+    // (JS-initiated chain, escapeException) have no JS frame reachable from
+    // here, so the error is logged and dropped.
+    __android_log_print(ANDROID_LOG_ERROR, "TNS.Napi",
+                        "Uncontained exception in Node-API callback: %s",
+                        ArgConverter::ToString(isolate, exception).c_str());
+    tc.Reset();
   }
 }
 
