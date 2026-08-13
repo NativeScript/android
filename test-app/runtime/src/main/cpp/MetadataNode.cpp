@@ -1853,8 +1853,6 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
             }
 
             string srcFileName = ArgConverter::ConvertToString(scriptName);
-            // trim 'file://' to normalize path to always begin with "/data/"
-            srcFileName = Util::ReplaceAll(srcFileName, "file://", "");
 
             string fullPathToFile;
             if (srcFileName == "<embedded>") {
@@ -1866,11 +1864,49 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
                 // preceding the underscore (_)
                 fullPathToFile = "script";
             } else {
-                string hardcodedPathToSkip = Constants::APP_ROOT_FOLDER_PATH;
+                // srcFileName is not always `file://<APP_ROOT>/<path>.js`:
+                // HTTP ESM loading (HMR dev workflow) passes a full URL like
+                // `http://127.0.0.1:5173/ns/core/...` with no `.js` suffix and
+                // no app-root prefix, so naive scheme/app-root/`.js` stripping
+                // can yield an empty `fullPathToFile` and crash downstream on
+                // an empty token list.
+                string normalized = srcFileName;
 
-                int startIndex = hardcodedPathToSkip.length();
-                int strToTakeLen = (srcFileName.length() - startIndex - 3); // 3 refers to .js at the end of file name
-                fullPathToFile = srcFileName.substr(startIndex, strToTakeLen);
+                auto stripPrefix = [](string& s, const string& prefix) {
+                    if (s.size() >= prefix.size() &&
+                        s.compare(0, prefix.size(), prefix) == 0) {
+                        s.erase(0, prefix.size());
+                    }
+                };
+
+                stripPrefix(normalized, "file://");
+                if (normalized.rfind("http://", 0) == 0 ||
+                    normalized.rfind("https://", 0) == 0) {
+                    size_t schemeEnd = normalized.find("://");
+                    size_t pathStart = normalized.find('/', schemeEnd + 3);
+                    if (pathStart == string::npos) {
+                        normalized.clear();
+                    } else {
+                        normalized.erase(0, pathStart + 1);
+                    }
+                }
+
+                const string& appRoot = Constants::APP_ROOT_FOLDER_PATH;
+                if (!appRoot.empty()) {
+                    stripPrefix(normalized, appRoot);
+                }
+
+                auto endsWith = [](const string& s, const string& suffix) {
+                    return s.size() >= suffix.size() &&
+                           s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+                };
+                if (endsWith(normalized, ".mjs")) {
+                    normalized.resize(normalized.size() - 4);
+                } else if (endsWith(normalized, ".js")) {
+                    normalized.resize(normalized.size() - 3);
+                }
+
+                fullPathToFile = normalized;
 
                 std::replace(fullPathToFile.begin(), fullPathToFile.end(), '/', '_');
                 std::replace(fullPathToFile.begin(), fullPathToFile.end(), '.', '_');
@@ -1878,10 +1914,18 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
                 std::replace(fullPathToFile.begin(), fullPathToFile.end(), ' ', '_');
 
                 std::vector<std::string> pathParts;
-
                 Util::SplitString(fullPathToFile, "_", pathParts);
 
-                std::string lastPathPart = pathParts.back();
+                std::string lastPathPart;
+                for (auto it = pathParts.rbegin(); it != pathParts.rend(); ++it) {
+                    if (!it->empty()) {
+                        lastPathPart = *it;
+                        break;
+                    }
+                }
+                if (lastPathPart.empty()) {
+                    lastPathPart = "script";
+                }
                 fullPathToFile = lastPathPart;
             }
 
