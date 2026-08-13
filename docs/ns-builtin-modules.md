@@ -52,6 +52,28 @@ Rules:
 versions for readability; it is intended for humans and must not be parsed
 programmatically.
 
+### `ns:module` (v1)
+
+The module-loader control surface consumed by development tooling
+(`@nativescript/vite`). Mechanism only: every policy concern (boot
+orchestration, `import.meta.hot`, full reload, CSS apply, worker teardown,
+WebSocket protocol) lives in the tooling.
+
+| export | description |
+|---|---|
+| `configureLoader(config)` | Install loader policy before the session imports anything: `importMap` (bare specifier → URL, consulted inside the synchronous resolver), `volatilePatterns` (URL substrings always re-fetched), `canonicalization` (`stripParams`/`forPathPrefixes`/`preserveQueryFor` vocabulary for registry keying). Each present section replaces its state wholesale. |
+| `invalidateModules(urls)` | Evict the given URLs (canonicalized) from the module registry and mark them bust-next-fetch, so the next network fetch bypasses every HTTP cache layer. |
+| `getLoadedModuleUrls()` | URL-like keys currently in the module registry (used to compute full-reload eviction sets). |
+| `setDevBootComplete(value?)` | Flip the dev-boot-complete signal (defaults to `true`); disarms cold-boot-only behaviors. |
+
+Debug builds additionally carry `canonicalizeHttpUrlKey(url)`, a pure test
+diagnostic; release builds omit it. Missing members are simply absent —
+never present-but-throwing — so feature checks work. The module is
+registered in every build; the security boundary for remote module loading
+sits at the network layer (`security.allowRemoteModules` in
+nativescript.config, enforced inside `HttpLoader`), not the module
+registry.
+
 ## `node:` compatibility shims
 
 The same registry serves the `node:` scheme with **compatibility shims** so
