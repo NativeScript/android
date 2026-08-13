@@ -194,7 +194,7 @@ public class DexFactory {
     }
 
     public Class<?> findClass(String className) throws ClassNotFoundException {
-        String canonicalName = className.replace('/', '.');
+        String canonicalName = className.replace('/', '.').replace('$', '_');
         if (logger.isEnabled()) {
             logger.write(canonicalName);
         }

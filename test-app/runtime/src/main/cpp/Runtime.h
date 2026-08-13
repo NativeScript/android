@@ -116,6 +116,10 @@ class Runtime {
             return m_state.get();
         }
 
+        bool IsMainThread() const {
+            return m_isMainThread;
+        }
+
         jobject GetJavaRuntime() const;
 
         ObjectManager* GetObjectManager() const;

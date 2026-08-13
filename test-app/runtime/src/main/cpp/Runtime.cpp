@@ -19,6 +19,7 @@
 #include "Events.h"
 #include "File.h"
 #include "FrameCallbacks.h"
+#include "HttpLoader.h"
 #include "Interop.h"
 #include "IsolateTracked.h"
 #include "IsolateDisposer.h"
@@ -318,17 +319,34 @@ void Runtime::Unlock() {
 #endif
 }
 
+static void PumpPendingHttpModuleGraph(v8::Isolate* isolate) {
+  if (!tns::HasPendingAsyncModuleGraphWork()) {
+    return;
+  }
+  const auto start = std::chrono::steady_clock::now();
+  while (tns::HasPendingAsyncModuleGraphWork()) {
+    isolate->PerformMicrotaskCheckpoint();
+    ALooper_pollOnce(10, nullptr, nullptr, nullptr);
+    isolate->PerformMicrotaskCheckpoint();
+    if (std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() > 60.0) {
+      break;
+    }
+  }
+}
+
 void Runtime::RunModule(JNIEnv* _env, jobject obj, jstring scriptFile) {
   JEnv env(_env);
 
   string filePath = ArgConverter::jstringToString(scriptFile);
   auto context = this->GetContext();
   m_module.Load(context, filePath);
+  PumpPendingHttpModuleGraph(m_isolate);
 }
 
 void Runtime::RunModule(const char* moduleName) {
   auto context = this->GetContext();
   m_module.Load(context, moduleName);
+  PumpPendingHttpModuleGraph(m_isolate);
 }
 
 void Runtime::RunWorker(const std::string& filePath) {
@@ -946,7 +964,6 @@ void Runtime::DestroyRuntime() {
   m_dispatchUnhandledRejectionFunc.Reset();
   m_dispatchRejectionHandledFunc.Reset();
   m_dispatchNativeUncaughtErrorFunc.Reset();
-
   // Both hold v8::Global handles to JS callbacks, so their entries must be
   // dropped here rather than in ~Runtime, which runs after Isolate::Dispose --
   // resetting a Global then writes into a freed handle table. Doing it here
@@ -955,6 +972,16 @@ void Runtime::DestroyRuntime() {
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
   FrameCallbacks::RemoveIsolateEntries(m_isolate);
 
+  // Drop this isolate's module registry (compiled modules, fallbacks,
+  // in-flight async graph loads) while the isolate is still alive.
+  tns::DestroyModuleStateForIsolate(m_isolate);
+  // Process-wide HTTP-loader / import-map state is shared across isolates;
+  // only the main isolate may clear it (worker teardown must not wipe the
+  // main isolate's session).
+  if (m_isMainThread) {
+    tns::CleanupHttpLoaderGlobals();
+    tns::CleanupImportMapGlobals();
+  }
   tns::disposeIsolate(m_isolate);
 
   // V8 does not run weak callbacks when an isolate is disposed, so anything

@@ -8,6 +8,7 @@
 #include "ModuleInternalCallbacks.h"
 #include "BuiltinLoader.h"
 #include "File.h"
+#include "HttpLoader.h"
 #include "JniLocalRef.h"
 #include "ArgConverter.h"
 #include "V8GlobalHelpers.h"
@@ -31,13 +32,59 @@
 #include <time.h>
 #include <utime.h>
 #include <unistd.h>
+#include <android/looper.h>
+#include <chrono>
+#include <cstring>
 
 using namespace v8;
 using namespace std;
 using namespace tns;
 
-// Global module registry for ES modules: maps absolute file paths → compiled Module handles
-std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
+static bool IsHttpModulePath(const std::string& path) {
+    return path.rfind("http://", 0) == 0 || path.rfind("https://", 0) == 0 ||
+           path.rfind("file://http://", 0) == 0 || path.rfind("file://https://", 0) == 0;
+}
+
+static std::string NormalizeHttpModuleUrl(const std::string& path) {
+    if (path.rfind("file://http://", 0) == 0 || path.rfind("file://https://", 0) == 0) {
+        return path.substr(strlen("file://"));
+    }
+    return path;
+}
+
+static std::string PromiseRejectionMessage(Isolate* isolate, Local<Promise> promise,
+                                           const std::string& path) {
+    std::string errorMessage = "Module evaluation promise rejected: " + path;
+    Local<Value> reason = promise->Result();
+    if (reason.IsEmpty()) {
+        return errorMessage;
+    }
+    if (reason->IsObject()) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> errorObj = reason.As<Object>();
+        Local<Value> messageVal;
+        if (errorObj->Get(context, ArgConverter::ConvertToV8String(isolate, "message"))
+                    .ToLocal(&messageVal) &&
+            messageVal->IsString()) {
+            v8::String::Utf8Value messageUtf8(isolate, messageVal);
+            if (*messageUtf8) {
+                errorMessage.append(" — ");
+                errorMessage.append(*messageUtf8);
+            }
+        }
+    } else {
+        Local<Context> context = isolate->GetCurrentContext();
+        auto maybeReasonStr = reason->ToString(context);
+        if (!maybeReasonStr.IsEmpty()) {
+            v8::String::Utf8Value reasonUtf8(isolate, maybeReasonStr.ToLocalChecked());
+            if (*reasonUtf8) {
+                errorMessage.append(" — ");
+                errorMessage.append(*reasonUtf8);
+            }
+        }
+    }
+    return errorMessage;
+}
 
 // Helper function to check if a module name looks like an optional external module
 bool ModuleInternal::IsLikelyOptionalModule(const std::string& moduleName) {
@@ -251,6 +298,10 @@ void ModuleInternal::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Va
 void ModuleInternal::Load(Local<Context> context, const string& path) {
     TNSPERF();
     auto isolate = m_isolate;
+    if (IsHttpModulePath(path) || IsESModule(path)) {
+        LoadESModule(isolate, path);
+        return;
+    }
     auto globalObject = context->Global();
     auto require = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "require")).ToLocalChecked().As<Function>();
     Local<Value> args[] = { ArgConverter::ConvertToV8String(isolate, path) };
@@ -262,7 +313,11 @@ void ModuleInternal::LoadWorker(Local<Context> context, const string& path) {
     auto isolate = m_isolate;
     TryCatch tc(isolate);
 
-    Load(context, path);
+    try {
+        Load(context, path);
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    }
 
     if (tc.HasCaught()) {
         // This will handle any errors that occur when first loading a script (new worker)
@@ -578,54 +633,72 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
 
 Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path) {
     auto context = isolate->GetCurrentContext();
+    const bool isHttpModule = IsHttpModulePath(path);
+    const std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : path;
 
-    // 1) Prepare URL & source
-    string url = "file://" + path;
-    string content = Runtime::GetRuntime(isolate)->ReadFileText(path);
-    
-    Local<String> sourceText = ArgConverter::ConvertToV8String(isolate, content);
-    ScriptCompiler::CachedData* cacheData = nullptr; // TODO: Implement cache support for ES modules
-
-    Local<String> urlString;
-    if (!String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
-        throw NativeScriptException(string("Failed to create URL string for ES module ") + path);
-    }
-
-    ScriptOrigin origin(urlString, 0, 0, false, -1, Local<Value>(), false, false,
-                        true  // ← is_module
-    );
-    ScriptCompiler::Source source(sourceText, origin, cacheData);
-
-    // 2) Compile with its own TryCatch
     Local<Module> module;
-    {
-        TryCatch tcCompile(isolate);
-        MaybeLocal<Module> maybeMod = ScriptCompiler::CompileModule(
-            isolate, &source,
-            cacheData ? ScriptCompiler::kConsumeCodeCache : ScriptCompiler::kNoCompileOptions);
+    ScriptCompiler::CachedData* cacheData = nullptr;
 
+    if (isHttpModule) {
+        RunAsyncHttpModuleGraphLoadPumped(isolate, context, requestPath, 60.0);
+        MaybeLocal<Module> maybeMod = LoadHttpModuleForUrl(isolate, context, requestPath);
         if (!maybeMod.ToLocal(&module)) {
-            if (tcCompile.HasCaught()) {
-                throw NativeScriptException(tcCompile, "Cannot compile ES module " + path);
-            } else {
-                throw NativeScriptException(string("Cannot compile ES module ") + path);
+            std::string reason = TakeLastHttpFetchErrorReason();
+            std::string message = "Cannot load ES module " + requestPath;
+            if (!reason.empty()) {
+                message.append(" — ");
+                message.append(reason);
+            }
+            throw NativeScriptException(message);
+        }
+        if (module->GetStatus() == Module::kEvaluated) {
+            UpdateModuleFallback(isolate, CanonicalizeHttpUrlKey(requestPath), module);
+            return module->GetModuleNamespace();
+        }
+    } else {
+        // 1) Prepare URL & source
+        string url = "file://" + path;
+        string content = Runtime::GetRuntime(isolate)->ReadFileText(path);
+
+        Local<String> sourceText = ArgConverter::ConvertToV8String(isolate, content);
+
+        Local<String> urlString;
+        if (!String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
+            throw NativeScriptException(string("Failed to create URL string for ES module ") + path);
+        }
+
+        ScriptOrigin origin(urlString, 0, 0, false, -1, Local<Value>(), false, false,
+                            true  // ← is_module
+        );
+        ScriptCompiler::Source source(sourceText, origin, cacheData);
+
+        // 2) Compile with its own TryCatch
+        {
+            TryCatch tcCompile(isolate);
+            MaybeLocal<Module> maybeMod = ScriptCompiler::CompileModule(
+                isolate, &source,
+                cacheData ? ScriptCompiler::kConsumeCodeCache : ScriptCompiler::kNoCompileOptions);
+
+            if (!maybeMod.ToLocal(&module)) {
+                if (tcCompile.HasCaught()) {
+                    throw NativeScriptException(tcCompile, "Cannot compile ES module " + path);
+                } else {
+                    throw NativeScriptException(string("Cannot compile ES module ") + path);
+                }
             }
         }
-    }
 
-    // 3) Register for resolution callback
-    // Safe Global handle management: Clear any existing entry first
-    auto it = g_moduleRegistry.find(path);
-    if (it != g_moduleRegistry.end()) {
-        // Clear the existing Global handle before replacing it
-        it->second.Reset();
+        // 3) Register for resolution callback
+        auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+        auto it = g_moduleRegistry.find(path);
+        if (it != g_moduleRegistry.end()) {
+            it->second.Reset();
+        }
+        g_moduleRegistry[path].Reset(isolate, module);
     }
-
-    // Now safely set the new module handle
-    g_moduleRegistry[path].Reset(isolate, module);
 
     // 4) Instantiate (link) with ResolveModuleCallback
-    {
+    if (module->GetStatus() < Module::kInstantiated) {
         TryCatch tcLink(isolate);
         bool linked = module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false);
 
@@ -653,12 +726,9 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         // Handle the case where evaluation returns a Promise (for top-level await)
         if (result->IsPromise()) {
             Local<Promise> promise = result.As<Promise>();
-            
-            // Process microtasks to allow Promise resolution
-            int maxAttempts = 100;
-            int attempts = 0;
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
 
-            while (attempts < maxAttempts) {
+            while (true) {
                 isolate->PerformMicrotaskCheckpoint();
                 Promise::PromiseState state = promise->State();
 
@@ -666,13 +736,17 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                     if (state == Promise::kRejected) {
                         Local<Value> reason = promise->Result();
                         isolate->ThrowException(reason);
-                        throw NativeScriptException(string("Module evaluation promise rejected: ") + path);
+                        throw NativeScriptException(PromiseRejectionMessage(isolate, promise, path));
                     }
                     break;
                 }
 
-                attempts++;
-                usleep(100);  // 0.1ms delay
+                if (std::chrono::steady_clock::now() >= deadline) {
+                    throw NativeScriptException(string("Module evaluation promise timed out: ") + path);
+                }
+
+                ALooper_pollOnce(10, nullptr, nullptr, nullptr);
+                usleep(100);
             }
         }
     }
