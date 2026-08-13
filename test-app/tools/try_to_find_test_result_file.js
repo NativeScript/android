@@ -131,6 +131,14 @@ async function checkForErrorActivity() {
   }
 }
 
+function isCompleteJunitXml(text) {
+  if (!text || typeof text !== "string") {
+    return false;
+  }
+  const trimmed = text.trim();
+  return /<testsuites[\s>]/.test(trimmed) && trimmed.includes("</testsuites>");
+}
+
 async function tryPullResultsFile() {
   const { error } = await execAndStream(`${adbPrefix} pull ${resultsPath}`);
 
@@ -138,7 +146,7 @@ async function tryPullResultsFile() {
     const fs = require("fs");
     try {
       const text = fs.readFileSync("android_unit_test_results.xml", "utf8");
-      if (text.trimStart().startsWith("<?xml")) {
+      if (isCompleteJunitXml(text)) {
         console.log("Tests results file found!");
         process.exit(0);
       }
@@ -153,7 +161,7 @@ async function tryPullResultsFile() {
   const { error: runAsError, stdout } = await execAndStream(
     `${adbPrefix} exec-out run-as ${appId} cat android_unit_test_results.xml`
   );
-  if (!runAsError && stdout && stdout.trimStart().startsWith("<?xml")) {
+  if (!runAsError && isCompleteJunitXml(stdout)) {
     const fs = require("fs");
     fs.writeFileSync(localPath, stdout);
     console.log("Tests results file found via run-as!");

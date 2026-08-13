@@ -8,6 +8,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstring>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -20,6 +21,7 @@
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include "robin_hood.h"
+#include "v8-json.h"
 
 namespace tns {
 
@@ -232,25 +234,33 @@ struct CanonicalizationConfig {
     std::vector<std::string> devPathPrefixes;
     std::vector<std::string> preserveQueryPrefixes;
 };
-static CanonicalizationConfig g_canonConfig;
-static bool g_canonConfigured = false;
+static std::mutex g_canonConfigMutex;
+static std::shared_ptr<const CanonicalizationConfig> g_canonConfig;
+
+static std::shared_ptr<const CanonicalizationConfig> CurrentCanonicalizationConfig() {
+    std::lock_guard<std::mutex> lock(g_canonConfigMutex);
+    return g_canonConfig;
+}
 
 static void SetCanonicalizationConfig(CanonicalizationConfig config) {
-    g_canonConfig = std::move(config);
-    g_canonConfigured = true;
+    auto snapshot = std::make_shared<const CanonicalizationConfig>(std::move(config));
+    {
+        std::lock_guard<std::mutex> lock(g_canonConfigMutex);
+        g_canonConfig = snapshot;
+    }
     if (IsScriptLoadingLogEnabled()) {
         DEBUG_WRITE_FORCE(
                 "[ns:module configureLoader] canonicalization set (strip=%lu devPrefixes=%lu "
                 "preserve=%lu)",
-                (unsigned long)g_canonConfig.stripParams.size(),
-                (unsigned long)g_canonConfig.devPathPrefixes.size(),
-                (unsigned long)g_canonConfig.preserveQueryPrefixes.size());
+                (unsigned long)snapshot->stripParams.size(),
+                (unsigned long)snapshot->devPathPrefixes.size(),
+                (unsigned long)snapshot->preserveQueryPrefixes.size());
     }
 }
 
 static void ResetCanonicalizationConfig() {
-    g_canonConfig = CanonicalizationConfig{};
-    g_canonConfigured = false;
+    std::lock_guard<std::mutex> lock(g_canonConfigMutex);
+    g_canonConfig.reset();
 }
 
 std::string CanonicalizeHttpUrlKey(const std::string& url) {
@@ -278,16 +288,17 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
     std::string originAndPath = (qPos == std::string::npos) ? noHash : noHash.substr(0, qPos);
     std::string query = (qPos == std::string::npos) ? std::string() : noHash.substr(qPos + 1);
 
+    auto canon = CurrentCanonicalizationConfig();
     {
         std::string pathOnly = originAndPath.substr(pathStart);
-        if (g_canonConfigured) {
-            for (const auto& p : g_canonConfig.preserveQueryPrefixes) {
+        if (canon) {
+            for (const auto& p : canon->preserveQueryPrefixes) {
                 if (!p.empty() && pathOnly.find(p) != std::string::npos) {
                     return noHash;
                 }
             }
             bool isDevEndpoint = false;
-            for (const auto& p : g_canonConfig.devPathPrefixes) {
+            for (const auto& p : canon->devPathPrefixes) {
                 if (!p.empty() && StartsWith(pathOnly, p.c_str())) {
                     isDevEndpoint = true;
                     break;
@@ -322,9 +333,9 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
             size_t eq = pair.find('=');
             std::string name = (eq == std::string::npos) ? pair : pair.substr(0, eq);
             bool drop;
-            if (g_canonConfigured) {
-                drop = std::find(g_canonConfig.stripParams.begin(), g_canonConfig.stripParams.end(),
-                                 name) != g_canonConfig.stripParams.end();
+            if (canon) {
+                drop = std::find(canon->stripParams.begin(), canon->stripParams.end(),
+                                 name) != canon->stripParams.end();
             } else {
                 drop = (name == "import" || name == "t" || name == "v");
             }
@@ -698,14 +709,29 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
         jobject baos = env.NewObject(clsBAOS, baosCtor);
 
         jbyteArray buffer = env.NewByteArray(8192);
+        bool readFailed = false;
         while (true) {
             jint n = env.CallIntMethod(inStream, readMethod, buffer);
+            std::string excClass, excMsg;
+            if (DrainPendingJniException(env, excClass, excMsg)) {
+                RecordLastHttpFetchError("read-body", excClass, excMsg);
+                if (IsScriptLoadingLogEnabled()) {
+                    DEBUG_WRITE_FORCE(
+                            "[http-esm][fetch][exception] stage=read-body url=%s class=%s msg=%s",
+                            url.c_str(), excClass.c_str(), excMsg.c_str());
+                }
+                readFailed = true;
+                break;
+            }
             if (n < 0) break;
             if (n == 0) continue;
             env.CallVoidMethod(baos, baosWrite, buffer, 0, n);
         }
 
         env.CallVoidMethod(inStream, closeIS);
+        if (readFailed) {
+            return false;
+        }
         jbyteArray bytes = static_cast<jbyteArray>(env.CallObjectMethod(baos, baosToByteArray));
         env.CallVoidMethod(baos, baosClose);
 
@@ -773,6 +799,26 @@ void FetchModuleBodyAsync(const std::string& url,
     }
 
     std::thread([url, completion = std::move(completion)]() mutable {
+        JavaVM* jvm = Runtime::GetJVM();
+        bool attachedHere = false;
+        if (jvm != nullptr) {
+            JNIEnv* raw = nullptr;
+            if (jvm->GetEnv(reinterpret_cast<void**>(&raw), JNI_VERSION_1_6) != JNI_OK) {
+                if (jvm->AttachCurrentThread(&raw, nullptr) == JNI_OK) {
+                    attachedHere = true;
+                }
+            }
+        }
+        struct DetachIfAttached {
+            JavaVM* jvm;
+            bool attached;
+            ~DetachIfAttached() {
+                if (attached && jvm != nullptr) {
+                    jvm->DetachCurrentThread();
+                }
+            }
+        } detachGuard{jvm, attachedHere};
+
         std::string out;
         std::string contentType;
         int status = 0;
@@ -870,19 +916,9 @@ void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
             v8::String::Utf8Value utf8(isolate, importMapVal);
             if (*utf8) jsonStr = *utf8;
         } else if (importMapVal->IsObject()) {
-            v8::Local<v8::Object> jsonObj =
-                    ctx->Global()
-                            ->Get(ctx, ToV8String(isolate, "JSON"))
-                            .ToLocalChecked()
-                            .As<v8::Object>();
-            v8::Local<v8::Function> stringify =
-                    jsonObj->Get(ctx, ToV8String(isolate, "stringify"))
-                            .ToLocalChecked()
-                            .As<v8::Function>();
-            v8::Local<v8::Value> args[] = {importMapVal};
-            v8::Local<v8::Value> result;
-            if (stringify->Call(ctx, jsonObj, 1, args).ToLocal(&result) && result->IsString()) {
-                v8::String::Utf8Value utf8(isolate, result);
+            v8::Local<v8::String> stringified;
+            if (v8::JSON::Stringify(ctx, importMapVal).ToLocal(&stringified)) {
+                v8::String::Utf8Value utf8(isolate, stringified);
                 if (*utf8) jsonStr = *utf8;
             }
         }

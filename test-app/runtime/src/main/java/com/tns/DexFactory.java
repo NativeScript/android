@@ -194,7 +194,7 @@ public class DexFactory {
     }
 
     public Class<?> findClass(String className) throws ClassNotFoundException {
-        String canonicalName = className.replace('/', '.').replace('$', '_');
+        String canonicalName = className.replace('/', '.');
         if (logger.isEnabled()) {
             logger.write(canonicalName);
         }
@@ -204,7 +204,22 @@ public class DexFactory {
             return existingClass;
         }
 
-        return classLoader.loadClass(canonicalName);
+        String underscored = canonicalName.replace('$', '_');
+        if (!underscored.equals(canonicalName)) {
+            existingClass = this.injectedDexClasses.get(underscored);
+            if (existingClass != null) {
+                return existingClass;
+            }
+        }
+
+        try {
+            return classLoader.loadClass(canonicalName);
+        } catch (ClassNotFoundException e) {
+            if (!underscored.equals(canonicalName)) {
+                return classLoader.loadClass(underscored);
+            }
+            throw e;
+        }
     }
 
     public static String strJoin(String[] array, String separator) {

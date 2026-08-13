@@ -171,6 +171,8 @@ private:
     std::atomic_bool isTerminating_;
     std::atomic_bool isDisposed_;
     std::atomic_bool drainRetryPending_;
+    int drainRetryAttempts_ = 0;
+    static constexpr int kMaxDrainRetryAttempts = 40;
 
     ConcurrentQueue queue_;
 

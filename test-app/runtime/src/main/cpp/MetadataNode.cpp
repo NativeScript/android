@@ -1891,6 +1891,11 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
                     }
                 }
 
+                size_t queryOrFragment = normalized.find_first_of("?#");
+                if (queryOrFragment != string::npos) {
+                    normalized.resize(queryOrFragment);
+                }
+
                 const string& appRoot = Constants::APP_ROOT_FOLDER_PATH;
                 if (!appRoot.empty()) {
                     stripPrefix(normalized, appRoot);
@@ -1908,10 +1913,17 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
 
                 fullPathToFile = normalized;
 
-                std::replace(fullPathToFile.begin(), fullPathToFile.end(), '/', '_');
-                std::replace(fullPathToFile.begin(), fullPathToFile.end(), '.', '_');
-                std::replace(fullPathToFile.begin(), fullPathToFile.end(), '-', '_');
-                std::replace(fullPathToFile.begin(), fullPathToFile.end(), ' ', '_');
+                for (char& ch : fullPathToFile) {
+                    const unsigned char c = static_cast<unsigned char>(ch);
+                    const bool isIdentifierChar =
+                            (c >= 'A' && c <= 'Z') ||
+                            (c >= 'a' && c <= 'z') ||
+                            (c >= '0' && c <= '9') ||
+                            ch == '_';
+                    if (!isIdentifierChar) {
+                        ch = '_';
+                    }
+                }
 
                 std::vector<std::string> pathParts;
                 Util::SplitString(fullPathToFile, "_", pathParts);
