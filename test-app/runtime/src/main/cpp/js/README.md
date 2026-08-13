@@ -46,6 +46,7 @@ module.exports = somethingTheCallSiteNeeds;
   `node:util` shim: one source file per specifier, the shim owning every bit of
   Node compatibility. See `docs/ns-builtin-modules.md` for the cross-runtime
   contract.
+- `ns-module.js` is the `ns:module` loader-control surface.
 - Destructure `binding` and `primordials` once, at the top of the file, so the
   file's dependencies are visible and greppable.
 

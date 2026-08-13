@@ -74,6 +74,7 @@ set(RUNTIME_BUILTIN_JS
         ${RUNTIME_BUILTIN_JS_DIR}/inspect.js
         ${RUNTIME_BUILTIN_JS_DIR}/json-helper.js
         ${RUNTIME_BUILTIN_JS_DIR}/node-util.js
+        ${RUNTIME_BUILTIN_JS_DIR}/ns-module.js
         ${RUNTIME_BUILTIN_JS_DIR}/ns-util.js
         ${RUNTIME_BUILTIN_JS_DIR}/performance.js
         ${RUNTIME_BUILTIN_JS_DIR}/primordials.js

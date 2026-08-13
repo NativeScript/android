@@ -6,6 +6,7 @@
 
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
+#include "HttpLoader.h"
 #include "RuntimeState.h"
 #include "console/Console.h"
 #include "robin_hood.h"
@@ -31,6 +32,7 @@ struct Registration {
  * never carries compatibility code.
  */
 constexpr Registration kRegistry[] = {
+        {"ns:module", BuiltinId::kNsModule},
         {"ns:util", BuiltinId::kNsUtil},
         {"node:util", BuiltinId::kNodeUtil},
 };
@@ -88,6 +90,12 @@ MaybeLocal<Object> BuildBinding(Local<Context> context, BuiltinId builtin) {
     Local<Object> binding = Object::New(isolate);
 
     switch (builtin) {
+        case BuiltinId::kNsModule: {
+            if (!BuildNsModuleBinding(context, binding)) {
+                return MaybeLocal<Object>();
+            }
+            break;
+        }
         case BuiltinId::kNsUtil: {
             // The console formatter is built once per realm; ns:util
             // re-exports that instance instead of creating a second one.
