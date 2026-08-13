@@ -329,6 +329,7 @@ static void PumpPendingHttpModuleGraph(v8::Isolate* isolate) {
     ALooper_pollOnce(10, nullptr, nullptr, nullptr);
     isolate->PerformMicrotaskCheckpoint();
     if (std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() > 60.0) {
+      DEBUG_WRITE("PumpPendingHttpModuleGraph: deadline expired with pending async module work");
       break;
     }
   }

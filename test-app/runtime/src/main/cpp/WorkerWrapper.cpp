@@ -45,6 +45,7 @@ WorkerWrapper::WorkerWrapper(Isolate* parentIsolate, int workerId, std::string w
           isTerminating_(false),
           isDisposed_(false),
           drainRetryPending_(false),
+          drainRetryAttempts_(0),
           javaLooperRef_(nullptr) {}
 
 void WorkerWrapper::Start() {
@@ -164,7 +165,9 @@ void WorkerWrapper::DrainPendingTasks() {
                         .ToLocal(&onMessageValue);
         if (!gotHandler || !onMessageValue->IsFunction()) {
             bool expected = false;
-            if (drainRetryPending_.compare_exchange_strong(expected, true)) {
+            if (drainRetryAttempts_ < kMaxDrainRetryAttempts &&
+                drainRetryPending_.compare_exchange_strong(expected, true)) {
+                ++drainRetryAttempts_;
                 const int workerId = workerId_;
                 std::thread([workerId]() {
                     usleep(50 * 1000);
@@ -174,8 +177,15 @@ void WorkerWrapper::DrainPendingTasks() {
                         wrapper->SignalMessageDrain();
                     }
                 }).detach();
+                return;
             }
-            return;
+            if (drainRetryAttempts_ < kMaxDrainRetryAttempts) {
+                return;
+            }
+            // Retry budget exhausted: fall through so the per-message loop
+            // logs the missing handler and drops the messages.
+        } else {
+            drainRetryAttempts_ = 0;
         }
     }
 

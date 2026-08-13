@@ -55,6 +55,7 @@ static std::string NormalizeHttpModuleUrl(const std::string& path) {
 static std::string PromiseRejectionMessage(Isolate* isolate, Local<Promise> promise,
                                            const std::string& path) {
     std::string errorMessage = "Module evaluation promise rejected: " + path;
+    TryCatch tc(isolate);
     Local<Value> reason = promise->Result();
     if (reason.IsEmpty()) {
         return errorMessage;
@@ -82,6 +83,9 @@ static std::string PromiseRejectionMessage(Isolate* isolate, Local<Promise> prom
                 errorMessage.append(*reasonUtf8);
             }
         }
+    }
+    if (tc.HasCaught()) {
+        tc.Reset();
     }
     return errorMessage;
 }
