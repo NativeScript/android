@@ -44,6 +44,7 @@ WorkerWrapper::WorkerWrapper(Isolate* parentIsolate, int workerId, std::string w
           isClosing_(false),
           isTerminating_(false),
           isDisposed_(false),
+          drainRetryPending_(false),
           javaLooperRef_(nullptr) {}
 
 void WorkerWrapper::Start() {
@@ -145,17 +146,43 @@ void WorkerWrapper::DrainPendingTasks() {
         return;
     }
 
-    auto messages = queue_.PopAll();
-    if (messages.empty()) {
-        return;
-    }
-
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     auto context = runtime_->GetContext();
     Context::Scope context_scope(context);
     auto globalObject = context->Global();
+
+    // WHATWG parity: buffer inbound messages until the entry script has
+    // installed `onmessage`. Async ESM entries (HTTP dev sessions, TLA)
+    // finish evaluating after the wrapper starts draining; silently dropping
+    // messages with no handler would leave the sender waiting forever.
+    if (!isTerminating_ && !isClosing_ && !queue_.IsEmpty()) {
+        Local<Value> onMessageValue;
+        bool gotHandler =
+                globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "onmessage"))
+                        .ToLocal(&onMessageValue);
+        if (!gotHandler || !onMessageValue->IsFunction()) {
+            bool expected = false;
+            if (drainRetryPending_.compare_exchange_strong(expected, true)) {
+                const int workerId = workerId_;
+                std::thread([workerId]() {
+                    usleep(50 * 1000);
+                    auto wrapper = WorkerWrapper::GetById(workerId);
+                    if (wrapper != nullptr) {
+                        wrapper->drainRetryPending_ = false;
+                        wrapper->SignalMessageDrain();
+                    }
+                }).detach();
+            }
+            return;
+        }
+    }
+
+    auto messages = queue_.PopAll();
+    if (messages.empty()) {
+        return;
+    }
 
     for (auto& message : messages) {
         if (isTerminating_ || isClosing_) {
@@ -186,6 +213,10 @@ void WorkerWrapper::DrainPendingTasks() {
             CallbackHandlers::CallWorkerScopeOnErrorHandle(isolate, tc);
         }
     }
+}
+
+void WorkerWrapper::SignalMessageDrain() {
+    queue_.Signal();
 }
 
 void WorkerWrapper::FireMessageOnParentWorkerObject(int workerId,
