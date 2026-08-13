@@ -86,16 +86,6 @@ static std::string PromiseRejectionMessage(Isolate* isolate, Local<Promise> prom
     return errorMessage;
 }
 
-// Helper function to check if a module name looks like an optional external module
-bool ModuleInternal::IsLikelyOptionalModule(const std::string& moduleName) {
-    // Check if it's a bare module name (no path separators) that could be an npm package
-    if (moduleName.find('/') == std::string::npos && moduleName.find('\\') == std::string::npos &&
-        moduleName[0] != '.' && moduleName[0] != '~' && moduleName[0] != '/') {
-        return true;
-    }
-    return false;
-}
-
 // A package-style specifier: neither a path nor a scheme, so it may be claimed
 // by a registry rather than resolved on disk.
 static bool IsBareSpecifier(const std::string& specifier) {

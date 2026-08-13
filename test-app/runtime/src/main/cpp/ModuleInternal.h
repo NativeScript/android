@@ -38,7 +38,6 @@ class ModuleInternal {
         static void CheckFileExists(v8::Isolate* isolate, const std::string& path, const std::string& baseDir);
 
         // Helper functions for ES module support
-        static bool IsLikelyOptionalModule(const std::string& moduleName);
         static bool IsESModule(const std::string& path);
         static v8::Local<v8::Value> LoadESModule(v8::Isolate* isolate, const std::string& path);
 
