@@ -304,6 +304,17 @@ public class Runtime {
         }
         return false;
     }
+
+    public static boolean getHttpFetchUrlLogEnabled() {
+        Runtime runtime = com.tns.Runtime.getCurrentRuntime();
+        if (runtime != null && runtime.config != null && runtime.config.appConfig != null) {
+            return runtime.config.appConfig.getHttpFetchUrlLog();
+        }
+        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
+            return staticConfiguration.appConfig.getHttpFetchUrlLog();
+        }
+        return false;
+    }
     
     // Security config
     
@@ -349,14 +360,47 @@ public class Runtime {
             return true;
         }
         
-        // Check if URL matches any allowlist prefix
+        // Check if URL matches any allowlist prefix at a URL-component boundary
+        // (exact match, entry ends in '/', or next char is '/', '?', or '#').
+        // This refuses lookalike-host and lookalike-port bypasses.
         for (String prefix : allowlist) {
-            if (url != null && prefix != null && url.startsWith(prefix)) {
+            if (url != null && prefix != null && remoteUrlMatchesAllowlistEntry(url, prefix)) {
                 return true;
             }
         }
         
         return false;
+    }
+
+    private static boolean remoteUrlMatchesAllowlistEntry(String url, String entry) {
+        if (entry.isEmpty() || url.length() < entry.length()) {
+            return false;
+        }
+        if (!url.startsWith(entry)) {
+            return false;
+        }
+        if (url.length() == entry.length()) {
+            return true;
+        }
+        if (entry.charAt(entry.length() - 1) == '/') {
+            return true;
+        }
+        char next = url.charAt(entry.length());
+        return next == '/' || next == '?' || next == '#';
+    }
+    
+    /**
+     * Test/JNI helper: boot-time security.allowRemoteModules (debug always true).
+     */
+    public static boolean getSecurityAllowRemoteModules() {
+        return isRemoteModulesAllowed();
+    }
+
+    /**
+     * Test/JNI helper: boot-time security.remoteModuleAllowlist.
+     */
+    public static String[] getSecurityRemoteModuleAllowlist() {
+        return getRemoteModuleAllowlist();
     }
     
     /**

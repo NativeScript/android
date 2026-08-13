@@ -26,7 +26,8 @@ class AppConfig {
         EnableMultithreadedJavascript("enableMultithreadedJavascript", false),
         LogScriptLoading("logScriptLoading", false),
         // Appended last: native code reads this array by ordinal.
-        UncaughtErrorPolicy("uncaughtErrorPolicy", "report");
+        UncaughtErrorPolicy("uncaughtErrorPolicy", "report"),
+        HttpFetchUrlLog("httpFetchUrlLog", false);
 
         private final String name;
         private final Object defaultValue;
@@ -87,6 +88,9 @@ class AppConfig {
                 }
                 if (rootObject.has(KnownKeys.LogScriptLoading.getName())) {
                     values[KnownKeys.LogScriptLoading.ordinal()] = rootObject.getBoolean(KnownKeys.LogScriptLoading.getName());
+                }
+                if (rootObject.has(KnownKeys.HttpFetchUrlLog.getName())) {
+                    values[KnownKeys.HttpFetchUrlLog.ordinal()] = rootObject.getBoolean(KnownKeys.HttpFetchUrlLog.getName());
                 }
                 if (rootObject.has(KnownKeys.DiscardUncaughtJsExceptions.getName())) {
                     boolean discard = rootObject.getBoolean(KnownKeys.DiscardUncaughtJsExceptions.getName());
@@ -226,8 +230,13 @@ class AppConfig {
     }
 
     public boolean getLogScriptLoading() {
-    Object v = values[KnownKeys.LogScriptLoading.ordinal()];
-    return (v instanceof Boolean) ? ((Boolean)v).booleanValue() : false;
+        Object v = values[KnownKeys.LogScriptLoading.ordinal()];
+        return (v instanceof Boolean) ? ((Boolean)v).booleanValue() : false;
+    }
+
+    public boolean getHttpFetchUrlLog() {
+        Object v = values[KnownKeys.HttpFetchUrlLog.ordinal()];
+        return (v instanceof Boolean) ? ((Boolean)v).booleanValue() : false;
     }
 
     // Security conf
