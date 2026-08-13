@@ -35,6 +35,9 @@ def getBuildArguments = { ->
     if (onlyX86) {
         arguments.add("-PonlyX86")
     }
+    if (project.hasProperty("abis")) {
+        arguments.add("-Pabis=${project.property('abis')}")
+    }
     if (useCCache) {
         arguments.add("-PuseCCache")
     }
@@ -68,13 +71,14 @@ task runAdbAsRoot(type: Exec) {
 }
 
 task deletePreviousResultXml(type: Exec) {
+    ignoreExitValue = true
     doFirst {
         println "Removing previous android_unit_test_results.xml"
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "-e", "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
+            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "-e", "shell", "run-as", "com.tns.testapplication", "rm", "-f", "android_unit_test_results.xml"
         } else {
-            commandLine "adb", runOnDeviceOrEmulator, "-e", "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
+            commandLine "adb", runOnDeviceOrEmulator, "-e", "shell", "run-as", "com.tns.testapplication", "rm", "-f", "android_unit_test_results.xml"
         }
     }
 }
