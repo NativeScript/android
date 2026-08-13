@@ -8,7 +8,9 @@ try {
 }
 
 (napiCoverageModuleAvailable ? describe : xdescribe)("Node-API value surface", function () {
-    var napi = require("napicoveragemodule");
+    // Conditional so the disabled suite's declaration body stays throw-free
+    // (jasmine executes it even for xdescribe).
+    var napi = napiCoverageModuleAvailable ? require("napicoveragemodule") : {};
 
     it("is a separate addon from napitestmodule, cached per env", function () {
         expect(napi).not.toBe(require("napitestmodule"));

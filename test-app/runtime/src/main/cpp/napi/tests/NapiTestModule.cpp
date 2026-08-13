@@ -302,6 +302,9 @@ static NapiAsyncWorkContext* CreateAsyncWorkContext(napi_env env, napi_value cal
       napi_create_reference(env, callback, 1, &context->callbackRef) != napi_ok ||
       napi_create_async_work(env, NULL, name, ExecuteAsyncWork, CompleteAsyncWork, context,
                              &context->work) != napi_ok) {
+    if (context->callbackRef != NULL) {
+      napi_delete_reference(env, context->callbackRef);
+    }
     free(context);
     NapiThrowLastError(env);
     return NULL;

@@ -411,7 +411,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
         auto handle = dlopen(modulePath.c_str(), RTLD_LAZY);
         if (handle == nullptr) {
             auto error = dlerror();
-            string errMsg(error);
+            string errMsg(error != nullptr ? error : "dlopen failed for " + modulePath);
             throw NativeScriptException(errMsg);
         }
 

@@ -842,7 +842,18 @@ napi_status NAPI_CDECL napi_add_env_cleanup_hook(node_api_basic_env basic_env,
 
   CleanupRegistry& registry = Cleanups();
   std::lock_guard<std::mutex> lock(registry.mutex);
-  registry.byEnv[env].push_back(CleanupEntry{fun, arg, nullptr});
+  std::vector<CleanupEntry>& entries = registry.byEnv[env];
+  // Node keeps these in a set keyed by (fun, arg): re-registering an existing
+  // pair is a no-op there, and running the hook twice at teardown would hand
+  // an addon written against that contract a double free.
+  auto existing = std::find_if(
+      entries.begin(), entries.end(), [&](const CleanupEntry& candidate) {
+        return candidate.asyncHandle == nullptr && candidate.hook == fun &&
+               candidate.arg == arg;
+      });
+  if (existing == entries.end()) {
+    entries.push_back(CleanupEntry{fun, arg, nullptr});
+  }
 
   return napi_clear_last_error(env);
 }

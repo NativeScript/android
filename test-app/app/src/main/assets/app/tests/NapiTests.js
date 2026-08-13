@@ -8,7 +8,9 @@ try {
 }
 
 (napiTestModuleAvailable ? describe : xdescribe)("Node-API addon", function () {
-    var napi = require("napitestmodule");
+    // Conditional so the disabled suite's declaration body stays throw-free
+    // (jasmine executes it even for xdescribe).
+    var napi = napiTestModuleAvailable ? require("napitestmodule") : {};
 
     it("exports the addon's functions", function () {
         expect(typeof napi).toBe("object");
