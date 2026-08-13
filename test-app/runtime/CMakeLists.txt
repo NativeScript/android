@@ -142,6 +142,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT OPTIMIZED_BUILD AND NOT OPTIMIZED_
 
         src/main/cpp/napi/tests/NapiTestModule.cpp
         src/main/cpp/napi/tests/NapiCoverageModule.cpp
+        src/main/cpp/napi/tests/NapiFastCallsModule.cpp
     )
 else ()
     set(NAPI_TEST_SOURCES)
@@ -231,6 +232,7 @@ add_library(
         # (env lifecycle, module registry, async work, threadsafe functions)
         src/main/cpp/napi/vendor/js_native_api_v8.cc
         src/main/cpp/napi/NapiEnv.cpp
+        src/main/cpp/napi/NapiFastCalls.cpp
         src/main/cpp/napi/NapiRuntime.cpp
         src/main/cpp/napi/NapiThreadSafeFunction.cpp
         src/main/cpp/napi/NodeApiEmbed.cpp

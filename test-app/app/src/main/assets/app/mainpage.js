@@ -90,6 +90,7 @@ require('./tests/testNsUtil');
 // Node-API addon surface
 require('./tests/NapiTests');
 require('./tests/NapiCoverageTests');
+require('./tests/NapiFastCallsTests');
 require("./tests/testConcurrentAccess");
 
 require("./tests/testESModules.mjs");
