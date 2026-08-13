@@ -184,7 +184,23 @@ so the old "be idempotent before bailing out" rule no longer applies.
 
 Leaf, allocation-free, side-effect-free functions with scalar or raw-buffer
 arguments in a hot loop: vector and geometry math, hashing, codecs, byte
-crunching. Deno reports roughly 10× on call overhead for exactly this shape.
+crunching.
+
+Measured on this runtime with a two-`int32` addition — the cheapest possible
+body, so essentially pure call overhead — 2M calls from an optimized caller,
+on an **arm64 emulator** (absolute numbers are inflated by virtualization; the
+ratio is the meaningful part):
+
+| | ns/call |
+| --- | --- |
+| Fast path (99.4% of calls; the rest ran before the caller tiered up) | **24** |
+| Plain Node-API function | **860** |
+
+So roughly **35× on call overhead** for a function that does nothing else,
+which is the ceiling rather than a typical result: the moment the body does
+real work, or the arguments need anything the fast path forbids, the ratio
+collapses toward 1. The slow path's extra forwarding call (see below) is not
+separately measured.
 
 Where it does not pay: anything that needs handles, the env, string
 materialization beyond a one-byte view, or JNI marshalling. Node removed the
