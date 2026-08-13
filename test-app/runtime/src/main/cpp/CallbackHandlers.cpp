@@ -684,6 +684,13 @@ void CallbackHandlers::RunOnMainThreadCallback(const FunctionCallbackInfo<v8::Va
     uint64_t key = ++count_;
     Local<v8::Function> callback = args[0].As<v8::Function>();
 
+    // resolve the loop before inserting: an entry cached with no post to
+    // consume it would pin the callback until isolate teardown
+    auto mainLoop = Runtime::GetMainEventLoop();
+    if (mainLoop == nullptr) {
+        return;
+    }
+
     {
         std::lock_guard<std::mutex> lock(cacheMutex_);
         bool inserted;
@@ -691,10 +698,6 @@ void CallbackHandlers::RunOnMainThreadCallback(const FunctionCallbackInfo<v8::Va
         assert(inserted && "Main thread callback ID should not be duplicated");
     }
 
-    auto mainLoop = Runtime::GetMainEventLoop();
-    if (mainLoop == nullptr) {
-        return;
-    }
     // bare entry: the closure locks the CALLER's isolate (possibly a
     // worker's), so the loop must not take the main isolate's Locker first -
     // nesting the two can deadlock against multithreaded-JS entry paths

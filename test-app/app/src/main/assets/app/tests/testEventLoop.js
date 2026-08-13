@@ -12,7 +12,9 @@ describe("event loop foreground tasks", function () {
             expect(value).toBe("ok");
             done();
         }).catch(e => {
-            done.fail("Atomics.waitAsync promise rejected: " + e);
+            // jasmine 2.0.1: done has no .fail - record the failure, then complete
+            expect("resolved").toBe("rejected: " + e);
+            done();
         });
 
         const woken = Atomics.notify(i32, 0);
@@ -30,7 +32,9 @@ describe("event loop foreground tasks", function () {
             expect(value).toBe("timed-out");
             done();
         }).catch(e => {
-            done.fail("Atomics.waitAsync promise rejected: " + e);
+            // jasmine 2.0.1: done has no .fail - record the failure, then complete
+            expect("resolved").toBe("rejected: " + e);
+            done();
         });
     });
 
@@ -57,7 +61,8 @@ describe("event loop foreground tasks", function () {
             expect(order).toEqual(["waitAsync", "chained"]);
             done();
         }).catch(e => {
-            done.fail("promise chain failed: " + e);
+            expect("resolved").toBe("rejected: " + e);
+            done();
         });
 
         Atomics.notify(i32, 0);
@@ -169,14 +174,25 @@ describe("event loop token cancellation", function () {
     });
 
     it("background-thread clear racing dispatch neither jumps java posts nor ghost-fires", function (done) {
+        // only iterations whose clear provably ran count toward the quota, so
+        // the spec can't pass on 30 runs where the thread never raced at all
         let remaining = 30;
+        let attempts = 0;
         (function iter() {
+            if (++attempts > 300) {
+                expect("background clears raced " + (30 - remaining) + "/30 times")
+                    .toBe("background clears raced 30/30 times");
+                done();
+                return;
+            }
             const order = [];
+            const cleared = new java.util.concurrent.atomic.AtomicBoolean(false);
             const handler = new android.os.Handler(android.os.Looper.myLooper());
             const t1 = __ns__setTimeout(() => order.push("t1"), 0);
             new java.lang.Thread(new java.lang.Runnable({
                 run() {
                     __ns__clearTimeout(t1);
+                    cleared.set(true);
                 }
             })).start();
             handler.post(new java.lang.Runnable({
@@ -188,7 +204,7 @@ describe("event loop token cancellation", function () {
                 // t1 either fired before the clear landed (at its own legal
                 // slot, ahead of "java") or never; t2 must never jump "java"
                 expect(observed === "java>t2" || observed === "t1>java>t2").toBe(true);
-                if (--remaining === 0) {
+                if (cleared.get() && --remaining === 0) {
                     done();
                 } else {
                     iter();

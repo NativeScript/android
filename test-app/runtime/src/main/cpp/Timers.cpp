@@ -94,7 +94,27 @@ void Timers::addTask(std::shared_ptr<TimerTask> task) {
                                    return ref.dueTime > value;
                                });
     sortedTimers_.insert(it, TimerReference{task->id_, task->dueTime_});
-    postTimer(task, now);
+    try {
+        postTimer(task, now);
+    } catch (...) {
+        // No token reached the queue: the slot must not linger, tokenless -
+        // as a live entry it would consume some other token's slot, and as a
+        // tombstone it would starve the item behind it. Erase it outright.
+        auto sit = std::lower_bound(sortedTimers_.begin(), sortedTimers_.end(), task->dueTime_,
+                                    [](const TimerReference &ref, const double &value) {
+                                        return ref.dueTime < value;
+                                    });
+        while (sit != sortedTimers_.end() && sit->dueTime == task->dueTime_) {
+            if (sit->id == task->id_) {
+                sortedTimers_.erase(sit);
+                break;
+            }
+            ++sit;
+        }
+        timerMap_.erase(task->id_);
+        task->Unschedule();
+        throw;
+    }
 }
 
 // Above this remaining delay a timer's token gets an identified peer so a

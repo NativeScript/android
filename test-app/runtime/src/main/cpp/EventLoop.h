@@ -259,6 +259,17 @@ private:
      */
     static jboolean ClaimTokenCritical(jlong loopPtr, jlong cellWord);
 
+    /**
+     * Standard-ABI twin registered on devices below API 26, where ART ignores
+     * @CriticalNative and calls through the normal JNI convention - binding
+     * the critical-convention function there would misread its arguments.
+     */
+    static jboolean ClaimTokenLegacy(JNIEnv* env, jclass clazz, jlong loopPtr, jlong cellWord);
+
+    // false when the claim gate couldn't be registered: PostTimerToken then
+    // never emits cell words, so nativeClaimToken is never invoked
+    static bool claimGateRegistered_;
+
     v8::Isolate* isolate_;
     std::mutex mutex_;
     Lane internal_;

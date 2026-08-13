@@ -1,5 +1,6 @@
 #include "EventLoop.h"
 
+#include <android/api-level.h>
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
@@ -46,6 +47,7 @@ void RunGuarded(F&& body) {
 
 namespace tns {
 
+bool EventLoop::claimGateRegistered_ = false;
 jclass EventLoop::EVENT_LOOP_HANDLER_CLASS = nullptr;
 jmethodID EventLoop::EVENT_LOOP_HANDLER_CTOR = nullptr;
 jmethodID EventLoop::EVENT_LOOP_HANDLER_POST = nullptr;
@@ -106,14 +108,23 @@ void EventLoop::BindToCurrentThread() {
         EVENT_LOOP_HANDLER_CANCEL_IDENTIFIED = env.GetMethodID(
                 EVENT_LOOP_HANDLER_CLASS, "cancelIdentified", "(Ljava/lang/Object;)Z");
         EVENT_LOOP_HANDLER_RELEASE = env.GetMethodID(EVENT_LOOP_HANDLER_CLASS, "release", "()V");
-        // the @CriticalNative gate must be bound explicitly (name resolution
-        // doesn't apply to the critical calling convention on older ART)
-        static const JNINativeMethod claimMethod = {
+        // The @CriticalNative gate must be bound explicitly (name resolution
+        // doesn't apply to the critical calling convention on older ART).
+        // Below API 26 ART ignores the annotation and calls through the
+        // normal JNI ABI, so bind the standard-convention twin there.
+        const bool criticalAbi = android_get_device_api_level() >= 26;
+        const JNINativeMethod claimMethod = {
                 const_cast<char*>("nativeClaimToken"), const_cast<char*>("(JJ)Z"),
-                reinterpret_cast<void*>(EventLoop::ClaimTokenCritical)};
+                criticalAbi ? reinterpret_cast<void*>(EventLoop::ClaimTokenCritical)
+                            : reinterpret_cast<void*>(EventLoop::ClaimTokenLegacy)};
         JNIEnv* rawEnv = env;
-        jint registered = rawEnv->RegisterNatives(EVENT_LOOP_HANDLER_CLASS, &claimMethod, 1);
-        assert(registered == 0);
+        if (rawEnv->RegisterNatives(EVENT_LOOP_HANDLER_CLASS, &claimMethod, 1) == 0) {
+            claimGateRegistered_ = true;
+        } else {
+            rawEnv->ExceptionClear();
+            DEBUG_WRITE_FORCE(
+                    "EventLoop: claim gate registration failed; timer tokens stay plain");
+        }
     }
     JniLocalRef handler(env.NewObject(EVENT_LOOP_HANDLER_CLASS, EVENT_LOOP_HANDLER_CTOR,
                                       reinterpret_cast<jlong>(this)));
@@ -283,16 +294,28 @@ uint64_t EventLoop::PostTimerToken(jlong uptimeMillis, int timerId) {
     }
     uint64_t word = 0;
     auto& cell = claimCells_[((uint32_t) timerId) & (kClaimCells - 1)];
-    uint64_t expected = 0;
-    uint64_t candidate = (((uint64_t) (uint32_t) timerId) << 2) | kCellActive;
-    if (cell.compare_exchange_strong(expected, candidate, std::memory_order_acq_rel)) {
-        word = candidate;
+    if (claimGateRegistered_) {
+        uint64_t expected = 0;
+        uint64_t candidate = (((uint64_t) (uint32_t) timerId) << 2) | kCellActive;
+        if (cell.compare_exchange_strong(expected, candidate, std::memory_order_acq_rel)) {
+            word = candidate;
+        }
+        // a busy slot (previous token of the same interval still in flight,
+        // or an id collision) downgrades this token to plain; clear then uses
+        // tombstones
     }
-    // a busy slot (previous token of the same interval still in flight, or an
-    // id collision) downgrades this token to plain; clear then uses tombstones
     JEnv env;
-    env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_POST_TOKEN, uptimeMillis,
-                       (jint) (word >> 32), (jint) (word & 0xffffffffull));
+    try {
+        env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_POST_TOKEN, uptimeMillis,
+                           (jint) (word >> 32), (jint) (word & 0xffffffffull));
+    } catch (...) {
+        // no token reached the queue, so no dispatch gate will ever retire
+        // the cell - release it here or the slot is burned for the process
+        if (word != 0) {
+            cell.store(0, std::memory_order_release);
+        }
+        throw;
+    }
     return word;
 }
 
@@ -338,6 +361,10 @@ bool EventLoop::CancelIdentifiedToken(jobject peer) {
 void EventLoop::ReleaseIdentifiedToken(jobject peer) {
     JEnv env;
     env.DeleteGlobalRef(peer);
+}
+
+jboolean EventLoop::ClaimTokenLegacy(JNIEnv* env, jclass clazz, jlong loopPtr, jlong cellWord) {
+    return ClaimTokenCritical(loopPtr, cellWord);
 }
 
 jboolean EventLoop::ClaimTokenCritical(jlong loopPtr, jlong cellWord) {
