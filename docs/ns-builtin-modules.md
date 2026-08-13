@@ -52,6 +52,32 @@ Rules:
 versions for readability; it is intended for humans and must not be parsed
 programmatically.
 
+### `ns:runtime` (v1)
+
+Runtime-level configuration. Keys, value domains, and scope are defined and
+validated natively; the module surface is a thin frozen wrapper.
+
+| export | description |
+|---|---|
+| `setConfig(key, value)` | Sets a runtime config key. Throws `TypeError` on an unknown key, an invalid value, or (for process-wide keys) when called from a worker isolate. |
+| `getConfig(key)` | Returns the current value of a config key. Throws `TypeError` on an unknown key. Readable from any isolate. |
+
+Config keys:
+
+| key | values | scope | default |
+|---|---|---|---|
+| `logScriptLoading` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate) | `false`, or the `logScriptLoading` value from nativescript.config / package.json at boot |
+| `httpFetchUrlLog` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate) | `false`, or the `httpFetchUrlLog` value from nativescript.config / package.json at boot |
+
+Remote-module security (`security.allowRemoteModules`,
+`security.remoteModuleAllowlist`) is **not** part of this surface. Those
+values are read once from nativescript.config / package.json the first time
+the HTTP loader gates a fetch, and they cannot be inspected or changed
+through `getConfig` / `setConfig`.
+
+iOS additionally registers `releasedObjectPolicy`; Android does not (it has
+no released-native-counterpart machinery).
+
 ### `ns:module` (v1)
 
 The module-loader control surface consumed by development tooling
@@ -72,7 +98,11 @@ never present-but-throwing — so feature checks work. The module is
 registered in every build; the security boundary for remote module loading
 sits at the network layer (`security.allowRemoteModules` in
 nativescript.config, enforced inside `HttpLoader`), not the module
-registry.
+registry and not `ns:runtime` getConfig/setConfig.
+
+Note: `ns:module` (loader policy, structured, boot-time) is deliberately
+separate from `ns:runtime` (live key-value runtime flags, `setConfig`/
+`getConfig`).
 
 ## `node:` compatibility shims
 

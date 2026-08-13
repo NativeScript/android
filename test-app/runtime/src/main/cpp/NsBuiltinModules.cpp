@@ -8,6 +8,7 @@
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
 #include "HttpLoader.h"
+#include "Runtime.h"
 #include "console/Console.h"
 #include "robin_hood.h"
 
@@ -33,9 +34,88 @@ struct Registration {
  */
 constexpr Registration kRegistry[] = {
         {"ns:module", BuiltinId::kNsModule},
+        {"ns:runtime", BuiltinId::kNsRuntime},
         {"ns:util", BuiltinId::kNsUtil},
         {"node:util", BuiltinId::kNodeUtil},
 };
+
+constexpr const char* kLogScriptLoadingKey = "logScriptLoading";
+constexpr const char* kHttpFetchUrlLogKey = "httpFetchUrlLog";
+
+void ThrowTypeError(Isolate* isolate, const std::string& message) {
+    isolate->ThrowException(Exception::TypeError(ArgConverter::ConvertToV8String(isolate, message)));
+}
+
+bool EnsureMainIsolateWrite(Isolate* isolate, const std::string& key) {
+    Runtime* runtime = Runtime::GetRuntime(isolate);
+    if (runtime == nullptr || !runtime->IsMainThread()) {
+        ThrowTypeError(isolate, "'" + key +
+                                        "' is process-wide and can only be set from the main "
+                                        "isolate");
+        return false;
+    }
+    return true;
+}
+
+bool ParseBooleanValue(Isolate* isolate, const FunctionCallbackInfo<Value>& info,
+                       const std::string& key, bool* out) {
+    if (!info[1]->IsBoolean()) {
+        ThrowTypeError(isolate, "'" + key + "' must be a boolean");
+        return false;
+    }
+    *out = info[1].As<v8::Boolean>()->Value();
+    return true;
+}
+
+void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
+    Isolate* isolate = info.GetIsolate();
+    if (info.Length() < 2 || !info[0]->IsString()) {
+        ThrowTypeError(isolate, "setConfig expects (key: string, value)");
+        return;
+    }
+    std::string key = ArgConverter::ConvertToString(info[0].As<String>());
+    if (key == kLogScriptLoadingKey) {
+        if (!EnsureMainIsolateWrite(isolate, key)) {
+            return;
+        }
+        bool value = false;
+        if (!ParseBooleanValue(isolate, info, key, &value)) {
+            return;
+        }
+        tns::SetScriptLoadingLogEnabled(value);
+        return;
+    }
+    if (key == kHttpFetchUrlLogKey) {
+        if (!EnsureMainIsolateWrite(isolate, key)) {
+            return;
+        }
+        bool value = false;
+        if (!ParseBooleanValue(isolate, info, key, &value)) {
+            return;
+        }
+        tns::SetHttpFetchUrlLogEnabled(value);
+        return;
+    }
+    ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
+}
+
+void GetConfigCallback(const FunctionCallbackInfo<Value>& info) {
+    Isolate* isolate = info.GetIsolate();
+    if (info.Length() < 1 || !info[0]->IsString()) {
+        ThrowTypeError(isolate, "getConfig expects (key: string)");
+        return;
+    }
+    std::string key = ArgConverter::ConvertToString(info[0].As<String>());
+    if (key == kLogScriptLoadingKey) {
+        info.GetReturnValue().Set(v8::Boolean::New(isolate, tns::IsScriptLoadingLogEnabled()));
+        return;
+    }
+    if (key == kHttpFetchUrlLogKey) {
+        info.GetReturnValue().Set(v8::Boolean::New(isolate, tns::IsHttpFetchUrlLogEnabled()));
+        return;
+    }
+    ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
+}
 
 const Registration* Find(const std::string& specifier) {
     for (const Registration& registration : kRegistry) {
@@ -97,6 +177,20 @@ MaybeLocal<Object> BuildBinding(Local<Context> context, BuiltinId builtin) {
     switch (builtin) {
         case BuiltinId::kNsModule: {
             if (!BuildNsModuleBinding(context, binding)) {
+                return MaybeLocal<Object>();
+            }
+            break;
+        }
+        case BuiltinId::kNsRuntime: {
+            Local<v8::Function> setConfig, getConfig;
+            if (!v8::Function::New(context, SetConfigCallback).ToLocal(&setConfig) ||
+                !v8::Function::New(context, GetConfigCallback).ToLocal(&getConfig) ||
+                !binding->Set(context, ArgConverter::ConvertToV8String(isolate, "setConfig"),
+                              setConfig)
+                         .FromMaybe(false) ||
+                !binding->Set(context, ArgConverter::ConvertToV8String(isolate, "getConfig"),
+                              getConfig)
+                         .FromMaybe(false)) {
                 return MaybeLocal<Object>();
             }
             break;
