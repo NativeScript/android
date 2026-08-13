@@ -135,7 +135,28 @@ async function tryPullResultsFile() {
   const { error } = await execAndStream(`${adbPrefix} pull ${resultsPath}`);
 
   if (!error) {
-    console.log("Tests results file found!");
+    const fs = require("fs");
+    try {
+      const text = fs.readFileSync("android_unit_test_results.xml", "utf8");
+      if (text.trimStart().startsWith("<?xml")) {
+        console.log("Tests results file found!");
+        process.exit(0);
+      }
+    } catch (e) {
+      // Missing or unreadable; keep polling.
+    }
+  }
+
+  // Play Store / userdebug-less images reject `adb root` and cannot pull
+  // /data/data directly. Debug apps can still read their own files via run-as.
+  const localPath = "android_unit_test_results.xml";
+  const { error: runAsError, stdout } = await execAndStream(
+    `${adbPrefix} exec-out run-as ${appId} cat android_unit_test_results.xml`
+  );
+  if (!runAsError && stdout && stdout.trimStart().startsWith("<?xml")) {
+    const fs = require("fs");
+    fs.writeFileSync(localPath, stdout);
+    console.log("Tests results file found via run-as!");
     process.exit(0);
   }
 }

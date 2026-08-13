@@ -193,6 +193,9 @@ def getAssembleReleaseBuildArguments = { ->
     if (onlyX86) {
         arguments.add("-PonlyX86")
     }
+    if (project.hasProperty("abis")) {
+        arguments.add("-Pabis=${project.property('abis')}")
+    }
     if (useCCache) {
         arguments.add("-PuseCCache")
     }
@@ -461,6 +464,9 @@ def getRunTestsBuildArguments = { taskName ->
     arguments += ["-b", "runtests.gradle", taskName]
     if (onlyX86) {
         arguments.add("-PonlyX86")
+    }
+    if (project.hasProperty("abis")) {
+        arguments.add("-Pabis=${project.property('abis')}")
     }
     if (useCCache) {
         arguments.add("-PuseCCache")

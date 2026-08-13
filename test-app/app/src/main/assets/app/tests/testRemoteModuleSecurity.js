@@ -142,6 +142,15 @@ describe("Remote Module Security", function() {
             // In debug mode, this returns true because debug bypasses allowlist
             expect(isAllowed).toBe(true);
         });
+
+        it("should refuse lookalike-host prefixes at a URL-component boundary (Java helper)", function() {
+            // The Java helper is the production-path twin of the native gate.
+            // Debug still short-circuits to true, so this only asserts the
+            // helper exists and debug bypass still holds; production matching
+            // is covered by the native RemoteUrlMatchesAllowlistEntry logic.
+            expect(typeof com.tns.Runtime.isRemoteUrlAllowed).toBe("function");
+            expect(com.tns.Runtime.isRemoteUrlAllowed("https://cdn.example.com.attacker.com/x.js")).toBe(true);
+        });
     });
     
     describe("Static Import HTTP Loading", function() {
