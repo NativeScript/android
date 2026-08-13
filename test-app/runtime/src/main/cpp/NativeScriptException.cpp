@@ -6,7 +6,7 @@
 #include "ArgConverter.h"
 #include "ErrorEvents.h"
 #include "Interop.h"
-#include "LooperTasks.h"
+#include "EventLoop.h"
 #include "NativeScriptAssert.h"
 #include "Runtime.h"
 #include "Util.h"
@@ -622,18 +622,18 @@ void PromiseRejectionTracker::ScheduleDrain() {
   }
   drainScheduled_ = true;
 
-  auto looperTasks = runtime_->GetLooperTasks();
-  if (looperTasks == nullptr) {
+  auto eventLoop = runtime_->GetEventLoop();
+  if (eventLoop == nullptr) {
     drainScheduled_ = false;
     return;
   }
 
   // The task runs on the runtime's own looper thread, strictly after the
   // microtask checkpoint of the turn that produced the rejection. It is
-  // dropped (never runs) once the runtime's LooperTasks is terminated, so
+  // dropped (never runs) once the runtime's event loop is shut down, so
   // capturing the raw Runtime pointer is safe.
   Runtime* runtime = runtime_;
-  looperTasks->Post([runtime]() {
+  eventLoop->PostInternal([runtime]() {
     auto isolate = runtime->GetIsolate();
     v8::Locker locker(isolate);
     Isolate::Scope isolateScope(isolate);

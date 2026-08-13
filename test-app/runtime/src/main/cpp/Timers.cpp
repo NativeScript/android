@@ -4,8 +4,7 @@
 #include "NativeScriptException.h"
 #include "ModuleBinding.h"
 #include "IsolateDisposer.h"
-#include "JEnv.h"
-#include "JniLocalRef.h"
+#include "NativeScriptPlatform.h"
 #include "Util.h"
 #include <cmath>
 #include <sstream>
@@ -15,16 +14,18 @@
  * Overall rules when modifying this file:
  * Everything runs on the isolate's thread (or under its v8::Locker): there are
  * no background threads and no locking. `sortedTimers_` must always be sorted
- * by dueTime (stable for equal dueTimes) and in sync with `timerMap_`.
+ * by dueTime (stable for equal dueTimes) and in sync with `timerMap_` (except
+ * tombstones, which only live in `sortedTimers_`).
  *
- * Scheduling model: every scheduled timer enqueues one anonymous "due token"
- * message on a dedicated Java Handler bound to this thread's Looper, at
- * uptimeMillis >= the timer's due time. Timers therefore share one queue with
- * Handler.post/postDelayed and interleave with Java messages in exact
- * MessageQueue order. Because the Java queue is millisecond-quantized, the
- * token does not name a timer: each token fires the front of `sortedTimers_`
- * (the earliest due timer by exact sub-millisecond time). A token whose front
- * timer is not yet due is a leftover from a cleared timer and is dropped.
+ * Scheduling model: every scheduled timer posts one anonymous "due token"
+ * through the runtime EventLoop's ordered lane (a Java Handler bound to this
+ * thread's Looper), at uptimeMillis >= the timer's due time. Timers therefore
+ * share one queue with Handler.post/postDelayed and ordered macrotasks, and
+ * interleave with Java messages in exact MessageQueue order. Because the Java
+ * queue is millisecond-quantized, the token does not name a timer: the
+ * EventLoop drain consumes the earliest due item across this list and its own
+ * ordered entries. Cancelled timers leave a tombstone so their token consumes
+ * a slot as a no-op instead of lending its position to a later item.
  * ALL changes and scheduling of a TimerTask MUST be done when locked in an isolate to ensure consistency
  */
 
@@ -57,11 +58,6 @@ static double now_ms() {
 
 namespace tns {
 
-jclass Timers::TIMER_HANDLER_CLASS = nullptr;
-jmethodID Timers::TIMER_HANDLER_CTOR = nullptr;
-jmethodID Timers::TIMER_HANDLER_POST = nullptr;
-jmethodID Timers::TIMER_HANDLER_RELEASE = nullptr;
-
 void Timers::Init(v8::Isolate *isolate, v8::Local<v8::ObjectTemplate> &globalObjectTemplate) {
     isolate_ = isolate;
     // TODO: remove the __ns__ prefix once this is validated
@@ -70,20 +66,10 @@ void Timers::Init(v8::Isolate *isolate, v8::Local<v8::ObjectTemplate> &globalObj
     SetMethod(isolate, globalObjectTemplate, "__ns__clearTimeout", ClearTimer, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
     SetMethod(isolate, globalObjectTemplate, "__ns__clearInterval", ClearTimer, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
 
-    JEnv env;
-    if (TIMER_HANDLER_CLASS == nullptr) {
-        // JEnv::FindClass caches a global ref to the class
-        TIMER_HANDLER_CLASS = env.FindClass("com/tns/TimerHandler");
-        assert(TIMER_HANDLER_CLASS != nullptr);
-        TIMER_HANDLER_CTOR = env.GetMethodID(TIMER_HANDLER_CLASS, "<init>", "(J)V");
-        TIMER_HANDLER_POST = env.GetMethodID(TIMER_HANDLER_CLASS, "post", "(J)V");
-        TIMER_HANDLER_RELEASE = env.GetMethodID(TIMER_HANDLER_CLASS, "release", "()V");
-    }
-    // the handler binds to the current thread's Looper, which Runtime.java
-    // prepares before initNativeScript on both the main and worker threads
-    JniLocalRef handler(env.NewObject(TIMER_HANDLER_CLASS, TIMER_HANDLER_CTOR,
-                                      reinterpret_cast<jlong>(this)));
-    handler_ = env.NewGlobalRef(handler);
+    // PrepareV8Runtime bound the loop to this thread's looper before any
+    // builtin initialization runs
+    eventLoop_ = NativeScriptPlatform::Instance()->GetEventLoop(isolate);
+    eventLoop_->SetTimerSource(this);
     stopped_ = false;
 }
 
@@ -108,8 +94,36 @@ void Timers::addTask(std::shared_ptr<TimerTask> task) {
                                    return ref.dueTime > value;
                                });
     sortedTimers_.insert(it, TimerReference{task->id_, task->dueTime_});
-    postTimer(task, now);
+    try {
+        postTimer(task, now);
+    } catch (...) {
+        // No token reached the queue: the slot must not linger, tokenless -
+        // as a live entry it would consume some other token's slot, and as a
+        // tombstone it would starve the item behind it. Erase it outright.
+        auto sit = std::lower_bound(sortedTimers_.begin(), sortedTimers_.end(), task->dueTime_,
+                                    [](const TimerReference &ref, const double &value) {
+                                        return ref.dueTime < value;
+                                    });
+        while (sit != sortedTimers_.end() && sit->dueTime == task->dueTime_) {
+            if (sit->id == task->id_) {
+                sortedTimers_.erase(sit);
+                break;
+            }
+            ++sit;
+        }
+        timerMap_.erase(task->id_);
+        task->Unschedule();
+        throw;
+    }
 }
+
+// Above this remaining delay a timer's token gets an identified peer so a
+// clear removes the queued message outright: the stale wakeup is the cost
+// worth paying JNI to avoid (debounce-style long timers on a possibly idle
+// device). Below it the wakeup lands within two frames of the interaction
+// that scheduled it - the app is provably awake - so the timer takes the
+// zero-overhead claim-cell path instead.
+static constexpr double kIdentifiedCutoffMs = 32;
 
 void Timers::postTimer(const std::shared_ptr<TimerTask> &task, double now) {
     // uptimeMillis is the integer part of the same CLOCK_MONOTONIC clock as
@@ -117,8 +131,24 @@ void Timers::postTimer(const std::shared_ptr<TimerTask> &task, double now) {
     // a Handler.postDelayed(0) made in the same millisecond; future timers
     // post at ceil(dueTime) so the token never arrives before the due time.
     auto when = task->dueTime_ <= now ? (jlong) now : (jlong) std::ceil(task->dueTime_);
-    JEnv env;
-    env.CallVoidMethod(handler_, TIMER_HANDLER_POST, when);
+    // an interval re-arm orphans the previous token's carriers: the old token
+    // stays valid anonymously, only the newest one is cancellable
+    releaseTokenCarriers(task);
+    if (task->dueTime_ - now >= kIdentifiedCutoffMs) {
+        task->tokenPeer_ = eventLoop_->PostIdentifiedTimerToken(when);
+        if (task->tokenPeer_ != nullptr) {
+            return;
+        }
+    }
+    task->tokenCell_ = eventLoop_->PostTimerToken(when, task->id_);
+}
+
+void Timers::releaseTokenCarriers(const std::shared_ptr<TimerTask> &task) {
+    if (task->tokenPeer_ != nullptr) {
+        eventLoop_->ReleaseIdentifiedToken(task->tokenPeer_);
+        task->tokenPeer_ = nullptr;
+    }
+    task->tokenCell_ = 0;
 }
 
 void Timers::removeTask(const std::shared_ptr<TimerTask> &task) {
@@ -128,9 +158,24 @@ void Timers::removeTask(const std::shared_ptr<TimerTask> &task) {
 void Timers::removeTask(const int &taskId) {
     auto it = timerMap_.find(taskId);
     if (it != timerMap_.end()) {
-        // if still scheduled, drop the sorted entry; the token already in the
-        // java queue will find a not-yet-due (or no) front timer and no-op
         if (it->second->queued_) {
+            // First try to neutralize the pending token itself. Winning the
+            // claim means the token is guaranteed dead wherever it is, so the
+            // sorted entry can be erased outright - token and slot leave
+            // together and no wakeup work remains. Losing means dispatch
+            // already owns the token (in flight past the claim gate), so
+            // leave a tombstone: the owned token consumes it as a no-op
+            // instead of running whatever item happens to be due next, which
+            // could jump foreign Java messages queued between the two tokens'
+            // positions.
+            bool tokenNeutralized = false;
+            if (it->second->tokenPeer_ != nullptr) {
+                tokenNeutralized = eventLoop_->CancelIdentifiedToken(it->second->tokenPeer_);
+                it->second->tokenPeer_ = nullptr;  // ref released by the cancel
+            } else if (it->second->tokenCell_ != 0) {
+                tokenNeutralized = eventLoop_->CancelClaimCell(it->second->tokenCell_);
+                it->second->tokenCell_ = 0;
+            }
             auto dueTime = it->second->dueTime_;
             auto sit = std::lower_bound(sortedTimers_.begin(), sortedTimers_.end(), dueTime,
                                         [](const TimerReference &ref, const double &value) {
@@ -138,12 +183,17 @@ void Timers::removeTask(const int &taskId) {
                                         });
             while (sit != sortedTimers_.end() && sit->dueTime == dueTime) {
                 if (sit->id == taskId) {
-                    sortedTimers_.erase(sit);
+                    if (tokenNeutralized) {
+                        sortedTimers_.erase(sit);
+                    } else {
+                        sit->cancelled = true;
+                    }
                     break;
                 }
                 ++sit;
             }
         }
+        releaseTokenCarriers(it->second);
         it->second->Unschedule();
         timerMap_.erase(it);
     }
@@ -154,11 +204,15 @@ void Timers::Destroy() {
         return;
     }
     stopped_ = true;
-    if (handler_ != nullptr) {
-        JEnv env;
-        env.CallVoidMethod(handler_, TIMER_HANDLER_RELEASE);
-        env.DeleteGlobalRef(handler_);
-        handler_ = nullptr;
+    if (eventLoop_ != nullptr) {
+        for (auto &pair : timerMap_) {
+            releaseTokenCarriers(pair.second);
+        }
+        // the loop is already shut down by DestroyRuntime at this point (its
+        // handler dropped every pending token), but the source pointer must
+        // not outlive this object
+        eventLoop_->SetTimerSource(nullptr);
+        eventLoop_.reset();
     }
     timerMap_.clear();
     sortedTimers_.clear();
@@ -226,37 +280,51 @@ void Timers::SetTimer(const v8::FunctionCallbackInfo<v8::Value> &args, bool repe
 
         auto task = std::make_shared<TimerTask>(isolate, ctx, handler, timeout, repeatable,
                                                 argArray, id, now_ms());
-        thiz->addTask(task);
+        try {
+            thiz->addTask(task);
+        } catch (NativeScriptException &e) {
+            // a failed JNI token post must surface as a JS exception, not
+            // unwind through the V8 callback frame
+            e.ReThrowToV8();
+            return;
+        }
     }
     args.GetReturnValue().Set(id);
 
 }
 
 /**
- * Invoked by Java TimerHandler.handleMessage on the isolate's thread, once per
- * scheduled "due token". Fires the earliest due timer (exact sub-millisecond
- * order), which is not necessarily the timer that enqueued this token.
+ * Invoked by the EventLoop's ordered-lane token drain on the isolate's
+ * thread. Under one Locker acquisition (sortedTimers_ is mutated through
+ * setTimeout from background threads under multithreaded JS): if the front
+ * slot is due and earlier-or-equal to the loop's own earliest entry, consume
+ * it - firing the earliest due timer (exact sub-millisecond order, not
+ * necessarily the timer that enqueued the token) or swallowing a tombstone
+ * left by clearTimeout/clearInterval.
  */
-void Timers::FireTimer() {
+bool Timers::RunIfEarliest(double now, double otherDue) {
     auto isolate = isolate_;
     if (stopped_ || isolate == nullptr || isolate->IsDead()) {
-        return;
+        return false;
     }
     // thread safety is important!
     v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
     if (sortedTimers_.empty()) {
-        // leftover token of a cleared timer
-        return;
+        return false;
     }
     auto ref = sortedTimers_.front();
-    if (ref.dueTime > now_ms()) {
-        // the earliest timer isn't due yet, so this token is a leftover from a
-        // cleared timer; the front timer's own token will arrive at its due time
-        return;
+    if (ref.dueTime > now_ms() || (otherDue >= 0 && ref.dueTime > otherDue)) {
+        // not due, or the loop's own entry is earlier - not this source's slot
+        return false;
     }
     sortedTimers_.erase(sortedTimers_.begin());
+    if (ref.cancelled) {
+        // tombstone: this slot's token is spent doing nothing, keeping tokens
+        // and slots 1:1 so later items can't jump foreign Java messages
+        return true;
+    }
     auto it = timerMap_.find(ref.id);
     if (it != timerMap_.end()) {
         auto task = it->second;
@@ -305,6 +373,8 @@ void Timers::FireTimer() {
 
 
     }
+    // the slot was consumed (front popped) even if the map had no task
+    return true;
 }
 
 void Timers::InitStatic(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalObjectTemplate) {
@@ -316,20 +386,3 @@ void Timers::InitStatic(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> glob
 };
 
 NODE_BINDING_PER_ISOLATE_INIT_OBJ(timers, tns::Timers::InitStatic);
-
-extern "C" JNIEXPORT void JNICALL Java_com_tns_TimerHandler_nativeFireTimer(
-        JNIEnv *env, jclass clazz, jlong timersPtr) {
-    try {
-        reinterpret_cast<tns::Timers *>(timersPtr)->FireTimer();
-    } catch (tns::NativeScriptException &e) {
-        e.ReThrowToJava();
-    } catch (std::exception &e) {
-        std::stringstream ss;
-        ss << "Error: c++ exception: " << e.what() << std::endl;
-        tns::NativeScriptException nsEx(ss.str());
-        nsEx.ReThrowToJava();
-    } catch (...) {
-        tns::NativeScriptException nsEx(std::string("Error: c++ exception!"));
-        nsEx.ReThrowToJava();
-    }
-}

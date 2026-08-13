@@ -31,6 +31,7 @@
 #include "ModuleInternalCallbacks.h"
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
+#include "NativeScriptPlatform.h"
 #include "Performance.h"
 #include "SimpleAllocator.h"
 #include "SimpleProfiler.h"
@@ -145,7 +146,6 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
       m_runGC(false) {
   m_runtime = env->NewGlobalRef(runtime);
   m_objectManager = new ObjectManager(m_runtime);
-  m_loopTimer = new MessageLoopTimer();
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_id2RuntimeCache.emplace(id, this);
@@ -300,23 +300,16 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
 
 Runtime::~Runtime() {
   delete this->m_objectManager;
-  delete this->m_loopTimer;
+  // idempotent backstop for the matched erase WorkerWrapper does right after
+  // Isolate::Dispose (the match keeps this from evicting a new isolate that
+  // reused the pointer); instance/isolate may be null when construction
+  // failed before PrepareV8Runtime
+  auto* platformInstance = NativeScriptPlatform::Instance();
+  if (platformInstance != nullptr && m_isolate != nullptr && m_eventLoop != nullptr) {
+    platformInstance->IsolateDisposed(m_isolate, m_eventLoop);
+  }
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
   FrameCallbacks::RemoveIsolateEntries(m_isolate);
-  if (m_isMainThread) {
-    if (m_mainLooper_fd[0] != -1) {
-      ALooper_removeFd(m_mainLooper, m_mainLooper_fd[0]);
-    }
-    ALooper_release(m_mainLooper);
-
-    if (m_mainLooper_fd[0] != -1) {
-      close(m_mainLooper_fd[0]);
-    }
-
-    if (m_mainLooper_fd[1] != -1) {
-      close(m_mainLooper_fd[1]);
-    }
-  }
 }
 
 std::string Runtime::ReadFileText(const std::string& filePath) {
@@ -596,7 +589,10 @@ static void InitializeV8() {
   // per isolate. Runtime::Init has already read them out of the Java config.
   V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(),
                          Constants::V8_STARTUP_FLAGS.size());
-  Runtime::platform = v8::platform::NewDefaultPlatform().release();
+  // wrap the default platform so foreground tasks ride each runtime thread's
+  // Java Looper instead of sitting in never-pumped libplatform queues
+  Runtime::platform =
+      new NativeScriptPlatform(v8::platform::NewDefaultPlatform());
   V8::InitializePlatform(Runtime::platform);
   V8::Initialize();
 }
@@ -633,6 +629,12 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_isolate2RuntimesCache[isolate] = this;
   }
+  // attach the runtime's event loop to this thread's looper; v8 foreground
+  // tasks buffered during Isolate::New start flowing from here on. Refresh
+  // rather than Get: a reused isolate pointer may still map to the previous
+  // tenant's stopped loop
+  m_eventLoop = NativeScriptPlatform::Instance()->RefreshEventLoop(isolate);
+  m_eventLoop->BindToCurrentThread();
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
   HandleScope handleScope(isolate);
@@ -680,6 +682,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   globalTemplate->Set(
       ArgConverter::ConvertToV8String(isolate, "__drainMicrotaskQueue"),
       FunctionTemplate::New(isolate, CallbackHandlers::DrainMicrotaskCallback));
+  // TODO: remove the __ns__ prefix once the event loop's ordered lane backs
+  // public macrotask APIs (performance observers etc.)
+  globalTemplate->Set(
+      ArgConverter::ConvertToV8String(isolate, "__ns__queueMacrotask"),
+      FunctionTemplate::New(isolate, CallbackHandlers::QueueMacrotaskCallback));
   globalTemplate->Set(
       ArgConverter::ConvertToV8String(isolate, "__enableVerboseLogging"),
       FunctionTemplate::New(
@@ -737,27 +744,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   if (!s_mainThreadInitialized) {
     m_isMainThread = true;
-    pipe2(m_mainLooper_fd, O_NONBLOCK | O_CLOEXEC);
-    m_mainLooper = ALooper_forThread();
-
-    ALooper_acquire(m_mainLooper);
-
-    // try using 2MB
-    int ret = fcntl(m_mainLooper_fd[1], F_SETPIPE_SZ, 2 * (1024 * 1024));
-
-    // try using 1MB
-    if (ret != 0) {
-      ret = fcntl(m_mainLooper_fd[1], F_SETPIPE_SZ, 1 * (1024 * 1024));
-    }
-
-    // try using 512KB
-    if (ret != 0) {
-      ret = fcntl(m_mainLooper_fd[1], F_SETPIPE_SZ, (512 * 1024));
-    }
-
-    ALooper_addFd(m_mainLooper, m_mainLooper_fd[0], ALOOPER_POLL_CALLBACK,
-                  ALOOPER_EVENT_INPUT,
-                  CallbackHandlers::RunOnMainThreadFdCallback, nullptr);
+    // __runOnMainThread closures from any runtime's thread land on this loop
+    s_mainEventLoop = m_eventLoop;
   }
   /*
    * Emulate a `WorkerGlobalScope`
@@ -806,17 +794,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
                         workerFuncTemplate);
   }
 
-  /*
-   * Per-runtime task queue used by child workers to deliver messages, errors
-   * and cleanup notifications to this runtime's thread. The looper exists for
-   * every runtime: Java prepares it before initNativeScript on both the main
-   * and worker threads.
-   */
-  m_looperTasks = std::make_shared<LooperTasks>();
-  m_looperTasks->Initialize(ALooper_forThread());
-
   // Unhandled-promise-rejection tracker; fed by the SetPromiseRejectCallback
-  // above and drained via a LooperTasks task once per looper turn.
+  // above and drained via an event-loop task once per looper turn.
   m_promiseRejections = std::make_unique<PromiseRejectionTracker>(this);
 
   SimpleProfiler::Init(isolate, globalTemplate);
@@ -910,8 +889,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   m_arrayBufferHelper.CreateConvertFunctions(context, global, m_objectManager);
 
-  m_loopTimer->Init(context);
-
   this->m_context = new Persistent<Context>(isolate, context);
 
   s_mainThreadInitialized = true;
@@ -952,10 +929,10 @@ void Runtime::DestroyRuntime() {
     s_id2RuntimeCache.erase(m_id);
     s_isolate2RuntimesCache.erase(m_isolate);
   }
-  if (m_looperTasks != nullptr) {
+  if (m_eventLoop != nullptr) {
     // runs on this runtime's own thread; children still holding a weak_ptr
-    // will have their posts dropped from now on
-    m_looperTasks->Terminate();
+    // and v8 teardown posts have their work dropped from now on
+    m_eventLoop->Shutdown();
   }
   // The events state holds v8::Global handles (backing event target, dispatch
   // closures and tracked promise rejections) - reset them while the isolate
@@ -975,9 +952,6 @@ Local<Context> Runtime::GetContext() {
 
 int Runtime::GetId() { return this->m_id; }
 
-int Runtime::GetWriter() { return m_mainLooper_fd[1]; }
-
-int Runtime::GetReader() { return m_mainLooper_fd[0]; }
 
 JavaVM* Runtime::s_jvm = nullptr;
 jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
@@ -987,5 +961,4 @@ std::mutex Runtime::s_runtimeCacheMutex;
 bool Runtime::s_mainThreadInitialized = false;
 v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
-ALooper* Runtime::m_mainLooper = nullptr;
-int Runtime::m_mainLooper_fd[2];
+std::shared_ptr<EventLoop> Runtime::s_mainEventLoop;

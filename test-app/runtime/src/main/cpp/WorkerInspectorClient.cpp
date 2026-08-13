@@ -11,6 +11,7 @@
 #include <src/inspector/v8-stack-trace-impl.h>
 
 #include "JsV8InspectorClient.h"
+#include "NativeScriptPlatform.h"
 #include "Runtime.h"
 
 using namespace v8;
@@ -218,8 +219,11 @@ void WorkerInspectorClient::runMessageLoopOnPause(int contextGroupId) {
             this->DispatchOne(message);
         }
 
-        while (v8::platform::PumpMessageLoop(Runtime::platform, isolate_)) {
-        }
+        // JS frames are on the stack, so only nestable v8 foreground tasks
+        // may run; everything else fires from its own wakeup after resume
+        tns::NativeScriptPlatform::Instance()
+                ->GetEventLoop(isolate_)
+                ->RunNestableV8Tasks();
 
         if (shouldWait && !pauseTerminated_ && !dying_) {
             std::unique_lock<std::mutex> lock(messageArrivedMutex_);

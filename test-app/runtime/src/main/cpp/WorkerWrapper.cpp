@@ -11,6 +11,7 @@
 #include "JniLocalRef.h"
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
+#include "NativeScriptPlatform.h"
 #include "Runtime.h"
 
 #include <unistd.h>
@@ -29,7 +30,7 @@ WorkerWrapper::WorkerWrapper(Isolate* parentIsolate, int workerId, std::string w
                              Local<Object> workerObject)
         : parentIsolate_(parentIsolate),
           // runs on the parent's thread, where the parent runtime is alive
-          parentTasks_(Runtime::GetRuntime(parentIsolate)->GetLooperTasks()),
+          parentTasks_(Runtime::GetRuntime(parentIsolate)->GetEventLoop()),
           workerIsolate_(nullptr),
           runtime_(nullptr),
           workerId_(workerId),
@@ -70,7 +71,7 @@ void WorkerWrapper::PostMessageToParent(std::shared_ptr<worker::Message> message
     }
 
     int workerId = workerId_;
-    parentTasks->Post([workerId, message]() {
+    parentTasks->PostInternal([workerId, message]() {
         WorkerWrapper::FireMessageOnParentWorkerObject(workerId, message);
     });
 }
@@ -248,7 +249,7 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToParent(const std::string& m
     std::string threadName = threadName_;
     Isolate* parentIsolate = parentIsolate_;
 
-    parentTasks->Post([workerId, message, filename, stackTrace, lineno, threadName,
+    parentTasks->PostInternal([workerId, message, filename, stackTrace, lineno, threadName,
                        parentIsolate]() {
         v8::Locker locker(parentIsolate);
         Isolate::Scope isolate_scope(parentIsolate);
@@ -464,6 +465,12 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
             runtime_->DestroyRuntime();
         }
         isolate->Dispose();
+        // Dispose freed the isolate's memory, so its address can be reused by
+        // a concurrent Isolate::New - drop the platform's loop entry now, not
+        // in ~Runtime (which still runs JNI calls first). The matched erase
+        // means the late ~Runtime backstop can't evict a new tenant.
+        NativeScriptPlatform::Instance()->IsolateDisposed(isolate,
+                                                          runtime_->GetEventLoop());
 
         // The Runtime destructor still makes JNI calls - it must run before
         // DetachCurrentThread below.
@@ -486,7 +493,7 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
     // own shutdown already cleared them).
     if (auto parentTasks = parentTasks_.lock()) {
         int workerId = workerId_;
-        parentTasks->Post([workerId]() {
+        parentTasks->PostInternal([workerId]() {
             WorkerWrapper::ClearWorkerOnParent(workerId);
         });
     }

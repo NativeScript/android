@@ -1,0 +1,636 @@
+#include "EventLoop.h"
+
+#include <android/api-level.h>
+#include <sys/eventfd.h>
+#include <sys/timerfd.h>
+#include <unistd.h>
+
+#include <algorithm>
+#include <cassert>
+#include <cerrno>
+#include <cmath>
+#include <cstring>
+#include <ctime>
+
+#include "JEnv.h"
+#include "JniLocalRef.h"
+#include "NativeScriptAssert.h"
+#include "NativeScriptException.h"
+
+using namespace v8;
+
+namespace {
+
+// same clock as android.os.SystemClock.uptimeMillis() and the timerfd below
+double now_ms() {
+    struct timespec res;
+    clock_gettime(CLOCK_MONOTONIC, &res);
+    return 1000.0 * res.tv_sec + (double) res.tv_nsec / 1e6;
+}
+
+// runs one unit of work without letting a C++ exception escape into an
+// ALooper callback frame
+template <typename F>
+void RunGuarded(F&& body) {
+    try {
+        body();
+    } catch (tns::NativeScriptException& ex) {
+        ex.ReThrowToJava();
+    } catch (std::exception& ex) {
+        DEBUG_WRITE_FORCE("Error: c++ exception in event loop task: %s", ex.what());
+    } catch (...) {
+        DEBUG_WRITE_FORCE("Error: unknown c++ exception in event loop task!");
+    }
+}
+
+}  // namespace
+
+namespace tns {
+
+bool EventLoop::claimGateRegistered_ = false;
+jclass EventLoop::EVENT_LOOP_HANDLER_CLASS = nullptr;
+jmethodID EventLoop::EVENT_LOOP_HANDLER_CTOR = nullptr;
+jmethodID EventLoop::EVENT_LOOP_HANDLER_POST = nullptr;
+jmethodID EventLoop::EVENT_LOOP_HANDLER_POST_TOKEN = nullptr;
+jmethodID EventLoop::EVENT_LOOP_HANDLER_POST_IDENTIFIED = nullptr;
+jmethodID EventLoop::EVENT_LOOP_HANDLER_CANCEL_IDENTIFIED = nullptr;
+jmethodID EventLoop::EVENT_LOOP_HANDLER_RELEASE = nullptr;
+
+void EventLoop::BindToCurrentThread() {
+    JEnv env;
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (looper_ != nullptr || stopped_) {
+        return;
+    }
+
+    auto looper = ALooper_forThread();
+    if (looper == nullptr) {
+        DEBUG_WRITE_FORCE("EventLoop: no ALooper on the binding thread");
+        return;
+    }
+
+    int eventFd = eventfd(0, EFD_SEMAPHORE | EFD_NONBLOCK | EFD_CLOEXEC);
+    if (eventFd == -1) {
+        DEBUG_WRITE_FORCE("EventLoop: eventfd failed: %s", strerror(errno));
+        return;
+    }
+    int timerFd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
+    if (timerFd == -1) {
+        DEBUG_WRITE_FORCE("EventLoop: timerfd failed: %s", strerror(errno));
+        close(eventFd);
+        return;
+    }
+    if (ALooper_addFd(looper, eventFd, ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT,
+                      EventLoop::EventFdCallback, this) != 1 ||
+        ALooper_addFd(looper, timerFd, ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT,
+                      EventLoop::TimerFdCallback, this) != 1) {
+        DEBUG_WRITE_FORCE("EventLoop: ALooper_addFd failed");
+        ALooper_removeFd(looper, eventFd);
+        close(eventFd);
+        close(timerFd);
+        return;
+    }
+    looper_ = looper;
+    ALooper_acquire(looper_);
+    eventFd_ = eventFd;
+    timerFd_ = timerFd;
+
+    if (EVENT_LOOP_HANDLER_CLASS == nullptr) {
+        // JEnv::FindClass caches a global ref to the class
+        EVENT_LOOP_HANDLER_CLASS = env.FindClass("com/tns/EventLoopHandler");
+        assert(EVENT_LOOP_HANDLER_CLASS != nullptr);
+        EVENT_LOOP_HANDLER_CTOR = env.GetMethodID(EVENT_LOOP_HANDLER_CLASS, "<init>", "(J)V");
+        EVENT_LOOP_HANDLER_POST = env.GetMethodID(EVENT_LOOP_HANDLER_CLASS, "post", "(J)V");
+        EVENT_LOOP_HANDLER_POST_TOKEN =
+                env.GetMethodID(EVENT_LOOP_HANDLER_CLASS, "postToken", "(JII)V");
+        EVENT_LOOP_HANDLER_POST_IDENTIFIED = env.GetMethodID(
+                EVENT_LOOP_HANDLER_CLASS, "postIdentified", "(J)Ljava/lang/Object;");
+        EVENT_LOOP_HANDLER_CANCEL_IDENTIFIED = env.GetMethodID(
+                EVENT_LOOP_HANDLER_CLASS, "cancelIdentified", "(Ljava/lang/Object;)Z");
+        EVENT_LOOP_HANDLER_RELEASE = env.GetMethodID(EVENT_LOOP_HANDLER_CLASS, "release", "()V");
+        // The @CriticalNative gate must be bound explicitly (name resolution
+        // doesn't apply to the critical calling convention on older ART).
+        // Below API 26 ART ignores the annotation and calls through the
+        // normal JNI ABI, so bind the standard-convention twin there.
+        const bool criticalAbi = android_get_device_api_level() >= 26;
+        const JNINativeMethod claimMethod = {
+                const_cast<char*>("nativeClaimToken"), const_cast<char*>("(JJ)Z"),
+                criticalAbi ? reinterpret_cast<void*>(EventLoop::ClaimTokenCritical)
+                            : reinterpret_cast<void*>(EventLoop::ClaimTokenLegacy)};
+        JNIEnv* rawEnv = env;
+        if (rawEnv->RegisterNatives(EVENT_LOOP_HANDLER_CLASS, &claimMethod, 1) == 0) {
+            claimGateRegistered_ = true;
+        } else {
+            rawEnv->ExceptionClear();
+            DEBUG_WRITE_FORCE(
+                    "EventLoop: claim gate registration failed; timer tokens stay plain");
+        }
+    }
+    JniLocalRef handler(env.NewObject(EVENT_LOOP_HANDLER_CLASS, EVENT_LOOP_HANDLER_CTOR,
+                                      reinterpret_cast<jlong>(this)));
+    assert(!handler.IsNull());
+    handler_ = env.NewGlobalRef(handler);
+
+    // flush work buffered before the home thread was known
+    auto now = now_ms();
+    for (size_t i = 0; i < internal_.immediate.size(); i++) {
+        uint64_t value = 1;
+        write(eventFd_, &value, sizeof(value));
+    }
+    ArmTimerLocked(now);
+    for (auto& entry : ordered_.immediate) {
+        env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_POST, (jlong) entry.time);
+    }
+    for (auto& pair : ordered_.delayed) {
+        env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_POST, (jlong) std::ceil(pair.first));
+    }
+    for (auto when : pendingTokens_) {
+        env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_POST, when);
+    }
+    pendingTokens_.clear();
+}
+
+void EventLoop::Shutdown() {
+    // must run on the home thread: removing an fd concurrently with an
+    // in-flight ALooper callback dispatch is racy
+    JEnv env;
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) {
+        return;
+    }
+    stopped_ = true;
+    internal_.immediate.clear();
+    internal_.delayed.clear();
+    ordered_.immediate.clear();
+    ordered_.delayed.clear();
+    if (eventFd_ != -1) {
+        ALooper_removeFd(looper_, eventFd_);
+        close(eventFd_);
+        eventFd_ = -1;
+    }
+    if (timerFd_ != -1) {
+        ALooper_removeFd(looper_, timerFd_);
+        close(timerFd_);
+        timerFd_ = -1;
+    }
+    if (looper_ != nullptr) {
+        ALooper_release(looper_);
+        looper_ = nullptr;
+    }
+    if (handler_ != nullptr) {
+        // the global ref stays alive until the destructor, but the released
+        // handler ignores any token already in (or racing into) its queue
+        env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_RELEASE);
+    }
+}
+
+EventLoop::~EventLoop() {
+    // Normally a no-op: DestroyRuntime already shut the loop down and this
+    // runs on the home thread via ~Runtime. In the pathological case where a
+    // transient shared_ptr taken on a v8 pool thread is the last reference,
+    // the JEnv below permanently attaches that thread to ART (which aborts if
+    // it later exits attached) - accepted, since those pool threads live for
+    // the process lifetime.
+    Shutdown();
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (handler_ != nullptr) {
+        JEnv env;
+        env.DeleteGlobalRef(handler_);
+        handler_ = nullptr;
+    }
+}
+
+void EventLoop::PostInternalLocked(Entry entry, double delayMs) {
+    auto now = now_ms();
+    if (delayMs <= 0) {
+        entry.time = now;
+        internal_.immediate.push_back(std::move(entry));
+        if (eventFd_ != -1) {
+            uint64_t value = 1;
+            write(eventFd_, &value, sizeof(value));
+        }
+    } else {
+        auto due = now + delayMs;
+        entry.time = due;
+        internal_.delayed.emplace(due, std::move(entry));
+        if (timerFd_ != -1) {
+            ArmTimerLocked(now);
+        }
+    }
+}
+
+void EventLoop::PostOrderedLocked(Entry entry, double delayMs) {
+    auto now = now_ms();
+    if (delayMs <= 0) {
+        entry.time = now;
+        ordered_.immediate.push_back(std::move(entry));
+        if (handler_ != nullptr) {
+            // Handler.sendMessageAtTime only enqueues, so the JNI call is
+            // cheap enough to keep under the lock, which in turn keeps posts
+            // from overlapping Shutdown/destruction
+            JEnv env;
+            env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_POST, (jlong) now);
+        }
+    } else {
+        auto due = now + delayMs;
+        entry.time = due;
+        ordered_.delayed.emplace(due, std::move(entry));
+        if (handler_ != nullptr) {
+            // ceil so the token never arrives before the due time
+            JEnv env;
+            env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_POST, (jlong) std::ceil(due));
+        }
+    }
+}
+
+void EventLoop::PostInternal(std::function<void()> fn) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) {
+        return;
+    }
+    PostInternalLocked(Entry{nullptr, std::move(fn), true, false, 0}, 0);
+}
+
+void EventLoop::PostInternalDelayed(std::function<void()> fn, double delayMs) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) {
+        return;
+    }
+    PostInternalLocked(Entry{nullptr, std::move(fn), true, false, 0}, delayMs);
+}
+
+void EventLoop::PostInternalBare(std::function<void()> fn) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) {
+        return;
+    }
+    PostInternalLocked(Entry{nullptr, std::move(fn), true, true, 0}, 0);
+}
+
+void EventLoop::PostOrdered(std::function<void()> fn) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) {
+        return;
+    }
+    PostOrderedLocked(Entry{nullptr, std::move(fn), true, false, 0}, 0);
+}
+
+void EventLoop::PostOrderedDelayed(std::function<void()> fn, double delayMs) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) {
+        return;
+    }
+    PostOrderedLocked(Entry{nullptr, std::move(fn), true, false, 0}, delayMs);
+}
+
+uint64_t EventLoop::PostTimerToken(jlong uptimeMillis, int timerId) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) {
+        return 0;
+    }
+    if (handler_ == nullptr) {
+        pendingTokens_.push_back(uptimeMillis);
+        return 0;
+    }
+    uint64_t word = 0;
+    auto& cell = claimCells_[((uint32_t) timerId) & (kClaimCells - 1)];
+    if (claimGateRegistered_) {
+        uint64_t expected = 0;
+        uint64_t candidate = (((uint64_t) (uint32_t) timerId) << 2) | kCellActive;
+        if (cell.compare_exchange_strong(expected, candidate, std::memory_order_acq_rel)) {
+            word = candidate;
+        }
+        // a busy slot (previous token of the same interval still in flight,
+        // or an id collision) downgrades this token to plain; clear then uses
+        // tombstones
+    }
+    JEnv env;
+    try {
+        env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_POST_TOKEN, uptimeMillis,
+                           (jint) (word >> 32), (jint) (word & 0xffffffffull));
+    } catch (...) {
+        // no token reached the queue, so no dispatch gate will ever retire
+        // the cell - release it here or the slot is burned for the process
+        if (word != 0) {
+            cell.store(0, std::memory_order_release);
+        }
+        throw;
+    }
+    return word;
+}
+
+jobject EventLoop::PostIdentifiedTimerToken(jlong uptimeMillis) {
+    JEnv env;
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) {
+        return nullptr;
+    }
+    if (handler_ == nullptr) {
+        pendingTokens_.push_back(uptimeMillis);
+        return nullptr;
+    }
+    JniLocalRef peer(env.CallObjectMethod(handler_, EVENT_LOOP_HANDLER_POST_IDENTIFIED,
+                                          uptimeMillis));
+    if (peer.IsNull()) {
+        return nullptr;
+    }
+    return env.NewGlobalRef(peer);
+}
+
+bool EventLoop::CancelClaimCell(uint64_t cellWord) {
+    auto& cell = claimCells_[(cellWord >> 2) & (kClaimCells - 1)];
+    uint64_t expected = cellWord;  // id|ACTIVE
+    return cell.compare_exchange_strong(expected, (cellWord & ~3ull) | kCellCancelled,
+                                        std::memory_order_acq_rel);
+}
+
+bool EventLoop::CancelIdentifiedToken(jobject peer) {
+    JEnv env;
+    bool won = false;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!stopped_ && handler_ != nullptr) {
+            won = env.CallBooleanMethod(handler_, EVENT_LOOP_HANDLER_CANCEL_IDENTIFIED, peer) ==
+                  JNI_TRUE;
+        }
+    }
+    env.DeleteGlobalRef(peer);
+    return won;
+}
+
+void EventLoop::ReleaseIdentifiedToken(jobject peer) {
+    JEnv env;
+    env.DeleteGlobalRef(peer);
+}
+
+jboolean EventLoop::ClaimTokenLegacy(JNIEnv* env, jclass clazz, jlong loopPtr, jlong cellWord) {
+    return ClaimTokenCritical(loopPtr, cellWord);
+}
+
+jboolean EventLoop::ClaimTokenCritical(jlong loopPtr, jlong cellWord) {
+    // @CriticalNative: no JNIEnv, thread stays runnable - a single CAS, no
+    // locks, no allocation, no exceptions. The loop pointer is valid for the
+    // same reason nativeRunTask's is: the handler is released before the loop
+    // is destroyed, and released handlers never reach this gate.
+    auto* loop = reinterpret_cast<EventLoop*>(loopPtr);
+    auto word = (uint64_t) cellWord;
+    auto& cell = loop->claimCells_[(word >> 2) & (kClaimCells - 1)];
+    uint64_t expected = word;  // id|ACTIVE
+    if (cell.compare_exchange_strong(expected, 0, std::memory_order_acq_rel)) {
+        // claimed and retired in one step: proceed to the fat path
+        return JNI_TRUE;
+    }
+    if (expected == ((word & ~3ull) | kCellCancelled)) {
+        // the timer was cleared; retire the cell and drop the token here
+        cell.store(0, std::memory_order_release);
+        return JNI_FALSE;
+    }
+    // defensive: a mismatched word can't occur while this token is in flight
+    // (only the gate retires cells), but the fat path is always safe
+    return JNI_TRUE;
+}
+
+void EventLoop::SetTimerSource(OrderedTaskSource* source) {
+    // home thread only, like every consumer of timerSource_
+    timerSource_ = source;
+}
+
+void EventLoop::PostV8Task(std::unique_ptr<Task> task, bool nestable, double delaySeconds) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) {
+        return;
+    }
+    PostInternalLocked(Entry{std::move(task), nullptr, nestable, false, 0},
+                       delaySeconds * 1000.0);
+}
+
+bool EventLoop::IsStopped() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return stopped_;
+}
+
+std::unique_ptr<EventLoop::Entry> EventLoop::TakeDueLocked(Lane& lane, bool nestableOnly,
+                                                           bool v8Only,
+                                                           bool requireSignaledDelayed,
+                                                           double now) {
+    auto matches = [&](const Entry& e) {
+        return (!nestableOnly || e.nestable) && (!v8Only || e.task != nullptr);
+    };
+    auto imIt = lane.immediate.begin();
+    while (imIt != lane.immediate.end() && !matches(*imIt)) {
+        ++imIt;
+    }
+    auto delIt = lane.delayed.begin();
+    while (delIt != lane.delayed.end() &&
+           (!matches(delIt->second) || (requireSignaledDelayed && !delIt->second.signaled))) {
+        ++delIt;
+    }
+    bool hasImmediate = imIt != lane.immediate.end();
+    bool hasDelayed = delIt != lane.delayed.end() && delIt->first <= now;
+    if (hasImmediate && (!hasDelayed || imIt->time <= delIt->first)) {
+        auto entry = std::make_unique<Entry>(std::move(*imIt));
+        lane.immediate.erase(imIt);
+        return entry;
+    }
+    if (hasDelayed) {
+        auto entry = std::make_unique<Entry>(std::move(delIt->second));
+        lane.delayed.erase(delIt);
+        return entry;
+    }
+    return nullptr;
+}
+
+double EventLoop::PeekDueLocked(Lane& lane, double now) {
+    // immediate entries are enqueued with monotonically increasing times, so
+    // the front is the earliest
+    double due = lane.immediate.empty() ? -1 : lane.immediate.front().time;
+    if (!lane.delayed.empty() && lane.delayed.begin()->first <= now &&
+        (due < 0 || lane.delayed.begin()->first < due)) {
+        due = lane.delayed.begin()->first;
+    }
+    return due;
+}
+
+void EventLoop::ArmTimerLocked(double now) {
+    if (timerFd_ == -1) {
+        return;
+    }
+    // earliest delayed entry that hasn't had its eventfd unit issued yet;
+    // signaled entries are just waiting to be consumed
+    double due = -1;
+    for (auto& pair : internal_.delayed) {
+        if (!pair.second.signaled) {
+            due = pair.first;
+            break;
+        }
+    }
+    struct itimerspec spec = {};
+    if (due >= 0) {
+        // a due time already in the past fires immediately, except an exact 0
+        // would disarm - clamp to 1ns
+        due = std::max(due, now - 1);
+        spec.it_value.tv_sec = (time_t) (due / 1000.0);
+        spec.it_value.tv_nsec = std::max(1L, (long) (std::fmod(due, 1000.0) * 1e6));
+    }
+    timerfd_settime(timerFd_, TFD_TIMER_ABSTIME, &spec, nullptr);
+}
+
+void EventLoop::RunEntry(Entry& entry) {
+    if (entry.bare) {
+        // the fn locks its own (possibly different) isolate; taking this
+        // loop's Locker here would nest Lockers across isolates
+        entry.fn();
+        return;
+    }
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope isolate_scope(isolate_);
+    v8::HandleScope handleScope(isolate_);
+    if (entry.task != nullptr) {
+        entry.task->Run();
+    } else {
+        entry.fn();
+    }
+    // work may enqueue microtasks without entering JS (e.g. resolving the
+    // Atomics.waitAsync promise), which never reaches kAuto's depth-0 drain
+    isolate_->PerformMicrotaskCheckpoint();
+}
+
+void EventLoop::RunOneInternal() {
+    std::unique_ptr<Entry> entry;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (stopped_) {
+            return;
+        }
+        entry = TakeDueLocked(internal_, false, false, true, now_ms());
+    }
+    if (entry == nullptr) {
+        // leftover unit: the work it represented ran early from a nested loop
+        // drain
+        return;
+    }
+    RunEntry(*entry);
+}
+
+void EventLoop::RunNestableV8Tasks() {
+    // bounded to the entries present at call time so a task that reposts
+    // can't wedge the inspector pause loop that called us
+    size_t budget;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        budget = internal_.immediate.size() + internal_.delayed.size();
+    }
+    while (budget-- > 0) {
+        std::unique_ptr<Entry> entry;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (stopped_) {
+                return;
+            }
+            entry = TakeDueLocked(internal_, true, true, false, now_ms());
+        }
+        if (entry == nullptr) {
+            return;
+        }
+        // the pause loops call this from inside v8 inspector frames - a C++
+        // exception must not unwind through them
+        RunGuarded([&] { RunEntry(*entry); });
+    }
+}
+
+void EventLoop::RunOrderedTask() {
+    // one anonymous token = one due slot across the whole ordered domain:
+    // pick the earliest due item among the ordered entries and the timer
+    // source, whichever it is. Timers and entries only ever run on this
+    // thread, so the peeked winner can't be taken by anyone else before we
+    // re-lock (a concurrent post can only add later work).
+    auto now = now_ms();
+    double entryDue;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (stopped_) {
+            return;
+        }
+        entryDue = PeekDueLocked(ordered_, now);
+    }
+    if (timerSource_ != nullptr && timerSource_->RunIfEarliest(now, entryDue)) {
+        return;
+    }
+    if (entryDue < 0) {
+        // leftover token: nothing in the domain is due yet
+        return;
+    }
+    std::unique_ptr<Entry> entry;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (stopped_) {
+            return;
+        }
+        entry = TakeDueLocked(ordered_, false, false, false, now_ms());
+    }
+    if (entry != nullptr) {
+        RunEntry(*entry);
+    }
+}
+
+int EventLoop::EventFdCallback(int fd, int events, void* data) {
+    uint64_t value;
+    // EFD_SEMAPHORE: consumes exactly one unit; while more remain the fd stays
+    // readable and ALooper calls back next poll, interleaving with Java
+    // messages instead of draining in one go. A spurious wakeup with nothing
+    // to read must not consume an entry, or its real unit becomes a leftover.
+    if (read(fd, &value, sizeof(value)) != sizeof(value)) {
+        return 1;
+    }
+    RunGuarded([&] { static_cast<EventLoop*>(data)->RunOneInternal(); });
+    return 1;
+}
+
+int EventLoop::TimerFdCallback(int fd, int events, void* data) {
+    uint64_t expirations;
+    if (read(fd, &expirations, sizeof(expirations)) != sizeof(expirations)) {
+        return 1;
+    }
+    auto self = static_cast<EventLoop*>(data);
+    {
+        std::lock_guard<std::mutex> lock(self->mutex_);
+        if (self->stopped_) {
+            return 0;
+        }
+        auto now = now_ms();
+        uint64_t due = 0;
+        for (auto& pair : self->internal_.delayed) {
+            if (pair.first > now) {
+                break;
+            }
+            if (!pair.second.signaled) {
+                pair.second.signaled = true;
+                due++;
+            }
+        }
+        if (due > 0 && self->eventFd_ != -1) {
+            // plain (non-semaphore) write of N adds N one-unit reads
+            write(self->eventFd_, &due, sizeof(due));
+        }
+        self->ArmTimerLocked(now);
+    }
+    return 1;
+}
+
+}  // namespace tns
+
+extern "C" JNIEXPORT void JNICALL Java_com_tns_EventLoopHandler_nativeRunTask(
+        JNIEnv* env, jclass clazz, jlong nativeLoopPtr) {
+    try {
+        reinterpret_cast<tns::EventLoop*>(nativeLoopPtr)->RunOrderedTask();
+    } catch (tns::NativeScriptException& e) {
+        e.ReThrowToJava();
+    } catch (std::exception& e) {
+        std::string msg = std::string("Error: c++ exception: ") + e.what();
+        tns::NativeScriptException nsEx(msg);
+        nsEx.ReThrowToJava();
+    } catch (...) {
+        tns::NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToJava();
+    }
+}

@@ -9,10 +9,9 @@
 #include "ArrayBufferHelper.h"
 #include "Profiler.h"
 #include "ModuleInternal.h"
-#include "MessageLoopTimer.h"
 #include "File.h"
 #include "Timers.h"
-#include "LooperTasks.h"
+#include "EventLoop.h"
 #include <memory>
 #include <mutex>
 #include <android/looper.h>
@@ -97,22 +96,25 @@ class Runtime {
 
         std::string ReadFileText(const std::string& filePath);
 
-        static int GetWriter();
-        static int GetReader();
-        static ALooper* GetMainLooper() {
-            return m_mainLooper;
+        /*
+         * The main runtime's event loop, set once when the main runtime
+         * initializes. __runOnMainThread posts its (own-isolate) closures
+         * here from any runtime's thread.
+         */
+        static std::shared_ptr<EventLoop> GetMainEventLoop() {
+            return s_mainEventLoop;
         }
         static JavaVM* GetJVM() {
             return s_jvm;
         }
 
         /*
-         * Task queue bound to this runtime's looper. Child workers hold a
-         * weak_ptr to their parent runtime's queue for worker -> parent
+         * Scheduler bound to this runtime's looper. Child workers hold a
+         * weak_ptr to their parent runtime's loop for worker -> parent
          * delivery (messages, errors, cleanup notifications).
          */
-        std::shared_ptr<LooperTasks> GetLooperTasks() const {
-            return m_looperTasks;
+        std::shared_ptr<EventLoop> GetEventLoop() const {
+            return m_eventLoop;
         }
 
         /*
@@ -220,9 +222,7 @@ class Runtime {
 
         Profiler m_profiler;
 
-        MessageLoopTimer* m_loopTimer;
-
-        std::shared_ptr<LooperTasks> m_looperTasks;
+        std::shared_ptr<EventLoop> m_eventLoop;
 
         v8::Global<v8::Object> m_globalEventTarget;
         v8::Global<v8::Function> m_dispatchErrorEventFunc;
@@ -271,9 +271,7 @@ class Runtime {
 
         static bool s_mainThreadInitialized;
 
-        static ALooper* m_mainLooper;
-
-        static int m_mainLooper_fd[2];
+        static std::shared_ptr<EventLoop> s_mainEventLoop;
 
 #ifdef APPLICATION_IN_DEBUG
         std::mutex m_fileWriteMutex;

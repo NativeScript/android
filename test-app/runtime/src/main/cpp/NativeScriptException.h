@@ -185,7 +185,7 @@ class NativeScriptException : public std::exception {
  * Per-isolate tracker for unhandled promise rejections (ported from the iOS
  * runtime's PromiseRejectionTracker). All members are touched only while the
  * v8::Locker for the runtime's isolate is held: OnReject/OnHandlerAdded run
- * inside V8 callbacks and Drain runs in a LooperTasks task that acquires the
+ * inside V8 callbacks and Drain runs in an event-loop task that acquires the
  * lock, so no extra synchronization is required.
  */
 class PromiseRejectionTracker {
@@ -204,9 +204,9 @@ class PromiseRejectionTracker {
 
  private:
   /*
-   * Posts a Drain task to the owning runtime's LooperTasks queue (at most one
+   * Posts a Drain task to the owning runtime's event loop (internal lane) (at most one
    * outstanding). Tasks posted during runtime teardown are dropped by
-   * LooperTasks itself.
+   * the event loop itself.
    */
   void ScheduleDrain();
   /* Drop weak handles the GC has already cleared. */

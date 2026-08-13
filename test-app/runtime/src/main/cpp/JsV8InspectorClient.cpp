@@ -13,6 +13,7 @@
 #include "Runtime.h"
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
+#include "NativeScriptPlatform.h"
 
 #include "ArgConverter.h"
 #include "Constants.h"
@@ -383,8 +384,11 @@ void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id) {
             doDispatchMessage(inspectorMessage);
         }
 
-        while (v8::platform::PumpMessageLoop(Runtime::platform, isolate_)) {
-        }
+        // JS frames are on the stack, so only nestable v8 foreground tasks
+        // may run; everything else fires from its own wakeup after resume
+        tns::NativeScriptPlatform::Instance()
+                ->GetEventLoop(isolate_)
+                ->RunNestableV8Tasks();
     }
     isPausedNestedLoop_.store(false, std::memory_order_release);
     terminated_ = false;

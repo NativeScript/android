@@ -3,6 +3,7 @@
 
 #include <jni.h>
 #include "v8.h"
+#include "EventLoop.h"
 #include "ObjectManager.h"
 #include "robin_hood.h"
 
@@ -49,6 +50,17 @@ namespace tns {
 #ifdef NS_TIMERS_NESTING_CLAMP
         int nestingLevel_ = 0;
 #endif
+        /**
+         * Cancellation carrier of this task's NEWEST pending token (at most
+         * one is set): a claim-cell word for short timers, or a global ref to
+         * the Java AtomicBoolean peer for long ones. An older token orphaned
+         * by an interval re-arm keeps functioning anonymously through its own
+         * carrier - only the newest token is cancellable, matching clear
+         * semantics. The peer ref is released by Timers (needs JEnv), never
+         * by Unschedule.
+         */
+        uint64_t tokenCell_ = 0;
+        jobject tokenPeer_ = nullptr;
         v8::Isolate *isolate_;
         v8::Persistent<v8::Function> callback_;
         std::shared_ptr<std::vector<std::shared_ptr<v8::Persistent<v8::Value>>>> args_;
@@ -69,13 +81,25 @@ namespace tns {
     struct TimerReference {
         int id;
         double dueTime;
+        // clearTimeout/clearInterval tombstones the entry instead of erasing
+        // it: its already-posted token then consumes this slot as a no-op, so
+        // no token gains surplus capacity to run a LATER-scheduled item ahead
+        // of foreign Java messages queued between the two token positions
+        bool cancelled = false;
     };
 
-    class Timers {
+    /**
+     * Timers are the ordered lane's external source: each scheduled timer
+     * posts one anonymous token through the runtime's EventLoop, and the
+     * loop's token drain runs the earliest due item across timers and ordered
+     * macrotasks - ONE due-ordered domain, strictly FIFO with Handler.post
+     * runnables on the same looper.
+     */
+    class Timers : public OrderedTaskSource {
     public:
         /**
          * Initializes the global functions setTimeout, setInterval, clearTimeout and clearInterval
-         * also creates the dedicated Java Handler bound to the executing thread's Looper
+         * and registers this instance as the runtime EventLoop's timer source
          * @param isolate target isolate
          * @param globalObjectTemplate global template
          */
@@ -84,8 +108,7 @@ namespace tns {
         static void InitStatic(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalObjectTemplate);
 
         /**
-         * Disposes the timers. This will clear all references and remove all
-         * pending timer messages from the Java message queue.
+         * Disposes the timers and unregisters from the EventLoop.
          * MUST be called in the same thread Init was called
          * This method doesn't need to be called most of the time as it's called on object destruction
          * Reusing this class is not advised
@@ -95,13 +118,10 @@ namespace tns {
         /**
          * Calls Destroy
          */
-        ~Timers();
+        ~Timers() override;
 
-        /**
-         * Fires the earliest due timer, if any (invoked by Java
-         * TimerHandler.handleMessage once per scheduled "due token")
-         */
-        void FireTimer();
+        // OrderedTaskSource (called by the EventLoop's token drain)
+        bool RunIfEarliest(double now, double otherDue) override;
 
     private:
         static void SetTimeoutCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
@@ -113,6 +133,9 @@ namespace tns {
         static void ClearTimer(const v8::FunctionCallbackInfo<v8::Value> &args);
 
         void addTask(std::shared_ptr<TimerTask> task);
+
+        // releases the task's peer ref (if any) without cancelling
+        void releaseTokenCarriers(const std::shared_ptr<TimerTask> &task);
 
         void removeTask(const std::shared_ptr<TimerTask> &task);
 
@@ -127,22 +150,15 @@ namespace tns {
 #endif
         // stores the map of timer tasks
         robin_hood::unordered_map<int, std::shared_ptr<TimerTask>> timerMap_;
-        // scheduled timers sorted by exact (sub-millisecond) dueTime, stable for
-        // equal dueTimes. Only ever touched under the isolate lock, no mutex.
-        // The Java message queue is millisecond-quantized, so this preserves the
-        // relative order of JS timers; each Java message is an anonymous token
-        // that fires the front of this list.
+        // scheduled timers (and tombstones) sorted by exact (sub-millisecond)
+        // dueTime, stable for equal dueTimes. Only ever touched on the
+        // isolate's home thread, no mutex. The Java message queue is
+        // millisecond-quantized, so this preserves the relative order of JS
+        // timers; each anonymous EventLoop token consumes the front slot.
         std::vector<TimerReference> sortedTimers_;
-        // global ref to the dedicated com.tns.TimerHandler for this isolate's thread
-        jobject handler_ = nullptr;
+        // the runtime's event loop, carrier of the ordered-lane tokens
+        std::shared_ptr<EventLoop> eventLoop_;
         bool stopped_ = false;
-
-        // process-wide JNI cache, written once on the first Timers::Init (main
-        // runtime), which happens-before any worker thread is spawned
-        static jclass TIMER_HANDLER_CLASS;
-        static jmethodID TIMER_HANDLER_CTOR;
-        static jmethodID TIMER_HANDLER_POST;
-        static jmethodID TIMER_HANDLER_RELEASE;
     };
 
 }
