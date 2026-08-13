@@ -1,5 +1,9 @@
 # Runtime documentation
 
+- [Node-API](node-api.md) — the standard `napi_*` C ABI for native addons:
+  building against the prefab package, registering and requiring addons,
+  threading and finalizer contracts, and the documented divergences from Node
+  (shared with the iOS runtime).
 - [Performance API](performance.md) — WHATWG `performance` (hr-time, user
   timing, performance timeline with `PerformanceObserver`), per-isolate time
   origins for workers, the native clock hook that future `requestAnimationFrame`

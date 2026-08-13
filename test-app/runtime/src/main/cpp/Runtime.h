@@ -17,6 +17,10 @@
 #include <android/looper.h>
 #include <fcntl.h>
 
+// Declared rather than included: js_native_api_types.h pins NAPI_VERSION for
+// the whole translation unit, and Runtime.h reaches nearly all of them.
+typedef struct napi_env__* napi_env;
+
 namespace tns {
 class PromiseRejectionTracker;
 
@@ -47,6 +51,34 @@ class Runtime {
         static Runtime* GetRuntime(v8::Isolate* isolate);
 
         static Runtime* GetRuntimeFromIsolateData(v8::Isolate* isolate);
+
+        /*
+         * The runtime whose home thread is the calling thread, or null. Set at
+         * the end of PrepareV8Runtime; may be stale after a Runtime destroyed
+         * on another thread, so consumers must validate through
+         * GetNapiEnvIfAlive rather than dereference it.
+         */
+        static Runtime* GetCurrentRuntime() {
+            return s_currentRuntime;
+        }
+
+        /*
+         * The Node-API environment for this runtime's context. Null before
+         * PrepareV8Runtime creates it and after DestroyRuntime destroys it.
+         */
+        napi_env GetNapiEnv() const {
+            return m_napiEnv;
+        }
+
+        /*
+         * Resolves the env while holding the registry lock, so a possibly-
+         * stale pointer (e.g. the thread-local left behind when a Runtime was
+         * destroyed on another thread) is never dereferenced outside it. The
+         * returned env's validity is governed by the Node-API threading
+         * contract: it is only safe to use on the runtime's own thread, where
+         * teardown cannot race it.
+         */
+        static napi_env GetNapiEnvIfAlive(const Runtime* runtime);
 
         static ObjectManager* GetObjectManager(v8::Isolate* isolate);
 
@@ -224,6 +256,8 @@ class Runtime {
 
         std::shared_ptr<EventLoop> m_eventLoop;
 
+        napi_env m_napiEnv = nullptr;
+
         v8::Global<v8::Object> m_globalEventTarget;
         v8::Global<v8::Function> m_dispatchErrorEventFunc;
         v8::Global<v8::Function> m_dispatchUnhandledRejectionFunc;
@@ -272,6 +306,8 @@ class Runtime {
         static bool s_mainThreadInitialized;
 
         static std::shared_ptr<EventLoop> s_mainEventLoop;
+
+        static thread_local Runtime* s_currentRuntime;
 
 #ifdef APPLICATION_IN_DEBUG
         std::mutex m_fileWriteMutex;

@@ -15,6 +15,7 @@
 #include "Constants.h"
 #include "NativeScriptException.h"
 #include "NsBuiltinModules.h"
+#include "napi/NapiModules.h"
 #include "Util.h"
 #include "SimpleProfiler.h"
 #include "include/v8.h"
@@ -45,6 +46,17 @@ bool ModuleInternal::IsLikelyOptionalModule(const std::string& moduleName) {
         return true;
     }
     return false;
+}
+
+// A package-style specifier: neither a path nor a scheme, so it may be claimed
+// by a registry rather than resolved on disk.
+static bool IsBareSpecifier(const std::string& specifier) {
+    if (specifier.empty() || specifier[0] == '.' || specifier[0] == '/' ||
+        specifier[0] == '~') {
+        return false;
+    }
+
+    return specifier.find(':') == std::string::npos;
 }
 
 // Helper function to check if a file path is an ES module (.mjs) but not a source map (.mjs.map)
@@ -188,6 +200,17 @@ void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Valu
         } else if (!NsBuiltinModules::IsRegistered(moduleName)) {
             isolate->ThrowException(Exception::Error(ArgConverter::ConvertToV8String(
                     isolate, NsBuiltinModules::NotFoundMessage(moduleName))));
+        }
+        return;
+    }
+
+    // Node-API addons claim a bare name only, so a path can never be diverted
+    // into the addon registry, and builtins keep priority over both.
+    if (IsBareSpecifier(moduleName) && NapiModules::IsRegistered(moduleName)) {
+        auto context = isolate->GetCurrentContext();
+        Local<Object> exports;
+        if (NapiModules::GetExports(context, moduleName).ToLocal(&exports)) {
+            args.GetReturnValue().Set(exports);
         }
         return;
     }
@@ -377,12 +400,34 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
         }
         moduleFunc = moduleFuncValue.As<Function>();
     } else if (Util::EndsWith(modulePath, ".so")) {
+        // Registrations from libraries this loader did not dlopen (statically
+        // linked addons whose constructors ran at app start) must not be
+        // attributed to whatever `.so` happens to load next.
+        NapiModules::ClaimPendingModule();
+
         auto handle = dlopen(modulePath.c_str(), RTLD_LAZY);
         if (handle == nullptr) {
             auto error = dlerror();
             string errMsg(error);
             throw NativeScriptException(errMsg);
         }
+
+        // A library whose constructors registered a Node-API module is a
+        // Node-API addon: its exports come from the addon registry (Node's
+        // dlopen consumes `modpending` the same way). NSMain remains the
+        // protocol for plain native modules.
+        string napiModuleName = NapiModules::ClaimPendingModule();
+        if (!napiModuleName.empty()) {
+            Local<Object> napiExports;
+            if (!NapiModules::GetExports(context, napiModuleName).ToLocal(&napiExports) || tc.HasCaught()) {
+                throw NativeScriptException(tc, "Error initializing Node-API module " + napiModuleName);
+            }
+            moduleObj->Set(context, exportsPropName, napiExports);
+            tempModule.SaveToCache();
+            result = moduleObj;
+            return result;
+        }
+
         auto func = dlsym(handle, "NSMain");
         if (func == nullptr) {
             string errMsg("Cannot find 'NSMain' in " + modulePath);

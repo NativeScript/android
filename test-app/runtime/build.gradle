@@ -159,7 +159,34 @@ android {
         }
     }
 
+    // Ships the Node-API headers and the libNativeScript.so link target inside
+    // the .aar, so a plugin's native build gets both with
+    //   android { buildFeatures { prefab true } }
+    //   find_package(NativeScript REQUIRED CONFIG)
+    //   target_link_libraries(<plugin> NativeScript::NativeScript)
+    // and the ecosystem-standard bare `#include <node_api.h>` compiles as it
+    // does against Node itself (required by node-addon-api).
+    buildFeatures {
+        prefabPublishing true
+    }
+    prefab {
+        NativeScript {
+            headers "${layout.buildDirectory.get().asFile.path}/napi-headers"
+        }
+    }
+
 }
+
+// Only the public Node-API surface is exported: the vendored engine headers
+// (js_native_api_v8.h) and the shim stay internal.
+tasks.register("stageNapiHeaders", Copy) {
+    into layout.buildDirectory.dir("napi-headers")
+    from("src/main/cpp/napi/vendor") {
+        include "node_api.h", "node_api_types.h", "js_native_api.h", "js_native_api_types.h"
+    }
+    from "src/main/cpp/napi/NapiRuntime.h"
+}
+preBuild.dependsOn("stageNapiHeaders")
 
 allprojects {
  afterEvaluate {

@@ -56,6 +56,10 @@ include_directories(
         src/main/cpp/include
         src/main/cpp/v8_inspector
         src/main/cpp/ada
+        # Node-API: the vendored upstream sources include their own headers and
+        # the shim's Node-internal stand-ins (env-inl.h, util-inl.h) bare.
+        src/main/cpp/napi/vendor
+        src/main/cpp/napi/shim
 )
 
 # The runtime's builtin JavaScript (src/main/cpp/js) embedded into a generated
@@ -127,6 +131,20 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
 else ()
     # When building in Release mode we do not include the V8 inspector sources
     set(INSPECTOR_SOURCES)
+endif ()
+
+# The Node-API test addons back the NapiTests/NapiCoverageTests specs of the
+# test app. Local Debug builds only — exactly the variant runtests installs —
+# so no published .aar ever carries them.
+if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT OPTIMIZED_BUILD AND NOT OPTIMIZED_WITH_INSPECTOR_BUILD)
+    set(
+        NAPI_TEST_SOURCES
+
+        src/main/cpp/napi/tests/NapiTestModule.cpp
+        src/main/cpp/napi/tests/NapiCoverageModule.cpp
+    )
+else ()
+    set(NAPI_TEST_SOURCES)
 endif ()
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/add_library.html
@@ -209,10 +227,21 @@ add_library(
         src/main/cpp/HMRSupport.cpp
         src/main/cpp/DevFlags.cpp
 
+        # Node-API: vendored upstream implementation plus the embedder half
+        # (env lifecycle, module registry, async work, threadsafe functions)
+        src/main/cpp/napi/vendor/js_native_api_v8.cc
+        src/main/cpp/napi/NapiEnv.cpp
+        src/main/cpp/napi/NapiRuntime.cpp
+        src/main/cpp/napi/NapiThreadSafeFunction.cpp
+        src/main/cpp/napi/NodeApiEmbed.cpp
+
         ${RUNTIME_BUILTINS_GENERATED_DIR}/RuntimeBuiltins.cpp
 
         # V8 inspector source files will be included only in Release mode
         ${INSPECTOR_SOURCES}
+
+        # Node-API test addons, local Debug builds only
+        ${NAPI_TEST_SOURCES}
 )
 
 set(NATIVES_BLOB_INCLUDE_DIRECTORIES ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/include)
