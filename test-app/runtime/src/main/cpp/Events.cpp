@@ -10,8 +10,7 @@ using namespace v8;
 
 void Events::Init(Local<Context> context) {
     auto isolate = v8::Isolate::GetCurrent();
-    auto runtime = static_cast<Runtime*>(
-            isolate->GetData((uint32_t) Runtime::IsolateData::RUNTIME));
+    auto runtime = Runtime::TryGetRuntime(isolate);
     if (runtime == nullptr) {
         throw NativeScriptException("Events::Init: no runtime for isolate");
     }

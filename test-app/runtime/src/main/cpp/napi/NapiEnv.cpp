@@ -47,8 +47,7 @@ NapiEnv* NapiEnv::ForIsolate(Isolate* isolate) {
   // Read the isolate slot directly: the Runtime::GetRuntime* accessors throw
   // NativeScriptException when the slot is unset, and a C++ exception must
   // not cross the extern "C" Node-API surface this is called under.
-  Runtime* runtime = static_cast<Runtime*>(
-      isolate->GetData((uint32_t)Runtime::IsolateData::RUNTIME));
+  Runtime* runtime = Runtime::TryGetRuntime(isolate);
   if (runtime == nullptr) {
     return nullptr;
   }

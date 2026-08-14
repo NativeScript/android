@@ -198,7 +198,11 @@ int64_t ArgConverter::ConvertToJavaLong(Isolate* isolate, const Local<Value>& va
 
 ArgConverter::TypeLongOperationsCache* ArgConverter::GetTypeLongCache(v8::Isolate* isolate) {
     // Per runtime, so there is no shared table to race on; see RuntimeState.h.
-    return RuntimeState::For<TypeLongOperationsCache>(isolate);
+    auto* cache = RuntimeState::For<TypeLongOperationsCache>(isolate);
+    if (cache == nullptr) {
+        throw NativeScriptException("Long conversion cache requested after the runtime was torn down");
+    }
+    return cache;
 }
 
 

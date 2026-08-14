@@ -55,6 +55,18 @@ class Runtime {
         static Runtime* GetRuntimeFromIsolateData(v8::Isolate* isolate);
 
         /*
+         * The runtime for this isolate, or null. Unlike the accessors above it
+         * neither throws nor locks -- it only reads the isolate's own data
+         * slot -- which is what makes it usable from the places that must not
+         * throw: GC weak callbacks, teardown paths, and the error handlers
+         * that run while a runtime is going away.
+         */
+        static Runtime* TryGetRuntime(v8::Isolate* isolate) {
+            return static_cast<Runtime*>(
+                isolate->GetData((uint32_t)IsolateData::RUNTIME));
+        }
+
+        /*
          * The runtime whose home thread is the calling thread, or null. Set at
          * the end of PrepareV8Runtime; may be stale after a Runtime destroyed
          * on another thread, so consumers must validate through

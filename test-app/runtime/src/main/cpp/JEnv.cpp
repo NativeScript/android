@@ -1,10 +1,22 @@
 #include "JEnv.h"
+
+#include <shared_mutex>
 #include <assert.h>
 #include "Util.h"
 #include "NativeScriptException.h"
 #include "DesugaredInterfaceCompanionClassNameResolver.h"
 
 using namespace tns;
+
+/*
+ * The class caches are process-wide and string-keyed, holding JNI global refs,
+ * which is correct to share -- but every runtime resolves classes from its own
+ * thread and workers run concurrently. Shared for lookups, exclusive only to
+ * publish. NewGlobalRef/DeleteLocalRef stay outside the lock; if two threads
+ * resolve the same class, the first published wins and the loser releases its
+ * ref rather than leaking it.
+ */
+static std::shared_mutex classCacheMutex;
 using namespace std;
 
 JEnv::JEnv()
@@ -758,6 +770,8 @@ jclass JEnv::FindClass(const string &className) {
 
 jclass JEnv::CheckForClassInCache(const string &className) {
     jclass global_class = nullptr;
+
+    std::shared_lock<std::shared_mutex> lock(classCacheMutex);
     auto itFound = s_classCache.find(className);
 
     if (itFound != s_classCache.end()) {
@@ -769,14 +783,30 @@ jclass JEnv::CheckForClassInCache(const string &className) {
 
 jclass JEnv::InsertClassIntoCache(const string &className, jclass &tmp) {
     auto global_class = reinterpret_cast<jclass>(m_env->NewGlobalRef(tmp));
-    s_classCache.emplace(className, global_class);
     m_env->DeleteLocalRef(tmp);
+
+    jclass published = nullptr;
+    {
+        std::unique_lock<std::shared_mutex> lock(classCacheMutex);
+        auto result = s_classCache.emplace(className, global_class);
+        if (!result.second) {
+            published = result.first->second;
+        }
+    }
+
+    if (published != nullptr) {
+        // Another thread resolved the same class first; keep its ref.
+        m_env->DeleteGlobalRef(global_class);
+        return published;
+    }
 
     return global_class;
 }
 
 jthrowable JEnv::CheckForClassMissingCache(const string &className) {
     jthrowable throwable = nullptr;
+
+    std::shared_lock<std::shared_mutex> lock(classCacheMutex);
     auto itFound = s_missingClasses.find(className);
 
     if (itFound != s_missingClasses.end()) {
@@ -788,8 +818,21 @@ jthrowable JEnv::CheckForClassMissingCache(const string &className) {
 
 jthrowable JEnv::InsertClassIntoMissingCache(const string &className,const jthrowable &tmp) {
     auto throwable = reinterpret_cast<jthrowable>(m_env->NewGlobalRef(tmp));
-    s_missingClasses.emplace(className, throwable);
     m_env->DeleteLocalRef(tmp);
+
+    jthrowable published = nullptr;
+    {
+        std::unique_lock<std::shared_mutex> lock(classCacheMutex);
+        auto result = s_missingClasses.emplace(className, throwable);
+        if (!result.second) {
+            published = result.first->second;
+        }
+    }
+
+    if (published != nullptr) {
+        m_env->DeleteGlobalRef(throwable);
+        return published;
+    }
 
     return throwable;
 }

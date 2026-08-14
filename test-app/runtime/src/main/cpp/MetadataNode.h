@@ -278,9 +278,12 @@ class MetadataNode {
          * while its isolate is still alive.
          */
         struct MetadataNodeCache {
-            v8::Persistent<v8::String>* MetadataKey;
+            // Initialized rather than left indeterminate: the cache is created
+            // on first use, which may precede MetadataNode::Init populating
+            // these, and the destructor below releases them.
+            v8::Persistent<v8::String>* MetadataKey = nullptr;
 
-            v8::Persistent<v8::String>* PackageKey;
+            v8::Persistent<v8::String>* PackageKey = nullptr;
 
             robin_hood::unordered_map<MetadataTreeNode*, CtorCacheData> CtorFuncCache;
 
@@ -298,6 +301,8 @@ class MetadataNode {
             robin_hood::unordered_map<MetadataNode*, v8::Persistent<v8::Function>*> CtorFunctions;
 
             ~MetadataNodeCache() {
+                delete MetadataKey;
+                delete PackageKey;
                 delete ArrayObjectTemplate;
                 for (auto& entry : CtorFunctions) {
                     delete entry.second;

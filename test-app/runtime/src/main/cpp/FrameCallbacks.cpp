@@ -258,8 +258,7 @@ void Dispatch(EntryId id, int64_t frameTimeNanos) {
     }
 
     Isolate* isolate = entry->isolate_;
-    Runtime* runtime = static_cast<Runtime*>(
-            isolate->GetData((uint32_t) Runtime::IsolateData::RUNTIME));
+    Runtime* runtime = Runtime::TryGetRuntime(isolate);
     if (runtime == nullptr) {
         return;
     }

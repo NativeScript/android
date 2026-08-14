@@ -149,25 +149,37 @@ class V8StringConstants {
             };
 
             ~PerIsolateV8Constants() {
-                CLASS_IMPLEMENTATION_OBJECT_PERSISTENT->Reset();
-                DEBUG_NAME_PERSISTENT->Reset();
-                EXTEND_PERSISTENT->Reset();
-                NULL_OBJECT_PERSISTENT->Reset();
-                NULL_NODE_NAME_PERSISTENT->Reset();
-                IS_PROTOTYPE_IMPLEMENTATION_OBJECT_PERSISTENT->Reset();
-                NATIVE_EXCEPTION_PERSISTENT->Reset();
-                STACK_PERSISTENT->Reset();
-                STACK_TRACE_PERSISTENT->Reset();
-                LONG_NUMBER_PERSISTENT->Reset();
-                PROTOTYPE_PERSISTENT->Reset();
-                SUPER_PERSISTENT->Reset();
-                TARGET_PERSISTENT->Reset();
-                TO_STRING_PERSISTENT->Reset();
-                JAVA_LONG_PERSISTENT->Reset();
-                VALUE_OF_PERSISTENT->Reset();
-                VALUE_PERSISTENT->Reset();
-                UNCAUGHT_ERROR_PERSISTENT->Reset();
-                IMPLEMENTATION_OBJECT_PERSISTENT->Reset();
+                // Persistent's traits do not reset in the destructor, so each
+                // handle is reset explicitly (requires a live isolate) and then
+                // freed. Generated from the member list -- keep the two in step.
+                ResetAndDelete(CLASS_IMPLEMENTATION_OBJECT_PERSISTENT);
+                ResetAndDelete(DEBUG_NAME_PERSISTENT);
+                ResetAndDelete(DISCARDED_ERROR_PERSISTENT);
+                ResetAndDelete(EXTEND_PERSISTENT);
+                ResetAndDelete(IMPLEMENTATION_OBJECT_PERSISTENT);
+                ResetAndDelete(IS_PROTOTYPE_IMPLEMENTATION_OBJECT_PERSISTENT);
+                ResetAndDelete(JAVA_LONG_PERSISTENT);
+                ResetAndDelete(LONG_NUMBER_PERSISTENT);
+                ResetAndDelete(NATIVE_EXCEPTION_PERSISTENT);
+                ResetAndDelete(NULL_NODE_NAME_PERSISTENT);
+                ResetAndDelete(NULL_OBJECT_PERSISTENT);
+                ResetAndDelete(PROTOTYPE_PERSISTENT);
+                ResetAndDelete(STACK_PERSISTENT);
+                ResetAndDelete(STACK_TRACE_PERSISTENT);
+                ResetAndDelete(SUPER_PERSISTENT);
+                ResetAndDelete(TARGET_PERSISTENT);
+                ResetAndDelete(TO_STRING_PERSISTENT);
+                ResetAndDelete(UNCAUGHT_ERROR_PERSISTENT);
+                ResetAndDelete(VALUE_OF_PERSISTENT);
+                ResetAndDelete(VALUE_PERSISTENT);
+            }
+
+            static void ResetAndDelete(v8::Persistent<v8::String>*& handle) {
+                if (handle != nullptr) {
+                    handle->Reset();
+                    delete handle;
+                    handle = nullptr;
+                }
             }
 
             v8::Persistent<v8::String>* CLASS_IMPLEMENTATION_OBJECT_PERSISTENT;

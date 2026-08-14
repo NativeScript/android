@@ -95,7 +95,13 @@ class RuntimeState {
 
 template <typename T>
 T* RuntimeState::For(v8::Isolate* isolate) {
-    Runtime* runtime = Runtime::GetRuntime(isolate);
+    // TryGetRuntime, not GetRuntime: this runs from GC weak callbacks, where
+    // throwing is not an option.
+    auto* runtime = Runtime::TryGetRuntime(isolate);
+    if (runtime == nullptr) {
+        return nullptr;
+    }
+
     RuntimeState* state = runtime->GetState();
     if (state == nullptr) {
         return nullptr;

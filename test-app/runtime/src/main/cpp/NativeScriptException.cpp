@@ -281,15 +281,6 @@ void NativeScriptException::OnUncaughtError(Local<Message> message,
   e.ReThrowToJava();
 }
 
-/*
- * Non-throwing runtime lookup, safe from V8 callbacks that may fire while a
- * runtime is being torn down (Runtime::GetRuntime throws in that window).
- */
-static Runtime* GetRuntimeOrNull(Isolate* isolate) {
-  return static_cast<Runtime*>(
-      isolate->GetData((uint32_t)Runtime::IsolateData::RUNTIME));
-}
-
 static string ToDetailString(Isolate* isolate, Local<Value> value) {
   auto context = isolate->GetCurrentContext();
   Local<String> str;
@@ -326,7 +317,7 @@ static void LogLines(const string& text) {
 void NativeScriptException::OnPromiseRejected(v8::PromiseRejectMessage message) {
   auto promise = message.GetPromise();
   auto isolate = v8::Isolate::GetCurrent();
-  auto runtime = GetRuntimeOrNull(isolate);
+  auto runtime = Runtime::TryGetRuntime(isolate);
   if (runtime == nullptr || runtime->PromiseRejections() == nullptr) {
     return;
   }
@@ -363,7 +354,7 @@ void NativeScriptException::ReportUnhandledRejection(Isolate* isolate,
     return;
   }
 
-  auto runtime = GetRuntimeOrNull(isolate);
+  auto runtime = Runtime::TryGetRuntime(isolate);
   bool discard =
       runtime != nullptr && runtime->GetDiscardUncaughtJsExceptions();
   ReportFatalTail(isolate, reason, stackTrace, "Unhandled promise rejection:",
@@ -458,7 +449,7 @@ static bool IsMarkedReportedToJs(Isolate* isolate, Local<Value> error) {
 
 bool NativeScriptException::ContainUncaughtCallbackException(Isolate* isolate,
                                                              v8::TryCatch& tc) {
-  auto runtime = GetRuntimeOrNull(isolate);
+  auto runtime = Runtime::TryGetRuntime(isolate);
   if (runtime == nullptr) {
     return false;
   }
