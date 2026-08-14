@@ -39,7 +39,7 @@ char g_rendered[2][kBufferMax];
 size_t g_renderedLength[2];
 std::atomic<int> g_active{-1};
 
-int g_storeFd = -1;
+std::atomic<int> g_storeFd{-1};
 std::atomic_flag g_recorded = ATOMIC_FLAG_INIT;
 struct sigaction g_previous[NSIG];
 
@@ -84,6 +84,11 @@ void Append(char* out, size_t& length, const char* format, ...) {
 }
 
 void RenderLocked() {
+  // Once a crash is recorded the handler may be reading either buffer; a
+  // second flip after that point would rewrite the one it is copying out.
+  if (g_recorded.test(std::memory_order_acquire)) {
+    return;
+  }
   int next = g_active.load(std::memory_order_relaxed) == 0 ? 1 : 0;
   char* out = g_rendered[next];
   size_t length = 0;
@@ -138,7 +143,7 @@ void AppendRawInt(char* out, size_t capacity, size_t& length, int value) {
 void Handler(int signalNumber, siginfo_t* info, void* context) {
   // Only the first thread to fault records; the rest are already doomed.
   if (!g_recorded.test_and_set()) {
-    int fd = g_storeFd;
+    int fd = g_storeFd.load(std::memory_order_acquire);
     if (fd >= 0) {
       char header[kHeaderMax];
       size_t length = 0;
@@ -219,7 +224,7 @@ void CrashBreadcrumbs::OpenStore(const std::string& filesRoot) {
       ftruncate(fd, 0);
     }
 
-    g_storeFd = fd;
+    g_storeFd.store(fd, std::memory_order_release);
   });
 }
 
@@ -273,13 +278,25 @@ void CrashBreadcrumbs::SetWorkerScript(int runtimeId, const char* script) {
   RenderLocked();
 }
 
-void CrashBreadcrumbs::SetCurrentModule(const char* modulePath) {
+CrashBreadcrumbs::ModuleScope::ModuleScope(const char* modulePath) {
   Slot* slot = t_slot;
   if (slot == nullptr) {
     return;
   }
   std::lock_guard<std::mutex> lock(g_mutex);
+  previous_ = slot->module;
+  restore_ = true;
   CopyField(slot->module, modulePath);
+  RenderLocked();
+}
+
+CrashBreadcrumbs::ModuleScope::~ModuleScope() {
+  Slot* slot = t_slot;
+  if (!restore_ || slot == nullptr) {
+    return;
+  }
+  std::lock_guard<std::mutex> lock(g_mutex);
+  CopyField(slot->module, previous_.c_str());
   RenderLocked();
 }
 

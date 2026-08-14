@@ -364,7 +364,7 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleNam
 Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& modulePath, const string& moduleCacheKey) {
     string frameName("LoadModule " + modulePath);
     tns::instrumentation::Frame frame(frameName);
-    CrashBreadcrumbs::SetCurrentModule(modulePath.c_str());
+    CrashBreadcrumbs::ModuleScope moduleBreadcrumb(modulePath.c_str());
     Local<Object> result;
 
     auto context = isolate->GetCurrentContext();

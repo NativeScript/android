@@ -36,8 +36,22 @@ class CrashBreadcrumbs {
   /* Marks a registered runtime as a worker started from `script`. */
   static void SetWorkerScript(int runtimeId, const char* script);
 
-  /* Records the module the calling runtime is about to execute. */
-  static void SetCurrentModule(const char* modulePath);
+  /*
+   * Records the module the calling runtime is executing for the lifetime of
+   * the scope. Module loads nest (`require` inside a module body), so the
+   * enclosing module is restored on destruction, on throw paths included.
+   */
+  class ModuleScope {
+   public:
+    explicit ModuleScope(const char* modulePath);
+    ~ModuleScope();
+    ModuleScope(const ModuleScope&) = delete;
+    ModuleScope& operator=(const ModuleScope&) = delete;
+
+   private:
+    std::string previous_;
+    bool restore_ = false;
+  };
 };
 
 }  // namespace tns
