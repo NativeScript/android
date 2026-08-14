@@ -113,11 +113,17 @@ class ObjectManager {
   struct ObjectWeakCallbackState {
     ObjectWeakCallbackState(ObjectManager* _thisPtr, JSInstanceInfo* _jsInfo,
                             v8::Persistent<v8::Object>* _target)
-        : thisPtr(_thisPtr), jsInfo(_jsInfo), target(_target) {}
+        : thisPtr(_thisPtr),
+          jsInfo(_jsInfo),
+          target(_target),
+          javaObjectID(_jsInfo->JavaObjectID) {}
 
     ObjectManager* thisPtr;
     JSInstanceInfo* jsInfo;
     v8::Persistent<v8::Object>* target;
+    // Duplicated from jsInfo: the finalizer has to unregister itself even when
+    // the JsInfo field was already cleared and jsInfo freed.
+    uint32_t javaObjectID;
   };
 
   struct GarbageCollectionInfo {

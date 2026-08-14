@@ -364,6 +364,9 @@ void ObjectManager::JSObjectFinalizer(Isolate* isolate,
   auto jsInstanceInfo = GetJSInstanceInfoFromRuntimeObject(po->Get(m_isolate));
 
   if (jsInstanceInfo == nullptr) {
+    // The link was already torn down (ReleaseNativeCounterpart); nothing but
+    // the registration is left to drop.
+    m_idToObject.erase(callbackState->javaObjectID);
     po->Reset();
     delete po;
     delete callbackState;
@@ -649,6 +652,14 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
   JEnv env;
   env.CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,
                      jsInstanceInfo->JavaObjectID);
+
+  // The registration outlives the link: it is dropped by the finalizer once
+  // the wrapper is collected. Until then the entry must not point at the
+  // JSInstanceInfo being freed here.
+  auto it = m_idToObject.find(jsInstanceInfo->JavaObjectID);
+  if (it != m_idToObject.end()) {
+    it->second->jsInfo = nullptr;
+  }
 
   delete jsInstanceInfo;
   auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
