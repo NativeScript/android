@@ -166,12 +166,35 @@
 		}
 	}
 
-	// No-op decorator for plain ES classes extending native types.
-	// The runtime registers such classes lazily (on first construction, static usage or when
-	// passed to native APIs), so the decorator only exists so shared iOS/Android sources and
-	// non-transformed code keep working.
-	function NativeClass(target) {
+	function applyNativeClassOptions(target, options) {
+		// Workers must not mint or rename process-global native classes.
+		if (global.__ns__worker) {
+			return target;
+		}
+		// This runtime implements `android`; `ios` is accepted and ignored.
+		var android = options && options.android;
+		var interfaces = (android && android.interfaces) || (options && options.interfaces);
+		var name = android && android.name;
+
+		if (interfaces && interfaces.length > 0) {
+			target.interfaces = (target.interfaces && target.interfaces instanceof Array ? target.interfaces.concat(interfaces) : interfaces.slice());
+		}
+		if (name) {
+			target.nativeClassName = name;
+			// Accessing `.class` lazily registers the proxy under the explicit name.
+			void target.class;
+		}
 		return target;
+	}
+
+	function NativeClass(arg) {
+		if (typeof arg === "function") {
+			return applyNativeClassOptions(arg, {});
+		}
+		var options = arg || {};
+		return function (target) {
+			return applyNativeClassOptions(target, options);
+		};
 	}
 
 	Object.defineProperty(global, "__native", { value: __native });
@@ -182,7 +205,5 @@
 		global.JavaProxy = JavaProxy;
 	}
 	global.Interfaces = Interfaces;
-	if (!global.NativeClass) {
-		global.NativeClass = NativeClass;
-	}
+	global.NativeClass = NativeClass;
 })()

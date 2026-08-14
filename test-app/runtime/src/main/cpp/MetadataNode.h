@@ -52,6 +52,16 @@ class MetadataNode {
 
         static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate* isolate, ObjectManager* objectManager, const std::string& proxyClassName);
 
+        /*
+         * Java-born instances of an ES-derived proxy (clazz.newInstance(),
+         * framework inflation, etc.) are adopted into a real construct of the
+         * ES class so fields and the constructor body run. super() binds the
+         * existing Java object and does not allocate again.
+         */
+        static bool TryConstructESDerivedInstance(v8::Isolate* isolate, const std::string& proxyClassName, int javaObjectID, v8::Local<v8::Object>& out);
+
+        static bool TryConsumePendingESAdopt(v8::Isolate* isolate, int& javaObjectID);
+
         static v8::Local<v8::Object> GetImplementationObject(v8::Isolate* isolate, const v8::Local<v8::Object>& object);
 
         static void CreateTopLevelNamespaces(v8::Isolate* isolate, const v8::Local<v8::Object>& global);
@@ -327,6 +337,12 @@ class MetadataNode {
              * runtime's teardown walked every node to erase its entry.
              */
             robin_hood::unordered_map<MetadataNode*, v8::Persistent<v8::Function>*> CtorFunctions;
+
+            // Java object id being adopted by an in-flight ES construct
+            // (CreateJSInstanceNative → CallAsConstructor → super()).
+            // RegisterInstance consumes it so super() binds that id and does
+            // not NewObject again.
+            int PendingESAdoptObjectId = -1;
 
             ~MetadataNodeCache() {
                 delete MetadataKey;
