@@ -1267,6 +1267,13 @@ MetadataNode::TypeMetadata* MetadataNode::EnsureExtendedESClass(Isolate* isolate
         return existingMetadata;
     }
 
+    // Only the main isolate mints ES-derived Java proxies. Workers keep
+    // NativeClass / lazy registration as a no-op so they cannot claim
+    // process-global names. Legacy `.extend()` is unchanged.
+    if (Runtime::GetRuntime(isolate)->IsWorker()) {
+        return nullptr;
+    }
+
     auto context = isolate->GetCurrentContext();
 
     // Only genuine `class` syntax constructors participate in lazy ES registration. Downleveled
@@ -1488,6 +1495,53 @@ MetadataNode::TypeMetadata* MetadataNode::EnsureExtendedESClass(Isolate* isolate
     DEBUG_WRITE("EnsureExtendedESClass: registered %s (base %s)", fullExtendedName.c_str(), baseClassName.c_str());
 
     return typeMetadata;
+}
+
+bool MetadataNode::TryConstructESDerivedInstance(Isolate* isolate, const string& proxyClassName, int javaObjectID, Local<Object>& out) {
+    auto cache = GetMetadataNodeCache(isolate);
+    if (cache->PendingESAdoptObjectId != -1) {
+        return false;
+    }
+
+    auto cacheData = GetCachedExtendedClassData(isolate, proxyClassName);
+    if (cacheData.extendedCtorFunction == nullptr) {
+        return false;
+    }
+
+    Local<Function> ctor = Local<Function>::New(isolate, *cacheData.extendedCtorFunction);
+    auto typeMetadata = TryGetTypeMetadata(isolate, ctor);
+    if (typeMetadata == nullptr || !typeMetadata->isESDerived) {
+        return false;
+    }
+
+    cache->PendingESAdoptObjectId = javaObjectID;
+    TryCatch tc(isolate);
+    auto context = isolate->GetCurrentContext();
+    bool ok = !ctor->CallAsConstructor(context, 0, nullptr).IsEmpty();
+    cache->PendingESAdoptObjectId = -1;
+    if (!ok) {
+        throw NativeScriptException(tc, "Failed to construct ES class for native instance");
+    }
+
+    auto objectManager = Runtime::GetRuntime(isolate)->GetObjectManager();
+    auto cached = objectManager->GetJsObjectByJavaObject(javaObjectID);
+    if (cached.IsEmpty()) {
+        return false;
+    }
+
+    out = cached;
+    return true;
+}
+
+bool MetadataNode::TryConsumePendingESAdopt(Isolate* isolate, int& javaObjectID) {
+    auto cache = GetMetadataNodeCache(isolate);
+    if (cache->PendingESAdoptObjectId == -1) {
+        return false;
+    }
+
+    javaObjectID = cache->PendingESAdoptObjectId;
+    cache->PendingESAdoptObjectId = -1;
+    return true;
 }
 
 MetadataNode* MetadataNode::GetInstanceMetadata(Isolate* isolate, const Local<Object>& value) {

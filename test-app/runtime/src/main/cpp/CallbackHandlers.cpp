@@ -95,6 +95,18 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
 
+    int adoptObjectId = -1;
+    if (MetadataNode::TryConsumePendingESAdopt(isolate, adoptObjectId)) {
+        // Adopt path: Java already created this object. Bind it to the ES
+        // construct and do not NewObject again (that would be a second
+        // instance, or recurse through initInstance).
+        objectManager->Link(jsObject, adoptObjectId, nullptr);
+        JEnv env;
+        jclass instanceClass = env.FindClass(fullClassName);
+        objectManager->SetJavaClass(jsObject, instanceClass);
+        return true;
+    }
+
     // The Java constructor may synchronously call back into JS (extended
     // class init) - that whole window is a JS-initiated chain.
     JavaCallScope javaCallScope(runtime);
