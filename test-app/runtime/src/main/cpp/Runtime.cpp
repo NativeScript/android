@@ -983,6 +983,14 @@ void Runtime::DestroyRuntime() {
   // is alive and its destructors can still touch v8::Global handles.
   IsolateTracked::SweepAll(m_isolate);
 
+  // Same reason: every still-linked Java<->JS wrapper holds a Persistent, a
+  // JSInstanceInfo and its weak-callback state, and those finalizers will
+  // never run now. The JNI half of ObjectManager is released later, in its
+  // destructor, once the isolate is gone.
+  if (m_objectManager != nullptr) {
+    m_objectManager->ReleaseAllRegistered();
+  }
+
   // Everything below still needs the isolate alive -- the caller disposes it
   // only after this returns -- but runs after the hooks above so nothing they
   // touch is pulled out from under them.

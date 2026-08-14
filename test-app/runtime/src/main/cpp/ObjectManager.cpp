@@ -220,7 +220,7 @@ Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID) {
     return handleScope.Escape(Local<Object>());
   }
 
-  Persistent<Object>* jsObject = it->second;
+  Persistent<Object>* jsObject = it->second->target;
 
   auto localObject = Local<Object>::New(isolate, *jsObject);
   return handleScope.Escape(localObject);
@@ -296,7 +296,7 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
   // link
   object->SetInternalField(jsInfoIdx, jsInfo);
 
-  m_idToObject.emplace(javaObjectID, objectHandle);
+  m_idToObject.emplace(javaObjectID, state);
 }
 
 bool ObjectManager::CloneLink(const Local<Object>& src,
@@ -460,6 +460,50 @@ int ObjectManager::GenerateNewObjectID() {
   return oldValue;
 }
 
+void ObjectManager::ReleaseAllRegistered() {
+  HandleScope handleScope(m_isolate);
+
+  auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+
+  // Detached first: nothing below should observe a half-emptied map, and the
+  // finalizers these handles were armed with will never run now anyway.
+  auto survivors = std::move(m_idToObject);
+  m_idToObject.clear();
+
+  for (auto& entry : survivors) {
+    ObjectWeakCallbackState* state = entry.second;
+    Persistent<Object>* po = state->target;
+
+    if (!po->IsEmpty()) {
+      auto local = po->Get(m_isolate);
+      if (!local.IsEmpty()) {
+        // Drop the back-pointer before the JSInstanceInfo goes away.
+        local->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+      }
+      po->Reset();
+    }
+
+    delete po;
+    delete state->jsInfo;
+    delete state;
+  }
+
+  if (m_poJsWrapperFunc != nullptr) {
+    m_poJsWrapperFunc->Reset();
+    delete m_poJsWrapperFunc;
+    m_poJsWrapperFunc = nullptr;
+  }
+}
+
+ObjectManager::~ObjectManager() {
+  // JNI only -- the isolate is already disposed by the time this runs. The LRU
+  // cache holds a JNI weak global ref per entry (up to its capacity) and only
+  // ever evicted them under capacity pressure, so a worker that touched Java
+  // objects abandoned the whole cache when it died. ART's weak-global table is
+  // bounded, so enough worker cycles turned that leak into an abort.
+  m_cache.clear();
+}
+
 void ObjectManager::ReleaseJSInstance(Persistent<Object>* po,
                                       JSInstanceInfo* jsInstanceInfo) {
   int javaObjectID = jsInstanceInfo->JavaObjectID;
@@ -473,9 +517,11 @@ void ObjectManager::ReleaseJSInstance(Persistent<Object>* po,
     throw NativeScriptException(ss.str());
   }
 
-  assert(po == it->second);
+  assert(po == it->second->target);
 
+  ObjectWeakCallbackState* callbackState = it->second;
   m_idToObject.erase(it);
+  delete callbackState;
   m_released.insert(po, javaObjectID);
   po->Reset();
 

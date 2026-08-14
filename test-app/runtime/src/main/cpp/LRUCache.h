@@ -105,6 +105,23 @@ class LRUCache {
             insert(key, ref);
         }
 
+
+        /*
+         * Evicts every entry, running the evict callback for each. Needed at
+         * teardown: the callback owns the resource behind each value (JNI weak
+         * global refs, here), and nothing else releases them -- eviction
+         * otherwise only happens on capacity pressure or invalidation.
+         */
+        void clear() {
+            if (m_evictCallback != nullptr) {
+                for (auto& entry : m_key_to_value) {
+                    m_evictCallback(entry.second.first, m_state);
+                }
+            }
+            m_key_to_value.clear();
+            m_key_tracker.clear();
+        }
+
     private:
 
         void evictKey(const key_type& key) {

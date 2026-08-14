@@ -19,6 +19,21 @@ class ObjectManager {
  public:
   ObjectManager(jobject javaRuntimeObject);
 
+  /*
+   * Frees the JS side of every still-linked object. Must run on the runtime's
+   * own thread while the isolate is alive -- it resets v8::Persistents and
+   * clears internal fields. V8 does not run weak callbacks at isolate
+   * disposal, so without this every linked wrapper's handle, JSInstanceInfo
+   * and callback state is abandoned.
+   */
+  void ReleaseAllRegistered();
+
+  /*
+   * JNI-only teardown; runs from ~Runtime, after the isolate is disposed and
+   * while the thread is still attached. Must not touch any v8 handle.
+   */
+  ~ObjectManager();
+
   void Init(v8::Isolate* isolate);
 
   JniLocalRef GetJavaObjectByJsObject(const v8::Local<v8::Object>& object);
@@ -201,7 +216,7 @@ class ObjectManager {
 
   std::stack<GarbageCollectionInfo> m_markedForGC;
 
-  std::unordered_map<int, v8::Persistent<v8::Object>*> m_idToObject;
+  std::unordered_map<int, ObjectWeakCallbackState*> m_idToObject;
 
   PersistentObjectIdSet m_released;
 
