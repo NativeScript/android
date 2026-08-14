@@ -115,19 +115,26 @@ class ArgConverter {
                 return v8::String::NewFromTwoByte(isolate, ((const uint16_t*) utf16string.data())).ToLocalChecked();
         }
 
-        static void onDisposeIsolate(v8::Isolate* isolate);
+        /*
+         * Per-runtime state (RuntimeState owns one of these per runtime, so it
+         * has to be constructible from outside ArgConverter). Destroyed with
+         * the runtime, while its isolate is still alive.
+         */
+        struct TypeLongOperationsCache {
+            v8::Persistent<v8::Function>* LongNumberCtorFunc = nullptr;
+
+            v8::Persistent<v8::NumberObject>* NanNumberObject = nullptr;
+
+            ~TypeLongOperationsCache() {
+                delete LongNumberCtorFunc;
+                delete NanNumberObject;
+            }
+        };
 
     private:
 
         // TODO: plamen5kov: rewrite logic for java long number operations in javascript (java long -> javascript number operations check)
         static const long long JS_LONG_LIMIT = ((long long) 1) << 53;
-
-        struct TypeLongOperationsCache {
-            v8::Persistent<v8::Function>* LongNumberCtorFunc;
-
-            v8::Persistent<v8::NumberObject>* NanNumberObject;
-        };
-        //
 
         static TypeLongOperationsCache* GetTypeLongCache(v8::Isolate* isolate);
 
@@ -146,11 +153,6 @@ class ArgConverter {
 
         static void NativeScriptLongToStringFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-        /*
-         * "s_type_long_operations_cache" used to keep function
-         * dealing with operations concerning java long -> javascript number.
-         */
-        static robin_hood::unordered_map<v8::Isolate*, TypeLongOperationsCache*> s_type_long_operations_cache;
 };
 }
 

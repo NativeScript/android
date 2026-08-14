@@ -31,7 +31,6 @@ class Console {
         static void timeCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-        static void onDisposeIsolate(v8::Isolate* isolate);
 
         // Builds this realm's inspect function if it isn't there yet. Public
         // so ns:util can re-export the same instance.
@@ -43,7 +42,6 @@ class Console {
         static int m_maxLogcatObjectSize;
         static ConsoleCallback m_callback;
         static const char* LOG_TAG;
-        static std::map<v8::Isolate*, std::map<std::string, double>> s_isolateToConsoleTimersMap;
 
         static void initInspect(v8::Local<v8::Context> context);
 

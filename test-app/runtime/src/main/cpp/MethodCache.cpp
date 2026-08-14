@@ -1,4 +1,6 @@
 #include "MethodCache.h"
+
+#include <shared_mutex>
 #include "JniLocalRef.h"
 #include "JsArgToArrayConverter.h"
 #include "MetadataNode.h"
@@ -13,6 +15,16 @@
 #include <sstream>
 
 using namespace v8;
+
+/*
+ * s_mthod_ctor_signature_cache is process-wide and string-keyed: it holds only
+ * JNI handles, so sharing it across runtimes is correct -- but every runtime
+ * resolves into it from its own thread, and workers run concurrently. Shared
+ * for lookups (the common case by far), exclusive only to publish a new entry.
+ * Never held across the JNI resolution itself: two threads may resolve the
+ * same signature, which is idempotent, and the first one published wins.
+ */
+static std::shared_mutex signatureCacheMutex;
 using namespace std;
 using namespace tns;
 
@@ -33,31 +45,34 @@ MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& c
     CacheMethodInfo method_info;
 
     auto encoded_method_signature = EncodeSignature(className, methodName, args, isStatic);
-    auto it = s_mthod_ctor_signature_cache.find(encoded_method_signature);
-
-    if (it == s_mthod_ctor_signature_cache.end()) {
-        auto signature = ResolveJavaMethod(args, className, methodName);
-
-        DEBUG_WRITE("ResolveMethodSignature %s='%s'", encoded_method_signature.c_str(), signature.c_str());
-
-        if (!signature.empty()) {
-            JEnv env;
-            auto clazz = env.FindClass(className);
-            assert(clazz != nullptr);
-            method_info.clazz = clazz;
-            method_info.signature = signature;
-            method_info.returnType = MetadataReader::ParseReturnType(method_info.signature);
-            method_info.retType = MetadataReader::GetReturnType(method_info.returnType);
-            method_info.isStatic = isStatic;
-            method_info.mid = isStatic
-                              ? env.GetStaticMethodID(clazz, methodName, signature)
-                              :
-                              env.GetMethodID(clazz, methodName, signature);
-
-            s_mthod_ctor_signature_cache.emplace(encoded_method_signature, method_info);
+    {
+        std::shared_lock<std::shared_mutex> lock(signatureCacheMutex);
+        auto it = s_mthod_ctor_signature_cache.find(encoded_method_signature);
+        if (it != s_mthod_ctor_signature_cache.end()) {
+            return it->second;
         }
-    } else {
-        method_info = (*it).second;
+    }
+
+    auto signature = ResolveJavaMethod(args, className, methodName);
+
+    DEBUG_WRITE("ResolveMethodSignature %s='%s'", encoded_method_signature.c_str(), signature.c_str());
+
+    if (!signature.empty()) {
+        JEnv env;
+        auto clazz = env.FindClass(className);
+        assert(clazz != nullptr);
+        method_info.clazz = clazz;
+        method_info.signature = signature;
+        method_info.returnType = MetadataReader::ParseReturnType(method_info.signature);
+        method_info.retType = MetadataReader::GetReturnType(method_info.returnType);
+        method_info.isStatic = isStatic;
+        method_info.mid = isStatic
+                          ? env.GetStaticMethodID(clazz, methodName, signature)
+                          :
+                          env.GetMethodID(clazz, methodName, signature);
+
+        std::unique_lock<std::shared_mutex> lock(signatureCacheMutex);
+        s_mthod_ctor_signature_cache.emplace(encoded_method_signature, method_info);
     }
 
     return method_info;
@@ -68,23 +83,26 @@ MethodCache::CacheMethodInfo MethodCache::ResolveConstructorSignature(const Args
 
     auto& args = argWrapper.args;
     auto encoded_ctor_signature = EncodeSignature(fullClassName, "<init>", args, false);
-    auto it = s_mthod_ctor_signature_cache.find(encoded_ctor_signature);
-
-    if (it == s_mthod_ctor_signature_cache.end()) {
-        auto signature = ResolveConstructor(args, javaClass, isInterface);
-
-        DEBUG_WRITE("ResolveConstructorSignature %s='%s'", encoded_ctor_signature.c_str(), signature.c_str());
-
-        if (!signature.empty()) {
-            JEnv env;
-            constructor_info.clazz = javaClass;
-            constructor_info.signature = signature;
-            constructor_info.mid = env.GetMethodID(javaClass, "<init>", signature);
-
-            s_mthod_ctor_signature_cache.emplace(encoded_ctor_signature, constructor_info);
+    {
+        std::shared_lock<std::shared_mutex> lock(signatureCacheMutex);
+        auto it = s_mthod_ctor_signature_cache.find(encoded_ctor_signature);
+        if (it != s_mthod_ctor_signature_cache.end()) {
+            return it->second;
         }
-    } else {
-        constructor_info = (*it).second;
+    }
+
+    auto signature = ResolveConstructor(args, javaClass, isInterface);
+
+    DEBUG_WRITE("ResolveConstructorSignature %s='%s'", encoded_ctor_signature.c_str(), signature.c_str());
+
+    if (!signature.empty()) {
+        JEnv env;
+        constructor_info.clazz = javaClass;
+        constructor_info.signature = signature;
+        constructor_info.mid = env.GetMethodID(javaClass, "<init>", signature);
+
+        std::unique_lock<std::shared_mutex> lock(signatureCacheMutex);
+        s_mthod_ctor_signature_cache.emplace(encoded_ctor_signature, constructor_info);
     }
 
     return constructor_info;

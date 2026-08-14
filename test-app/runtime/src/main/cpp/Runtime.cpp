@@ -20,6 +20,7 @@
 #include "File.h"
 #include "FrameCallbacks.h"
 #include "Interop.h"
+#include "IsolateTracked.h"
 #include "IsolateDisposer.h"
 #include "JType.h"
 #include "JsArgConverter.h"
@@ -32,6 +33,7 @@
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
 #include "NativeScriptPlatform.h"
+#include "RuntimeState.h"
 #include "napi/NapiEnv.h"
 #include "Performance.h"
 #include "SimpleAllocator.h"
@@ -147,6 +149,7 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
       m_runGC(false) {
   m_runtime = env->NewGlobalRef(runtime);
   m_objectManager = new ObjectManager(m_runtime);
+  m_state = std::make_unique<RuntimeState>();
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_id2RuntimeCache.emplace(id, this);
@@ -185,8 +188,7 @@ Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
    * is written once in PrepareV8Runtime before the isolate runs any JS, so
    * reading it requires no lock.
    */
-  auto runtime = static_cast<Runtime*>(
-      isolate->GetData((uint32_t)Runtime::IsolateData::RUNTIME));
+  auto runtime = TryGetRuntime(isolate);
   if (runtime != nullptr) {
     return runtime;
   }
@@ -208,9 +210,7 @@ Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
 }
 
 Runtime* Runtime::GetRuntimeFromIsolateData(v8::Isolate* isolate) {
-  void* maybeRuntime =
-      isolate->GetData((uint32_t)Runtime::IsolateData::RUNTIME);
-  auto runtime = static_cast<Runtime*>(maybeRuntime);
+  auto runtime = TryGetRuntime(isolate);
 
   if (runtime == nullptr) {
     stringstream ss;
@@ -309,8 +309,16 @@ Runtime::~Runtime() {
   if (platformInstance != nullptr && m_isolate != nullptr && m_eventLoop != nullptr) {
     platformInstance->IsolateDisposed(m_isolate, m_eventLoop);
   }
-  CallbackHandlers::RemoveIsolateEntries(m_isolate);
-  FrameCallbacks::RemoveIsolateEntries(m_isolate);
+
+  // Last: ObjectManager calls Java through this same object above, so the ref
+  // has to outlive it. Without this the com.tns.Runtime instance -- and every
+  // Java object the runtime ever strongly registered through it -- stays
+  // reachable for the life of the process.
+  if (m_runtime != nullptr) {
+    JEnv env;
+    env.DeleteGlobalRef(m_runtime);
+    m_runtime = nullptr;
+  }
 }
 
 std::string Runtime::ReadFileText(const std::string& filePath) {
@@ -615,7 +623,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
    * Setup the V8Platform only once per process - once for the application
    * lifetime Don't execute again if main thread has already been initialized
    */
-  if (!s_mainThreadInitialized) {
+  if (!s_mainThreadInitialized.load(std::memory_order_acquire)) {
     InitializeV8();
   }
 
@@ -743,7 +751,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URLPattern"),
                       URLPatternImpl::GetCtor(isolate));
 
-  if (!s_mainThreadInitialized) {
+  if (!s_mainThreadInitialized.load(std::memory_order_acquire)) {
     m_isMainThread = true;
     // __runOnMainThread closures from any runtime's thread land on this loop
     s_mainEventLoop = m_eventLoop;
@@ -847,7 +855,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   m_weakRef.Init(isolate, context);
 
   // Do not set 'self' accessor to main thread JavaScript
-  if (s_mainThreadInitialized) {
+  if (s_mainThreadInitialized.load(std::memory_order_acquire)) {
     global->DefineOwnProperty(context,
                               ArgConverter::ConvertToV8String(isolate, "self"),
                               global, readOnlyFlags);
@@ -877,7 +885,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   // Do not build metadata (which should be static for the process) for non-main
   // threads
-  if (!s_mainThreadInitialized) {
+  if (!s_mainThreadInitialized.load(std::memory_order_acquire)) {
     MetadataNode::BuildMetadata(filesPath);
   }
 
@@ -895,7 +903,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   this->m_napiEnv = NapiEnv::Create(context, m_eventLoop);
   s_currentRuntime = this;
 
-  s_mainThreadInitialized = true;
+  s_mainThreadInitialized.store(true, std::memory_order_release);
 
   return isolate;
 }
@@ -959,7 +967,50 @@ void Runtime::DestroyRuntime() {
   m_dispatchUnhandledRejectionFunc.Reset();
   m_dispatchRejectionHandledFunc.Reset();
   m_dispatchNativeUncaughtErrorFunc.Reset();
+
+  // Both hold v8::Global handles to JS callbacks, so their entries must be
+  // dropped here rather than in ~Runtime, which runs after Isolate::Dispose --
+  // resetting a Global then writes into a freed handle table. Doing it here
+  // also closes a window in which the main thread could take a Locker on this
+  // isolate (RunMainThreadEntry) after it had already been disposed.
+  CallbackHandlers::RemoveIsolateEntries(m_isolate);
+  FrameCallbacks::RemoveIsolateEntries(m_isolate);
+
   tns::disposeIsolate(m_isolate);
+
+  // V8 does not run weak callbacks when an isolate is disposed, so anything
+  // still bound to one has to be deleted explicitly, here, while the isolate
+  // is alive and its destructors can still touch v8::Global handles.
+  IsolateTracked::SweepAll(m_isolate);
+
+  // Everything below still needs the isolate alive -- the caller disposes it
+  // only after this returns -- but runs after the hooks above so nothing they
+  // touch is pulled out from under them.
+
+  // Cached per-isolate string constants; its destructor resets 19 handles. The
+  // slot is cleared so a stray lookup during the rest of teardown reads null
+  // rather than freed memory.
+  auto* consts = static_cast<V8StringConstants::PerIsolateV8Constants*>(
+      m_isolate->GetData((uint32_t)Runtime::IsolateData::CONSTANTS));
+  delete consts;
+  m_isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, nullptr);
+
+  if (m_gcFunc != nullptr) {
+    m_gcFunc->Reset();
+    delete m_gcFunc;
+    m_gcFunc = nullptr;
+  }
+  if (m_context != nullptr) {
+    m_context->Reset();
+    delete m_context;
+    m_context = nullptr;
+  }
+
+  // Last, so anything above still finds its state: this state holds
+  // v8::Persistents, which have to be released while the isolate is alive.
+  if (m_state != nullptr) {
+    m_state->Clear();
+  }
 }
 
 Local<Context> Runtime::GetContext() {
@@ -974,7 +1025,7 @@ jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 robin_hood::unordered_map<int, Runtime*> Runtime::s_id2RuntimeCache;
 robin_hood::unordered_map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 std::mutex Runtime::s_runtimeCacheMutex;
-bool Runtime::s_mainThreadInitialized = false;
+std::atomic<bool> Runtime::s_mainThreadInitialized{false};
 v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 std::shared_ptr<EventLoop> Runtime::s_mainEventLoop;

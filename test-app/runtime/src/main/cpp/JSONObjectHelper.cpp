@@ -2,6 +2,7 @@
 #include "JSONObjectHelper.h"
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
+#include "RuntimeState.h"
 #include "robin_hood.h"
 #include <sstream>
 #include <string>
@@ -9,7 +10,16 @@
 using namespace v8;
 using namespace tns;
 
-static robin_hood::unordered_map<Isolate*, Persistent<Function>*> isolateToSerializeFunc;
+namespace {
+// The compiled JS->org.json serializer, per runtime; see RuntimeState.h.
+struct SerializeFuncState {
+    Persistent<Function>* func = nullptr;
+
+    ~SerializeFuncState() {
+        delete func;
+    }
+};
+}  // namespace
 
 void JSONObjectHelper::RegisterFromFunction(Isolate *isolate, Local<Value>& jsonObject) {
     if (!jsonObject->IsFunction()) {
@@ -84,9 +94,12 @@ void JSONObjectHelper::ConvertCallbackStatic(const FunctionCallbackInfo<Value>& 
 Persistent<Function>* JSONObjectHelper::GetSerializeFunc(Local<Context> context) {
     Isolate* isolate = v8::Isolate::GetCurrent();
 
-    auto it = isolateToSerializeFunc.find(isolate);
-    if (it != isolateToSerializeFunc.end()) {
-        return it->second;
+    auto* state = RuntimeState::For<SerializeFuncState>(isolate);
+    if (state == nullptr) {
+        return nullptr;
+    }
+    if (state->func != nullptr) {
+        return state->func;
     }
 
     Local<Value> result;
@@ -95,16 +108,8 @@ Persistent<Function>* JSONObjectHelper::GetSerializeFunc(Local<Context> context)
         return nullptr;
     }
 
-    auto* serializeFunc = new Persistent<Function>(isolate, result.As<Function>());
-    isolateToSerializeFunc.emplace(isolate, serializeFunc);
+    state->func = new Persistent<Function>(isolate, result.As<Function>());
 
-    return serializeFunc;
+    return state->func;
 }
 
-void JSONObjectHelper::onDisposeIsolate(Isolate* isolate) {
-    auto it = isolateToSerializeFunc.find(isolate);
-    if (it != isolateToSerializeFunc.end()) {
-        delete it->second;
-        isolateToSerializeFunc.erase(it);
-    }
-}

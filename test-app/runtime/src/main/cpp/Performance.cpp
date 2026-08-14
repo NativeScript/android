@@ -11,15 +11,6 @@ namespace tns {
 
 namespace {
 
-/*
- * Non-throwing runtime lookup, safe from V8 callbacks that may fire while a
- * runtime is being torn down (Runtime::GetRuntime throws in that window).
- */
-Runtime* GetRuntimeOrNull(Isolate* isolate) {
-    return static_cast<Runtime*>(
-            isolate->GetData((uint32_t) Runtime::IsolateData::RUNTIME));
-}
-
 }  // namespace
 
 void Performance::Init(Local<Context> context) {
@@ -55,7 +46,7 @@ void Performance::Init(Local<Context> context) {
 }
 
 double Performance::NowMillis(Isolate* isolate) {
-    Runtime* runtime = GetRuntimeOrNull(isolate);
+    Runtime* runtime = Runtime::TryGetRuntime(isolate);
     if (runtime == nullptr) {
         return 0.0;
     }
@@ -64,7 +55,7 @@ double Performance::NowMillis(Isolate* isolate) {
 }
 
 double Performance::TimeOriginMillis(Isolate* isolate) {
-    Runtime* runtime = GetRuntimeOrNull(isolate);
+    Runtime* runtime = Runtime::TryGetRuntime(isolate);
     if (runtime == nullptr) {
         return 0.0;
     }
@@ -74,7 +65,7 @@ double Performance::TimeOriginMillis(Isolate* isolate) {
 
 double Performance::MonotonicNanosToTimelineMillis(Isolate* isolate,
                                                    int64_t nanos) {
-    Runtime* runtime = GetRuntimeOrNull(isolate);
+    Runtime* runtime = Runtime::TryGetRuntime(isolate);
     if (runtime == nullptr) {
         return 0.0;
     }

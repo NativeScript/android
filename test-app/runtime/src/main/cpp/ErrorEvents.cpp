@@ -11,15 +11,6 @@ using namespace tns;
 using namespace v8;
 
 /*
- * Non-throwing runtime lookup, safe from V8 callbacks that may fire while a
- * runtime is being torn down (Runtime::GetRuntime throws in that window).
- */
-static Runtime* GetRuntimeOrNull(Isolate* isolate) {
-    return static_cast<Runtime*>(
-            isolate->GetData((uint32_t) Runtime::IsolateData::RUNTIME));
-}
-
-/*
  * Native function handed to internal/error-events.js as `nativeReportFatal(error,
  * stackString)`. It runs the terminal tail (shim + log) WITHOUT re-dispatching
  * an event: reportError and listener-thrown errors have already gone through
@@ -38,7 +29,7 @@ static void NativeReportFatalCallback(const FunctionCallbackInfo<Value>& info) {
 
 void ErrorEvents::Init(Local<Context> context) {
     auto isolate = v8::Isolate::GetCurrent();
-    auto runtime = GetRuntimeOrNull(isolate);
+    auto runtime = Runtime::TryGetRuntime(isolate);
     if (runtime == nullptr) {
         throw NativeScriptException("ErrorEvents::Init: no runtime for isolate");
     }
@@ -81,7 +72,7 @@ void ErrorEvents::Init(Local<Context> context) {
 bool ErrorEvents::DispatchError(Isolate* isolate, Local<Value> error,
                                 const string& messageString,
                                 const string& stack) {
-    auto runtime = GetRuntimeOrNull(isolate);
+    auto runtime = Runtime::TryGetRuntime(isolate);
     if (runtime == nullptr || runtime->DispatchErrorEventFunc().IsEmpty()) {
         return false;
     }
@@ -104,7 +95,7 @@ bool ErrorEvents::DispatchError(Isolate* isolate, Local<Value> error,
 bool ErrorEvents::DispatchUnhandledRejection(Isolate* isolate,
                                              Local<Promise> promise,
                                              Local<Value> reason) {
-    auto runtime = GetRuntimeOrNull(isolate);
+    auto runtime = Runtime::TryGetRuntime(isolate);
     if (runtime == nullptr || runtime->DispatchUnhandledRejectionFunc().IsEmpty()) {
         return false;
     }
@@ -126,7 +117,7 @@ bool ErrorEvents::DispatchNativeUncaughtError(Isolate* isolate,
                                               Local<Value> error,
                                               const string& messageString,
                                               const string& stack) {
-    auto runtime = GetRuntimeOrNull(isolate);
+    auto runtime = Runtime::TryGetRuntime(isolate);
     if (runtime == nullptr || runtime->DispatchNativeUncaughtErrorFunc().IsEmpty()) {
         return false;
     }
@@ -149,7 +140,7 @@ bool ErrorEvents::DispatchNativeUncaughtError(Isolate* isolate,
 void ErrorEvents::DispatchRejectionHandled(Isolate* isolate,
                                            Local<Promise> promise,
                                            Local<Value> reason) {
-    auto runtime = GetRuntimeOrNull(isolate);
+    auto runtime = Runtime::TryGetRuntime(isolate);
     if (runtime == nullptr || runtime->DispatchRejectionHandledFunc().IsEmpty()) {
         return;
     }

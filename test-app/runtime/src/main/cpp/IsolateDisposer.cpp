@@ -15,10 +15,6 @@
 
 namespace tns {
     void disposeIsolate(v8::Isolate *isolate) {
-        tns::ArgConverter::onDisposeIsolate(isolate);
-        tns::MetadataNode::onDisposeIsolate(isolate);
-        tns::Console::onDisposeIsolate(isolate);
-        tns::JSONObjectHelper::onDisposeIsolate(isolate);
         tns::NsBuiltinModules::onDisposeIsolate(isolate);
         tns::BuiltinLoader::onDisposeIsolate(isolate);
         // clear all isolate bound objects

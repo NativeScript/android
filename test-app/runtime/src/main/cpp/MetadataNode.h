@@ -18,6 +18,7 @@
 //	....->InstanceProxy->EmptyInstance
 
 #include "v8.h"
+#include <atomic>
 #include "MetadataEntry.h"
 #include "MetadataTreeNode.h"
 #include "MetadataReader.h"
@@ -70,7 +71,6 @@ class MetadataNode {
 
         static bool TryGetPackageName(v8::Isolate* isolate, const v8::Local<v8::Object>& value, std::string& out);
 
-        static void onDisposeIsolate(v8::Isolate* isolate);
 
         static MetadataReader* getMetadataReader();
     private:
@@ -185,7 +185,6 @@ class MetadataNode {
                                    PrototypeTemplateFiller& protoFiller);
 
         MetadataTreeNode* m_treeNode;
-        robin_hood::unordered_map<v8::Isolate*, v8::Persistent<v8::Function>*> m_poCtorCachePerIsolate;
         std::string m_name;
         std::string m_implType;
         bool m_isArray;
@@ -195,9 +194,7 @@ class MetadataNode {
         static robin_hood::unordered_map<std::string, MetadataNode*> s_name2NodeCache;
         static robin_hood::unordered_map<std::string, MetadataTreeNode*> s_name2TreeNodeCache;
         static robin_hood::unordered_map<MetadataTreeNode*, MetadataNode*> s_treeNode2NodeCache;
-        static robin_hood::unordered_map<v8::Isolate*, MetadataNodeCache*> s_metadata_node_cache;
-        static robin_hood::unordered_map<v8::Isolate*, v8::Persistent<v8::ObjectTemplate>*> s_arrayObjectTemplates;
-        static bool s_profilerEnabled;
+        static std::atomic<bool> s_profilerEnabled;
 
         struct MethodCallbackData {
             MethodCallbackData()
@@ -275,14 +272,55 @@ class MetadataNode {
             MetadataNode* node;
         };
 
+        /*
+         * Metadata state for one runtime. Owned by RuntimeState, so it is
+         * reached without a shared container and destroyed with the runtime,
+         * while its isolate is still alive.
+         */
         struct MetadataNodeCache {
-            v8::Persistent<v8::String>* MetadataKey;
+            // Initialized rather than left indeterminate: the cache is created
+            // on first use, which may precede MetadataNode::Init populating
+            // these, and the destructor below releases them.
+            v8::Persistent<v8::String>* MetadataKey = nullptr;
 
-            v8::Persistent<v8::String>* PackageKey;
+            v8::Persistent<v8::String>* PackageKey = nullptr;
 
             robin_hood::unordered_map<MetadataTreeNode*, CtorCacheData> CtorFuncCache;
 
             robin_hood::unordered_map<std::string, MetadataNode::ExtendedClassCacheData> ExtendedCtorFuncCache;
+
+            // The array wrapper template for this runtime.
+            v8::Persistent<v8::ObjectTemplate>* ArrayObjectTemplate = nullptr;
+
+            /*
+             * This runtime's constructor function per node. The nodes
+             * themselves are shared between runtimes, so this cannot live on
+             * them -- it used to, as a map keyed by isolate, which meant every
+             * runtime's teardown walked every node to erase its entry.
+             */
+            robin_hood::unordered_map<MetadataNode*, v8::Persistent<v8::Function>*> CtorFunctions;
+
+            ~MetadataNodeCache() {
+                delete MetadataKey;
+                delete PackageKey;
+                delete ArrayObjectTemplate;
+                for (auto& entry : CtorFunctions) {
+                    delete entry.second;
+                }
+                /*
+                 * Freed from the maps rather than from CtorCacheData and
+                 * ExtendedClassCacheData themselves: both are held by value and
+                 * handed out by value (GetCachedExtendedClassData returns a
+                 * copy), and the copies share these raw pointers. A destructor
+                 * on either struct would turn every copy into a double free.
+                 */
+                for (auto& entry : CtorFuncCache) {
+                    delete entry.second.ft;
+                }
+                for (auto& entry : ExtendedCtorFuncCache) {
+                    delete entry.second.extendedCtorFunction;
+                }
+            }
         };
 };
 }
