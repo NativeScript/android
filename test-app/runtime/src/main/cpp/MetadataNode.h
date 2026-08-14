@@ -307,6 +307,19 @@ class MetadataNode {
                 for (auto& entry : CtorFunctions) {
                     delete entry.second;
                 }
+                /*
+                 * Freed from the maps rather than from CtorCacheData and
+                 * ExtendedClassCacheData themselves: both are held by value and
+                 * handed out by value (GetCachedExtendedClassData returns a
+                 * copy), and the copies share these raw pointers. A destructor
+                 * on either struct would turn every copy into a double free.
+                 */
+                for (auto& entry : CtorFuncCache) {
+                    delete entry.second.ft;
+                }
+                for (auto& entry : ExtendedCtorFuncCache) {
+                    delete entry.second.extendedCtorFunction;
+                }
             }
         };
 };
