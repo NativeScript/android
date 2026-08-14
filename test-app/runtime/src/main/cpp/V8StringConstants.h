@@ -151,7 +151,10 @@ class V8StringConstants {
             ~PerIsolateV8Constants() {
                 // Persistent's traits do not reset in the destructor, so each
                 // handle is reset explicitly (requires a live isolate) and then
-                // freed. Generated from the member list -- keep the two in step.
+                // freed. Every member is default-initialized because not all of
+                // them are allocated by the constructor -- DEBUG_NAME_PERSISTENT
+                // never is, and the previous version of this destructor reset it
+                // unconditionally, which would have faulted had it ever run.
                 ResetAndDelete(CLASS_IMPLEMENTATION_OBJECT_PERSISTENT);
                 ResetAndDelete(DEBUG_NAME_PERSISTENT);
                 ResetAndDelete(DISCARDED_ERROR_PERSISTENT);
@@ -182,26 +185,26 @@ class V8StringConstants {
                 }
             }
 
-            v8::Persistent<v8::String>* CLASS_IMPLEMENTATION_OBJECT_PERSISTENT;
-            v8::Persistent<v8::String>* DEBUG_NAME_PERSISTENT;
-            v8::Persistent<v8::String>* EXTEND_PERSISTENT;
-            v8::Persistent<v8::String>* NULL_OBJECT_PERSISTENT;
-            v8::Persistent<v8::String>* NULL_NODE_NAME_PERSISTENT;
-            v8::Persistent<v8::String>* IS_PROTOTYPE_IMPLEMENTATION_OBJECT_PERSISTENT;
-            v8::Persistent<v8::String>* NATIVE_EXCEPTION_PERSISTENT;
-            v8::Persistent<v8::String>* STACK_PERSISTENT;
-            v8::Persistent<v8::String>* STACK_TRACE_PERSISTENT;
-            v8::Persistent<v8::String>* LONG_NUMBER_PERSISTENT;
-            v8::Persistent<v8::String>* PROTOTYPE_PERSISTENT;
-            v8::Persistent<v8::String>* SUPER_PERSISTENT;
-            v8::Persistent<v8::String>* TARGET_PERSISTENT;
-            v8::Persistent<v8::String>* TO_STRING_PERSISTENT;
-            v8::Persistent<v8::String>* JAVA_LONG_PERSISTENT;
-            v8::Persistent<v8::String>* VALUE_OF_PERSISTENT;
-            v8::Persistent<v8::String>* VALUE_PERSISTENT;
-            v8::Persistent<v8::String>* UNCAUGHT_ERROR_PERSISTENT;
-            v8::Persistent<v8::String>* DISCARDED_ERROR_PERSISTENT;
-            v8::Persistent<v8::String>* IMPLEMENTATION_OBJECT_PERSISTENT;
+            v8::Persistent<v8::String>* CLASS_IMPLEMENTATION_OBJECT_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* DEBUG_NAME_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* EXTEND_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* NULL_OBJECT_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* NULL_NODE_NAME_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* IS_PROTOTYPE_IMPLEMENTATION_OBJECT_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* NATIVE_EXCEPTION_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* STACK_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* STACK_TRACE_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* LONG_NUMBER_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* PROTOTYPE_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* SUPER_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* TARGET_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* TO_STRING_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* JAVA_LONG_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* VALUE_OF_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* VALUE_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* UNCAUGHT_ERROR_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* DISCARDED_ERROR_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* IMPLEMENTATION_OBJECT_PERSISTENT = nullptr;
         };
 
     private:
