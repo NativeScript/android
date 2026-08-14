@@ -167,6 +167,7 @@ add_library(
         src/main/cpp/CallbackHandlers.cpp
         src/main/cpp/ConcurrentQueue.cpp
         src/main/cpp/Constants.cpp
+        src/main/cpp/CrashBreadcrumbs.cpp
         src/main/cpp/DirectBuffer.cpp
         src/main/cpp/ErrorEvents.cpp
         src/main/cpp/EventLoop.cpp
