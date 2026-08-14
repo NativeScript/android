@@ -13,6 +13,7 @@
 #include "V8GlobalHelpers.h"
 #include "NativeScriptAssert.h"
 #include "Constants.h"
+#include "CrashBreadcrumbs.h"
 #include "NativeScriptException.h"
 #include "NsBuiltinModules.h"
 #include "napi/NapiModules.h"
@@ -363,6 +364,7 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleNam
 Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& modulePath, const string& moduleCacheKey) {
     string frameName("LoadModule " + modulePath);
     tns::instrumentation::Frame frame(frameName);
+    CrashBreadcrumbs::ModuleScope moduleBreadcrumb(modulePath.c_str());
     Local<Object> result;
 
     auto context = isolate->GetCurrentContext();

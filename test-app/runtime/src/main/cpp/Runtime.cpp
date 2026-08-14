@@ -5,7 +5,6 @@
 #include <unistd.h>
 
 #include <chrono>
-#include <csignal>
 #include <mutex>
 #include <sstream>
 #include <thread>
@@ -15,6 +14,7 @@
 #include "BuiltinLoader.h"
 #include "CallbackHandlers.h"
 #include "Constants.h"
+#include "CrashBreadcrumbs.h"
 #include "ErrorEvents.h"
 #include "Events.h"
 #include "File.h"
@@ -64,26 +64,6 @@ using namespace tns;
 bool tns::LogEnabled = true;
 SimpleAllocator g_allocator;
 
-void SIG_handler(int sigNumber) {
-  stringstream msg;
-  msg << "JNI Exception occurred (";
-  switch (sigNumber) {
-    case SIGABRT:
-      msg << "SIGABRT";
-      break;
-    case SIGSEGV:
-      msg << "SIGSEGV";
-      break;
-    default:
-      // Shouldn't happen, but for completeness
-      msg << "Signal #" << sigNumber;
-      break;
-  }
-  msg << ").\n=======\nCheck the 'adb logcat' for additional information about "
-         "the error.\n=======\n";
-  throw NativeScriptException(msg.str());
-}
-
 void LogAndAbortUncaught() {
   try {
     throw;  // rethrow the current unknown
@@ -115,15 +95,8 @@ void Runtime::Init(JavaVM* vm, void* reserved) {
     JEnv::Init(s_jvm);
   }
 
-  // handle SIGABRT/SIGSEGV only on API level > 20 as the handling is not so
-  // efficient in older versions
-  if (m_androidVersion > 20) {
-    struct sigaction action = {};
-    action.sa_handler = SIG_handler;
-    sigemptyset(&action.sa_mask);
-    sigaction(SIGABRT, &action, NULL);
-    sigaction(SIGSEGV, &action, NULL);
-  }
+  CrashBreadcrumbs::Install();
+
   // Set terminate handler for uncaught exceptions
   std::set_terminate(LogAndAbortUncaught);
 }
@@ -256,6 +229,11 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
   auto nativeLibDirStr = ArgConverter::jstringToString(nativeLibDir);
   auto packageNameStr = ArgConverter::jstringToString(packageName);
   auto callingDirStr = ArgConverter::jstringToString(callingDir);
+
+  // Runs on this runtime's own thread, for the main runtime and for workers
+  // alike, so the calling thread is the one the breadcrumb should name.
+  CrashBreadcrumbs::OpenStore(filesRoot);
+  CrashBreadcrumbs::RegisterRuntime(m_id);
 
   Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
   // read config options passed from Java
@@ -936,6 +914,7 @@ double Runtime::PerformanceNowMillis() {
 }
 
 void Runtime::DestroyRuntime() {
+  CrashBreadcrumbs::UnregisterRuntime(m_id);
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_id2RuntimeCache.erase(m_id);
