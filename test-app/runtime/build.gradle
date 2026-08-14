@@ -161,6 +161,51 @@ android {
 
 }
 
+// Ships the Node-API headers inside the .aar as a header-only prefab package,
+// so a plugin's native build gets the ecosystem-standard bare
+// `#include <node_api.h>` (required by node-addon-api) with
+//   android { buildFeatures { prefab true } }
+//   find_package(NativeScript REQUIRED CONFIG)
+//   target_link_libraries(<plugin> NativeScript::NativeScript)
+// The package is hand-authored rather than AGP-generated: AGP's
+// prefabPublishing would name the package after the gradle project, record
+// the c++_static STL (which prefab's consumer check rejects for a shared
+// library no matter the consumer's STL), and bundle the unstripped .so.
+// Header-only carries none of that. Linking follows the same convention V8
+// plugins already use: link against the runtime .so extracted from this .aar
+// and exclude it from packaging (see docs/node-api.md).
+//
+// Only the public Node-API surface is exported: the vendored engine headers
+// (js_native_api_v8.h) and the shim stay internal.
+def napiPrefabDir = layout.buildDirectory.dir("napi-prefab")
+tasks.register("stageNapiPrefab", Sync) {
+    into napiPrefabDir
+    from("prefab-package") {
+        // prefab.json at the package root, module.json inside the module
+        eachFile { f ->
+            if (f.name == "module.json") {
+                f.path = "prefab/modules/NativeScript/module.json"
+            } else {
+                f.path = "prefab/${f.name}"
+            }
+        }
+    }
+    from("src/main/cpp/napi/vendor") {
+        include "node_api.h", "node_api_types.h", "js_native_api.h", "js_native_api_types.h"
+        into "prefab/modules/NativeScript/include"
+    }
+    from("src/main/cpp/napi/NapiRuntime.h") {
+        into "prefab/modules/NativeScript/include"
+    }
+    includeEmptyDirs = false
+}
+afterEvaluate {
+    tasks.withType(com.android.build.gradle.tasks.BundleAar).configureEach {
+        dependsOn("stageNapiPrefab")
+        from(napiPrefabDir)
+    }
+}
+
 allprojects {
  afterEvaluate {
     tasks.withType(JavaCompile).configureEach {

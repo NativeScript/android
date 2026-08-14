@@ -12,6 +12,9 @@
   global:
     Java_*;
     JNI_OnLoad;
+    napi_*;
+    node_api_*;
+    NativeScriptNapiEnv;
     extern "C++" {
       v8::[A-Z]*;
       v8::api_internal::*;

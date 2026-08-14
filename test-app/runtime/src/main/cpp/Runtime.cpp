@@ -32,6 +32,7 @@
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
 #include "NativeScriptPlatform.h"
+#include "napi/NapiEnv.h"
 #include "Performance.h"
 #include "SimpleAllocator.h"
 #include "SimpleProfiler.h"
@@ -891,6 +892,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   this->m_context = new Persistent<Context>(isolate, context);
 
+  this->m_napiEnv = NapiEnv::Create(context, m_eventLoop);
+  s_currentRuntime = this;
+
   s_mainThreadInitialized = true;
 
   return isolate;
@@ -934,6 +938,18 @@ void Runtime::DestroyRuntime() {
     // and v8 teardown posts have their work dropped from now on
     m_eventLoop->Shutdown();
   }
+  if (m_napiEnv != nullptr) {
+    // After Shutdown so no queued Node-API entry can run against a dying env,
+    // and before disposeIsolate: the env's reference lists hold v8::Globals,
+    // so its teardown needs the isolate alive and locked. The Locker is
+    // reentrant for the worker path, which already holds it here.
+    v8::Locker locker(m_isolate);
+    NapiEnv::Destroy(static_cast<NapiEnv*>(m_napiEnv));
+    m_napiEnv = nullptr;
+  }
+  if (s_currentRuntime == this) {
+    s_currentRuntime = nullptr;
+  }
   // The events state holds v8::Global handles (backing event target, dispatch
   // closures and tracked promise rejections) - reset them while the isolate
   // is still alive.
@@ -962,3 +978,27 @@ bool Runtime::s_mainThreadInitialized = false;
 v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 std::shared_ptr<EventLoop> Runtime::s_mainEventLoop;
+
+thread_local Runtime* Runtime::s_currentRuntime = nullptr;
+
+napi_env Runtime::GetNapiEnvIfAlive(const Runtime* runtime) {
+  if (runtime == nullptr) {
+    return nullptr;
+  }
+
+  std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
+  for (const auto& entry : s_isolate2RuntimesCache) {
+    Runtime* candidate = entry.second;
+    // The home-thread comparison closes the allocator-reuse (ABA) hole: a
+    // stale thread-local can only exist on the dead runtime's home thread,
+    // and a recycled same-address Runtime homed on this thread would have
+    // overwritten that thread-local — so an address match homed on a foreign
+    // thread can only be a recycled pointer.
+    if (candidate == runtime && candidate->m_napiEnv != nullptr &&
+        static_cast<NapiEnv*>(candidate->m_napiEnv)->HomeThread() ==
+            std::this_thread::get_id()) {
+      return candidate->m_napiEnv;
+    }
+  }
+  return nullptr;
+}
