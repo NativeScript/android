@@ -16,6 +16,7 @@ env:
   NPM_TAG: "next"
   EMULATOR_NAME: "runtime-emu"
   NDK_VERSION: r29
+  CMAKE_VERSION: "3.31.6"
   ANDROID_API: 33
   ANDROID_ABI: x86_64
   NDK_ARCH: linux
@@ -53,7 +54,7 @@ jobs:
         uses: android-actions/setup-android@651bceb6f9ca583f16b8d75b62c36ded2ae6fc9c # v4.0.0
       - name: Setup NDK
         run: |
-          echo "y" | sdkmanager "cmake;3.6.4111459"
+          echo "y" | sdkmanager "cmake;$CMAKE_VERSION"
           wget -q https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           chmod +x android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           unzip -q android-ndk-$NDK_VERSION-$NDK_ARCH.zip
@@ -62,6 +63,23 @@ jobs:
           echo ANDROID_NDK_HOME=${ANDROID_NDK_HOME} >> $GITHUB_ENV
           echo ANDROID_NDK=${ANDROID_NDK_HOME} >> $GITHUB_ENV
           echo ${ANDROID_NDK_HOME} >> $GITHUB_PATH
+      - name: Setup ccache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.ccache
+          key: ccache-build-${{ github.sha }}
+          restore-keys: ccache-build-
+      - name: Configure build caches
+        run: |
+          command -v ccache || sudo apt-get install -y ccache
+          ccache --version
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=1G" >> $GITHUB_ENV
+          # the NDK is unzipped fresh every run, so mtime-based compiler
+          # identification (the default) would invalidate the whole cache
+          echo "CCACHE_COMPILERCHECK=content" >> $GITHUB_ENV
+          mkdir -p ~/.gradle
+          printf 'org.gradle.parallel=true\norg.gradle.caching=true\n' >> ~/.gradle/gradle.properties
       - name: Install Dependencies
         run: |
           npm install
@@ -96,7 +114,9 @@ jobs:
       - name: Fetch prebuilt V8
         run: ./download_v8.sh
       - name: Build npm package
-        run: ./gradlew -PgitCommitVersion=${{ github.sha }} -PnoCCache --stacktrace
+        run: ./gradlew -PgitCommitVersion=${{ github.sha }} --stacktrace
+      - name: ccache stats
+        run: ccache -s
       - name: Upload npm package artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -133,7 +153,7 @@ jobs:
         uses: android-actions/setup-android@651bceb6f9ca583f16b8d75b62c36ded2ae6fc9c # v4.0.0
       - name: Setup NDK
         run: |
-          echo "y" | sdkmanager "cmake;3.6.4111459"
+          echo "y" | sdkmanager "cmake;$CMAKE_VERSION"
           wget -q https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           chmod +x android-ndk-$NDK_VERSION-$NDK_ARCH.zip
           unzip -q android-ndk-$NDK_VERSION-$NDK_ARCH.zip
@@ -142,6 +162,26 @@ jobs:
           echo ANDROID_NDK_HOME=${ANDROID_NDK_HOME} >> $GITHUB_ENV
           echo ANDROID_NDK=${ANDROID_NDK_HOME} >> $GITHUB_ENV
           echo ${ANDROID_NDK_HOME} >> $GITHUB_PATH
+      - name: Setup ccache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.ccache
+          key: ccache-test-${{ github.sha }}
+          restore-keys: ccache-test-
+      - name: Configure build caches
+        # no org.gradle.caching here: the SBG AST tests spawn nested `gradlew -b`
+        # builds that fail with "Build cache controller already set" when the
+        # build cache is on
+        run: |
+          command -v ccache || sudo apt-get install -y ccache
+          ccache --version
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=1G" >> $GITHUB_ENV
+          # the NDK is unzipped fresh every run, so mtime-based compiler
+          # identification (the default) would invalidate the whole cache
+          echo "CCACHE_COMPILERCHECK=content" >> $GITHUB_ENV
+          mkdir -p ~/.gradle
+          printf 'org.gradle.parallel=true\n' >> ~/.gradle/gradle.properties
       - name: Install Dependencies
         run: |
           npm install
@@ -162,7 +202,8 @@ jobs:
           # this is needed on API 30+
           #target: google_apis
           arch: ${{env.ANDROID_ABI}}
-          script: ./gradlew runtestsAndVerifyResults --stacktrace
+          # only build native code for the ABI the emulator actually runs
+          script: ./gradlew runtestsAndVerifyResults -Pabis=${{env.ANDROID_ABI}} --stacktrace
       - name: Upload Test Results
         if: ${{ !cancelled() }} # run this step even if previous step failed
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

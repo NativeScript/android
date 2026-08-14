@@ -4,6 +4,7 @@ def runOnDeviceOrEmulator = runOnDevice ? "-d" : "-e"
 
 def onlyX86 = project.hasProperty("onlyX86")
 def useCCache = project.hasProperty("useCCache")
+def selectedAbis = project.hasProperty("abis") ? project.property("abis") : null
 
 // task deleteDist(type: Delete) {
 //     doFirst {
@@ -36,6 +37,9 @@ def getBuildArguments = { ->
     }
     if (useCCache) {
         arguments.add("-PuseCCache")
+    }
+    if (selectedAbis != null) {
+        arguments.add("-Pabis=${selectedAbis}")
     }
 
     arguments.add("-PuseKotlin=true")

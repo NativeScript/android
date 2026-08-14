@@ -115,12 +115,10 @@ android {
                 if (optimizedWithInspector) {
                     arguments.add("-DOPTIMIZED_WITH_INSPECTOR_BUILD=true")
                 }
-//
-//                if (useCCache) {
-//                    arguments.add("-DUSE_CCACHE=true")
-//                }
-//
-//                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}"
+
+                if (useCCache) {
+                    arguments.add("-DUSE_CCACHE=true")
+                }
 
                 cppFlags "-std=c++20"
                 arguments "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
@@ -154,7 +152,7 @@ android {
     }
     externalNativeBuild {
         cmake {
-            // version "3.18.1"
+            version "3.31.6"
             path "CMakeLists.txt"
         }
     }
@@ -247,73 +245,9 @@ tasks.configureEach { task ->
         task.finalizedBy createPackageConfigFileTask(taskName)
     }
 
-    if (task =~ /configureCMake.*/) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (task =~ /buildCMake.*/) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (taskName.contains("syncReleaseLibJars") || taskName.contains("syncDebugLibJars")) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (taskName.contains("mergeReleaseJniLibFolders") || taskName.contains("mergeDebugJniLibFolders")) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (taskName.contains("mergeReleaseShaders") || taskName.contains("mergeDebugShaders")) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (taskName.contains("packageReleaseAssets") || taskName.contains("packageDebugAssets")) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (taskName.contains("copyReleaseJniLibsProjectOnly") || taskName.contains("copyDebugJniLibsProjectOnly")) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (taskName.contains("copyReleaseJniLibsProjectAndLocalJars") || taskName.contains("copyDebugJniLibsProjectAndLocalJars")) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (taskName.contains("generateReleaseLintVitalModel") || taskName.contains("generateDebugLintVitalModel")) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (taskName.contains("lintVitalAnalyzeRelease") || taskName.contains("lintVitalAnalyzeDebug")) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (task =~ /lintAnalyze.+AndroidTest/) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (task =~ /compile.+UnitTestJavaWithJavac/) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (task =~ /generate.+LintModel/) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (task =~ /process.+Manifest/) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (task =~ /merge.+Resources/) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (task =~ /verify.+Resources/) {
-        task.finalizedBy(":app:buildMetadata")
-    }
-
-    if (task =~ /test.+UnitTest/) {
-        task.finalizedBy(":app:buildMetadata")
-    }
+    // Do not wire :app:buildMetadata onto runtime tasks: the app declares its own
+    // dependency on it (merge*Assets), and forcing it here drags a full :app build
+    // (both variants) into every standalone :runtime:assembleRelease.
 }
 
 task 'setPackageVersion' {
