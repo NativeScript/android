@@ -149,6 +149,10 @@ class Runtime {
 
         int GetId();
 
+        bool IsWorker() const {
+            return !m_isMainThread;
+        }
+
         v8::Local<v8::Context> GetContext();
 
         static v8::Platform* platform;

@@ -303,17 +303,162 @@ describe("Tests native ES class extensions (class X extends NativeType)", functi
         }).not.toThrow();
     });
 
-    it("When_the_NativeClass_decorator_is_applied_it_should_be_a_noop", function () {
+    it("When_java_instantiates_an_es_class_the_js_constructor_and_fields_should_run", function () {
+        var constructorRuns = 0;
+
+        class ESAllocCtorObject extends java.lang.Object {
+            field = 42;
+
+            constructor() {
+                super();
+                constructorRuns++;
+                this.initializedFromJs = true;
+            }
+        }
+
+        // Objects Java allocates — Class.newInstance here, but equally view
+        // inflation or framework construction — are adopted into a real ES
+        // construct so class fields and the constructor body run on both paths.
+        var allocated = ESAllocCtorObject.class.newInstance();
+        expect(constructorRuns).toBe(1);
+        expect(allocated.field).toBe(42);
+        expect(allocated.initializedFromJs).toBe(true);
+        expect(allocated instanceof ESAllocCtorObject).toBe(true);
+
+        var constructed = new ESAllocCtorObject();
+        expect(constructorRuns).toBe(2);
+        expect(constructed.field).toBe(42);
+        expect(constructed.initializedFromJs).toBe(true);
+    });
+
+    it("When_java_instantiates_an_es_class_private_fields_should_be_readable", function () {
+        class ESPrivateAllocObject extends java.lang.Object {
+            #a = 1;
+
+            constructor() {
+                super();
+            }
+
+            someMethod() {
+                return this.#a;
+            }
+        }
+
+        expect(new ESPrivateAllocObject().someMethod()).toBe(1);
+        expect(ESPrivateAllocObject.class.newInstance().someMethod()).toBe(1);
+    });
+
+    it("When_java_instantiates_an_es_class_super_args_should_not_construct_again", function () {
+        class ESAdoptOnceObject extends com.tns.tests.DummyClass {
+            constructor() {
+                super("from-super");
+            }
+        }
+
+        // Java already called the no-arg DummyClass ctor (nameField = "dummy").
+        // Adopt must not run DummyClass(String).
+        var allocated = ESAdoptOnceObject.class.newInstance();
+        expect(allocated.nameField).toBe("dummy");
+        expect(allocated instanceof ESAdoptOnceObject).toBe(true);
+
+        var constructed = new ESAdoptOnceObject();
+        expect(constructed.nameField).toBe("from-super");
+        expect(constructed instanceof ESAdoptOnceObject).toBe(true);
+    });
+
+    it("When_an_es_class_constructor_throws_both_paths_should_surface_the_error", function () {
+        class ESThrowingCtorObject extends java.lang.Object {
+            constructor() {
+                super();
+                throw new Error("adopt construct failed");
+            }
+        }
+
+        var threw = false;
+        try {
+            ESThrowingCtorObject.class.newInstance();
+        } catch (e) {
+            threw = true;
+        }
+        expect(threw).toBe(true);
+
+        threw = false;
+        try {
+            new ESThrowingCtorObject();
+        } catch (e) {
+            threw = true;
+        }
+        expect(threw).toBe(true);
+    });
+
+    it("When_the_NativeClass_decorator_is_applied_it_should_apply_android_options", function () {
         expect(typeof global.NativeClass).toBe("function");
 
-        const DecoratedButton = global.NativeClass(class DecoratedButton extends com.tns.tests.Button1 {
+        const ESDecoratedPlain = global.NativeClass(class ESDecoratedPlainObject extends com.tns.tests.Button1 {
             getIMAGE_ID_PROP() {
                 return "decorated";
             }
         });
 
-        var button = new DecoratedButton();
+        var button = new ESDecoratedPlain();
+        expect(button instanceof ESDecoratedPlain).toBe(true);
         expect(button.getIMAGE_ID_PROP()).toBe("decorated");
+
+        var ran = { value: false };
+        const ESDecoratedInterfaces = global.NativeClass({
+            android: {
+                interfaces: [java.lang.Runnable]
+            }
+        })(
+            class ESDecoratedInterfacesObject extends java.lang.Object {
+                run() {
+                    ran.value = true;
+                }
+            }
+        );
+
+        var instance = new ESDecoratedInterfaces();
+        expect(instance instanceof java.lang.Runnable).toBe(true);
+
+        var thread = new java.lang.Thread(instance);
+        thread.run();
+        expect(ran.value).toBe(true);
+    });
+
+    it("When_NativeClass_sets_an_android_name_the_proxy_should_register_immediately", function () {
+        const ESEagerNamed = global.NativeClass({
+            android: {
+                name: "com.tns.gen.ESEagerNamedObject"
+            }
+        })(class UnusedJsNameForEager extends java.lang.Object {
+        });
+
+        expect(ESEagerNamed.class.getName()).toBe("com.tns.gen.ESEagerNamedObject");
+        expect(java.lang.Class.forName("com.tns.gen.ESEagerNamedObject", false, appClassLoader).equals(ESEagerNamed.class)).toBe(true);
+        expect(new ESEagerNamed() instanceof ESEagerNamed).toBe(true);
+    });
+
+    it("When_NativeClass_runs_on_a_worker_it_should_be_a_noop", function (done) {
+        var worker = new Worker("../shared/Workers/EvalWorker.js");
+        worker.onmessage = function (msg) {
+            expect(msg.data.isFunction).toBe(true);
+            expect(msg.data.isWorker).toBe(true);
+            expect(msg.data.hasName).toBe(false);
+            expect(msg.data.found).toBe(false);
+            worker.terminate();
+            done();
+        };
+        worker.onerror = function (error) {
+            fail("worker failed: " + error.message);
+            worker.terminate();
+            done();
+        };
+        worker.postMessage({
+            eval: "var C = NativeClass({ android: { name: 'com.tns.gen.TNSWorkerNativeClassName' } })(class TNSWorkerNativeClass extends java.lang.Object {}); " +
+                  "var found = false; " +
+                  "try { java.lang.Class.forName('com.tns.gen.TNSWorkerNativeClassName'); found = true; } catch (e) {} " +
+                  "postMessage({ isFunction: typeof NativeClass === 'function', isWorker: !!__ns__worker, hasName: C.nativeClassName === 'com.tns.gen.TNSWorkerNativeClassName', found: found });"
+        });
     });
 
     it("When_anonymous_es_classes_extend_native_types_each_should_get_a_distinct_proxy", function () {
