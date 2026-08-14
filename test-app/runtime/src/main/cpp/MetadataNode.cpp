@@ -1,4 +1,5 @@
 #include "MetadataNode.h"
+#include "RuntimeState.h"
 #include "NativeScriptAssert.h"
 #include "Constants.h"
 #include "Util.h"
@@ -82,9 +83,9 @@ bool MetadataNode::TryGetPackageName(Isolate* isolate, const Local<Object>& valu
 }
 
 Local<ObjectTemplate> MetadataNode::GetOrCreateArrayObjectTemplate(Isolate* isolate) {
-    auto it = s_arrayObjectTemplates.find(isolate);
-    if (it != s_arrayObjectTemplates.end()) {
-        return it->second->Get(isolate);
+    auto cache = GetMetadataNodeCache(isolate);
+    if (cache->ArrayObjectTemplate != nullptr) {
+        return cache->ArrayObjectTemplate->Get(isolate);
     }
 
     auto arrayObjectTemplate = ObjectTemplate::New(isolate);
@@ -92,7 +93,7 @@ Local<ObjectTemplate> MetadataNode::GetOrCreateArrayObjectTemplate(Isolate* isol
     arrayObjectTemplate->SetHandler(IndexedPropertyHandlerConfiguration(
             ArrayIndexedPropertyGetterCallback, ArrayIndexedPropertySetterCallback));
 
-    s_arrayObjectTemplates.emplace(std::make_pair(isolate, new Persistent<ObjectTemplate>(isolate, arrayObjectTemplate)));
+    cache->ArrayObjectTemplate = new Persistent<ObjectTemplate>(isolate, arrayObjectTemplate);
 
     return arrayObjectTemplate;
 }
@@ -721,7 +722,7 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
                 callbackData->parent = *itFound;
             }
 
-            if (s_profilerEnabled) {
+            if (s_profilerEnabled.load(std::memory_order_relaxed)) {
                 Local<External> funcData = External::New(isolate, callbackData, v8::kExternalPointerTypeTagDefault);
                 Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
                 auto func = funcTemplate->GetFunction(context).ToLocalChecked();
@@ -965,8 +966,9 @@ void MetadataNode::InnerTypeAccessorGetterCallback(v8::Local<v8::Name> property,
     MetadataTreeNode* curChild = static_cast<MetadataTreeNode*>(
         v8::External::Cast(*info.Data())->Value(v8::kExternalPointerTypeTagDefault));
     auto childNode = GetOrCreateInternal(curChild);
-    auto itFound = childNode->m_poCtorCachePerIsolate.find(isolate);
-    if (itFound != childNode->m_poCtorCachePerIsolate.end()) {
+    auto innerCache = GetMetadataNodeCache(isolate);
+    auto itFound = innerCache->CtorFunctions.find(childNode);
+    if (itFound != innerCache->CtorFunctions.end()) {
         info.GetReturnValue().Set(itFound->second->Get(isolate));
         return;
     }
@@ -1086,7 +1088,7 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     node->SetStaticMembers(isolate, wrappedCtorFunc, treeNode, curPtr);
 
     // insert isolate-specific persistent function handle
-    node->m_poCtorCachePerIsolate.insert({isolate, new Persistent<Function>(isolate, wrappedCtorFunc)});
+    cache->CtorFunctions.emplace(node, new Persistent<Function>(isolate, wrappedCtorFunc));
     if (!baseCtorFunc.IsEmpty()) {
         auto currentContext = isolate->GetCurrentContext();
         wrappedCtorFunc->SetPrototype(currentContext, baseCtorFunc);
@@ -1116,8 +1118,9 @@ Local<Function> MetadataNode::GetConstructorFunction(Isolate* isolate) {
 }
 
 Persistent<Function>* MetadataNode::GetPersistentConstructorFunction(Isolate* isolate) {
-    auto itFound = m_poCtorCachePerIsolate.find(isolate);
-    if (itFound != m_poCtorCachePerIsolate.end()) {
+    auto cache = GetMetadataNodeCache(isolate);
+    auto itFound = cache->CtorFunctions.find(this);
+    if (itFound != cache->CtorFunctions.end()) {
         auto& constrFunction = itFound->second;
 
         return constrFunction;
@@ -2063,19 +2066,17 @@ void MetadataNode::CreateTopLevelNamespaces(Isolate* isolate, const Local<Object
 }
 
 MetadataNode::MetadataNodeCache* MetadataNode::GetMetadataNodeCache(Isolate* isolate) {
-    MetadataNodeCache* cache;
-    auto itFound = s_metadata_node_cache.find(isolate);
-    if (itFound == s_metadata_node_cache.end()) {
-        cache = new MetadataNodeCache;
-        s_metadata_node_cache.emplace(isolate, cache);
-    } else {
-        cache = itFound->second;
+    // Per runtime; see RuntimeState.h. Null only once the runtime has begun
+    // tearing down, which no caller here can legitimately reach.
+    auto* cache = RuntimeState::For<MetadataNodeCache>(isolate);
+    if (cache == nullptr) {
+        throw NativeScriptException("Metadata cache requested after the runtime was torn down");
     }
     return cache;
 }
 
 void MetadataNode::EnableProfiler(bool enableProfiler) {
-    s_profilerEnabled = enableProfiler;
+    s_profilerEnabled.store(enableProfiler, std::memory_order_relaxed);
 }
 
 bool MetadataNode::IsJavascriptKeyword(const std::string &word) {
@@ -2095,7 +2096,7 @@ bool MetadataNode::IsJavascriptKeyword(const std::string &word) {
 }
 
 Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& function, const string& name, const string& origin, bool isCtorFunc) {
-    if (!s_profilerEnabled || name == "<init>") {
+    if (!s_profilerEnabled.load(std::memory_order_relaxed) || name == "<init>") {
         return function;
     }
 
@@ -2305,32 +2306,6 @@ std::string MetadataNode::GetJniClassName(MetadataEntry& entry) {
     return fullClassName;
 }
 
-void MetadataNode::onDisposeIsolate(Isolate* isolate) {
-    {
-        auto it = s_metadata_node_cache.find(isolate);
-        if (it != s_metadata_node_cache.end()) {
-            delete it->second;
-            s_metadata_node_cache.erase(it);
-        }
-    }
-    {
-        auto it = s_arrayObjectTemplates.find(isolate);
-        if (it != s_arrayObjectTemplates.end()) {
-            delete it->second;
-            s_arrayObjectTemplates.erase(it);
-        }
-    }
-    {
-        for (auto it = s_treeNode2NodeCache.begin(); it != s_treeNode2NodeCache.end(); it++) {
-            auto it2 = it->second->m_poCtorCachePerIsolate.find(isolate);
-            if(it2 != it->second->m_poCtorCachePerIsolate.end()) {
-                delete it2->second;
-                it->second->m_poCtorCachePerIsolate.erase(it2);
-            }
-        }
-    }
-}
-
 MetadataReader* MetadataNode::getMetadataReader() {
     return &MetadataNode::s_metadataReader;
 }
@@ -2340,7 +2315,5 @@ MetadataReader MetadataNode::s_metadataReader;
 robin_hood::unordered_map<std::string, MetadataNode*> MetadataNode::s_name2NodeCache;
 robin_hood::unordered_map<std::string, MetadataTreeNode*> MetadataNode::s_name2TreeNodeCache;
 robin_hood::unordered_map<MetadataTreeNode*, MetadataNode*> MetadataNode::s_treeNode2NodeCache;
-robin_hood::unordered_map<Isolate*, MetadataNode::MetadataNodeCache*> MetadataNode::s_metadata_node_cache;
-bool MetadataNode::s_profilerEnabled = false;
-robin_hood::unordered_map<Isolate*, Persistent<ObjectTemplate>*> MetadataNode::s_arrayObjectTemplates;
+std::atomic<bool> MetadataNode::s_profilerEnabled{false};
 

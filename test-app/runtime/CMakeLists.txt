@@ -203,6 +203,7 @@ add_library(
         src/main/cpp/Profiler.cpp
         src/main/cpp/ReadWriteLock.cpp
         src/main/cpp/Runtime.cpp
+        src/main/cpp/RuntimeState.cpp
         src/main/cpp/SimpleAllocator.cpp
         src/main/cpp/SimpleProfiler.cpp
         src/main/cpp/StructuredClone.cpp

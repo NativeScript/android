@@ -19,22 +19,36 @@
 #include "BuiltinLoader.h"
 #include "Console.h"
 #include "NsBuiltinModules.h"
+#include "RuntimeState.h"
 #include "robin_hood.h"
 
 namespace tns {
 
-// internal/inspect.js, one compiled instance per isolate. Worker runtimes
-// initialize on their own threads, so every access is under the mutex.
-static std::mutex inspectMutex;
-static robin_hood::unordered_map<v8::Isolate*, v8::Persistent<v8::Function>*> isolateToInspect;
+namespace {
+/*
+ * Console state belonging to one runtime: the console.time() labels and the
+ * compiled internal/inspect.js instance for this realm. Every access is on the
+ * owning runtime's own thread, so none of it needs synchronization -- which is
+ * exactly what a process-wide map keyed by v8::Isolate* could not give, since
+ * the container was shared even though the entries were not. See RuntimeState.h.
+ */
+struct ConsoleState {
+    robin_hood::unordered_map<std::string, double> timerLabels;
+
+    v8::Persistent<v8::Function>* inspect = nullptr;
+
+    ~ConsoleState() {
+        delete inspect;
+    }
+};
+}  // namespace
 
 static v8::Local<v8::Function> getInspectFunction(v8::Isolate* isolate) {
-    std::lock_guard<std::mutex> lock(inspectMutex);
-    auto it = isolateToInspect.find(isolate);
-    if (it == isolateToInspect.end()) {
+    auto* state = tns::RuntimeState::For<ConsoleState>(isolate);
+    if (state == nullptr || state->inspect == nullptr) {
         return v8::Local<v8::Function>();
     }
-    return it->second->Get(isolate);
+    return state->inspect->Get(isolate);
 }
 
 v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, ConsoleCallback callback, const int maxLogcatObjectSize, const bool forceLog) {
@@ -48,9 +62,6 @@ v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, Con
 
     assert(success);
 
-    std::map<std::string, double> timersMap;
-    Console::s_isolateToConsoleTimersMap.insert(
-        std::make_pair(v8::Isolate::GetCurrent(), timersMap));
 
     bindFunctionProperty(context, console, "assert", assertCallback);
     bindFunctionProperty(context, console, "error", errorCallback);
@@ -118,10 +129,12 @@ void Console::initInspect(v8::Local<v8::Context> context) {
         return;
     }
 
-    std::lock_guard<std::mutex> lock(inspectMutex);
-    auto& slot = isolateToInspect[isolate];
-    delete slot;
-    slot = new v8::Persistent<v8::Function>(isolate, result.As<v8::Function>());
+    auto* state = tns::RuntimeState::For<ConsoleState>(isolate);
+    if (state == nullptr) {
+        return;
+    }
+    delete state->inspect;
+    state->inspect = new v8::Persistent<v8::Function>(isolate, result.As<v8::Function>());
 }
 
 v8::Local<v8::Function> Console::getInspect(v8::Local<v8::Context> context) {
@@ -525,15 +538,17 @@ void Console::timeCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
             label = ArgConverter::ConvertToString(argString);
         }
 
-        auto it = Console::s_isolateToConsoleTimersMap.find(isolate);
-        if (it == Console::s_isolateToConsoleTimersMap.end()) {
-            // throw?
-        }
-
         auto nano = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::system_clock::now());
         double timeStamp = nano.time_since_epoch().count();
 
-        it->second.insert(std::make_pair(label, timeStamp));
+        auto* timers = tns::RuntimeState::For<ConsoleState>(isolate);
+        if (timers == nullptr) {
+            return;
+        }
+
+        // emplace, not assignment: a second console.time() with the same label
+        // keeps the original start stamp, as before.
+        timers->timerLabels.emplace(label, timeStamp);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -559,15 +574,20 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
             label = ArgConverter::ConvertToString(argString);
         }
 
-        auto it = Console::s_isolateToConsoleTimersMap.find(isolate);
-        if (it == Console::s_isolateToConsoleTimersMap.end()) {
-            // throw?
+        double startTimeStamp = 0;
+        bool started = false;
+
+        auto* timers = tns::RuntimeState::For<ConsoleState>(isolate);
+        if (timers != nullptr) {
+            auto itTimersMap = timers->timerLabels.find(label);
+            if (itTimersMap != timers->timerLabels.end()) {
+                startTimeStamp = itTimersMap->second;
+                timers->timerLabels.erase(itTimersMap);
+                started = true;
+            }
         }
 
-        std::map<std::string, double> timersMap = it->second;
-
-        auto itTimersMap = timersMap.find(label);
-        if (itTimersMap == timersMap.end()) {
+        if (!started) {
             std::string warning = std::string("No such label '" + label + "' for console.timeEnd()");
 
             __android_log_write(ANDROID_LOG_WARN, LOG_TAG, warning.c_str());
@@ -578,9 +598,6 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
         auto nano = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::system_clock::now());
         double endTimeStamp = nano.time_since_epoch().count();
-        double startTimeStamp = itTimersMap->second;
-
-        it->second.erase(label);
 
         double diffMicroseconds = endTimeStamp - startTimeStamp;
         double diffMilliseconds = diffMicroseconds / 1000.0;
@@ -604,19 +621,7 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     }
 }
 
-void Console::onDisposeIsolate(v8::Isolate* isolate) {
-    s_isolateToConsoleTimersMap.erase(isolate);
-
-    std::lock_guard<std::mutex> lock(inspectMutex);
-    auto it = isolateToInspect.find(isolate);
-    if (it != isolateToInspect.end()) {
-        delete it->second;
-        isolateToInspect.erase(it);
-    }
-}
-
 const char* Console::LOG_TAG = "JS";
-std::map<v8::Isolate*, std::map<std::string, double>> Console::s_isolateToConsoleTimersMap;
 ConsoleCallback Console::m_callback = nullptr;
 int Console::m_maxLogcatObjectSize;
 }

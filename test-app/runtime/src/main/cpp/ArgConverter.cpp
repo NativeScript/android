@@ -7,6 +7,7 @@
 #include "Runtime.h"
 #include "V8GlobalHelpers.h"
 #include "NativeScriptAssert.h"
+#include "RuntimeState.h"
 #include <sstream>
 
 using namespace v8;
@@ -196,16 +197,8 @@ int64_t ArgConverter::ConvertToJavaLong(Isolate* isolate, const Local<Value>& va
 }
 
 ArgConverter::TypeLongOperationsCache* ArgConverter::GetTypeLongCache(v8::Isolate* isolate) {
-    TypeLongOperationsCache* cache;
-    auto itFound = s_type_long_operations_cache.find(isolate);
-    if (itFound == s_type_long_operations_cache.end()) {
-        cache = new TypeLongOperationsCache;
-        s_type_long_operations_cache.emplace(isolate, cache);
-    } else {
-        cache = itFound->second;
-    }
-
-    return cache;
+    // Per runtime, so there is no shared table to race on; see RuntimeState.h.
+    return RuntimeState::For<TypeLongOperationsCache>(isolate);
 }
 
 
@@ -222,12 +215,3 @@ u16string ArgConverter::ConvertToUtf16String(const v8::Local<String>& s) {
 
 
 
-void ArgConverter::onDisposeIsolate(Isolate* isolate) {
-    auto itFound = s_type_long_operations_cache.find(isolate);
-    if (itFound != s_type_long_operations_cache.end()) {
-        delete itFound->second;
-        s_type_long_operations_cache.erase(itFound);
-    }
-}
-
-robin_hood::unordered_map<Isolate*, ArgConverter::TypeLongOperationsCache*> ArgConverter::s_type_long_operations_cache;

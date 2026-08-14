@@ -12,6 +12,7 @@
 #include "File.h"
 #include "Timers.h"
 #include "EventLoop.h"
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <android/looper.h>
@@ -23,6 +24,7 @@ typedef struct napi_env__* napi_env;
 
 namespace tns {
 class PromiseRejectionTracker;
+class RuntimeState;
 
 class Runtime {
     public:
@@ -92,6 +94,15 @@ class Runtime {
         void Init(JNIEnv* env, jstring filesPath, jstring nativeLibsDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog);
 
         v8::Isolate* GetIsolate() const;
+
+        /*
+         * Per-runtime storage for subsystem state bound to this isolate; see
+         * RuntimeState.h. Released in DestroyRuntime while the isolate is
+         * still alive, so state holding v8::Persistents can be torn down.
+         */
+        RuntimeState* GetState() const {
+            return m_state.get();
+        }
 
         jobject GetJavaRuntime() const;
 
@@ -256,6 +267,8 @@ class Runtime {
 
         std::shared_ptr<EventLoop> m_eventLoop;
 
+        std::unique_ptr<RuntimeState> m_state;
+
         napi_env m_napiEnv = nullptr;
 
         v8::Global<v8::Object> m_globalEventTarget;
@@ -303,7 +316,7 @@ class Runtime {
 
         static jmethodID GET_USED_MEMORY_METHOD_ID;
 
-        static bool s_mainThreadInitialized;
+        static std::atomic<bool> s_mainThreadInitialized;
 
         static std::shared_ptr<EventLoop> s_mainEventLoop;
 

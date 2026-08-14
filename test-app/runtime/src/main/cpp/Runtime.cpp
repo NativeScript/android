@@ -32,6 +32,7 @@
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
 #include "NativeScriptPlatform.h"
+#include "RuntimeState.h"
 #include "napi/NapiEnv.h"
 #include "Performance.h"
 #include "SimpleAllocator.h"
@@ -147,6 +148,7 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
       m_runGC(false) {
   m_runtime = env->NewGlobalRef(runtime);
   m_objectManager = new ObjectManager(m_runtime);
+  m_state = std::make_unique<RuntimeState>();
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_id2RuntimeCache.emplace(id, this);
@@ -615,7 +617,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
    * Setup the V8Platform only once per process - once for the application
    * lifetime Don't execute again if main thread has already been initialized
    */
-  if (!s_mainThreadInitialized) {
+  if (!s_mainThreadInitialized.load(std::memory_order_acquire)) {
     InitializeV8();
   }
 
@@ -743,7 +745,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URLPattern"),
                       URLPatternImpl::GetCtor(isolate));
 
-  if (!s_mainThreadInitialized) {
+  if (!s_mainThreadInitialized.load(std::memory_order_acquire)) {
     m_isMainThread = true;
     // __runOnMainThread closures from any runtime's thread land on this loop
     s_mainEventLoop = m_eventLoop;
@@ -847,7 +849,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   m_weakRef.Init(isolate, context);
 
   // Do not set 'self' accessor to main thread JavaScript
-  if (s_mainThreadInitialized) {
+  if (s_mainThreadInitialized.load(std::memory_order_acquire)) {
     global->DefineOwnProperty(context,
                               ArgConverter::ConvertToV8String(isolate, "self"),
                               global, readOnlyFlags);
@@ -877,7 +879,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   // Do not build metadata (which should be static for the process) for non-main
   // threads
-  if (!s_mainThreadInitialized) {
+  if (!s_mainThreadInitialized.load(std::memory_order_acquire)) {
     MetadataNode::BuildMetadata(filesPath);
   }
 
@@ -895,7 +897,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   this->m_napiEnv = NapiEnv::Create(context, m_eventLoop);
   s_currentRuntime = this;
 
-  s_mainThreadInitialized = true;
+  s_mainThreadInitialized.store(true, std::memory_order_release);
 
   return isolate;
 }
@@ -958,6 +960,11 @@ void Runtime::DestroyRuntime() {
   m_dispatchErrorEventFunc.Reset();
   m_dispatchUnhandledRejectionFunc.Reset();
   m_dispatchRejectionHandledFunc.Reset();
+  // Subsystem state bound to this isolate: released here, while the isolate is
+  // still alive, because it holds v8::Persistents.
+  if (m_state != nullptr) {
+    m_state->Clear();
+  }
   m_dispatchNativeUncaughtErrorFunc.Reset();
   tns::disposeIsolate(m_isolate);
 }
@@ -974,7 +981,7 @@ jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 robin_hood::unordered_map<int, Runtime*> Runtime::s_id2RuntimeCache;
 robin_hood::unordered_map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 std::mutex Runtime::s_runtimeCacheMutex;
-bool Runtime::s_mainThreadInitialized = false;
+std::atomic<bool> Runtime::s_mainThreadInitialized{false};
 v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 std::shared_ptr<EventLoop> Runtime::s_mainEventLoop;
