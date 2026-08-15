@@ -1178,7 +1178,7 @@ MetadataNode::TypeMetadata* MetadataNode::TryGetTypeMetadata(Isolate* isolate, c
         return nullptr;
     }
 
-    return reinterpret_cast<TypeMetadata*>(hiddenVal.As<External>()->Value());
+    return reinterpret_cast<TypeMetadata*>(hiddenVal.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 }
 
 std::string MetadataNode::TryResolveClassCtorTypeName(Isolate* isolate, const Local<Function>& func) {
@@ -1221,10 +1221,39 @@ std::string SanitizeESClassNamePart(const std::string& name) {
     std::string result;
     result.reserve(name.size());
     for (char c : name) {
-        bool isValid = isalpha(c) || isdigit(c) || c == '_';
+        auto uc = static_cast<unsigned char>(c);
+        bool isValid = isalnum(uc) || c == '_';
         result += isValid ? c : '_';
     }
     return result;
+}
+
+std::string BuildESClassProxyIdentity(const std::string& scriptName, const std::string& baseClassName, const std::string& className,
+                                      const std::vector<std::string>& methodOverrides, const std::vector<std::string>& implementedInterfaces) {
+    auto sortedMethods = methodOverrides;
+    auto sortedInterfaces = implementedInterfaces;
+    std::sort(sortedMethods.begin(), sortedMethods.end());
+    std::sort(sortedInterfaces.begin(), sortedInterfaces.end());
+
+    std::string identity = scriptName + "|" + baseClassName + "|" + className;
+    for (const auto& method : sortedMethods) {
+        identity += "|m:" + method;
+    }
+    for (const auto& iface : sortedInterfaces) {
+        identity += "|i:" + iface;
+    }
+    return identity;
+}
+
+bool TryGetConstructorPrototype(Isolate* isolate, const Local<Function>& ctorFunc, Local<Object>& out) {
+    auto context = isolate->GetCurrentContext();
+    Local<Value> protoValue;
+    if (!ctorFunc->Get(context, V8StringConstants::GetPrototype(isolate)).ToLocal(&protoValue)
+            || protoValue.IsEmpty() || !protoValue->IsObject()) {
+        return false;
+    }
+    out = protoValue.As<Object>();
+    return true;
 }
 
 // True only for genuine `class` syntax constructors. Function source text is the reliable
@@ -1232,9 +1261,11 @@ std::string SanitizeESClassNamePart(const std::string& name) {
 // `class` declaration/expression source (possibly behind leading comments/whitespace, which V8
 // does not emit for the class case - the text starts with "class").
 bool IsESClassConstructor(v8::Isolate* isolate, const v8::Local<v8::Function>& func) {
+    v8::TryCatch tc(isolate);
     auto context = isolate->GetCurrentContext();
     v8::Local<v8::String> sourceText;
     if (!func->FunctionProtoToString(context).ToLocal(&sourceText)) {
+        tc.Reset();
         return false;
     }
 
@@ -1431,7 +1462,7 @@ MetadataNode::TypeMetadata* MetadataNode::EnsureExtendedESClass(Isolate* isolate
             scriptName = ArgConverter::ConvertToString(resourceName.As<String>());
         }
 
-        string extendNameAndLocation = "es" + HashESClassId(scriptName + "|" + baseClassName + "|" + className) + "_" + className;
+        string extendNameAndLocation = "es" + HashESClassId(BuildESClassProxyIdentity(scriptName, baseClassName, className, methodOverrides, implementedInterfaces)) + "_" + className;
         string candidate = TNS_PREFIX + CreateFullClassName(baseClassName, extendNameAndLocation);
 
         // collision handling for distinct classes that produce the same deterministic name
@@ -1492,6 +1523,13 @@ bool MetadataNode::TryConstructESDerivedInstance(Isolate* isolate, const string&
         return false;
     }
 
+    // DexFactory collapses every interface extension onto one shared
+    // com.tns.gen.<interface> proxy. That name does not identify a single ES
+    // class, so Java-born instances stay on the legacy wrapper path.
+    if (cacheData.node != nullptr && cacheData.node->IsNodeTypeInterface()) {
+        return false;
+    }
+
     Local<Function> ctor = Local<Function>::New(isolate, *cacheData.extendedCtorFunction);
     auto typeMetadata = TryGetTypeMetadata(isolate, ctor);
     if (typeMetadata == nullptr || !typeMetadata->isESDerived) {
@@ -1499,10 +1537,12 @@ bool MetadataNode::TryConstructESDerivedInstance(Isolate* isolate, const string&
     }
 
     cache->PendingESAdoptObjectId = javaObjectID;
+    cache->PendingESAdoptClassName = proxyClassName;
     TryCatch tc(isolate);
     auto context = isolate->GetCurrentContext();
     bool ok = !ctor->CallAsConstructor(context, 0, nullptr).IsEmpty();
     cache->PendingESAdoptObjectId = -1;
+    cache->PendingESAdoptClassName.clear();
     if (!ok) {
         throw NativeScriptException(tc, "Failed to construct ES class for native instance");
     }
@@ -1517,14 +1557,18 @@ bool MetadataNode::TryConstructESDerivedInstance(Isolate* isolate, const string&
     return true;
 }
 
-bool MetadataNode::TryConsumePendingESAdopt(Isolate* isolate, int& javaObjectID) {
+bool MetadataNode::TryConsumePendingESAdopt(Isolate* isolate, const string& fullClassName, int& javaObjectID) {
     auto cache = GetMetadataNodeCache(isolate);
     if (cache->PendingESAdoptObjectId == -1) {
+        return false;
+    }
+    if (cache->PendingESAdoptClassName != fullClassName) {
         return false;
     }
 
     javaObjectID = cache->PendingESAdoptObjectId;
     cache->PendingESAdoptObjectId = -1;
+    cache->PendingESAdoptClassName.clear();
     return true;
 }
 
@@ -1618,7 +1662,10 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
             }
 
             if (typeMetadata != nullptr && typeMetadata->isESDerived) {
-                auto esImplementationObject = newTargetFunc->Get(context, V8StringConstants::GetPrototype(isolate)).ToLocalChecked().As<Object>();
+                Local<Object> esImplementationObject;
+                if (!TryGetConstructorPrototype(isolate, newTargetFunc, esImplementationObject)) {
+                    throw NativeScriptException(string("Cannot resolve the prototype of the ES class constructor."));
+                }
 
                 SetInstanceMetadata(isolate, thiz, node);
                 thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
@@ -1705,8 +1752,10 @@ void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::V
             }
 
             if (typeMetadata != nullptr && typeMetadata->isESDerived) {
-                auto context = isolate->GetCurrentContext();
-                auto implementationObject = newTargetFunc->Get(context, V8StringConstants::GetPrototype(isolate)).ToLocalChecked().As<Object>();
+                Local<Object> implementationObject;
+                if (!TryGetConstructorPrototype(isolate, newTargetFunc, implementationObject)) {
+                    throw NativeScriptException(string("Cannot resolve the prototype of the ES class constructor."));
+                }
 
                 SetInstanceMetadata(isolate, thiz, node);
                 thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));

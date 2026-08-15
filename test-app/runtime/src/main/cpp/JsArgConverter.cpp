@@ -166,7 +166,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
             // JEnv caches classes as global refs - mark as global so the dtor doesn't delete it
             SetConvertedObject(index, clazz, true /* isGlobal */);
         } else {
-            sprintf(buff, "Cannot convert function to %s at index %d", typeSignature.c_str(), index);
+            snprintf(buff, sizeof(buff), "Cannot convert function to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsObject()) {
         auto context = m_isolate->GetCurrentContext();
