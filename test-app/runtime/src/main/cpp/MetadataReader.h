@@ -3,8 +3,11 @@
 
 #include "MetadataEntry.h"
 #include "MetadataFieldInfo.h"
+#include <condition_variable>
 #include <map>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <assert.h>
 #include "robin_hood.h"
 
@@ -16,9 +19,13 @@ namespace tns {
     public:
         MetadataReader();
 
-        MetadataReader(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength,
-                       uint8_t *nameData, uint32_t valueLength, uint8_t *valueData,
-                       GetTypeMetadataCallback getTypeMetadataCallack);
+        /*
+         * Replaces assignment from a temporary: the reader owns a mutex, so it
+         * is neither copyable nor assignable.
+         */
+        void Initialize(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength,
+                        uint8_t *nameData, uint32_t valueLength, uint8_t *valueData,
+                        GetTypeMetadataCallback getTypeMetadataCallack);
 
         inline static MetadataEntry ReadInstanceFieldEntry(uint8_t **data) {
             MetadataEntry entry(nullptr, NodeType::Field);
@@ -215,6 +222,81 @@ namespace tns {
 
     private:
 
+        /*
+         * Guards the reader's mutable state: the node vector (which reallocates
+         * on push_back), the value-buffer bump allocator, the type-name cache
+         * and the node types memoized onto the tree. Every runtime's thread
+         * reaches all of it through MetadataNode, on the path that runs for
+         * every JS-wrapper creation.
+         *
+         * Reentrant because GetOrCreateTreeNodeByName recurses into itself, and
+         * releasable to zero mid-section because that function resolves an
+         * unknown type by calling into Java -- ART class loading, and dex
+         * generation on the .extend() path. Held across that, it could invert
+         * against the monitor com.tns.Runtime's constructor takes and against
+         * the cross-thread callJSMethod wait. std::recursive_mutex cannot
+         * express the release: unlocking it once drops a single level, so a
+         * nested caller would still exclude every other thread.
+         *
+         * Ordering rule: the only lock that may be taken while this one is held
+         * is Runtime::s_runtimeCacheMutex.
+         */
+        class StateMutex {
+        public:
+            void Lock();
+
+            void Unlock();
+
+            // Drops every level this thread holds, returning the count so
+            // Reacquire can restore it. Only for use around a JNI call that can
+            // re-enter JS.
+            unsigned ReleaseAll();
+
+            void Reacquire(unsigned depth);
+
+        private:
+            std::mutex mutex_;
+            std::condition_variable available_;
+            std::thread::id owner_;
+            unsigned depth_ = 0;
+        };
+
+        class StateLock {
+        public:
+            explicit StateLock(StateMutex &mutex) : mutex_(mutex) {
+                mutex_.Lock();
+            }
+
+            ~StateLock() {
+                mutex_.Unlock();
+            }
+
+            StateLock(const StateLock &) = delete;
+            StateLock &operator=(const StateLock &) = delete;
+
+        private:
+            StateMutex &mutex_;
+        };
+
+        // The inverse guard: releases the lock for the duration of a scope.
+        class StateUnlock {
+        public:
+            explicit StateUnlock(StateMutex &mutex)
+                    : mutex_(mutex), depth_(mutex.ReleaseAll()) {
+            }
+
+            ~StateUnlock() {
+                mutex_.Reacquire(depth_);
+            }
+
+            StateUnlock(const StateUnlock &) = delete;
+            StateUnlock &operator=(const StateUnlock &) = delete;
+
+        private:
+            StateMutex &mutex_;
+            unsigned depth_;
+        };
+
         static const uint32_t ARRAY_OFFSET = INT32_MAX; // 2147483647
 
         MetadataTreeNode *BuildTree();
@@ -236,6 +318,8 @@ namespace tns {
         GetTypeMetadataCallback m_getTypeMetadataCallback;
 
         robin_hood::unordered_map<MetadataTreeNode *, std::string> m_typeNameCache;
+
+        mutable StateMutex m_stateMutex;
     };
 }
 

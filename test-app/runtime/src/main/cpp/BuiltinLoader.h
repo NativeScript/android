@@ -27,8 +27,6 @@ public:
     static v8::MaybeLocal<v8::Value> RunBuiltin(
             v8::Local<v8::Context> context, BuiltinId id,
             v8::Local<v8::Value> binding = v8::Local<v8::Value>());
-
-    static void onDisposeIsolate(v8::Isolate* isolate);
 };
 
 }  // namespace tns

@@ -2,6 +2,7 @@
 #define NATIVESCRIPTEXCEPTION_H_
 
 #include <exception>
+#include <memory>
 #include <vector>
 
 #include "JEnv.h"
@@ -39,6 +40,16 @@ class NativeScriptException : public std::exception {
 
   void ReThrowToV8();
   void ReThrowToJava();
+
+  /*
+   * Drops the handle to the thrown JS value, keeping the message and stack
+   * strings. For an exception that has to outlive the isolate it was thrown in
+   * -- a failed runtime initialization, where the isolate is disposed while the
+   * exception is still in flight.
+   */
+  void ReleaseJsHandle() {
+    m_javascriptException.reset();
+  }
 
   std::string ToString() const;
   std::string GetErrorMessage() const;
@@ -163,7 +174,12 @@ class NativeScriptException : public std::exception {
   std::string GetFullMessage(const v8::TryCatch& tc,
                              const std::string& jsExceptionMessage);
 
-  v8::Persistent<v8::Value>* m_javascriptException;
+  /*
+   * The thrown JS value, held strongly for as long as this exception lives.
+   * Shared rather than owned outright because an exception object may be
+   * copied while in flight; the last copy releases the handle.
+   */
+  std::shared_ptr<v8::Persistent<v8::Value>> m_javascriptException;
   JniLocalRef m_javaException;
   std::string m_message;
   std::string m_stackTrace;

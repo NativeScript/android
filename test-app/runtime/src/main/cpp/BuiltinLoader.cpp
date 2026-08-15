@@ -5,6 +5,7 @@
 
 #include "ArgConverter.h"
 #include "NsBuiltinModules.h"
+#include "RuntimeState.h"
 #include "robin_hood.h"
 
 using namespace v8;
@@ -36,13 +37,14 @@ constexpr const char* kPrimordialsParamName = "primordials";
 constexpr size_t kParamCount = 5;
 
 /*
- * Per-isolate intrinsics snapshot and builtin require. Worker runtimes
- * initialize on their own threads, so every access is under the mutex.
+ * This runtime's intrinsics snapshot and builtin require. Per-runtime state
+ * rather than an isolate-keyed shared map, so reaching it needs no lock and it
+ * is released with the runtime, while the isolate is still alive.
  */
-std::mutex primordialsMutex;
-robin_hood::unordered_map<Isolate*, Persistent<Object>*> isolateToPrimordials;
-std::mutex builtinRequireMutex;
-robin_hood::unordered_map<Isolate*, Persistent<v8::Function>*> isolateToBuiltinRequire;
+struct BuiltinRealm {
+    v8::Global<v8::Object> primordials;
+    v8::Global<v8::Function> builtinRequire;
+};
 
 /*
  * The `require` every builtin receives: builtin specifiers only, so a builtin
@@ -70,12 +72,13 @@ void BuiltinRequireCallback(const FunctionCallbackInfo<Value>& info) {
 MaybeLocal<v8::Function> GetBuiltinRequire(Local<Context> context) {
     Isolate* isolate = v8::Isolate::GetCurrent();
 
-    {
-        std::lock_guard<std::mutex> lock(builtinRequireMutex);
-        auto it = isolateToBuiltinRequire.find(isolate);
-        if (it != isolateToBuiltinRequire.end()) {
-            return it->second->Get(isolate);
-        }
+    auto* realm = RuntimeState::For<BuiltinRealm>(isolate);
+    if (realm == nullptr) {
+        return MaybeLocal<v8::Function>();
+    }
+
+    if (!realm->builtinRequire.IsEmpty()) {
+        return realm->builtinRequire.Get(isolate);
     }
 
     Local<v8::Function> require;
@@ -85,10 +88,7 @@ MaybeLocal<v8::Function> GetBuiltinRequire(Local<Context> context) {
         return MaybeLocal<v8::Function>();
     }
 
-    {
-        std::lock_guard<std::mutex> lock(builtinRequireMutex);
-        isolateToBuiltinRequire.emplace(isolate, new Persistent<v8::Function>(isolate, require));
-    }
+    realm->builtinRequire.Reset(isolate, require);
     return require;
 }
 
@@ -191,12 +191,13 @@ MaybeLocal<Value> CallBuiltin(Local<Context> context, BuiltinId id, Local<Value>
 MaybeLocal<Object> GetPrimordials(Local<Context> context) {
     Isolate* isolate = v8::Isolate::GetCurrent();
 
-    {
-        std::lock_guard<std::mutex> lock(primordialsMutex);
-        auto it = isolateToPrimordials.find(isolate);
-        if (it != isolateToPrimordials.end()) {
-            return it->second->Get(isolate);
-        }
+    auto* realm = RuntimeState::For<BuiltinRealm>(isolate);
+    if (realm == nullptr) {
+        return MaybeLocal<Object>();
+    }
+
+    if (!realm->primordials.IsEmpty()) {
+        return realm->primordials.Get(isolate);
     }
 
     Local<Value> result;
@@ -207,10 +208,7 @@ MaybeLocal<Object> GetPrimordials(Local<Context> context) {
     }
 
     Local<Object> primordials = result.As<Object>();
-    {
-        std::lock_guard<std::mutex> lock(primordialsMutex);
-        isolateToPrimordials.emplace(isolate, new Persistent<Object>(isolate, primordials));
-    }
+    realm->primordials.Reset(isolate, primordials);
     return primordials;
 }
 
@@ -224,24 +222,6 @@ MaybeLocal<Value> BuiltinLoader::RunBuiltin(Local<Context> context, BuiltinId id
     }
 
     return CallBuiltin(context, id, binding, primordials);
-}
-
-void BuiltinLoader::onDisposeIsolate(Isolate* isolate) {
-    {
-        std::lock_guard<std::mutex> lock(primordialsMutex);
-        auto it = isolateToPrimordials.find(isolate);
-        if (it != isolateToPrimordials.end()) {
-            delete it->second;
-            isolateToPrimordials.erase(it);
-        }
-    }
-
-    std::lock_guard<std::mutex> lock(builtinRequireMutex);
-    auto it = isolateToBuiltinRequire.find(isolate);
-    if (it != isolateToBuiltinRequire.end()) {
-        delete it->second;
-        isolateToBuiltinRequire.erase(it);
-    }
 }
 
 }  // namespace tns

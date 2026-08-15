@@ -57,8 +57,6 @@ public:
      * module could not be built; callers degrade instead of failing the log.
      */
     static v8::Local<v8::Function> GetFormatFunc(v8::Local<v8::Context> context);
-
-    static void onDisposeIsolate(v8::Isolate* isolate);
 };
 
 }  // namespace tns
