@@ -94,6 +94,18 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
 
+    int adoptObjectId = -1;
+    if (MetadataNode::TryConsumePendingESAdopt(isolate, fullClassName, adoptObjectId)) {
+        // Adopt path: Java already created this object. Bind it to the ES
+        // construct and do not NewObject again (that would be a second
+        // instance, or recurse through initInstance).
+        objectManager->Link(jsObject, adoptObjectId, nullptr);
+        JEnv env;
+        jclass instanceClass = env.FindClass(fullClassName);
+        objectManager->SetJavaClass(jsObject, instanceClass);
+        return true;
+    }
+
     // The Java constructor may synchronously call back into JS (extended
     // class init) - that whole window is a JS-initiated chain.
     JavaCallScope javaCallScope(runtime);
@@ -180,6 +192,50 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &baseClassN
 
         env.DeleteGlobalRef(methodOverrides);
         env.DeleteGlobalRef(implementedInterfaces);
+    }
+
+    return globalRefToGeneratedClass;
+}
+
+jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &baseClassName,
+                                      const string &fullClassName,
+                                      const vector<string> &methodOverrides,
+                                      const vector<string> &implementedInterfaces,
+                                      bool isInterface) {
+    JEnv env;
+    jclass globalRefToGeneratedClass = env.CheckForClassInCache(fullClassName);
+
+    if (globalRefToGeneratedClass == nullptr) {
+        JniLocalRef javaBaseClassName(env.NewStringUTF(baseClassName.c_str()));
+        JniLocalRef javaFullClassName(env.NewStringUTF(fullClassName.c_str()));
+
+        jobjectArray methodOverridesArr = GetJavaStringArray(env, methodOverrides.size());
+        for (size_t i = 0; i < methodOverrides.size(); i++) {
+            JniLocalRef name(env.NewStringUTF(methodOverrides[i].c_str()));
+            env.SetObjectArrayElement(methodOverridesArr, i, name);
+        }
+
+        jobjectArray implementedInterfacesArr = GetJavaStringArray(env, implementedInterfaces.size());
+        for (size_t i = 0; i < implementedInterfaces.size(); i++) {
+            JniLocalRef name(env.NewStringUTF(implementedInterfaces[i].c_str()));
+            env.SetObjectArrayElement(implementedInterfacesArr, i, name);
+        }
+
+        auto runtime = Runtime::GetRuntime(isolate);
+
+        // create or load generated binding (java class)
+        jclass generatedClass = (jclass) env.CallObjectMethod(runtime->GetJavaRuntime(),
+                                                              RESOLVE_CLASS_METHOD_ID,
+                                                              (jstring) javaBaseClassName,
+                                                              (jstring) javaFullClassName,
+                                                              methodOverridesArr,
+                                                              implementedInterfacesArr,
+                                                              isInterface);
+
+        globalRefToGeneratedClass = env.InsertClassIntoCache(fullClassName, generatedClass);
+
+        env.DeleteGlobalRef(methodOverridesArr);
+        env.DeleteGlobalRef(implementedInterfacesArr);
     }
 
     return globalRefToGeneratedClass;

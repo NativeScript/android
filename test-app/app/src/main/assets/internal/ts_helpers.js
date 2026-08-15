@@ -166,6 +166,46 @@
 		}
 	}
 
+	function applyNativeClassOptions(target, options) {
+		// Workers must not mint or rename process-global native classes.
+		if (global.__ns__worker) {
+			return target;
+		}
+		// This runtime implements `android`; `ios` is accepted and ignored.
+		var android = options && options.android;
+		var interfaces = (android && android.interfaces) || (options && options.interfaces);
+		var name = android && android.name;
+
+		if (interfaces && interfaces.length > 0) {
+			var merged = (target.interfaces && target.interfaces instanceof Array ? target.interfaces.concat(interfaces) : interfaces.slice());
+			target.interfaces = merged;
+			// Legacy `.extend()` reads interfaces from the implementation object
+			// (the prototype). Keep both so downleveled ES5 targets still work.
+			if (target.prototype) {
+				target.prototype.interfaces = merged;
+			}
+		}
+		if (name) {
+			if (name.indexOf(".") === -1) {
+				throw new Error("NativeClass android.name must be a fully qualified Java class name.");
+			}
+			target.nativeClassName = name;
+			// Accessing `.class` lazily registers the proxy under the explicit name.
+			void target.class;
+		}
+		return target;
+	}
+
+	function NativeClass(arg) {
+		if (typeof arg === "function") {
+			return applyNativeClassOptions(arg, {});
+		}
+		var options = arg || {};
+		return function (target) {
+			return applyNativeClassOptions(target, options);
+		};
+	}
+
 	Object.defineProperty(global, "__native", { value: __native });
 	Object.defineProperty(global, "__extends", { value: __extends });
 	Object.defineProperty(global, "__decorate", { value: __decorate });
@@ -174,4 +214,5 @@
 		global.JavaProxy = JavaProxy;
 	}
 	global.Interfaces = Interfaces;
+	global.NativeClass = NativeClass;
 })()

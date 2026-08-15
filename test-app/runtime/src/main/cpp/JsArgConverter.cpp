@@ -1,5 +1,6 @@
 #include "JsArgConverter.h"
 #include "ObjectManager.h"
+#include "MetadataNode.h"
 #include "JniSignatureParser.h"
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
@@ -150,6 +151,22 @@ bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
 
         if (!success) {
             sprintf(buff, "Cannot convert string to %s at index %d", typeSignature.c_str(), index);
+        }
+    } else if (arg->IsFunction() &&
+               (typeSignature == "Ljava/lang/Class;" || typeSignature == "Ljava/lang/Object;") &&
+               !MetadataNode::TryResolveClassCtorTypeName(m_isolate, arg.As<Function>()).empty()) {
+        // a native type ctor (or a plain ES class extending one - registered lazily here)
+        // passed where Java expects a java.lang.Class. Typed nulls (`SomeClass.null`) and other
+        // functions resolve to an empty name and keep flowing through the object branch below.
+        auto typeName = MetadataNode::TryResolveClassCtorTypeName(m_isolate, arg.As<Function>());
+        JEnv env;
+        jclass clazz = env.FindClass(typeName);
+        success = clazz != nullptr;
+        if (success) {
+            // JEnv caches classes as global refs - mark as global so the dtor doesn't delete it
+            SetConvertedObject(index, clazz, true /* isGlobal */);
+        } else {
+            snprintf(buff, sizeof(buff), "Cannot convert function to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsObject()) {
         auto context = m_isolate->GetCurrentContext();

@@ -42,6 +42,18 @@ namespace tns {
                                    const v8::Local<v8::Object> &implementationObject,
                                    bool isInterface);
 
+        /*
+         * ResolveClass variant with explicitly collected method override names and implemented
+         * interface names. Used for plain ES class extensions where the overrides span multiple
+         * prototype levels and are non-enumerable (so the implementationObject-based scan above
+         * cannot see them).
+         */
+        static jclass ResolveClass(v8::Isolate *isolate, const std::string &baseClassName,
+                                   const std::string &fullClassName,
+                                   const std::vector<std::string> &methodOverrides,
+                                   const std::vector<std::string> &implementedInterfaces,
+                                   bool isInterface);
+
         static std::string ResolveClassName(v8::Isolate *isolate, jclass &clazz);
 
         static v8::Local<v8::Value>

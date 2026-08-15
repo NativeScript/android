@@ -52,6 +52,16 @@ class MetadataNode {
 
         static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate* isolate, ObjectManager* objectManager, const std::string& proxyClassName);
 
+        /*
+         * Java-born instances of an ES-derived proxy (clazz.newInstance(),
+         * framework inflation, etc.) are adopted into a real construct of the
+         * ES class so fields and the constructor body run. super() binds the
+         * existing Java object and does not allocate again.
+         */
+        static bool TryConstructESDerivedInstance(v8::Isolate* isolate, const std::string& proxyClassName, int javaObjectID, v8::Local<v8::Object>& out);
+
+        static bool TryConsumePendingESAdopt(v8::Isolate* isolate, const std::string& fullClassName, int& javaObjectID);
+
         static v8::Local<v8::Object> GetImplementationObject(v8::Isolate* isolate, const v8::Local<v8::Object>& object);
 
         static void CreateTopLevelNamespaces(v8::Isolate* isolate, const v8::Local<v8::Object>& global);
@@ -71,6 +81,14 @@ class MetadataNode {
 
         static bool TryGetPackageName(v8::Isolate* isolate, const v8::Local<v8::Object>& value, std::string& out);
 
+        /*
+         * Resolves the Java class name a constructor function stands for, lazily registering a
+         * Java proxy class when the function is a plain ES `class X extends NativeType {}` that
+         * has not been registered yet. Returns an empty string when the function is not part of
+         * a native inheritance chain. Used when marshalling a constructor function to a Java
+         * `java.lang.Class` (or `java.lang.Object`) argument.
+         */
+        static std::string TryResolveClassCtorTypeName(v8::Isolate* isolate, const v8::Local<v8::Function>& func);
 
         static MetadataReader* getMetadataReader();
     private:
@@ -140,7 +158,23 @@ class MetadataNode {
 
         static TypeMetadata* GetTypeMetadata(v8::Isolate* isolate, const v8::Local<v8::Function>& value);
 
+        // Safe variant of GetTypeMetadata - returns nullptr when the function carries no type
+        // metadata (e.g. a plain ES class constructor) instead of crashing
+        static TypeMetadata* TryGetTypeMetadata(v8::Isolate* isolate, const v8::Local<v8::Function>& value);
+
         static void SetTypeMetadata(v8::Isolate* isolate, v8::Local<v8::Function> value, TypeMetadata* data);
+
+        /*
+         * Lazily registers a Java proxy class for a plain ES `class X extends NativeType {}`
+         * constructor function (no `.extend()` call, no downleveling). Walks the constructor
+         * prototype chain to the native base, collects overridden method names from every ES
+         * level's prototype and implemented interfaces from `static interfaces = [...]`, resolves
+         * the proxy class through the regular DexFactory pipeline and tags the constructor the
+         * same way `.extend()` tags its result (typemetadata + ExtendedCtorFuncCache entry).
+         * Returns nullptr when ctorFunc is not part of a native inheritance chain or the chain
+         * goes through a legacy `.extend()`-created class. Idempotent.
+         */
+        static TypeMetadata* EnsureExtendedESClass(v8::Isolate* isolate, v8::Local<v8::Function> ctorFunc);
 
         static std::string CreateFullClassName(const std::string& className, const std::string& extendNameAndLocation);
         static void MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -239,12 +273,16 @@ class MetadataNode {
         };
 
         struct TypeMetadata {
-            TypeMetadata(const std::string& _name)
+            TypeMetadata(const std::string& _name, bool _isESDerived = false)
                 :
-                name(_name) {
+                name(_name), isESDerived(_isESDerived) {
             }
 
             std::string name;
+
+            // true when the class was registered lazily from a plain ES
+            // `class X extends NativeType {}` constructor (see EnsureExtendedESClass)
+            bool isESDerived;
         };
 
         struct CtorCacheData {
@@ -299,6 +337,13 @@ class MetadataNode {
              * runtime's teardown walked every node to erase its entry.
              */
             robin_hood::unordered_map<MetadataNode*, v8::Persistent<v8::Function>*> CtorFunctions;
+
+            // Java object id being adopted by an in-flight ES construct
+            // (CreateJSInstanceNative → CallAsConstructor → super()).
+            // RegisterInstance consumes it only when fullClassName matches, so
+            // a nested `new OtherNative()` before super() cannot steal the id.
+            int PendingESAdoptObjectId = -1;
+            std::string PendingESAdoptClassName;
 
             ~MetadataNodeCache() {
                 delete MetadataKey;
