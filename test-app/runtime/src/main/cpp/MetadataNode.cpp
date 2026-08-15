@@ -1439,6 +1439,7 @@ MetadataNode::TypeMetadata* MetadataNode::EnsureExtendedESClass(Isolate* isolate
 
     // Compute the proxy class name
     string fullClassName;
+    string generatedCandidate;
     if (!nativeClassName.empty() && nativeClassName.find('.') != string::npos) {
         fullClassName = nativeClassName;
     } else if (isInterface) {
@@ -1463,20 +1464,25 @@ MetadataNode::TypeMetadata* MetadataNode::EnsureExtendedESClass(Isolate* isolate
         }
 
         string extendNameAndLocation = "es" + HashESClassId(BuildESClassProxyIdentity(scriptName, baseClassName, className, methodOverrides, implementedInterfaces)) + "_" + className;
-        string candidate = TNS_PREFIX + CreateFullClassName(baseClassName, extendNameAndLocation);
-
-        // collision handling for distinct classes that produce the same deterministic name
-        // (e.g. a class factory evaluated multiple times in the same script)
-        fullClassName = candidate;
-        int suffix = 2;
-        while (GetCachedExtendedClassData(isolate, fullClassName).extendedCtorFunction != nullptr) {
-            fullClassName = candidate + "_" + std::to_string(suffix++);
-        }
+        generatedCandidate = TNS_PREFIX + CreateFullClassName(baseClassName, extendNameAndLocation);
+        fullClassName = generatedCandidate;
     }
 
-    // Resolve (generate or load) the Java proxy class through the regular DexFactory pipeline
-    auto clazz = CallbackHandlers::ResolveClass(isolate, baseClassName, fullClassName, methodOverrides, implementedInterfaces, isInterface);
-    auto fullExtendedName = CallbackHandlers::ResolveClassName(isolate, clazz);
+    // Resolve through DexFactory, then key collision checks on the name it
+    // actually produced. Class.getName() drops the com.tns.gen/ request prefix,
+    // so looking up ExtendedCtorFuncCache with the request name never hit.
+    jclass clazz = nullptr;
+    string fullExtendedName;
+    int suffix = 2;
+    while (true) {
+        clazz = CallbackHandlers::ResolveClass(isolate, baseClassName, fullClassName, methodOverrides, implementedInterfaces, isInterface);
+        fullExtendedName = CallbackHandlers::ResolveClassName(isolate, clazz);
+        if (generatedCandidate.empty()
+                || GetCachedExtendedClassData(isolate, fullExtendedName).extendedCtorFunction == nullptr) {
+            break;
+        }
+        fullClassName = generatedCandidate + "_" + std::to_string(suffix++);
+    }
 
     // Tag the ES ctor the same way ExtendMethodCallback tags `.extend()`-created functions, so
     // the rest of the runtime (construction, Java-initiated instantiation, `.class`, marshalling)
