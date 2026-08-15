@@ -96,7 +96,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     auto objectManager = runtime->GetObjectManager();
 
     int adoptObjectId = -1;
-    if (MetadataNode::TryConsumePendingESAdopt(isolate, adoptObjectId)) {
+    if (MetadataNode::TryConsumePendingESAdopt(isolate, fullClassName, adoptObjectId)) {
         // Adopt path: Java already created this object. Bind it to the ES
         // construct and do not NewObject again (that would be a second
         // instance, or recurse through initInstance).

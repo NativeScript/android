@@ -63,7 +63,7 @@ class MetadataNode {
          */
         static bool TryConstructESDerivedInstance(v8::Isolate* isolate, const std::string& proxyClassName, int javaObjectID, v8::Local<v8::Object>& out);
 
-        static bool TryConsumePendingESAdopt(v8::Isolate* isolate, int& javaObjectID);
+        static bool TryConsumePendingESAdopt(v8::Isolate* isolate, const std::string& fullClassName, int& javaObjectID);
 
         static v8::Local<v8::Object> GetImplementationObject(v8::Isolate* isolate, const v8::Local<v8::Object>& object);
 
@@ -383,9 +383,10 @@ class MetadataNode {
 
             // Java object id being adopted by an in-flight ES construct
             // (CreateJSInstanceNative → CallAsConstructor → super()).
-            // RegisterInstance consumes it so super() binds that id and does
-            // not NewObject again.
+            // RegisterInstance consumes it only when fullClassName matches, so
+            // a nested `new OtherNative()` before super() cannot steal the id.
             int PendingESAdoptObjectId = -1;
+            std::string PendingESAdoptClassName;
 
             ~MetadataNodeCache() {
                 delete MetadataKey;
