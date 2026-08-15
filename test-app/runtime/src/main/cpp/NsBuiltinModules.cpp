@@ -2,11 +2,11 @@
 
 #include <android/log.h>
 
-#include <mutex>
 #include <vector>
 
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
+#include "RuntimeState.h"
 #include "console/Console.h"
 #include "robin_hood.h"
 
@@ -50,11 +50,9 @@ bool HasPrefix(const std::string& specifier, const char* prefix) {
 
 /*
  * A builtin module is a singleton per realm, so every cache here is per
- * isolate: workers get their own exports objects and their own synthetic
+ * runtime: workers get their own exports objects and their own synthetic
  * modules. The process-global g_moduleRegistry deliberately holds none of
- * this. Worker runtimes initialize on their own threads, so the map itself is
- * under the mutex; the state it holds is only ever touched from its isolate's
- * thread.
+ * this. Touched only from its own runtime's thread.
  */
 struct RealmState {
     robin_hood::unordered_map<std::string, Persistent<Object>*> exports;
@@ -76,16 +74,13 @@ struct RealmState {
     }
 };
 
-std::mutex realmsMutex;
-robin_hood::unordered_map<Isolate*, RealmState*> isolateToRealm;
-
-RealmState& GetRealm(Isolate* isolate) {
-    std::lock_guard<std::mutex> lock(realmsMutex);
-    auto it = isolateToRealm.find(isolate);
-    if (it == isolateToRealm.end()) {
-        it = isolateToRealm.emplace(isolate, new RealmState()).first;
-    }
-    return *it->second;
+/*
+ * This runtime's realm. Per-runtime state rather than an isolate-keyed shared
+ * map, so reaching it needs no lock and it is released with the runtime. Null
+ * once the runtime has begun tearing down.
+ */
+RealmState* GetRealm(Isolate* isolate) {
+    return RuntimeState::For<RealmState>(isolate);
 }
 
 MaybeLocal<Object> BuildBinding(Local<Context> context, BuiltinId builtin) {
@@ -119,7 +114,13 @@ MaybeLocal<Object> BuildBinding(Local<Context> context, BuiltinId builtin) {
  */
 bool Instantiate(Local<Context> context, const Registration& requested) {
     Isolate* isolate = v8::Isolate::GetCurrent();
-    RealmState& realm = GetRealm(isolate);
+    RealmState* realmState = GetRealm(isolate);
+    if (realmState == nullptr) {
+        isolate->ThrowException(Exception::Error(ArgConverter::ConvertToV8String(
+                isolate, "Cannot load a builtin module: the runtime is shutting down")));
+        return false;
+    }
+    RealmState& realm = *realmState;
 
     /*
      * A shim reaches its ns: module through the builtin require, so the graph
@@ -241,7 +242,11 @@ MaybeLocal<Object> NsBuiltinModules::GetExports(Local<Context> context,
     }
 
     Isolate* isolate = v8::Isolate::GetCurrent();
-    RealmState& realm = GetRealm(isolate);
+    RealmState* realmState = GetRealm(isolate);
+    if (realmState == nullptr) {
+        return MaybeLocal<Object>();
+    }
+    RealmState& realm = *realmState;
     auto it = realm.exports.find(specifier);
     if (it == realm.exports.end()) {
         if (!Instantiate(context, *registration)) {
@@ -258,7 +263,11 @@ MaybeLocal<Object> NsBuiltinModules::GetExports(Local<Context> context,
 MaybeLocal<Module> NsBuiltinModules::GetModule(Local<Context> context,
                                                const std::string& specifier) {
     Isolate* isolate = v8::Isolate::GetCurrent();
-    RealmState& realm = GetRealm(isolate);
+    RealmState* realmState = GetRealm(isolate);
+    if (realmState == nullptr) {
+        return MaybeLocal<Module>();
+    }
+    RealmState& realm = *realmState;
 
     auto it = realm.modules.find(specifier);
     if (it != realm.modules.end()) {
@@ -310,7 +319,11 @@ MaybeLocal<Module> NsBuiltinModules::GetModule(Local<Context> context,
 
 Local<v8::Function> NsBuiltinModules::GetFormatFunc(Local<Context> context) {
     Isolate* isolate = v8::Isolate::GetCurrent();
-    RealmState& realm = GetRealm(isolate);
+    RealmState* realmState = GetRealm(isolate);
+    if (realmState == nullptr) {
+        return Local<v8::Function>();
+    }
+    RealmState& realm = *realmState;
     if (realm.format != nullptr) {
         return realm.format->Get(isolate);
     }
@@ -336,15 +349,6 @@ Local<v8::Function> NsBuiltinModules::GetFormatFunc(Local<Context> context) {
 
     realm.format = new Persistent<v8::Function>(isolate, format.As<v8::Function>());
     return format.As<v8::Function>();
-}
-
-void NsBuiltinModules::onDisposeIsolate(Isolate* isolate) {
-    std::lock_guard<std::mutex> lock(realmsMutex);
-    auto it = isolateToRealm.find(isolate);
-    if (it != isolateToRealm.end()) {
-        delete it->second;
-        isolateToRealm.erase(it);
-    }
 }
 
 }  // namespace tns

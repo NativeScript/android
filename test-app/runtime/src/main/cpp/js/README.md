@@ -74,8 +74,8 @@ module.exports = somethingTheCallSiteNeeds;
 
 `primordials.js` runs first in every isolate — lazily, on the first
 `RunBuiltin` call, which happens during runtime init — and its frozen,
-null-prototype export is cached per isolate (`BuiltinLoader`, released from
-`disposeIsolate`) and handed to every other builtin, so a builtin that
+null-prototype export is cached per runtime (`BuiltinLoader`, in
+`RuntimeState`) and handed to every other builtin, so a builtin that
 compiles later in the isolate's life still sees intrinsics as they were before
 user code ran.
 

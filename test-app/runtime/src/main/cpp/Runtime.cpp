@@ -21,7 +21,6 @@
 #include "FrameCallbacks.h"
 #include "Interop.h"
 #include "IsolateTracked.h"
-#include "IsolateDisposer.h"
 #include "JType.h"
 #include "JsArgConverter.h"
 #include "JsArgToArrayConverter.h"
@@ -1023,10 +1022,10 @@ void Runtime::DestroyRuntime() {
     m_eventLoop->Shutdown();
   }
   if (m_napiEnv != nullptr) {
-    // After Shutdown so no queued Node-API entry can run against a dying env,
-    // and before disposeIsolate: the env's reference lists hold v8::Globals,
-    // so its teardown needs the isolate alive and locked. The Locker is
-    // reentrant for the worker path, which already holds it here.
+    // After Shutdown so no queued Node-API entry can run against a dying env.
+    // The env's reference lists hold v8::Globals, so its teardown needs the
+    // isolate alive and locked; the Locker is reentrant for the worker path,
+    // which already holds it here.
     v8::Locker locker(m_isolate);
     NapiEnv::Destroy(static_cast<NapiEnv*>(m_napiEnv));
     m_napiEnv = nullptr;
@@ -1051,8 +1050,6 @@ void Runtime::DestroyRuntime() {
   // isolate (RunMainThreadEntry) after it had already been disposed.
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
   FrameCallbacks::RemoveIsolateEntries(m_isolate);
-
-  tns::disposeIsolate(m_isolate);
 
   // V8 does not run weak callbacks when an isolate is disposed, so anything
   // still bound to one has to be deleted explicitly, here, while the isolate
