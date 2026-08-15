@@ -252,10 +252,12 @@ function formatObject(ctx, value, depth) {
 
 // A toString override that is NOT Object.prototype's: own property first, then
 // up the chain, stopping at Object.prototype. Data properties only — a
-// toString defined as an accessor is not worth invoking a getter for.
+// toString defined as an accessor is not worth invoking a getter for. The hop
+// cap only bounds Proxy getPrototypeOf traps fabricating endless chains; it
+// must clear real hierarchies (core layout views sit ~10 prototypes deep).
 function findCustomToString(value) {
   let target = value;
-  for (let i = 0; target !== null && target !== ObjectPrototype && i < 8; i++) {
+  for (let i = 0; target !== null && target !== ObjectPrototype && i < 32; i++) {
     const desc = ObjectGetOwnPropertyDescriptor(target, "toString");
     if (desc !== undefined) {
       return typeof desc.value === "function" ? desc.value : undefined;

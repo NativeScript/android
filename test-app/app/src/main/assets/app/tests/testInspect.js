@@ -180,6 +180,19 @@ describe("inspect", function () {
         expect(__inspect(broken).indexOf("a: 1")).toBeGreaterThan(-1);
     });
 
+    it("finds toString deep in the prototype chain (core layout depth)", function () {
+        // Core view chains run ~10 prototypes deep (GridLayout -> ... -> ViewBase,
+        // which holds toString); the walk cap must clear them.
+        function ViewBase() {}
+        ViewBase.prototype.toString = function () { return "GridLayout(7)"; };
+        var proto = ViewBase.prototype;
+        for (var i = 0; i < 9; i++) {
+            proto = Object.create(proto);
+        }
+        var deep = Object.create(proto);
+        expect(__inspect(deep)).toBe("GridLayout(7)");
+    });
+
     it("formats under tampered prototypes", function () {
         var savedSlice = Array.prototype.slice;
         var savedIndexOf = Array.prototype.indexOf;
