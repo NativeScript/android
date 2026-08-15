@@ -3,7 +3,7 @@
 #include "Runtime.h"
 #include "NativeScriptException.h"
 #include "ModuleBinding.h"
-#include "IsolateDisposer.h"
+#include "RuntimeState.h"
 #include "NativeScriptPlatform.h"
 #include "Util.h"
 #include <cmath>
@@ -378,9 +378,13 @@ bool Timers::RunIfEarliest(double now, double otherDue) {
 }
 
 void Timers::InitStatic(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalObjectTemplate) {
-   auto timers = new Timers();
+   // Owned by the runtime, which destroys it while the isolate is still alive
+   // -- what releasing the tasks' handles and their Java token peers requires.
+   auto* timers = RuntimeState::For<Timers>(isolate);
+   if (timers == nullptr) {
+       return;
+   }
    timers->Init(isolate, globalObjectTemplate);
-   registerIsolateBoundObject(isolate, timers);
 }
 
 };
