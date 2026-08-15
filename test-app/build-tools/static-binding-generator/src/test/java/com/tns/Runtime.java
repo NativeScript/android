@@ -5,4 +5,5 @@ public class Runtime {
     public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, Object... args) {
         return null;
     }
+    public static void passSuppressedExceptionToJs(Object instance, Throwable ex, String methodName) {}
 }
