@@ -49,9 +49,18 @@ struct sigaction g_previous[NSIG];
  * handler. Kept out of the rendered buffers so that recording it needs no
  * lock -- the thread may be aborting from under one.
  */
+enum FatalState { kFatalFree = 0, kFatalClaiming = 1, kFatalPublished = 2 };
+
 char g_fatalMessage[kFatalMax];
-std::atomic<size_t> g_fatalLength{0};
-std::atomic_flag g_fatalClaimed = ATOMIC_FLAG_INIT;
+size_t g_fatalLength = 0;
+std::atomic<int> g_fatalState{kFatalFree};
+
+/*
+ * How long the handler waits on a thread that has claimed the slot but not
+ * filled it yet. Bounded, so a thread that never gets to publish cannot stall
+ * the crash path.
+ */
+constexpr int kFatalSpinLimit = 200000;
 
 thread_local Slot* t_slot = nullptr;
 
@@ -167,10 +176,18 @@ void Handler(int signalNumber, siginfo_t* info, void* context) {
       if (written > 0) {
         off_t offset = written;
 
-        size_t fatalLength = g_fatalLength.load(std::memory_order_acquire);
-        if (fatalLength > 0) {
+        // A thread that has claimed the slot is a memcpy away from filling
+        // it. Waiting for it beats emitting a record that omits the very
+        // check that brought the process here.
+        for (int spin = 0;
+             spin < kFatalSpinLimit &&
+             g_fatalState.load(std::memory_order_acquire) == kFatalClaiming;
+             ++spin) {
+        }
+
+        if (g_fatalState.load(std::memory_order_acquire) == kFatalPublished) {
           ssize_t fatalWritten =
-              pwrite(fd, g_fatalMessage, fatalLength, offset);
+              pwrite(fd, g_fatalMessage, g_fatalLength, offset);
           if (fatalWritten > 0) {
             offset += fatalWritten;
           }
@@ -308,7 +325,9 @@ void CrashBreadcrumbs::RecordFatal(const char* message) {
   // Only the first caller writes. A second thread failing a check at the same
   // moment would otherwise overlap this copy, including while the signal
   // handler is reading the buffer out.
-  if (g_fatalClaimed.test_and_set(std::memory_order_acq_rel)) {
+  int expected = kFatalFree;
+  if (!g_fatalState.compare_exchange_strong(expected, kFatalClaiming,
+                                            std::memory_order_acq_rel)) {
     return;
   }
   // Room is reserved for the newline and the terminator.
@@ -316,7 +335,9 @@ void CrashBreadcrumbs::RecordFatal(const char* message) {
   memcpy(g_fatalMessage, message, length);
   g_fatalMessage[length] = '\n';
   g_fatalMessage[length + 1] = '\0';
-  g_fatalLength.store(length + 1, std::memory_order_release);
+  g_fatalLength = length + 1;
+  // Publishes the buffer and the length together.
+  g_fatalState.store(kFatalPublished, std::memory_order_release);
 }
 
 CrashBreadcrumbs::ModuleScope::ModuleScope(const char* modulePath) {

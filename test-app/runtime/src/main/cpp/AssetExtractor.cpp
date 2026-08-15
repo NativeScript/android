@@ -3,7 +3,11 @@
 #include "NativeScriptAssert.h"
 #include <libgen.h>
 #include <utime.h>
+#include <unistd.h>
 #include <sys/stat.h>
+#include <cerrno>
+#include <cstdio>
+#include <string>
 #include "AssetExtractor.h"
 
 using namespace tns;
@@ -63,10 +67,23 @@ void AssetExtractor::ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstrin
                     continue;
                 }
 
-                auto fd = fopen(assetFullname.c_str(), "w");
+                /*
+                 * Extracted through a temporary and renamed once complete.
+                 * Writing in place would truncate a good asset up front, and a
+                 * read that fails partway would leave the remains behind: the
+                 * mtime comparison above keeps whatever is already on disk
+                 * unless the apk's copy is strictly newer, so a partial file
+                 * would never be replaced on a later launch.
+                 */
+                std::string tempFullname(assetFullname);
+                tempFullname.append(".ns-partial.");
+                tempFullname.append(std::to_string(getpid()));
+
+                auto fd = fopen(tempFullname.c_str(), "w");
 
                 if (fd != nullptr) {
                     zip_int64_t sum = 0;
+                    bool complete = true;
                     while (sum != (zip_int64_t)sb.size) {
                         zip_int64_t len = zip_fread(zf, buf, sizeof(buf));
                         // 0 means the entry ended early, -1 a read error. Both
@@ -79,16 +96,30 @@ void AssetExtractor::ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstrin
                                 sb.name, (long long)sum,
                                 (unsigned long long)sb.size,
                                 zip_file_strerror(zf));
+                            complete = false;
                             break;
                         }
 
-                        fwrite(buf, 1, len, fd);
+                        if (fwrite(buf, 1, len, fd) != (size_t)len) {
+                            DEBUG_WRITE_FORCE(
+                                "AssetExtractor: could not write '%s' (errno %d)",
+                                assetFullname.c_str(), errno);
+                            complete = false;
+                            break;
+                        }
                         sum += len;
                     }
-                    fclose(fd);
-                    utimbuf t;
-                    t.modtime = sb.mtime;
-                    utime(assetFullname.c_str(), &t);
+
+                    complete = (fclose(fd) == 0) && complete;
+
+                    if (complete && rename(tempFullname.c_str(),
+                                           assetFullname.c_str()) == 0) {
+                        utimbuf t;
+                        t.modtime = sb.mtime;
+                        utime(assetFullname.c_str(), &t);
+                    } else {
+                        remove(tempFullname.c_str());
+                    }
                 }
 
                 zip_fclose(zf);
