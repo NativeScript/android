@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 #include "AssetExtractor.h"
 
@@ -76,10 +77,29 @@ void AssetExtractor::ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstrin
                  * would never be replaced on a later launch.
                  */
                 std::string tempFullname(assetFullname);
-                tempFullname.append(".ns-partial.");
-                tempFullname.append(std::to_string(getpid()));
+                tempFullname.append(".ns-XXXXXX");
 
-                auto fd = fopen(tempFullname.c_str(), "w");
+                // Exclusive creation, so two extractions of the same entry
+                // cannot land on one temporary. mkstemp writes the name it
+                // settled on back into the buffer.
+                FILE* fd = nullptr;
+                int tempFd = mkstemp(tempFullname.data());
+                if (tempFd < 0) {
+                    DEBUG_WRITE_FORCE(
+                        "AssetExtractor: could not create a temporary for '%s' "
+                        "(errno %d)",
+                        assetFullname.c_str(), errno);
+                } else {
+                    fd = fdopen(tempFd, "w");
+                    if (fd == nullptr) {
+                        DEBUG_WRITE_FORCE(
+                            "AssetExtractor: could not open the temporary for "
+                            "'%s' (errno %d)",
+                            assetFullname.c_str(), errno);
+                        close(tempFd);
+                        remove(tempFullname.c_str());
+                    }
+                }
 
                 if (fd != nullptr) {
                     zip_int64_t sum = 0;
