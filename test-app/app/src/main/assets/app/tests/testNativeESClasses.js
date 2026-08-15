@@ -202,6 +202,31 @@ describe("Tests native ES class extensions (class X extends NativeType)", functi
         expect(runCount).toBe(1);
     });
 
+    it("When_two_es_classes_implement_the_same_interface_js_instances_should_stay_distinct", function () {
+        var aCount = 0;
+        var bCount = 0;
+
+        class EsRunnableA extends java.lang.Runnable {
+            run() {
+                aCount++;
+            }
+        }
+
+        class EsRunnableB extends java.lang.Runnable {
+            run() {
+                bCount++;
+            }
+        }
+
+        new java.lang.Thread(new EsRunnableA()).run();
+        new java.lang.Thread(new EsRunnableB()).run();
+
+        expect(aCount).toBe(1);
+        expect(bCount).toBe(1);
+        // DexFactory shares one interface proxy; JS identity is per instance.
+        expect(EsRunnableA.class.equals(EsRunnableB.class)).toBe(true);
+    });
+
     it("When_declaring_static_interfaces_the_proxy_should_implement_them", function () {
         var ran = { value: false };
 
@@ -348,6 +373,30 @@ describe("Tests native ES class extensions (class X extends NativeType)", functi
         expect(ESPrivateAllocObject.class.newInstance().someMethod()).toBe(1);
     });
 
+    it("When_java_instantiates_an_es_class_nested_native_construction_should_not_steal_adopt", function () {
+        class ESNestedAdoptObject extends java.lang.Object {
+            constructor() {
+                // Valid before super(): must not consume the pending adopt id
+                // that belongs to ESNestedAdoptObject.
+                var list = new java.util.ArrayList();
+                list.add("nested");
+                super();
+                this.list = list;
+            }
+        }
+
+        var allocated = ESNestedAdoptObject.class.newInstance();
+        expect(allocated instanceof ESNestedAdoptObject).toBe(true);
+        expect(allocated.list instanceof java.util.ArrayList).toBe(true);
+        expect(allocated.list.size()).toBe(1);
+        expect(allocated.list.get(0)).toBe("nested");
+        expect(allocated.getClass().getName()).toContain("ESNestedAdoptObject");
+
+        var constructed = new ESNestedAdoptObject();
+        expect(constructed.list.get(0)).toBe("nested");
+        expect(constructed.getClass().equals(allocated.getClass())).toBe(true);
+    });
+
     it("When_java_instantiates_an_es_class_super_args_should_not_construct_again", function () {
         class ESAdoptOnceObject extends com.tns.tests.DummyClass {
             constructor() {
@@ -438,6 +487,17 @@ describe("Tests native ES class extensions (class X extends NativeType)", functi
         expect(new ESEagerNamed() instanceof ESEagerNamed).toBe(true);
     });
 
+    it("When_NativeClass_sets_an_unqualified_android_name_it_should_throw", function () {
+        expect(function () {
+            global.NativeClass({
+                android: {
+                    name: "UnqualifiedName"
+                }
+            })(class UnqualifiedNativeClass extends java.lang.Object {
+            });
+        }).toThrow();
+    });
+
     it("When_NativeClass_runs_on_a_worker_it_should_be_a_noop", function (done) {
         var worker = new Worker("../shared/Workers/EvalWorker.js");
         worker.onmessage = function (msg) {
@@ -462,16 +522,22 @@ describe("Tests native ES class extensions (class X extends NativeType)", functi
     });
 
     it("When_anonymous_es_classes_extend_native_types_each_should_get_a_distinct_proxy", function () {
-        var First = class extends java.lang.Object {
-            toString() {
-                return "first anonymous";
+        // Array-literal class expressions stay anonymous (no inferred name),
+        // so both hash as ESClass and exercise the _2 suffix collision path.
+        var classes = [
+            class extends java.lang.Object {
+                toString() {
+                    return "first anonymous";
+                }
+            },
+            class extends java.lang.Object {
+                toString() {
+                    return "second anonymous";
+                }
             }
-        };
-        var Second = class extends java.lang.Object {
-            toString() {
-                return "second anonymous";
-            }
-        };
+        ];
+        var First = classes[0];
+        var Second = classes[1];
 
         var firstInstance = new First();
         var secondInstance = new Second();

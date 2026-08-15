@@ -177,9 +177,18 @@
 		var name = android && android.name;
 
 		if (interfaces && interfaces.length > 0) {
-			target.interfaces = (target.interfaces && target.interfaces instanceof Array ? target.interfaces.concat(interfaces) : interfaces.slice());
+			var merged = (target.interfaces && target.interfaces instanceof Array ? target.interfaces.concat(interfaces) : interfaces.slice());
+			target.interfaces = merged;
+			// Legacy `.extend()` reads interfaces from the implementation object
+			// (the prototype). Keep both so downleveled ES5 targets still work.
+			if (target.prototype) {
+				target.prototype.interfaces = merged;
+			}
 		}
 		if (name) {
+			if (name.indexOf(".") === -1) {
+				throw new Error("NativeClass android.name must be a fully qualified Java class name.");
+			}
 			target.nativeClassName = name;
 			// Accessing `.class` lazily registers the proxy under the explicit name.
 			void target.class;
