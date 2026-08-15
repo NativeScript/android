@@ -1,4 +1,5 @@
 #include "WeakRef.h"
+#include "NativeScriptAssert.h"
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
 #include "V8StringConstants.h"
@@ -15,5 +16,5 @@ WeakRef::WeakRef() {
 
 void WeakRef::Init(v8::Isolate* isolate, Local<v8::Context> context) {
     bool success = !BuiltinLoader::RunBuiltin(context, BuiltinId::kWeakRef).IsEmpty();
-    assert(success);
+    NS_DCHECK(success);
 }

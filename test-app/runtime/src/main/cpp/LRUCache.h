@@ -17,7 +17,7 @@
  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <cassert>
+#include "NativeScriptAssert.h"
 #include <list>
 #include "robin_hood.h"
 
@@ -47,8 +47,8 @@ class LRUCache {
         // the maximum number of records to be stored
         LRUCache(value_type (*loadCallback)(const key_type&, void*), void (*evictCallback)(const value_type&, void*), bool (*cacheValidCallback)(const key_type&, const value_type&, void*), size_t capacity, void* state)
             : m_loadCallback(loadCallback), m_capacity(capacity), m_evictCallback(evictCallback), m_cacheValidCallback(cacheValidCallback), m_state(state) {
-            assert(m_loadCallback != nullptr);
-            assert((0 < m_capacity) && (m_capacity < 10000));
+            NS_CHECK(m_loadCallback != nullptr);
+            NS_CHECK((0 < m_capacity) && (m_capacity < 10000));
         }
 
         // Obtain value of the cached function for k
@@ -138,7 +138,7 @@ class LRUCache {
         // Record a fresh key-value pair in the cache
         void insert(const key_type& k, const value_type& v) {
             // Method is only called on cache misses
-            assert(m_key_to_value.find(k) == m_key_to_value.end());
+            NS_DCHECK(m_key_to_value.find(k) == m_key_to_value.end());
 
             // Make space if necessary
             if (m_key_to_value.size() == m_capacity) {
@@ -158,11 +158,11 @@ class LRUCache {
         // Purge the least-recently-used element in the cache
         void evict() {
             // Assert method is never called when cache is empty
-            assert(!m_key_tracker.empty());
+            NS_DCHECK(!m_key_tracker.empty());
 
             // Identify least recently used key
             auto it = m_key_to_value.find(m_key_tracker.front());
-            assert(it != m_key_to_value.end());
+            NS_DCHECK(it != m_key_to_value.end());
 
             if (m_evictCallback != nullptr) {
                 m_evictCallback((*it).second.first, m_state);

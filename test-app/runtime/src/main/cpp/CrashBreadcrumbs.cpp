@@ -18,6 +18,7 @@ constexpr size_t kMaxRuntimes = 16;
 constexpr size_t kFieldMax = 160;
 constexpr size_t kBufferMax = 8192;
 constexpr size_t kHeaderMax = 128;
+constexpr size_t kFatalMax = 256;
 
 struct Slot {
   bool used;
@@ -42,6 +43,24 @@ std::atomic<int> g_active{-1};
 std::atomic<int> g_storeFd{-1};
 std::atomic_flag g_recorded = ATOMIC_FLAG_INIT;
 struct sigaction g_previous[NSIG];
+
+/*
+ * Written by whichever thread is on its way to abort(), read by the signal
+ * handler. Kept out of the rendered buffers so that recording it needs no
+ * lock -- the thread may be aborting from under one.
+ */
+enum FatalState { kFatalFree = 0, kFatalClaiming = 1, kFatalPublished = 2 };
+
+char g_fatalMessage[kFatalMax];
+size_t g_fatalLength = 0;
+std::atomic<int> g_fatalState{kFatalFree};
+
+/*
+ * How long the handler waits on a thread that has claimed the slot but not
+ * filled it yet. Bounded, so a thread that never gets to publish cannot stall
+ * the crash path.
+ */
+constexpr int kFatalSpinLimit = 200000;
 
 thread_local Slot* t_slot = nullptr;
 
@@ -154,9 +173,30 @@ void Handler(int signalNumber, siginfo_t* info, void* context) {
       AppendRaw(header, sizeof(header), length, "\n");
 
       ssize_t written = pwrite(fd, header, length, 0);
-      int active = g_active.load(std::memory_order_acquire);
-      if (written > 0 && active >= 0) {
-        pwrite(fd, g_rendered[active], g_renderedLength[active], written);
+      if (written > 0) {
+        off_t offset = written;
+
+        // A thread that has claimed the slot is a memcpy away from filling
+        // it. Waiting for it beats emitting a record that omits the very
+        // check that brought the process here.
+        for (int spin = 0;
+             spin < kFatalSpinLimit &&
+             g_fatalState.load(std::memory_order_acquire) == kFatalClaiming;
+             ++spin) {
+        }
+
+        if (g_fatalState.load(std::memory_order_acquire) == kFatalPublished) {
+          ssize_t fatalWritten =
+              pwrite(fd, g_fatalMessage, g_fatalLength, offset);
+          if (fatalWritten > 0) {
+            offset += fatalWritten;
+          }
+        }
+
+        int active = g_active.load(std::memory_order_acquire);
+        if (active >= 0) {
+          pwrite(fd, g_rendered[active], g_renderedLength[active], offset);
+        }
       }
     }
   }
@@ -206,7 +246,7 @@ void CrashBreadcrumbs::OpenStore(const std::string& filesRoot) {
       return;
     }
 
-    char previous[kBufferMax + kHeaderMax];
+    char previous[kHeaderMax + kFatalMax + kBufferMax];
     ssize_t length = read(fd, previous, sizeof(previous) - 1);
     if (length > 0) {
       previous[length] = '\0';
@@ -276,6 +316,28 @@ void CrashBreadcrumbs::SetWorkerScript(int runtimeId, const char* script) {
   slot->isWorker = true;
   CopyField(slot->script, script);
   RenderLocked();
+}
+
+void CrashBreadcrumbs::RecordFatal(const char* message) {
+  if (message == nullptr) {
+    return;
+  }
+  // Only the first caller writes. A second thread failing a check at the same
+  // moment would otherwise overlap this copy, including while the signal
+  // handler is reading the buffer out.
+  int expected = kFatalFree;
+  if (!g_fatalState.compare_exchange_strong(expected, kFatalClaiming,
+                                            std::memory_order_acq_rel)) {
+    return;
+  }
+  // Room is reserved for the newline and the terminator.
+  size_t length = strnlen(message, kFatalMax - 2);
+  memcpy(g_fatalMessage, message, length);
+  g_fatalMessage[length] = '\n';
+  g_fatalMessage[length + 1] = '\0';
+  g_fatalLength = length + 1;
+  // Publishes the buffer and the length together.
+  g_fatalState.store(kFatalPublished, std::memory_order_release);
 }
 
 CrashBreadcrumbs::ModuleScope::ModuleScope(const char* modulePath) {

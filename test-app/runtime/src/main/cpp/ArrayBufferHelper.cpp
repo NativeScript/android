@@ -1,4 +1,5 @@
 #include "ArrayBufferHelper.h"
+#include "NativeScriptAssert.h"
 #include "ArgConverter.h"
 #include "NativeScriptException.h"
 #include <sstream>
@@ -65,7 +66,7 @@ void ArrayBufferHelper::CreateFromCallbackImpl(const FunctionCallbackInfo<Value>
 
     if (m_ByteBufferClass == nullptr) {
         m_ByteBufferClass = env.FindClass("java/nio/ByteBuffer");
-        assert(m_ByteBufferClass != nullptr);
+        NS_CHECK(m_ByteBufferClass != nullptr);
     }
 
     auto isByteBuffer = env.IsInstanceOf(obj, m_ByteBufferClass);
@@ -76,7 +77,7 @@ void ArrayBufferHelper::CreateFromCallbackImpl(const FunctionCallbackInfo<Value>
 
     if (m_isDirectMethodID == nullptr) {
         m_isDirectMethodID = env.GetMethodID(m_ByteBufferClass, "isDirect", "()Z");
-        assert(m_isDirectMethodID != nullptr);
+        NS_CHECK(m_isDirectMethodID != nullptr);
     }
 
     auto ret = env.CallBooleanMethod(obj, m_isDirectMethodID);
@@ -99,14 +100,14 @@ void ArrayBufferHelper::CreateFromCallbackImpl(const FunctionCallbackInfo<Value>
     } else {
         if (m_remainingMethodID == nullptr) {
             m_remainingMethodID = env.GetMethodID(m_ByteBufferClass, "remaining", "()I");
-            assert(m_remainingMethodID != nullptr);
+            NS_CHECK(m_remainingMethodID != nullptr);
         }
 
         int bufferRemainingSize = env.CallIntMethod(obj, m_remainingMethodID);
 
         if (m_getMethodID == nullptr) {
             m_getMethodID = env.GetMethodID(m_ByteBufferClass, "get", "([BII)Ljava/nio/ByteBuffer;");
-            assert(m_getMethodID != nullptr);
+            NS_CHECK(m_getMethodID != nullptr);
         }
 
         jbyteArray byteArray = env.NewByteArray(bufferRemainingSize);

@@ -1,6 +1,6 @@
 #include "StructuredSerialization.h"
 
-#include <cassert>
+#include "NativeScriptAssert.h"
 
 #include "ArgConverter.h"
 
@@ -18,7 +18,7 @@ void ThrowDataCloneError(Isolate* isolate, const std::string& message) {
                     ->Set(context, ArgConverter::ConvertToV8String(isolate, "name"),
                           ArgConverter::ConvertToV8String(isolate, "DataCloneError"))
                     .FromMaybe(false);
-    assert(success);
+    NS_DCHECK(success);
     isolate->ThrowException(error);
 }
 
@@ -168,7 +168,7 @@ Maybe<bool> SerializedValue::Serialize(Isolate* isolate, Local<Context> context,
                                        HostObjectPolicy hostObjectPolicy) {
     HandleScope handleScope(isolate);
     Context::Scope contextScope(context);
-    assert(buffer_ == nullptr);
+    NS_DCHECK(buffer_ == nullptr);
 
     std::vector<Local<ArrayBuffer>> transfers;
     if (!CollectTransferList(isolate, context, transferList, transfers)) {

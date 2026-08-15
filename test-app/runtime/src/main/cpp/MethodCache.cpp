@@ -32,13 +32,13 @@ void MethodCache::Init() {
     JEnv env;
 
     RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
-    assert(RUNTIME_CLASS != nullptr);
+    NS_CHECK(RUNTIME_CLASS != nullptr);
 
     RESOLVE_METHOD_OVERLOAD_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "resolveMethodOverload", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;");
-    assert(RESOLVE_METHOD_OVERLOAD_METHOD_ID != nullptr);
+    NS_CHECK(RESOLVE_METHOD_OVERLOAD_METHOD_ID != nullptr);
 
     RESOLVE_CONSTRUCTOR_SIGNATURE_ID = env.GetMethodID(RUNTIME_CLASS, "resolveConstructorSignature", "(Ljava/lang/Class;[Ljava/lang/Object;)Ljava/lang/String;");
-    assert(RESOLVE_CONSTRUCTOR_SIGNATURE_ID != nullptr);
+    NS_CHECK(RESOLVE_CONSTRUCTOR_SIGNATURE_ID != nullptr);
 }
 
 MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic) {
@@ -60,7 +60,7 @@ MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& c
     if (!signature.empty()) {
         JEnv env;
         auto clazz = env.FindClass(className);
-        assert(clazz != nullptr);
+        NS_DCHECK(clazz != nullptr);
         method_info.clazz = clazz;
         method_info.signature = signature;
         method_info.returnType = MetadataReader::ParseReturnType(method_info.signature);

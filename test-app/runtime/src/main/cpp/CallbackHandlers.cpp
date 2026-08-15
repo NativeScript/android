@@ -1,4 +1,5 @@
 #include "CallbackHandlers.h"
+#include "NativeScriptAssert.h"
 #include "MetadataNode.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
@@ -30,33 +31,33 @@ void CallbackHandlers::Init(Isolate *isolate) {
     JEnv env;
 
     JAVA_LANG_STRING = env.FindClass("java/lang/String");
-    assert(JAVA_LANG_STRING != nullptr);
+    NS_CHECK(JAVA_LANG_STRING != nullptr);
 
     RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
-    assert(RUNTIME_CLASS != nullptr);
+    NS_CHECK(RUNTIME_CLASS != nullptr);
 
     RESOLVE_CLASS_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "resolveClass",
                                               "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;Z)Ljava/lang/Class;");
-    assert(RESOLVE_CLASS_METHOD_ID != nullptr);
+    NS_CHECK(RESOLVE_CLASS_METHOD_ID != nullptr);
 
     CURRENT_OBJECTID_FIELD_ID = env.GetFieldID(RUNTIME_CLASS, "currentObjectId", "I");
-    assert(CURRENT_OBJECTID_FIELD_ID != nullptr);
+    NS_CHECK(CURRENT_OBJECTID_FIELD_ID != nullptr);
 
     MAKE_INSTANCE_STRONG_ID = env.GetMethodID(RUNTIME_CLASS, "makeInstanceStrong",
                                               "(Ljava/lang/Object;I)V");
-    assert(MAKE_INSTANCE_STRONG_ID != nullptr);
+    NS_CHECK(MAKE_INSTANCE_STRONG_ID != nullptr);
 
     GET_TYPE_METADATA = env.GetStaticMethodID(RUNTIME_CLASS, "getTypeMetadata",
                                               "(Ljava/lang/String;I)[Ljava/lang/String;");
-    assert(GET_TYPE_METADATA != nullptr);
+    NS_CHECK(GET_TYPE_METADATA != nullptr);
 
     ENABLE_VERBOSE_LOGGING_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "enableVerboseLogging",
                                                        "()V");
-    assert(ENABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
+    NS_CHECK(ENABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
 
     DISABLE_VERBOSE_LOGGING_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "disableVerboseLogging",
                                                         "()V");
-    assert(ENABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
+    NS_CHECK(DISABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
 
     MetadataNode::Init(isolate);
 
@@ -559,7 +560,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             break;
         }
         default: {
-            assert(false);
+            NS_DCHECK(false);
             break;
         }
     }
@@ -674,7 +675,7 @@ CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object> &implementat
 }
 
 void CallbackHandlers::RunOnMainThreadCallback(const FunctionCallbackInfo<v8::Value> &args) {
-    assert(args[0]->IsFunction());
+    NS_DCHECK(args[0]->IsFunction());
     Isolate *isolate = args.GetIsolate();
 
     v8::Locker locker(isolate);
@@ -695,7 +696,7 @@ void CallbackHandlers::RunOnMainThreadCallback(const FunctionCallbackInfo<v8::Va
         std::lock_guard<std::mutex> lock(cacheMutex_);
         bool inserted;
         std::tie(std::ignore, inserted) = cache_.try_emplace(key, isolate, callback);
-        assert(inserted && "Main thread callback ID should not be duplicated");
+        NS_DCHECK(inserted && "Main thread callback ID should not be duplicated");
     }
 
     // bare entry: the closure locks the CALLER's isolate (possibly a
@@ -957,7 +958,7 @@ vector<string> CallbackHandlers::GetTypeMetadata(const string &name, int index) 
 
     jsize length = env.GetArrayLength(pubApi);
 
-    assert(length > 0);
+    NS_DCHECK(length > 0);
 
     vector<string> result;
 

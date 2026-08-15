@@ -3,7 +3,7 @@
 //
 
 #include <include/v8.h>
-#include <assert.h>
+#include "NativeScriptAssert.h"
 #include <android/log.h>
 #include <cstdlib>
 #include <chrono>
@@ -60,7 +60,7 @@ v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, Con
     v8::Local<v8::Object> console = v8::Object::New(isolate);
     bool success = console->SetPrototype(context, v8::Object::New(isolate)).FromMaybe(false);
 
-    assert(success);
+    NS_DCHECK(success);
 
 
     bindFunctionProperty(context, console, "assert", assertCallback);

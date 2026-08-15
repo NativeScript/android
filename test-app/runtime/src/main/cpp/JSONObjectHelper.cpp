@@ -1,4 +1,5 @@
 #include "NativeScriptException.h"
+#include "NativeScriptAssert.h"
 #include "JSONObjectHelper.h"
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
@@ -46,7 +47,7 @@ void JSONObjectHelper::RegisterFromFunction(Isolate *isolate, Local<Value>& json
     Local<External> extData = External::New(isolate, serializeFunc, v8::kExternalPointerTypeTagDefault);
     Local<Function> fromFunc;
     bool ok = FunctionTemplate::New(isolate, ConvertCallbackStatic, extData)->GetFunction(context).ToLocal(&fromFunc);
-    assert(ok);
+    NS_DCHECK(ok);
     jsonObjectFunc->Set(context, fromKey, fromFunc);
 }
 

@@ -8,7 +8,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
-#include <assert.h>
+#include "NativeScriptAssert.h"
 #include "robin_hood.h"
 
 namespace tns {
@@ -117,7 +117,7 @@ namespace tns {
 
             std::string name(ptr, len);
 
-            assert(name.length() == len);
+            NS_DCHECK(name.length() == len);
 
             return name;
         }
@@ -214,7 +214,7 @@ namespace tns {
                               : MethodReturnType::Object;
                     break;
                 default:
-                    assert(false);
+                    NS_DCHECK(false);
                     break;
             }
             return retType;

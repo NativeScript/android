@@ -1,4 +1,5 @@
 #include "ArrayHelper.h"
+#include "NativeScriptAssert.h"
 #include "ArgConverter.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
@@ -15,10 +16,10 @@ void ArrayHelper::Init(const Local<Context>& context) {
     JEnv env;
 
     RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
-    assert(RUNTIME_CLASS != nullptr);
+    NS_CHECK(RUNTIME_CLASS != nullptr);
 
     CREATE_ARRAY_HELPER = env.GetStaticMethodID(RUNTIME_CLASS, "createArrayHelper", "(Ljava/lang/String;I)Ljava/lang/Object;");
-    assert(CREATE_ARRAY_HELPER != nullptr);
+    NS_CHECK(CREATE_ARRAY_HELPER != nullptr);
 
     auto isolate = v8::Isolate::GetCurrent();
     auto global = context->Global();
