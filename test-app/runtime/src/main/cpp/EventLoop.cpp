@@ -6,7 +6,6 @@
 #include <unistd.h>
 
 #include <algorithm>
-#include <cassert>
 #include <cerrno>
 #include <cmath>
 #include <cstring>
@@ -98,7 +97,7 @@ void EventLoop::BindToCurrentThread() {
     if (EVENT_LOOP_HANDLER_CLASS == nullptr) {
         // JEnv::FindClass caches a global ref to the class
         EVENT_LOOP_HANDLER_CLASS = env.FindClass("com/tns/EventLoopHandler");
-        assert(EVENT_LOOP_HANDLER_CLASS != nullptr);
+        NS_CHECK(EVENT_LOOP_HANDLER_CLASS != nullptr);
         EVENT_LOOP_HANDLER_CTOR = env.GetMethodID(EVENT_LOOP_HANDLER_CLASS, "<init>", "(J)V");
         EVENT_LOOP_HANDLER_POST = env.GetMethodID(EVENT_LOOP_HANDLER_CLASS, "post", "(J)V");
         EVENT_LOOP_HANDLER_POST_TOKEN =
@@ -128,7 +127,7 @@ void EventLoop::BindToCurrentThread() {
     }
     JniLocalRef handler(env.NewObject(EVENT_LOOP_HANDLER_CLASS, EVENT_LOOP_HANDLER_CTOR,
                                       reinterpret_cast<jlong>(this)));
-    assert(!handler.IsNull());
+    NS_DCHECK(!handler.IsNull());
     handler_ = env.NewGlobalRef(handler);
 
     // flush work buffered before the home thread was known

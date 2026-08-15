@@ -1,4 +1,5 @@
 #include "V8StringConstants.h"
+#include "NativeScriptAssert.h"
 #include "Runtime.h"
 
 using namespace v8;
@@ -10,7 +11,7 @@ V8StringConstants::PerIsolateV8Constants* V8StringConstants::GetConstantsForIsol
     auto consts = reinterpret_cast<V8StringConstants::PerIsolateV8Constants*>(data);
 
     // assert that the structure which contains the constants is not null for the current Isolate
-    assert(consts != nullptr);
+    NS_CHECK(consts != nullptr);
 
     return consts;
 }

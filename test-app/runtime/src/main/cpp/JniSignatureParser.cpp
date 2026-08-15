@@ -1,6 +1,6 @@
 #include "JniSignatureParser.h"
 
-#include <assert.h>
+#include "NativeScriptAssert.h"
 
 using namespace std;
 using namespace tns;
@@ -12,11 +12,11 @@ JniSignatureParser::JniSignatureParser(const string& signature)
 vector<string> JniSignatureParser::Parse() {
     size_t startIdx = m_signature.find_first_of('(');
 
-    assert(startIdx != string::npos);
+    NS_DCHECK(startIdx != string::npos);
 
     size_t endIdx = m_signature.find_first_of(')');
 
-    assert(endIdx != string::npos);
+    NS_DCHECK(endIdx != string::npos);
 
     vector<string> tokens = ParseParams(startIdx + 1, endIdx);
 
@@ -60,7 +60,7 @@ string JniSignatureParser::ReadNextToken(int endIdx) {
 
     case 'L':
         idx = m_signature.find(';', m_pos);
-        assert(idx != string::npos);
+        NS_DCHECK(idx != string::npos);
         token = m_signature.substr(m_pos, idx - m_pos + 1);
         m_pos = idx + 1;
         break;
@@ -88,13 +88,13 @@ string JniSignatureParser::ReadNextToken(int endIdx) {
                 endFound = currChar == ';';
             }
         }
-        assert(endFound);
+        NS_DCHECK(endFound);
         token = m_signature.substr(m_pos, idx - m_pos);
         m_pos = idx;
         break;
 
     default:
-        assert(false);
+        NS_DCHECK(false);
         break;
     }
 

@@ -129,11 +129,11 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
 
   if (GET_USED_MEMORY_METHOD_ID == nullptr) {
     auto RUNTIME_CLASS = env->FindClass("com/tns/Runtime");
-    assert(RUNTIME_CLASS != nullptr);
+    NS_CHECK(RUNTIME_CLASS != nullptr);
 
     GET_USED_MEMORY_METHOD_ID =
         env->GetMethodID(RUNTIME_CLASS, "getUsedMemory", "()J");
-    assert(GET_USED_MEMORY_METHOD_ID != nullptr);
+    NS_CHECK(GET_USED_MEMORY_METHOD_ID != nullptr);
   }
 }
 

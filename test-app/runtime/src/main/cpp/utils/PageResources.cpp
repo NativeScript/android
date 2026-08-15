@@ -4,7 +4,6 @@
 
 #include <cstdlib>
 #include <jni.h>
-#include <assert.h>
 #include <NativeScriptAssert.h>
 #include <fstream>
 #include <iostream>
@@ -29,16 +28,16 @@ std::map<std::string, PageResource> PageResource::getPageResources() {
     auto result = std::map<std::string, PageResource>();
     tns::JEnv env;
     jclass inspectorClass = env.FindClass("com/tns/AndroidJsV8Inspector");
-    assert(inspectorClass != nullptr);
+    NS_CHECK(inspectorClass != nullptr);
 
     jclass pairClass = env.FindClass("android/util/Pair");
-    assert(pairClass != nullptr);
+    NS_CHECK(pairClass != nullptr);
 
     jfieldID pairFirst = env.GetFieldID(pairClass, "first", "Ljava/lang/Object;");
-    assert(pairFirst != nullptr);
+    NS_CHECK(pairFirst != nullptr);
 
     jfieldID pairSecond = env.GetFieldID(pairClass, "second", "Ljava/lang/Object;");
-    assert(pairSecond != nullptr);
+    NS_CHECK(pairSecond != nullptr);
 
     jmethodID getResourcesMethod = env.GetStaticMethodID(inspectorClass, "getPageResources", "()[Landroid/util/Pair;");
     jobject arrayOfPairs = env.CallStaticObjectMethod(inspectorClass, getResourcesMethod);

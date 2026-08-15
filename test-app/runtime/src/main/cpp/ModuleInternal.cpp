@@ -100,13 +100,13 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
 
     if (MODULE_CLASS == nullptr) {
         MODULE_CLASS = env.FindClass("com/tns/Module");
-        assert(MODULE_CLASS != nullptr);
+        NS_CHECK(MODULE_CLASS != nullptr);
 
         RESOLVE_PATH_METHOD_ID = env.GetStaticMethodID(MODULE_CLASS, "resolvePath", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
-        assert(RESOLVE_PATH_METHOD_ID != nullptr);
+        NS_CHECK(RESOLVE_PATH_METHOD_ID != nullptr);
         
         GET_APPLICATION_FILES_PATH_METHOD_ID = env.GetStaticMethodID(MODULE_CLASS, "getApplicationFilesPath", "()Ljava/lang/String;");
-        assert(GET_APPLICATION_FILES_PATH_METHOD_ID != nullptr);
+        NS_CHECK(GET_APPLICATION_FILES_PATH_METHOD_ID != nullptr);
     }
 
     m_isolate = isolate;
@@ -118,7 +118,7 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
     Local<Value> result;
     auto success = BuiltinLoader::RunBuiltin(context, BuiltinId::kRequireFactory).ToLocal(&result);
 
-    assert(success && result->IsFunction());
+    NS_DCHECK(success && result->IsFunction());
 
     auto requireFactoryFunction = result.As<Function>();
 
@@ -161,7 +161,7 @@ Local<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const strin
         auto thiz = Object::New(isolate);
         auto success = requireFuncFactory->Call(context, thiz, 2, args).ToLocal(&result);
 
-        assert(success && !result.IsEmpty() && result->IsFunction());
+        NS_DCHECK(success && !result.IsEmpty() && result->IsFunction());
 
         requireFunc = result.As<Function>();
 
@@ -242,7 +242,7 @@ void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Valu
     auto moduleObj = LoadImpl(isolate, moduleName, callingModuleDirName, isData);
 
     if (isData) {
-        assert(!moduleObj.IsEmpty());
+        NS_DCHECK(!moduleObj.IsEmpty());
 
         args.GetReturnValue().Set(moduleObj);
     } else {
@@ -250,7 +250,7 @@ void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Valu
         Local<Value> exportsVal;
         moduleObj->Get(context, ArgConverter::ConvertToV8String(isolate, "exports")).ToLocal(&exportsVal);
 
-        assert(!exportsVal.IsEmpty());
+        NS_DCHECK(!exportsVal.IsEmpty());
 
         auto exportsObj = exportsVal.As<Object>();
         args.GetReturnValue().Set(exportsObj);

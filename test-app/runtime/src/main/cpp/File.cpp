@@ -9,7 +9,6 @@
 #include <sstream>
 #include <fstream>
 #include <sys/mman.h>
-#include <assert.h>
 
 using namespace std;
 

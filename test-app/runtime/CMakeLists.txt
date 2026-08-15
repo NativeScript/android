@@ -195,6 +195,7 @@ add_library(
         src/main/cpp/ModuleBinding.cpp
         src/main/cpp/ModuleInternal.cpp
         src/main/cpp/ModuleInternalCallbacks.cpp
+        src/main/cpp/NativeScriptAssert.cpp
         src/main/cpp/NativeScriptException.cpp
         src/main/cpp/NativeScriptPlatform.cpp
         src/main/cpp/NsBuiltinModules.cpp

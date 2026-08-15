@@ -1,7 +1,7 @@
 #include "JEnv.h"
 
 #include <shared_mutex>
-#include <assert.h>
+#include "NativeScriptAssert.h"
 #include "Util.h"
 #include "NativeScriptException.h"
 #include "DesugaredInterfaceCompanionClassNameResolver.h"
@@ -26,8 +26,8 @@ JEnv::JEnv()
 
     if ((ret != JNI_OK) || (env == nullptr)) {
         ret = s_jvm->AttachCurrentThread(&env, nullptr);
-        assert(ret == JNI_OK);
-        assert(env != nullptr);
+        NS_CHECK(ret == JNI_OK);
+        NS_CHECK(env != nullptr);
     }
 
     m_env = env;
@@ -38,8 +38,8 @@ JEnv::JEnv(JNIEnv *jniEnv) {
 
     if ((ret != JNI_OK) || (jniEnv == nullptr)) {
         ret = s_jvm->AttachCurrentThread(&jniEnv, nullptr);
-        assert(ret == JNI_OK);
-        assert(jniEnv != nullptr);
+        NS_CHECK(ret == JNI_OK);
+        NS_CHECK(jniEnv != nullptr);
     }
 
     m_env = jniEnv;
@@ -862,15 +862,15 @@ jboolean JEnv::IsAssignableFrom(jclass clazz1, jclass clazz2) {
 }
 
 void JEnv::Init(JavaVM *jvm) {
-    assert(jvm != nullptr);
+    NS_CHECK(jvm != nullptr);
     s_jvm = jvm;
 
     JEnv env;
     RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
-    assert(RUNTIME_CLASS != nullptr);
+    NS_CHECK(RUNTIME_CLASS != nullptr);
     GET_CACHED_CLASS_METHOD_ID = env.GetStaticMethodID(RUNTIME_CLASS, "getCachedClass",
                                                        "(Ljava/lang/String;)Ljava/lang/Class;");
-    assert(GET_CACHED_CLASS_METHOD_ID != nullptr);
+    NS_CHECK(GET_CACHED_CLASS_METHOD_ID != nullptr);
 }
 
 jclass JEnv::GetObjectClass(jobject obj) {

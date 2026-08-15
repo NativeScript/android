@@ -18,6 +18,7 @@ constexpr size_t kMaxRuntimes = 16;
 constexpr size_t kFieldMax = 160;
 constexpr size_t kBufferMax = 8192;
 constexpr size_t kHeaderMax = 128;
+constexpr size_t kFatalMax = 256;
 
 struct Slot {
   bool used;
@@ -42,6 +43,14 @@ std::atomic<int> g_active{-1};
 std::atomic<int> g_storeFd{-1};
 std::atomic_flag g_recorded = ATOMIC_FLAG_INIT;
 struct sigaction g_previous[NSIG];
+
+/*
+ * Written by whichever thread is on its way to abort(), read by the signal
+ * handler. Kept out of the rendered buffers so that recording it needs no
+ * lock -- the thread may be aborting from under one.
+ */
+char g_fatalMessage[kFatalMax];
+std::atomic<size_t> g_fatalLength{0};
 
 thread_local Slot* t_slot = nullptr;
 
@@ -154,9 +163,22 @@ void Handler(int signalNumber, siginfo_t* info, void* context) {
       AppendRaw(header, sizeof(header), length, "\n");
 
       ssize_t written = pwrite(fd, header, length, 0);
-      int active = g_active.load(std::memory_order_acquire);
-      if (written > 0 && active >= 0) {
-        pwrite(fd, g_rendered[active], g_renderedLength[active], written);
+      if (written > 0) {
+        off_t offset = written;
+
+        size_t fatalLength = g_fatalLength.load(std::memory_order_acquire);
+        if (fatalLength > 0) {
+          ssize_t fatalWritten =
+              pwrite(fd, g_fatalMessage, fatalLength, offset);
+          if (fatalWritten > 0) {
+            offset += fatalWritten;
+          }
+        }
+
+        int active = g_active.load(std::memory_order_acquire);
+        if (active >= 0) {
+          pwrite(fd, g_rendered[active], g_renderedLength[active], offset);
+        }
       }
     }
   }
@@ -276,6 +298,18 @@ void CrashBreadcrumbs::SetWorkerScript(int runtimeId, const char* script) {
   slot->isWorker = true;
   CopyField(slot->script, script);
   RenderLocked();
+}
+
+void CrashBreadcrumbs::RecordFatal(const char* message) {
+  if (message == nullptr) {
+    return;
+  }
+  // Room is reserved for the newline and the terminator.
+  size_t length = strnlen(message, kFatalMax - 2);
+  memcpy(g_fatalMessage, message, length);
+  g_fatalMessage[length] = '\n';
+  g_fatalMessage[length + 1] = '\0';
+  g_fatalLength.store(length + 1, std::memory_order_release);
 }
 
 CrashBreadcrumbs::ModuleScope::ModuleScope(const char* modulePath) {

@@ -830,7 +830,7 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembersFromRu
         MetadataTreeNode* treeNode) {
     SET_PROFILER_FRAME();
 
-    assert(treeNode->metadata != nullptr);
+    NS_DCHECK(treeNode->metadata != nullptr);
 
     std::vector<MethodCallbackData*> instanceMethodData;
 
@@ -857,7 +857,7 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembersFromRu
         char chKind = kind[0];
 
         // method or field
-        assert((chKind == 'M') || (chKind == 'F'));
+        NS_DCHECK((chKind == 'M') || (chKind == 'F'));
 
         MetadataEntry entry(nullptr, NodeType::Field);
 
@@ -1919,7 +1919,7 @@ MetadataNode* MetadataNode::GetNodeFromHandle(const Local<Object>& value) {
 }
 
 MetadataEntry MetadataNode::GetChildMetadataForPackage(MetadataNode *node, const std::string &propName) {
-    assert(node->m_treeNode->children != nullptr);
+    NS_DCHECK(node->m_treeNode->children != nullptr);
 
     MetadataEntry child(nullptr, NodeType::Class);
 
@@ -2002,7 +2002,7 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
     }
     fseek(f, 0, SEEK_END);
     int lenNodes = ftell(f);
-    assert((lenNodes % sizeof(MetadataTreeNodeRawData)) == 0);
+    NS_DCHECK((lenNodes % sizeof(MetadataTreeNodeRawData)) == 0);
     char* nodes = new char[lenNodes];
     rewind(f);
     fread(nodes, 1, lenNodes, f);

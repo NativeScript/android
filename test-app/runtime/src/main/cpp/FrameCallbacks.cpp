@@ -6,7 +6,7 @@
 #include <time.h>
 
 #include <atomic>
-#include <cassert>
+#include "NativeScriptAssert.h"
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -135,7 +135,7 @@ void ResolveFrameCallbacksClass(JEnv& env) {
     std::call_once(once, [&env] {
         // JEnv::FindClass caches a global ref to the class
         FRAME_CALLBACKS_CLASS = env.FindClass("com/tns/FrameCallbacks");
-        assert(FRAME_CALLBACKS_CLASS != nullptr);
+        NS_CHECK(FRAME_CALLBACKS_CLASS != nullptr);
         FRAME_CALLBACKS_CTOR = env.GetMethodID(FRAME_CALLBACKS_CLASS, "<init>", "(J)V");
         FRAME_CALLBACKS_POST = env.GetMethodID(FRAME_CALLBACKS_CLASS, "post", "(J)V");
         FRAME_CALLBACKS_RELEASE =
@@ -407,7 +407,7 @@ void FrameCallbacks::PostFrameCallback(const FunctionCallbackInfo<Value>& args) 
         std::lock_guard<std::mutex> lock(entriesMutex_);
         auto inserted = entries_.emplace(
                 id, std::make_unique<FrameCallbackEntry>(isolate, func, id));
-        assert(inserted.second && "Frame callback ID should not be duplicated");
+        NS_DCHECK(inserted.second && "Frame callback ID should not be duplicated");
         entry = inserted.first->second.get();
     }
 

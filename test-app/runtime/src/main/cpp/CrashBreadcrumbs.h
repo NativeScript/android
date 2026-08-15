@@ -37,6 +37,13 @@ class CrashBreadcrumbs {
   static void SetWorkerScript(int runtimeId, const char* script);
 
   /*
+   * Records a line to be written ahead of the runtime state should the process
+   * die. Takes no lock, so it stays usable from a thread that is about to
+   * abort and may already hold any of the runtime's own locks.
+   */
+  static void RecordFatal(const char* message);
+
+  /*
    * Records the module the calling runtime is executing for the lifetime of
    * the scope. Module loads nest (`require` inside a module body), so the
    * enclosing module is restored on destruction, on throw paths included.

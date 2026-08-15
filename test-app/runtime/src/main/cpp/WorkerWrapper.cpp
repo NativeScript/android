@@ -573,7 +573,7 @@ void WorkerWrapper::EnsureJniCached() {
     JEnv env;
 
     RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
-    assert(RUNTIME_CLASS != nullptr);
+    NS_CHECK(RUNTIME_CLASS != nullptr);
     INIT_WORKER_RUNTIME_METHOD_ID =
             env.GetStaticMethodID(RUNTIME_CLASS, "initWorkerRuntime", "(ILjava/lang/String;)I");
     RUN_WORKER_LOOP_METHOD_ID = env.GetStaticMethodID(RUNTIME_CLASS, "runWorkerLoop", "()V");
@@ -581,13 +581,13 @@ void WorkerWrapper::EnsureJniCached() {
             env.GetStaticMethodID(RUNTIME_CLASS, "detachWorkerRuntime", "(I)V");
 
     LOOPER_CLASS = env.FindClass("android/os/Looper");
-    assert(LOOPER_CLASS != nullptr);
+    NS_CHECK(LOOPER_CLASS != nullptr);
     MY_LOOPER_METHOD_ID =
             env.GetStaticMethodID(LOOPER_CLASS, "myLooper", "()Landroid/os/Looper;");
     LOOPER_QUIT_METHOD_ID = env.GetMethodID(LOOPER_CLASS, "quit", "()V");
 
     PROCESS_CLASS = env.FindClass("android/os/Process");
-    assert(PROCESS_CLASS != nullptr);
+    NS_CHECK(PROCESS_CLASS != nullptr);
     SET_THREAD_PRIORITY_METHOD_ID =
             env.GetStaticMethodID(PROCESS_CLASS, "setThreadPriority", "(I)V");
 }

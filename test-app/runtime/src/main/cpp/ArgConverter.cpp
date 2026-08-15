@@ -177,16 +177,16 @@ Local<Value> ArgConverter::ConvertFromJavaLong(Isolate* isolate, jlong value) {
 }
 
 int64_t ArgConverter::ConvertToJavaLong(Isolate* isolate, const Local<Value>& value) {
-    assert(!value.IsEmpty());
+    NS_DCHECK(!value.IsEmpty());
 
     auto obj = Local<Object>::Cast(value);
 
-    assert(!obj.IsEmpty());
+    NS_DCHECK(!obj.IsEmpty());
 
     auto context = isolate->GetCurrentContext();
     Local<Value> temp;
     bool success = obj->Get(context, V8StringConstants::GetValue(isolate)).ToLocal(&temp);
-    assert(success && !temp.IsEmpty());
+    NS_DCHECK(success && !temp.IsEmpty());
     auto valueProp = temp.As<Object>();
 
     string num = ConvertToString(valueProp->ToString(context).ToLocalChecked());

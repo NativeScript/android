@@ -28,11 +28,11 @@ ObjectManager::ObjectManager(jobject javaRuntimeObject)
   InitializeJNI();
 
   auto runtimeClass = env.FindClass("com/tns/Runtime");
-  assert(runtimeClass != nullptr);
+  NS_CHECK(runtimeClass != nullptr);
 
   auto useGlobalRefsMethodID =
       env.GetStaticMethodID(runtimeClass, "useGlobalRefs", "()Z");
-  assert(useGlobalRefsMethodID != nullptr);
+  NS_CHECK(useGlobalRefsMethodID != nullptr);
 
   auto useGlobalRefs =
       env.CallStaticBooleanMethod(runtimeClass, useGlobalRefsMethodID);
@@ -51,38 +51,38 @@ void ObjectManager::InitializeJNI() {
   }
   JEnv env;
   auto runtimeClass = env.FindClass("com/tns/Runtime");
-  assert(runtimeClass != nullptr);
+  NS_CHECK(runtimeClass != nullptr);
   GET_JAVAOBJECT_BY_ID_METHOD_ID = env.GetMethodID(
       runtimeClass, "getJavaObjectByID", "(I)Ljava/lang/Object;");
-  assert(GET_JAVAOBJECT_BY_ID_METHOD_ID != nullptr);
+  NS_CHECK(GET_JAVAOBJECT_BY_ID_METHOD_ID != nullptr);
 
   GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID = env.GetMethodID(
       runtimeClass, "getOrCreateJavaObjectID", "(Ljava/lang/Object;)I");
-  assert(GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID != nullptr);
+  NS_CHECK(GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID != nullptr);
 
   MAKE_INSTANCE_WEAK_BATCH_METHOD_ID = env.GetMethodID(
       runtimeClass, "makeInstanceWeak", "(Ljava/nio/ByteBuffer;IZ)V");
-  assert(MAKE_INSTANCE_WEAK_BATCH_METHOD_ID != nullptr);
+  NS_CHECK(MAKE_INSTANCE_WEAK_BATCH_METHOD_ID != nullptr);
 
   MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID =
       env.GetMethodID(runtimeClass, "makeInstanceWeakAndCheckIfAlive", "(I)Z");
-  assert(MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID != nullptr);
+  NS_CHECK(MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID != nullptr);
 
   RELEASE_NATIVE_INSTANCE_METHOD_ID =
       env.GetMethodID(runtimeClass, "releaseNativeCounterpart", "(I)V");
-  assert(RELEASE_NATIVE_INSTANCE_METHOD_ID != nullptr);
+  NS_CHECK(RELEASE_NATIVE_INSTANCE_METHOD_ID != nullptr);
 
   CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID =
       env.GetMethodID(runtimeClass, "checkWeakObjectAreAlive",
                       "(Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;I)V");
-  assert(CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID != nullptr);
+  NS_CHECK(CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID != nullptr);
 
   JAVA_LANG_CLASS = env.FindClass("java/lang/Class");
-  assert(JAVA_LANG_CLASS != nullptr);
+  NS_CHECK(JAVA_LANG_CLASS != nullptr);
 
   GET_NAME_METHOD_ID =
       env.GetMethodID(JAVA_LANG_CLASS, "getName", "()Ljava/lang/String;");
-  assert(GET_NAME_METHOD_ID != nullptr);
+  NS_CHECK(GET_NAME_METHOD_ID != nullptr);
 }
 
 void ObjectManager::SetInstanceIsolate(Isolate* isolate) {
@@ -520,7 +520,7 @@ void ObjectManager::ReleaseJSInstance(Persistent<Object>* po,
     throw NativeScriptException(ss.str());
   }
 
-  assert(po == it->second->target);
+  NS_DCHECK(po == it->second->target);
 
   ObjectWeakCallbackState* callbackState = it->second;
   m_idToObject.erase(it);
@@ -558,7 +558,7 @@ void ObjectManager::ReleaseRegularObjects() {
 
     auto obj = Local<Object>::New(m_isolate, *po);
 
-    assert(!obj.IsEmpty());
+    NS_DCHECK(!obj.IsEmpty());
 
     Local<Value> gcNum;
     V8GetPrivateValue(m_isolate, obj, propName, gcNum);
@@ -628,14 +628,14 @@ Local<Object> ObjectManager::GetEmptyObject(Isolate* isolate) {
     return Local<Object>();
   }
   auto localVal = val.ToLocalChecked();
-  assert(localVal->IsObject());
+  NS_DCHECK(localVal->IsObject());
   auto obj = localVal.As<Object>();
   return obj;
 }
 
 void ObjectManager::JSWrapperConstructorCallback(
     const v8::FunctionCallbackInfo<v8::Value>& info) {
-  assert(info.IsConstructCall());
+  NS_DCHECK(info.IsConstructCall());
 }
 
 void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {

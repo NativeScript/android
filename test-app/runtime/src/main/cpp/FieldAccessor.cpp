@@ -1,4 +1,5 @@
 #include "FieldAccessor.h"
+#include "NativeScriptAssert.h"
 #include "ArgConverter.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
@@ -214,14 +215,14 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
 
         if (isStatic) {
             fieldData->clazz = env.FindClass(fieldMetadata.getDeclaringType());
-            assert(fieldData->clazz != nullptr);
+            NS_DCHECK(fieldData->clazz != nullptr);
             fieldData->fid = env.GetStaticFieldID(fieldData->clazz, fieldMetadata.name, fieldJniSig);
-            assert(fieldData->fid != nullptr);
+            NS_DCHECK(fieldData->fid != nullptr);
         } else {
             fieldData->clazz = env.FindClass(fieldMetadata.getDeclaringType());
-            assert(fieldData->clazz != nullptr);
+            NS_DCHECK(fieldData->clazz != nullptr);
             fieldData->fid = env.GetFieldID(fieldData->clazz, fieldMetadata.name, fieldJniSig);
-            assert(fieldData->fid != nullptr);
+            NS_DCHECK(fieldData->fid != nullptr);
         }
     }
 

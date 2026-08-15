@@ -1,4 +1,5 @@
 #include "MetadataReader.h"
+#include "NativeScriptAssert.h"
 #include "MetadataMethodInfo.h"
 #include <android/log.h>
 #include "NativeScriptException.h"
@@ -42,7 +43,7 @@ void MetadataReader::StateMutex::Lock() {
 void MetadataReader::StateMutex::Unlock() {
     std::lock_guard<std::mutex> guard(mutex_);
     // An unmatched unlock would wrap depth_ and hold the mutex forever.
-    assert(depth_ > 0 && owner_ == std::this_thread::get_id());
+    NS_DCHECK(depth_ > 0 && owner_ == std::this_thread::get_id());
     if (--depth_ == 0) {
         owner_ = std::thread::id();
         // Every waiter is blocked on the same `depth_ == 0`, so waking one is
@@ -55,7 +56,7 @@ unsigned MetadataReader::StateMutex::ReleaseAll() {
     std::lock_guard<std::mutex> guard(mutex_);
     // Only the owner may release: doing this from a non-owner would drop
     // another thread's lock while it is still inside its guarded section.
-    assert(depth_ > 0 && owner_ == std::this_thread::get_id());
+    NS_DCHECK(depth_ > 0 && owner_ == std::this_thread::get_id());
     unsigned held = depth_;
     depth_ = 0;
     owner_ = std::thread::id();
@@ -233,7 +234,7 @@ uint16_t MetadataReader::GetNodeId(MetadataTreeNode *treeNode) {
     StateLock lock(m_stateMutex);
 
     auto itFound = find(m_v.begin(), m_v.end(), treeNode);
-    assert(itFound != m_v.end());
+    NS_DCHECK(itFound != m_v.end());
     uint16_t nodeId = itFound - m_v.begin();
 
     return nodeId;
@@ -391,7 +392,7 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
                 auto cKind = kind[0];
 
                 // package, class, interface
-                assert((cKind == 'P') || (cKind == 'C') || (cKind == 'I'));
+                NS_DCHECK((cKind == 'P') || (cKind == 'C') || (cKind == 'I'));
 
                 if ((cKind == 'C') || (cKind == 'I')) {
                     child->metadata = new string(part);
@@ -406,7 +407,7 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
                     baseClassLine >> kind >> name;
                     cKind = kind[0];
 
-                    assert(cKind == 'B');
+                    NS_DCHECK(cKind == 'B');
                     auto baseClassTreeNode = GetOrCreateTreeNodeByName(name);
                     auto baseClassNodeId = GetNodeId(baseClassTreeNode);
 

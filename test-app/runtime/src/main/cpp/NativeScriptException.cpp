@@ -364,34 +364,34 @@ void NativeScriptException::Init() {
   JEnv env;
 
   RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
-  assert(RUNTIME_CLASS != nullptr);
+  NS_CHECK(RUNTIME_CLASS != nullptr);
 
   THROWABLE_CLASS = env.FindClass("java/lang/Throwable");
-  assert(THROWABLE_CLASS != nullptr);
+  NS_CHECK(THROWABLE_CLASS != nullptr);
 
   NATIVESCRIPTEXCEPTION_CLASS = env.FindClass("com/tns/NativeScriptException");
-  assert(NATIVESCRIPTEXCEPTION_CLASS != nullptr);
+  NS_CHECK(NATIVESCRIPTEXCEPTION_CLASS != nullptr);
 
   NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID =
       env.GetMethodID(NATIVESCRIPTEXCEPTION_CLASS, "<init>",
                       "(Ljava/lang/String;Ljava/lang/String;J)V");
-  assert(NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID != nullptr);
+  NS_CHECK(NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID != nullptr);
 
   NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID = env.GetMethodID(
       NATIVESCRIPTEXCEPTION_CLASS, "<init>",
       "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)V");
-  assert(NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID != nullptr);
+  NS_CHECK(NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID != nullptr);
 
   NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID =
       env.GetStaticMethodID(NATIVESCRIPTEXCEPTION_CLASS,
                             "getStackTraceAsString",
                             "(Ljava/lang/Throwable;)Ljava/lang/String;");
-  assert(NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID != nullptr);
+  NS_CHECK(NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID != nullptr);
 
   NATIVESCRIPTEXCEPTION_GET_MESSAGE_METHOD_ID =
       env.GetStaticMethodID(NATIVESCRIPTEXCEPTION_CLASS, "getMessage",
                             "(Ljava/lang/Throwable;)Ljava/lang/String;");
-  assert(NATIVESCRIPTEXCEPTION_GET_MESSAGE_METHOD_ID != nullptr);
+  NS_CHECK(NATIVESCRIPTEXCEPTION_GET_MESSAGE_METHOD_ID != nullptr);
 }
 
 std::string NativeScriptException::ToString() const {

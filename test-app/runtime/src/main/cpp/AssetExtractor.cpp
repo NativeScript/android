@@ -1,6 +1,6 @@
 #include "jni.h"
 #include "zip.h"
-#include <assert.h>
+#include "NativeScriptAssert.h"
 #include <libgen.h>
 #include <utime.h>
 #include <sys/stat.h>
@@ -22,7 +22,7 @@ void AssetExtractor::ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstrin
     int err = 0;
     auto z = zip_open(strApk.c_str(), 0, &err);
 
-    assert(z != nullptr);
+    NS_DCHECK(z != nullptr);
     zip_int64_t num = zip_get_num_entries(z, 0);
     struct zip_stat sb;
     struct zip_file* zf;
@@ -53,7 +53,7 @@ void AssetExtractor::ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstrin
                 mkdir_rec(dirFullname.c_str());
 
                 zf = zip_fopen_index(z, i, 0);
-                assert(zf != nullptr);
+                NS_DCHECK(zf != nullptr);
 
                 auto fd = fopen(assetFullname.c_str(), "w");
 
@@ -61,7 +61,7 @@ void AssetExtractor::ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstrin
                     zip_int64_t sum = 0;
                     while (sum != sb.size) {
                         zip_int64_t len = zip_fread(zf, buf, sizeof(buf));
-                        assert(len > 0);
+                        NS_DCHECK(len > 0);
 
                         fwrite(buf, 1, len, fd);
                         sum += len;

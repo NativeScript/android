@@ -1,5 +1,4 @@
 #include "JsV8InspectorClient.h"
-#include <assert.h>
 #include <algorithm>
 #include <cstring>
 #include <include/libplatform/libplatform.h>
@@ -204,16 +203,16 @@ JsV8InspectorClient::JsV8InspectorClient(v8::Isolate* isolate)
     JEnv env;
 
     inspectorClass_ = env.FindClass("com/tns/AndroidJsV8Inspector");
-    assert(inspectorClass_ != nullptr);
+    NS_CHECK(inspectorClass_ != nullptr);
 
     sendMethod_ = env.GetStaticMethodID(inspectorClass_, "send", "(Ljava/lang/Object;Ljava/lang/String;)V");
-    assert(sendMethod_ != nullptr);
+    NS_CHECK(sendMethod_ != nullptr);
 
     sendToDevToolsConsoleMethod_ = env.GetStaticMethodID(inspectorClass_, "sendToDevToolsConsole", "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)V");
-    assert(sendToDevToolsConsoleMethod_ != nullptr);
+    NS_CHECK(sendToDevToolsConsoleMethod_ != nullptr);
 
     getInspectorMessageMethod_ = env.GetStaticMethodID(inspectorClass_, "getInspectorMessage", "(Ljava/lang/Object;)Ljava/lang/String;");
-    assert(getInspectorMessageMethod_ != nullptr);
+    NS_CHECK(getInspectorMessageMethod_ != nullptr);
 }
 
 void JsV8InspectorClient::connect(jobject connection) {
@@ -971,7 +970,7 @@ void JsV8InspectorClient::registerDomainDispatcherCallback(const FunctionCallbac
         Local<Value> ctorArgs[0];
         Local<Value> domainInstance;
         bool success = domainCtorFunc->CallAsConstructor(context, 0, ctorArgs).ToLocal(&domainInstance);
-        assert(success && domainInstance->IsObject());
+        NS_DCHECK(success && domainInstance->IsObject());
 
         Local<Object> domainObj = domainInstance.As<Object>();
         Persistent<Object>* poDomainObj = new Persistent<Object>(isolate, domainObj);
@@ -1003,26 +1002,26 @@ void JsV8InspectorClient::registerModules() {
 
     // __inspector
     success = global->Set(context, ArgConverter::ConvertToV8String(isolate, "__inspector"), inspectorObject).FromMaybe(false);
-    assert(success);
+    NS_DCHECK(success);
 
     // __registerDomainDispatcher
     success = v8::Function::New(context, registerDomainDispatcherCallback).ToLocal(&func);
-    assert(success);
+    NS_DCHECK(success);
     success = global->Set(context, ArgConverter::ConvertToV8String(isolate, "__registerDomainDispatcher"), func).FromMaybe(false);
-    assert(success);
+    NS_DCHECK(success);
 
     // __inspectorSendEvent
     Local<External> data = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
     success = v8::Function::New(context, inspectorSendEventCallback, data).ToLocal(&func);
-    assert(success);
+    NS_DCHECK(success);
     success = global->Set(context, ArgConverter::ConvertToV8String(isolate, "__inspectorSendEvent"), func).FromMaybe(false);
-    assert(success);
+    NS_DCHECK(success);
 
     // __inspectorTimestamp
     success = v8::Function::New(context, inspectorTimestampCallback).ToLocal(&func);
-    assert(success);
+    NS_DCHECK(success);
     success = global->Set(context, ArgConverter::ConvertToV8String(isolate, "__inspectorTimestamp"), func).FromMaybe(false);
-    assert(success);
+    NS_DCHECK(success);
 
     TryCatch tc(isolate);
     Runtime::GetRuntime(isolate)->RunModule("inspector_modules");
