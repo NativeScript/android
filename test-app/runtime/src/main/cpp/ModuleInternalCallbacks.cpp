@@ -1017,7 +1017,7 @@ static uint64_t MonotonicUs() {
 //
 //   EnqueueUrl(root)
 //     → FetchModuleBodyAsync (background thread — see HttpLoader.cpp)
-//     → hop to the isolate's JS thread via LooperTasks::Post
+//     → hop to the isolate's JS thread via EventLoop::PostInternal
 //     → CompileModuleForResolveRegisterOnly (registers under the canonical
 //       URL key — the exact entry ResolveModuleCallback will look up)
 //     → GetModuleRequests() → ResolveModuleRequestForWalk → EnqueueUrl(…)
@@ -1033,7 +1033,7 @@ namespace {
 struct AsyncGraphLoad {
   v8::Isolate* isolate = nullptr;
   v8::Global<v8::Context> context;
-  std::shared_ptr<LooperTasks> jsTasks;             // isolate's JS thread queue
+  std::shared_ptr<EventLoop> jsTasks;               // isolate's JS thread queue
   std::string rootKey;                              // canonical registry key of the root URL
   robin_hood::unordered_set<std::string> visited;   // canonical keys (JS thread only)
   int pendingFetches = 0;                           // JS thread only
@@ -1284,7 +1284,7 @@ static void AsyncGraphEnqueueUrl(const std::shared_ptr<AsyncGraphLoad>& load,
   }
 
   load->pendingFetches++;
-  std::shared_ptr<LooperTasks> jsTasks = load->jsTasks;
+  std::shared_ptr<EventLoop> jsTasks = load->jsTasks;
   std::shared_ptr<AsyncGraphLoad> loadRef = load;
   FetchModuleBodyAsync(url, [loadRef, url, jsTasks](bool ok, int status,
                                                     std::string body) {
@@ -1295,7 +1295,7 @@ static void AsyncGraphEnqueueUrl(const std::shared_ptr<AsyncGraphLoad>& load,
       return;
     }
     auto bodyPtr = std::make_shared<std::string>(std::move(body));
-    jsTasks->Post([loadRef, url, ok, status, bodyPtr]() {
+    jsTasks->PostInternal([loadRef, url, ok, status, bodyPtr]() {
       AsyncGraphOnFetchCompleted(loadRef, url, ok, status, bodyPtr);
     });
   });
@@ -1315,7 +1315,7 @@ void StartAsyncHttpModuleGraphLoad(
   load->onComplete = std::move(onComplete);
 
   Runtime* runtime = Runtime::GetRuntime(isolate);
-  load->jsTasks = runtime != nullptr ? runtime->GetLooperTasks() : nullptr;
+  load->jsTasks = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
 
   AsyncGraphLoad::g_asyncGraphLoadsInFlightCounter().fetch_add(
       1, std::memory_order_acq_rel);
@@ -1344,7 +1344,7 @@ bool RunAsyncHttpModuleGraphLoadPumped(v8::Isolate* isolate,
 
   // Manual looper pump ("until either all is settled or the app takes
   // over"): the walk's completion tasks are posted to this thread's
-  // LooperTasks queue and dispatched via ALooper — polling the looper here
+  // EventLoop and dispatched via ALooper — polling the looper here
   // services them. ALooper_pollOnce with a small timeout keeps the pump
   // responsive without spinning.
   const auto deadline =
