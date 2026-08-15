@@ -119,6 +119,14 @@ public class DexFactory {
 
         // strip the `com.tns.gen` off the base extended class name
         String desiredDexClassName = this.getClassToProxyName(fullClassName);
+        // An explicit name like com.tns.gen.ESEagerNamedObject strips to a
+        // single identifier. ProxyGenerator then treats that as a suffix and
+        // emits java.lang.Object_ESEagerNamedObject while we try to load
+        // ESEagerNamedObject. Keep the qualified name so generation and load
+        // use the same class identity.
+        if (!desiredDexClassName.contains(".")) {
+            desiredDexClassName = fullClassName;
+        }
 
         // when interfaces are extended as classes, we still want to preserve
         // just the interface name without the extra file, line, column information
