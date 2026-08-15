@@ -1,6 +1,7 @@
 #include "NativeScriptException.h"
 
 #include <algorithm>
+#include <atomic>
 #include <sstream>
 
 #include "ArgConverter.h"
@@ -76,14 +77,25 @@ struct JsErrorHandles {
         pruneAt = std::max<size_t>(16, entries.size() * 2);
     }
 
-    int64_t nextId = 1;
     size_t pruneAt = 16;
     robin_hood::unordered_map<int64_t, Entry> entries;
 };
 
 /*
- * Files `error` under a fresh id for this runtime. Returns 0 when the runtime
- * is tearing down, which the Java side reads as "no JS value".
+ * Ids are unique process-wide rather than per runtime. A throwable can be
+ * converted back to JS on a runtime other than the one that created it (it
+ * outlives its runtime, or crosses threads), and a per-runtime counter would
+ * make that lookup hit an unrelated entry with the same id instead of missing.
+ * Being globally unique is what makes `entries.find(id)` the ownership check:
+ * a foreign id is simply absent, and the caller falls back to rebuilding the
+ * error from the Java throwable.
+ */
+std::atomic<int64_t> g_nextJsErrorId{1};
+
+/*
+ * Files `error` in this runtime's table under a process-wide unique id.
+ * Returns 0 when the runtime is tearing down, which the Java side reads as
+ * "no JS value".
  */
 int64_t StoreJsError(Isolate* isolate, Local<Value> error) {
     auto* handles = RuntimeState::For<JsErrorHandles>(isolate);
@@ -94,7 +106,7 @@ int64_t StoreJsError(Isolate* isolate, Local<Value> error) {
     JEnv env;
     handles->PruneIfDue(env);
 
-    int64_t id = handles->nextId++;
+    int64_t id = g_nextJsErrorId.fetch_add(1, std::memory_order_relaxed);
     JsErrorHandles::Entry entry;
     entry.value.Reset(isolate, error);
     handles->entries.emplace(id, std::move(entry));

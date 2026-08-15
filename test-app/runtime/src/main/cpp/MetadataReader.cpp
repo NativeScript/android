@@ -1,6 +1,7 @@
 #include "MetadataReader.h"
 #include "MetadataMethodInfo.h"
 #include <android/log.h>
+#include "NativeScriptException.h"
 #include "Util.h"
 #include <sstream>
 
@@ -40,6 +41,8 @@ void MetadataReader::StateMutex::Lock() {
 
 void MetadataReader::StateMutex::Unlock() {
     std::lock_guard<std::mutex> guard(mutex_);
+    // An unmatched unlock would wrap depth_ and hold the mutex forever.
+    assert(depth_ > 0 && owner_ == std::this_thread::get_id());
     if (--depth_ == 0) {
         owner_ = std::thread::id();
         // Every waiter is blocked on the same `depth_ == 0`, so waking one is
@@ -50,6 +53,9 @@ void MetadataReader::StateMutex::Unlock() {
 
 unsigned MetadataReader::StateMutex::ReleaseAll() {
     std::lock_guard<std::mutex> guard(mutex_);
+    // Only the owner may release: doing this from a non-owner would drop
+    // another thread's lock while it is still inside its guarded section.
+    assert(depth_ > 0 && owner_ == std::this_thread::get_id());
     unsigned held = depth_;
     depth_ = 0;
     owner_ = std::thread::id();
@@ -144,6 +150,9 @@ MetadataTreeNode *MetadataReader::GetNodeById(uint16_t nodeId) {
     StateLock lock(m_stateMutex);
 
     if (nodeId >= m_v.size()) {
+        __android_log_print(ANDROID_LOG_ERROR, "TNS.error",
+                            "Metadata node id %u is out of range (%zu nodes). The metadata is inconsistent.",
+                            nodeId, m_v.size());
         return nullptr;
     }
 
@@ -152,6 +161,12 @@ MetadataTreeNode *MetadataReader::GetNodeById(uint16_t nodeId) {
 
 
 string MetadataReader::ReadTypeName(MetadataTreeNode *treeNode) {
+    // Guards the whole family: the uint16_t overload and ReadTypeNameInternal's
+    // array-element forward both reach here with a GetNodeById result.
+    if (treeNode == nullptr) {
+        throw NativeScriptException("Cannot read a type name: the metadata refers to a node that does not exist.");
+    }
+
     StateLock lock(m_stateMutex);
 
     string name;
@@ -245,6 +260,9 @@ uint8_t MetadataReader::GetNodeType(MetadataTreeNode *treeNode) {
         } else {
             uint16_t nodeId = offsetValue - ARRAY_OFFSET;
             MetadataTreeNode * arrElemNode = GetNodeById(nodeId);
+            if (arrElemNode == nullptr) {
+                throw NativeScriptException("Cannot resolve an array element type: the metadata refers to a node that does not exist.");
+            }
             nodeType = *(m_valueData + arrElemNode->offsetValue);
         }
 
@@ -425,10 +443,8 @@ MetadataTreeNode *MetadataReader::GetBaseClassNode(MetadataTreeNode *treeNode) {
         uint16_t baseClassNodeId = *reinterpret_cast<uint16_t *>(m_valueData +
                                                                  treeNode->offsetValue + 1);
 
-        size_t nodeCount = m_v.size();
-
-        assert(baseClassNodeId < nodeCount);
-
+        // Null for an id the metadata got wrong, which GetNodeById logs; every
+        // caller already treats a missing base class as "no base class".
         baseClassNode = GetNodeById(baseClassNodeId);
     }
 
