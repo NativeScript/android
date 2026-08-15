@@ -747,6 +747,13 @@ task buildMetadata(type: BuildToolTask) {
 
 
     android.applicationVariants.all { variant ->
+        // The generator only reads the selected build type's classes (see doFirst),
+        // so depending on the other variant's tasks would just force a second full
+        // app build without affecting the produced metadata.
+        if (variant.buildType.name != project.ext.selectedBuildType) {
+            return
+        }
+
         def buildTypeName = variant.buildType.name.capitalize()
         def mergeShadersTaskName = "merge${buildTypeName}Shaders"
         def mergeShadersTask = tasks.findByName(mergeShadersTaskName)
@@ -1303,18 +1310,19 @@ tasks.configureEach({ DefaultTask currentTask ->
 
 })
 
-rootProject.subprojects.forEach {
-    it.tasks.configureEach({ DefaultTask currentTask ->
-        if (currentTask =~ /.+bundleLibCompileToJar.*/) {
-            currentTask.finalizedBy(cleanupAllJars)
+// Do not attach app metadata tasks onto other projects' library tasks: any build
+// that actually packages this app reaches buildMetadata through merge*Assets, and
+// hooking library tasks forces a full app build into library-only invocations
+// (e.g. :runtime:assembleRelease).
+//
+// Library subprojects' classes.jar is an input of the jar-extraction pipeline
+// (see processJar), so its producer must be ordered before cleanupAllJars —
+// only for the selected build type; depending on the whole compile classpath
+// instead creates a cycle through this app's own compile tasks.
+rootProject.subprojects.forEach { sub ->
+    if (sub.path != project.path) {
+        sub.tasks.matching { it.name == "bundleLibCompileToJar${project.selectedBuildType.capitalize()}" }.all { producer ->
+            cleanupAllJars.dependsOn(producer)
         }
-
-        if (currentTask =~ /bundleLibRuntimeToDir.*/) {
-            currentTask.finalizedBy(buildMetadata)
-        }
-  
-        if (currentTask =~ /compile.*LibraryResources/) {
-            currentTask.finalizedBy(buildMetadata)
-        }
-    })
+    }
 }
