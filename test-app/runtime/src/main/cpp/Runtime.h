@@ -13,6 +13,7 @@
 #include "Timers.h"
 #include "EventLoop.h"
 #include <atomic>
+#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <android/looper.h>
@@ -301,7 +302,8 @@ class Runtime {
 
         v8::Persistent<v8::Context>* m_context;
 
-        bool m_isMainThread;
+        // Decided by ElectMainRuntime, before anything can read it.
+        bool m_isMainThread = false;
 
         // This isolate's performance time origin, captured at isolate
         // creation: the monotonic clock reading now() is relative to, and the
@@ -310,6 +312,32 @@ class Runtime {
         double m_timeOriginRealtimeMs {0};
 
         v8::Isolate* PrepareV8Runtime(const std::string& filesPath, const std::string& nativeLibsDir, const std::string& packageName, bool isDebuggable, const std::string& callingDir, const std::string& profilerOutputDir, const int maxLogcatObjectSize, const bool forceLog);
+
+        /*
+         * Decides whether this runtime is the main one and, if so, performs the
+         * once-per-process V8 initialization -- both inside one critical
+         * section, so two concurrent bootstraps cannot each elect themselves
+         * and overwrite Runtime::platform and s_mainEventLoop.
+         *
+         * A runtime that loses the election blocks here until the main runtime
+         * is ready, because everything after this point depends on state only
+         * the main runtime publishes -- most of all the metadata tree, which it
+         * alone builds and every other runtime reads. Throws if the main
+         * runtime failed to initialize.
+         */
+        void ElectMainRuntime();
+
+        // Publishes (or, on failure, withdraws) the main runtime's readiness
+        // and wakes anything blocked in ElectMainRuntime.
+        static void SignalMainRuntimeReady(bool failed);
+
+        /*
+         * Unwinds an initialization that threw after the isolate existed. The
+         * Java-side rollback only unwinds Java state, which would otherwise
+         * leave the isolate in the runtime caches and the half-built Runtime
+         * holding everything it had allocated.
+         */
+        void UnwindFailedInit();
         jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
         static int GetAndroidVersion();
         static int m_androidVersion;
@@ -328,7 +356,19 @@ class Runtime {
 
         static jmethodID GET_USED_MEMORY_METHOD_ID;
 
+        /*
+         * The main runtime has finished initializing. Distinct from the
+         * election below: the elected runtime is not usable by others until it
+         * has built the metadata they all read.
+         */
         static std::atomic<bool> s_mainThreadInitialized;
+
+        // Guards main-runtime election and the V8 initialization that goes
+        // with it; s_mainInitReady signals the flags above and below.
+        static std::mutex s_mainInitMutex;
+        static std::condition_variable s_mainInitReady;
+        static bool s_mainRuntimeElected;
+        static bool s_mainRuntimeFailed;
 
         static std::shared_ptr<EventLoop> s_mainEventLoop;
 

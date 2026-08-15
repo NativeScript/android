@@ -21,8 +21,10 @@ namespace tns {
              delete p;
         });
     }
-    robin_hood::unordered_map<v8::Isolate*, std::shared_ptr<std::vector<unique_void_ptr>>> isolateBoundObjects_;
-    std::mutex isolateBoundObjectsMutex_;
+    // inline: this header is included by three TUs, and a namespace-scope
+    // definition would be a strong symbol in each of them.
+    inline robin_hood::unordered_map<v8::Isolate*, std::shared_ptr<std::vector<unique_void_ptr>>> isolateBoundObjects_;
+    inline std::mutex isolateBoundObjectsMutex_;
     template<typename T>
     void registerIsolateBoundObject(v8::Isolate* isolate, T *ptr) {
         std::lock_guard<std::mutex> lock(isolateBoundObjectsMutex_);

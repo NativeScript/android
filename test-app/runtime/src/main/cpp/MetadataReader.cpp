@@ -12,14 +12,61 @@ MetadataReader::MetadataReader() : m_root(nullptr), m_nodesLength(0), m_nameLeng
                                    m_nodeData(nullptr), m_nameData(nullptr), m_valueData(nullptr),
                                    m_getTypeMetadataCallback(nullptr) {}
 
-MetadataReader::MetadataReader(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength,
-                               uint8_t *nameData, uint32_t valueLength, uint8_t *valueData,
-                               GetTypeMetadataCallback getTypeMetadataCallback)
-        :
-        m_nodesLength(nodesLength), m_nodeData(nodeData), m_nameLength(nameLength),
-        m_nameData(nameData), m_valueLength(valueLength), m_valueData(valueData),
-        m_getTypeMetadataCallback(getTypeMetadataCallback) {
+void MetadataReader::Initialize(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength,
+                                uint8_t *nameData, uint32_t valueLength, uint8_t *valueData,
+                                GetTypeMetadataCallback getTypeMetadataCallback) {
+    StateLock lock(m_stateMutex);
+
+    m_nodesLength = nodesLength;
+    m_nodeData = nodeData;
+    m_nameLength = nameLength;
+    m_nameData = nameData;
+    m_valueLength = valueLength;
+    m_valueData = valueData;
+    m_getTypeMetadataCallback = getTypeMetadataCallback;
+    m_v.clear();
+    m_typeNameCache.clear();
+
     m_root = BuildTree();
+}
+
+void MetadataReader::StateMutex::Lock() {
+    std::unique_lock<std::mutex> guard(mutex_);
+    auto self = std::this_thread::get_id();
+    available_.wait(guard, [this, self] { return depth_ == 0 || owner_ == self; });
+    owner_ = self;
+    ++depth_;
+}
+
+void MetadataReader::StateMutex::Unlock() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    if (--depth_ == 0) {
+        owner_ = std::thread::id();
+        // Every waiter is blocked on the same `depth_ == 0`, so waking one is
+        // enough -- it takes the lock and the rest stay parked.
+        available_.notify_one();
+    }
+}
+
+unsigned MetadataReader::StateMutex::ReleaseAll() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    unsigned held = depth_;
+    depth_ = 0;
+    owner_ = std::thread::id();
+    available_.notify_one();
+
+    return held;
+}
+
+void MetadataReader::StateMutex::Reacquire(unsigned depth) {
+    if (depth == 0) {
+        return;
+    }
+
+    std::unique_lock<std::mutex> guard(mutex_);
+    available_.wait(guard, [this] { return depth_ == 0; });
+    owner_ = std::this_thread::get_id();
+    depth_ = depth;
 }
 
 
@@ -94,11 +141,19 @@ MetadataTreeNode* MetadataReader::BuildTree() {
 }
 
 MetadataTreeNode *MetadataReader::GetNodeById(uint16_t nodeId) {
+    StateLock lock(m_stateMutex);
+
+    if (nodeId >= m_v.size()) {
+        return nullptr;
+    }
+
     return m_v[nodeId];
 }
 
 
 string MetadataReader::ReadTypeName(MetadataTreeNode *treeNode) {
+    StateLock lock(m_stateMutex);
+
     string name;
 
     auto itFound = m_typeNameCache.find(treeNode);
@@ -160,6 +215,8 @@ uint8_t *MetadataReader::GetValueData() const {
 }
 
 uint16_t MetadataReader::GetNodeId(MetadataTreeNode *treeNode) {
+    StateLock lock(m_stateMutex);
+
     auto itFound = find(m_v.begin(), m_v.end(), treeNode);
     assert(itFound != m_v.end());
     uint16_t nodeId = itFound - m_v.begin();
@@ -172,6 +229,8 @@ MetadataTreeNode *MetadataReader::GetRoot() const {
 }
 
 uint8_t MetadataReader::GetNodeType(MetadataTreeNode *treeNode) {
+    StateLock lock(m_stateMutex);
+
     if (treeNode->type == MetadataTreeNode::INVALID_TYPE) {
         uint8_t nodeType;
 
@@ -196,6 +255,8 @@ uint8_t MetadataReader::GetNodeType(MetadataTreeNode *treeNode) {
 }
 
 MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &className) {
+    StateLock lock(m_stateMutex);
+
     MetadataTreeNode * treeNode = GetRoot();
 
     int arrayIdx = -1;
@@ -275,7 +336,21 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
         MetadataTreeNode * child = treeNode->GetChild(*it);
 
         if (child == nullptr) {
-            vector<string> api = m_getTypeMetadataCallback(cn, curIdx);
+            vector<string> api;
+            {
+                // Resolving an unknown type runs Class.forName and, for an
+                // .extend()ed class, dex generation; see StateMutex.
+                StateUnlock unlocked(m_stateMutex);
+                api = m_getTypeMetadataCallback(cn, curIdx);
+            }
+
+            // Another thread may have resolved the same type meanwhile.
+            child = treeNode->GetChild(*it);
+            if (child != nullptr) {
+                treeNode = child;
+                ++curIdx;
+                continue;
+            }
 
             for (const auto &part: api) {
                 vector<MetadataTreeNode *> *children = treeNode->children;
@@ -342,6 +417,8 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
 }
 
 MetadataTreeNode *MetadataReader::GetBaseClassNode(MetadataTreeNode *treeNode) {
+    StateLock lock(m_stateMutex);
+
     MetadataTreeNode * baseClassNode = nullptr;
 
     if (treeNode != nullptr) {

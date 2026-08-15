@@ -112,6 +112,10 @@ class ModuleInternal {
                     if (m_dispose) {
                         m_module->m_loadedModules.erase(m_modulePath);
                         m_module->m_loadedModules.erase(m_cacheKey);
+                        // The isolate is alive on this path, so the handle is
+                        // released rather than left for isolate disposal.
+                        m_poModuleObj->Reset();
+                        delete m_poModuleObj;
                     }
                 }
 

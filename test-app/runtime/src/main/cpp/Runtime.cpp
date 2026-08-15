@@ -215,8 +215,15 @@ void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath,
 
   auto enableLog = verboseLoggingEnabled == JNI_TRUE;
 
-  runtime->Init(env, filesPath, nativeLibDir, enableLog, isDebuggable,
-                packageName, args, callingDir, maxLogcatObjectSize, forceLog);
+  try {
+    runtime->Init(env, filesPath, nativeLibDir, enableLog, isDebuggable,
+                  packageName, args, callingDir, maxLogcatObjectSize, forceLog);
+  } catch (...) {
+    // The Java side rolls back its own state and rethrows; without this the
+    // native half of a failed bootstrap would stay allocated and registered.
+    delete runtime;
+    throw;
+  }
 }
 
 void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
@@ -272,12 +279,38 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
   auto profilerOutputDirStr = ArgConverter::jstringToString(profilerOutputDir);
 
   NativeScriptException::Init();
-  m_isolate = PrepareV8Runtime(
-      filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr,
-      profilerOutputDirStr, maxLogcatObjectSize, forceLog);
+  try {
+    m_isolate = PrepareV8Runtime(
+        filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr,
+        profilerOutputDirStr, maxLogcatObjectSize, forceLog);
+  } catch (NativeScriptException& e) {
+    // The isolate is about to go away and this exception outlives it, so it
+    // must not carry a handle into it any further; the message and stack it
+    // already extracted are what the Java side reports.
+    e.ReleaseJsHandle();
+    UnwindFailedInit();
+    throw;
+  } catch (...) {
+    UnwindFailedInit();
+    throw;
+  }
 }
 
 Runtime::~Runtime() {
+  /*
+   * Idempotent backstop for the erase DestroyRuntime does: a bootstrap that
+   * failed before PrepareV8Runtime ran never reached it. The isolate entry is
+   * matched on value so it cannot evict a new runtime that reused the pointer.
+   */
+  {
+    std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
+    s_id2RuntimeCache.erase(m_id);
+    auto it = s_isolate2RuntimesCache.find(m_isolate);
+    if (it != s_isolate2RuntimesCache.end() && it->second == this) {
+      s_isolate2RuntimesCache.erase(it);
+    }
+  }
+
   delete this->m_objectManager;
   // idempotent backstop for the matched erase WorkerWrapper does right after
   // Isolate::Dispose (the match keeps this from evicting a new isolate that
@@ -584,6 +617,69 @@ static void InitializeV8() {
   V8::Initialize();
 }
 
+void Runtime::ElectMainRuntime() {
+  std::unique_lock<std::mutex> lock(s_mainInitMutex);
+
+  if (!s_mainRuntimeElected) {
+    s_mainRuntimeElected = true;
+    s_mainRuntimeFailed = false;
+    m_isMainThread = true;
+    // Once per process: V8::Initialize freezes the flag list, and setting a
+    // flag afterwards aborts.
+    InitializeV8();
+    return;
+  }
+
+  m_isMainThread = false;
+
+  s_mainInitReady.wait(lock, [] {
+    return s_mainThreadInitialized.load(std::memory_order_acquire) ||
+           s_mainRuntimeFailed;
+  });
+
+  if (!s_mainThreadInitialized.load(std::memory_order_acquire)) {
+    throw NativeScriptException(
+        "Cannot initialize a runtime: the main runtime failed to initialize");
+  }
+}
+
+void Runtime::SignalMainRuntimeReady(bool failed) {
+  {
+    std::lock_guard<std::mutex> lock(s_mainInitMutex);
+    if (failed) {
+      // Hand the election back so a later bootstrap can retry.
+      s_mainRuntimeElected = false;
+      s_mainRuntimeFailed = true;
+    } else {
+      s_mainThreadInitialized.store(true, std::memory_order_release);
+    }
+  }
+  s_mainInitReady.notify_all();
+}
+
+void Runtime::UnwindFailedInit() {
+  /*
+   * Reuses the two teardown windows rather than adding a third cleanup path.
+   * Every step DestroyRuntime takes is null-tolerant, which is what makes it
+   * usable on a runtime that never finished building; the Locker is reentrant,
+   * so it does not matter whether the failure unwound past the one
+   * PrepareV8Runtime holds.
+   */
+  if (m_isolate != nullptr) {
+    {
+      v8::Locker locker(m_isolate);
+      Isolate::Scope isolateScope(m_isolate);
+      DestroyRuntime();
+    }
+    m_isolate->Dispose();
+    m_isolate = nullptr;
+  }
+
+  if (m_isMainThread) {
+    SignalMainRuntimeReady(true /* failed */);
+  }
+}
+
 Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
                                    const string& nativeLibDir,
                                    const string& packageName, bool isDebuggable,
@@ -597,13 +693,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   create_params.array_buffer_allocator = &g_allocator;
 
-  /*
-   * Setup the V8Platform only once per process - once for the application
-   * lifetime Don't execute again if main thread has already been initialized
-   */
-  if (!s_mainThreadInitialized.load(std::memory_order_acquire)) {
-    InitializeV8();
-  }
+  // Also initializes V8 for the process if this runtime wins the election, and
+  // otherwise waits for the runtime that did.
+  ElectMainRuntime();
 
   tns::instrumentation::Frame isolateFrame;
   auto isolate = Isolate::New(create_params);
@@ -611,6 +703,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   m_timeOriginMonotonic = platform->MonotonicallyIncreasingTime();
   m_timeOriginRealtimeMs = platform->CurrentClockTimeMillis();
   isolateFrame.log("Isolate.New");
+
+  // From here on the isolate is reachable through the runtime caches and owns
+  // allocations of its own, so anything that throws below has to be unwound.
+  m_isolate = isolate;
+  m_objectManager->SetInstanceIsolate(isolate);
 
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
@@ -625,8 +722,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
   HandleScope handleScope(isolate);
-
-  m_objectManager->SetInstanceIsolate(isolate);
 
   // Sets a structure with v8 String constants on the isolate object at slot 1
   auto consts = new V8StringConstants::PerIsolateV8Constants(isolate);
@@ -729,8 +824,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "URLPattern"),
                       URLPatternImpl::GetCtor(isolate));
 
-  if (!s_mainThreadInitialized.load(std::memory_order_acquire)) {
-    m_isMainThread = true;
+  if (m_isMainThread) {
     // __runOnMainThread closures from any runtime's thread land on this loop
     s_mainEventLoop = m_eventLoop;
   }
@@ -739,7 +833,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
    * Attach 'postMessage', 'close' to the global object
    */
   else {
-    m_isMainThread = false;
     auto postMessageFuncTemplate = FunctionTemplate::New(
         isolate, CallbackHandlers::WorkerGlobalPostMessageCallback);
     globalTemplate->Set(
@@ -833,7 +926,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   m_weakRef.Init(isolate, context);
 
   // Do not set 'self' accessor to main thread JavaScript
-  if (s_mainThreadInitialized.load(std::memory_order_acquire)) {
+  if (!m_isMainThread) {
     global->DefineOwnProperty(context,
                               ArgConverter::ConvertToV8String(isolate, "self"),
                               global, readOnlyFlags);
@@ -863,7 +956,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   // Do not build metadata (which should be static for the process) for non-main
   // threads
-  if (!s_mainThreadInitialized.load(std::memory_order_acquire)) {
+  if (m_isMainThread) {
     MetadataNode::BuildMetadata(filesPath);
   }
 
@@ -881,7 +974,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   this->m_napiEnv = NapiEnv::Create(context, m_eventLoop);
   s_currentRuntime = this;
 
-  s_mainThreadInitialized.store(true, std::memory_order_release);
+  if (m_isMainThread) {
+    // Releases any runtime waiting in ElectMainRuntime: the metadata tree and
+    // the main event loop they depend on are published by now.
+    SignalMainRuntimeReady(false /* failed */);
+  }
 
   return isolate;
 }
@@ -1013,6 +1110,10 @@ robin_hood::unordered_map<int, Runtime*> Runtime::s_id2RuntimeCache;
 robin_hood::unordered_map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 std::mutex Runtime::s_runtimeCacheMutex;
 std::atomic<bool> Runtime::s_mainThreadInitialized{false};
+std::mutex Runtime::s_mainInitMutex;
+std::condition_variable Runtime::s_mainInitReady;
+bool Runtime::s_mainRuntimeElected = false;
+bool Runtime::s_mainRuntimeFailed = false;
 v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 std::shared_ptr<EventLoop> Runtime::s_mainEventLoop;

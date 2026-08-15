@@ -9,6 +9,7 @@
 #include "EventLoop.h"
 #include "NativeScriptAssert.h"
 #include "Runtime.h"
+#include "RuntimeState.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
@@ -21,6 +22,154 @@ using namespace v8;
 /* Defined below, next to ContainUncaughtCallbackException. */
 static void MarkReportedToJs(Isolate* isolate, Local<Value> error);
 static bool IsMarkedReportedToJs(Isolate* isolate, Local<Value> error);
+
+namespace {
+
+/*
+ * Per-runtime table of JS errors handed to Java as
+ * com.tns.NativeScriptException's `jsValueAddress`.
+ *
+ * Java used to be given the raw v8::Persistent<v8::Value>* and had no way to
+ * free it, so every JS error crossing into Java pinned its Error object -- and
+ * the stack it captured -- for the life of the process. It now gets an opaque
+ * id into this table instead. An entry is dropped when the error is converted
+ * back to JS, when the throwable holding the id is collected, and at the latest
+ * when the runtime is torn down: RuntimeState destroys the table while the
+ * isolate is still alive, which is what resetting a v8::Global requires.
+ */
+struct JsErrorHandles {
+    struct Entry {
+        v8::Global<v8::Value> value;
+        /*
+         * Weak: an id must not keep its throwable alive, and a cleared ref
+         * means nothing can ever ask for this entry again.
+         */
+        jweak throwable = nullptr;
+    };
+
+    ~JsErrorHandles() {
+        JEnv env;
+        for (auto& entry : entries) {
+            if (entry.second.throwable != nullptr) {
+                env.DeleteWeakGlobalRef(entry.second.throwable);
+            }
+        }
+    }
+
+    // Drops entries whose throwable has been collected. Amortized by only
+    // sweeping once the table has doubled since the last sweep.
+    void PruneIfDue(JEnv& env) {
+        if (entries.size() < pruneAt) {
+            return;
+        }
+
+        for (auto it = entries.begin(); it != entries.end();) {
+            jweak throwable = it->second.throwable;
+            if (throwable != nullptr && env.isSameObject(throwable, nullptr)) {
+                env.DeleteWeakGlobalRef(throwable);
+                it = entries.erase(it);
+            } else {
+                ++it;
+            }
+        }
+
+        pruneAt = std::max<size_t>(16, entries.size() * 2);
+    }
+
+    int64_t nextId = 1;
+    size_t pruneAt = 16;
+    robin_hood::unordered_map<int64_t, Entry> entries;
+};
+
+/*
+ * Files `error` under a fresh id for this runtime. Returns 0 when the runtime
+ * is tearing down, which the Java side reads as "no JS value".
+ */
+int64_t StoreJsError(Isolate* isolate, Local<Value> error) {
+    auto* handles = RuntimeState::For<JsErrorHandles>(isolate);
+    if (handles == nullptr) {
+        return 0;
+    }
+
+    JEnv env;
+    handles->PruneIfDue(env);
+
+    int64_t id = handles->nextId++;
+    JsErrorHandles::Entry entry;
+    entry.value.Reset(isolate, error);
+    handles->entries.emplace(id, std::move(entry));
+
+    return id;
+}
+
+/*
+ * Ties an entry's lifetime to the throwable that carries its id, so the JS
+ * error is released once Java is done with the exception. Drops the entry
+ * outright if the throwable could not be created.
+ */
+void BindJsErrorToThrowable(JEnv& env, Isolate* isolate, int64_t id,
+                            jthrowable throwable) {
+    if (id == 0) {
+        return;
+    }
+
+    auto* handles = RuntimeState::For<JsErrorHandles>(isolate);
+    if (handles == nullptr) {
+        return;
+    }
+
+    auto it = handles->entries.find(id);
+    if (it == handles->entries.end()) {
+        return;
+    }
+
+    if (throwable == nullptr) {
+        handles->entries.erase(it);
+        return;
+    }
+
+    it->second.throwable = env.NewWeakGlobalRef(throwable);
+}
+
+/*
+ * Removes the entry and hands back its value. False when the id belongs to
+ * another runtime, has already been taken, or the runtime is tearing down --
+ * the caller then rebuilds the error from the Java throwable.
+ */
+bool TakeJsError(Isolate* isolate, int64_t id, Local<Value>& out) {
+    auto* handles = RuntimeState::For<JsErrorHandles>(isolate);
+    if (handles == nullptr) {
+        return false;
+    }
+
+    auto it = handles->entries.find(id);
+    if (it == handles->entries.end()) {
+        return false;
+    }
+
+    out = Local<Value>::New(isolate, it->second.value);
+    if (it->second.throwable != nullptr) {
+        JEnv env;
+        env.DeleteWeakGlobalRef(it->second.throwable);
+    }
+    handles->entries.erase(it);
+
+    return true;
+}
+
+std::shared_ptr<Persistent<Value>> MakeOwnedPersistent(Isolate* isolate,
+                                                       Local<Value> value) {
+    return std::shared_ptr<Persistent<Value>>(
+        new Persistent<Value>(isolate, value), [](Persistent<Value>* handle) {
+            // Released on the runtime's own thread while the isolate is alive:
+            // a NativeScriptException never outlives the handling of the throw
+            // that produced it.
+            handle->Reset();
+            delete handle;
+        });
+}
+
+}  // namespace
 
 NativeScriptException::NativeScriptException(JEnv& env)
     : m_javascriptException(nullptr) {
@@ -46,7 +195,7 @@ NativeScriptException::NativeScriptException(TryCatch& tc,
   auto isolate = Isolate::GetCurrent();
   auto ex = tc.Exception();
   m_javascriptException =
-      ex.IsEmpty() ? nullptr : new Persistent<Value>(isolate, ex);
+      ex.IsEmpty() ? nullptr : MakeOwnedPersistent(isolate, ex);
 
   // A terminated isolate carries no message object and no inspectable
   // exception - every accessor below hands back an empty handle. Resetting
@@ -146,10 +295,12 @@ void NativeScriptException::ReThrowToJava() {
     JniLocalRef stackTrace(env.NewStringUTF(m_stackTrace.c_str()));
 
     if (ex == nullptr) {
+      // An id into this runtime's table, not a pointer Java could never free.
+      int64_t jsErrorId = StoreJsError(isolate, errObj);
       ex = static_cast<jthrowable>(env.NewObject(
           NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID,
-          (jstring)msg, (jstring)stackTrace,
-          reinterpret_cast<jlong>(m_javascriptException)));
+          (jstring)msg, (jstring)stackTrace, (jlong)jsErrorId));
+      BindJsErrorToThrowable(env, isolate, jsErrorId, ex);
     } else {
       auto excClassName = ObjectManager::GetClassName(ex);
       if (excClassName != "com/tns/NativeScriptException") {
@@ -804,10 +955,12 @@ Local<Value> NativeScriptException::WrapJavaToJsException() {
                                       "jsValueAddress", "J");
     jlong addr = env.GetLongField(m_javaException, fieldID);
 
-    if (addr != 0) {
-      auto pv = (Persistent<Value>*)addr;
-      errObj = Local<Value>::New(isolate, *pv);
-      pv->Reset();
+    Local<Value> stored;
+    if (addr != 0 && TakeJsError(isolate, addr, stored)) {
+      errObj = stored;
+      // The id is spent; clearing it keeps a second conversion from picking up
+      // a recycled entry.
+      env.SetLongField(m_javaException, fieldID, 0);
     } else {
       errObj = GetJavaExceptionFromEnv(m_javaException, env);
     }

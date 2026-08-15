@@ -25,9 +25,12 @@
 #include "FieldCallbackData.h"
 #include "ArgsWrapper.h"
 #include "ObjectManager.h"
-#include <string>
-#include <vector>
 #include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace tns {
 class MetadataNode {
@@ -194,6 +197,8 @@ class MetadataNode {
         static robin_hood::unordered_map<std::string, MetadataNode*> s_name2NodeCache;
         static robin_hood::unordered_map<std::string, MetadataTreeNode*> s_name2TreeNodeCache;
         static robin_hood::unordered_map<MetadataTreeNode*, MetadataNode*> s_treeNode2NodeCache;
+        // Guards the three caches above; see GetOrCreate for the ordering rule.
+        static std::mutex s_nodeCacheMutex;
         static std::atomic<bool> s_profilerEnabled;
 
         struct MethodCallbackData {
@@ -229,6 +234,17 @@ class MetadataNode {
                 :
                 node(_node), extendedName(_extendedName), fullClassName(_fullClassName) {
                 implementationObject = new v8::Persistent<v8::Object>(v8::Isolate::GetCurrent(), _implementationObject);
+            }
+
+            // Sole owner of implementationObject, which is a strong handle
+            // pinning the whole JS implementation object; copying would make
+            // that a double free.
+            ExtendedClassCallbackData(const ExtendedClassCallbackData&) = delete;
+            ExtendedClassCallbackData& operator=(const ExtendedClassCallbackData&) = delete;
+
+            ~ExtendedClassCallbackData() {
+                implementationObject->Reset();
+                delete implementationObject;
             }
 
             MetadataNode* node;
@@ -299,6 +315,33 @@ class MetadataNode {
              * runtime's teardown walked every node to erase its entry.
              */
             robin_hood::unordered_map<MetadataNode*, v8::Persistent<v8::Function>*> CtorFunctions;
+
+            /*
+             * Owns every callback payload this runtime hands to V8 as External
+             * or FunctionTemplate data -- MethodCallbackData, FieldCallbackData,
+             * PropertyCallbackData, TypeMetadata, ExtendedClassCallbackData.
+             * V8 attaches no finalizer to any of them, so without an owner they
+             * leaked on every GC and, for the ones reachable from a template,
+             * for the life of the runtime.
+             *
+             * An arena rather than per-holder ownership because the same
+             * MethodCallbackData is shared: it is reachable from a prototype
+             * method, from CtorCacheData::instanceMethodCallbacks, and from the
+             * `instanceMethodsCallbackData` a derived class copies out of the
+             * cache. One owner sidesteps that entirely.
+             *
+             * Type-erased so the deleter, not the container, restores the type.
+             */
+            using OwnedPtr = std::unique_ptr<void, void (*)(void*)>;
+            std::vector<OwnedPtr> OwnedCallbackData;
+
+            template <typename T, typename... Args>
+            T* Own(Args&&... args) {
+                T* ptr = new T(std::forward<Args>(args)...);
+                OwnedCallbackData.emplace_back(
+                    ptr, [](void* value) { delete static_cast<T*>(value); });
+                return ptr;
+            }
 
             ~MetadataNodeCache() {
                 delete MetadataKey;

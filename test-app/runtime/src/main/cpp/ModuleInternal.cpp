@@ -77,6 +77,22 @@ ModuleInternal::~ModuleInternal() {
         delete pair.second;
     }
     this->m_requireCache.clear();
+
+    /*
+     * Runs after Isolate::Dispose, so the handles are freed with the isolate and
+     * only the wrappers are deleted -- v8::Persistent does not reset in its
+     * destructor, which is what makes that safe here.
+     *
+     * Deduplicated by pointer: a module is cached under both its resolved path
+     * and its cache key, and both entries hold the same Persistent.
+     */
+    robin_hood::unordered_set<v8::Persistent<v8::Object>*> freed;
+    for (const auto& pair: this->m_loadedModules) {
+        if (freed.insert(pair.second.obj).second) {
+            delete pair.second.obj;
+        }
+    }
+    this->m_loadedModules.clear();
 }
 
 void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
