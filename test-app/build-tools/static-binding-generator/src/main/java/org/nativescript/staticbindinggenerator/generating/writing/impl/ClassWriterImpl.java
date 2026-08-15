@@ -11,6 +11,7 @@ public class ClassWriterImpl implements ClassWriter {
     private static final String PUBLIC_CLASS_KEYWORD = "public class";
     private static final String JAVASCRIPT_IMPLEMENTATION_FILE_NAME_PATTERN = "@com.tns.JavaScriptImplementation(javaScriptFile = \"./%s\")";
     private static final String NATIVESCRIPT_HASHCODE_PROVIDER_INTERFACE_NAME = "com.tns.NativeScriptHashCodeProvider";
+    private static final String NATIVESCRIPT_RUNTIME_BOUND_INTERFACE_NAME = "com.tns.NativeScriptRuntimeBound";
     private static final String NOT_EXTENDING_ANY_CLASS_MESSAGE = "Not extending any class!";
 
     private final Writer writer;
@@ -42,6 +43,9 @@ public class ClassWriterImpl implements ClassWriter {
         writer.write(IMPLEMENTS_KEYWORD);
         writer.write(SPACE_LITERAL);
         writer.write(NATIVESCRIPT_HASHCODE_PROVIDER_INTERFACE_NAME);
+        writer.write(COMMA_LITERAL);
+        writer.write(SPACE_LITERAL);
+        writer.write(NATIVESCRIPT_RUNTIME_BOUND_INTERFACE_NAME);
 
         if (!isEmpty(implementedInterfacesNames) && !isEmpty(implementedInterfacesNames.get(0))) {
             writer.write(COMMA_LITERAL);
