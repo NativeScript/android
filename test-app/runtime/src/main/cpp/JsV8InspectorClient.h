@@ -35,6 +35,11 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         // socket; serializes against connect/disconnect.
         void SendToFrontend(const std::string& message);
 
+        // Any thread. As SendToFrontend, but skips the source map rewrite (and
+        // the full-message scan and copy it costs) for payloads that cannot
+        // contain a sourceMapURL.
+        void SendRawToFrontend(const std::string& message);
+
         // Worker target management (Target domain, flat-session protocol).
         // Register/Unregister run on the worker's own thread; SchedulePauseInWorker
         // runs on the worker thread from a V8 interrupt.

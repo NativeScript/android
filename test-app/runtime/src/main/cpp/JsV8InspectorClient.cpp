@@ -192,7 +192,8 @@ std::string MaybeRewriteSourceMapURL(const std::string& message) {
 }  // namespace
 
 JsV8InspectorClient::JsV8InspectorClient(v8::Isolate* isolate)
-    : isolate_(isolate),
+    : tracing_agent_(new tns::inspector::TracingAgentImpl()),
+      isolate_(isolate),
       inspector_(nullptr),
       session_(nullptr),
       connection_(nullptr),
@@ -245,6 +246,10 @@ void JsV8InspectorClient::disconnect() {
         resourceStreams_.clear();
     }
 
+    // Nothing will ever ask for a trace the disconnected frontend started, and
+    // leaving it running keeps the ring buffer filling forever.
+    tracing_agent_->stopAndDiscard();
+
     // Reset worker sessions first and without the main-isolate Locker: if the
     // main isolate is paused, its nested loop owns the Locker and this thread
     // blocks below — workers must still get a clean slate (resume if paused,
@@ -288,8 +293,6 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     auto context = Runtime::GetRuntime(isolate_)->GetContext();
     Context::Scope context_scope(context);
 
-    std::vector<uint16_t> vector = tns::Util::ToVector(message);
-    StringView messageView(vector.data(), vector.size());
     bool success;
 
     /*
@@ -304,22 +307,8 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     */
 
 
-    if(message.find("Tracing.start") != std::string::npos) {
-        tracing_agent_->start();
-
-        // echo back the request to notify frontend the action was a success
-        // todo: send an empty response for the incoming message id instead.
-        this->sendNotification(StringBuffer::create(messageView));
-        return;
-    }
-
-    if(message.find("Tracing.end") != std::string::npos) {
-        tracing_agent_->end();
-        std::string res = tracing_agent_->getLastTrace();
-        tracing_agent_->SendToDevtools(context, res);
-        return;
-    }
-
+    // Note: the Tracing domain is handled in handleMessageOnSocketThread, so it
+    // never waits on this queue or takes the Locker above.
 
     // parse incoming message as JSON
     Local<Value> arg;
@@ -464,6 +453,75 @@ bool JsV8InspectorClient::handleMessageOnSocketThread(const std::string& message
         response = method == "IO.read"
                    ? HandleIORead(msgId, handle, size, sessionId)
                    : HandleIOClose(msgId, handle, sessionId);
+        return true;
+    }
+
+    // The Tracing domain never touches the isolate, so it is answered here
+    // instead of on the main-thread dispatch queue: flushing a large trace to
+    // the frontend must not wait for (or block) JS. The dataCollected chunks
+    // are pre-serialized by the trace writer and cannot carry a sessionId
+    // without re-parsing them, so only the main session is served; V8 traces
+    // the whole process anyway.
+    if (sessionId.empty() && method == "Tracing.start") {
+        std::vector<std::string> categories;
+        double bufferSizeInKb = 0;
+
+        const json* traceConfig = nullptr;
+        if (parsed.contains("params") && parsed["params"].is_object()) {
+            const auto& params = parsed["params"];
+            if (params.contains("traceConfig") && params["traceConfig"].is_object()) {
+                traceConfig = &params["traceConfig"];
+            } else if (params.contains("categories") && params["categories"].is_array()) {
+                // deprecated flat format
+                traceConfig = &params;
+            }
+        }
+
+        if (traceConfig != nullptr) {
+            const char* categoriesKey =
+                traceConfig->contains("includedCategories") ? "includedCategories" : "categories";
+            if (traceConfig->contains(categoriesKey) && (*traceConfig)[categoriesKey].is_array()) {
+                for (const auto& category : (*traceConfig)[categoriesKey]) {
+                    if (category.is_string()) {
+                        categories.push_back(category.get<std::string>());
+                    }
+                }
+            }
+            if (traceConfig->contains("traceBufferSizeInKb") &&
+                    (*traceConfig)["traceBufferSizeInKb"].is_number()) {
+                bufferSizeInKb = (*traceConfig)["traceBufferSizeInKb"].get<double>();
+            }
+        }
+
+        json reply = {{"id", msgId}};
+        if (tracing_agent_->start(categories, bufferSizeInKb)) {
+            reply["result"] = json::object();
+        } else {
+            reply["error"] = {{"code", -32000}, {"message", "Tracing is already started"}};
+        }
+        response = JsonDump(reply);
+        return true;
+    }
+
+    if (sessionId.empty() && method == "Tracing.end") {
+        tns::inspector::TracingAgentImpl::Result trace;
+        if (!tracing_agent_->end(trace)) {
+            json error = {{"id", msgId},
+                          {"error", {{"code", -32000}, {"message", "Tracing is not started"}}}};
+            response = JsonDump(error);
+            return true;
+        }
+
+        // The ack must reach the frontend before the events it asked for, so it
+        // is sent here rather than through `response`.
+        json ack = {{"id", msgId}, {"result", json::object()}};
+        this->SendRawToFrontend(JsonDump(ack));
+        for (const auto& traceMessage : trace.messages) {
+            this->SendRawToFrontend(traceMessage);
+        }
+        json complete = {{"method", "Tracing.tracingComplete"},
+                         {"params", {{"dataLossOccurred", trace.dataLossOccurred}}}};
+        this->SendRawToFrontend(JsonDump(complete));
         return true;
     }
 
@@ -781,6 +839,10 @@ void JsV8InspectorClient::sendNotification(std::unique_ptr<StringBuffer> message
 }
 
 void JsV8InspectorClient::SendToFrontend(const std::string& message) {
+    SendRawToFrontend(MaybeRewriteSourceMapURL(message));
+}
+
+void JsV8InspectorClient::SendRawToFrontend(const std::string& msg) {
     JEnv env;
     JniLocalRef connection;
     {
@@ -794,7 +856,6 @@ void JsV8InspectorClient::SendToFrontend(const std::string& message) {
         connection = JniLocalRef(env.NewLocalRef(connection_));
     }
 
-    const std::string msg = MaybeRewriteSourceMapURL(message);
     try {
         // TODO: Pete: Check if we can use a wide (utf 16) string here
         JniLocalRef str(env.NewStringUTF(msg.c_str()));
@@ -830,8 +891,6 @@ void JsV8InspectorClient::init() {
     context_.Reset(isolate_, context);
 
     createInspectorSession();
-
-    tracing_agent_.reset(new tns::inspector::TracingAgentImpl());
 
     try {
         this->registerModules();
