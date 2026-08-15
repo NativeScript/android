@@ -51,6 +51,7 @@ struct sigaction g_previous[NSIG];
  */
 char g_fatalMessage[kFatalMax];
 std::atomic<size_t> g_fatalLength{0};
+std::atomic_flag g_fatalClaimed = ATOMIC_FLAG_INIT;
 
 thread_local Slot* t_slot = nullptr;
 
@@ -228,7 +229,7 @@ void CrashBreadcrumbs::OpenStore(const std::string& filesRoot) {
       return;
     }
 
-    char previous[kBufferMax + kHeaderMax];
+    char previous[kHeaderMax + kFatalMax + kBufferMax];
     ssize_t length = read(fd, previous, sizeof(previous) - 1);
     if (length > 0) {
       previous[length] = '\0';
@@ -302,6 +303,12 @@ void CrashBreadcrumbs::SetWorkerScript(int runtimeId, const char* script) {
 
 void CrashBreadcrumbs::RecordFatal(const char* message) {
   if (message == nullptr) {
+    return;
+  }
+  // Only the first caller writes. A second thread failing a check at the same
+  // moment would otherwise overlap this copy, including while the signal
+  // handler is reading the buffer out.
+  if (g_fatalClaimed.test_and_set(std::memory_order_acq_rel)) {
     return;
   }
   // Room is reserved for the newline and the terminator.

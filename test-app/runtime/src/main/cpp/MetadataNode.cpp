@@ -2002,7 +2002,16 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
     }
     fseek(f, 0, SEEK_END);
     int lenNodes = ftell(f);
-    NS_DCHECK((lenNodes % sizeof(MetadataTreeNodeRawData)) == 0);
+    if (lenNodes < 0 ||
+        (static_cast<size_t>(lenNodes) % sizeof(MetadataTreeNodeRawData)) != 0) {
+        fclose(f);
+        stringstream ss;
+        ss << "Metadata file " << nodesFile << " is " << lenNodes
+           << " bytes, which is not a whole number of "
+           << sizeof(MetadataTreeNodeRawData)
+           << "-byte records. The metadata is truncated or corrupt.";
+        throw NativeScriptException(ss.str());
+    }
     char* nodes = new char[lenNodes];
     rewind(f);
     fread(nodes, 1, lenNodes, f);

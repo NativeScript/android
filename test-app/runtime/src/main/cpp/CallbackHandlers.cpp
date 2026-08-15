@@ -57,7 +57,7 @@ void CallbackHandlers::Init(Isolate *isolate) {
 
     DISABLE_VERBOSE_LOGGING_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "disableVerboseLogging",
                                                         "()V");
-    NS_CHECK(ENABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
+    NS_CHECK(DISABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
 
     MetadataNode::Init(isolate);
 

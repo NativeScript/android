@@ -47,8 +47,8 @@ class LRUCache {
         // the maximum number of records to be stored
         LRUCache(value_type (*loadCallback)(const key_type&, void*), void (*evictCallback)(const value_type&, void*), bool (*cacheValidCallback)(const key_type&, const value_type&, void*), size_t capacity, void* state)
             : m_loadCallback(loadCallback), m_capacity(capacity), m_evictCallback(evictCallback), m_cacheValidCallback(cacheValidCallback), m_state(state) {
-            NS_DCHECK(m_loadCallback != nullptr);
-            NS_DCHECK((0 < m_capacity) && (m_capacity < 10000));
+            NS_CHECK(m_loadCallback != nullptr);
+            NS_CHECK((0 < m_capacity) && (m_capacity < 10000));
         }
 
         // Obtain value of the cached function for k

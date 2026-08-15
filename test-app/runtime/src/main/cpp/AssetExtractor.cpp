@@ -22,7 +22,9 @@ void AssetExtractor::ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstrin
     int err = 0;
     auto z = zip_open(strApk.c_str(), 0, &err);
 
-    NS_DCHECK(z != nullptr);
+    // Nothing downstream can run without the app's assets, and every call
+    // below dereferences the archive.
+    NS_CHECK(z != nullptr);
     zip_int64_t num = zip_get_num_entries(z, 0);
     struct zip_stat sb;
     struct zip_file* zf;
@@ -53,15 +55,32 @@ void AssetExtractor::ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstrin
                 mkdir_rec(dirFullname.c_str());
 
                 zf = zip_fopen_index(z, i, 0);
-                NS_DCHECK(zf != nullptr);
+                if (zf == nullptr) {
+                    DEBUG_WRITE_FORCE(
+                        "AssetExtractor: skipping '%s', it could not be opened "
+                        "inside the apk (%s)",
+                        sb.name, zip_strerror(z));
+                    continue;
+                }
 
                 auto fd = fopen(assetFullname.c_str(), "w");
 
                 if (fd != nullptr) {
                     zip_int64_t sum = 0;
-                    while (sum != sb.size) {
+                    while (sum != (zip_int64_t)sb.size) {
                         zip_int64_t len = zip_fread(zf, buf, sizeof(buf));
-                        NS_DCHECK(len > 0);
+                        // 0 means the entry ended early, -1 a read error. Both
+                        // leave the loop unable to advance, and -1 would reach
+                        // fwrite as a huge size_t.
+                        if (len <= 0) {
+                            DEBUG_WRITE_FORCE(
+                                "AssetExtractor: '%s' ended after %lld of %llu "
+                                "bytes (%s)",
+                                sb.name, (long long)sum,
+                                (unsigned long long)sb.size,
+                                zip_file_strerror(zf));
+                            break;
+                        }
 
                         fwrite(buf, 1, len, fd);
                         sum += len;

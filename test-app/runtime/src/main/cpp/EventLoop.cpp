@@ -127,7 +127,7 @@ void EventLoop::BindToCurrentThread() {
     }
     JniLocalRef handler(env.NewObject(EVENT_LOOP_HANDLER_CLASS, EVENT_LOOP_HANDLER_CTOR,
                                       reinterpret_cast<jlong>(this)));
-    NS_DCHECK(!handler.IsNull());
+    NS_CHECK(!handler.IsNull());
     handler_ = env.NewGlobalRef(handler);
 
     // flush work buffered before the home thread was known

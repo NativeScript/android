@@ -152,17 +152,17 @@ namespace tns {
 
             v8::Local<v8::Script> script;
             bool success = v8::Script::Compile(context, tns::ArgConverter::ToV8String(isolate, source)).ToLocal(&script);
-            NS_DCHECK(success && !script.IsEmpty());
+            NS_CHECK(success && !script.IsEmpty());
 
             v8::Local<v8::Value> result;
             success = script->Run(context).ToLocal(&result);
-            NS_DCHECK(success);
+            NS_CHECK(success);
 
             v8::Local<v8::Function> processTraceData = result.As<v8::Function>();
 
             v8::Local<v8::Value> args[1] = { tns::ArgConverter::ToV8String(isolate, jsonData) };
             success = processTraceData->Call(context, processTraceData, 1, args).ToLocal(&result);
-            NS_DCHECK(success);
+            NS_CHECK(success);
         }
 
 

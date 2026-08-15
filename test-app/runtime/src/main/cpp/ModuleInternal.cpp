@@ -118,7 +118,7 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
     Local<Value> result;
     auto success = BuiltinLoader::RunBuiltin(context, BuiltinId::kRequireFactory).ToLocal(&result);
 
-    NS_DCHECK(success && result->IsFunction());
+    NS_CHECK(success && result->IsFunction());
 
     auto requireFactoryFunction = result.As<Function>();
 
@@ -161,7 +161,7 @@ Local<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const strin
         auto thiz = Object::New(isolate);
         auto success = requireFuncFactory->Call(context, thiz, 2, args).ToLocal(&result);
 
-        NS_DCHECK(success && !result.IsEmpty() && result->IsFunction());
+        NS_CHECK(success && !result.IsEmpty() && result->IsFunction());
 
         requireFunc = result.As<Function>();
 

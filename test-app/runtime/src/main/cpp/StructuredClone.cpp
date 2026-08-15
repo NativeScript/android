@@ -48,20 +48,20 @@ void StructuredClone::Init(Local<Context> context) {
 
     Local<v8::Function> clone;
     bool success = v8::Function::New(context, CloneCallback).ToLocal(&clone);
-    NS_DCHECK(success);
+    NS_CHECK(success);
 
     Local<Object> binding = Object::New(isolate);
     success = binding->Set(context,
                            ArgConverter::ConvertToV8String(isolate, "clone"),
                            clone)
                       .FromMaybe(false);
-    NS_DCHECK(success);
+    NS_CHECK(success);
 
     Local<Value> result;
     success = BuiltinLoader::RunBuiltin(context, BuiltinId::kStructuredClone,
                                         binding)
                       .ToLocal(&result);
-    NS_DCHECK(success);
+    NS_CHECK(success);
 }
 
 }  // namespace tns
