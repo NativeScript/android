@@ -263,7 +263,19 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
                 metadataAnnotation.packageName,
                 metadataAnnotation.extraInt)
 
-        KotlinClassMetadata.readStrict(metadata)
+        // readStrict rejects any class whose metadata version is newer than the bundled
+        // kotlin-metadata-jvm, which happens whenever an app or one of its dependencies is
+        // compiled with a Kotlin release newer than the one this jar was built against.
+        // Lenient reading only gives up the ability to write metadata back, which nothing here does.
+        try {
+            KotlinClassMetadata.readLenient(metadata)
+        } catch (e: Exception) {
+            // Bytecode-only parsing still yields usable members, so never let an unreadable
+            // annotation drop the whole class from the generated metadata.
+            println("Warning: could not read Kotlin metadata for $className; falling back to bytecode-only parsing")
+            println("\tError: $e")
+            null
+        }
     }
 
 

@@ -26,11 +26,13 @@ class BytecodeExtensionFunctionsCollector(private val kotlinClassMetadataParser:
                 val functionName = signature.name
                 val functionSignature = signature.descriptor
 
+                // Metadata written by a newer Kotlin compiler can describe functions this jar's
+                // bytecode view does not match; skip those rather than dropping the whole class.
                 val extensionFunctionDescriptor: KotlinMethodDescriptor = Arrays
                         .stream(kotlinClassDescriptor.methods)
                         .filter { x -> x.name == functionName && x.signature == functionSignature }
                         .findFirst()
-                        .get()
+                        .orElse(null) ?: continue
 
                 if (extensionFunctionDescriptor.isStatic) {
                     val receiverType = extensionFunctionDescriptor.argumentTypes[0] // kotlin extension functions' first argument is the receiver type
