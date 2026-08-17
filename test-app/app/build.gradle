@@ -1053,7 +1053,7 @@ task generateTypescriptDefinitions(type: BuildToolTask) {
         // Resolved against the project when building from source; an empty rootPath leaves it
         // relative to workingDir, which is where the packaged framework keeps the jar.
         paramz.add(Paths.get(rootPath, "dts-generator.jar").toString())
-        paramz.add("-input")
+        paramz.add("--input")
 
         for (String jarPath : allJarLibraries) {
             // don't generate typings for runtime jars and classes
@@ -1062,7 +1062,7 @@ task generateTypescriptDefinitions(type: BuildToolTask) {
             }
         }
 
-        paramz.add("-output")
+        paramz.add("--output")
         paramz.add("$TYPINGS_PATH")
 
         new File("$TYPINGS_PATH").mkdirs()
