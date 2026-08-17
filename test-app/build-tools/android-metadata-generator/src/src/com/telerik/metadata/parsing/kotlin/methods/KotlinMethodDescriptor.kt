@@ -4,7 +4,10 @@ import com.telerik.metadata.parsing.bytecode.methods.NativeMethodBytecodeDescrip
 import com.telerik.metadata.parsing.kotlin.classes.KotlinClassDescriptor
 import kotlin.metadata.KmDeclarationContainer
 import kotlin.metadata.Visibility
+import kotlin.metadata.jvm.JvmMethodSignature
 import kotlin.metadata.jvm.KotlinClassMetadata
+import kotlin.metadata.jvm.getterSignature
+import kotlin.metadata.jvm.setterSignature
 import kotlin.metadata.jvm.signature
 import kotlin.metadata.visibility
 import org.apache.bcel.classfile.Method
@@ -44,9 +47,28 @@ class KotlinMethodDescriptor(private val method: Method, private val originClass
     private fun checkIfMethodIsInternal(method: Method, kotlinDeclarationContainer: KmDeclarationContainer): Boolean {
         val function = kotlinDeclarationContainer
                 .functions
-                .firstOrNull {
-                    it.signature != null && it.signature!!.name == method.name && it.signature!!.descriptor == method.signature
-                }
-        return if (function != null) function.visibility == Visibility.INTERNAL else false
+                .firstOrNull { it.signature.matches(method) }
+        if (function != null) {
+            return function.visibility == Visibility.INTERNAL
+        }
+
+        // Property accessors are absent from `functions`, so without this an internal property's
+        // getter and setter are treated as public and stay reachable from JS under their mangled
+        // names. An accessor can also narrow the property's visibility on its own.
+        for (property in kotlinDeclarationContainer.properties) {
+            if (property.getterSignature.matches(method)) {
+                return property.visibility == Visibility.INTERNAL || property.getter.visibility == Visibility.INTERNAL
+            }
+
+            if (property.setterSignature.matches(method)) {
+                return property.visibility == Visibility.INTERNAL || property.setter?.visibility == Visibility.INTERNAL
+            }
+        }
+
+        return false
+    }
+
+    private fun JvmMethodSignature?.matches(method: Method): Boolean {
+        return this != null && name == method.name && descriptor == method.signature
     }
 }

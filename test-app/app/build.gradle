@@ -742,6 +742,9 @@ task buildMetadata(type: BuildToolTask) {
     if (!findProject(':android-metadata-generator').is(null)) {
         rootPath = Paths.get(project(':android-metadata-generator').projectDir.path, "build/libs").toString()
         dependsOn ':android-metadata-generator:jar'
+        // Without this the task stays up-to-date after the generator changes, so edits to it
+        // silently produce no new metadata.
+        inputs.files(tasks.getByPath(':android-metadata-generator:jar'))
     }
 
 
@@ -1031,8 +1034,11 @@ task buildMetadata(type: BuildToolTask) {
 }
 
 task generateTypescriptDefinitions(type: BuildToolTask) {
+    def rootPath = ""
     if (!findProject(':dts-generator').is(null)) {
+        rootPath = Paths.get(project(':dts-generator').projectDir.path, "build/libs").toString()
         dependsOn ':dts-generator:jar'
+        inputs.files(tasks.getByPath(':dts-generator:jar'))
     }
 
     def paramz = new ArrayList<String>()
@@ -1044,7 +1050,9 @@ task generateTypescriptDefinitions(type: BuildToolTask) {
     doFirst {
         delete "$TYPINGS_PATH"
 
-        paramz.add("dts-generator.jar")
+        // Resolved against the project when building from source; an empty rootPath leaves it
+        // relative to workingDir, which is where the packaged framework keeps the jar.
+        paramz.add(Paths.get(rootPath, "dts-generator.jar").toString())
         paramz.add("-input")
 
         for (String jarPath : allJarLibraries) {
@@ -1095,7 +1103,21 @@ task 'copyTypings' {
     }
 }
 
-copyTypings.onlyIf { generateTypescriptDefinitions.didWork }
+// USER_PROJECT_ROOT is two levels above the gradle root, which only lands on an app when that
+// root is <app>/platforms/android. In a runtime checkout it points outside the repository, so
+// require some evidence of a real project before copying anything there.
+def hasUserProject = { ->
+    file("$USER_PROJECT_ROOT/$PACKAGE_JSON").exists() ||
+            rootDir.toString().replace(File.separator, "/").endsWith(PLATFORMS_ANDROID)
+}
+
+// didWork only means the task ran, so on a failed generation this would still report success
+// and copy an empty typings directory over the user's project.
+copyTypings.onlyIf {
+    generateTypescriptDefinitions.didWork &&
+            generateTypescriptDefinitions.state.failure == null &&
+            hasUserProject()
+}
 generateTypescriptDefinitions.finalizedBy(copyTypings)
 
 task 'validateAppIdMatch' {
