@@ -461,10 +461,34 @@ static v8::MaybeLocal<v8::Module> CompileModuleFromSource(
   return hs.Escape(mod);
 }
 
+// "message (line L:C)" for a caught exception, or empty. The line/column are
+// the part no caller can reconstruct from a failure code.
+static std::string DescribeCaughtError(v8::Isolate* isolate,
+                                       v8::Local<v8::Context> context,
+                                       const v8::TryCatch& tc) {
+  if (!tc.HasCaught()) return std::string();
+  v8::Local<v8::Message> message = tc.Message();
+  if (message.IsEmpty()) return std::string();
+  v8::String::Utf8Value text(isolate, message->Get());
+  std::string described = *text ? *text : "";
+  int line = message->GetLineNumber(context).FromMaybe(0);
+  if (line > 0) {
+    described += " (line " + std::to_string(line) + ":" +
+                 std::to_string(message->GetStartColumn()) + ")";
+  }
+  return described;
+}
+
 // Compile-only variant used inside ResolveModuleCallback. Compiles a
 // v8::Module and registers it under urlStr but does NOT instantiate or
 // evaluate. V8 is currently instantiating the importer and will handle
 // instantiation of this dependency.
+//
+// On compile failure the exception is left PENDING, the same contract as
+// ModuleInternal::CompileFileEsModule: it names the file, line and column,
+// which nothing downstream can reconstruct. A caller that cannot let it
+// propagate must consume it through its own TryCatch and route the text into
+// its own failure channel — never drop it.
 static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
     v8::Isolate* isolate, v8::Local<v8::Context> context,
     const std::string& code, const std::string& urlStr) {
@@ -479,6 +503,16 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
       ShouldTraceRegistryKey(urlStr, registryKey)) {
     TNS_DEBUG(Esm, "[resolver][register-resolve-only] raw=%s key=%s",
                    urlStr.c_str(), registryKey.c_str());
+  }
+
+  // Checked before compiling: recompiling a key that is already registered
+  // would mint a second module identity while importers hold the first.
+  auto itExisting = g_moduleRegistry.find(registryKey);
+  if (itExisting != g_moduleRegistry.end()) {
+    v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
+    if (!existing.IsEmpty()) {
+      return hs.Escape(existing);
+    }
   }
 
   v8::Local<v8::String> sourceText =
@@ -496,77 +530,10 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
   {
     v8::TryCatch tcCompile(isolate);
     if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&mod)) {
-      if (IsDebuggable() && LogCategoryEnabled(LogCategory::Esm)) {
-        uint64_t h = 1469598103934665603ull;  // FNV-1a 64-bit
-        for (unsigned char c : code) {
-          h ^= c;
-          h *= 1099511628211ull;
-        }
-        std::string snippet = code.substr(0, 600);
-        for (char& ch : snippet) {
-          if (ch == '\n' || ch == '\r') ch = ' ';
-        }
-        const char* classification = "unknown";
-        v8::Local<v8::Message> message = tcCompile.Message();
-        std::string msgStr;
-        std::string srcLineStr;
-        int lineNum = 0;
-        int startCol = 0;
-        int endCol = 0;
-        if (!message.IsEmpty()) {
-          v8::String::Utf8Value m8(isolate, message->Get());
-          if (*m8) msgStr = *m8;
-          lineNum = message->GetLineNumber(context).FromMaybe(0);
-          startCol = message->GetStartColumn();
-          endCol = message->GetEndColumn();
-          v8::MaybeLocal<v8::String> maybeLine = message->GetSourceLine(context);
-          if (!maybeLine.IsEmpty()) {
-            v8::String::Utf8Value l8(isolate, maybeLine.ToLocalChecked());
-            if (*l8) srcLineStr = *l8;
-          }
-          if (msgStr.find("Unexpected identifier") != std::string::npos ||
-              msgStr.find("Unexpected token") != std::string::npos) {
-            if (msgStr.find("export") != std::string::npos &&
-                code.find("export default") == std::string::npos &&
-                code.find("__sfc__") != std::string::npos)
-              classification = "missing-export-default";
-            else
-              classification = "syntax";
-          } else if (msgStr.find("Cannot use import statement") != std::string::npos) {
-            classification = "wrap-error";
-          }
-        }
-        if (classification == std::string("unknown")) {
-          if (code.find("export default") == std::string::npos &&
-              code.find("__sfc__") != std::string::npos)
-            classification = "missing-export-default";
-          else if (code.find("__sfc__") != std::string::npos &&
-                   code.find("export {") == std::string::npos &&
-                   code.find("export ") == std::string::npos)
-            classification = "no-exports";
-          else if (code.find("import ") == std::string::npos &&
-                   code.find("export ") == std::string::npos)
-            classification = "not-module";
-          else if (code.find("_openBlock") != std::string::npos &&
-                   code.find("openBlock") == std::string::npos)
-            classification = "underscore-helper-unmapped";
-        }
-        if (srcLineStr.size() > 240) srcLineStr = srcLineStr.substr(0, 240);
-        TNS_DEBUG(Esm,
-                  "[http-esm][compile][v8-error][%s] %s line=%d col=%d..%d "
-                  "hash=%llx bytes=%lu msg=%s srcLine=%s snippet=%s",
-                  classification, urlStr.c_str(), lineNum, startCol, endCol,
-                  (unsigned long long)h, (unsigned long)code.size(),
-                  msgStr.c_str(), srcLineStr.c_str(), snippet.c_str());
-      }
+      TNS_DEBUG(Esm, "[http-esm][compile][fail] %s %s", urlStr.c_str(),
+                     DescribeCaughtError(isolate, context, tcCompile).c_str());
+      tcCompile.ReThrow();
       return v8::MaybeLocal<v8::Module>();
-    }
-  }
-  auto itExisting = g_moduleRegistry.find(registryKey);
-  if (itExisting != g_moduleRegistry.end()) {
-    v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
-    if (!existing.IsEmpty()) {
-      return hs.Escape(existing);
     }
   }
   UnindexRegistryKey(*moduleState, isolate, registryKey);
@@ -698,15 +665,26 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
                                      requestedUrl);
   }
 
-  v8::MaybeLocal<v8::Module> loaded = CompileModuleForResolveRegisterOnly(
-      isolate, context, fetched.body, registryKey);
-  if (loaded.IsEmpty()) {
-    TNS_DEBUG(Esm, "[http-esm][load][compile-fail] request=%s key=%s bytes=%zu",
-                   requestedUrl.c_str(), registryKey.c_str(), fetched.body.size());
-    std::string msg = "HTTP import compile failed: " + requestedUrl;
-    isolate->ThrowException(v8::Exception::Error(
-        ArgConverter::ConvertToV8String(isolate, msg)));
-    return v8::MaybeLocal<v8::Module>();
+  v8::Local<v8::Module> loaded;
+  {
+    v8::TryCatch tcCompile(isolate);
+    if (!CompileModuleForResolveRegisterOnly(isolate, context, fetched.body,
+                                             registryKey)
+             .ToLocal(&loaded)) {
+      TNS_DEBUG(Esm, "[http-esm][load][compile-fail] request=%s key=%s bytes=%zu",
+                     requestedUrl.c_str(), registryKey.c_str(),
+                     fetched.body.size());
+      if (tcCompile.HasCaught()) {
+        // The compile error names the module, line and column; replacing it
+        // with a generic "compile failed" would strictly lose information.
+        tcCompile.ReThrow();
+      } else {
+        std::string msg = "HTTP import compile failed: " + requestedUrl;
+        isolate->ThrowException(v8::Exception::Error(
+            ArgConverter::ConvertToV8String(isolate, msg)));
+      }
+      return v8::MaybeLocal<v8::Module>();
+    }
   }
 
   TNS_DEBUG(Esm, "[http-esm][load][ok] request=%s key=%s type=%s bytes=%zu",
@@ -1642,16 +1620,31 @@ static void AsyncGraphOnFetchCompleted(
       }
     } else {
       load->fetchedCount++;
-      v8::MaybeLocal<v8::Module> maybeMod =
-          CompileModuleForResolveRegisterOnly(isolate, context, fetched->body, key);
       v8::Local<v8::Module> mod;
-      if (!maybeMod.ToLocal(&mod)) {
+      bool compiled = false;
+      std::string compileError;
+      {
+        // This callback runs on to completion and a microtask checkpoint, so a
+        // compile exception must be consumed here rather than left pending; its
+        // text goes into the load's own failure channel instead.
+        v8::TryCatch tcCompile(isolate);
+        compiled = CompileModuleForResolveRegisterOnly(isolate, context,
+                                                       fetched->body, key)
+                       .ToLocal(&mod);
+        if (!compiled) {
+          compileError = DescribeCaughtError(isolate, context, tcCompile);
+        }
+      }
+      if (!compiled) {
         if (isRoot) {
           load->failed = true;
           load->failureMessage = "HTTP import compile failed: " + url;
+          if (!compileError.empty()) {
+            load->failureMessage += " — " + compileError;
+          }
         } else {
-          TNS_DEBUG(Esm, "[graph][dep-compile-fail] %s (left to sync resolver)",
-                         url.c_str());
+          TNS_DEBUG(Esm, "[graph][dep-compile-fail] %s %s (left to sync resolver)",
+                         url.c_str(), compileError.c_str());
         }
       } else {
         load->compiledCount++;
@@ -1821,7 +1814,7 @@ void StartModuleGraphLoad(
 bool RunModuleGraphLoadPumped(v8::Isolate* isolate,
                               v8::Local<v8::Context> context,
                               const std::string& root, double timeoutSeconds) {
-  if (timeoutSeconds <= 0.0) timeoutSeconds = 60.0;
+  if (timeoutSeconds <= 0.0) timeoutSeconds = kModuleEvaluateDeadlineSeconds;
   auto done = std::make_shared<bool>(false);
   StartModuleGraphLoad(isolate, context, root,
                        [done](bool /*ok*/, const std::string& /*errorMessage*/,
@@ -2366,6 +2359,8 @@ static v8::MaybeLocal<v8::Module> CompileNodeBuiltinPolyfill(
         isolate, NsBuiltinModules::NotFoundMessage(spec))));
     return v8::MaybeLocal<v8::Module>();
   }
+  // The polyfill source is the runtime's own, so a compile failure here is a
+  // runtime bug: keep the parse error rather than masking it.
   return CompileModuleForResolveRegisterOnly(isolate, context, polyfill, key);
 }
 
@@ -2992,14 +2987,27 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         TNS_DEBUG(Esm, "[dyn-import][blob] compiling blob module, code length=%zu",
                        code.size());
 
-        v8::MaybeLocal<v8::Module> modMaybe =
-            CompileModuleForResolveRegisterOnly(iso, ctx, code, d->blobUrl);
         v8::Local<v8::Module> mod;
-        if (!modMaybe.ToLocal(&mod)) {
-          RejectHttpDynamicWaiters(iso, ctx, d->registryKey,
-                                   v8::Exception::Error(
-                                       ArgConverter::ConvertToV8String(
-                                           iso, "Failed to compile blob module")));
+        bool compiled = false;
+        std::string compileError;
+        {
+          // A pending exception would escape this callback into V8's promise
+          // machinery; the waiters are this path's failure channel.
+          v8::TryCatch tcCompile(iso);
+          compiled = CompileModuleForResolveRegisterOnly(iso, ctx, code, d->blobUrl)
+                         .ToLocal(&mod);
+          if (!compiled) {
+            compileError = DescribeCaughtError(iso, ctx, tcCompile);
+          }
+        }
+        if (!compiled) {
+          std::string msg = "Failed to compile blob module";
+          if (!compileError.empty()) {
+            msg += ": " + compileError;
+          }
+          RejectHttpDynamicWaiters(
+              iso, ctx, d->registryKey,
+              v8::Exception::Error(ArgConverter::ConvertToV8String(iso, msg)));
           delete d;
           return;
         }
@@ -3374,7 +3382,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       const ModuleResolution rootResolution = ResolveSpecifierToPath(
           isolate, context, *adjustedUtf8 ? *adjustedUtf8 : "", std::string());
       if (rootResolution.kind == ModuleResolution::Kind::kFile) {
-        RunModuleGraphLoadPumped(isolate, context, rootResolution.path, 60.0);
+        RunModuleGraphLoadPumped(isolate, context, rootResolution.path,
+                                 kModuleEvaluateDeadlineSeconds);
       }
     }
 

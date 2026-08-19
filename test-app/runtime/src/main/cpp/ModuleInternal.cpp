@@ -15,6 +15,7 @@
 #include "NativeScriptAssert.h"
 #include "Constants.h"
 #include "CrashBreadcrumbs.h"
+#include "EventLoop.h"
 #include "NativeScriptException.h"
 #include "NsBuiltinModules.h"
 #include "napi/NapiModules.h"
@@ -309,7 +310,9 @@ void ModuleInternal::Load(Local<Context> context, const string& path) {
     TNSPERF();
     auto isolate = m_isolate;
     if (IsHttpModulePath(path) || IsESModule(path)) {
-        LoadESModule(isolate, path);
+        // The entry runs before this thread's event loop does, so its graph can
+        // only make progress from the pump inside LoadESModule.
+        LoadESModule(isolate, path, ModuleEvaluationPolicy::kSyncPumping);
         return;
     }
     auto globalObject = context->Global();
@@ -447,8 +450,10 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
 
     // Check if this is an ES module (.mjs)
     if (Util::EndsWith(modulePath, ".mjs")) {
-        // For ES modules, load using the ES module system
-        Local<Value> moduleNamespace = LoadESModule(isolate, modulePath);
+        // require()'s route into the ES module system, which cannot wait: an
+        // async graph is refused rather than pumped.
+        Local<Value> moduleNamespace =
+                LoadESModule(isolate, modulePath, ModuleEvaluationPolicy::kSyncStrict);
         
         // Create a wrapper object that behaves like a CommonJS module
         // but exports the ES module namespace
@@ -660,11 +665,172 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
     return ScriptCompiler::CompileModule(isolate, &source);
 }
 
+namespace {
+
+struct ModuleEvaluationOptions {
+    enum class TimeoutBehavior { kReturnPending, kThrow };
+
+    ModuleEvaluationPolicy policy = ModuleEvaluationPolicy::kSyncStrict;
+    // kSyncPumping only: how long the graph gets to settle in-pump.
+    double deadlineSeconds = 0.0;
+    // kSyncPumping only: what an expired window means.
+    TimeoutBehavior timeoutBehavior = TimeoutBehavior::kReturnPending;
+    // kSyncPumping only: also give the Android looper a slice per iteration, for
+    // graphs whose progress depends on native transports rather than V8 tasks.
+    bool pumpRunLoop = false;
+};
+
+// `require()` cannot wait, so an async graph is refused rather than evaluated.
+// Never evicts: the module is perfectly loadable through import().
+[[noreturn]] void ThrowAsyncGraphRefusal(const std::string& canonicalPath) {
+    throw NativeScriptException("require() cannot load ES module '" + canonicalPath +
+                                "': the module graph contains top-level await. Use import() "
+                                "instead.");
+}
+
+// Evicts the module and surfaces the rejection reason. Always throws, in every
+// build — the reason has to reach the boundary handler that reports it.
+[[noreturn]] void ThrowModuleEvaluationRejection(Isolate* isolate, Local<Promise> promise,
+                                                 TryCatch& tc,
+                                                 const std::string& canonicalPath) {
+    RemoveModuleFromRegistry(canonicalPath);
+    std::string detail = PromiseRejectionMessage(isolate, promise, canonicalPath);
+    if (!tc.HasCaught()) {
+        Local<Value> reason = promise->Result();
+        if (!reason.IsEmpty()) {
+            isolate->ThrowException(reason);
+        }
+    }
+    if (tc.HasCaught()) {
+        throw NativeScriptException(tc, detail);
+    }
+    throw NativeScriptException(detail);
+}
+
+// Evaluates an instantiated graph under `options`. Returns the capability
+// promise for kAsync and an empty handle otherwise; the namespace always comes
+// from the module itself. Throws NativeScriptException on failure, in every
+// build. `canonicalPath` names the registry entry to evict on failure.
+MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context,
+                                        Local<Module> module,
+                                        const std::string& canonicalPath,
+                                        const ModuleEvaluationOptions& options) {
+    if (options.policy == ModuleEvaluationPolicy::kSyncStrict) {
+        if (module->IsGraphAsync()) {
+            // Refusing before evaluation leaves the graph at kInstantiated, so a
+            // later import() can still evaluate it, and keeps this diagnosis ahead
+            // of whatever runtime error the graph would have produced first.
+            ThrowAsyncGraphRefusal(canonicalPath);
+        }
+        if (module->GetStatus() == Module::kEvaluating) {
+            // Re-entered through a cycle while the graph is still on the stack; its
+            // namespace holds whatever has been initialized so far.
+            return MaybeLocal<Promise>();
+        }
+    }
+
+    TryCatch tcEval(isolate);
+    Local<Value> result;
+    if (!module->Evaluate(context).ToLocal(&result)) {
+        RemoveModuleFromRegistry(canonicalPath);
+        if (tcEval.HasCaught()) {
+            throw NativeScriptException(tcEval, "Cannot evaluate module " + canonicalPath);
+        }
+        throw NativeScriptException(string("Cannot evaluate module ") + canonicalPath);
+    }
+
+    if (!result->IsPromise()) {
+        return MaybeLocal<Promise>();
+    }
+    Local<Promise> promise = result.As<Promise>();
+
+    if (options.policy == ModuleEvaluationPolicy::kAsync) {
+        return promise;
+    }
+
+    TryCatch promiseTc(isolate);
+
+    if (options.policy == ModuleEvaluationPolicy::kSyncStrict) {
+        Promise::PromiseState state = promise->State();
+        if (state == Promise::kRejected) {
+            ThrowModuleEvaluationRejection(isolate, promise, promiseTc, canonicalPath);
+        }
+        if (state == Promise::kPending) {
+            // V8 guarantees a settled capability for a graph that reported
+            // !IsGraphAsync, so reaching here means the graph classification and the
+            // evaluation disagree — never paper over it with a half-initialized
+            // namespace.
+            throw NativeScriptException("ES module " + canonicalPath +
+                                        " left its evaluation promise pending on a graph reported "
+                                        "as synchronous");
+        }
+        return MaybeLocal<Promise>();
+    }
+
+    // Top-level await can depend on native async work such as fetch(), which
+    // needs both V8 microtasks and the looper to advance. An await whose
+    // resolution arrives as a v8 foreground task never settles from checkpoints
+    // alone; JS frames are on the stack, so like the inspector pause loops only
+    // nestable tasks may run here.
+    Runtime* runtime = Runtime::GetRuntime(isolate);
+    std::shared_ptr<EventLoop> eventLoop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
+
+    auto pumpAsyncProgress = [&]() {
+        if (eventLoop != nullptr) {
+            eventLoop->RunNestableV8Tasks();
+        }
+        isolate->PerformMicrotaskCheckpoint();
+        if (options.pumpRunLoop) {
+            ALooper_pollOnce(10 /* ms */, nullptr, nullptr, nullptr);
+            isolate->PerformMicrotaskCheckpoint();
+        }
+    };
+
+    const auto deadline =
+            std::chrono::steady_clock::now() +
+            std::chrono::milliseconds(static_cast<int64_t>(options.deadlineSeconds * 1000.0));
+    bool settled = false;
+
+    // State is checked before the first pump: a synchronous graph's evaluation
+    // promise is already settled when Evaluate() returns, so it exits here
+    // without paying for a looper slice.
+    while (!promiseTc.HasCaught()) {
+        Promise::PromiseState state = promise->State();
+        if (state != Promise::kPending) {
+            settled = true;
+            if (state == Promise::kRejected) {
+                ThrowModuleEvaluationRejection(isolate, promise, promiseTc, canonicalPath);
+            }
+            break;
+        }
+
+        if (std::chrono::steady_clock::now() >= deadline) {
+            break;
+        }
+
+        pumpAsyncProgress();
+        if (!options.pumpRunLoop) {
+            usleep(1000);  // 1ms delay for non-HTTP top-level await polling
+        }
+    }
+
+    if (!settled && promise->State() == Promise::kPending &&
+        options.timeoutBehavior == ModuleEvaluationOptions::TimeoutBehavior::kThrow) {
+        RemoveModuleFromRegistry(canonicalPath);
+        throw NativeScriptException("Top-level await timed out for ES module " + canonicalPath);
+    }
+
+    return MaybeLocal<Promise>();
+}
+
+}  // namespace
+
 // The root entry point for an ES module graph: compile + register the root,
 // then instantiate and evaluate it once. Dependencies are compiled and
 // registered by ResolveModuleCallback while V8 walks the graph from here;
 // nothing below the root evaluates on its own.
-Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path) {
+Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path,
+                                          ModuleEvaluationPolicy policy) {
     auto context = isolate->GetCurrentContext();
     const bool isHttpModule = IsHttpModulePath(path);
     // The key the resolver would derive for this same module as someone's
@@ -676,7 +842,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     Local<Module> module;
 
     if (isHttpModule) {
-        RunModuleGraphLoadPumped(isolate, context, requestPath, 60.0);
+        RunModuleGraphLoadPumped(isolate, context, requestPath, kModuleEvaluateDeadlineSeconds);
         // The loader throws the classifier's reason (status, MIME or
         // transport); catch it so it lands in the message instead of staying
         // pending on the isolate behind a C++ throw.
@@ -695,6 +861,12 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
             throw NativeScriptException(message);
         }
         if (module->GetStatus() == Module::kEvaluated) {
+            // A top-level-await graph reports kEvaluated while its capability
+            // promise is still pending, so the namespace here may be in its TDZ;
+            // require() refuses the graph whatever the load order, matching Node.
+            if (policy == ModuleEvaluationPolicy::kSyncStrict && module->IsGraphAsync()) {
+                ThrowAsyncGraphRefusal(canonicalPath);
+            }
             return module->GetModuleNamespace();
         }
     } else {
@@ -711,6 +883,12 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
             if (status == Module::kErrored) {
                 RemoveModuleFromRegistry(canonicalPath);
             } else if (status == Module::kEvaluated) {
+                // A top-level-await graph reports kEvaluated while its capability
+                // promise is still pending, so the namespace here may be in its TDZ;
+                // require() refuses the graph whatever the load order, matching Node.
+                if (policy == ModuleEvaluationPolicy::kSyncStrict && existing->IsGraphAsync()) {
+                    ThrowAsyncGraphRefusal(canonicalPath);
+                }
                 return existing->GetModuleNamespace();
             } else if (status == Module::kUninstantiated || status == Module::kInstantiated) {
                 // Recompiling would mint a second module identity while importers still
@@ -727,7 +905,8 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
             // whole closure up front — including this root — so instantiation
             // resolves as pure lookup. A graph with no HTTP edges settles inside the
             // call and pays no wait.
-            RunModuleGraphLoadPumped(isolate, context, canonicalPath, 60.0);
+            RunModuleGraphLoadPumped(isolate, context, canonicalPath,
+                                     kModuleEvaluateDeadlineSeconds);
             auto walkedIt = g_moduleRegistry.find(canonicalPath);
             if (walkedIt != g_moduleRegistry.end()) {
                 Local<Module> walked = walkedIt->second.Get(isolate);
@@ -771,45 +950,23 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         }
     }
 
-    // Evaluate with its own TryCatch
-    Local<Value> result;
-    {
-        TryCatch tcEval(isolate);
-        if (!module->Evaluate(context).ToLocal(&result)) {
-            if (tcEval.HasCaught()) {
-                throw NativeScriptException(tcEval, "Cannot evaluate module " + canonicalPath);
-            } else {
-                throw NativeScriptException(string("Cannot evaluate module ") + canonicalPath);
-            }
-        }
-
-        // Handle the case where evaluation returns a Promise (for top-level await)
-        if (result->IsPromise()) {
-            Local<Promise> promise = result.As<Promise>();
-            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
-
-            while (true) {
-                isolate->PerformMicrotaskCheckpoint();
-                Promise::PromiseState state = promise->State();
-
-                if (state != Promise::kPending) {
-                    if (state == Promise::kRejected) {
-                        Local<Value> reason = promise->Result();
-                        isolate->ThrowException(reason);
-                        throw NativeScriptException(PromiseRejectionMessage(isolate, promise, canonicalPath));
-                    }
-                    break;
-                }
-
-                if (std::chrono::steady_clock::now() >= deadline) {
-                    throw NativeScriptException(string("Module evaluation promise timed out: ") + canonicalPath);
-                }
-
-                ALooper_pollOnce(10, nullptr, nullptr, nullptr);
-                usleep(100);
-            }
-        }
+    // Evaluate the graph under the caller's policy.
+    ModuleEvaluationOptions evalOptions;
+    evalOptions.policy = policy;
+    if (policy == ModuleEvaluationPolicy::kSyncPumping) {
+        // For local modules the bound is a yield, not a timeout: only nestable V8
+        // tasks can run while these JS frames are on the stack, so a TLA parked on
+        // a non-nestable foreground task can never settle in-pump — give it one
+        // short window, then return and let the real event loop finish it after
+        // the turn. HTTP entries must settle in-pump — the dev client needs the
+        // rejection reason synchronously — so they get the full deadline.
+        evalOptions.deadlineSeconds = isHttpModule ? kModuleEvaluateDeadlineSeconds : 1.0;
+        evalOptions.timeoutBehavior = isHttpModule
+                                              ? ModuleEvaluationOptions::TimeoutBehavior::kThrow
+                                              : ModuleEvaluationOptions::TimeoutBehavior::kReturnPending;
+        evalOptions.pumpRunLoop = isHttpModule;
     }
+    EvaluateModuleGraph(isolate, context, module, canonicalPath, evalOptions);
 
     return module->GetModuleNamespace();
 }

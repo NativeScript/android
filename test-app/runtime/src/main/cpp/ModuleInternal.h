@@ -15,6 +15,22 @@
 #include <map>
 
 namespace tns {
+
+// The single deadline for every module-graph settle wait: the entry
+// top-level-await pump in LoadESModule and the pumped module-graph walk. One
+// knob, so the waits stay ordered — transport timeouts < this.
+inline constexpr double kModuleEvaluateDeadlineSeconds = 60.0;
+
+// How a module graph's evaluation promise is settled.
+//   kSyncStrict  - Node's `require(esm)`: an async graph is refused before it
+//                  ever evaluates, and the capability promise must already be
+//                  settled when Evaluate() returns.
+//   kSyncPumping - drive this thread in place until the promise settles or the
+//                  window closes. Only legal while nothing else owns the loop
+//                  (entry evaluation), and only nestable V8 tasks can run.
+//   kAsync       - evaluate and hand the caller the capability promise.
+enum class ModuleEvaluationPolicy { kSyncStrict, kSyncPumping, kAsync };
+
 class ModuleInternal {
     public:
         ModuleInternal();
@@ -39,7 +55,14 @@ class ModuleInternal {
 
         // Helper functions for ES module support
         static bool IsESModule(const std::string& path);
-        static v8::Local<v8::Value> LoadESModule(v8::Isolate* isolate, const std::string& path);
+
+        /*
+         * Compile/link/evaluate an ES module; returns its namespace object. `policy`
+         * decides how the graph's evaluation promise is settled — see
+         * ModuleEvaluationPolicy.
+         */
+        static v8::Local<v8::Value> LoadESModule(v8::Isolate* isolate, const std::string& path,
+                                                 ModuleEvaluationPolicy policy);
 
         /*
          * Read + compile `path` as an ES module WITHOUT registering, instantiating or
