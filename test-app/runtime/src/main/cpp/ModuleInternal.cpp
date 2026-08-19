@@ -641,13 +641,39 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
     return json;
 }
 
+MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const std::string& path) {
+    string url = "file://" + path;
+    string content = Runtime::GetRuntime(isolate)->ReadFileText(path);
+
+    Local<String> sourceText = ArgConverter::ConvertToV8String(isolate, content);
+
+    Local<String> urlString;
+    if (!String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
+        throw NativeScriptException(string("Failed to create URL string for ES module ") + path);
+    }
+
+    ScriptOrigin origin(urlString, 0, 0, false, -1, Local<Value>(), false, false,
+                        true  // ← is_module
+    );
+    ScriptCompiler::Source source(sourceText, origin);
+
+    return ScriptCompiler::CompileModule(isolate, &source);
+}
+
+// The root entry point for an ES module graph: compile + register the root,
+// then instantiate and evaluate it once. Dependencies are compiled and
+// registered by ResolveModuleCallback while V8 walks the graph from here;
+// nothing below the root evaluates on its own.
 Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path) {
     auto context = isolate->GetCurrentContext();
     const bool isHttpModule = IsHttpModulePath(path);
-    const std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : path;
+    // The key the resolver would derive for this same module as someone's
+    // dependency. Keying the root by anything else mints a second identity for
+    // one file, so a cycle back to the root would not terminate on its entry.
+    const std::string canonicalPath = CanonicalizeRegistryKey(path);
+    const std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : canonicalPath;
 
     Local<Module> module;
-    ScriptCompiler::CachedData* cacheData = nullptr;
 
     if (isHttpModule) {
         RunAsyncHttpModuleGraphLoadPumped(isolate, context, requestPath, 60.0);
@@ -662,80 +688,74 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
             throw NativeScriptException(message);
         }
         if (module->GetStatus() == Module::kEvaluated) {
-            UpdateModuleFallback(isolate, CanonicalizeHttpUrlKey(requestPath), module);
             return module->GetModuleNamespace();
         }
     } else {
-        // 1) Prepare URL & source
-        string url = "file://" + path;
-        string content = Runtime::GetRuntime(isolate)->ReadFileText(path);
-
-        Local<String> sourceText = ArgConverter::ConvertToV8String(isolate, content);
-
-        Local<String> urlString;
-        if (!String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
-            throw NativeScriptException(string("Failed to create URL string for ES module ") + path);
-        }
-
-        ScriptOrigin origin(urlString, 0, 0, false, -1, Local<Value>(), false, false,
-                            true  // ← is_module
-        );
-        ScriptCompiler::Source source(sourceText, origin, cacheData);
-
-        // 2) Compile with its own TryCatch
-        {
-            TryCatch tcCompile(isolate);
-            MaybeLocal<Module> maybeMod = ScriptCompiler::CompileModule(
-                isolate, &source,
-                cacheData ? ScriptCompiler::kConsumeCodeCache : ScriptCompiler::kNoCompileOptions);
-
-            if (!maybeMod.ToLocal(&module)) {
-                if (tcCompile.HasCaught()) {
-                    throw NativeScriptException(tcCompile, "Cannot compile ES module " + path);
-                } else {
-                    throw NativeScriptException(string("Cannot compile ES module ") + path);
-                }
-            }
-        }
-
-        // 3) Register for resolution callback
         auto* registryPtr = ModuleRegistryFor(isolate);
         if (registryPtr == nullptr) {
             return Local<Value>();
         }
         auto& g_moduleRegistry = *registryPtr;
-        UnindexModuleForIsolate(isolate, path);
-        auto it = g_moduleRegistry.find(path);
-        if (it != g_moduleRegistry.end()) {
-            it->second.Reset();
+
+        auto existingIt = g_moduleRegistry.find(canonicalPath);
+        if (existingIt != g_moduleRegistry.end()) {
+            Local<Module> existing = existingIt->second.Get(isolate);
+            Module::Status status = existing.IsEmpty() ? Module::kErrored : existing->GetStatus();
+            if (status == Module::kErrored) {
+                RemoveModuleFromRegistry(canonicalPath);
+            } else if (status == Module::kEvaluated) {
+                return existing->GetModuleNamespace();
+            } else if (status == Module::kUninstantiated || status == Module::kInstantiated) {
+                // Recompiling would mint a second module identity while importers still
+                // hold this one; reuse it and let InstantiateModule below no-op
+                // (kInstantiated) or link it (kUninstantiated).
+                module = existing;
+            }
         }
-        g_moduleRegistry[path].Reset(isolate, module);
-        IndexModuleForIsolate(isolate, path, module);
+
+        if (module.IsEmpty()) {
+            TryCatch tcCompile(isolate);
+            if (!CompileFileEsModule(isolate, canonicalPath).ToLocal(&module)) {
+                if (tcCompile.HasCaught()) {
+                    throw NativeScriptException(tcCompile, "Cannot compile ES module " + canonicalPath);
+                } else {
+                    throw NativeScriptException(string("Cannot compile ES module ") + canonicalPath);
+                }
+            }
+
+            UnindexModuleForIsolate(isolate, canonicalPath);
+            auto it = g_moduleRegistry.find(canonicalPath);
+            if (it != g_moduleRegistry.end()) {
+                it->second.Reset();
+            }
+            g_moduleRegistry[canonicalPath].Reset(isolate, module);
+            IndexModuleForIsolate(isolate, canonicalPath, module);
+        }
     }
 
-    // 4) Instantiate (link) with ResolveModuleCallback
+    // Instantiate (link) with ResolveModuleCallback
     if (module->GetStatus() < Module::kInstantiated) {
         TryCatch tcLink(isolate);
         bool linked = module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false);
 
         if (!linked) {
             if (tcLink.HasCaught()) {
-                throw NativeScriptException(tcLink, "Cannot instantiate module " + path);
+                throw NativeScriptException(tcLink, "Cannot instantiate module " + canonicalPath);
             } else {
-                throw NativeScriptException(string("Cannot instantiate module ") + path);
+                throw NativeScriptException(string("Cannot instantiate module ") + canonicalPath);
             }
         }
     }
 
-    // 5) Evaluate with its own TryCatch
+    // Evaluate with its own TryCatch
     Local<Value> result;
     {
         TryCatch tcEval(isolate);
         if (!module->Evaluate(context).ToLocal(&result)) {
             if (tcEval.HasCaught()) {
-                throw NativeScriptException(tcEval, "Cannot evaluate module " + path);
+                throw NativeScriptException(tcEval, "Cannot evaluate module " + canonicalPath);
             } else {
-                throw NativeScriptException(string("Cannot evaluate module ") + path);
+                throw NativeScriptException(string("Cannot evaluate module ") + canonicalPath);
             }
         }
 
@@ -752,13 +772,13 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                     if (state == Promise::kRejected) {
                         Local<Value> reason = promise->Result();
                         isolate->ThrowException(reason);
-                        throw NativeScriptException(PromiseRejectionMessage(isolate, promise, path));
+                        throw NativeScriptException(PromiseRejectionMessage(isolate, promise, canonicalPath));
                     }
                     break;
                 }
 
                 if (std::chrono::steady_clock::now() >= deadline) {
-                    throw NativeScriptException(string("Module evaluation promise timed out: ") + path);
+                    throw NativeScriptException(string("Module evaluation promise timed out: ") + canonicalPath);
                 }
 
                 ALooper_pollOnce(10, nullptr, nullptr, nullptr);
@@ -767,7 +787,6 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         }
     }
 
-    // 6) Return the namespace
     return module->GetModuleNamespace();
 }
 

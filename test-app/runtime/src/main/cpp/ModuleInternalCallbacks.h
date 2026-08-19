@@ -16,6 +16,13 @@ namespace tns {
 using ModuleHandleMap =
     robin_hood::unordered_map<std::string, v8::Global<v8::Module>>;
 
+// The registry key for `key`, whatever form it arrives in (filesystem path,
+// file:// URL, http(s) URL, blob:, or a custom scheme such as node:). Every
+// registry read and write goes through this, so a module reached as a root and
+// the same module reached as someone's dependency land on one entry — and one
+// identity for import.meta.
+std::string CanonicalizeRegistryKey(const std::string& key);
+
 // Per-isolate module registry accessor: map canonical keys → compiled
 // v8::Module handles for `isolate`. Keyed by v8::Isolate* (not thread) because
 // v8::Global<Module> handles are isolate-bound; see the long-form comment
@@ -97,12 +104,6 @@ bool RunAsyncHttpModuleGraphLoadPumped(v8::Isolate* isolate,
 // True while any async graph load (any isolate) has fetches or compiles
 // outstanding.
 bool HasPendingAsyncModuleGraphWork();
-
-// Keep a fallback copy of the last evaluated module so it could be served
-// while reloading if needed.
-void UpdateModuleFallback(v8::Isolate* isolate,
-                          const std::string& canonicalPath,
-                          v8::Local<v8::Module> module);
 
 // Drop exact URL-keyed modules from the registry and clear any in-flight
 // invalidation bookkeeping tied to those canonical keys.

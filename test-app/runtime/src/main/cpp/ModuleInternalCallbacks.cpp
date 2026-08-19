@@ -223,11 +223,9 @@ static std::string ResolveHttpRelative(const std::string& referrerUrl,
 // Forward declarations for helpers referenced before their definitions.
 static bool ShouldTraceRegistryKey(const std::string& rawKey,
                                    const std::string& registryKey);
-static std::string CanonicalizeRegistryKey(const std::string& key);
 static const char* ModuleStatusToString(v8::Module::Status status);
 static void KillAsyncGraphLoadsForIsolate(v8::Isolate* isolate);
 static bool IsCurrentIsolateWorker(v8::Isolate* isolate);
-static std::string ExtractRelativePath(const std::string& path);
 static void RejectAndClearInvalidatedModuleState(v8::Isolate* isolate,
                                                  v8::Local<v8::Context> context,
                                                  const std::string& registryKey);
@@ -274,9 +272,7 @@ struct LoaderVocabulary {
 // to static/thread destructors, where a post-disposal Reset would crash.
 // Access from the isolate's own thread only, per the slot contract.
 struct ModuleLoaderState {
-  ModuleHandleMap registry;            // canonical key  -> compiled module
-  ModuleHandleMap fallbackRegistry;    // canonical key  -> last good module
-  ModuleHandleMap fallbackByRelative;  // relative path  -> last good module
+  ModuleHandleMap registry;  // canonical key -> compiled module
 
   // What the dev client taught THIS isolate's loader: import map,
   // canonicalization vocabulary, volatile patterns.
@@ -289,21 +285,9 @@ struct ModuleLoaderState {
   // the slot destructor alone is not enough for them.
   std::vector<std::weak_ptr<AsyncGraphLoad>> asyncGraphLoads;
 
-  // Active resolution stack, used to detect and short-circuit self-recursive
-  // module loads, plus the re-entry bookkeeping keyed by registry key.
-  std::vector<std::string> resolutionStack;
-  robin_hood::unordered_map<std::string, size_t> reentryCounts;
-  robin_hood::unordered_map<std::string, robin_hood::unordered_set<std::string>>
-      reentryParents;
-  robin_hood::unordered_map<std::string, std::string> primaryImporters;
+  // HTTP dynamic imports currently fetching/evaluating, for coalescing.
   robin_hood::unordered_set<std::string> modulesInFlight;
-  robin_hood::unordered_set<std::string> modulesPendingReset;
 
-  // Waiters: registry key -> Promise resolvers settled when the module
-  // finishes (instantiated/evaluated) or errors.
-  robin_hood::unordered_map<std::string,
-                            std::vector<v8::Global<v8::Promise::Resolver>>>
-      moduleWaiters;
   // Dynamic HTTP import waiters: resolve to the module namespace.
   robin_hood::unordered_map<std::string,
                             std::vector<v8::Global<v8::Promise::Resolver>>>
@@ -314,8 +298,7 @@ struct ModuleLoaderState {
   // instead of a scan of the whole registry. Hashes collide, so a bucket holds
   // candidates; FindKeyForModule confirms each against the registry and prunes
   // the ones it no longer backs, so a stale candidate can never answer a
-  // lookup. Covers `registry` only — the fallback maps are never looked up by
-  // handle.
+  // lookup.
   robin_hood::unordered_map<int, std::vector<std::string>> keysByModuleHash;
 };
 
@@ -617,7 +600,7 @@ static bool ShouldTraceRegistryKey(const std::string& rawKey,
          StartsWith(registryKey, "blob:");
 }
 
-static std::string CanonicalizeRegistryKey(const std::string& key) {
+std::string CanonicalizeRegistryKey(const std::string& key) {
   if (key.empty()) return key;
 
   std::string registryKey;
@@ -1460,25 +1443,6 @@ bool RunAsyncHttpModuleGraphLoadPumped(v8::Isolate* isolate,
 // ─────────────────────────────────────────────────────────────
 // Registry mutation + diagnostics
 
-// Compute a relative path key for fallback lookup (mirrors iOS's helper).
-// On Android there is no separate Documents directory — everything lives
-// under the application path.
-static std::string ExtractRelativePath(const std::string& path) {
-  std::string appPrefix = NormalizePath(GetApplicationPath());
-  if (!appPrefix.empty()) {
-    std::string directPrefix = appPrefix + "/";
-    if (path.rfind(directPrefix, 0) == 0) {
-      return path.substr(directPrefix.size());
-    }
-    // Some code paths carry "…/app/…" twice (bundled app folder).
-    std::string appFolderPrefix = appPrefix + "/app/";
-    if (path.rfind(appFolderPrefix, 0) == 0) {
-      return path.substr(appFolderPrefix.size());
-    }
-  }
-  return "";
-}
-
 static const char* ModuleStatusToString(v8::Module::Status status) {
   switch (status) {
     case v8::Module::kUninstantiated:
@@ -1504,8 +1468,6 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) return;
   auto& g_moduleRegistry = moduleState->registry;
-  auto& g_moduleFallbackRegistry = moduleState->fallbackRegistry;
-  auto& g_moduleFallbackByRelative = moduleState->fallbackByRelative;
   const std::string registryKey = CanonicalizeRegistryKey(canonicalPath);
 
   // Defensive: never operate on an anomalous/sentinel key.
@@ -1545,8 +1507,6 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
   }
 
   size_t regPre = g_moduleRegistry.size();
-  size_t fbPre = g_moduleFallbackRegistry.size();
-  size_t relPre = g_moduleFallbackByRelative.size();
 
   auto it = g_moduleRegistry.find(registryKey);
   if (it != g_moduleRegistry.end()) {
@@ -1559,30 +1519,12 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
     it->second.Reset();
     g_moduleRegistry.erase(it);
   } else {
-    TNS_DEBUG(
-        Esm,
-        "[resolver][remove:miss] key not found, proceed to clear fallbacks (%s)",
-        registryKey.c_str());
-  }
-  auto fb = g_moduleFallbackRegistry.find(registryKey);
-  if (fb != g_moduleFallbackRegistry.end()) {
-    fb->second.Reset();
-    g_moduleFallbackRegistry.erase(fb);
-  }
-  std::string rel = ExtractRelativePath(registryKey);
-  if (!rel.empty()) {
-    auto fbr = g_moduleFallbackByRelative.find(rel);
-    if (fbr != g_moduleFallbackByRelative.end()) {
-      fbr->second.Reset();
-      g_moduleFallbackByRelative.erase(fbr);
-    }
+    TNS_DEBUG(Esm, "[resolver][remove:miss] key not found (%s)",
+                   registryKey.c_str());
   }
 
-  TNS_DEBUG(Esm, "[resolver][remove:post] reg %lu->%lu fb %lu->%lu rel %lu->%lu",
-                 (unsigned long)regPre, (unsigned long)g_moduleRegistry.size(),
-                 (unsigned long)fbPre, (unsigned long)g_moduleFallbackRegistry.size(),
-                 (unsigned long)relPre,
-                 (unsigned long)g_moduleFallbackByRelative.size());
+  TNS_DEBUG(Esm, "[resolver][remove:post] reg %lu->%lu", (unsigned long)regPre,
+                 (unsigned long)g_moduleRegistry.size());
 }
 
 std::vector<std::string> GetLoadedModuleUrls() {
@@ -1649,40 +1591,11 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
                       (unsigned long)misses, (unsigned long)g_moduleRegistry.size());
 }
 
-void UpdateModuleFallback(v8::Isolate* isolate,
-                          const std::string& canonicalPath,
-                          v8::Local<v8::Module> module) {
-  auto* moduleState = ModuleLoaderStateFor(isolate);
-  if (moduleState == nullptr) return;
-  auto& g_moduleFallbackRegistry = moduleState->fallbackRegistry;
-  auto& g_moduleFallbackByRelative = moduleState->fallbackByRelative;
-  auto fallbackIt = g_moduleFallbackRegistry.find(canonicalPath);
-  if (fallbackIt != g_moduleFallbackRegistry.end()) {
-    fallbackIt->second.Reset();
-  }
-  if (!module.IsEmpty()) {
-    g_moduleFallbackRegistry[canonicalPath].Reset(isolate, module);
-    TNS_DEBUG(Esm, "[resolver] fallback updated for %s from evaluated module",
-                   canonicalPath.c_str());
-    std::string relative = ExtractRelativePath(canonicalPath);
-    if (!relative.empty()) {
-      auto relativeIt = g_moduleFallbackByRelative.find(relative);
-      if (relativeIt != g_moduleFallbackByRelative.end()) {
-        relativeIt->second.Reset();
-      }
-      g_moduleFallbackByRelative[relative].Reset(isolate, module);
-      TNS_DEBUG(Esm, "[resolver] fallback relative updated for %s",
-                     relative.c_str());
-    }
-  }
-}
-
 // ─────────────────────────────────────────────────────────────
 // Resolver state
 //
-// The resolution stack, re-entry bookkeeping and waiter lists live in
-// ModuleLoaderState (per isolate, in a RuntimeState slot).
-static constexpr size_t kMaxModuleReentryCount = 256;
+// The dynamic-import in-flight set and waiter lists live in ModuleLoaderState
+// (per isolate, in a RuntimeState slot).
 
 static bool IsModuleEvaluationInProgress(v8::Module::Status status) {
   return status == v8::Module::kInstantiating ||
@@ -1731,25 +1644,6 @@ static void RejectResolversWithReason(
   }
 }
 
-static bool QueueModuleWaiterIfInFlight(v8::Isolate* isolate,
-                                        const std::string& registryKey,
-                                        v8::Local<v8::Module> module,
-                                        v8::Local<v8::Promise::Resolver> resolver) {
-  auto* moduleState = ModuleLoaderStateFor(isolate);
-  if (moduleState == nullptr) return false;
-  auto& g_modulesInFlight = moduleState->modulesInFlight;
-  if (registryKey.empty() || module.IsEmpty() ||
-      !IsModuleEvaluationInProgress(module->GetStatus()) ||
-      g_modulesInFlight.find(registryKey) == g_modulesInFlight.end()) {
-    return false;
-  }
-  moduleState->moduleWaiters[registryKey].emplace_back(isolate, resolver);
-  TNS_DEBUG(Esm, "[dyn-import][await] queued module waiter for %s status=%s",
-                 registryKey.c_str(),
-                 ModuleStatusToString(module->GetStatus()));
-  return true;
-}
-
 static bool QueueHttpDynamicWaiterIfInFlight(
     v8::Isolate* isolate, const std::string& registryKey,
     v8::Local<v8::Module> module, v8::Local<v8::Promise::Resolver> resolver) {
@@ -1793,37 +1687,6 @@ static v8::Local<v8::Value> BuildModuleFailureReason(v8::Isolate* isolate,
   }
   TNS_DEBUG(Esm, "[dyn-import][failure] %s", message.c_str());
   return v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, message));
-}
-
-static void ResolveModuleWaiters(v8::Isolate* isolate,
-                                 v8::Local<v8::Context> context,
-                                 const std::string& registryKey,
-                                 v8::Local<v8::Module> module) {
-  auto* moduleState = ModuleLoaderStateFor(isolate);
-  if (moduleState == nullptr) return;
-  auto& g_moduleWaiters = moduleState->moduleWaiters;
-  auto waitIt = g_moduleWaiters.find(registryKey);
-  if (waitIt == g_moduleWaiters.end()) return;
-  std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
-  resolvers.swap(waitIt->second);
-  g_moduleWaiters.erase(waitIt);
-  ResolveResolversWithModuleNamespace(isolate, context, resolvers, module,
-                                      registryKey);
-}
-
-static void RejectModuleWaiters(v8::Isolate* isolate,
-                                v8::Local<v8::Context> context,
-                                const std::string& registryKey,
-                                v8::Local<v8::Value> reason) {
-  auto* moduleState = ModuleLoaderStateFor(isolate);
-  if (moduleState == nullptr) return;
-  auto& g_moduleWaiters = moduleState->moduleWaiters;
-  auto waitIt = g_moduleWaiters.find(registryKey);
-  if (waitIt == g_moduleWaiters.end()) return;
-  std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
-  resolvers.swap(waitIt->second);
-  g_moduleWaiters.erase(waitIt);
-  RejectResolversWithReason(isolate, context, resolvers, reason);
 }
 
 static void ResolveHttpDynamicWaiters(v8::Isolate* isolate,
@@ -1883,21 +1746,8 @@ static void RejectAndClearInvalidatedModuleState(v8::Isolate* isolate,
                                                  const std::string& registryKey) {
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) return;
-  auto& g_moduleWaiters = moduleState->moduleWaiters;
   auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
-  moduleState->reentryCounts.erase(registryKey);
-  moduleState->reentryParents.erase(registryKey);
-  moduleState->primaryImporters.erase(registryKey);
   moduleState->modulesInFlight.erase(registryKey);
-  moduleState->modulesPendingReset.erase(registryKey);
-
-  auto waitIt = g_moduleWaiters.find(registryKey);
-  if (waitIt != g_moduleWaiters.end()) {
-    std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
-    resolvers.swap(waitIt->second);
-    g_moduleWaiters.erase(waitIt);
-    RejectResolversForInvalidation(isolate, context, resolvers, registryKey);
-  }
 
   auto dynamicWaitIt = g_httpDynamicWaiters.find(registryKey);
   if (dynamicWaitIt != g_httpDynamicWaiters.end()) {
@@ -1909,104 +1759,6 @@ static void RejectAndClearInvalidatedModuleState(v8::Isolate* isolate,
   TNS_DEBUG(Esm, "[resolver][invalidate-state] cleared in-flight state for %s",
                  registryKey.c_str());
 }
-
-namespace {
-struct ResolutionStackGuard {
-  ResolutionStackGuard(v8::Isolate* isolate, ModuleLoaderState& state,
-                       const std::string& entry)
-      : isolate_(isolate),
-        state_(state),
-        stack_(state.resolutionStack),
-        entry_(entry),
-        active_(true) {
-    stack_.push_back(entry_);
-    state_.reentryCounts[entry_] = 0;
-    state_.reentryParents.erase(entry_);
-    if (stack_.size() > 1) {
-      state_.primaryImporters[entry_] = stack_[stack_.size() - 2];
-    } else {
-      state_.primaryImporters.erase(entry_);
-    }
-    state_.modulesInFlight.insert(entry_);
-    state_.modulesPendingReset.erase(entry_);
-    TNS_DEBUG(Esm, "[resolver][stack] push (%lu) %s",
-                   static_cast<unsigned long>(stack_.size()), entry_.c_str());
-  }
-
-  ~ResolutionStackGuard() {
-    if (!active_ || stack_.empty()) return;
-    auto& g_moduleRegistry = state_.registry;
-    auto& g_moduleFallbackRegistry = state_.fallbackRegistry;
-    auto& g_moduleWaiters = state_.moduleWaiters;
-    auto& g_modulesPendingReset = state_.modulesPendingReset;
-    TNS_DEBUG(Esm, "[resolver][stack] pop (%lu) %s",
-                   static_cast<unsigned long>(stack_.size()), entry_.c_str());
-    state_.reentryCounts.erase(entry_);
-    state_.reentryParents.erase(entry_);
-    state_.primaryImporters.erase(entry_);
-    state_.modulesInFlight.erase(entry_);
-
-    v8::Module::Status finalStatus = v8::Module::kErrored;
-    auto regIt = g_moduleRegistry.find(entry_);
-    if (regIt != g_moduleRegistry.end()) {
-      v8::Local<v8::Module> m = regIt->second.Get(isolate_);
-      if (!m.IsEmpty()) finalStatus = m->GetStatus();
-    }
-    bool isError = finalStatus == v8::Module::kErrored;
-    auto waitIt = g_moduleWaiters.find(entry_);
-    if (waitIt != g_moduleWaiters.end()) {
-      v8::Local<v8::Context> currentContext = isolate_->GetCurrentContext();
-      if (isError || regIt == g_moduleRegistry.end()) {
-        std::string msg = "Module evaluation failed: " + entry_;
-        RejectModuleWaiters(
-            isolate_, currentContext, entry_,
-            v8::Exception::Error(ArgConverter::ConvertToV8String(isolate_, msg)));
-      } else {
-        v8::Local<v8::Module> resolvedModule = regIt->second.Get(isolate_);
-        ResolveModuleWaiters(isolate_, currentContext, entry_, resolvedModule);
-      }
-    }
-    stack_.pop_back();
-    auto pendingIt = g_modulesPendingReset.find(entry_);
-    if (pendingIt != g_modulesPendingReset.end()) {
-      auto it = g_moduleRegistry.find(entry_);
-      if (it != g_moduleRegistry.end()) {
-        v8::Local<v8::Module> module = it->second.Get(isolate_);
-        v8::Module::Status status =
-            module.IsEmpty() ? v8::Module::kErrored : module->GetStatus();
-        if (status != v8::Module::kEvaluated && status != v8::Module::kErrored) {
-          TNS_DEBUG(Esm,
-                 "[resolver] dropping incomplete module after unwind %s (status=%s)",
-                 entry_.c_str(), ModuleStatusToString(status));
-          RemoveModuleFromRegistry(entry_);
-        }
-      }
-      g_modulesPendingReset.erase(pendingIt);
-    }
-
-    auto activeIt = g_moduleRegistry.find(entry_);
-    if (activeIt != g_moduleRegistry.end()) {
-      v8::Local<v8::Module> activeModule = activeIt->second.Get(isolate_);
-      if (!activeModule.IsEmpty() &&
-          activeModule->GetStatus() == v8::Module::kEvaluated) {
-        g_moduleFallbackRegistry[entry_].Reset(isolate_, activeModule);
-        TNS_DEBUG(Esm,
-               "[resolver] updated fallback module for %s after successful evaluation",
-               entry_.c_str());
-      }
-    }
-  }
-
-  void Release() { active_ = false; }
-
- private:
-  v8::Isolate* isolate_;
-  ModuleLoaderState& state_;
-  std::vector<std::string>& stack_;
-  std::string entry_;
-  bool active_;
-};
-}  // namespace
 
 // ─────────────────────────────────────────────────────────────
 // JSON module → synthetic ES module
@@ -2021,6 +1773,21 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(
     return v8::MaybeLocal<v8::Module>();
   }
   auto& g_moduleRegistry = moduleState->registry;
+
+  // JSON modules are compiled eagerly to kEvaluated, so a registered entry is
+  // complete and must be reused — recompiling would mint a second module
+  // identity (and namespace) for the same file on every resolve.
+  auto existingIt = g_moduleRegistry.find(registryAbsPath);
+  if (existingIt != g_moduleRegistry.end()) {
+    v8::Local<v8::Module> existing = existingIt->second.Get(isolate);
+    if (!existing.IsEmpty() && existing->GetStatus() == v8::Module::kEvaluated) {
+      return v8::MaybeLocal<v8::Module>(existing);
+    }
+    UnindexRegistryKey(*moduleState, isolate, registryAbsPath);
+    existingIt->second.Reset();
+    g_moduleRegistry.erase(existingIt);
+  }
+
   TNS_DEBUG(Esm, "[resolver][json] wrapping %s", absPath.c_str());
 
   std::string jsonText = Runtime::GetRuntime(isolate)->ReadFileText(absPath);
@@ -2181,8 +1948,6 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(
     return v8::MaybeLocal<v8::Module>();
   }
   auto& g_moduleRegistry = moduleState->registry;
-  auto& g_moduleFallbackRegistry = moduleState->fallbackRegistry;
-  auto& g_moduleResolutionStack = moduleState->resolutionStack;
 
   v8::String::Utf8Value specUtf8(isolate, specifier);
   const std::string rawSpec = *specUtf8 ? *specUtf8 : "";
@@ -2485,63 +2250,39 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(
     return CompileJsonAsEsModule(isolate, context, absPath, registryAbsPath);
   }
 
-  // Cache lookup.
+  // Reuse any live, non-errored registry entry. The resolver never evaluates,
+  // so an unfinished entry (kUninstantiated / kInstantiating / kEvaluating)
+  // simply rejoins the graph V8 is currently linking — that is how import
+  // cycles terminate, the same way Node/Blink break them with the module-map
+  // self-insert.
   auto it = g_moduleRegistry.find(registryAbsPath);
   if (it != g_moduleRegistry.end()) {
     v8::Local<v8::Module> existing = it->second.Get(isolate);
-    v8::Module::Status status =
-        existing.IsEmpty() ? v8::Module::kErrored : existing->GetStatus();
-    bool inCurrentStack =
-        std::find(g_moduleResolutionStack.begin(),
-                  g_moduleResolutionStack.end(),
-                  registryAbsPath) != g_moduleResolutionStack.end();
-    bool shouldReuse = !existing.IsEmpty() && status != v8::Module::kErrored;
-    if (shouldReuse &&
-        (status == v8::Module::kUninstantiated ||
-         status == v8::Module::kInstantiating ||
-         status == v8::Module::kEvaluating)) {
-      if (!inCurrentStack) shouldReuse = false;
-    }
-    if (shouldReuse) {
+    if (!existing.IsEmpty() && existing->GetStatus() != v8::Module::kErrored) {
       TNS_DEBUG(Esm, "[resolver] cache hit %s (status=%s)", absPath.c_str(),
-                     ModuleStatusToString(status));
+                     ModuleStatusToString(existing->GetStatus()));
       return v8::MaybeLocal<v8::Module>(existing);
-    }
-    if (!existing.IsEmpty() && status == v8::Module::kEvaluated) {
-      auto fallbackIt = g_moduleFallbackRegistry.find(registryAbsPath);
-      if (fallbackIt != g_moduleFallbackRegistry.end()) {
-        fallbackIt->second.Reset();
-      }
-      g_moduleFallbackRegistry[registryAbsPath].Reset(isolate, existing);
     }
     RemoveModuleFromRegistry(absPath);
   }
 
-  // Detect recursive load prior to LoadESModule.
-  auto cycleIt = std::find(g_moduleResolutionStack.begin(),
-                           g_moduleResolutionStack.end(), registryAbsPath);
-  if (cycleIt != g_moduleResolutionStack.end()) {
-    TNS_DEBUG(Esm, "[resolver] Detected recursive load for %s (stack len %lu)",
-                   absPath.c_str(), (unsigned long)g_moduleResolutionStack.size());
-    auto existing = g_moduleRegistry.find(registryAbsPath);
-    if (existing != g_moduleRegistry.end()) {
-      return v8::MaybeLocal<v8::Module>(existing->second.Get(isolate));
-    }
-    if (IsDebuggable()) {
-      DEBUG_WRITE("[resolver] Debug mode - empty return for recursive load: %s",
-                  absPath.c_str());
+  // Compile + register only — never instantiate or evaluate here. V8 is
+  // instantiating the importer and continues the graph walk by resolving this
+  // module's own requests next; evaluating inside the resolver would run
+  // dependencies in resolver order instead of the spec's evaluation order.
+  TNS_DEBUG(Esm, "[resolver] -> compile-register %s", absPath.c_str());
+  try {
+    v8::Local<v8::Module> mod;
+    if (!tns::ModuleInternal::CompileFileEsModule(isolate, absPath)
+             .ToLocal(&mod)) {
+      // The compile exception is pending on the isolate; V8 fails the
+      // importer's instantiation with it.
       return v8::MaybeLocal<v8::Module>();
     }
-    std::string msg = "Recursive module resolution detected for " + absPath;
-    isolate->ThrowException(
-        v8::Exception::Error(ArgConverter::ConvertToV8String(isolate, msg)));
-    return v8::MaybeLocal<v8::Module>();
-  }
-
-  ResolutionStackGuard stackGuard(isolate, *moduleState, registryAbsPath);
-  TNS_DEBUG(Esm, "[resolver] -> LoadESModule %s", absPath.c_str());
-  try {
-    tns::ModuleInternal::LoadESModule(isolate, absPath);
+    UnindexRegistryKey(*moduleState, isolate, registryAbsPath);
+    g_moduleRegistry[registryAbsPath].Reset(isolate, mod);
+    IndexRegisteredModule(*moduleState, registryAbsPath, mod);
+    return v8::MaybeLocal<v8::Module>(mod);
   } catch (NativeScriptException& ex) {
     if (isWorker) {
       DEBUG_WRITE("[resolver] Worker failed to compile '%s' -> '%s'",
@@ -2550,11 +2291,6 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(
     ex.ReThrowToV8();
     return v8::MaybeLocal<v8::Module>();
   }
-  auto it2 = g_moduleRegistry.find(registryAbsPath);
-  if (it2 == g_moduleRegistry.end()) {
-    return v8::MaybeLocal<v8::Module>();
-  }
-  return v8::MaybeLocal<v8::Module>(it2->second.Get(isolate));
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -3424,10 +3160,6 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       TNS_DEBUG(Esm, "[dyn-import][resolver-call] raw=%s normalized=%s adjusted=%s",
                      rawSpec.c_str(), normalizedSpec.c_str(), cAdj);
     }
-    v8::String::Utf8Value adjustedSpecUtf8(isolate, adjustedSpecifier);
-    std::string adjustedRegistryKey =
-        *adjustedSpecUtf8 ? CanonicalizeRegistryKey(*adjustedSpecUtf8)
-                          : std::string();
     if (maybeModule.IsEmpty()) {
       if (resolveTc.HasCaught()) {
         resolver->Reject(context, resolveTc.Exception()).FromMaybe(false);
@@ -3468,20 +3200,10 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       }
     }
 
-    if (IsModuleEvaluationInProgress(module->GetStatus())) {
-      if (QueueModuleWaiterIfInFlight(isolate, adjustedRegistryKey, module,
-                                      resolver)) {
-        return scope.Escape(resolver->GetPromise());
-      }
-      TNS_DEBUG(Esm,
-             "[dyn-import] avoiding re-entrant Evaluate for %s status=%s",
-             adjustedRegistryKey.empty() ? rawSpec.c_str()
-                                         : adjustedRegistryKey.c_str(),
-             ModuleStatusToString(module->GetStatus()));
-      resolver->Resolve(context, module->GetModuleNamespace()).Check();
-      return scope.Escape(resolver->GetPromise());
-    }
-
+    // A kEvaluating module (TLA in flight, or a cycle re-entry) falls through
+    // deliberately: Evaluate() on an already-evaluating module returns its
+    // existing top-level capability promise, so the TLA chain below coalesces
+    // this import with the in-flight evaluation.
     if (module->GetStatus() != v8::Module::kEvaluated) {
       v8::Local<v8::Value> evalResult;
       if (!module->Evaluate(context).ToLocal(&evalResult)) {

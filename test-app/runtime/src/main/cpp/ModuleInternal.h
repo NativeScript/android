@@ -41,6 +41,15 @@ class ModuleInternal {
         static bool IsESModule(const std::string& path);
         static v8::Local<v8::Value> LoadESModule(v8::Isolate* isolate, const std::string& path);
 
+        /*
+         * Read + compile `path` as an ES module WITHOUT registering, instantiating or
+         * evaluating it. On compile failure the exception is left pending on the isolate
+         * (or a NativeScriptException is thrown for setup failures) and the result is empty.
+         * This is the resolver's file loader: the resolver must only ever hand V8 a
+         * compiled module — evaluation order belongs to V8.
+         */
+        static v8::MaybeLocal<v8::Module> CompileFileEsModule(v8::Isolate* isolate, const std::string& path);
+
         static int MODULE_PROLOGUE_LENGTH;
     private:
         enum class ModulePathKind {
