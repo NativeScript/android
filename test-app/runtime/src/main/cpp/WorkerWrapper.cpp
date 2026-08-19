@@ -40,6 +40,8 @@ WorkerWrapper::WorkerWrapper(Isolate* parentIsolate, int workerId, std::string w
           // workerPath_ (not workerPath) - the parameter was just moved from
           threadName_("W" + std::to_string(workerId) + ": " + workerPath_),
           priority_(priority),
+          // Runs on the parent's thread, so this is the parent's live vocabulary.
+          inheritedVocabulary_(CaptureLoaderVocabulary(parentIsolate)),
           poWorker_(new Persistent<Object>(parentIsolate, workerObject)),
           isClosing_(false),
           isTerminating_(false),
@@ -419,6 +421,9 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
 
                 auto context = runtime_->GetContext();
                 Context::Scope context_scope(context);
+
+                // Before any module load runs in this isolate.
+                InstallLoaderVocabulary(isolate, inheritedVocabulary_);
 
 #ifdef APPLICATION_IN_DEBUG
                 // Expose this worker to an attached Chrome DevTools frontend

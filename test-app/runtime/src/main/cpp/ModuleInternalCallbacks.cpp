@@ -241,41 +241,6 @@ struct RequireFacadeEntry {
   v8::Global<v8::Module> facade;
 };
 
-// One import-map section: specifier key → target. Lookup within a section is
-// exact-then-trailing-slash-prefix with longest match, per the import-maps
-// spec.
-using ImportMapEntries = robin_hood::unordered_map<std::string, std::string>;
-
-// A parsed import map. `scopes` is kept ordered most-specific-first so the
-// resolution cascade walks it without re-sorting on every lookup.
-struct ParsedImportMap {
-  ImportMapEntries imports;
-  std::vector<std::pair<std::string, ImportMapEntries>> scopes;
-
-  bool empty() const { return imports.empty() && scopes.empty(); }
-};
-
-// Everything the dev client teaches one isolate's loader (see the header's
-// long-form note): the import map, the canonicalization vocabulary and the
-// volatile-URL patterns.
-struct LoaderVocabulary {
-  // Bare specifier → resolved URL, plus the per-referrer `scopes` overrides.
-  // Instead of rewriting import statements on the bundler side, the runtime
-  // resolves bare specifiers through this map to HTTP module URLs; source code
-  // is served as-is.
-  ParsedImportMap importMap;
-
-  // URLs matching any of these substrings are always re-fetched (the cache is
-  // evicted before loading). The vocabulary is server/framework policy, so the
-  // runtime carries no framework-specific URL strings of its own.
-  std::vector<std::string> volatilePatterns;
-
-  CanonicalizationConfig canonicalization;
-  // Distinguishes "no vocabulary supplied" (mechanical canonicalization only)
-  // from "supplied, and empty" — an empty vocabulary is explicit policy.
-  bool canonicalizationConfigured = false;
-};
-
 // ─────────────────────────────────────────────────────────────
 // Per-isolate module-loader state
 //
@@ -1058,6 +1023,22 @@ void SetVolatilePatterns(const std::vector<std::string>& patterns) {
   vocabulary->volatilePatterns = patterns;
   TNS_DEBUG(Esm, "[import-map] volatile patterns: %lu",
                  (unsigned long)vocabulary->volatilePatterns.size());
+}
+
+LoaderVocabulary CaptureLoaderVocabulary(v8::Isolate* isolate) {
+  auto* state = ModuleLoaderStateFor(isolate);
+  return state != nullptr ? state->vocabulary : LoaderVocabulary();
+}
+
+void InstallLoaderVocabulary(v8::Isolate* isolate, LoaderVocabulary vocabulary) {
+  auto* state = ModuleLoaderStateFor(isolate);
+  if (state == nullptr) return;
+  state->vocabulary = std::move(vocabulary);
+  TNS_DEBUG(Esm,
+            "[import-map] inherited %lu entries, %lu scopes, %lu volatile patterns",
+            (unsigned long)state->vocabulary.importMap.imports.size(),
+            (unsigned long)state->vocabulary.importMap.scopes.size(),
+            (unsigned long)state->vocabulary.volatilePatterns.size());
 }
 
 const CanonicalizationConfig* CanonicalizationConfigForCurrentIsolate() {

@@ -11,6 +11,58 @@
 
 namespace tns {
 
+// ── The loader vocabulary ────────────────────────────────────
+//
+// Everything the dev client teaches one isolate's module loader: which bare
+// specifiers resolve where, how URLs are keyed, and which URLs are never
+// cached. Per-isolate, not process-wide — it lives in the isolate's loader
+// state and dies with the isolate.
+//
+// A worker inherits a COPY taken on the parent's thread at spawn (see
+// CaptureLoaderVocabulary / InstallLoaderVocabulary), so no synchronization is
+// needed anywhere: each isolate only ever reads and writes its own. A live
+// worker therefore does not observe a later reconfiguration — the dev client
+// restarts workers on updates.
+
+// One import-map section: specifier key → target. Lookup within a section is
+// exact-then-trailing-slash-prefix with longest match, per the import-maps
+// spec.
+using ImportMapEntries = robin_hood::unordered_map<std::string, std::string>;
+
+// A parsed import map. `scopes` is kept ordered most-specific-first so the
+// resolution cascade walks it without re-sorting on every lookup.
+struct ParsedImportMap {
+    ImportMapEntries imports;
+    std::vector<std::pair<std::string, ImportMapEntries>> scopes;
+
+    bool empty() const { return imports.empty() && scopes.empty(); }
+};
+
+struct LoaderVocabulary {
+    // Bare specifier → resolved URL, plus the per-referrer `scopes` overrides.
+    // Instead of rewriting import statements on the bundler side, the runtime
+    // resolves bare specifiers through this map to HTTP module URLs; source
+    // code is served as-is.
+    ParsedImportMap importMap;
+
+    // URLs matching any of these substrings are always re-fetched (the cache is
+    // evicted before loading). The vocabulary is server/framework policy, so
+    // the runtime carries no framework-specific URL strings of its own.
+    std::vector<std::string> volatilePatterns;
+
+    CanonicalizationConfig canonicalization;
+    // Distinguishes "no vocabulary supplied" (mechanical canonicalization only)
+    // from "supplied, and empty" — an empty vocabulary is explicit policy.
+    bool canonicalizationConfigured = false;
+};
+
+// Copy `isolate`'s vocabulary. Call on that isolate's own thread.
+LoaderVocabulary CaptureLoaderVocabulary(v8::Isolate* isolate);
+
+// Replace `isolate`'s vocabulary wholesale. Call on that isolate's own thread,
+// before it loads any module.
+void InstallLoaderVocabulary(v8::Isolate* isolate, LoaderVocabulary vocabulary);
+
 // Canonical module key → compiled-module handle map used by the per-isolate
 // registries below.
 using ModuleHandleMap =

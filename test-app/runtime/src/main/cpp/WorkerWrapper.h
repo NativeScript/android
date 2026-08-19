@@ -16,6 +16,7 @@
 #endif
 
 #include "ConcurrentQueue.h"
+#include "ModuleInternalCallbacks.h"
 #include "WorkerMessage.h"
 #include "v8.h"
 
@@ -164,6 +165,13 @@ private:
     const std::string callingDir_;
     const std::string threadName_;
     const int priority_;
+
+    // The parent's loader vocabulary, copied on the parent's thread when this
+    // wrapper is constructed and installed on the worker's own isolate before
+    // it loads anything. Nothing is shared, so nothing needs synchronizing —
+    // and a live worker deliberately does not observe a later configureLoader
+    // on the parent (the dev client restarts workers on vocabulary updates).
+    const LoaderVocabulary inheritedVocabulary_;
 
     v8::Persistent<v8::Object>* poWorker_;
 
