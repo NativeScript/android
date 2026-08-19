@@ -2109,16 +2109,24 @@ static void ResolveHttpDynamicWaiters(v8::Isolate* isolate,
                                       v8::Local<v8::Module> module) {
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) return;
+  // Settling a promise can run its reactions immediately: with the default
+  // microtask policy, a Resolve/Reject issued from a plain platform task (no
+  // JS on the stack) drains the queue as the API call unwinds. A reaction that
+  // re-imports this URL would then see stale routing state and park on a
+  // waiter list that was just flushed — a promise nothing would ever settle.
+  // So every piece of state that can route a new import onto the waiter list
+  // is cleared FIRST; a re-entrant import then takes the registry-hit path.
+  std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
   auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
   auto waitIt = g_httpDynamicWaiters.find(registryKey);
   if (waitIt != g_httpDynamicWaiters.end()) {
-    std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
     resolvers.swap(waitIt->second);
     g_httpDynamicWaiters.erase(waitIt);
-    ResolveResolversWithModuleNamespace(isolate, context, resolvers, module,
-                                        registryKey);
   }
   moduleState->modulesInFlight.erase(registryKey);
+
+  ResolveResolversWithModuleNamespace(isolate, context, resolvers, module,
+                                      registryKey);
 }
 
 static void RejectHttpDynamicWaiters(v8::Isolate* isolate,
@@ -2127,15 +2135,19 @@ static void RejectHttpDynamicWaiters(v8::Isolate* isolate,
                                      v8::Local<v8::Value> reason) {
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) return;
+  // Cleared before rejecting, for the same reason as the resolve path: a
+  // rejection handler that retries this URL must not join a flushed waiter
+  // list.
+  std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
   auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
   auto waitIt = g_httpDynamicWaiters.find(registryKey);
   if (waitIt != g_httpDynamicWaiters.end()) {
-    std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
     resolvers.swap(waitIt->second);
     g_httpDynamicWaiters.erase(waitIt);
-    RejectResolversWithReason(isolate, context, resolvers, reason);
   }
   moduleState->modulesInFlight.erase(registryKey);
+
+  RejectResolversWithReason(isolate, context, resolvers, reason);
 }
 
 static void RejectResolversForInvalidation(
