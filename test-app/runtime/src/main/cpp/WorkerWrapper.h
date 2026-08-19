@@ -101,6 +101,16 @@ public:
      */
     static int NextWorkerId();
     static std::shared_ptr<WorkerWrapper> GetById(int workerId);
+
+    /*
+     * WHATWG parity: the worker's implicit port message queue starts disabled;
+     * the worker thread calls this once the entry script has finished
+     * evaluating (including after a pending top-level await settles). From then
+     * on every buffered and future message dispatches whether or not a handler
+     * exists — a handler installed later (e.g. from a timer) misses earlier
+     * messages, exactly as on the web.
+     */
+    void EnableMessageQueue();
     static void Insert(int workerId, std::shared_ptr<WorkerWrapper> wrapper);
 
     /*
@@ -143,7 +153,6 @@ public:
 private:
     void BackgroundLooper(std::shared_ptr<WorkerWrapper> self);
     void DrainPendingTasks();
-    void SignalMessageDrain();
     void QuitLooper();
     static int DrainCallback(int fd, int events, void* data);
     static void FireMessageOnParentWorkerObject(int workerId,
@@ -178,9 +187,10 @@ private:
     std::atomic_bool isClosing_;
     std::atomic_bool isTerminating_;
     std::atomic_bool isDisposed_;
-    std::atomic_bool drainRetryPending_;
-    int drainRetryAttempts_ = 0;
-    static constexpr int kMaxDrainRetryAttempts = 40;
+    // False until the entry script has finished evaluating
+    // (EnableMessageQueue); DrainPendingTasks leaves the queue untouched while
+    // disabled.
+    std::atomic_bool messagesEnabled_;
 
     ConcurrentQueue queue_;
 

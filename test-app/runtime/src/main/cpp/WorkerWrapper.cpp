@@ -46,8 +46,7 @@ WorkerWrapper::WorkerWrapper(Isolate* parentIsolate, int workerId, std::string w
           isClosing_(false),
           isTerminating_(false),
           isDisposed_(false),
-          drainRetryPending_(false),
-          drainRetryAttempts_(0),
+          messagesEnabled_(false),
           javaLooperRef_(nullptr) {}
 
 void WorkerWrapper::Start() {
@@ -156,39 +155,13 @@ void WorkerWrapper::DrainPendingTasks() {
     Context::Scope context_scope(context);
     auto globalObject = context->Global();
 
-    // WHATWG parity: buffer inbound messages until the entry script has
-    // installed `onmessage`. Async ESM entries (HTTP dev sessions, TLA)
-    // finish evaluating after the wrapper starts draining; silently dropping
-    // messages with no handler would leave the sender waiting forever.
-    if (!isTerminating_ && !isClosing_ && !queue_.IsEmpty()) {
-        Local<Value> onMessageValue;
-        bool gotHandler =
-                globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "onmessage"))
-                        .ToLocal(&onMessageValue);
-        if (!gotHandler || !onMessageValue->IsFunction()) {
-            bool expected = false;
-            if (drainRetryAttempts_ < kMaxDrainRetryAttempts &&
-                drainRetryPending_.compare_exchange_strong(expected, true)) {
-                ++drainRetryAttempts_;
-                const int workerId = workerId_;
-                std::thread([workerId]() {
-                    usleep(50 * 1000);
-                    auto wrapper = WorkerWrapper::GetById(workerId);
-                    if (wrapper != nullptr) {
-                        wrapper->drainRetryPending_ = false;
-                        wrapper->SignalMessageDrain();
-                    }
-                }).detach();
-                return;
-            }
-            if (drainRetryAttempts_ < kMaxDrainRetryAttempts) {
-                return;
-            }
-            // Retry budget exhausted: fall through so the per-message loop
-            // logs the missing handler and drops the messages.
-        } else {
-            drainRetryAttempts_ = 0;
-        }
+    // WHATWG parity: the implicit port's message queue starts disabled and is
+    // enabled once the entry script has finished evaluating (including after a
+    // pending top-level await settles). Until then messages stay buffered here;
+    // afterwards every message dispatches whether or not a handler exists — a
+    // handler installed later misses earlier messages, exactly as on the web.
+    if (!messagesEnabled_.load(std::memory_order_acquire)) {
+        return;
     }
 
     auto messages = queue_.PopAll();
@@ -227,7 +200,8 @@ void WorkerWrapper::DrainPendingTasks() {
     }
 }
 
-void WorkerWrapper::SignalMessageDrain() {
+void WorkerWrapper::EnableMessageQueue() {
+    messagesEnabled_.store(true, std::memory_order_release);
     queue_.Signal();
 }
 
@@ -435,6 +409,38 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
 
                 if (!isTerminating_) {
                     runtime_->RunWorker(workerPath_);
+
+                    // WHATWG parity: enable the implicit port's message queue
+                    // once the entry has finished evaluating. RunWorker returns
+                    // settled for classic scripts and pumped HTTP entries; a
+                    // local top-level-await entry that outlived its settle
+                    // window enables when its evaluation promise settles
+                    // (fulfilled or rejected — a broken worker just dispatches
+                    // into a listenerless global, as on the web).
+                    Local<Promise> pendingEntry;
+                    if (!ModuleInternal::PendingEntryEvaluation(isolate, workerPath_)
+                                 .ToLocal(&pendingEntry)) {
+                        EnableMessageQueue();
+                    } else {
+                        auto onSettled = [](const v8::FunctionCallbackInfo<Value>& info) {
+                            // Resolve the wrapper by id — never capture it across
+                            // the settle; the worker may be gone by then.
+                            auto wrapper = WorkerWrapper::GetById(
+                                    info.Data().As<v8::Int32>()->Value());
+                            if (wrapper != nullptr) {
+                                wrapper->EnableMessageQueue();
+                            }
+                        };
+                        Local<Function> enableFn;
+                        if (Function::New(context, onSettled,
+                                          v8::Integer::New(isolate, workerId_))
+                                    .ToLocal(&enableFn)) {
+                            pendingEntry->Then(context, enableFn, enableFn)
+                                    .FromMaybe(Local<Promise>());
+                        } else {
+                            EnableMessageQueue();
+                        }
+                    }
                 }
             }
 

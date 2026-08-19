@@ -1052,6 +1052,38 @@ MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> co
     return MaybeLocal<Promise>();
 }
 
+MaybeLocal<Promise> ModuleInternal::PendingEntryEvaluation(Isolate* isolate,
+                                                           const std::string& path) {
+    if (!IsESModule(path) && !IsHttpModulePath(path)) {
+        return MaybeLocal<Promise>();
+    }
+    auto* registryPtr = ModuleRegistryFor(isolate);
+    if (registryPtr == nullptr) {
+        return MaybeLocal<Promise>();
+    }
+    auto it = registryPtr->find(CanonicalizeRegistryKey(path));
+    if (it == registryPtr->end()) {
+        return MaybeLocal<Promise>();
+    }
+    Local<Module> mod = it->second.Get(isolate);
+    if (mod.IsEmpty() || mod->GetStatus() != Module::kEvaluated) {
+        return MaybeLocal<Promise>();
+    }
+    // Evaluate() on an already-evaluated module hands back the same capability
+    // promise without re-running anything.
+    TryCatch tc(isolate);
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Value> result;
+    if (!mod->Evaluate(context).ToLocal(&result) || !result->IsPromise()) {
+        return MaybeLocal<Promise>();
+    }
+    Local<Promise> promise = result.As<Promise>();
+    if (promise->State() != Promise::kPending) {
+        return MaybeLocal<Promise>();
+    }
+    return MaybeLocal<Promise>(promise);
+}
+
 // The root entry point for an ES module graph: compile + register the root,
 // then instantiate and evaluate it once. Dependencies are compiled and
 // registered by ResolveModuleCallback while V8 walks the graph from here;

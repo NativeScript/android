@@ -104,6 +104,18 @@ class ModuleInternal {
          */
         static v8::MaybeLocal<v8::Module> CompileFileEsModule(v8::Isolate* isolate, const std::string& path);
 
+        /*
+         * The entry module's still-pending evaluation promise, or empty when
+         * evaluation has settled (classic scripts settle synchronously and always
+         * return empty). Callers use this after the entry load to observe a
+         * top-level await that outlived the settle window. Note a TLA-parked module
+         * reports kEvaluated while its capability promise is still pending, so this
+         * probes the promise (Evaluate() hands back the same capability), not the
+         * status enum.
+         */
+        static v8::MaybeLocal<v8::Promise> PendingEntryEvaluation(v8::Isolate* isolate,
+                                                                  const std::string& path);
+
         static int MODULE_PROLOGUE_LENGTH;
     private:
         enum class ModulePathKind {
