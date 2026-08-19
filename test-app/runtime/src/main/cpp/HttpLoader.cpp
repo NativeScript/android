@@ -977,11 +977,21 @@ void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
                 if (*utf8) jsonStr = *utf8;
             }
         }
-        if (!jsonStr.empty()) {
-            SetImportMap(jsonStr);
-            TNS_DEBUG(Esm, "[ns:module configureLoader] import map set (%zu bytes)",
-                           jsonStr.size());
+        if (jsonStr.empty()) {
+            isolate->ThrowException(v8::Exception::TypeError(ToV8String(
+                    isolate, "configureLoader: importMap must be an object or a JSON string")));
+            return;
         }
+        std::string importMapError;
+        if (!SetImportMap(jsonStr, &importMapError)) {
+            // The previous map is still installed: a rejected update changes
+            // nothing, so a typo cannot empty a live session's vocabulary.
+            isolate->ThrowException(v8::Exception::TypeError(
+                    ToV8String(isolate, "configureLoader: " + importMapError)));
+            return;
+        }
+        TNS_DEBUG(Esm, "[ns:module configureLoader] import map set (%zu bytes)",
+                       jsonStr.size());
     }
 
     auto readStringArray = [&](v8::Local<v8::Object> obj, const char* key,

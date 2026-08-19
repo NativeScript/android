@@ -166,9 +166,17 @@ void InitializeImportMetaObject(v8::Local<v8::Context> context,
 // its own and nothing here needs synchronization. All of it must be set from
 // the isolate's own thread.
 
-// Parse and store an import map from JSON on the calling isolate. Expected
-// shape: {"imports": {"key": "value", ...}}
-void SetImportMap(const std::string& json);
+// Import map support.
+//
+// Shape: {"imports": {"specifier": "target", ...},
+//         "scopes": {"<referrer-key-prefix>": {imports-shaped map}, ...}}
+//
+// Parsed and validated in full before anything is installed: on any invalid
+// input this returns false with `error` explaining which key or section is
+// wrong, and the calling isolate's currently installed map is left untouched.
+// Per-isolate like the rest of the loader vocabulary — a worker resolves
+// through the copy taken at spawn.
+bool SetImportMap(const std::string& json, std::string* error);
 
 // Set URL patterns that should bypass module cache (e.g. "/@ns/sfc/", "?v=")
 // on the calling isolate.
