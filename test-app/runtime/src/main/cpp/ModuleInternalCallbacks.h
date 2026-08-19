@@ -230,7 +230,7 @@ void InitializeImportMetaObject(v8::Local<v8::Context> context,
 // through the copy taken at spawn.
 bool SetImportMap(const std::string& json, std::string* error);
 
-// Set URL patterns that should bypass module cache (e.g. "/@ns/sfc/", "?v=")
+// Set URL patterns that should bypass module cache (e.g. "?v=", "/hot/")
 // on the calling isolate.
 void SetVolatilePatterns(const std::vector<std::string>& patterns);
 

@@ -1866,8 +1866,8 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
             } else {
                 // srcFileName is not always `file://<APP_ROOT>/<path>.js`:
                 // HTTP ESM loading (HMR dev workflow) passes a full URL like
-                // `http://127.0.0.1:5173/ns/core/...` with no `.js` suffix and
-                // no app-root prefix, so naive scheme/app-root/`.js` stripping
+                // `http://<dev-host>/<path>` with no `.js` suffix and no
+                // app-root prefix, so naive scheme/app-root/`.js` stripping
                 // can yield an empty `fullPathToFile` and crash downstream on
                 // an empty token list.
                 string normalized = srcFileName;

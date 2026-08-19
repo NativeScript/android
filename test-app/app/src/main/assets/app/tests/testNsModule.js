@@ -67,22 +67,22 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
         expect(typeof canon).toBe("function");
     });
 
-    it("drops dev cache-busters (t/v/import) but keeps real query params", function () {
-        checkKey("http://h/ns/core?p=x&t=123&v=9&import=1", "http://h/ns/core?p=x");
+    // Unconfigured, canonicalization is purely mechanical: the fragment goes
+    // and the query stays. Which params are cache-busters and which paths are
+    // dev endpoints is client vocabulary the runtime no longer guesses.
+    it("unconfigured: strips the fragment and nothing else", function () {
+        checkKey("http://h/app/foo.js#frag", "http://h/app/foo.js");
+        checkKey("http://h/app/foo.js?t=123&v=9#frag", "http://h/app/foo.js?t=123&v=9");
     });
 
-    it("leaves public (non-dev, non-volatile) URLs untouched", function () {
+    it("unconfigured: leaves every query param in the key", function () {
+        checkKey("http://h/app/foo.js?t=123&v=9&import=1", "http://h/app/foo.js?t=123&v=9&import=1");
         checkKey("https://cdn.example.com/lib.js?token=abc", "https://cdn.example.com/lib.js?token=abc");
     });
 
     it("treats module identity as literally the URL — no path-tag collapses", function () {
-        checkKey("http://h/ns/m/foo.js", "http://h/ns/m/foo.js");
-        checkKey("http://h/ns/rt", "http://h/ns/rt");
-        checkKey("http://h/ns/core", "http://h/ns/core");
-    });
-
-    it("ignores URL fragments for dev endpoints", function () {
-        checkKey("http://h/ns/m/foo.js#frag", "http://h/ns/m/foo.js");
+        checkKey("http://h/app/m/foo.js", "http://h/app/m/foo.js");
+        checkKey("http://h/app/rt", "http://h/app/rt");
     });
 
     it("honors a client-supplied canonicalization vocabulary via configureLoader", function () {
@@ -91,15 +91,20 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
             pending("ns:module.canonicalizeHttpUrlKey not exposed (release build)");
             return;
         }
+        // Neutral vocabulary: the mechanics under test are the runtime's, the
+        // strings are the client's to choose.
         require("ns:module").configureLoader({
             canonicalization: {
-                stripParams: ["t", "v", "import"],
-                forPathPrefixes: ["/ns/", "/node_modules/.vite/", "/@id/", "/@fs/"],
-                preserveQueryFor: ["/@ng/component"],
+                stripParams: ["cachebust", "rev"],
+                forPathPrefixes: ["/dev/"],
+                preserveQueryFor: ["/dev/metadata"],
             },
         });
-        expect(canon("http://h/ns/core?p=x&t=123&v=9&import=1")).toBe("http://h/ns/core?p=x");
-        expect(canon("http://h/ns/m/comp/@ng/component?c=a&t=42")).toBe("http://h/ns/m/comp/@ng/component?c=a&t=42");
-        expect(canon("https://cdn.example.com/lib.js?token=abc")).toBe("https://cdn.example.com/lib.js?token=abc");
+        // Under a configured dev prefix, the named params drop and the rest sort.
+        expect(canon("http://h/dev/core?p=x&cachebust=123&rev=9")).toBe("http://h/dev/core?p=x");
+        // preserveQueryFor wins over the dev prefix: the query IS the identity.
+        expect(canon("http://h/dev/metadata?c=a&cachebust=42")).toBe("http://h/dev/metadata?c=a&cachebust=42");
+        // Outside every configured prefix, the query is untouched.
+        expect(canon("https://cdn.example.com/lib.js?cachebust=abc")).toBe("https://cdn.example.com/lib.js?cachebust=abc");
     });
 });

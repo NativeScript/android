@@ -200,36 +200,41 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
     std::string originAndPath = (qPos == std::string::npos) ? noHash : noHash.substr(0, qPos);
     std::string query = (qPos == std::string::npos) ? std::string() : noHash.substr(qPos + 1);
 
+    // This key is the module registry/cache key. For general-purpose HTTP
+    // module loading the query can be part of a module's identity (auth,
+    // content versioning, routing), so query normalization applies only to the
+    // endpoints the client names, through the vocabulary it supplies.
+    //
+    // `preserveQueryFor` is checked BEFORE the dev-endpoint prefix test, so it
+    // covers endpoints nested under a dev prefix: for some endpoints the query
+    // IS the identity, and stripping it would collapse every refetch onto the
+    // boot-time key.
+    //
+    // Until a client supplies that vocabulary, canonicalization is purely
+    // mechanical: the fragment is gone and the query stays. Which params are
+    // cache-busters and which paths are dev endpoints is knowledge only the
+    // client has; guessing would silently collapse two distinct modules onto
+    // one registry key.
     const CanonicalizationConfig* canon = CanonicalizationConfigForCurrentIsolate();
+    if (canon == nullptr) {
+        return noHash;
+    }
     {
         std::string pathOnly = originAndPath.substr(pathStart);
-        if (canon) {
-            for (const auto& p : canon->preserveQueryPrefixes) {
-                if (!p.empty() && pathOnly.find(p) != std::string::npos) {
-                    return noHash;
-                }
-            }
-            bool isDevEndpoint = false;
-            for (const auto& p : canon->devPathPrefixes) {
-                if (!p.empty() && StartsWith(pathOnly, p.c_str())) {
-                    isDevEndpoint = true;
-                    break;
-                }
-            }
-            if (!isDevEndpoint) {
+        for (const auto& p : canon->preserveQueryPrefixes) {
+            if (!p.empty() && pathOnly.find(p) != std::string::npos) {
                 return noHash;
             }
-        } else {
-            if (pathOnly.find("/@ng/component") != std::string::npos) {
-                return noHash;
+        }
+        bool isDevEndpoint = false;
+        for (const auto& p : canon->devPathPrefixes) {
+            if (!p.empty() && StartsWith(pathOnly, p.c_str())) {
+                isDevEndpoint = true;
+                break;
             }
-            const bool isDevEndpoint = StartsWith(pathOnly, "/ns/") ||
-                                       StartsWith(pathOnly, "/node_modules/.vite/") ||
-                                       StartsWith(pathOnly, "/@id/") ||
-                                       StartsWith(pathOnly, "/@fs/");
-            if (!isDevEndpoint) {
-                return noHash;
-            }
+        }
+        if (!isDevEndpoint) {
+            return noHash;
         }
     }
 
@@ -244,13 +249,8 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
         if (!pair.empty()) {
             size_t eq = pair.find('=');
             std::string name = (eq == std::string::npos) ? pair : pair.substr(0, eq);
-            bool drop;
-            if (canon) {
-                drop = std::find(canon->stripParams.begin(), canon->stripParams.end(),
-                                 name) != canon->stripParams.end();
-            } else {
-                drop = (name == "import" || name == "t" || name == "v");
-            }
+            const bool drop = std::find(canon->stripParams.begin(), canon->stripParams.end(),
+                                        name) != canon->stripParams.end();
             if (!drop) kept.push_back(pair);
         }
         if (amp == std::string::npos) break;
