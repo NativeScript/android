@@ -31,6 +31,29 @@ inline constexpr double kModuleEvaluateDeadlineSeconds = 60.0;
 //   kAsync       - evaluate and hand the caller the capability promise.
 enum class ModuleEvaluationPolicy { kSyncStrict, kSyncPumping, kAsync };
 
+struct ModuleEvaluationOptions {
+    enum class TimeoutBehavior { kReturnPending, kThrow };
+
+    ModuleEvaluationPolicy policy = ModuleEvaluationPolicy::kSyncStrict;
+    // kSyncPumping only: how long the graph gets to settle in-pump.
+    double deadlineSeconds = 0.0;
+    // kSyncPumping only: what an expired window means.
+    TimeoutBehavior timeoutBehavior = TimeoutBehavior::kReturnPending;
+    // kSyncPumping only: also give the Android looper a slice per iteration, for
+    // graphs whose progress depends on native transports rather than V8 tasks.
+    bool pumpRunLoop = false;
+};
+
+// Evaluates an instantiated graph under `options`. Returns the capability
+// promise for kAsync and an empty handle otherwise; the namespace always comes
+// from the module itself. Throws NativeScriptException on failure, in every
+// build. `canonicalPath` names the registry entry to evict on failure.
+v8::MaybeLocal<v8::Promise> EvaluateModuleGraph(v8::Isolate* isolate,
+                                                v8::Local<v8::Context> context,
+                                                v8::Local<v8::Module> module,
+                                                const std::string& canonicalPath,
+                                                const ModuleEvaluationOptions& options);
+
 class ModuleInternal {
     public:
         ModuleInternal();

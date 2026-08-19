@@ -429,6 +429,71 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleNam
     return result;
 }
 
+static bool NamespaceHasOwn(Isolate* isolate, Local<Context> context, Local<Object> ns,
+                            const char* name) {
+    return ns->HasOwnProperty(context, ArgConverter::ConvertToV8String(isolate, name))
+            .FromMaybe(false);
+}
+
+// The live compiled module behind a registry key, or empty.
+static Local<Module> RegisteredModuleForPath(Isolate* isolate, const std::string& canonicalPath) {
+    auto* registryPtr = ModuleRegistryFor(isolate);
+    if (registryPtr == nullptr) {
+        return Local<Module>();
+    }
+    auto it = registryPtr->find(canonicalPath);
+    if (it == registryPtr->end()) {
+        return Local<Module>();
+    }
+    return it->second.Get(isolate);
+}
+
+// What `require()` of an ES module hands back, per Node's
+// populateCJSExportsFromESM: an explicit `module.exports` export wins outright;
+// a namespace with no default export, or one that already declares
+// __esModule, passes through untouched; everything else gets the facade so
+// transpiled consumers reading `_mod.__esModule ? _mod.default : _mod` find the
+// default. Export names are arbitrary strings, hence the own-property probes.
+static Local<Value> RequireExportsForNamespace(Isolate* isolate, Local<Context> context,
+                                               Local<Object> ns,
+                                               const std::string& canonicalPath) {
+    TryCatch tc(isolate);
+
+    if (NamespaceHasOwn(isolate, context, ns, "module.exports")) {
+        Local<Value> moduleExports;
+        if (!ns->Get(context, ArgConverter::ConvertToV8String(isolate, "module.exports"))
+                    .ToLocal(&moduleExports)) {
+            throw NativeScriptException(
+                    tc, "Cannot read the 'module.exports' export of " + canonicalPath);
+        }
+        return moduleExports;
+    }
+
+    bool hasDefault = NamespaceHasOwn(isolate, context, ns, "default");
+    bool hasEsModuleMarker = NamespaceHasOwn(isolate, context, ns, "__esModule");
+    if (!hasDefault || hasEsModuleMarker) {
+        return ns;
+    }
+
+    Local<Module> target = RegisteredModuleForPath(isolate, canonicalPath);
+    if (target.IsEmpty()) {
+        // The load that produced this namespace registered the module under this
+        // very key, so a miss means the registry and the namespace disagree —
+        // returning the bare namespace would drop __esModule and misroute every
+        // transpiled consumer downstream.
+        throw NativeScriptException(
+                "require() cannot build the exports facade for " + canonicalPath +
+                ": the module evaluated but is absent from the registry under its canonical key");
+    }
+
+    Local<Module> facade;
+    if (!GetOrCreateRequireFacade(isolate, context, target, canonicalPath).ToLocal(&facade)) {
+        throw NativeScriptException("Cannot build the require() exports facade for " +
+                                    canonicalPath);
+    }
+    return facade->GetModuleNamespace();
+}
+
 Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& modulePath, const string& moduleCacheKey) {
     string frameName("LoadModule " + modulePath);
     tns::instrumentation::Frame frame(frameName);
@@ -454,11 +519,21 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
         // async graph is refused rather than pumped.
         Local<Value> moduleNamespace =
                 LoadESModule(isolate, modulePath, ModuleEvaluationPolicy::kSyncStrict);
-        
-        // Create a wrapper object that behaves like a CommonJS module
-        // but exports the ES module namespace
-        moduleObj->Set(context, ArgConverter::ConvertToV8String(isolate, "exports"), moduleNamespace);
-        
+
+        // `module.exports` is what Node's populateCJSExportsFromESM produces for
+        // this namespace, not the namespace itself. A namespace can still be
+        // empty when the load bailed on a torn-down isolate; nothing to interop.
+        Local<Value> esmExports = moduleNamespace;
+        if (!moduleNamespace.IsEmpty() && moduleNamespace->IsObject()) {
+            esmExports = RequireExportsForNamespace(isolate, context,
+                                                    moduleNamespace.As<Object>(),
+                                                    CanonicalizeRegistryKey(modulePath));
+        }
+        if (!esmExports.IsEmpty()) {
+            moduleObj->Set(context, ArgConverter::ConvertToV8String(isolate, "exports"),
+                           esmExports);
+        }
+
         tempModule.SaveToCache();
         result = moduleObj;
         return result;
@@ -667,19 +742,6 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
 
 namespace {
 
-struct ModuleEvaluationOptions {
-    enum class TimeoutBehavior { kReturnPending, kThrow };
-
-    ModuleEvaluationPolicy policy = ModuleEvaluationPolicy::kSyncStrict;
-    // kSyncPumping only: how long the graph gets to settle in-pump.
-    double deadlineSeconds = 0.0;
-    // kSyncPumping only: what an expired window means.
-    TimeoutBehavior timeoutBehavior = TimeoutBehavior::kReturnPending;
-    // kSyncPumping only: also give the Android looper a slice per iteration, for
-    // graphs whose progress depends on native transports rather than V8 tasks.
-    bool pumpRunLoop = false;
-};
-
 // `require()` cannot wait, so an async graph is refused rather than evaluated.
 // Never evicts: the module is perfectly loadable through import().
 [[noreturn]] void ThrowAsyncGraphRefusal(const std::string& canonicalPath) {
@@ -707,14 +769,12 @@ struct ModuleEvaluationOptions {
     throw NativeScriptException(detail);
 }
 
-// Evaluates an instantiated graph under `options`. Returns the capability
-// promise for kAsync and an empty handle otherwise; the namespace always comes
-// from the module itself. Throws NativeScriptException on failure, in every
-// build. `canonicalPath` names the registry entry to evict on failure.
-MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context,
-                                        Local<Module> module,
-                                        const std::string& canonicalPath,
-                                        const ModuleEvaluationOptions& options) {
+}  // namespace
+
+MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> context,
+                                             Local<Module> module,
+                                             const std::string& canonicalPath,
+                                             const ModuleEvaluationOptions& options) {
     if (options.policy == ModuleEvaluationPolicy::kSyncStrict) {
         if (module->IsGraphAsync()) {
             // Refusing before evaluation leaves the graph at kInstantiated, so a
@@ -822,8 +882,6 @@ MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context
 
     return MaybeLocal<Promise>();
 }
-
-}  // namespace
 
 // The root entry point for an ES module graph: compile + register the root,
 // then instantiate and evaluate it once. Dependencies are compiled and

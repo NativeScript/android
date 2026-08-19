@@ -58,6 +58,17 @@ void UnindexModuleForIsolate(v8::Isolate* isolate,
 void IndexModuleForIsolate(v8::Isolate* isolate, const std::string& canonicalKey,
                            v8::Local<v8::Module> mod);
 
+// The require(esm) exports facade: a synthetic source-text module that
+// re-exports everything from `target` and adds `__esModule = true`, so
+// transpiled CJS consumers (`_mod.__esModule ? _mod.default : _mod`) pick up a
+// real ESM default export through require(). Re-exports keep the target's live
+// bindings and enumerability, which a copied object would not. Returns the
+// facade instantiated and evaluated; the caller takes GetModuleNamespace().
+// One facade per target module, cached until the target leaves the registry.
+v8::MaybeLocal<v8::Module> GetOrCreateRequireFacade(
+    v8::Isolate* isolate, v8::Local<v8::Context> context,
+    v8::Local<v8::Module> target, const std::string& targetCanonicalPath);
+
 // Authoritative HTTP URL loader for dev-served ESM. This compiles and
 // registers the module under its canonical URL key without evaluating it.
 v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(
