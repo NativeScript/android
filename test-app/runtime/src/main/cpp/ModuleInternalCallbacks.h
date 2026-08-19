@@ -64,42 +64,54 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(
     v8::Isolate* isolate, v8::Local<v8::Context> context,
     const std::string& requestedUrl);
 
-// ── Async HTTP module-graph pipeline ─────────────
+// ── The module-graph walk ────────────────────────
 //
 // Standard three-phase module-map pipeline (the Node/Blink shape) under V8's
 // synchronous ResolveModuleCallback: the sync constraint applies to
-// *resolution*, not *fetching*. Starting from `rootUrl`, the walk fetches
-// bodies concurrently off-thread (FetchModuleBodyAsync), compiles each on the
-// isolate's JS thread (ScriptCompiler::CompileModule parses without
-// resolving), resolves every static module request with the same import-map +
-// relative-URL logic ResolveModuleCallback uses, and recurses until the
-// transitive closure is compiled + registered. By InstantiateModule time the
-// resolver is a pure registry lookup for the walked graph; anything the walk
-// missed falls back to the legacy synchronous fetch inside the resolver.
+// *resolution*, not *fetching*. Starting from `root` (an absolute http(s) URL
+// or a canonical filesystem path), the walk discovers the transitive closure
+// and compiles + registers every module in it, so that by InstantiateModule
+// time the resolver is a pure registry lookup.
+//
+// Discovery is scheme-agnostic; only the fetch is per-scheme. Every edge goes
+// through the same resolution the resolver uses (ResolveSpecifierToPath), so
+// both agree on a module's registry key:
+//   - http(s) edges are fetched concurrently off-thread
+//     (FetchModuleBodyAsync) and compiled on the isolate's JS thread;
+//   - local edges are read and compiled inline during the walk — the bytes
+//     are already on disk, and a thread hop would only reorder discovery;
+//   - builtins are left to the resolver, which serves them from the builtin
+//     registry;
+//   - specifiers the walk cannot resolve (typically a bare name with no
+//     import-map entry) stay on the resolver's lazy path.
+//
+// Compilation runs no user code, so pre-compiling the closure cannot change
+// evaluation order: V8 still evaluates in spec order from the root.
 //
 // `onComplete(ok, errorMessage, context)` runs exactly once on the isolate's
 // JS thread with the isolate entered and `context` (the context captured at
-// start) already scoped. `ok` is false only when the ROOT fetch/compile
-// failed — dependency failures are logged and left to surface through the
-// resolver during instantiation, so the walk itself introduces no new
-// failure modes.
-void StartAsyncHttpModuleGraphLoad(
+// start) already scoped. `ok` is false only when an HTTP ROOT fetch/compile
+// failed. Every other failure — a dependency, or anything local including the
+// root — is left unregistered for the resolver (or the caller's own load
+// path) to report with its own message, so the walk introduces no new failure
+// modes and steals no error text.
+void StartModuleGraphLoad(
     v8::Isolate* isolate, v8::Local<v8::Context> context,
-    const std::string& rootUrl,
+    const std::string& root,
     std::function<void(bool ok, const std::string& errorMessage,
                        v8::Local<v8::Context> context)>
         onComplete);
 
 // Synchronous wrapper for callers that need the graph ready before
-// continuing (static HTTP entry loads): starts the walk, then pumps the
-// current thread's Android Looper until it settles or `timeoutSeconds`
-// elapses. Returns true when the walk completed (regardless of root success
-// — the caller's own load path reports root failures). This is the "manual
-// run loop until settled" boot handoff.
-bool RunAsyncHttpModuleGraphLoadPumped(v8::Isolate* isolate,
-                                       v8::Local<v8::Context> context,
-                                       const std::string& rootUrl,
-                                       double timeoutSeconds);
+// continuing: starts the walk, then pumps the current thread's Android Looper
+// until it settles or `timeoutSeconds` elapses. A graph with no http(s) edges
+// completes entirely inside StartModuleGraphLoad, so this returns without
+// entering the wait loop at all — a disk-only load pays no looper slice.
+// Returns true when the walk completed (regardless of root success — the
+// caller's own load path reports root failures).
+bool RunModuleGraphLoadPumped(v8::Isolate* isolate,
+                              v8::Local<v8::Context> context,
+                              const std::string& root, double timeoutSeconds);
 
 // True while any async graph load (any isolate) has fetches or compiles
 // outstanding.

@@ -1039,6 +1039,15 @@ void Runtime::DestroyRuntime() {
     s_id2RuntimeCache.erase(m_id);
     s_isolate2RuntimesCache.erase(m_isolate);
   }
+  // Flag this isolate's in-flight async graph loads dead and Reset their
+  // context Globals while the isolate is still alive, so fetch completions
+  // still queued on background threads become no-ops. This MUST precede the
+  // event-loop Shutdown: a post the stopped loop rejects is destroyed on the
+  // POSTING (background) thread, and quiescing first guarantees such a task
+  // holds only already-Reset Globals by then. The rest of the loader state
+  // (registries, waiters, loader vocabulary) lives in a RuntimeState slot and
+  // is destroyed with it below. Worker isolates quiesce the same way.
+  tns::QuiesceModuleLoadsForIsolate(m_isolate);
   if (m_eventLoop != nullptr) {
     // runs on this runtime's own thread; children still holding a weak_ptr
     // and v8 teardown posts have their work dropped from now on
@@ -1073,12 +1082,6 @@ void Runtime::DestroyRuntime() {
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
   FrameCallbacks::RemoveIsolateEntries(m_isolate);
 
-  // Flag this isolate's in-flight async graph loads dead and Reset their
-  // context Globals while the isolate is still alive, so fetch completions
-  // still queued on background threads become no-ops. The rest of the loader
-  // state (registries, waiters, loader vocabulary) lives in a RuntimeState
-  // slot and is destroyed with it below. Worker isolates quiesce the same way.
-  tns::QuiesceModuleLoadsForIsolate(m_isolate);
   // The transport's process-wide state (cache-bust marks, dev-boot flag) is
   // shared across isolates; only the main isolate may clear it (worker
   // teardown must not wipe the main isolate's session).

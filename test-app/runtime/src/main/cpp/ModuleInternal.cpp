@@ -676,7 +676,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     Local<Module> module;
 
     if (isHttpModule) {
-        RunAsyncHttpModuleGraphLoadPumped(isolate, context, requestPath, 60.0);
+        RunModuleGraphLoadPumped(isolate, context, requestPath, 60.0);
         MaybeLocal<Module> maybeMod = LoadHttpModuleForUrl(isolate, context, requestPath);
         if (!maybeMod.ToLocal(&module)) {
             std::string reason = TakeLastHttpFetchErrorReason();
@@ -710,6 +710,23 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                 // hold this one; reuse it and let InstantiateModule below no-op
                 // (kInstantiated) or link it (kUninstantiated).
                 module = existing;
+            }
+        }
+
+        if (module.IsEmpty()) {
+            // Discovery pre-pass for local roots too: a local graph can reach HTTP
+            // edges, and without this they hit the resolver cold and fetch serially,
+            // one blocking request at a time. The walk compiles and registers the
+            // whole closure up front — including this root — so instantiation
+            // resolves as pure lookup. A graph with no HTTP edges settles inside the
+            // call and pays no wait.
+            RunModuleGraphLoadPumped(isolate, context, canonicalPath, 60.0);
+            auto walkedIt = g_moduleRegistry.find(canonicalPath);
+            if (walkedIt != g_moduleRegistry.end()) {
+                Local<Module> walked = walkedIt->second.Get(isolate);
+                if (!walked.IsEmpty() && walked->GetStatus() != Module::kErrored) {
+                    module = walked;
+                }
             }
         }
 
