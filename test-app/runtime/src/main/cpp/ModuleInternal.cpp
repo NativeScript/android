@@ -1302,7 +1302,14 @@ MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> co
         }
         isolate->PerformMicrotaskCheckpoint();
         if (options.pumpRunLoop) {
-            ALooper_pollOnce(10 /* ms */, nullptr, nullptr, nullptr);
+            // Nested ALooper_pollOnce inside an fd callback dangles the outer
+            // poll's Response& (see EventLoop::IsInLooperCallback); the direct
+            // drains above keep the graph moving, so only yield the CPU here.
+            if (EventLoop::IsInLooperCallback()) {
+                usleep(1000);
+            } else {
+                ALooper_pollOnce(10 /* ms */, nullptr, nullptr, nullptr);
+            }
             isolate->PerformMicrotaskCheckpoint();
         }
     };

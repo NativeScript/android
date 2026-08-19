@@ -184,6 +184,17 @@ public:
     void RunNestableV8Tasks();
 
     /**
+     * True while the calling thread is inside one of this process's ALooper
+     * fd callbacks. Android's Looper::pollInner holds a Response& into its
+     * response vector across each callback; a nested ALooper_pollOnce on the
+     * same looper clears and reallocates that vector, so the outer poll
+     * resumes over freed memory. Any code that pumps the looper (module
+     * evaluation, the boot backstop, the fetch yield) must consult this and
+     * drain queues directly instead of polling when it is set.
+     */
+    static bool IsInLooperCallback();
+
+    /**
      * Runs at most one due ordered-lane entry, then performs a microtask
      * checkpoint. Invoked by Java EventLoopHandler.handleMessage once per
      * token, on the home thread.

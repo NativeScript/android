@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "ArgConverter.h"
+#include "EventLoop.h"
 #include "JEnv.h"
 #include "ModuleInternal.h"
 #include "ModuleInternalCallbacks.h"
@@ -950,7 +951,12 @@ static void MaybePumpJSThreadDuringBoot() {
     if (isolate->GetData((uint32_t)Runtime::IsolateData::RUNTIME) == nullptr) return;
 
     isolate->PerformMicrotaskCheckpoint();
-    ALooper_pollOnce(0, nullptr, nullptr, nullptr);
+    // See EventLoop::IsInLooperCallback: a nested poll corrupts the outer
+    // poll's response state. A fetch issued from inside a dispatch skips the
+    // looper slice; the microtask checkpoints still run.
+    if (!EventLoop::IsInLooperCallback()) {
+        ALooper_pollOnce(0, nullptr, nullptr, nullptr);
+    }
     isolate->PerformMicrotaskCheckpoint();
 }
 

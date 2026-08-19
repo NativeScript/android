@@ -2,6 +2,7 @@
 #include "ModuleInternalCallbacks.h"
 
 #include <android/looper.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <v8.h>
 
@@ -1767,7 +1768,14 @@ bool RunModuleGraphLoadPumped(v8::Isolate* isolate,
       eventLoop->RunNestableV8Tasks();
     }
     if (*done) break;
-    ALooper_pollOnce(10 /* ms */, nullptr, nullptr, nullptr);
+    // Polling the looper from inside one of its fd callbacks dangles the
+    // outer poll's Response& (see EventLoop::IsInLooperCallback); the direct
+    // drain above still delivers fetch completions, so just yield instead.
+    if (EventLoop::IsInLooperCallback()) {
+      usleep(1000);
+    } else {
+      ALooper_pollOnce(10 /* ms */, nullptr, nullptr, nullptr);
+    }
   }
   if (!*done) {
     TNS_DEBUG(

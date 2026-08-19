@@ -2,6 +2,8 @@
 
 #include <console/Console.h>
 
+#include <unistd.h>
+
 #include <chrono>
 #include <cinttypes>
 #include <mutex>
@@ -15,6 +17,7 @@
 #include "Constants.h"
 #include "CrashBreadcrumbs.h"
 #include "ErrorEvents.h"
+#include "EventLoop.h"
 #include "Events.h"
 #include "File.h"
 #include "FrameCallbacks.h"
@@ -398,7 +401,14 @@ static void HoldBootBackstop(v8::Isolate* isolate, const std::string& entryPath)
       eventLoop->RunNestableV8Tasks();
     }
     isolate->PerformMicrotaskCheckpoint();
-    ALooper_pollOnce(10, nullptr, nullptr, nullptr);
+    // See EventLoop::IsInLooperCallback: a nested poll corrupts the outer
+    // poll's response state. Boot normally reaches this outside any dispatch,
+    // but an HTTP entry re-run from a dev-session task must not poll.
+    if (EventLoop::IsInLooperCallback()) {
+      usleep(1000);
+    } else {
+      ALooper_pollOnce(10, nullptr, nullptr, nullptr);
+    }
     isolate->PerformMicrotaskCheckpoint();
 
     if (entryPending) {
