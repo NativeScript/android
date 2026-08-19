@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "HttpLoader.h"
 #include "robin_hood.h"
 
 namespace tns {
@@ -19,14 +20,16 @@ using ModuleHandleMap =
 // v8::Module handles for `isolate`. Keyed by v8::Isolate* (not thread) because
 // v8::Global<Module> handles are isolate-bound; see the long-form comment
 // above the definition in ModuleInternalCallbacks.cpp for the
-// cross-isolate-handle bug this prevents. Callers bind a local alias, e.g.
-// `auto& g_moduleRegistry = tns::ModuleRegistryFor(isolate);`.
-ModuleHandleMap& ModuleRegistryFor(v8::Isolate* isolate);
+// cross-isolate-handle bug this prevents. The map lives in a RuntimeState
+// slot, so this returns null once the isolate's teardown has begun — callers
+// must bail.
+ModuleHandleMap* ModuleRegistryFor(v8::Isolate* isolate);
 
-// Reset + drop every module handle owned by `isolate`. Must be called while
-// the isolate is still alive (the Runtime destructor should call this before
-// disposal).
-void DestroyModuleStateForIsolate(v8::Isolate* isolate);
+// Mark every in-flight async graph load owned by `isolate` dead and Reset
+// their context Globals. Must be called while the isolate is still alive (the
+// Runtime destructor calls this before disposal); the rest of the loader state
+// is destroyed with the isolate's RuntimeState.
+void QuiesceModuleLoadsForIsolate(v8::Isolate* isolate);
 
 // Utility to drop modules from the registry when compilation/instantiation
 // fails. Operates on the *current* isolate's maps (resolved internally); only
@@ -115,16 +118,31 @@ void InitializeImportMetaObject(v8::Local<v8::Context> context,
                                 v8::Local<v8::Module> module,
                                 v8::Local<v8::Object> meta);
 
-// Import map support.
-// Parse and store an import map from JSON. Expected shape:
-// {"imports": {"key": "value", ...}}
+// ── The loader vocabulary ─────────────────────────────────────
+//
+// Everything the dev client teaches one isolate's module loader: which bare
+// specifiers resolve where, how URLs are keyed, and which URLs are never
+// cached. Per-isolate, not process-wide — it lives in the isolate's loader
+// state and dies with the isolate, so each isolate only ever reads and writes
+// its own and nothing here needs synchronization. All of it must be set from
+// the isolate's own thread.
+
+// Parse and store an import map from JSON on the calling isolate. Expected
+// shape: {"imports": {"key": "value", ...}}
 void SetImportMap(const std::string& json);
 
-// Set URL patterns that should bypass module cache (e.g. "/@ns/sfc/", "?v=").
+// Set URL patterns that should bypass module cache (e.g. "/@ns/sfc/", "?v=")
+// on the calling isolate.
 void SetVolatilePatterns(const std::vector<std::string>& patterns);
 
-// Clear import map state and vendor module cache. Must be called before
-// isolate disposal.
-void CleanupImportMapGlobals();
+// The calling isolate's canonicalization vocabulary, or null when it has none
+// (the mechanical canonicalization applies). Isolate thread only — the
+// transport never calls this, it carries canonical keys instead.
+const CanonicalizationConfig* CanonicalizationConfigForCurrentIsolate();
+
+// Install the client-supplied canonicalization vocabulary on the calling
+// isolate. Its presence replaces the mechanical default entirely — empty
+// vectors are honored as explicit policy.
+void SetCanonicalizationConfig(CanonicalizationConfig config);
 
 }  // namespace tns

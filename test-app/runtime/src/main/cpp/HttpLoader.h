@@ -38,6 +38,25 @@ namespace tns {
 // ─────────────────────────────────────────────────────────────
 // HTTP loader helpers (used by dev/HMR and general-purpose HTTP module loading)
 //
+// The canonical-key *mechanism* (fragment strip, cache-buster param drop,
+// param sort) must be native because it keys the module registry inside V8's
+// synchronous resolve walk. The *vocabulary* — which query params are pure
+// cache busters, which path prefixes identify dev endpoints whose queries may
+// be normalized, and which paths must keep their query verbatim because the
+// query IS the identity — is server/framework policy, supplied by the dev
+// client via ns:module `configureLoader({ canonicalization: {...} })`. It is
+// per-isolate loader vocabulary — installed through SetCanonicalizationConfig
+// in ModuleInternalCallbacks.h — so CanonicalizeHttpUrlKey runs on the
+// isolate's own thread only. The transport never canonicalizes; it carries
+// keys computed for it.
+//
+// When unconfigured, canonicalization is purely mechanical (fragment strip).
+struct CanonicalizationConfig {
+    std::vector<std::string> stripParams;            // query param names to drop
+    std::vector<std::string> devPathPrefixes;        // StartsWith → normalize query
+    std::vector<std::string> preserveQueryPrefixes;  // contains → keep query
+};
+
 // Normalize an HTTP(S) URL into a stable module registry/cache key.
 // - Always strips URL fragments.
 // - For NativeScript dev endpoints, drops known cache busters (t/v/import)
@@ -109,11 +128,10 @@ void MarkUrlsForCacheBust(const std::vector<std::string>& urls);
 void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context,
                         bool value);
 
-// Clear process-wide HTTP-loader state (cache-bust marks, boot-complete
-// flag, canonicalization vocabulary). MUST be called inside
-// Runtime::DestroyRuntime() before isolate disposal — and only for the MAIN
-// isolate (worker teardown must not wipe shared state the main isolate
-// still uses).
+// Clear the transport's process-wide state (cache-bust marks, boot-complete
+// flag). MUST be called inside Runtime::DestroyRuntime() before isolate
+// disposal — and only for the MAIN isolate (worker teardown must not wipe
+// shared state the main isolate still uses).
 void CleanupHttpLoaderGlobals();
 
 // ─────────────────────────────────────────────────────────────

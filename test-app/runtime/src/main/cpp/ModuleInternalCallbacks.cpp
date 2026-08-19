@@ -27,6 +27,7 @@
 #include "NativeScriptException.h"
 #include "NsBuiltinModules.h"
 #include "Runtime.h"
+#include "RuntimeState.h"
 #include "Util.h"
 #include "robin_hood.h"
 
@@ -229,7 +230,95 @@ static std::string ExtractRelativePath(const std::string& path);
 static void RejectAndClearInvalidatedModuleState(v8::Isolate* isolate,
                                                  v8::Local<v8::Context> context,
                                                  const std::string& registryKey);
-static bool IsVolatileUrl(const std::string& url);
+
+namespace {
+struct AsyncGraphLoad;
+
+// Everything the dev client teaches one isolate's loader (see the header's
+// long-form note): the import map, the canonicalization vocabulary and the
+// volatile-URL patterns.
+struct LoaderVocabulary {
+  // Bare specifier → resolved URL. Instead of rewriting import statements on
+  // the bundler side, the runtime resolves bare specifiers through this map to
+  // HTTP module URLs; source code is served as-is.
+  robin_hood::unordered_map<std::string, std::string> importMap;
+
+  // URLs matching any of these substrings are always re-fetched (the cache is
+  // evicted before loading). The vocabulary is server/framework policy, so the
+  // runtime carries no framework-specific URL strings of its own.
+  std::vector<std::string> volatilePatterns;
+
+  CanonicalizationConfig canonicalization;
+  // Distinguishes "no vocabulary supplied" (mechanical canonicalization only)
+  // from "supplied, and empty" — an empty vocabulary is explicit policy.
+  bool canonicalizationConfigured = false;
+};
+
+// ─────────────────────────────────────────────────────────────
+// Per-isolate module-loader state
+//
+// Why per-isolate (not process-global, not thread_local): v8::Global<T>
+// handles are bound to the isolate that created them; reading their internal
+// state from a different isolate is undefined behaviour. NS Workers each run
+// a separate v8::Isolate on their own thread and, under HMR, may fetch the
+// same URLs the main thread already loaded — a shared map would hand the
+// worker isolate a Module the main isolate compiled, and V8's linker would
+// read the cross-isolate export table and emit bogus errors like:
+//   SyntaxError: The requested module 'X' does not provide an export named 'Y'
+//
+// Lifetime: the state lives in a RuntimeState slot, so it is destroyed with
+// the runtime (Runtime::DestroyRuntime → RuntimeState::Clear), on the
+// runtime's own thread while the isolate is still alive — which lets the
+// v8::Global members Reset safely in their own destructors and leaves nothing
+// to static/thread destructors, where a post-disposal Reset would crash.
+// Access from the isolate's own thread only, per the slot contract.
+struct ModuleLoaderState {
+  ModuleHandleMap registry;            // canonical key  -> compiled module
+  ModuleHandleMap fallbackRegistry;    // canonical key  -> last good module
+  ModuleHandleMap fallbackByRelative;  // relative path  -> last good module
+
+  // What the dev client taught THIS isolate's loader: import map,
+  // canonicalization vocabulary, volatile patterns.
+  LoaderVocabulary vocabulary;
+
+  // In-flight async graph walks; entries are weak so a finished load frees
+  // itself. A pending background fetch completion can hold a load's
+  // shared_ptr past teardown, so QuiesceModuleLoadsForIsolate must flag these
+  // dead and Reset their context Globals while the isolate is still alive —
+  // the slot destructor alone is not enough for them.
+  std::vector<std::weak_ptr<AsyncGraphLoad>> asyncGraphLoads;
+
+  // Active resolution stack, used to detect and short-circuit self-recursive
+  // module loads, plus the re-entry bookkeeping keyed by registry key.
+  std::vector<std::string> resolutionStack;
+  robin_hood::unordered_map<std::string, size_t> reentryCounts;
+  robin_hood::unordered_map<std::string, robin_hood::unordered_set<std::string>>
+      reentryParents;
+  robin_hood::unordered_map<std::string, std::string> primaryImporters;
+  robin_hood::unordered_set<std::string> modulesInFlight;
+  robin_hood::unordered_set<std::string> modulesPendingReset;
+
+  // Waiters: registry key -> Promise resolvers settled when the module
+  // finishes (instantiated/evaluated) or errors.
+  robin_hood::unordered_map<std::string,
+                            std::vector<v8::Global<v8::Promise::Resolver>>>
+      moduleWaiters;
+  // Dynamic HTTP import waiters: resolve to the module namespace.
+  robin_hood::unordered_map<std::string,
+                            std::vector<v8::Global<v8::Promise::Resolver>>>
+      httpDynamicWaiters;
+};
+
+// This isolate's loader state, or null once teardown has begun — callers must
+// bail, not recreate state.
+ModuleLoaderState* ModuleLoaderStateFor(v8::Isolate* isolate) {
+  if (isolate == nullptr) return nullptr;
+  return RuntimeState::For<ModuleLoaderState>(isolate);
+}
+}  // namespace
+
+static bool IsVolatileUrl(const LoaderVocabulary& vocabulary,
+                          const std::string& url);
 
 // ─────────────────────────────────────────────────────────────
 // AdoptThenable
@@ -306,7 +395,11 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
     v8::Isolate* isolate, v8::Local<v8::Context> context,
     const std::string& code, const std::string& urlStr) {
   v8::EscapableHandleScope hs(isolate);
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return v8::MaybeLocal<v8::Module>();
+  }
+  auto& g_moduleRegistry = moduleState->registry;
   const std::string registryKey = CanonicalizeRegistryKey(urlStr);
   if (IsScriptLoadingLogEnabled() && ShouldTraceRegistryKey(urlStr, registryKey)) {
     DEBUG_WRITE("[resolver][register-resolve-only] raw=%s key=%s",
@@ -405,99 +498,28 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
   return hs.Escape(mod);
 }
 
-// ─────────────────────────────────────────────────────────────
-// Per-isolate module registries
-//
-// Why per-isolate (not process-global, not thread_local): v8::Global<T>
-// handles are bound to the isolate that created them; reading their internal
-// state from a different isolate is undefined behaviour. NS Workers each run
-// a separate v8::Isolate on their own thread and, under HMR, may fetch the
-// same URLs the main thread already loaded — a shared map would hand the
-// worker isolate a Module the main isolate compiled, and V8's linker would
-// read the cross-isolate export table and emit bogus errors like:
-//   SyntaxError: The requested module 'X' does not provide an export named 'Y'
-// Keying by v8::Isolate* stays correct even if an isolate is ever entered
-// from another thread under v8::Locker.
-//
-// Lifetime: the per-isolate state is created lazily on first access and torn
-// down by DestroyModuleStateForIsolate(), which the Runtime destructor
-// should call while the isolate is still alive (before disposal) — so every
-// v8::Global is Reset() at a safe time.
-
-namespace {
-struct PerIsolateModuleState {
-  ModuleHandleMap registry;            // canonical key  -> compiled module
-  ModuleHandleMap fallbackRegistry;    // canonical key  -> last good module
-  ModuleHandleMap fallbackByRelative;  // relative path  -> last good module
-};
-
-std::mutex& ModuleStateTableMutex() {
-  static std::mutex* mutex = new std::mutex();
-  return *mutex;
+// Each access site binds a local reference (e.g.
+// `auto& g_moduleRegistry = moduleState->registry;`) so the bodies below read
+// as though the maps were plain globals. Accessors return null once teardown
+// has begun.
+ModuleHandleMap* ModuleRegistryFor(v8::Isolate* isolate) {
+  auto* state = ModuleLoaderStateFor(isolate);
+  return state == nullptr ? nullptr : &state->registry;
 }
 
-robin_hood::unordered_map<v8::Isolate*, std::unique_ptr<PerIsolateModuleState>>&
-ModuleStateTable() {
-  static auto* table = new robin_hood::unordered_map<
-      v8::Isolate*, std::unique_ptr<PerIsolateModuleState>>();
-  return *table;
-}
-
-PerIsolateModuleState& ModuleStateFor(v8::Isolate* isolate) {
-  std::lock_guard<std::mutex> lock(ModuleStateTableMutex());
-  auto& table = ModuleStateTable();
-  auto it = table.find(isolate);
-  if (it == table.end()) {
-    it = table.emplace(isolate, std::make_unique<PerIsolateModuleState>()).first;
-  }
-  return *it->second;
-}
-}  // namespace
-
-ModuleHandleMap& ModuleRegistryFor(v8::Isolate* isolate) {
-  return ModuleStateFor(isolate).registry;
-}
-
-static ModuleHandleMap& ModuleFallbackRegistryFor(v8::Isolate* isolate) {
-  return ModuleStateFor(isolate).fallbackRegistry;
-}
-
-static ModuleHandleMap& ModuleFallbackByRelativeFor(v8::Isolate* isolate) {
-  return ModuleStateFor(isolate).fallbackByRelative;
-}
-
-void DestroyModuleStateForIsolate(v8::Isolate* isolate) {
-  // First: neutralize any in-flight async graph loads for this isolate. Their
-  // fetch completions check the dead flag before touching V8, and their
-  // context Globals are Reset here while the isolate is still alive.
+// Neutralize any in-flight async graph loads for `isolate`: their fetch
+// completions check the dead flag before touching V8, and their context
+// Globals are Reset here, while the isolate is still alive. The rest of the
+// loader state is destroyed with the isolate's RuntimeState.
+void QuiesceModuleLoadsForIsolate(v8::Isolate* isolate) {
   KillAsyncGraphLoadsForIsolate(isolate);
-
-  std::unique_ptr<PerIsolateModuleState> state;
-  {
-    std::lock_guard<std::mutex> lock(ModuleStateTableMutex());
-    auto& table = ModuleStateTable();
-    auto it = table.find(isolate);
-    if (it == table.end()) return;
-    state = std::move(it->second);
-    table.erase(it);
-  }
-  for (auto& kv : state->registry) kv.second.Reset();
-  for (auto& kv : state->fallbackRegistry) kv.second.Reset();
-  for (auto& kv : state->fallbackByRelative) kv.second.Reset();
 }
 
-// ─────────────────────────────────────────────────────────────
-// Import map: bare specifier → resolved URL (populated by ns:module
-// configureLoader). Instead of rewriting import statements on the bundler
-// side, the runtime resolves bare specifiers through this map to HTTP module
-// URLs. Source code is served as-is.
-static robin_hood::unordered_map<std::string, std::string> g_importMap;
-
-// Volatile URL patterns: URLs matching these substrings are always re-fetched
-// (cache is evicted before loading). Configured at boot by the dev client —
-// the vocabulary is server/framework policy, so the runtime carries no
-// framework-specific URL strings here.
-static std::vector<std::string> g_volatilePatterns;
+// The calling isolate's vocabulary, or null once teardown has begun.
+static LoaderVocabulary* VocabularyForCurrentIsolate() {
+  auto* state = ModuleLoaderStateFor(v8::Isolate::TryGetCurrent());
+  return state != nullptr ? &state->vocabulary : nullptr;
+}
 
 static bool ShouldTraceRegistryKey(const std::string& rawKey,
                                    const std::string& registryKey) {
@@ -551,7 +573,11 @@ static std::string CanonicalizeRegistryKey(const std::string& key) {
 v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
                                                 v8::Local<v8::Context> context,
                                                 const std::string& requestedUrl) {
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return v8::MaybeLocal<v8::Module>();
+  }
+  auto& g_moduleRegistry = moduleState->registry;
   const std::string registryKey = CanonicalizeHttpUrlKey(requestedUrl);
 
   if (IsScriptLoadingLogEnabled()) {
@@ -751,6 +777,9 @@ struct JsonScanner {
 }  // namespace
 
 void SetImportMap(const std::string& json) {
+  LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
+  if (vocabulary == nullptr) return;
+  auto& g_importMap = vocabulary->importMap;
   g_importMap.clear();
   if (json.empty()) return;
 
@@ -802,15 +831,41 @@ void SetImportMap(const std::string& json) {
 }
 
 void SetVolatilePatterns(const std::vector<std::string>& patterns) {
-  g_volatilePatterns = patterns;
+  LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
+  if (vocabulary == nullptr) return;
+  vocabulary->volatilePatterns = patterns;
   if (IsScriptLoadingLogEnabled()) {
     DEBUG_WRITE("[import-map] volatile patterns: %lu",
-                (unsigned long)g_volatilePatterns.size());
+                (unsigned long)vocabulary->volatilePatterns.size());
   }
 }
 
-static bool IsVolatileUrl(const std::string& url) {
-  for (const auto& pat : g_volatilePatterns) {
+const CanonicalizationConfig* CanonicalizationConfigForCurrentIsolate() {
+  const LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
+  if (vocabulary == nullptr || !vocabulary->canonicalizationConfigured) {
+    return nullptr;
+  }
+  return &vocabulary->canonicalization;
+}
+
+void SetCanonicalizationConfig(CanonicalizationConfig config) {
+  LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
+  if (vocabulary == nullptr) return;
+  vocabulary->canonicalization = std::move(config);
+  vocabulary->canonicalizationConfigured = true;
+  if (IsScriptLoadingLogEnabled()) {
+    DEBUG_WRITE(
+        "[ns:module configureLoader] canonicalization set (strip=%lu "
+        "devPrefixes=%lu preserve=%lu)",
+        (unsigned long)vocabulary->canonicalization.stripParams.size(),
+        (unsigned long)vocabulary->canonicalization.devPathPrefixes.size(),
+        (unsigned long)vocabulary->canonicalization.preserveQueryPrefixes.size());
+  }
+}
+
+static bool IsVolatileUrl(const LoaderVocabulary& vocabulary,
+                          const std::string& url) {
+  for (const auto& pat : vocabulary.volatilePatterns) {
     if (url.find(pat) != std::string::npos) return true;
   }
   return false;
@@ -948,7 +1003,9 @@ static std::string NormalizeViteSpecifier(const std::string& specifier) {
 
 // Look up a specifier in the import map. Supports exact and prefix matches
 // (trailing-slash entries like "solid-js/" that map subpaths).
-static std::string LookupImportMap(const std::string& specifier) {
+static std::string LookupImportMap(const LoaderVocabulary& vocabulary,
+                                   const std::string& specifier) {
+  const auto& g_importMap = vocabulary.importMap;
   auto it = g_importMap.find(specifier);
   if (it != g_importMap.end()) {
     if (IsScriptLoadingLogEnabled()) {
@@ -980,15 +1037,6 @@ static std::string LookupImportMap(const std::string& specifier) {
     return resolved;
   }
   return "";
-}
-
-void CleanupImportMapGlobals() {
-  // Process-global import-map state (not isolate-bound). The per-isolate
-  // module handle maps (registry / fallback / fallbackByRelative) are torn
-  // down separately by DestroyModuleStateForIsolate(), which the Runtime
-  // destructor invokes for every isolate before disposal.
-  g_importMap.clear();
-  g_volatilePatterns.clear();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1058,23 +1106,15 @@ struct AsyncGraphLoad {
   }
 };
 
-std::mutex& AsyncGraphLoadsMutex() {
-  static std::mutex* mutex = new std::mutex();
-  return *mutex;
-}
-
-robin_hood::unordered_map<v8::Isolate*,
-                          std::vector<std::weak_ptr<AsyncGraphLoad>>>&
-AsyncGraphLoadsByIsolate() {
-  static auto* table = new robin_hood::unordered_map<
-      v8::Isolate*, std::vector<std::weak_ptr<AsyncGraphLoad>>>();
-  return *table;
-}
-
+// Registration and quiesce both run on the isolate's thread (the slot
+// contract); background fetch completions only ever touch the AsyncGraphLoad
+// they retain, never this list, so no lock is needed.
 void RegisterAsyncGraphLoad(v8::Isolate* isolate,
                             const std::shared_ptr<AsyncGraphLoad>& load) {
-  std::lock_guard<std::mutex> lock(AsyncGraphLoadsMutex());
-  auto& loads = AsyncGraphLoadsByIsolate()[isolate];
+  auto* state = ModuleLoaderStateFor(isolate);
+  if (state == nullptr) return;
+  auto& loads = state->asyncGraphLoads;
+  // Prune expired entries opportunistically so the vector stays small.
   loads.erase(std::remove_if(loads.begin(), loads.end(),
                              [](const std::weak_ptr<AsyncGraphLoad>& w) {
                                return w.expired();
@@ -1091,25 +1131,20 @@ bool HasPendingAsyncModuleGraphWork() {
 
 // Isolate-teardown hook: mark every in-flight load owned by `isolate` dead
 // (pending fetch completions become no-ops) and Reset their context Globals
-// NOW, while the isolate is still alive.
+// NOW, while the isolate is still alive — nothing may destroy a v8::Global
+// after isolate disposal, and a pending background fetch completion can hold a
+// load's shared_ptr past teardown, so the slot destructor alone cannot cover
+// these. Called from QuiesceModuleLoadsForIsolate.
 static void KillAsyncGraphLoadsForIsolate(v8::Isolate* isolate) {
-  std::vector<std::shared_ptr<AsyncGraphLoad>> doomed;
-  {
-    std::lock_guard<std::mutex> lock(AsyncGraphLoadsMutex());
-    auto& table = AsyncGraphLoadsByIsolate();
-    auto it = table.find(isolate);
-    if (it == table.end()) return;
-    for (auto& weak : it->second) {
-      if (auto load = weak.lock()) {
-        doomed.push_back(std::move(load));
-      }
+  auto* state = ModuleLoaderStateFor(isolate);
+  if (state == nullptr) return;
+  for (auto& weak : state->asyncGraphLoads) {
+    if (auto load = weak.lock()) {
+      load->dead.store(true, std::memory_order_release);
+      load->context.Reset();
     }
-    table.erase(it);
   }
-  for (auto& load : doomed) {
-    load->dead.store(true, std::memory_order_release);
-    load->context.Reset();
-  }
+  state->asyncGraphLoads.clear();
 }
 
 // Resolve one static module request to an absolute HTTP(S) URL using the
@@ -1127,12 +1162,13 @@ static std::string ResolveModuleRequestForWalk(const std::string& rawSpec,
     spec.insert(6, "/");
   }
 
-  if (!g_importMap.empty()) {
-    std::string mapped = LookupImportMap(spec);
+  const LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
+  if (vocabulary != nullptr && !vocabulary->importMap.empty()) {
+    std::string mapped = LookupImportMap(*vocabulary, spec);
     if (mapped.empty()) {
       std::string normalized = NormalizeViteSpecifier(spec);
       if (!normalized.empty()) {
-        mapped = LookupImportMap(normalized);
+        mapped = LookupImportMap(*vocabulary, normalized);
       }
     }
     if (!mapped.empty()) spec = mapped;
@@ -1267,7 +1303,9 @@ static void AsyncGraphEnqueueUrl(const std::shared_ptr<AsyncGraphLoad>& load,
   if (!load->visited.insert(key).second) return;
 
   v8::Isolate* isolate = load->isolate;
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) return;
+  auto& g_moduleRegistry = moduleState->registry;
   auto it = g_moduleRegistry.find(key);
   if (it != g_moduleRegistry.end()) {
     v8::Local<v8::Module> existing = it->second.Get(isolate);
@@ -1405,10 +1443,11 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
   // Only ever called on an isolate's own JS thread during module
   // resolution/loading, so the entered isolate owns the maps to mutate.
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  if (isolate == nullptr) return;
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
-  auto& g_moduleFallbackRegistry = ModuleFallbackRegistryFor(isolate);
-  auto& g_moduleFallbackByRelative = ModuleFallbackByRelativeFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) return;
+  auto& g_moduleRegistry = moduleState->registry;
+  auto& g_moduleFallbackRegistry = moduleState->fallbackRegistry;
+  auto& g_moduleFallbackByRelative = moduleState->fallbackByRelative;
   const std::string registryKey = CanonicalizeRegistryKey(canonicalPath);
 
   // Defensive: never operate on an anomalous/sentinel key.
@@ -1424,13 +1463,14 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
     return;
   }
 
-  auto classify = [](const std::string& s) -> const char* {
+  const LoaderVocabulary& vocabulary = moduleState->vocabulary;
+  auto classify = [&vocabulary](const std::string& s) -> const char* {
     if (s == "@") return "sentinel:@";
     if (s.find("__invalid_at__.mjs") != std::string::npos)
       return "sentinel:invalid_at";
     bool http = StartsWith(s, "http://") || StartsWith(s, "https://");
     if (http) {
-      if (IsVolatileUrl(s)) return "http:volatile";
+      if (IsVolatileUrl(vocabulary, s)) return "http:volatile";
       if (s.find("/@ns/sfc/") != std::string::npos) return "http:sfc";
       if (s.find("/@ns/m/") != std::string::npos) return "http:m";
       return "http:other";
@@ -1496,8 +1536,9 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
 std::vector<std::string> GetLoadedModuleUrls() {
   std::vector<std::string> urls;
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  if (isolate == nullptr) return urls;
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) return urls;
+  auto& g_moduleRegistry = moduleState->registry;
   urls.reserve(g_moduleRegistry.size());
 
   for (const auto& entry : g_moduleRegistry) {
@@ -1514,7 +1555,9 @@ std::vector<std::string> GetLoadedModuleUrls() {
 
 void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
                        const std::vector<std::string>& urls) {
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) return;
+  auto& g_moduleRegistry = moduleState->registry;
   if (urls.empty()) return;
 
   robin_hood::unordered_set<std::string> seen;
@@ -1563,8 +1606,10 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
 void UpdateModuleFallback(v8::Isolate* isolate,
                           const std::string& canonicalPath,
                           v8::Local<v8::Module> module) {
-  auto& g_moduleFallbackRegistry = ModuleFallbackRegistryFor(isolate);
-  auto& g_moduleFallbackByRelative = ModuleFallbackByRelativeFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) return;
+  auto& g_moduleFallbackRegistry = moduleState->fallbackRegistry;
+  auto& g_moduleFallbackByRelative = moduleState->fallbackByRelative;
   auto fallbackIt = g_moduleFallbackRegistry.find(canonicalPath);
   if (fallbackIt != g_moduleFallbackRegistry.end()) {
     fallbackIt->second.Reset();
@@ -1591,28 +1636,11 @@ void UpdateModuleFallback(v8::Isolate* isolate,
 }
 
 // ─────────────────────────────────────────────────────────────
-// Thread-local resolver state
+// Resolver state
 //
-// Recursion detection + module in-flight/waiter tracking. Everything here is
-// touched only from the isolate's own JS thread, so thread_local is safe.
-static thread_local std::vector<std::string> g_moduleResolutionStack;
-static thread_local robin_hood::unordered_map<std::string, size_t> g_moduleReentryCounts;
-static thread_local robin_hood::unordered_map<std::string,
-                                              robin_hood::unordered_set<std::string>>
-    g_moduleReentryParents;
-static thread_local robin_hood::unordered_map<std::string, std::string> g_modulePrimaryImporters;
-static thread_local robin_hood::unordered_set<std::string> g_modulesInFlight;
-static thread_local robin_hood::unordered_set<std::string> g_modulesPendingReset;
+// The resolution stack, re-entry bookkeeping and waiter lists live in
+// ModuleLoaderState (per isolate, in a RuntimeState slot).
 static constexpr size_t kMaxModuleReentryCount = 256;
-// Waiters: module registry key -> list of Promise resolvers waiting for
-// completion (instantiated/evaluated or errored).
-static robin_hood::unordered_map<std::string,
-                                 std::vector<v8::Global<v8::Promise::Resolver>>>
-    g_moduleWaiters;
-// Dynamic HTTP import waiters: resolve to module namespace when available.
-static thread_local robin_hood::unordered_map<
-    std::string, std::vector<v8::Global<v8::Promise::Resolver>>>
-    g_httpDynamicWaiters;
 
 static bool IsModuleEvaluationInProgress(v8::Module::Status status) {
   return status == v8::Module::kInstantiating ||
@@ -1665,12 +1693,15 @@ static bool QueueModuleWaiterIfInFlight(v8::Isolate* isolate,
                                         const std::string& registryKey,
                                         v8::Local<v8::Module> module,
                                         v8::Local<v8::Promise::Resolver> resolver) {
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) return false;
+  auto& g_modulesInFlight = moduleState->modulesInFlight;
   if (registryKey.empty() || module.IsEmpty() ||
       !IsModuleEvaluationInProgress(module->GetStatus()) ||
       g_modulesInFlight.find(registryKey) == g_modulesInFlight.end()) {
     return false;
   }
-  g_moduleWaiters[registryKey].emplace_back(isolate, resolver);
+  moduleState->moduleWaiters[registryKey].emplace_back(isolate, resolver);
   if (IsScriptLoadingLogEnabled()) {
     DEBUG_WRITE("[dyn-import][await] queued module waiter for %s status=%s",
                 registryKey.c_str(),
@@ -1682,12 +1713,15 @@ static bool QueueModuleWaiterIfInFlight(v8::Isolate* isolate,
 static bool QueueHttpDynamicWaiterIfInFlight(
     v8::Isolate* isolate, const std::string& registryKey,
     v8::Local<v8::Module> module, v8::Local<v8::Promise::Resolver> resolver) {
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) return false;
+  auto& g_modulesInFlight = moduleState->modulesInFlight;
   if (registryKey.empty() || module.IsEmpty() ||
       !IsModuleEvaluationInProgress(module->GetStatus()) ||
       g_modulesInFlight.find(registryKey) == g_modulesInFlight.end()) {
     return false;
   }
-  g_httpDynamicWaiters[registryKey].emplace_back(isolate, resolver);
+  moduleState->httpDynamicWaiters[registryKey].emplace_back(isolate, resolver);
   if (IsScriptLoadingLogEnabled()) {
     DEBUG_WRITE("[dyn-import][http-await] queued waiter for %s status=%s",
                 registryKey.c_str(),
@@ -1729,6 +1763,9 @@ static void ResolveModuleWaiters(v8::Isolate* isolate,
                                  v8::Local<v8::Context> context,
                                  const std::string& registryKey,
                                  v8::Local<v8::Module> module) {
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) return;
+  auto& g_moduleWaiters = moduleState->moduleWaiters;
   auto waitIt = g_moduleWaiters.find(registryKey);
   if (waitIt == g_moduleWaiters.end()) return;
   std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
@@ -1742,6 +1779,9 @@ static void RejectModuleWaiters(v8::Isolate* isolate,
                                 v8::Local<v8::Context> context,
                                 const std::string& registryKey,
                                 v8::Local<v8::Value> reason) {
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) return;
+  auto& g_moduleWaiters = moduleState->moduleWaiters;
   auto waitIt = g_moduleWaiters.find(registryKey);
   if (waitIt == g_moduleWaiters.end()) return;
   std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
@@ -1754,6 +1794,9 @@ static void ResolveHttpDynamicWaiters(v8::Isolate* isolate,
                                       v8::Local<v8::Context> context,
                                       const std::string& registryKey,
                                       v8::Local<v8::Module> module) {
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) return;
+  auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
   auto waitIt = g_httpDynamicWaiters.find(registryKey);
   if (waitIt != g_httpDynamicWaiters.end()) {
     std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
@@ -1762,13 +1805,16 @@ static void ResolveHttpDynamicWaiters(v8::Isolate* isolate,
     ResolveResolversWithModuleNamespace(isolate, context, resolvers, module,
                                         registryKey);
   }
-  g_modulesInFlight.erase(registryKey);
+  moduleState->modulesInFlight.erase(registryKey);
 }
 
 static void RejectHttpDynamicWaiters(v8::Isolate* isolate,
                                      v8::Local<v8::Context> context,
                                      const std::string& registryKey,
                                      v8::Local<v8::Value> reason) {
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) return;
+  auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
   auto waitIt = g_httpDynamicWaiters.find(registryKey);
   if (waitIt != g_httpDynamicWaiters.end()) {
     std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
@@ -1776,7 +1822,7 @@ static void RejectHttpDynamicWaiters(v8::Isolate* isolate,
     g_httpDynamicWaiters.erase(waitIt);
     RejectResolversWithReason(isolate, context, resolvers, reason);
   }
-  g_modulesInFlight.erase(registryKey);
+  moduleState->modulesInFlight.erase(registryKey);
 }
 
 static void RejectResolversForInvalidation(
@@ -1799,11 +1845,15 @@ static void RejectResolversForInvalidation(
 static void RejectAndClearInvalidatedModuleState(v8::Isolate* isolate,
                                                  v8::Local<v8::Context> context,
                                                  const std::string& registryKey) {
-  g_moduleReentryCounts.erase(registryKey);
-  g_moduleReentryParents.erase(registryKey);
-  g_modulePrimaryImporters.erase(registryKey);
-  g_modulesInFlight.erase(registryKey);
-  g_modulesPendingReset.erase(registryKey);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) return;
+  auto& g_moduleWaiters = moduleState->moduleWaiters;
+  auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
+  moduleState->reentryCounts.erase(registryKey);
+  moduleState->reentryParents.erase(registryKey);
+  moduleState->primaryImporters.erase(registryKey);
+  moduleState->modulesInFlight.erase(registryKey);
+  moduleState->modulesPendingReset.erase(registryKey);
 
   auto waitIt = g_moduleWaiters.find(registryKey);
   if (waitIt != g_moduleWaiters.end()) {
@@ -1828,19 +1878,23 @@ static void RejectAndClearInvalidatedModuleState(v8::Isolate* isolate,
 
 namespace {
 struct ResolutionStackGuard {
-  ResolutionStackGuard(v8::Isolate* isolate, std::vector<std::string>& stack,
+  ResolutionStackGuard(v8::Isolate* isolate, ModuleLoaderState& state,
                        const std::string& entry)
-      : isolate_(isolate), stack_(stack), entry_(entry), active_(true) {
+      : isolate_(isolate),
+        state_(state),
+        stack_(state.resolutionStack),
+        entry_(entry),
+        active_(true) {
     stack_.push_back(entry_);
-    g_moduleReentryCounts[entry_] = 0;
-    g_moduleReentryParents.erase(entry_);
+    state_.reentryCounts[entry_] = 0;
+    state_.reentryParents.erase(entry_);
     if (stack_.size() > 1) {
-      g_modulePrimaryImporters[entry_] = stack_[stack_.size() - 2];
+      state_.primaryImporters[entry_] = stack_[stack_.size() - 2];
     } else {
-      g_modulePrimaryImporters.erase(entry_);
+      state_.primaryImporters.erase(entry_);
     }
-    g_modulesInFlight.insert(entry_);
-    g_modulesPendingReset.erase(entry_);
+    state_.modulesInFlight.insert(entry_);
+    state_.modulesPendingReset.erase(entry_);
     if (IsScriptLoadingLogEnabled()) {
       DEBUG_WRITE("[resolver][stack] push (%lu) %s",
                   static_cast<unsigned long>(stack_.size()), entry_.c_str());
@@ -1849,16 +1903,18 @@ struct ResolutionStackGuard {
 
   ~ResolutionStackGuard() {
     if (!active_ || stack_.empty()) return;
-    auto& g_moduleRegistry = ModuleRegistryFor(isolate_);
-    auto& g_moduleFallbackRegistry = ModuleFallbackRegistryFor(isolate_);
+    auto& g_moduleRegistry = state_.registry;
+    auto& g_moduleFallbackRegistry = state_.fallbackRegistry;
+    auto& g_moduleWaiters = state_.moduleWaiters;
+    auto& g_modulesPendingReset = state_.modulesPendingReset;
     if (IsScriptLoadingLogEnabled()) {
       DEBUG_WRITE("[resolver][stack] pop (%lu) %s",
                   static_cast<unsigned long>(stack_.size()), entry_.c_str());
     }
-    g_moduleReentryCounts.erase(entry_);
-    g_moduleReentryParents.erase(entry_);
-    g_modulePrimaryImporters.erase(entry_);
-    g_modulesInFlight.erase(entry_);
+    state_.reentryCounts.erase(entry_);
+    state_.reentryParents.erase(entry_);
+    state_.primaryImporters.erase(entry_);
+    state_.modulesInFlight.erase(entry_);
 
     v8::Module::Status finalStatus = v8::Module::kErrored;
     auto regIt = g_moduleRegistry.find(entry_);
@@ -1919,6 +1975,7 @@ struct ResolutionStackGuard {
 
  private:
   v8::Isolate* isolate_;
+  ModuleLoaderState& state_;
   std::vector<std::string>& stack_;
   std::string entry_;
   bool active_;
@@ -1934,7 +1991,11 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(
     v8::Isolate* isolate, v8::Local<v8::Context> context,
     const std::string& absPath, const std::string& registryAbsPath,
     bool isWorker) {
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return v8::MaybeLocal<v8::Module>();
+  }
+  auto& g_moduleRegistry = moduleState->registry;
   if (isWorker && IsScriptLoadingLogEnabled()) {
     DEBUG_WRITE("[resolver] Worker handling JSON module '%s'", absPath.c_str());
   }
@@ -2090,8 +2151,13 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(
     v8::Local<v8::FixedArray> /*import_assertions*/,
     v8::Local<v8::Module> referrer) {
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
-  auto& g_moduleFallbackRegistry = ModuleFallbackRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return v8::MaybeLocal<v8::Module>();
+  }
+  auto& g_moduleRegistry = moduleState->registry;
+  auto& g_moduleFallbackRegistry = moduleState->fallbackRegistry;
+  auto& g_moduleResolutionStack = moduleState->resolutionStack;
 
   v8::String::Utf8Value specUtf8(isolate, specifier);
   const std::string rawSpec = *specUtf8 ? *specUtf8 : "";
@@ -2135,12 +2201,13 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(
   }
 
   // Import map resolution (bare specifiers → resolved URLs).
-  if (!g_importMap.empty()) {
-    std::string mapped = LookupImportMap(normalizedSpec);
+  const LoaderVocabulary& vocabulary = moduleState->vocabulary;
+  if (!vocabulary.importMap.empty()) {
+    std::string mapped = LookupImportMap(vocabulary, normalizedSpec);
     if (mapped.empty()) {
       std::string normalized = NormalizeViteSpecifier(normalizedSpec);
       if (!normalized.empty()) {
-        mapped = LookupImportMap(normalized);
+        mapped = LookupImportMap(vocabulary, normalized);
         if (!mapped.empty() && IsScriptLoadingLogEnabled()) {
           DEBUG_WRITE("[resolver][import-map] normalized: %s -> %s -> %s",
                       normalizedSpec.c_str(), normalized.c_str(),
@@ -2162,7 +2229,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(
       if (looksBare && IsScriptLoadingLogEnabled()) {
         DEBUG_WRITE(
             "[resolver][import-map][miss] bare='%s' importMap.size=%lu",
-            normalizedSpec.c_str(), (unsigned long)g_importMap.size());
+            normalizedSpec.c_str(), (unsigned long)vocabulary.importMap.size());
       }
     }
   }
@@ -2486,8 +2553,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(
     return v8::MaybeLocal<v8::Module>();
   }
 
-  ResolutionStackGuard stackGuard(isolate, g_moduleResolutionStack,
-                                  registryAbsPath);
+  ResolutionStackGuard stackGuard(isolate, *moduleState, registryAbsPath);
   if (IsScriptLoadingLogEnabled()) {
     DEBUG_WRITE("[resolver] -> LoadESModule %s", absPath.c_str());
   }
@@ -2521,8 +2587,9 @@ static void FinishHttpDynamicImport(v8::Isolate* isolate,
                                     const std::string& key,
                                     const std::string& requestUrl) {
   if (IsScriptLoadingLogEnabled()) {
-    auto& g_moduleRegistry = ModuleRegistryFor(isolate);
-    if (g_moduleRegistry.find(key) == g_moduleRegistry.end()) {
+    auto* moduleState = ModuleLoaderStateFor(isolate);
+    if (moduleState != nullptr &&
+        moduleState->registry.find(key) == moduleState->registry.end()) {
       DEBUG_WRITE("[async-graph][fallback-sync-load] root missed walk: %s",
                   key.c_str());
     }
@@ -2654,7 +2721,13 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     v8::Local<v8::Value> resource_name, v8::Local<v8::String> specifier,
     v8::Local<v8::FixedArray> import_assertions) {
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return v8::MaybeLocal<v8::Promise>();
+  }
+  auto& g_moduleRegistry = moduleState->registry;
+  auto& g_modulesInFlight = moduleState->modulesInFlight;
+  auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
 
   v8::String::Utf8Value specUtf8(isolate, specifier);
   const char* cSpec = (*specUtf8) ? *specUtf8 : "<invalid>";
@@ -2725,12 +2798,14 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   }
 
   // ── Import map resolution for dynamic import() ──
-  if (!g_importMap.empty() && !normalizedSpec.empty() && normalizedSpec != "@") {
-    std::string mapped = LookupImportMap(normalizedSpec);
+  const LoaderVocabulary& vocabulary = moduleState->vocabulary;
+  if (!vocabulary.importMap.empty() && !normalizedSpec.empty() &&
+      normalizedSpec != "@") {
+    std::string mapped = LookupImportMap(vocabulary, normalizedSpec);
     if (mapped.empty()) {
       std::string normalized = NormalizeViteSpecifier(normalizedSpec);
       if (!normalized.empty()) {
-        mapped = LookupImportMap(normalized);
+        mapped = LookupImportMap(vocabulary, normalized);
         if (!mapped.empty() && IsScriptLoadingLogEnabled()) {
           DEBUG_WRITE("[dyn-import][import-map] normalized: %s -> %s -> %s",
                       normalizedSpec.c_str(), normalized.c_str(),
@@ -3183,7 +3258,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // supplied exclusively by JS via ns:module `configureLoader({
       // volatilePatterns })` — the runtime carries no framework or server URL
       // vocabulary of its own.
-      bool isVolatile = IsVolatileUrl(normalizedSpec);
+      bool isVolatile = IsVolatileUrl(vocabulary, normalizedSpec);
       if (isVolatile) {
         auto ex = g_moduleRegistry.find(key);
         if (ex != g_moduleRegistry.end()) {
@@ -3604,7 +3679,9 @@ void InitializeImportMetaObject(v8::Local<v8::Context> context,
                                 v8::Local<v8::Module> module,
                                 v8::Local<v8::Object> meta) {
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) return;
+  auto& g_moduleRegistry = moduleState->registry;
 
   std::string modulePath;
   for (auto& kv : g_moduleRegistry) {

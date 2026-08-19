@@ -227,41 +227,7 @@ void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context, bo
 }
 
 // ─────────────────────────────────────────────────────────────
-// Canonicalization vocabulary
-
-struct CanonicalizationConfig {
-    std::vector<std::string> stripParams;
-    std::vector<std::string> devPathPrefixes;
-    std::vector<std::string> preserveQueryPrefixes;
-};
-static std::mutex g_canonConfigMutex;
-static std::shared_ptr<const CanonicalizationConfig> g_canonConfig;
-
-static std::shared_ptr<const CanonicalizationConfig> CurrentCanonicalizationConfig() {
-    std::lock_guard<std::mutex> lock(g_canonConfigMutex);
-    return g_canonConfig;
-}
-
-static void SetCanonicalizationConfig(CanonicalizationConfig config) {
-    auto snapshot = std::make_shared<const CanonicalizationConfig>(std::move(config));
-    {
-        std::lock_guard<std::mutex> lock(g_canonConfigMutex);
-        g_canonConfig = snapshot;
-    }
-    if (IsScriptLoadingLogEnabled()) {
-        DEBUG_WRITE_FORCE(
-                "[ns:module configureLoader] canonicalization set (strip=%lu devPrefixes=%lu "
-                "preserve=%lu)",
-                (unsigned long)snapshot->stripParams.size(),
-                (unsigned long)snapshot->devPathPrefixes.size(),
-                (unsigned long)snapshot->preserveQueryPrefixes.size());
-    }
-}
-
-static void ResetCanonicalizationConfig() {
-    std::lock_guard<std::mutex> lock(g_canonConfigMutex);
-    g_canonConfig.reset();
-}
+// Canonical module keys
 
 std::string CanonicalizeHttpUrlKey(const std::string& url) {
     std::string normalizedUrl = url;
@@ -288,7 +254,7 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
     std::string originAndPath = (qPos == std::string::npos) ? noHash : noHash.substr(0, qPos);
     std::string query = (qPos == std::string::npos) ? std::string() : noHash.substr(qPos + 1);
 
-    auto canon = CurrentCanonicalizationConfig();
+    const CanonicalizationConfig* canon = CanonicalizationConfigForCurrentIsolate();
     {
         std::string pathOnly = originAndPath.substr(pathStart);
         if (canon) {
@@ -356,6 +322,11 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
 
 // ─────────────────────────────────────────────────────────────
 // Eviction-driven fetch cache-bust
+//
+// Process-global because it belongs to the transport, not to any isolate: the
+// HTTP cache layers it defeats are shared by the whole process. The set is
+// keyed by canonical keys the callers compute on their own isolate's thread
+// and pass in by value, so nothing here canonicalizes.
 
 static std::mutex g_bustNextFetchMutex;
 static robin_hood::unordered_set<std::string> g_bustNextFetchKeys;
@@ -370,16 +341,16 @@ void MarkUrlsForCacheBust(const std::vector<std::string>& urls) {
     }
 }
 
-static bool IsUrlMarkedForCacheBust(const std::string& url) {
+static bool IsUrlMarkedForCacheBust(const std::string& canonicalKey) {
     std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
     if (g_bustNextFetchKeys.empty()) return false;
-    return g_bustNextFetchKeys.find(CanonicalizeHttpUrlKey(url)) != g_bustNextFetchKeys.end();
+    return g_bustNextFetchKeys.find(canonicalKey) != g_bustNextFetchKeys.end();
 }
 
-static void ClearCacheBustForUrl(const std::string& url) {
+static void ClearCacheBustForUrl(const std::string& canonicalKey) {
     std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
     if (g_bustNextFetchKeys.empty()) return;
-    g_bustNextFetchKeys.erase(CanonicalizeHttpUrlKey(url));
+    g_bustNextFetchKeys.erase(canonicalKey);
 }
 
 static void ClearAllCacheBustMarks() {
@@ -445,14 +416,15 @@ static bool DrainPendingJniException(JEnv& env, std::string& outClassName, std::
     return true;
 }
 
-static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
-                                     std::string& contentType, int& status);
+static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
+                                     std::string& out, std::string& contentType, int& status);
 static void MaybePumpJSThreadDuringBoot();
 static inline void InvokeHttpFetchYield();
 
-static std::string ApplyCacheBustNonce(const std::string& url, bool* outBustRequested) {
+static std::string ApplyCacheBustNonce(const std::string& url, const std::string& canonicalKey,
+                                       bool* outBustRequested) {
     std::string fetchUrl = url;
-    const bool bustRequested = IsUrlMarkedForCacheBust(url);
+    const bool bustRequested = IsUrlMarkedForCacheBust(canonicalKey);
     if (outBustRequested) *outBustRequested = bustRequested;
     if (bustRequested) {
         static std::atomic<uint64_t> s_fetchSeq{0};
@@ -533,13 +505,18 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     const auto netStart = urlLogEnabled ? std::chrono::steady_clock::now()
                                         : std::chrono::steady_clock::time_point{};
 
-    bool ok = PerformHttpFetchOnceSync(url, out, contentType, status);
+    // Canonicalize here, on the caller's isolate thread: the vocabulary the
+    // key depends on belongs to that isolate, and the transport below must
+    // never reach for it.
+    const std::string canonicalKey = CanonicalizeHttpUrlKey(url);
+
+    bool ok = PerformHttpFetchOnceSync(url, canonicalKey, out, contentType, status);
     if (!ok) {
         if (IsScriptLoadingLogEnabled()) {
             DEBUG_WRITE_FORCE("[http-loader] retrying %s after initial fetch error", url.c_str());
         }
         usleep(120 * 1000);
-        ok = PerformHttpFetchOnceSync(url, out, contentType, status);
+        ok = PerformHttpFetchOnceSync(url, canonicalKey, out, contentType, status);
     }
     if (!ok || status < 200 || status >= 300) {
         return false;
@@ -569,8 +546,11 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     return true;
 }
 
-static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
-                                     std::string& contentType, int& status) {
+// Runs on whichever thread drives the fetch — the JS thread for the sync path,
+// a detached background thread for the async one. `canonicalKey` is computed
+// by the caller on its isolate's thread; nothing here may canonicalize.
+static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
+                                     std::string& out, std::string& contentType, int& status) {
     out.clear();
     contentType.clear();
     status = 0;
@@ -579,7 +559,7 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
     }
 
     bool bustRequested = false;
-    const std::string fetchUrl = ApplyCacheBustNonce(url, &bustRequested);
+    const std::string fetchUrl = ApplyCacheBustNonce(url, canonicalKey, &bustRequested);
 
     try {
         JEnv env;
@@ -755,7 +735,7 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
             return false;
         }
         if (status >= 200 && status < 300 && bustRequested) {
-            ClearCacheBustForUrl(url);
+            ClearCacheBustForUrl(canonicalKey);
         }
         return status >= 200 && status < 300;
     } catch (NativeScriptException& nse) {
@@ -798,7 +778,11 @@ void FetchModuleBodyAsync(const std::string& url,
         return;
     }
 
-    std::thread([url, completion = std::move(completion)]() mutable {
+    // Canonicalize before the hop: the vocabulary belongs to the calling
+    // isolate, and the fetch thread below has no isolate to read it from.
+    const std::string canonicalKey = CanonicalizeHttpUrlKey(url);
+
+    std::thread([url, canonicalKey, completion = std::move(completion)]() mutable {
         JavaVM* jvm = Runtime::GetJVM();
         bool attachedHere = false;
         if (jvm != nullptr) {
@@ -823,14 +807,14 @@ void FetchModuleBodyAsync(const std::string& url,
         std::string contentType;
         int status = 0;
         const auto start = std::chrono::steady_clock::now();
-        bool ok = PerformHttpFetchOnceSync(url, out, contentType, status);
+        bool ok = PerformHttpFetchOnceSync(url, canonicalKey, out, contentType, status);
         if (!ok) {
             if (IsScriptLoadingLogEnabled()) {
                 DEBUG_WRITE_FORCE("[http-loader][fetch-async] retrying %s after transport error",
                                   url.c_str());
             }
             usleep(120 * 1000);
-            ok = PerformHttpFetchOnceSync(url, out, contentType, status);
+            ok = PerformHttpFetchOnceSync(url, canonicalKey, out, contentType, status);
         }
         ok = ok && status >= 200 && status < 300;
         if (ok && out.empty()) {
@@ -876,7 +860,6 @@ static inline void InvokeHttpFetchYield() {
 void CleanupHttpLoaderGlobals() {
     ClearAllCacheBustMarks();
     g_devSessionBootComplete.store(false, std::memory_order_relaxed);
-    ResetCanonicalizationConfig();
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -1069,15 +1069,17 @@ void Runtime::DestroyRuntime() {
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
   FrameCallbacks::RemoveIsolateEntries(m_isolate);
 
-  // Drop this isolate's module registry (compiled modules, fallbacks,
-  // in-flight async graph loads) while the isolate is still alive.
-  tns::DestroyModuleStateForIsolate(m_isolate);
-  // Process-wide HTTP-loader / import-map state is shared across isolates;
-  // only the main isolate may clear it (worker teardown must not wipe the
-  // main isolate's session).
+  // Flag this isolate's in-flight async graph loads dead and Reset their
+  // context Globals while the isolate is still alive, so fetch completions
+  // still queued on background threads become no-ops. The rest of the loader
+  // state (registries, waiters, loader vocabulary) lives in a RuntimeState
+  // slot and is destroyed with it below. Worker isolates quiesce the same way.
+  tns::QuiesceModuleLoadsForIsolate(m_isolate);
+  // The transport's process-wide state (cache-bust marks, dev-boot flag) is
+  // shared across isolates; only the main isolate may clear it (worker
+  // teardown must not wipe the main isolate's session).
   if (m_isMainThread) {
     tns::CleanupHttpLoaderGlobals();
-    tns::CleanupImportMapGlobals();
   }
 
   // V8 does not run weak callbacks when an isolate is disposed, so anything

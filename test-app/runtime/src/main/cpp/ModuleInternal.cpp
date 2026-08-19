@@ -699,7 +699,11 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         }
 
         // 3) Register for resolution callback
-        auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+        auto* registryPtr = ModuleRegistryFor(isolate);
+        if (registryPtr == nullptr) {
+            return Local<Value>();
+        }
+        auto& g_moduleRegistry = *registryPtr;
         auto it = g_moduleRegistry.find(path);
         if (it != g_moduleRegistry.end()) {
             it->second.Reset();
