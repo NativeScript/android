@@ -11,7 +11,6 @@
 #include "HttpLoader.h"
 #include "JniLocalRef.h"
 #include "ArgConverter.h"
-#include "V8GlobalHelpers.h"
 #include "NativeScriptAssert.h"
 #include "Constants.h"
 #include "CrashBreadcrumbs.h"
@@ -21,12 +20,11 @@
 #include "napi/NapiModules.h"
 #include "Util.h"
 #include "SimpleProfiler.h"
-#include "include/v8.h"
 #include "CallbackHandlers.h"
 #include "ManualInstrumentation.h"
 #include "Runtime.h"
+#include "TraceLog.h"
 #include <sstream>
-#include <mutex>
 #include <libgen.h>
 #include <dlfcn.h>
 #include <sys/stat.h>
@@ -35,6 +33,7 @@
 #include <unistd.h>
 #include <android/looper.h>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 
 using namespace v8;
@@ -47,22 +46,49 @@ static bool IsHttpModulePath(const std::string& path) {
 }
 
 static std::string NormalizeHttpModuleUrl(const std::string& path) {
-    if (path.rfind("file://http://", 0) == 0 || path.rfind("file://https://", 0) == 0) {
-        return path.substr(strlen("file://"));
+    if (path.empty()) {
+        return path;
     }
-    return path;
+
+    std::string normalized = path;
+    if (normalized.rfind("file://http://", 0) == 0 || normalized.rfind("file://https://", 0) == 0) {
+        normalized = normalized.substr(strlen("file://"));
+    }
+
+    // A path normalizer that collapses `//` into `/` (Java's, or a URL that
+    // travelled through one) leaves the scheme separator one slash short.
+    if (normalized.rfind("http:/", 0) == 0 && normalized.rfind("http://", 0) != 0) {
+        normalized.insert(5, "/");
+    } else if (normalized.rfind("https:/", 0) == 0 && normalized.rfind("https://", 0) != 0) {
+        normalized.insert(6, "/");
+    }
+
+    return normalized;
 }
 
+// What a rejected evaluation promise says about itself.
+struct RejectionDetail {
+    // The reason's own text: an Error's `message`, or the reason stringified.
+    std::string message;
+    // A bounded rendering of the reason's `stack`, filled only when asked for.
+    std::string stackPreview;
+};
+
+// `detail`, when non-null, receives the reason's parts unjoined; reading the
+// stack costs a property get plus a copy, so callers pass null unless a trace
+// is actually going to be emitted.
 static std::string PromiseRejectionMessage(Isolate* isolate, Local<Promise> promise,
-                                           const std::string& path) {
+                                           const std::string& path,
+                                           RejectionDetail* detail = nullptr) {
     std::string errorMessage = "Module evaluation promise rejected: " + path;
     TryCatch tc(isolate);
     Local<Value> reason = promise->Result();
     if (reason.IsEmpty()) {
         return errorMessage;
     }
+    std::string reasonText;
+    Local<Context> context = isolate->GetCurrentContext();
     if (reason->IsObject()) {
-        Local<Context> context = isolate->GetCurrentContext();
         Local<Object> errorObj = reason.As<Object>();
         Local<Value> messageVal;
         if (errorObj->Get(context, ArgConverter::ConvertToV8String(isolate, "message"))
@@ -70,20 +96,35 @@ static std::string PromiseRejectionMessage(Isolate* isolate, Local<Promise> prom
             messageVal->IsString()) {
             v8::String::Utf8Value messageUtf8(isolate, messageVal);
             if (*messageUtf8) {
-                errorMessage.append(" — ");
-                errorMessage.append(*messageUtf8);
+                reasonText.assign(*messageUtf8);
+            }
+        }
+        Local<Value> stackVal;
+        if (detail != nullptr &&
+            errorObj->Get(context, ArgConverter::ConvertToV8String(isolate, "stack"))
+                    .ToLocal(&stackVal) &&
+            stackVal->IsString()) {
+            v8::String::Utf8Value stackUtf8(isolate, stackVal);
+            if (*stackUtf8) {
+                std::string stack(*stackUtf8);
+                detail->stackPreview = stack.size() > 240 ? stack.substr(0, 240) + "…" : stack;
             }
         }
     } else {
-        Local<Context> context = isolate->GetCurrentContext();
         auto maybeReasonStr = reason->ToString(context);
         if (!maybeReasonStr.IsEmpty()) {
             v8::String::Utf8Value reasonUtf8(isolate, maybeReasonStr.ToLocalChecked());
             if (*reasonUtf8) {
-                errorMessage.append(" — ");
-                errorMessage.append(*reasonUtf8);
+                reasonText.assign(*reasonUtf8);
             }
         }
+    }
+    if (!reasonText.empty()) {
+        errorMessage.append(" — ");
+        errorMessage.append(reasonText);
+    }
+    if (detail != nullptr) {
+        detail->message = std::move(reasonText);
     }
     if (tc.HasCaught()) {
         tc.Reset();
@@ -169,10 +210,20 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
 
     m_requireFactoryFunction = new Persistent<Function>(isolate, requireFactoryFunction);
 
-    auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
+    auto external = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
+
+    // Only the require factory receives this one, so the evaluation options it
+    // forwards were validated at mint time.
+    auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback, external);
     auto requireFunc = requireFuncTemplate->GetFunction(context).ToLocalChecked();
-    global->Set(context, ArgConverter::ConvertToV8String(isolate, "__nativeRequire"), requireFunc);
     m_requireFunction = new Persistent<Function>(isolate, requireFunc);
+
+    // App code can reach this one, so it reads nothing but the specifier and the
+    // calling directory: a caller must not be able to hand itself a pumping
+    // policy, an unbounded deadline or a looper-slicing require.
+    auto publicRequireTemplate = FunctionTemplate::New(isolate, RequirePublicCallback, external);
+    global->Set(context, ArgConverter::ConvertToV8String(isolate, "__nativeRequire"),
+                publicRequireTemplate->GetFunction(context).ToLocalChecked());
 
     Local<Function> globalRequire;
 
@@ -304,7 +355,12 @@ void ModuleInternal::CreateRequireCallback(const v8::FunctionCallbackInfo<v8::Va
     // ns-module.js has already validated these and passes undefined for anything
     // the caller left out, so each present value simply overrides its default.
     if (args.Length() > 2 && args[2]->IsNumber()) {
-        options.deadlineSeconds = args[2].As<Number>()->Value();
+        double deadlineSeconds = args[2].As<Number>()->Value();
+        // A NaN or infinite window makes the pump's deadline arithmetic
+        // undefined, and a non-positive one is no window at all.
+        if (std::isfinite(deadlineSeconds) && deadlineSeconds > 0.0) {
+            options.deadlineSeconds = deadlineSeconds;
+        }
     }
     if (args.Length() > 3 && args[3]->IsBoolean()) {
         options.timeoutBehavior = args[3]->BooleanValue(isolate)
@@ -331,10 +387,79 @@ bool ModuleInternal::InstallCreateRequireBinding(Local<Context> context, Local<O
             .FromMaybe(false);
 }
 
-void ModuleInternal::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+// Node's `determineSpecificType` (lib/internal/errors.js), so an
+// ERR_INVALID_ARG_TYPE-shaped message reads the same here as it does there.
+// Deliberately side-effect free: no getter, no user `toString`, no `inspect`.
+static std::string DescribeValueForTypeError(Isolate* isolate, Local<Value> value) {
+    if (value.IsEmpty() || value->IsUndefined()) {
+        return "undefined";
+    }
+    if (value->IsNull()) {
+        return "null";
+    }
+
+    if (value->IsFunction()) {
+        std::string name = ArgConverter::ToString(isolate, value.As<v8::Function>()->GetName());
+        return name.empty() ? "an instance of Function" : "function " + name;
+    }
+
+    if (value->IsObject()) {
+        std::string ctorName = ArgConverter::ToString(isolate,
+                                                      value.As<Object>()->GetConstructorName());
+        return ctorName.empty() ? "an object" : "an instance of " + ctorName;
+    }
+
+    // A primitive: `type <typeof> (<value>)`.
+    const char* typeName = "object";
+    std::string rendered;
+    if (value->IsBoolean()) {
+        typeName = "boolean";
+        rendered = value->IsTrue() ? "true" : "false";
+    } else if (value->IsNumber()) {
+        typeName = "number";
+        double number = value.As<v8::Number>()->Value();
+        // String(-0) is "0", but Node renders the sign, and losing it here would
+        // hide exactly the distinction the message is meant to surface.
+        rendered = (number == 0 && std::signbit(number)) ? "-0"
+                                                         : ArgConverter::ToString(isolate, value);
+    } else if (value->IsBigInt()) {
+        typeName = "bigint";
+        rendered = ArgConverter::ToString(isolate, value) + "n";
+    } else if (value->IsSymbol()) {
+        typeName = "symbol";
+        Local<Value> description = value.As<v8::Symbol>()->Description(isolate);
+        rendered = "Symbol(" + (description->IsUndefined()
+                                        ? std::string()
+                                        : ArgConverter::ToString(isolate, description)) +
+                   ")";
+    } else {
+        rendered = ArgConverter::ToString(isolate, value);
+    }
+
+    if (rendered.size() > 28) {
+        rendered = rendered.substr(0, 25) + "...";
+    }
+    return "type " + std::string(typeName) + " (" + rendered + ")";
+}
+
+void ModuleInternal::DispatchRequire(const v8::FunctionCallbackInfo<v8::Value>& args,
+                                     bool honorEvaluationOptions) {
+    auto isolate = args.GetIsolate();
+
+    // Every path below assumes a string specifier — the builtin probe, the
+    // http(s) guard and the filesystem resolution all read it — so reject a
+    // non-string before any of them rather than casting one unchecked.
+    if (args.Length() < 1 || !args[0]->IsString()) {
+        Local<Value> received = args.Length() < 1 ? Local<Value>() : args[0];
+        isolate->ThrowException(Exception::TypeError(ArgConverter::ConvertToV8String(
+                isolate, "The \"id\" argument must be of type string. Received " +
+                                 DescribeValueForTypeError(isolate, received))));
+        return;
+    }
+
     try {
         auto thiz = static_cast<ModuleInternal*>(args.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
-        thiz->RequireCallbackImpl(args);
+        thiz->RequireCallbackImpl(args, honorEvaluationOptions);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -348,7 +473,16 @@ void ModuleInternal::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& 
     }
 }
 
-void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void ModuleInternal::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    DispatchRequire(args, true /* honorEvaluationOptions */);
+}
+
+void ModuleInternal::RequirePublicCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    DispatchRequire(args, false /* honorEvaluationOptions */);
+}
+
+void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args,
+                                         bool honorEvaluationOptions) {
     auto isolate = args.GetIsolate();
 
     if (args.Length() < 2) {
@@ -393,29 +527,45 @@ void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Valu
         return;
     }
 
+    // URL-based modules must be loaded via dynamic import().
+    if (moduleName.rfind("http://", 0) == 0 || moduleName.rfind("https://", 0) == 0) {
+        throw NativeScriptException("NativeScript: require() of URL module is not supported: " +
+                                    moduleName + ". Use dynamic import() instead.");
+    }
+
     tns::instrumentation::Frame frame("RequireCallback " + moduleName);
     string callingModuleDirName = ArgConverter::ConvertToString(args[1].As<String>());
     auto isData = false;
 
-    // The require factory forwards the options its require was minted with; an
-    // absent policy is the strict default every ordinary require uses.
-    ModuleEvaluationPolicy policy = ModuleEvaluationPolicy::kSyncStrict;
-    if (args.Length() > 2 && args[2]->IsInt32() &&
-        args[2].As<Int32>()->Value() == static_cast<int>(ModuleEvaluationPolicy::kSyncPumping)) {
-        policy = ModuleEvaluationPolicy::kSyncPumping;
-    }
-    ModuleEvaluationOptions evaluationOptions = RequireEvaluationOptions(policy);
-    if (args.Length() > 3 && args[3]->IsNumber()) {
-        evaluationOptions.deadlineSeconds = args[3].As<Number>()->Value();
-    }
-    if (args.Length() > 4 && args[4]->IsBoolean()) {
-        evaluationOptions.timeoutBehavior =
-                args[4]->BooleanValue(isolate)
-                        ? ModuleEvaluationOptions::TimeoutBehavior::kThrow
-                        : ModuleEvaluationOptions::TimeoutBehavior::kReturnPending;
-    }
-    if (args.Length() > 5 && args[5]->IsBoolean()) {
-        evaluationOptions.pumpRunLoop = args[5]->BooleanValue(isolate);
+    ModuleEvaluationOptions evaluationOptions =
+            RequireEvaluationOptions(ModuleEvaluationPolicy::kSyncStrict);
+    if (honorEvaluationOptions) {
+        // The require factory forwards the options its require was minted with;
+        // an absent policy is the strict default every ordinary require uses.
+        ModuleEvaluationPolicy policy = ModuleEvaluationPolicy::kSyncStrict;
+        if (args.Length() > 2 && args[2]->IsInt32() &&
+            args[2].As<Int32>()->Value() ==
+                    static_cast<int>(ModuleEvaluationPolicy::kSyncPumping)) {
+            policy = ModuleEvaluationPolicy::kSyncPumping;
+        }
+        evaluationOptions = RequireEvaluationOptions(policy);
+        if (args.Length() > 3 && args[3]->IsNumber()) {
+            double deadlineSeconds = args[3].As<Number>()->Value();
+            // A NaN or infinite window makes the pump's deadline arithmetic
+            // undefined, and a non-positive one is no window at all.
+            if (std::isfinite(deadlineSeconds) && deadlineSeconds > 0.0) {
+                evaluationOptions.deadlineSeconds = deadlineSeconds;
+            }
+        }
+        if (args.Length() > 4 && args[4]->IsBoolean()) {
+            evaluationOptions.timeoutBehavior =
+                    args[4]->BooleanValue(isolate)
+                            ? ModuleEvaluationOptions::TimeoutBehavior::kThrow
+                            : ModuleEvaluationOptions::TimeoutBehavior::kReturnPending;
+        }
+        if (args.Length() > 5 && args[5]->IsBoolean()) {
+            evaluationOptions.pumpRunLoop = args[5]->BooleanValue(isolate);
+        }
     }
 
     auto moduleObj = LoadImpl(isolate, moduleName, callingModuleDirName, isData, evaluationOptions);
@@ -460,10 +610,17 @@ void ModuleInternal::Load(Local<Context> context, const string& path) {
     // dereference a null native context. The require branch never needed this
     // because Function::Call enters the context it is handed.
     Context::Scope context_scope(context);
-    if (IsHttpModulePath(path) || IsESModule(path)) {
+    const bool isHttpModule = IsHttpModulePath(path);
+    if (isHttpModule || IsESModule(path)) {
+        if (isHttpModule) {
+            TNS_DEBUG(Esm, "run-module http-esm begin %s", NormalizeHttpModuleUrl(path).c_str());
+        }
         // The entry runs before this thread's event loop does, so its graph can
         // only make progress from the pump inside LoadESModule.
-        LoadESModule(isolate, path, BootEntryEvaluationOptions(IsHttpModulePath(path)));
+        LoadESModule(isolate, path, BootEntryEvaluationOptions(isHttpModule));
+        if (isHttpModule) {
+            TNS_DEBUG(Esm, "run-module http-esm ok %s", NormalizeHttpModuleUrl(path).c_str());
+        }
         return;
     }
     auto globalObject = context->Global();
@@ -492,12 +649,32 @@ void ModuleInternal::LoadWorker(Local<Context> context, const string& path) {
     }
 }
 
-void ModuleInternal::CheckFileExists(Isolate* isolate, const std::string& path, const std::string& baseDir) {
+std::string ModuleInternal::CheckFileExists(Isolate* isolate, const std::string& path, const std::string& baseDir) {
     JEnv env;
     JniLocalRef jsModulename(env.NewStringUTF(path.c_str()));
     JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
 
-    env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsBaseDir);
+    // Throws a NativeScriptException (through JEnv's pending-exception check)
+    // when nothing resolves, so the conversion below only ever sees a hit.
+    JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID,
+                                                        (jstring) jsModulename,
+                                                        (jstring) jsBaseDir));
+
+    return ArgConverter::jstringToString((jstring) jsModulePath);
+}
+
+// The trailing extension without its dot, or an empty string when the last
+// segment has none. A leading dot names a hidden file, not an extension.
+static std::string PathExtension(const std::string& path) {
+    size_t dot = path.find_last_of('.');
+    if (dot == std::string::npos || dot + 1 >= path.size()) {
+        return std::string();
+    }
+    size_t slash = path.find_last_of('/');
+    if (slash != std::string::npos && (dot < slash || dot == slash + 1)) {
+        return std::string();
+    }
+    return path.substr(dot + 1);
 }
 
 Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleName,
@@ -565,7 +742,7 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleNam
                 isData = true;
                 result = LoadData(isolate, path);
             } else {
-                string errMsg = "Unsupported file extension: " + path;
+                string errMsg = "Unsupported file extension: " + PathExtension(path);
                 throw NativeScriptException(errMsg);
             }
         } else {
@@ -674,19 +851,22 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
         // async graph is refused rather than pumped.
         Local<Value> moduleNamespace = LoadESModule(isolate, modulePath, options);
 
+        // A load that produced no namespace produced no module either — an
+        // isolate torn down mid-load, or a graph that never settled. Caching the
+        // empty exports object would intern that failure for the process.
+        if (moduleNamespace.IsEmpty()) {
+            throw NativeScriptException("ES module load returned empty value " + modulePath);
+        }
+        if (!moduleNamespace->IsObject()) {
+            throw NativeScriptException("Failed to load ES module " + modulePath);
+        }
+
         // `module.exports` is what Node's populateCJSExportsFromESM produces for
-        // this namespace, not the namespace itself. A namespace can still be
-        // empty when the load bailed on a torn-down isolate; nothing to interop.
-        Local<Value> esmExports = moduleNamespace;
-        if (!moduleNamespace.IsEmpty() && moduleNamespace->IsObject()) {
-            esmExports = RequireExportsForNamespace(isolate, context,
-                                                    moduleNamespace.As<Object>(),
-                                                    CanonicalizeRegistryKey(modulePath));
-        }
-        if (!esmExports.IsEmpty()) {
-            moduleObj->Set(context, ArgConverter::ConvertToV8String(isolate, "exports"),
-                           esmExports);
-        }
+        // this namespace, not the namespace itself.
+        Local<Value> esmExports = RequireExportsForNamespace(isolate, context,
+                                                             moduleNamespace.As<Object>(),
+                                                             CanonicalizeRegistryKey(modulePath));
+        moduleObj->Set(context, ArgConverter::ConvertToV8String(isolate, "exports"), esmExports);
 
         tempModule.SaveToCache();
         result = moduleObj;
@@ -755,7 +935,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
         }
         moduleFunc = maybeFunc.ToLocalChecked();
     } else {
-        string errMsg = "Unsupported file extension: " + modulePath;
+        string errMsg = "Unsupported file extension: " + PathExtension(modulePath);
         throw NativeScriptException(errMsg);
     }
 
@@ -888,7 +1068,14 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
     }
 
     string url = "file://" + path;
-    string content = Runtime::GetRuntime(isolate)->ReadFileText(path);
+    // An exists-but-unreadable file, or one deleted between the stat above and
+    // the open, reads as "" — which compiles into a perfectly valid empty
+    // module unless the failure is told apart from an empty file here.
+    bool readOk = false;
+    string content = Runtime::GetRuntime(isolate)->ReadFileText(path, readOk);
+    if (!readOk) {
+        throw NativeScriptException("Cannot read module " + path);
+    }
 
     Local<String> sourceText = ArgConverter::ConvertToV8String(isolate, content);
 
@@ -905,11 +1092,81 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
     return ScriptCompiler::CompileModule(isolate, &source);
 }
 
+// Phase diagnostics for one module's trip through the loader.
+static void LogEsmPhase(const std::string& canonicalPath, const char* phase, const char* status,
+                        const char* classification = "", const char* extra = "") {
+    if (classification && classification[0] != '\0') {
+        if (extra && extra[0] != '\0') {
+            TNS_DEBUG(Esm, "[%s][%s][%s] %s %s", phase, status, classification,
+                      canonicalPath.c_str(), extra);
+        } else {
+            TNS_DEBUG(Esm, "[%s][%s][%s] %s", phase, status, classification, canonicalPath.c_str());
+        }
+    } else {
+        if (extra && extra[0] != '\0') {
+            TNS_DEBUG(Esm, "[%s][%s] %s %s", phase, status, canonicalPath.c_str(), extra);
+        } else {
+            TNS_DEBUG(Esm, "[%s][%s] %s", phase, status, canonicalPath.c_str());
+        }
+    }
+}
+
+// A V8 module status as it appears in a trace line.
+static const char* DescribeModuleStatus(Module::Status status) {
+    switch (status) {
+        case Module::kUninstantiated:
+            return "uninstantiated";
+        case Module::kInstantiating:
+            return "instantiating";
+        case Module::kInstantiated:
+            return "instantiated";
+        case Module::kEvaluating:
+            return "evaluating";
+        case Module::kEvaluated:
+            return "evaluated";
+        case Module::kErrored:
+            return "errored";
+    }
+
+    return "unknown";
+}
+
+struct V8FailureRule {
+    const char* needle;
+    const char* label;
+};
+
+// What the message of a failed compile/link/evaluate says the failure was, for
+// the trace line. Heuristic on purpose: V8 reports these as plain messages, so
+// the rules are matched in order and the first hit wins.
+static const char* ClassifyV8Failure(Isolate* isolate, TryCatch& tc,
+                                     std::initializer_list<V8FailureRule> rules) {
+    if (!tc.HasCaught()) {
+        return "unknown";
+    }
+    Local<Message> msg = tc.Message();
+    if (msg.IsEmpty()) {
+        return "unknown";
+    }
+    v8::String::Utf8Value text(isolate, msg->Get());
+    if (*text == nullptr) {
+        return "unknown";
+    }
+    std::string m(*text);
+    for (const V8FailureRule& rule : rules) {
+        if (m.find(rule.needle) != std::string::npos) {
+            return rule.label;
+        }
+    }
+    return "unknown";
+}
+
 namespace {
 
 // `require()` cannot wait, so an async graph is refused rather than evaluated.
 // Never evicts: the module is perfectly loadable through import().
 [[noreturn]] void ThrowAsyncGraphRefusal(const std::string& canonicalPath) {
+    LogEsmPhase(canonicalPath, "evaluate", "refused", "async-graph");
     throw NativeScriptException("require() cannot load ES module '" + canonicalPath +
                                 "': the module graph contains top-level await. Use import() or "
                                 "createPumpingRequire from ns:module instead.");
@@ -921,6 +1178,7 @@ namespace {
 // could never settle from here. Refused up front, before evaluation, so the
 // graph stays instantiated and import() can still load it.
 [[noreturn]] void ThrowMicrotaskPumpRefusal(const std::string& canonicalPath) {
+    LogEsmPhase(canonicalPath, "evaluate", "refused", "microtask-context");
     throw NativeScriptException(
             "createPumpingRequire cannot settle module graph '" + canonicalPath +
             "' from inside a microtask (after an await or inside a promise callback): the event "
@@ -932,8 +1190,17 @@ namespace {
 [[noreturn]] void ThrowModuleEvaluationRejection(Isolate* isolate, Local<Promise> promise,
                                                  TryCatch& tc,
                                                  const std::string& canonicalPath) {
-    RemoveModuleFromRegistry(canonicalPath);
-    std::string detail = PromiseRejectionMessage(isolate, promise, canonicalPath);
+    RemoveModuleFromRegistry(isolate, canonicalPath);
+    LogEsmPhase(canonicalPath, "evaluate", "promise-rejected");
+    const bool traceEsm = LogCategoryEnabled(LogCategory::Esm);
+    RejectionDetail rejection;
+    std::string detail = PromiseRejectionMessage(isolate, promise, canonicalPath,
+                                                 traceEsm ? &rejection : nullptr);
+    if (traceEsm) {
+        TNS_DEBUG(Esm, "[evaluate][promise-rejected:detail] path=%s message=%s stack=%s",
+                  canonicalPath.c_str(), rejection.message.c_str(),
+                  rejection.stackPreview.c_str());
+    }
     if (!tc.HasCaught()) {
         Local<Value> reason = promise->Result();
         if (!reason.IsEmpty()) {
@@ -974,19 +1241,27 @@ MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> co
         ThrowMicrotaskPumpRefusal(canonicalPath);
     }
 
+    LogEsmPhase(canonicalPath, "evaluate", "begin");
     TryCatch tcEval(isolate);
     Local<Value> result;
     if (!module->Evaluate(context).ToLocal(&result)) {
-        RemoveModuleFromRegistry(canonicalPath);
+        RemoveModuleFromRegistry(isolate, canonicalPath);
+        LogEsmPhase(canonicalPath, "evaluate", "fail",
+                    ClassifyV8Failure(isolate, tcEval,
+                                      {{"is not defined", "reference"},
+                                       {"TypeError", "type"},
+                                       {"Cannot read properties", "type-nullish"}}));
         if (tcEval.HasCaught()) {
             throw NativeScriptException(tcEval, "Cannot evaluate module " + canonicalPath);
         }
         throw NativeScriptException(string("Cannot evaluate module ") + canonicalPath);
     }
+    LogEsmPhase(canonicalPath, "evaluate", "ok");
 
     if (!result->IsPromise()) {
         return MaybeLocal<Promise>();
     }
+    LogEsmPhase(canonicalPath, "evaluate", "promise");
     Local<Promise> promise = result.As<Promise>();
 
     if (options.policy == ModuleEvaluationPolicy::kAsync) {
@@ -1009,6 +1284,7 @@ MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> co
                                         " left its evaluation promise pending on a graph reported "
                                         "as synchronous");
         }
+        LogEsmPhase(canonicalPath, "evaluate", "promise-resolved");
         return MaybeLocal<Promise>();
     }
 
@@ -1046,6 +1322,7 @@ MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> co
             if (state == Promise::kRejected) {
                 ThrowModuleEvaluationRejection(isolate, promise, promiseTc, canonicalPath);
             }
+            LogEsmPhase(canonicalPath, "evaluate", "promise-resolved");
             break;
         }
 
@@ -1059,10 +1336,12 @@ MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> co
         }
     }
 
-    if (!settled && promise->State() == Promise::kPending &&
-        options.timeoutBehavior == ModuleEvaluationOptions::TimeoutBehavior::kThrow) {
-        RemoveModuleFromRegistry(canonicalPath);
-        throw NativeScriptException("Top-level await timed out for ES module " + canonicalPath);
+    if (!settled && promise->State() == Promise::kPending) {
+        LogEsmPhase(canonicalPath, "evaluate", "promise-timeout");
+        if (options.timeoutBehavior == ModuleEvaluationOptions::TimeoutBehavior::kThrow) {
+            RemoveModuleFromRegistry(isolate, canonicalPath);
+            throw NativeScriptException("Top-level await timed out for ES module " + canonicalPath);
+        }
     }
 
     return MaybeLocal<Promise>();
@@ -1127,8 +1406,19 @@ EntryEvaluationState ModuleInternal::PollEntryEvaluation(Isolate* isolate, const
     }
     if (rejectionReason != nullptr) {
         Local<Value> reason = promise->Result();
-        *rejectionReason =
-                reason.IsEmpty() ? "<no reason>" : ArgConverter::ToString(isolate, reason);
+        if (reason.IsEmpty()) {
+            *rejectionReason = "<no reason>";
+        } else {
+            // A reason whose `toString` throws — or a Symbol, which cannot be
+            // stringified at all — must not leave the isolate poisoned: this runs
+            // from the boot pump, where the caller has no exception to observe.
+            TryCatch tc(isolate);
+            *rejectionReason = ArgConverter::ToString(isolate, reason);
+            if (tc.HasCaught()) {
+                *rejectionReason = "<unprintable reason>";
+                tc.Reset();
+            }
+        }
     }
     return EntryEvaluationState::kRejected;
 }
@@ -1147,9 +1437,15 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     const std::string canonicalPath = CanonicalizeRegistryKey(path);
     const std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : canonicalPath;
 
+    auto logPhase = [&canonicalPath](const char* phase, const char* status,
+                                     const char* classification = "", const char* extra = "") {
+        LogEsmPhase(canonicalPath, phase, status, classification, extra);
+    };
+
     Local<Module> module;
 
     if (isHttpModule) {
+        logPhase("compile", "delegate-http");
         RunModuleGraphLoadPumped(isolate, context, requestPath, kModuleEvaluateDeadlineSeconds);
         // The loader throws the classifier's reason (status, MIME or
         // transport); catch it so it lands in the message instead of staying
@@ -1157,7 +1453,8 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         TryCatch tcLoad(isolate);
         MaybeLocal<Module> maybeMod = LoadHttpModuleForUrl(isolate, context, requestPath);
         if (!maybeMod.ToLocal(&module)) {
-            std::string message = "Cannot load ES module " + requestPath;
+            logPhase("compile", "fail", "http-loader");
+            std::string message = "Cannot load ES module " + canonicalPath;
             if (tcLoad.HasCaught()) {
                 throw NativeScriptException(tcLoad, message);
             }
@@ -1168,6 +1465,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
             }
             throw NativeScriptException(message);
         }
+        logPhase("compile", "ok", "http-loader");
         if (module->GetStatus() == Module::kEvaluated) {
             // A top-level-await graph reports kEvaluated while its capability
             // promise is still pending, so the namespace here may be in its TDZ;
@@ -1188,8 +1486,14 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         if (existingIt != registry.end()) {
             Local<Module> existing = existingIt->second.Get(isolate);
             Module::Status status = existing.IsEmpty() ? Module::kErrored : existing->GetStatus();
+            if (existing.IsEmpty()) {
+                TNS_DEBUG(Esm, "[cache] dropping empty registry entry %s", canonicalPath.c_str());
+            } else {
+                TNS_DEBUG(Esm, "[cache] hit %s status=%s", canonicalPath.c_str(),
+                          DescribeModuleStatus(status));
+            }
             if (status == Module::kErrored) {
-                RemoveModuleFromRegistry(canonicalPath);
+                RemoveModuleFromRegistry(isolate, canonicalPath);
             } else if (status == Module::kEvaluated) {
                 // A top-level-await graph reports kEvaluated while its capability
                 // promise is still pending, so the namespace here may be in its TDZ;
@@ -1203,11 +1507,15 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                 // Recompiling would mint a second module identity while importers still
                 // hold this one; reuse it and let InstantiateModule below no-op
                 // (kInstantiated) or link it (kUninstantiated).
+                logPhase("compile", "reuse-registry");
                 module = existing;
             }
         }
 
+        const bool reusedFromRegistry = !module.IsEmpty();
+
         if (module.IsEmpty()) {
+            logPhase("compile", "begin");
             // Discovery pre-pass for local roots too: a local graph can reach HTTP
             // edges, and without this they hit the resolver cold and fetch serially,
             // one blocking request at a time. The walk compiles and registers the
@@ -1228,6 +1536,12 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         if (module.IsEmpty()) {
             TryCatch tcCompile(isolate);
             if (!CompileFileEsModule(isolate, canonicalPath).ToLocal(&module)) {
+                logPhase("compile", "fail",
+                         ClassifyV8Failure(
+                                 isolate, tcCompile,
+                                 {{"Unexpected token", "syntax"},
+                                  {"SyntaxError", "syntax"},
+                                  {"Cannot use import statement outside a module", "not-a-module"}}));
                 if (tcCompile.HasCaught()) {
                     throw NativeScriptException(tcCompile, "Cannot compile ES module " + canonicalPath);
                 } else {
@@ -1237,26 +1551,42 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
 
             UnindexModuleForIsolate(isolate, canonicalPath);
             auto it = registry.find(canonicalPath);
+            if (requestPath != canonicalPath || path != canonicalPath) {
+                TNS_DEBUG(Esm, "[register] raw=%s request=%s canonical=%s existing=%s", path.c_str(),
+                          requestPath.c_str(), canonicalPath.c_str(),
+                          it != registry.end() ? "yes" : "no");
+            }
             if (it != registry.end()) {
                 it->second.Reset();
             }
             registry[canonicalPath].Reset(isolate, module);
             IndexModuleForIsolate(isolate, canonicalPath, module);
         }
+        if (!reusedFromRegistry) {
+            logPhase("compile", "ok");
+        }
     }
 
     // Instantiate (link) with ResolveModuleCallback
     if (module->GetStatus() < Module::kInstantiated) {
+        logPhase("instantiate", "begin");
         TryCatch tcLink(isolate);
         bool linked = module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false);
 
         if (!linked) {
+            logPhase("instantiate", "fail",
+                     ClassifyV8Failure(
+                             isolate, tcLink,
+                             {{"Cannot find module", "resolve"},
+                              {"failed to resolve module specifier", "resolve"},
+                              {"does not provide an export named", "link-export"}}));
             if (tcLink.HasCaught()) {
                 throw NativeScriptException(tcLink, "Cannot instantiate module " + canonicalPath);
             } else {
                 throw NativeScriptException(string("Cannot instantiate module ") + canonicalPath);
             }
         }
+        logPhase("instantiate", "ok");
     }
 
     // Evaluate the graph under the caller's options.

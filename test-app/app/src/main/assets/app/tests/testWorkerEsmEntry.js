@@ -1,9 +1,9 @@
 // An ES module worker entry takes the same RunModule branch — and the same
 // boot evaluation options — the app's main entry takes, so these pin that
 // destination even though the suite cannot re-drive the app's own boot.
-// The `.mjs` entries are spawned app-root-absolute on purpose: a relative
-// worker path is resolved against the caller's directory only on the CommonJS
-// route, so an ES module entry needs a path that already stands on its own.
+// A worker specifier is resolved through Java resolvePath whatever route the
+// entry ends up taking, so app-root-absolute, relative and extension-less
+// paths all reach an `.mjs` entry.
 describe("worker ES module entries", function () {
     var originalTimeout;
 
@@ -34,6 +34,31 @@ describe("worker ES module entries", function () {
         var worker = new Worker("~/tests/esmEntryTlaWorker.mjs");
         worker.onmessage = function (msg) {
             expect(msg.data).toBe("tla-entry:ok:ping");
+            worker.terminate();
+            done();
+        };
+        worker.postMessage("ping");
+    });
+
+    it("runs an ES module worker entry spawned through a relative path", function (done) {
+        var worker = new Worker("./esmEntryRelativeWorker.mjs");
+        worker.onmessage = function (msg) {
+            expect(msg.data).toBe("relative-entry:ping");
+            worker.terminate();
+            done();
+        };
+        worker.postMessage("ping");
+    });
+
+    // Extension resolution tries `.js` before `.mjs`, and no `.js` sibling
+    // exists, so the ES module entry is what answers. Its top-level await also
+    // parks past the yield window, so the message posted here proves the
+    // settle-gated queue engages on a resolved specifier too.
+    it("runs an extension-less ES module worker entry past its top-level await",
+       function (done) {
+        var worker = new Worker("./esmEntryResolvedWorker");
+        worker.onmessage = function (msg) {
+            expect(msg.data).toBe("resolved-entry:ok:ping");
             worker.terminate();
             done();
         };

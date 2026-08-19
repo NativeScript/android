@@ -155,6 +155,11 @@ class Runtime {
         static v8::Platform* platform;
 
         std::string ReadFileText(const std::string& filePath);
+        /*
+         * `ok` distinguishes an unreadable file from an empty one — callers that
+         * compile what they read must not treat the first as valid empty source.
+         */
+        std::string ReadFileText(const std::string& filePath, bool& ok);
 
         /*
          * The main runtime's event loop, set once when the main runtime

@@ -47,8 +47,10 @@ namespace tns {
 // client via ns:module `configureLoader({ canonicalization: {...} })`. It is
 // per-isolate loader vocabulary — installed through SetCanonicalizationConfig
 // in ModuleInternalCallbacks.h — so CanonicalizeHttpUrlKey runs on the
-// isolate's own thread only. The transport never canonicalizes; it carries
-// keys computed for it.
+// isolate's own thread only. The transport canonicalizes at its JS-thread
+// entry points (HttpFetchModule, FetchModuleBodyAsync, MarkUrlsForCacheBust)
+// and nowhere else; background fetch threads only ever carry keys computed
+// for them.
 //
 // When unconfigured, canonicalization is purely mechanical (fragment strip).
 struct CanonicalizationConfig {
@@ -58,11 +60,13 @@ struct CanonicalizationConfig {
 };
 
 // Normalize an HTTP(S) URL into a stable module registry/cache key.
-// - Always strips URL fragments.
-// - For NativeScript dev endpoints, drops known cache busters (t/v/import)
-//   and sorts remaining query params for stability.
-// - For non-dev/public URLs, preserves the full query string as part of the
-//   cache key.
+// - Anything that is not HTTP(S) comes back unchanged, after unwrapping a
+//   `file://` prefix the resolver may have put in front of an http(s) URL.
+// - The fragment is always stripped.
+// - The query survives unless the isolate's canonicalization vocabulary says
+//   otherwise: a path matching `preserveQueryFor` keeps its query verbatim;
+//   a path under a `forPathPrefixes` prefix drops every `stripParams` name and
+//   sorts what remains, for stability. Unconfigured, every query is kept.
 // Module identity IS the (canonical) URL — the dev server serves every
 // module under exactly one URL and never varies it for freshness.
 std::string CanonicalizeHttpUrlKey(const std::string& url);
@@ -100,8 +104,8 @@ bool HttpFetchModule(const std::string& url, ModuleFetchResult& result);
 // Same response policy as HttpFetchModule, minus the JS-thread block:
 //   - security gate (IsRemoteUrlAllowed) checked up front,
 //   - a JNI HttpURLConnection GET on a background thread with the same
-//     request shape as the sync path (cache-bust nonce, zero-cache headers,
-//     no cookies) and one retry on transport error.
+//     request shape as the sync path (cache-bust nonce, zero-cache headers)
+//     and one retry on transport error.
 // `completion(result)` is invoked exactly once, on an arbitrary thread —
 // callers must hop to their JS thread before touching V8.
 void FetchModuleBodyAsync(
@@ -115,12 +119,14 @@ void FetchModuleBodyAsync(
 // errors when the transport never reached an HTTP status.
 std::string TakeLastHttpFetchErrorReason();
 
-// Register a "yield" callback that `HttpFetchModule` should invoke around its
-// synchronous network turn so the caller can pump its own runloop (e.g. the
-// JS-thread looper so a placeholder UI can repaint during cold-boot).
+// Register a "yield" callback that `HttpFetchModule` invokes once, after a
+// successful fetch, so the caller can pump its own runloop (e.g. the JS-thread
+// looper so a placeholder UI can repaint during cold-boot).
 //
-// Default: a built-in pump that no-ops outside the JS thread / after the
-// dev boot completes (see `MaybePumpJSThreadDuringBoot` in HttpLoader.cpp).
+// Default: a built-in pump that no-ops unless the calling thread has an
+// isolate and is inside an entry-module evaluation window opened by
+// SetBootEvaluationActive (see `MaybePumpJSThreadDuringBoot` in
+// HttpLoader.cpp).
 //
 // Pass `nullptr` to disable any yielding (used by hosts that drive their own
 // run loop or by tests that want bit-for-bit deterministic fetch timing).

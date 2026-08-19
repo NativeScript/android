@@ -15,6 +15,11 @@ class File {
     public:
         static const char* ReadText(const std::string& filePath, int& length, bool& isNew);
         static std::string ReadText(const std::string& filePath);
+        /*
+         * `ok` distinguishes a file that could not be opened from one that is
+         * genuinely empty — the plain overload renders both as "".
+         */
+        static std::string ReadText(const std::string& filePath, bool& ok);
         static bool WriteBinary(const std::string& filePath, const void* inData, int length);
         static void* ReadBinary(const std::string& filePath, int& length);
     private:

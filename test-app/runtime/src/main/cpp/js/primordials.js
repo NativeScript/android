@@ -2,7 +2,7 @@
 
 // Snapshot of the intrinsics the other builtins depend on, taken before any
 // user code can reach the globals. Runs first and is handed to every other
-// builtin as the fourth fixed parameter.
+// builtin as the fifth fixed parameter.
 //
 // Instance methods are exposed "uncurried" (Node's idiom): the receiver
 // becomes the first argument, so `ArrayPrototypeSlice(list, 0)` reads the

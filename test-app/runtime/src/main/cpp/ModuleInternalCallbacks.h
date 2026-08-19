@@ -22,7 +22,8 @@ namespace tns {
 // CaptureLoaderVocabulary / InstallLoaderVocabulary), so no synchronization is
 // needed anywhere: each isolate only ever reads and writes its own. A live
 // worker therefore does not observe a later reconfiguration — the dev client
-// restarts workers on updates.
+// restarts workers on updates. All of it must be set from the isolate's own
+// thread (see SetImportMap and friends at the bottom of this header).
 
 // One import-map section: specifier key → target. Lookup within a section is
 // exact-then-trailing-slash-prefix with longest match, per the import-maps
@@ -91,9 +92,9 @@ ModuleHandleMap* ModuleRegistryFor(v8::Isolate* isolate);
 void QuiesceModuleLoadsForIsolate(v8::Isolate* isolate);
 
 // Utility to drop modules from the registry when compilation/instantiation
-// fails. Operates on the *current* isolate's maps (resolved internally); only
-// ever called on the isolate's own JS thread during module resolution/loading.
-void RemoveModuleFromRegistry(const std::string& canonicalPath);
+// fails. Call on `isolate`'s own JS thread.
+void RemoveModuleFromRegistry(v8::Isolate* isolate,
+                              const std::string& canonicalPath);
 
 // The canonical registry key whose live entry is `mod`, or empty when the
 // module is not registered for `isolate`. O(1) via the loader state's
@@ -123,6 +124,10 @@ v8::MaybeLocal<v8::Module> GetOrCreateRequireFacade(
 
 // Authoritative HTTP URL loader for dev-served ESM. This compiles and
 // registers the module under its canonical URL key without evaluating it.
+// Returns empty with a V8 exception scheduled on `isolate` — the fetch
+// classifier's reason, or the compile error — so a caller that is not a V8
+// resolve callback must consume it through its own TryCatch and route the text
+// into its own failure channel.
 v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(
     v8::Isolate* isolate, v8::Local<v8::Context> context,
     const std::string& requestedUrl);
@@ -158,6 +163,12 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(
 // root — is left unregistered for the resolver (or the caller's own load
 // path) to report with its own message, so the walk introduces no new failure
 // modes and steals no error text.
+//
+// `onComplete` must capture only trivially destructible state. A background
+// fetch completion can drop the last reference to a load whose isolate is
+// already quiesced — QuiesceModuleLoadsForIsolate Resets the load's context
+// Global but nothing else — so the closure is destroyed on whichever thread
+// gets there last, and a captured v8 handle would be destroyed off-thread.
 void StartModuleGraphLoad(
     v8::Isolate* isolate, v8::Local<v8::Context> context,
     const std::string& root,
@@ -209,15 +220,6 @@ void InitializeImportMetaObject(v8::Local<v8::Context> context,
                                 v8::Local<v8::Module> module,
                                 v8::Local<v8::Object> meta);
 
-// ── The loader vocabulary ─────────────────────────────────────
-//
-// Everything the dev client teaches one isolate's module loader: which bare
-// specifiers resolve where, how URLs are keyed, and which URLs are never
-// cached. Per-isolate, not process-wide — it lives in the isolate's loader
-// state and dies with the isolate, so each isolate only ever reads and writes
-// its own and nothing here needs synchronization. All of it must be set from
-// the isolate's own thread.
-
 // Import map support.
 //
 // Shape: {"imports": {"specifier": "target", ...},
@@ -229,6 +231,11 @@ void InitializeImportMetaObject(v8::Local<v8::Context> context,
 // Per-isolate like the rest of the loader vocabulary — a worker resolves
 // through the copy taken at spawn.
 bool SetImportMap(const std::string& json, std::string* error);
+
+// Run the same parse `SetImportMap` runs and throw the result away. Lets
+// `configureLoader` validate the whole call before installing any section,
+// without the parsed representation leaving the loader implementation.
+bool ValidateImportMapJson(const std::string& json, std::string* error);
 
 // Set URL patterns that should bypass module cache (e.g. "?v=", "/hot/")
 // on the calling isolate.

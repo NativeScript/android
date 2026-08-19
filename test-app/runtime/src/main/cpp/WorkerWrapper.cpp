@@ -26,6 +26,57 @@ using namespace v8;
 
 namespace tns {
 
+namespace {
+
+/*
+ * Reports a worker entry that failed to evaluate, with the web's order: the
+ * worker scope's own `onerror` gets first refusal (a truthy return consumes the
+ * failure) and only an unconsumed one reaches the parent's Worker object.
+ * Mirrors the worker branch of the unhandled-rejection path in
+ * NativeScriptException.cpp, which this rejection no longer travels: attaching
+ * a rejection handler to the entry's evaluation promise marks it handled.
+ */
+void ReportEntryRejection(Isolate* isolate, Local<Value> reason,
+                          const std::shared_ptr<WorkerWrapper>& wrapper) {
+    auto context = isolate->GetCurrentContext();
+
+    std::string message = "Unhandled promise rejection: ";
+    Local<String> detail;
+    if (!reason.IsEmpty() && reason->ToDetailString(context).ToLocal(&detail)) {
+        message += ArgConverter::ConvertToString(detail);
+    }
+
+    std::string stackTrace;
+    if (!reason.IsEmpty()) {
+        auto stack = Exception::GetStackTrace(reason);
+        if (!stack.IsEmpty()) {
+            stackTrace = NativeScriptException::GetErrorStackTrace(stack);
+        }
+    }
+
+    Local<Value> onError;
+    if (context->Global()
+                ->Get(context, ArgConverter::ConvertToV8String(isolate, "onerror"))
+                .ToLocal(&onError) &&
+        onError->IsFunction()) {
+        Local<Value> args[] = {ArgConverter::ConvertToV8String(isolate, message)};
+        Local<Value> result;
+        // A handler that throws has not consumed anything - the failure falls
+        // through to the parent, as if no handler had been installed.
+        TryCatch tc(isolate);
+        if (onError.As<Function>()
+                    ->Call(context, Undefined(isolate), 1, args)
+                    .ToLocal(&result) &&
+            !result.IsEmpty() && result->BooleanValue(isolate)) {
+            return;
+        }
+    }
+
+    wrapper->PassUncaughtExceptionFromWorkerToParent(message, "", stackTrace, 0);
+}
+
+}  // namespace
+
 WorkerWrapper::WorkerWrapper(Isolate* parentIsolate, int workerId, std::string workerPath,
                              std::string callingDir, int priority,
                              Local<Object> workerObject)
@@ -414,28 +465,53 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
                     // once the entry has finished evaluating. RunWorker returns
                     // settled for classic scripts and pumped HTTP entries; a
                     // local top-level-await entry that outlived its settle
-                    // window enables when its evaluation promise settles
-                    // (fulfilled or rejected — a broken worker just dispatches
-                    // into a listenerless global, as on the web).
+                    // window enables when its evaluation promise settles —
+                    // rejected included, since a broken worker still drains its
+                    // inbox into a listenerless global, as on the web.
                     Local<Promise> pendingEntry;
                     if (!ModuleInternal::PendingEntryEvaluation(isolate, workerPath_)
                                  .ToLocal(&pendingEntry)) {
                         EnableMessageQueue();
                     } else {
-                        auto onSettled = [](const v8::FunctionCallbackInfo<Value>& info) {
-                            // Resolve the wrapper by id — never capture it across
-                            // the settle; the worker may be gone by then.
+                        // Neither handler may capture anything: they resolve the
+                        // wrapper by id because the worker may be gone by the
+                        // time the entry settles. Both run on this thread, in
+                        // this isolate.
+                        auto onFulfilled = [](const v8::FunctionCallbackInfo<Value>& info) {
                             auto wrapper = WorkerWrapper::GetById(
                                     info.Data().As<v8::Int32>()->Value());
                             if (wrapper != nullptr) {
                                 wrapper->EnableMessageQueue();
                             }
                         };
+                        // A rejection needs its own handler: sharing the fulfill
+                        // one would mark the entry's evaluation promise handled
+                        // and drop the failure on the floor.
+                        auto onRejected = [](const v8::FunctionCallbackInfo<Value>& info) {
+                            auto wrapper = WorkerWrapper::GetById(
+                                    info.Data().As<v8::Int32>()->Value());
+                            if (wrapper == nullptr) {
+                                return;
+                            }
+                            wrapper->EnableMessageQueue();
+                            if (wrapper->IsTerminating() || wrapper->IsDisposed()) {
+                                return;
+                            }
+                            auto isolate = info.GetIsolate();
+                            ReportEntryRejection(isolate,
+                                                 info.Length() > 0
+                                                         ? info[0]
+                                                         : Undefined(isolate).As<Value>(),
+                                                 wrapper);
+                        };
+                        auto workerIdData = v8::Integer::New(isolate, workerId_);
                         Local<Function> enableFn;
-                        if (Function::New(context, onSettled,
-                                          v8::Integer::New(isolate, workerId_))
-                                    .ToLocal(&enableFn)) {
-                            pendingEntry->Then(context, enableFn, enableFn)
+                        Local<Function> reportFn;
+                        if (Function::New(context, onFulfilled, workerIdData)
+                                    .ToLocal(&enableFn) &&
+                            Function::New(context, onRejected, workerIdData)
+                                    .ToLocal(&reportFn)) {
+                            pendingEntry->Then(context, enableFn, reportFn)
                                     .FromMaybe(Local<Promise>());
                         } else {
                             EnableMessageQueue();
@@ -654,10 +730,7 @@ void WorkerWrapper::CreateInspector(Isolate* isolate) {
     }
 
     // Same url scheme the module loader reports in Debugger.scriptParsed.
-    // workerPath_ may still be relative to the caller's dir at this point
-    // (resolution happens in require); callingDir_ ends with '/'.
-    std::string url =
-            "file://" + (workerPath_[0] == '/' ? workerPath_ : callingDir_ + workerPath_);
+    std::string url = "file://" + workerPath_;
 
     auto* client = new WorkerInspectorClient(workerId_, isolate, ALooper_forThread(), url);
     {

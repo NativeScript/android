@@ -124,6 +124,40 @@ describe("createRequire", function () {
         });
     });
 
+    // The specifier itself is validated with Node's ERR_INVALID_ARG_TYPE
+    // wording, so a message copied out of a stack trace matches what the
+    // ecosystem documents. Rejected before any builtin, http or filesystem
+    // handling — none of which can run without a string.
+    describe("specifier validation", function () {
+        var minted = nsModule.createRequire(fixtureDir + "/");
+
+        it("rejects a non-string specifier with Node's wording", function () {
+            expect(function () { globalThis.require(42); })
+                .toThrowError(TypeError,
+                              /^The "id" argument must be of type string\. Received type number \(42\)$/);
+        });
+
+        it("rejects a missing specifier with Node's wording", function () {
+            expect(function () { globalThis.require(); })
+                .toThrowError(TypeError,
+                              /^The "id" argument must be of type string\. Received undefined$/);
+        });
+
+        it("names null and object arguments the way Node does", function () {
+            expect(messageOf(function () { globalThis.require(null); }))
+                .toBe('The "id" argument must be of type string. Received null');
+            expect(messageOf(function () { globalThis.require({}); }))
+                .toBe('The "id" argument must be of type string. Received an instance of Object');
+        });
+
+        it("applies the same validation to a minted require", function () {
+            expect(function () { minted(42); })
+                .toThrowError(TypeError, /^The "id" argument must be of type string\./);
+            expect(function () { minted(); })
+                .toThrowError(TypeError, /Received undefined$/);
+        });
+    });
+
     describe("evaluation policy", function () {
         it("refuses a top-level-await graph strictly", function () {
             var strictRequire = nsModule.createRequire(fixtureDir + "/anything.js");

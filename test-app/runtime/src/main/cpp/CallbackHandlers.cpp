@@ -1231,16 +1231,21 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
             }
         }
 
-        // Will throw if the path is invalid or the file doesn't exist
+        // Will throw if the path is invalid or the file doesn't exist. The
+        // worker runs on its own thread, with its own working directory and
+        // module registry, so it gets the canonical path resolved here rather
+        // than the spec: nothing on the other side can redo this resolution,
+        // and the entry's registry key must be the file that was validated.
+        std::string entryPath;
         try {
-            ModuleInternal::CheckFileExists(isolate, resolvedPath, currentDir);
+            entryPath = ModuleInternal::CheckFileExists(isolate, resolvedPath, currentDir);
         } catch (NativeScriptException& e) {
             if (currentDir == Constants::APP_ROOT_FOLDER_PATH) {
                 throw;
             }
             // not found next to the caller - retry against the app root
-            ModuleInternal::CheckFileExists(isolate, resolvedPath,
-                                            Constants::APP_ROOT_FOLDER_PATH);
+            entryPath = ModuleInternal::CheckFileExists(isolate, resolvedPath,
+                                                        Constants::APP_ROOT_FOLDER_PATH);
             currentDir = Constants::APP_ROOT_FOLDER_PATH;
         }
 
@@ -1252,7 +1257,7 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         // here on the main thread where class loading is safe.
         WorkerWrapper::EnsureJniCached();
 
-        auto wrapper = std::make_shared<WorkerWrapper>(isolate, workerId, resolvedPath,
+        auto wrapper = std::make_shared<WorkerWrapper>(isolate, workerId, entryPath,
                                                        currentDir, priority, thiz);
         WorkerWrapper::Insert(workerId, wrapper);
 

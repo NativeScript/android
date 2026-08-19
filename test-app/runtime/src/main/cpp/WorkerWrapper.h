@@ -61,8 +61,9 @@ public:
 
     /*
      * parent -> worker. Queues a serialized message and wakes the worker
-     * looper. Messages posted before the worker finishes bootstrapping are
-     * drained right after the worker script runs.
+     * looper. Messages posted before the worker finishes bootstrapping stay
+     * buffered until the entry has finished evaluating - for a module entry
+     * that is when its evaluation promise settles, not when the script returns.
      */
     void PostMessage(std::shared_ptr<worker::Message> message);
 
@@ -95,14 +96,6 @@ public:
                                                  int lineno);
 
     /*
-     * Registry of live workers, keyed by workerId. Replaces the old
-     * CallbackHandlers::id2WorkerMap. Guarded by a mutex because the worker
-     * shutdown path posts cleanup from the worker thread.
-     */
-    static int NextWorkerId();
-    static std::shared_ptr<WorkerWrapper> GetById(int workerId);
-
-    /*
      * WHATWG parity: the worker's implicit port message queue starts disabled;
      * the worker thread calls this once the entry script has finished
      * evaluating (including after a pending top-level await settles). From then
@@ -111,6 +104,14 @@ public:
      * messages, exactly as on the web.
      */
     void EnableMessageQueue();
+
+    /*
+     * Registry of live workers, keyed by workerId. Replaces the old
+     * CallbackHandlers::id2WorkerMap. Guarded by a mutex because the worker
+     * shutdown path posts cleanup from the worker thread.
+     */
+    static int NextWorkerId();
+    static std::shared_ptr<WorkerWrapper> GetById(int workerId);
     static void Insert(int workerId, std::shared_ptr<WorkerWrapper> wrapper);
 
     /*
@@ -170,6 +171,9 @@ private:
     Runtime* runtime_;
 
     const int workerId_;
+    // The entry's canonical resolved path, produced by the module resolver on
+    // the parent's thread: the worker has its own module registry and working
+    // directory, so nothing on this side can redo a relative resolution.
     const std::string workerPath_;
     const std::string callingDir_;
     const std::string threadName_;
@@ -189,7 +193,8 @@ private:
     std::atomic_bool isDisposed_;
     // False until the entry script has finished evaluating
     // (EnableMessageQueue); DrainPendingTasks leaves the queue untouched while
-    // disabled.
+    // disabled. Written and read on the worker thread only - the atomic is
+    // belt-and-braces, not a cross-thread channel.
     std::atomic_bool messagesEnabled_;
 
     ConcurrentQueue queue_;

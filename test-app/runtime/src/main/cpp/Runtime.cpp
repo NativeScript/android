@@ -1,10 +1,9 @@
 #include "Runtime.h"
 
 #include <console/Console.h>
-#include <dlfcn.h>
-#include <unistd.h>
 
 #include <chrono>
+#include <cinttypes>
 #include <mutex>
 #include <sstream>
 #include <thread>
@@ -23,7 +22,6 @@
 #include "Interop.h"
 #include "IsolateTracked.h"
 #include "JType.h"
-#include "JsArgConverter.h"
 #include "JsArgToArrayConverter.h"
 #include "ManualInstrumentation.h"
 #include "MetadataNode.h"
@@ -44,13 +42,10 @@
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
 #include "Util.h"
-#include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include "Version.h"
 #include "WeakRef.h"
 #include "include/libplatform/libplatform.h"
-#include "include/zipconf.h"
-#include "libplatform/libplatform.h"
 #include "sys/system_properties.h"
 
 #ifdef APPLICATION_IN_DEBUG
@@ -343,6 +338,13 @@ std::string Runtime::ReadFileText(const std::string& filePath) {
   return File::ReadText(filePath);
 }
 
+std::string Runtime::ReadFileText(const std::string& filePath, bool& ok) {
+#ifdef APPLICATION_IN_DEBUG
+  std::lock_guard<std::mutex> lock(m_fileWriteMutex);
+#endif
+  return File::ReadText(filePath, ok);
+}
+
 void Runtime::Lock() {
 #ifdef APPLICATION_IN_DEBUG
   m_fileWriteMutex.lock();
@@ -367,13 +369,17 @@ void Runtime::Unlock() {
 // normally, Node-like. Only the two failures below are fatal, and both are
 // reported in every build.
 static void HoldBootBackstop(v8::Isolate* isolate, const std::string& entryPath) {
+  // The entry can already be rejected on the first poll: LoadESModule takes the
+  // registry-hit path for an already-evaluated module without re-entering
+  // EvaluateModuleGraph, so a re-run of a previously failed entry arrives here
+  // carrying its rejection.
   std::string entryRejectionReason;
-  bool entryPending =
-          ModuleInternal::PollEntryEvaluation(isolate, entryPath, &entryRejectionReason) ==
-          EntryEvaluationState::kPending;
-  bool entryRejected = false;
+  EntryEvaluationState entryState =
+          ModuleInternal::PollEntryEvaluation(isolate, entryPath, &entryRejectionReason);
+  bool entryPending = entryState == EntryEvaluationState::kPending;
+  bool entryRejected = entryState == EntryEvaluationState::kRejected;
 
-  if (!entryPending && !tns::HasPendingAsyncModuleGraphWork()) {
+  if (!entryPending && !entryRejected && !tns::HasPendingAsyncModuleGraphWork()) {
     return;
   }
 
@@ -383,7 +389,7 @@ static void HoldBootBackstop(v8::Isolate* isolate, const std::string& entryPath)
                                                  ? Runtime::GetRuntime(isolate)->GetEventLoop()
                                                  : nullptr;
 
-  while (entryPending || tns::HasPendingAsyncModuleGraphWork()) {
+  while (!entryRejected && (entryPending || tns::HasPendingAsyncModuleGraphWork())) {
     if (std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >
         deadlineSeconds) {
       break;
@@ -400,19 +406,21 @@ static void HoldBootBackstop(v8::Isolate* isolate, const std::string& entryPath)
               ModuleInternal::PollEntryEvaluation(isolate, entryPath, &entryRejectionReason);
       // Once it settles, stop probing for good.
       entryPending = state == EntryEvaluationState::kPending;
-      if (state == EntryEvaluationState::kRejected) {
-        entryRejected = true;
-        break;
-      }
+      entryRejected = state == EntryEvaluationState::kRejected;
     }
   }
 
+  // Evict before throwing: the entry would otherwise stay registered at
+  // kEvaluated with a failed capability, and the registry-hit path of a later
+  // RunModule on this isolate would never surface the failure again.
   if (entryRejected) {
+    tns::RemoveModuleFromRegistry(isolate, tns::CanonicalizeRegistryKey(entryPath));
     throw NativeScriptException(
             "Fatal: the main entry module's evaluation rejected during boot: " +
             entryRejectionReason);
   }
   if (entryPending) {
+    tns::RemoveModuleFromRegistry(isolate, tns::CanonicalizeRegistryKey(entryPath));
     throw NativeScriptException("Fatal: the main entry module '" + entryPath +
                                 "' never settled within " +
                                 std::to_string(static_cast<int>(deadlineSeconds)) + "s");
@@ -1087,7 +1095,6 @@ void Runtime::DestroyRuntime() {
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_id2RuntimeCache.erase(m_id);
-    s_isolate2RuntimesCache.erase(m_isolate);
   }
   // Flag this isolate's in-flight async graph loads dead and Reset their
   // context Globals while the isolate is still alive, so fetch completions
@@ -1098,6 +1105,14 @@ void Runtime::DestroyRuntime() {
   // (registries, waiters, loader vocabulary) lives in a RuntimeState slot and
   // is destroyed with it below. Worker isolates quiesce the same way.
   tns::QuiesceModuleLoadsForIsolate(m_isolate);
+  // The isolate->runtime mapping must outlive the quiesce: a fetch completion
+  // that finds GetRuntime(isolate) == nullptr bails without decrementing its
+  // load's accounting, so erasing first would leave a not-yet-dead load
+  // permanently un-completable.
+  {
+    std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
+    s_isolate2RuntimesCache.erase(m_isolate);
+  }
   if (m_eventLoop != nullptr) {
     // runs on this runtime's own thread; children still holding a weak_ptr
     // and v8 teardown posts have their work dropped from now on
@@ -1132,9 +1147,9 @@ void Runtime::DestroyRuntime() {
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
   FrameCallbacks::RemoveIsolateEntries(m_isolate);
 
-  // The transport's process-wide state (cache-bust marks, dev-boot flag) is
-  // shared across isolates; only the main isolate may clear it (worker
-  // teardown must not wipe the main isolate's session).
+  // The transport's process-wide state (the cache-bust marks) is shared
+  // across isolates; only the main isolate may clear it (worker teardown must
+  // not wipe the main isolate's session).
   if (m_isMainThread) {
     tns::CleanupHttpLoaderGlobals();
   }

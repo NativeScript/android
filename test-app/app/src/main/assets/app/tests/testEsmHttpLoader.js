@@ -179,6 +179,46 @@ describe("HTTP ESM Loader", function () {
             });
         });
 
+        // Each present configureLoader section replaces its state wholesale, so
+        // an empty array is explicit policy — "nothing is volatile any more" —
+        // not a no-op.
+        describe("volatile patterns", function () {
+            useHttpTimeout();
+
+            var nsModule = require("ns:module");
+
+            afterEach(function () {
+                nsModule.configureLoader({ volatilePatterns: [] });
+            });
+
+            it("stops treating a URL as volatile once the list is emptied", function (done) {
+                // The fixture pushes one entry per evaluation, so the bucket
+                // length counts how many times the module actually ran.
+                var url = origin + "/esm/graph-leaf.mjs?k=vol";
+                function evaluations() {
+                    return (globalThis.__nsMixedOrdervol || []).length;
+                }
+
+                nsModule.configureLoader({ volatilePatterns: ["k=vol"] });
+
+                import(url).then(function () {
+                    return import(url);
+                }).then(function () {
+                    // Volatile: the cached module is dropped, so it re-evaluates.
+                    expect(evaluations()).toBe(2);
+
+                    nsModule.configureLoader({ volatilePatterns: [] });
+                    return import(url);
+                }).then(function () {
+                    // Cleared: the registry entry is reused, nothing re-runs.
+                    expect(evaluations()).toBe(2);
+                    done();
+                }).catch(function (error) {
+                    reportRejection(error, done);
+                });
+            });
+        });
+
         // The import map is process-wide, so every spec here installs its own
         // and restores the empty map afterwards.
         describe("import map", function () {
@@ -311,6 +351,140 @@ describe("HTTP ESM Loader", function () {
                     expect(mods[1].leaf).toBe("deep");
                     // No scope matches this referrer.
                     expect(mods[2].leaf).toBe("top");
+                    done();
+                }).catch(function (error) {
+                    reportRejection(error, done);
+                });
+            });
+        });
+
+        // An imperative API rejects bad input loudly, the way WebIDL does on the
+        // web and ERR_INVALID_ARG_TYPE does in Node. Silently skipping a
+        // mistyped section or a typo'd key turns a caller's bug into a config
+        // that quietly does nothing.
+        describe("loader surface argument validation", function () {
+            useHttpTimeout();
+
+            var nsModule = require("ns:module");
+
+            it("rejects a missing or non-object config", function () {
+                expect(function () {
+                    nsModule.configureLoader();
+                }).toThrowError(TypeError, /configureLoader expects a config object/);
+                expect(function () {
+                    nsModule.configureLoader(42);
+                }).toThrowError(TypeError, /configureLoader expects a config object/);
+            });
+
+            it("rejects an unknown top-level config key by name", function () {
+                expect(function () {
+                    nsModule.configureLoader({ typoKey: [] });
+                }).toThrowError(TypeError, /unknown option 'typoKey'/);
+            });
+
+            it("rejects a non-array volatilePatterns", function () {
+                expect(function () {
+                    nsModule.configureLoader({ volatilePatterns: "x" });
+                }).toThrowError(TypeError, /volatilePatterns must be an array of strings/);
+            });
+
+            it("rejects a non-string volatilePatterns element by index", function () {
+                expect(function () {
+                    nsModule.configureLoader({ volatilePatterns: [1] });
+                }).toThrowError(TypeError, /volatilePatterns\[0\] must be a string/);
+                expect(function () {
+                    nsModule.configureLoader({ volatilePatterns: ["ok", null] });
+                }).toThrowError(TypeError, /volatilePatterns\[1\] must be a string/);
+            });
+
+            it("rejects a non-object canonicalization", function () {
+                expect(function () {
+                    nsModule.configureLoader({ canonicalization: "x" });
+                }).toThrowError(TypeError, /canonicalization must be an object/);
+            });
+
+            it("rejects a non-array canonicalization sub-key by name", function () {
+                expect(function () {
+                    nsModule.configureLoader({ canonicalization: { stripParams: "t" } });
+                }).toThrowError(TypeError,
+                                /canonicalization\.stripParams must be an array of strings/);
+                expect(function () {
+                    nsModule.configureLoader({ canonicalization: { forPathPrefixes: [7] } });
+                }).toThrowError(TypeError, /canonicalization\.forPathPrefixes\[0\] must be a string/);
+            });
+
+            it("rejects a non-array invalidateModules argument", function () {
+                expect(function () {
+                    nsModule.invalidateModules("x");
+                }).toThrowError(TypeError, /invalidateModules expects an array of URL strings/);
+            });
+
+            it("rejects a non-string invalidateModules element by index", function () {
+                expect(function () {
+                    nsModule.invalidateModules([1]);
+                }).toThrowError(TypeError, /urls\[0\] must be a string/);
+            });
+
+            it("rejects a non-string canonicalizeHttpUrlKey argument", function () {
+                // Debug-only diagnostic; release builds omit the member entirely.
+                if (typeof nsModule.canonicalizeHttpUrlKey !== "function") {
+                    pending("canonicalizeHttpUrlKey is debug-only; absent in this build");
+                    return;
+                }
+                expect(function () {
+                    nsModule.canonicalizeHttpUrlKey(42);
+                }).toThrowError(TypeError, /canonicalizeHttpUrlKey expects a URL string/);
+            });
+
+            // Validate-before-apply: the whole config is checked before any of
+            // it is installed, so a call that throws leaves every section on the
+            // state it already had.
+            it("applies no section when any part of the config is invalid", function () {
+                if (typeof nsModule.canonicalizeHttpUrlKey !== "function") {
+                    pending("canonicalizeHttpUrlKey is debug-only; absent in this build");
+                    return;
+                }
+                var url = "http://h/dev/core?p=x&t=123";
+                var before = nsModule.canonicalizeHttpUrlKey(url);
+
+                // A well-formed canonicalization section paired with a typo'd key.
+                expect(function () {
+                    nsModule.configureLoader({
+                        canonicalization: { stripParams: ["t"], forPathPrefixes: ["/dev/"] },
+                        typoKey: 1,
+                    });
+                }).toThrowError(TypeError, /unknown option 'typoKey'/);
+
+                // Had the canonicalization section been applied, `t` would now
+                // be stripped and the key would differ.
+                expect(nsModule.canonicalizeHttpUrlKey(url)).toBe(before);
+            });
+
+            it("leaves volatilePatterns untouched when the same call throws", function (done) {
+                var url = origin + "/esm/graph-leaf.mjs?k=vpre";
+                function evaluations() {
+                    return (globalThis.__nsMixedOrdervpre || []).length;
+                }
+
+                // Nothing is volatile yet, so a second import reuses the entry.
+                import(url).then(function () {
+                    return import(url);
+                }).then(function () {
+                    expect(evaluations()).toBe(1);
+
+                    // A valid volatilePatterns alongside an unknown key: the
+                    // call throws and the patterns must NOT be installed.
+                    expect(function () {
+                        nsModule.configureLoader({
+                            volatilePatterns: ["k=vpre"],
+                            typoKey: 1,
+                        });
+                    }).toThrowError(TypeError, /unknown option 'typoKey'/);
+
+                    return import(url);
+                }).then(function () {
+                    // Still not volatile: the rejected call installed nothing.
+                    expect(evaluations()).toBe(1);
                     done();
                 }).catch(function (error) {
                     reportRejection(error, done);

@@ -9,17 +9,16 @@
 #include <cctype>
 #include <chrono>
 #include <cstring>
-#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "ArgConverter.h"
 #include "JEnv.h"
 #include "ModuleInternal.h"
 #include "ModuleInternalCallbacks.h"
-#include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include "TraceLog.h"
@@ -301,34 +300,39 @@ static void ClearAllCacheBustMarks() {
 // ─────────────────────────────────────────────────────────────
 // JNI fetch diagnostics + request builder
 
-static thread_local std::string g_lastHttpFetchErrorReason;
+static thread_local std::string t_lastHttpFetchErrorReason;
 
 static void RecordLastHttpFetchError(const char* stage, const std::string& excClass,
                                      const std::string& excMsg) {
-    g_lastHttpFetchErrorReason.assign("stage=");
-    g_lastHttpFetchErrorReason.append(stage ? stage : "?");
-    g_lastHttpFetchErrorReason.append(" class=");
-    g_lastHttpFetchErrorReason.append(excClass);
-    g_lastHttpFetchErrorReason.append(" msg=");
-    g_lastHttpFetchErrorReason.append(excMsg);
+    t_lastHttpFetchErrorReason.assign("stage=");
+    t_lastHttpFetchErrorReason.append(stage ? stage : "?");
+    t_lastHttpFetchErrorReason.append(" class=");
+    t_lastHttpFetchErrorReason.append(excClass);
+    t_lastHttpFetchErrorReason.append(" msg=");
+    t_lastHttpFetchErrorReason.append(excMsg);
 }
 
 static void ClearLastHttpFetchErrorReason() {
-    g_lastHttpFetchErrorReason.clear();
+    t_lastHttpFetchErrorReason.clear();
 }
 
 std::string TakeLastHttpFetchErrorReason() {
-    std::string out = std::move(g_lastHttpFetchErrorReason);
-    g_lastHttpFetchErrorReason.clear();
+    std::string out = std::move(t_lastHttpFetchErrorReason);
+    t_lastHttpFetchErrorReason.clear();
     return out;
 }
 
+// Describes and clears a pending Java exception. The introspection calls go
+// through the raw JNIEnv: JEnv's wrappers turn a pending Java exception into a
+// thrown NativeScriptException, which here would replace the exception being
+// described with the failure to describe it.
 static bool DrainPendingJniException(JEnv& env, std::string& outClassName, std::string& outMessage) {
     outClassName.clear();
     outMessage.clear();
-    jthrowable th = env.ExceptionOccurred();
+    JNIEnv* raw = env;
+    jthrowable th = raw->ExceptionOccurred();
     if (!th) return false;
-    env.ExceptionClear();
+    raw->ExceptionClear();
 
     jclass clsThrowable = env.GetObjectClass(th);
     if (clsThrowable) {
@@ -336,8 +340,8 @@ static bool DrainPendingJniException(JEnv& env, std::string& outClassName, std::
         if (clsClass) {
             jmethodID getName = env.GetMethodID(clsClass, "getName", "()Ljava/lang/String;");
             if (getName) {
-                jstring jName = static_cast<jstring>(env.CallObjectMethod(clsThrowable, getName));
-                env.ExceptionClear();
+                jstring jName = static_cast<jstring>(raw->CallObjectMethod(clsThrowable, getName));
+                raw->ExceptionClear();
                 if (jName) {
                     outClassName = ArgConverter::jstringToString(jName);
                 }
@@ -345,19 +349,20 @@ static bool DrainPendingJniException(JEnv& env, std::string& outClassName, std::
         }
         jmethodID toString = env.GetMethodID(clsThrowable, "toString", "()Ljava/lang/String;");
         if (toString) {
-            jstring jMsg = static_cast<jstring>(env.CallObjectMethod(th, toString));
-            env.ExceptionClear();
+            jstring jMsg = static_cast<jstring>(raw->CallObjectMethod(th, toString));
+            raw->ExceptionClear();
             if (jMsg) {
                 outMessage = ArgConverter::jstringToString(jMsg);
             }
         }
     }
-    env.ExceptionClear();
+    raw->ExceptionClear();
     return true;
 }
 
 static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
-                                     std::string& out, std::string& contentType, int& status);
+                                     std::string& out, std::string& contentType, int& status,
+                                     bool& bustApplied);
 static void MaybePumpJSThreadDuringBoot();
 static inline void InvokeHttpFetchYield();
 
@@ -581,17 +586,27 @@ bool HttpFetchModule(const std::string& url, ModuleFetchResult& result) {
     std::string body;
     std::string contentType;
     int status = 0;
-    bool transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status);
+    bool bustApplied = false;
+    bool transportOk =
+            PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status, bustApplied);
     if (!transportOk) {
         // One retry, and only for a transport error: an HTTP status is an
         // answer, not a failure to communicate, so asking again would just
         // repeat it.
         TNS_DEBUG(Esm, "[http-loader] retrying %s after initial fetch error", url.c_str());
         usleep(120 * 1000);
-        transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status);
+        transportOk =
+                PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status, bustApplied);
     }
 
     ClassifyModuleResponse(url, transportOk, status, contentType, body, result);
+
+    // A cache-bust mark is only satisfied by a response the loader can actually
+    // use: a 404, or a 200 that classified as something other than a module,
+    // leaves it armed for the next attempt.
+    if (result.ok && bustApplied) {
+        ClearCacheBustForUrl(canonicalKey);
+    }
 
     if (!result.ok) {
         TNS_DEBUG(Esm, "[http-loader][fetch-sync][reject] %s", result.failureReason.c_str());
@@ -616,18 +631,33 @@ bool HttpFetchModule(const std::string& url, ModuleFetchResult& result) {
 // Runs on whichever thread drives the fetch — the JS thread for the sync path,
 // a detached background thread for the async one. `canonicalKey` is computed
 // by the caller on its isolate's thread; nothing here may canonicalize.
+//
+// The network calls below go through the raw JNIEnv rather than JEnv's
+// wrappers: a wrapper converts a pending Java exception into a thrown
+// NativeScriptException, which would unwind past the per-stage handling that
+// tells a status-bearing answer (an empty 404) apart from a transport failure,
+// and past the InputStream close. The wrappers stay on the setup calls, whose
+// failures have no per-stage verdict and are caught below.
 static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
-                                     std::string& out, std::string& contentType, int& status) {
+                                     std::string& out, std::string& contentType, int& status,
+                                     bool& bustApplied) {
     out.clear();
     contentType.clear();
     status = 0;
     TNS_DEBUG(Esm, "[http-esm][fetch][enter] url=%s", url.c_str());
 
-    bool bustRequested = false;
-    const std::string fetchUrl = ApplyCacheBustNonce(url, canonicalKey, &bustRequested);
+    const std::string fetchUrl = ApplyCacheBustNonce(url, canonicalKey, &bustApplied);
+
+    auto recordStageFailure = [&url](const char* stage, const std::string& excClass,
+                                     const std::string& excMsg) {
+        RecordLastHttpFetchError(stage, excClass, excMsg);
+        TNS_DEBUG(Esm, "[http-esm][fetch][exception] stage=%s url=%s class=%s msg=%s", stage,
+                       url.c_str(), excClass.c_str(), excMsg.c_str());
+    };
 
     try {
         JEnv env;
+        JNIEnv* raw = env;
         DisableHttpKeepAliveOnce(env);
         PermitAllStrictMode(env);
 
@@ -637,26 +667,21 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
         jmethodID openConnection =
                 env.GetMethodID(clsURL, "openConnection", "()Ljava/net/URLConnection;");
         jstring jUrlStr = env.NewStringUTF(fetchUrl.c_str());
-        jobject urlObj = env.NewObject(clsURL, urlCtor, jUrlStr);
+        jobject urlObj = raw->NewObject(clsURL, urlCtor, jUrlStr);
 
         {
             std::string excClass, excMsg;
             if (DrainPendingJniException(env, excClass, excMsg)) {
-                RecordLastHttpFetchError("url-ctor", excClass, excMsg);
-                TNS_DEBUG(Esm, "[http-esm][fetch][exception] stage=url-ctor url=%s class=%s msg=%s",
-                               url.c_str(), excClass.c_str(), excMsg.c_str());
+                recordStageFailure("url-ctor", excClass, excMsg);
                 return false;
             }
         }
 
-        jobject conn = env.CallObjectMethod(urlObj, openConnection);
+        jobject conn = raw->CallObjectMethod(urlObj, openConnection);
         {
             std::string excClass, excMsg;
             if (DrainPendingJniException(env, excClass, excMsg)) {
-                RecordLastHttpFetchError("open-connection", excClass, excMsg);
-                TNS_DEBUG(Esm, "[http-esm][fetch][exception] stage=open-connection url=%s class=%s "
-                               "msg=%s",
-                               url.c_str(), excClass.c_str(), excMsg.c_str());
+                recordStageFailure("open-connection", excClass, excMsg);
                 return false;
             }
         }
@@ -703,14 +728,12 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
         // the status and earn a pointless retry.
         bool haveStatus = false;
         if (isHttp && getResponseCode) {
-            status = env.CallIntMethod(conn, getResponseCode);
+            status = raw->CallIntMethod(conn, getResponseCode);
             std::string excClass, excMsg;
             if (DrainPendingJniException(env, excClass, excMsg)) {
-                RecordLastHttpFetchError("get-response-code", excClass, excMsg);
-                TNS_DEBUG(Esm,
-                     "[http-esm][fetch][exception] stage=get-response-code url=%s class=%s "
-                     "msg=%s",
-                     url.c_str(), excClass.c_str(), excMsg.c_str());
+                // The return value of a JNI call that threw is undefined.
+                status = 0;
+                recordStageFailure("get-response-code", excClass, excMsg);
                 return false;
             }
             haveStatus = status > 0;
@@ -720,21 +743,17 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
                 env.GetMethodID(clsConn, "getInputStream", "()Ljava/io/InputStream;");
         jobject inStream = nullptr;
         if (isHttp && status >= 400 && getErrorStream) {
-            inStream = env.CallObjectMethod(conn, getErrorStream);
-            env.ExceptionClear();
+            inStream = raw->CallObjectMethod(conn, getErrorStream);
+            raw->ExceptionClear();
         }
         if (!inStream) {
             // On an error status with no error body, getInputStream throws
             // FileNotFoundException rather than returning null.
-            inStream = env.CallObjectMethod(conn, getInputStream);
+            inStream = raw->CallObjectMethod(conn, getInputStream);
             std::string excClass, excMsg;
             if (DrainPendingJniException(env, excClass, excMsg)) {
                 if (!haveStatus) {
-                    RecordLastHttpFetchError("get-input-stream", excClass, excMsg);
-                    TNS_DEBUG(Esm,
-                         "[http-esm][fetch][exception] stage=get-input-stream url=%s class=%s "
-                         "msg=%s",
-                         url.c_str(), excClass.c_str(), excMsg.c_str());
+                    recordStageFailure("get-input-stream", excClass, excMsg);
                     return false;
                 }
                 inStream = nullptr;
@@ -748,6 +767,20 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
             jmethodID readMethod = env.GetMethodID(clsIS, "read", "([B)I");
             jmethodID closeIS = env.GetMethodID(clsIS, "close", "()V");
 
+            // The stream holds a socket fd, so nothing between here and the
+            // end of this scope — a failed read, or a Java exception escaping
+            // one of the checked wrappers — may leave it open.
+            struct StreamCloser {
+                JNIEnv* jni;
+                jobject stream;
+                jmethodID closeMethod;
+                ~StreamCloser() {
+                    if (closeMethod == nullptr) return;
+                    jni->CallVoidMethod(stream, closeMethod);
+                    jni->ExceptionClear();
+                }
+            } streamCloser{raw, inStream, closeIS};
+
             jclass clsBAOS = env.FindClass("java/io/ByteArrayOutputStream");
             jmethodID baosCtor = env.GetMethodID(clsBAOS, "<init>", "()V");
             jmethodID baosWrite = env.GetMethodID(clsBAOS, "write", "([BII)V");
@@ -756,23 +789,24 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
             jobject baos = env.NewObject(clsBAOS, baosCtor);
 
             jbyteArray buffer = env.NewByteArray(8192);
+            std::string excClass, excMsg;
             while (true) {
-                jint n = env.CallIntMethod(inStream, readMethod, buffer);
-                std::string excClass, excMsg;
+                jint n = raw->CallIntMethod(inStream, readMethod, buffer);
                 if (DrainPendingJniException(env, excClass, excMsg)) {
-                    RecordLastHttpFetchError("read-body", excClass, excMsg);
-                    TNS_DEBUG(Esm,
-                         "[http-esm][fetch][exception] stage=read-body url=%s class=%s msg=%s",
-                         url.c_str(), excClass.c_str(), excMsg.c_str());
+                    recordStageFailure("read-body", excClass, excMsg);
                     readFailed = true;
                     break;
                 }
                 if (n < 0) break;
                 if (n == 0) continue;
-                env.CallVoidMethod(baos, baosWrite, buffer, 0, n);
+                raw->CallVoidMethod(baos, baosWrite, buffer, 0, n);
+                if (DrainPendingJniException(env, excClass, excMsg)) {
+                    recordStageFailure("read-body", excClass, excMsg);
+                    readFailed = true;
+                    break;
+                }
             }
 
-            env.CallVoidMethod(inStream, closeIS);
             if (!readFailed) {
                 jbyteArray bytes =
                         static_cast<jbyteArray>(env.CallObjectMethod(baos, baosToByteArray));
@@ -803,11 +837,9 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
         }
 
         if (status == 0) status = 200;
-        // A cache-bust mark is only satisfied by a response that actually
-        // carried the new body; a 404 leaves it armed for the next attempt.
-        if (status >= 200 && status < 300 && bustRequested) {
-            ClearCacheBustForUrl(canonicalKey);
-        }
+        // Keeps TakeLastHttpFetchErrorReason's contract across a recovered
+        // retry: a reason belongs to the attempt that failed, not to the fetch.
+        ClearLastHttpFetchErrorReason();
         // Pure transport: true means a response arrived. Whether that response
         // is a usable module — status, MIME, emptiness — is
         // ClassifyModuleResponse's call, so both fetch paths answer it the
@@ -878,18 +910,25 @@ void FetchModuleBodyAsync(const std::string& url,
         std::string contentType;
         int status = 0;
         const auto start = std::chrono::steady_clock::now();
-        bool transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status);
+        bool bustApplied = false;
+        bool transportOk =
+                PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status, bustApplied);
         if (!transportOk) {
             // Transport error → one retry, the same single-retry policy the
             // sync path applies.
             TNS_DEBUG(Esm, "[http-loader][fetch-async] retrying %s after transport error",
                            url.c_str());
             usleep(120 * 1000);
-            transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status);
+            transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status,
+                                                   bustApplied);
         }
 
         ModuleFetchResult result;
         ClassifyModuleResponse(url, transportOk, status, contentType, body, result);
+
+        if (result.ok && bustApplied) {
+            ClearCacheBustForUrl(canonicalKey);
+        }
 
         if (!result.ok) {
             TNS_DEBUG(Esm, "[http-loader][fetch-async][reject] %s", result.failureReason.c_str());
@@ -946,86 +985,191 @@ void InstallDevFunction(v8::Isolate* isolate, v8::Local<v8::Context> context,
     target->CreateDataProperty(context, ToV8String(isolate, name), fn).Check();
 }
 
+// The only sections configureLoader understands. An unlisted key is a typo the
+// caller hears about rather than a setting that silently does nothing.
+constexpr const char* kLoaderConfigKeys[] = {"importMap", "volatilePatterns", "canonicalization"};
+
 void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
     v8::HandleScope scope(isolate);
     v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
+    auto throwTypeError = [&](const std::string& message) {
+        isolate->ThrowException(v8::Exception::TypeError(ToV8String(isolate, message)));
+    };
+
     if (info.Length() < 1 || !info[0]->IsObject()) {
-        TNS_DEBUG(Esm, "[ns:module configureLoader] expected config object argument");
+        throwTypeError("configureLoader expects a config object");
         return;
     }
 
     v8::Local<v8::Object> config = info[0].As<v8::Object>();
 
-    v8::Local<v8::String> importMapKey = ToV8String(isolate, "importMap");
-    v8::Local<v8::Value> importMapVal;
-    if (config->Get(ctx, importMapKey).ToLocal(&importMapVal) && !importMapVal->IsUndefined()) {
-        std::string jsonStr;
-        if (importMapVal->IsString()) {
-            v8::String::Utf8Value utf8(isolate, importMapVal);
-            if (*utf8) jsonStr = *utf8;
-        } else if (importMapVal->IsObject()) {
-            v8::Local<v8::String> stringified;
-            if (v8::JSON::Stringify(ctx, importMapVal).ToLocal(&stringified)) {
-                v8::String::Utf8Value utf8(isolate, stringified);
-                if (*utf8) jsonStr = *utf8;
+    // ── Validation phase ─────────────────────────────────────────────────
+    // Nothing below mutates the vocabulary. The whole config is checked first
+    // so a rejected call leaves every section exactly as it was — the
+    // atomicity the import map alone used to have, now covering the entire
+    // call.
+
+    // Unknown top-level keys.
+    v8::Local<v8::Array> configKeys;
+    if (!config->GetOwnPropertyNames(ctx, v8::PropertyFilter::ONLY_ENUMERABLE,
+                                     v8::KeyConversionMode::kConvertToString)
+                 .ToLocal(&configKeys)) {
+        return;  // pending exception
+    }
+    for (uint32_t i = 0; i < configKeys->Length(); i++) {
+        v8::Local<v8::Value> keyVal;
+        if (!configKeys->Get(ctx, i).ToLocal(&keyVal)) {
+            return;
+        }
+        std::string key = ArgConverter::ToString(isolate, keyVal);
+        bool known = false;
+        for (const char* candidate : kLoaderConfigKeys) {
+            if (key == candidate) {
+                known = true;
+                break;
             }
         }
-        if (jsonStr.empty()) {
-            isolate->ThrowException(v8::Exception::TypeError(ToV8String(
-                    isolate, "configureLoader: importMap must be an object or a JSON string")));
+        if (!known) {
+            throwTypeError("configureLoader: unknown option '" + key + "'");
             return;
         }
-        std::string importMapError;
-        if (!SetImportMap(jsonStr, &importMapError)) {
-            // The previous map is still installed: a rejected update changes
-            // nothing, so a typo cannot empty a live session's vocabulary.
-            isolate->ThrowException(v8::Exception::TypeError(
-                    ToV8String(isolate, "configureLoader: " + importMapError)));
-            return;
-        }
-        TNS_DEBUG(Esm, "[ns:module configureLoader] import map set (%zu bytes)",
-                       jsonStr.size());
     }
 
+    // Reads `obj[key]` as an array of strings into `out`. `label` names the
+    // section in any error. Returns false with an exception pending on a type
+    // failure; `present` distinguishes "absent" from "present and valid".
     auto readStringArray = [&](v8::Local<v8::Object> obj, const char* key,
-                               std::vector<std::string>& out) -> bool {
+                               const std::string& label, std::vector<std::string>& out,
+                               bool* present) -> bool {
+        *present = false;
         v8::Local<v8::Value> val;
-        if (!obj->Get(ctx, ToV8String(isolate, key)).ToLocal(&val) || !val->IsArray()) {
+        if (!obj->Get(ctx, ToV8String(isolate, key)).ToLocal(&val)) {
+            return false;
+        }
+        if (val->IsUndefined()) {
+            return true;
+        }
+        if (!val->IsArray()) {
+            throwTypeError("configureLoader: " + label + " must be an array of strings");
             return false;
         }
         v8::Local<v8::Array> arr = val.As<v8::Array>();
         for (uint32_t i = 0; i < arr->Length(); i++) {
             v8::Local<v8::Value> elem;
-            if (arr->Get(ctx, i).ToLocal(&elem) && elem->IsString()) {
-                v8::String::Utf8Value utf8(isolate, elem);
-                if (*utf8) out.push_back(*utf8);
+            if (!arr->Get(ctx, i).ToLocal(&elem)) {
+                return false;
             }
+            if (!elem->IsString()) {
+                throwTypeError("configureLoader: " + label + "[" + std::to_string(i) +
+                               "] must be a string");
+                return false;
+            }
+            out.push_back(ArgConverter::ToString(isolate, elem));
         }
+        *present = true;
         return true;
     };
 
-    {
-        std::vector<std::string> patterns;
-        if (readStringArray(config, "volatilePatterns", patterns) && !patterns.empty()) {
-            SetVolatilePatterns(patterns);
-            TNS_DEBUG(Esm, "[ns:module configureLoader] %zu volatile patterns set",
-                           patterns.size());
+    // importMap: an object or a JSON string. Validated here, installed below.
+    std::string importMapJson;
+    bool haveImportMap = false;
+    v8::Local<v8::Value> importMapVal;
+    if (!config->Get(ctx, ToV8String(isolate, "importMap")).ToLocal(&importMapVal)) {
+        return;
+    }
+    if (!importMapVal->IsUndefined()) {
+        std::string jsonStr;
+        if (importMapVal->IsString()) {
+            jsonStr = ArgConverter::ToString(isolate, importMapVal);
+        } else if (importMapVal->IsObject()) {
+            v8::Local<v8::String> stringified;
+            if (!v8::JSON::Stringify(ctx, importMapVal).ToLocal(&stringified)) {
+                return;  // a throwing toJSON / getter propagates unchanged
+            }
+            // JSON.stringify answers `undefined` for a function or a
+            // symbol-valued object, which is not a JSON string.
+            if (stringified->IsString()) {
+                jsonStr = ArgConverter::ToString(isolate, stringified);
+            }
         }
+        if (jsonStr.empty()) {
+            throwTypeError("configureLoader: importMap must be an object or a JSON string");
+            return;
+        }
+        std::string importMapError;
+        if (!ValidateImportMapJson(jsonStr, &importMapError)) {
+            // The previous map is still installed: a rejected update changes
+            // nothing, so a typo cannot empty a live session's vocabulary.
+            throwTypeError("configureLoader: " + importMapError);
+            return;
+        }
+        importMapJson = std::move(jsonStr);
+        haveImportMap = true;
     }
 
-    {
-        v8::Local<v8::Value> canonVal;
-        if (config->Get(ctx, ToV8String(isolate, "canonicalization")).ToLocal(&canonVal) &&
-            canonVal->IsObject()) {
-            v8::Local<v8::Object> canonObj = canonVal.As<v8::Object>();
-            CanonicalizationConfig canon;
-            readStringArray(canonObj, "stripParams", canon.stripParams);
-            readStringArray(canonObj, "forPathPrefixes", canon.devPathPrefixes);
-            readStringArray(canonObj, "preserveQueryFor", canon.preserveQueryPrefixes);
-            SetCanonicalizationConfig(std::move(canon));
+    // volatilePatterns: array of strings. Presence of the array decides, not
+    // its contents — an empty one is explicit policy meaning "nothing is
+    // volatile any more", the same rule canonicalization follows, and the only
+    // reading under which a present section replaces its state wholesale.
+    std::vector<std::string> patterns;
+    bool havePatterns = false;
+    if (!readStringArray(config, "volatilePatterns", "volatilePatterns", patterns, &havePatterns)) {
+        return;
+    }
+
+    // canonicalization: { stripParams, forPathPrefixes, preserveQueryFor } —
+    // the URL vocabulary CanonicalizeHttpUrlKey applies (see its doc block).
+    // Presence of the object marks the vocabulary as configured, replacing the
+    // built-in fallback entirely (empty arrays are honored as explicit policy).
+    CanonicalizationConfig canon;
+    bool haveCanon = false;
+    v8::Local<v8::Value> canonVal;
+    if (!config->Get(ctx, ToV8String(isolate, "canonicalization")).ToLocal(&canonVal)) {
+        return;
+    }
+    if (!canonVal->IsUndefined()) {
+        if (!canonVal->IsObject()) {
+            throwTypeError("configureLoader: canonicalization must be an object");
+            return;
         }
+        v8::Local<v8::Object> canonObj = canonVal.As<v8::Object>();
+        bool ignored = false;
+        if (!readStringArray(canonObj, "stripParams", "canonicalization.stripParams",
+                             canon.stripParams, &ignored) ||
+            !readStringArray(canonObj, "forPathPrefixes", "canonicalization.forPathPrefixes",
+                             canon.devPathPrefixes, &ignored) ||
+            !readStringArray(canonObj, "preserveQueryFor", "canonicalization.preserveQueryFor",
+                             canon.preserveQueryPrefixes, &ignored)) {
+            return;
+        }
+        haveCanon = true;
+    }
+
+    // ── Apply phase ──────────────────────────────────────────────────────
+    // Everything validated; from here nothing can fail on the caller's input.
+
+    if (haveImportMap) {
+        // The re-parse inside SetImportMap is deterministic and already
+        // succeeded above, so the only failure left is the isolate shutting
+        // down.
+        std::string installError;
+        if (!SetImportMap(importMapJson, &installError)) {
+            throwTypeError("configureLoader: " + installError);
+            return;
+        }
+        TNS_DEBUG(Esm, "[ns:module configureLoader] import map set (%zu bytes)",
+                       importMapJson.size());
+    }
+
+    if (havePatterns) {
+        SetVolatilePatterns(patterns);
+        TNS_DEBUG(Esm, "[ns:module configureLoader] %zu volatile patterns set", patterns.size());
+    }
+
+    if (haveCanon) {
+        SetCanonicalizationConfig(std::move(canon));
     }
 }
 
@@ -1035,7 +1179,8 @@ void InvalidateModulesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) 
     v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
     if (info.Length() < 1 || !info[0]->IsArray()) {
-        DEBUG_WRITE_FORCE("[ns:module invalidateModules] expected array of URL strings");
+        isolate->ThrowException(v8::Exception::TypeError(
+                ToV8String(isolate, "invalidateModules expects an array of URL strings")));
         return;
     }
 
@@ -1044,13 +1189,16 @@ void InvalidateModulesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) 
     urls.reserve(urlsArray->Length());
     for (uint32_t index = 0; index < urlsArray->Length(); index++) {
         v8::Local<v8::Value> value;
-        if (!urlsArray->Get(ctx, index).ToLocal(&value) || !value->IsString()) {
-            continue;
+        if (!urlsArray->Get(ctx, index).ToLocal(&value)) {
+            return;
         }
-        v8::String::Utf8Value utf8(isolate, value);
-        if (*utf8) {
-            urls.emplace_back(*utf8);
+        if (!value->IsString()) {
+            isolate->ThrowException(v8::Exception::TypeError(ToV8String(
+                    isolate,
+                    "invalidateModules: urls[" + std::to_string(index) + "] must be a string")));
+            return;
         }
+        urls.push_back(ArgConverter::ToString(isolate, value));
     }
 
     if (tns::LogCategoryEnabled(tns::LogCategory::Registry)) {
@@ -1102,11 +1250,11 @@ bool BuildNsModuleBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> 
         auto canonicalizeCb = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             v8::Isolate* iso = info.GetIsolate();
             if (info.Length() < 1 || !info[0]->IsString()) {
-                info.GetReturnValue().SetEmptyString();
+                iso->ThrowException(v8::Exception::TypeError(
+                        ToV8String(iso, "canonicalizeHttpUrlKey expects a URL string")));
                 return;
             }
-            v8::String::Utf8Value u(iso, info[0]);
-            std::string key = CanonicalizeHttpUrlKey(*u ? std::string(*u) : std::string());
+            std::string key = CanonicalizeHttpUrlKey(ArgConverter::ToString(iso, info[0]));
             info.GetReturnValue().Set(ToV8String(iso, key));
         };
         v8::Local<v8::Function> fn;

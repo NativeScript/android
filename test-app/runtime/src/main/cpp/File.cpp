@@ -16,9 +16,16 @@ using namespace std;
 namespace tns {
 
 string File::ReadText(const string& filePath) {
+    bool ok;
+    return ReadText(filePath, ok);
+}
+
+string File::ReadText(const string& filePath, bool& ok) {
     int len;
     bool isNew;
     const char* content = ReadText(filePath, len, isNew);
+
+    ok = content != nullptr;
 
     if (content == nullptr) {
         return string();

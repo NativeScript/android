@@ -17,8 +17,10 @@
 namespace tns {
 
 // The single deadline for every module-graph settle wait: the entry
-// top-level-await pump in LoadESModule and the pumped module-graph walk. One
-// knob, so the waits stay ordered — transport timeouts < this.
+// top-level-await pump in LoadESModule, the pumped module-graph walk, and
+// (doubled, as the outermost backstop) the app-boot handoff in Runtime.cpp.
+// One knob, so the waits stay ordered: transport timeouts < this < the boot
+// backstop.
 inline constexpr double kModuleEvaluateDeadlineSeconds = 60.0;
 
 // How a module graph's evaluation promise is settled.
@@ -31,9 +33,11 @@ inline constexpr double kModuleEvaluateDeadlineSeconds = 60.0;
 //   kAsync       - evaluate and hand the caller the capability promise.
 enum class ModuleEvaluationPolicy { kSyncStrict, kSyncPumping, kAsync };
 
-// The state of an entry module's evaluation promise. kNone means the path
-// names no registered ES module — a classic script settles synchronously and
-// never has one, so it needs no boot backstop.
+// The state of an entry module's evaluation promise. kNone covers everything
+// that has no promise to report on: a path naming no registered ES module (a
+// classic script settles synchronously and never has one, so it needs no boot
+// backstop), a torn-down isolate with no registry left, a module that has not
+// reached kEvaluated, and an Evaluate() that failed or returned a non-promise.
 enum class EntryEvaluationState { kNone, kPending, kFulfilled, kRejected };
 
 struct ModuleEvaluationOptions {
@@ -76,17 +80,20 @@ class ModuleInternal {
         void LoadWorker(v8::Local<v8::Context> context, const std::string& path);
 
         /*
-         * Checks if target script exists, will throw if negative
-         * Used before initializing workers, to ensure a thread will not be created, when the file doesn't exist
+         * Resolves `path` against `baseDir` through the Java module resolver and returns the
+         * canonical resolved path - extension (.js then .mjs) and directory/index resolution
+         * included. Throws when nothing resolves.
+         * Used before initializing workers, both to ensure a thread will not be created when the
+         * file doesn't exist and to hand the worker the very file that was validated here.
          */
-        static void CheckFileExists(v8::Isolate* isolate, const std::string& path, const std::string& baseDir);
+        static std::string CheckFileExists(v8::Isolate* isolate, const std::string& path, const std::string& baseDir);
 
         // Helper functions for ES module support
         static bool IsESModule(const std::string& path);
 
         /*
-         * Compile/link/evaluate an ES module; returns its namespace object. `policy`
-         * decides how the graph's evaluation promise is settled — see
+         * Compile/link/evaluate an ES module; returns its namespace object. `options`
+         * decide how the graph's evaluation promise is settled — see
          * ModuleEvaluationPolicy.
          */
         static v8::Local<v8::Value> LoadESModule(v8::Isolate* isolate, const std::string& path,
@@ -103,7 +110,8 @@ class ModuleInternal {
         /*
          * Read + compile `path` as an ES module WITHOUT registering, instantiating or
          * evaluating it. On compile failure the exception is left pending on the isolate
-         * (or a NativeScriptException is thrown for setup failures) and the result is empty.
+         * and the result is empty; a NativeScriptException is thrown instead when the
+         * file does not exist, cannot be read, or the compile could not be set up.
          * This is the resolver's file loader: the resolver must only ever hand V8 a
          * compiled module — evaluation order belongs to V8.
          */
@@ -153,13 +161,29 @@ class ModuleInternal {
             v8::Persistent<v8::Object>* obj;
         };
 
+        /*
+         * The require the require factory is handed. It honours the evaluation
+         * options the factory forwards as trailing arguments, so it must never be
+         * reachable from app code — see RequirePublicCallback.
+         */
         static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+        /*
+         * The require installed on the global. Reads the specifier and the calling
+         * directory only, and always evaluates under the strict defaults.
+         */
+        static void RequirePublicCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+        // Argument validation and the C++/V8 exception boundary shared by both.
+        static void DispatchRequire(const v8::FunctionCallbackInfo<v8::Value>& args,
+                                    bool honorEvaluationOptions);
 
         static void RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
         static void CreateRequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-        void RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args);
+        void RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args,
+                                 bool honorEvaluationOptions);
 
         v8::Local<v8::String> WrapModuleContent(const std::string& path);
 
