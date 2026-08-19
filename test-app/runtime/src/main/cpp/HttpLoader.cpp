@@ -20,6 +20,7 @@
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
+#include "TraceLog.h"
 #include "robin_hood.h"
 #include "v8-json.h"
 
@@ -36,61 +37,6 @@ static inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const char*
 
 static inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const std::string& str) {
     return ArgConverter::ConvertToV8String(isolate, str);
-}
-
-// ─────────────────────────────────────────────────────────────
-// Live ns:runtime log flags (boot default from Java, then setConfig)
-
-static std::atomic<bool> g_logScriptLoading{false};
-static std::atomic<bool> g_httpFetchUrlLog{false};
-static std::once_flag s_logFlagsInitFlag;
-
-static void EnsureLogFlagsInitialized() {
-    std::call_once(s_logFlagsInitFlag, []() {
-        try {
-            JEnv env;
-            jclass runtimeClass = env.FindClass("com/tns/Runtime");
-            if (runtimeClass == nullptr) {
-                return;
-            }
-            jmethodID logMid =
-                    env.GetStaticMethodID(runtimeClass, "getLogScriptLoadingEnabled", "()Z");
-            if (logMid != nullptr) {
-                g_logScriptLoading.store(env.CallStaticBooleanMethod(runtimeClass, logMid) ==
-                                                 JNI_TRUE,
-                                         std::memory_order_relaxed);
-            }
-            jmethodID urlLogMid =
-                    env.GetStaticMethodID(runtimeClass, "getHttpFetchUrlLogEnabled", "()Z");
-            if (urlLogMid != nullptr) {
-                g_httpFetchUrlLog.store(env.CallStaticBooleanMethod(runtimeClass, urlLogMid) ==
-                                                JNI_TRUE,
-                                        std::memory_order_relaxed);
-            }
-        } catch (...) {
-            // keep defaults (false)
-        }
-    });
-}
-
-bool IsScriptLoadingLogEnabled() {
-    EnsureLogFlagsInitialized();
-    return g_logScriptLoading.load(std::memory_order_relaxed);
-}
-
-void SetScriptLoadingLogEnabled(bool enabled) {
-    EnsureLogFlagsInitialized();
-    g_logScriptLoading.store(enabled, std::memory_order_relaxed);
-}
-
-bool IsHttpFetchUrlLogEnabled() {
-    EnsureLogFlagsInitialized();
-    return g_httpFetchUrlLog.load(std::memory_order_relaxed);
-}
-
-void SetHttpFetchUrlLogEnabled(bool enabled) {
-    EnsureLogFlagsInitialized();
-    g_httpFetchUrlLog.store(enabled, std::memory_order_relaxed);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -221,9 +167,7 @@ static inline bool IsDevSessionBootComplete() {
 void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context, bool value) {
     SetBooleanGlobal(isolate, context, "__NS_HMR_BOOT_COMPLETE__", value);
     g_devSessionBootComplete.store(value, std::memory_order_relaxed);
-    if (IsScriptLoadingLogEnabled()) {
-        DEBUG_WRITE_FORCE("[dev-boot] __NS_HMR_BOOT_COMPLETE__=%s", value ? "true" : "false");
-    }
+    TNS_DEBUG(Esm, "[dev-boot] __NS_HMR_BOOT_COMPLETE__=%s", value ? "true" : "false");
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -495,13 +439,11 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
 
     if (!IsRemoteUrlAllowed(url)) {
         status = 403;
-        if (IsScriptLoadingLogEnabled()) {
-            DEBUG_WRITE_FORCE("[http-esm][security][blocked] %s", url.c_str());
-        }
+        TNS_DEBUG(Esm, "[http-esm][security][blocked] %s", url.c_str());
         return false;
     }
 
-    const bool urlLogEnabled = IsHttpFetchUrlLogEnabled();
+    const bool urlLogEnabled = LogCategoryEnabled(LogCategory::Fetch);
     const auto netStart = urlLogEnabled ? std::chrono::steady_clock::now()
                                         : std::chrono::steady_clock::time_point{};
 
@@ -512,9 +454,7 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
 
     bool ok = PerformHttpFetchOnceSync(url, canonicalKey, out, contentType, status);
     if (!ok) {
-        if (IsScriptLoadingLogEnabled()) {
-            DEBUG_WRITE_FORCE("[http-loader] retrying %s after initial fetch error", url.c_str());
-        }
+        TNS_DEBUG(Esm, "[http-loader] retrying %s after initial fetch error", url.c_str());
         usleep(120 * 1000);
         ok = PerformHttpFetchOnceSync(url, canonicalKey, out, contentType, status);
     }
@@ -523,23 +463,18 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     }
     if (out.empty()) {
         out = "export {};\n";
-        if (IsScriptLoadingLogEnabled()) {
-            DEBUG_WRITE_FORCE(
-                    "[http-loader] empty 2xx body for %s — serving canonical empty module",
-                    url.c_str());
-        }
+        TNS_DEBUG(Esm, "[http-loader] empty 2xx body for %s — serving canonical empty module",
+                       url.c_str());
     }
-    if (IsScriptLoadingLogEnabled()) {
-        DEBUG_WRITE_FORCE("[http-loader] fetched status=%d content-type=%s bytes=%llu", status,
-                          contentType.empty() ? "<none>" : contentType.c_str(),
-                          (unsigned long long)out.size());
-    }
+    TNS_DEBUG(Esm, "[http-loader] fetched status=%d content-type=%s bytes=%llu", status,
+                   contentType.empty() ? "<none>" : contentType.c_str(),
+                   (unsigned long long)out.size());
     if (urlLogEnabled) {
         const auto netMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                                    std::chrono::steady_clock::now() - netStart)
                                    .count();
-        DEBUG_WRITE_FORCE("[http-loader][fetch][network] %s bytes=%lu ms=%lld", url.c_str(),
-                          (unsigned long)out.size(), (long long)netMs);
+        TNS_DEBUG(Fetch, "[http-loader][fetch][network] %s bytes=%lu ms=%lld", url.c_str(),
+                         (unsigned long)out.size(), (long long)netMs);
     }
 
     InvokeHttpFetchYield();
@@ -554,9 +489,7 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
     out.clear();
     contentType.clear();
     status = 0;
-    if (IsScriptLoadingLogEnabled()) {
-        DEBUG_WRITE_FORCE("[http-esm][fetch][enter] url=%s", url.c_str());
-    }
+    TNS_DEBUG(Esm, "[http-esm][fetch][enter] url=%s", url.c_str());
 
     bool bustRequested = false;
     const std::string fetchUrl = ApplyCacheBustNonce(url, canonicalKey, &bustRequested);
@@ -578,11 +511,8 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
             std::string excClass, excMsg;
             if (DrainPendingJniException(env, excClass, excMsg)) {
                 RecordLastHttpFetchError("url-ctor", excClass, excMsg);
-                if (IsScriptLoadingLogEnabled()) {
-                    DEBUG_WRITE_FORCE(
-                            "[http-esm][fetch][exception] stage=url-ctor url=%s class=%s msg=%s",
-                            url.c_str(), excClass.c_str(), excMsg.c_str());
-                }
+                TNS_DEBUG(Esm, "[http-esm][fetch][exception] stage=url-ctor url=%s class=%s msg=%s",
+                               url.c_str(), excClass.c_str(), excMsg.c_str());
                 return false;
             }
         }
@@ -592,12 +522,9 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
             std::string excClass, excMsg;
             if (DrainPendingJniException(env, excClass, excMsg)) {
                 RecordLastHttpFetchError("open-connection", excClass, excMsg);
-                if (IsScriptLoadingLogEnabled()) {
-                    DEBUG_WRITE_FORCE(
-                            "[http-esm][fetch][exception] stage=open-connection url=%s class=%s "
-                            "msg=%s",
-                            url.c_str(), excClass.c_str(), excMsg.c_str());
-                }
+                TNS_DEBUG(Esm, "[http-esm][fetch][exception] stage=open-connection url=%s class=%s "
+                               "msg=%s",
+                               url.c_str(), excClass.c_str(), excMsg.c_str());
                 return false;
             }
         }
@@ -643,12 +570,10 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
             std::string excClass, excMsg;
             if (DrainPendingJniException(env, excClass, excMsg)) {
                 RecordLastHttpFetchError("get-response-code", excClass, excMsg);
-                if (IsScriptLoadingLogEnabled()) {
-                    DEBUG_WRITE_FORCE(
-                            "[http-esm][fetch][exception] stage=get-response-code url=%s class=%s "
-                            "msg=%s",
-                            url.c_str(), excClass.c_str(), excMsg.c_str());
-                }
+                TNS_DEBUG(Esm,
+                     "[http-esm][fetch][exception] stage=get-response-code url=%s class=%s "
+                     "msg=%s",
+                     url.c_str(), excClass.c_str(), excMsg.c_str());
                 return false;
             }
         }
@@ -666,12 +591,10 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
             std::string excClass, excMsg;
             if (DrainPendingJniException(env, excClass, excMsg)) {
                 RecordLastHttpFetchError("get-input-stream", excClass, excMsg);
-                if (IsScriptLoadingLogEnabled()) {
-                    DEBUG_WRITE_FORCE(
-                            "[http-esm][fetch][exception] stage=get-input-stream url=%s class=%s "
-                            "msg=%s",
-                            url.c_str(), excClass.c_str(), excMsg.c_str());
-                }
+                TNS_DEBUG(Esm,
+                     "[http-esm][fetch][exception] stage=get-input-stream url=%s class=%s "
+                     "msg=%s",
+                     url.c_str(), excClass.c_str(), excMsg.c_str());
                 return false;
             }
         }
@@ -695,11 +618,9 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
             std::string excClass, excMsg;
             if (DrainPendingJniException(env, excClass, excMsg)) {
                 RecordLastHttpFetchError("read-body", excClass, excMsg);
-                if (IsScriptLoadingLogEnabled()) {
-                    DEBUG_WRITE_FORCE(
-                            "[http-esm][fetch][exception] stage=read-body url=%s class=%s msg=%s",
-                            url.c_str(), excClass.c_str(), excMsg.c_str());
-                }
+                TNS_DEBUG(Esm,
+                     "[http-esm][fetch][exception] stage=read-body url=%s class=%s msg=%s",
+                     url.c_str(), excClass.c_str(), excMsg.c_str());
                 readFailed = true;
                 break;
             }
@@ -744,26 +665,19 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
             what = nse.GetErrorMessage();
         }
         RecordLastHttpFetchError("native-script-exception", "tns::NativeScriptException", what);
-        if (IsScriptLoadingLogEnabled()) {
-            DEBUG_WRITE_FORCE(
-                    "[http-esm][fetch][exception] stage=native-script-exception url=%s msg=%s",
-                    url.c_str(), what.c_str());
-        }
+        TNS_DEBUG(Esm, "[http-esm][fetch][exception] stage=native-script-exception url=%s msg=%s",
+                       url.c_str(), what.c_str());
         return false;
     } catch (std::exception& ex) {
         std::string what = ex.what() ? ex.what() : "<unknown>";
         RecordLastHttpFetchError("std-exception", "std::exception", what);
-        if (IsScriptLoadingLogEnabled()) {
-            DEBUG_WRITE_FORCE("[http-esm][fetch][exception] stage=std-exception url=%s msg=%s",
-                              url.c_str(), what.c_str());
-        }
+        TNS_DEBUG(Esm, "[http-esm][fetch][exception] stage=std-exception url=%s msg=%s",
+                       url.c_str(), what.c_str());
         return false;
     } catch (...) {
         RecordLastHttpFetchError("unknown-cpp-exception", "<unknown>", "<no message available>");
-        if (IsScriptLoadingLogEnabled()) {
-            DEBUG_WRITE_FORCE("[http-esm][fetch][exception] stage=unknown-cpp-exception url=%s",
-                              url.c_str());
-        }
+        TNS_DEBUG(Esm, "[http-esm][fetch][exception] stage=unknown-cpp-exception url=%s",
+                       url.c_str());
         return false;
     }
 }
@@ -771,9 +685,7 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
 void FetchModuleBodyAsync(const std::string& url,
                           std::function<void(bool ok, int status, std::string body)> completion) {
     if (!IsRemoteUrlAllowed(url)) {
-        if (IsScriptLoadingLogEnabled()) {
-            DEBUG_WRITE_FORCE("[http-esm][security][blocked] %s", url.c_str());
-        }
+        TNS_DEBUG(Esm, "[http-esm][security][blocked] %s", url.c_str());
         completion(false, 403, std::string());
         return;
     }
@@ -809,10 +721,8 @@ void FetchModuleBodyAsync(const std::string& url,
         const auto start = std::chrono::steady_clock::now();
         bool ok = PerformHttpFetchOnceSync(url, canonicalKey, out, contentType, status);
         if (!ok) {
-            if (IsScriptLoadingLogEnabled()) {
-                DEBUG_WRITE_FORCE("[http-loader][fetch-async] retrying %s after transport error",
-                                  url.c_str());
-            }
+            TNS_DEBUG(Esm, "[http-loader][fetch-async] retrying %s after transport error",
+                           url.c_str());
             usleep(120 * 1000);
             ok = PerformHttpFetchOnceSync(url, canonicalKey, out, contentType, status);
         }
@@ -820,16 +730,16 @@ void FetchModuleBodyAsync(const std::string& url,
         if (ok && out.empty()) {
             out = "export {};\n";
         }
-        if (!ok && IsScriptLoadingLogEnabled()) {
-            DEBUG_WRITE_FORCE("[http-loader][fetch-async][error] url=%s status=%d", url.c_str(),
-                              status);
+        if (!ok) {
+            TNS_DEBUG(Esm, "[http-loader][fetch-async][error] url=%s status=%d", url.c_str(),
+                           status);
         }
-        if (ok && IsHttpFetchUrlLogEnabled()) {
+        if (ok && LogCategoryEnabled(LogCategory::Fetch)) {
             const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                                     std::chrono::steady_clock::now() - start)
                                     .count();
-            DEBUG_WRITE_FORCE("[http-loader][fetch][async] %s bytes=%lu ms=%lld", url.c_str(),
-                              (unsigned long)out.size(), (long long)ms);
+            TNS_DEBUG(Fetch, "[http-loader][fetch][async] %s bytes=%lu ms=%lld", url.c_str(),
+                             (unsigned long)out.size(), (long long)ms);
         }
         completion(ok, status, std::move(out));
     }).detach();
@@ -880,12 +790,9 @@ void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
     v8::HandleScope scope(isolate);
     v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
-    bool logScriptLoading = tns::IsScriptLoadingLogEnabled();
 
     if (info.Length() < 1 || !info[0]->IsObject()) {
-        if (logScriptLoading) {
-            DEBUG_WRITE_FORCE("[ns:module configureLoader] expected config object argument");
-        }
+        TNS_DEBUG(Esm, "[ns:module configureLoader] expected config object argument");
         return;
     }
 
@@ -907,10 +814,8 @@ void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
         }
         if (!jsonStr.empty()) {
             SetImportMap(jsonStr);
-            if (logScriptLoading) {
-                DEBUG_WRITE_FORCE("[ns:module configureLoader] import map set (%zu bytes)",
-                                  jsonStr.size());
-            }
+            TNS_DEBUG(Esm, "[ns:module configureLoader] import map set (%zu bytes)",
+                           jsonStr.size());
         }
     }
 
@@ -935,10 +840,8 @@ void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
         std::vector<std::string> patterns;
         if (readStringArray(config, "volatilePatterns", patterns) && !patterns.empty()) {
             SetVolatilePatterns(patterns);
-            if (logScriptLoading) {
-                DEBUG_WRITE_FORCE("[ns:module configureLoader] %zu volatile patterns set",
-                                  patterns.size());
-            }
+            TNS_DEBUG(Esm, "[ns:module configureLoader] %zu volatile patterns set",
+                           patterns.size());
         }
     }
 
@@ -980,17 +883,16 @@ void InvalidateModulesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) 
         }
     }
 
-    if (tns::IsScriptLoadingLogEnabled()) {
-        DEBUG_WRITE_FORCE("[ns-hmr][android-invalidate] called urls.count=%zu", urls.size());
+    if (tns::LogCategoryEnabled(tns::LogCategory::Registry)) {
+        TNS_DEBUG(Registry, "invalidate called urls.count=%zu", urls.size());
         size_t shown = 0;
         for (const auto& u : urls) {
             if (shown >= 32) break;
-            DEBUG_WRITE_FORCE("[ns-hmr][android-invalidate] url[%zu]=%s", shown, u.c_str());
+            TNS_DEBUG(Registry, "invalidate url[%zu]=%s", shown, u.c_str());
             shown++;
         }
         if (urls.size() > shown) {
-            DEBUG_WRITE_FORCE("[ns-hmr][android-invalidate] (hidden %zu more URL(s))",
-                              urls.size() - shown);
+            TNS_DEBUG(Registry, "invalidate (hidden %zu more URL(s))", urls.size() - shown);
         }
     }
 

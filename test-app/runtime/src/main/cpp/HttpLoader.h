@@ -155,19 +155,6 @@ bool IsRemoteUrlAllowed(const std::string& url);
 // config init. Fail-safe false until initialized.
 bool IsDebuggable();
 
-// Verbose script/module-loading diagnostics. Process-wide ns:runtime key
-// `logScriptLoading`; boot default is the nativescript.config / package.json
-// value (false when absent). Live value is readable via getConfig and
-// writable via setConfig from the main isolate.
-bool IsScriptLoadingLogEnabled();
-void SetScriptLoadingLogEnabled(bool enabled);
-
-// One log line per HTTP fetch URL (high volume). Process-wide ns:runtime
-// key `httpFetchUrlLog`; boot default is the nativescript.config /
-// package.json value (false when absent).
-bool IsHttpFetchUrlLogEnabled();
-void SetHttpFetchUrlLogEnabled(bool enabled);
-
 // ─────────────────────────────────────────────────────────────
 // The `ns:module` builtin binding
 //

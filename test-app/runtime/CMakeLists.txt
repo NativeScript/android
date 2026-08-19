@@ -230,6 +230,7 @@ add_library(
         src/main/cpp/URLSearchParamsImpl.cpp
         src/main/cpp/URLPatternImpl.cpp
         src/main/cpp/HttpLoader.cpp
+        src/main/cpp/TraceLog.cpp
 
         # Node-API: vendored upstream implementation plus the embedder half
         # (env lifecycle, module registry, async work, threadsafe functions)

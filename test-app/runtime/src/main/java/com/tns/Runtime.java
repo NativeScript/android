@@ -293,29 +293,6 @@ public class Runtime {
         }
     }
 
-    // Expose logScriptLoading flag for native code without re-reading package.json
-    public static boolean getLogScriptLoadingEnabled() {
-        Runtime runtime = com.tns.Runtime.getCurrentRuntime();
-        if (runtime != null && runtime.config != null && runtime.config.appConfig != null) {
-            return runtime.config.appConfig.getLogScriptLoading();
-        }
-        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
-            return staticConfiguration.appConfig.getLogScriptLoading();
-        }
-        return false;
-    }
-
-    public static boolean getHttpFetchUrlLogEnabled() {
-        Runtime runtime = com.tns.Runtime.getCurrentRuntime();
-        if (runtime != null && runtime.config != null && runtime.config.appConfig != null) {
-            return runtime.config.appConfig.getHttpFetchUrlLog();
-        }
-        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
-            return staticConfiguration.appConfig.getHttpFetchUrlLog();
-        }
-        return false;
-    }
-    
     // Security config
     
     /**

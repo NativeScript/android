@@ -39,6 +39,7 @@
 #include "SimpleAllocator.h"
 #include "SimpleProfiler.h"
 #include "StructuredClone.h"
+#include "TraceLog.h"
 #include "URLImpl.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
@@ -84,6 +85,9 @@ void LogAndAbortUncaught() {
 }
 
 void Runtime::Init(JavaVM* vm, void* reserved) {
+  // Before anything worth tracing runs, so NS_DEBUG covers boot itself.
+  tns::InitializeLogCategoriesFromEnvironment();
+
   __android_log_print(ANDROID_LOG_INFO, "TNS.Runtime",
                       "NativeScript Runtime Version %s, commit %s",
                       NATIVE_SCRIPT_RUNTIME_VERSION,
@@ -261,7 +265,7 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
     }
 
     JniLocalRef uncaughtErrorPolicy(env->GetObjectArrayElement(
-        args, (jsize)15 /* KnownKeys.UncaughtErrorPolicy */));
+        args, (jsize)14 /* KnownKeys.UncaughtErrorPolicy */));
     if (!uncaughtErrorPolicy.IsNull()) {
       auto policy = ArgConverter::jstringToString(uncaughtErrorPolicy);
       if (policy == "throw") {

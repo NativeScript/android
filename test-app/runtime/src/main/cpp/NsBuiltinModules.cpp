@@ -7,8 +7,10 @@
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
 #include "HttpLoader.h"
+#include "NativeScriptAssert.h"
 #include "Runtime.h"
 #include "RuntimeState.h"
+#include "TraceLog.h"
 #include "console/Console.h"
 #include "robin_hood.h"
 
@@ -39,8 +41,7 @@ constexpr Registration kRegistry[] = {
         {"node:util", BuiltinId::kNodeUtil},
 };
 
-constexpr const char* kLogScriptLoadingKey = "logScriptLoading";
-constexpr const char* kHttpFetchUrlLogKey = "httpFetchUrlLog";
+constexpr const char* kDebugKey = "debug";
 
 void ThrowTypeError(Isolate* isolate, const std::string& message) {
     isolate->ThrowException(Exception::TypeError(ArgConverter::ConvertToV8String(isolate, message)));
@@ -57,16 +58,6 @@ bool EnsureMainIsolateWrite(Isolate* isolate, const std::string& key) {
     return true;
 }
 
-bool ParseBooleanValue(Isolate* isolate, const FunctionCallbackInfo<Value>& info,
-                       const std::string& key, bool* out) {
-    if (!info[1]->IsBoolean()) {
-        ThrowTypeError(isolate, "'" + key + "' must be a boolean");
-        return false;
-    }
-    *out = info[1].As<v8::Boolean>()->Value();
-    return true;
-}
-
 void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     if (info.Length() < 2 || !info[0]->IsString()) {
@@ -74,26 +65,28 @@ void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
         return;
     }
     std::string key = ArgConverter::ConvertToString(info[0].As<String>());
-    if (key == kLogScriptLoadingKey) {
+    if (key == kDebugKey) {
         if (!EnsureMainIsolateWrite(isolate, key)) {
             return;
         }
-        bool value = false;
-        if (!ParseBooleanValue(isolate, info, key, &value)) {
+        if (!info[1]->IsString()) {
+            ThrowTypeError(isolate, "'" + key + "' must be a comma-separated category string (" +
+                                            tns::AllLogCategoryNames() +
+                                            "), or '' to disable tracing");
             return;
         }
-        tns::SetScriptLoadingLogEnabled(value);
-        return;
-    }
-    if (key == kHttpFetchUrlLogKey) {
-        if (!EnsureMainIsolateWrite(isolate, key)) {
-            return;
+        // The list replaces the whole mask, so a caller never has to know what
+        // was already on to turn something off.
+        std::string value = ArgConverter::ConvertToString(info[1].As<String>());
+        bool hadUnknown = false;
+        uint32_t mask = tns::ParseLogCategories(value, &hadUnknown);
+        tns::SetEnabledLogCategories(mask);
+        if (hadUnknown) {
+            DEBUG_WRITE_FORCE(
+                    "ns:runtime setConfig('debug', '%s'): ignoring unknown categories; valid "
+                    "categories are %s",
+                    value.c_str(), tns::AllLogCategoryNames().c_str());
         }
-        bool value = false;
-        if (!ParseBooleanValue(isolate, info, key, &value)) {
-            return;
-        }
-        tns::SetHttpFetchUrlLogEnabled(value);
         return;
     }
     ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
@@ -106,12 +99,9 @@ void GetConfigCallback(const FunctionCallbackInfo<Value>& info) {
         return;
     }
     std::string key = ArgConverter::ConvertToString(info[0].As<String>());
-    if (key == kLogScriptLoadingKey) {
-        info.GetReturnValue().Set(v8::Boolean::New(isolate, tns::IsScriptLoadingLogEnabled()));
-        return;
-    }
-    if (key == kHttpFetchUrlLogKey) {
-        info.GetReturnValue().Set(v8::Boolean::New(isolate, tns::IsHttpFetchUrlLogEnabled()));
+    if (key == kDebugKey) {
+        info.GetReturnValue().Set(
+                ArgConverter::ConvertToV8String(isolate, tns::EnabledLogCategoryNames()));
         return;
     }
     ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");

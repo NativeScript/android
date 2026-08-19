@@ -66,8 +66,7 @@ Config keys:
 
 | key | values | scope | default |
 |---|---|---|---|
-| `logScriptLoading` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate) | `false`, or the `logScriptLoading` value from nativescript.config / package.json at boot |
-| `httpFetchUrlLog` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate) | `false`, or the `httpFetchUrlLog` value from nativescript.config / package.json at boot |
+| `debug` | comma-separated category list, e.g. `"esm,fetch"` | process-wide (main-isolate writes only; read live by every isolate) | the `NS_DEBUG` environment variable, or `""` |
 
 Remote-module security (`security.allowRemoteModules`,
 `security.remoteModuleAllowlist`) is **not** part of this surface. Those
@@ -77,6 +76,26 @@ through `getConfig` / `setConfig`.
 
 iOS additionally registers `releasedObjectPolicy`; Android does not (it has
 no released-native-counterpart machinery).
+
+`debug` turns on the runtime's category-scoped trace logs. Categories:
+
+| category | covers |
+|---|---|
+| `esm` | module resolution, compilation, linking, evaluation, registry keying |
+| `fetch` | the HTTP module transport (one line per fetched URL — high volume) |
+| `registry` | registry invalidation and dynamic-import cache bookkeeping |
+
+Each write replaces the whole set, so `setConfig('debug', '')` disables
+tracing and no caller needs to know what was already on. `getConfig('debug')`
+returns the canonical comma-separated list of what is enabled. Unknown names
+are ignored, with one warning line naming the valid ones.
+
+The same list can be given before boot as the `NS_DEBUG` environment variable
+(`NS_DEBUG=esm,fetch`), which is the only way to trace boot itself. Traces are
+compiled into release builds as well: a release build that cannot be traced is
+a release build that cannot be diagnosed. Each category writes to its own
+logcat tag (`TNS.esm`, `TNS.fetch`, `TNS.registry`), so `adb logcat -s TNS.esm`
+filters them without matching message text.
 
 ### `ns:module` (v1)
 
