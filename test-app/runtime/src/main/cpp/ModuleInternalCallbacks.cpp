@@ -307,6 +307,15 @@ struct ModuleLoaderState {
   robin_hood::unordered_map<std::string,
                             std::vector<v8::Global<v8::Promise::Resolver>>>
       httpDynamicWaiters;
+
+  // Reverse index: v8::Module::GetIdentityHash() -> registry keys, so
+  // module→key lookups (resolver referrer discovery, import.meta) are O(1)
+  // instead of a scan of the whole registry. Hashes collide, so a bucket holds
+  // candidates; FindKeyForModule confirms each against the registry and prunes
+  // the ones it no longer backs, so a stale candidate can never answer a
+  // lookup. Covers `registry` only — the fallback maps are never looked up by
+  // handle.
+  robin_hood::unordered_map<int, std::vector<std::string>> keysByModuleHash;
 };
 
 // This isolate's loader state, or null once teardown has begun — callers must
@@ -315,7 +324,82 @@ ModuleLoaderState* ModuleLoaderStateFor(v8::Isolate* isolate) {
   if (isolate == nullptr) return nullptr;
   return RuntimeState::For<ModuleLoaderState>(isolate);
 }
+
+// Record `key` as a candidate for `mod`'s identity hash. Call alongside every
+// registry insert.
+void IndexRegisteredModule(ModuleLoaderState& state, const std::string& key,
+                           v8::Local<v8::Module> mod) {
+  if (mod.IsEmpty()) return;
+  auto& keys = state.keysByModuleHash[mod->GetIdentityHash()];
+  if (std::find(keys.begin(), keys.end(), key) == keys.end()) {
+    keys.push_back(key);
+  }
+}
+
+// Drop `key` from the bucket of whatever module the registry holds under it
+// right now. Call before replacing or erasing that entry, while the outgoing
+// handle is still reachable — afterwards its hash is unrecoverable.
+void UnindexRegistryKey(ModuleLoaderState& state, v8::Isolate* isolate,
+                        const std::string& key) {
+  auto regIt = state.registry.find(key);
+  if (regIt == state.registry.end() || regIt->second.IsEmpty()) return;
+  v8::Local<v8::Module> outgoing = regIt->second.Get(isolate);
+  if (outgoing.IsEmpty()) return;
+  auto bucketIt = state.keysByModuleHash.find(outgoing->GetIdentityHash());
+  if (bucketIt == state.keysByModuleHash.end()) return;
+  auto& keys = bucketIt->second;
+  keys.erase(std::remove(keys.begin(), keys.end(), key), keys.end());
+  if (keys.empty()) {
+    state.keysByModuleHash.erase(bucketIt);
+  }
+}
+
+// The registry key whose live entry is `mod`, or empty. Prunes candidates the
+// registry no longer confirms.
+std::string FindKeyForModule(ModuleLoaderState& state, v8::Isolate* isolate,
+                             v8::Local<v8::Module> mod) {
+  if (mod.IsEmpty()) return std::string();
+  auto bucketIt = state.keysByModuleHash.find(mod->GetIdentityHash());
+  if (bucketIt == state.keysByModuleHash.end()) return std::string();
+  auto& keys = bucketIt->second;
+  for (auto it = keys.begin(); it != keys.end();) {
+    auto regIt = state.registry.find(*it);
+    if (regIt == state.registry.end() || regIt->second.IsEmpty()) {
+      it = keys.erase(it);
+      continue;
+    }
+    if (regIt->second.Get(isolate) == mod) {
+      return *it;
+    }
+    ++it;
+  }
+  if (keys.empty()) {
+    state.keysByModuleHash.erase(bucketIt);
+  }
+  return std::string();
+}
 }  // namespace
+
+std::string LookupModuleKeyForModule(v8::Isolate* isolate,
+                                     v8::Local<v8::Module> mod) {
+  auto* state = ModuleLoaderStateFor(isolate);
+  if (state == nullptr) return std::string();
+  return FindKeyForModule(*state, isolate, mod);
+}
+
+void IndexModuleForIsolate(v8::Isolate* isolate, const std::string& canonicalKey,
+                           v8::Local<v8::Module> mod) {
+  auto* state = ModuleLoaderStateFor(isolate);
+  if (state == nullptr) return;
+  IndexRegisteredModule(*state, canonicalKey, mod);
+}
+
+void UnindexModuleForIsolate(v8::Isolate* isolate,
+                             const std::string& canonicalKey) {
+  auto* state = ModuleLoaderStateFor(isolate);
+  if (state == nullptr) return;
+  UnindexRegistryKey(*state, isolate, canonicalKey);
+}
 
 static bool IsVolatileUrl(const LoaderVocabulary& vocabulary,
                           const std::string& url);
@@ -494,7 +578,9 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
       return hs.Escape(existing);
     }
   }
+  UnindexRegistryKey(*moduleState, isolate, registryKey);
   g_moduleRegistry[registryKey].Reset(isolate, mod);
+  IndexRegisteredModule(*moduleState, registryKey, mod);
   return hs.Escape(mod);
 }
 
@@ -1501,6 +1587,7 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
     if (IsScriptLoadingLogEnabled() && !isHttpKey) {
       DEBUG_WRITE("[resolver] removing stale module %s", registryKey.c_str());
     }
+    UnindexRegistryKey(*moduleState, isolate, registryKey);
     it->second.Reset();
     g_moduleRegistry.erase(it);
   } else if (IsScriptLoadingLogEnabled()) {
@@ -2033,9 +2120,11 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(
   v8::MaybeLocal<v8::Value> evalResult = jsonModule->Evaluate(context);
   if (evalResult.IsEmpty()) return v8::MaybeLocal<v8::Module>();
 
+  UnindexRegistryKey(*moduleState, isolate, registryAbsPath);
   auto it = g_moduleRegistry.find(registryAbsPath);
   if (it != g_moduleRegistry.end()) it->second.Reset();
   g_moduleRegistry[registryAbsPath].Reset(isolate, jsonModule);
+  IndexRegisteredModule(*moduleState, registryAbsPath, jsonModule);
   return v8::MaybeLocal<v8::Module>(jsonModule);
 }
 
@@ -2248,14 +2337,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(
 
   // Find the referrer's registered path so we can resolve relative specs
   // against its directory.
-  std::string referrerPath;
-  for (auto& kv : g_moduleRegistry) {
-    v8::Local<v8::Module> registered = kv.second.Get(isolate);
-    if (!registered.IsEmpty() && registered == referrer) {
-      referrerPath = kv.first;
-      break;
-    }
-  }
+  std::string referrerPath = FindKeyForModule(*moduleState, isolate, referrer);
   bool specIsRelative = !spec.empty() && spec[0] == '.';
   if (referrerPath.empty() && specIsRelative) {
     if (IsScriptLoadingLogEnabled()) {
@@ -2837,7 +2919,10 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           CompileModuleFromSource(isolate, context, kEmptySrc, url);
       v8::Local<v8::Module> mod;
       if (modMaybe.ToLocal(&mod)) {
-        g_moduleRegistry[CanonicalizeRegistryKey(url)].Reset(isolate, mod);
+        const std::string atStubKey = CanonicalizeRegistryKey(url);
+        UnindexRegistryKey(*moduleState, isolate, atStubKey);
+        g_moduleRegistry[atStubKey].Reset(isolate, mod);
+        IndexRegisteredModule(*moduleState, atStubKey, mod);
         if (mod->GetStatus() != v8::Module::kEvaluated) {
           if (mod->Evaluate(context).IsEmpty()) {
             resolver
@@ -3681,16 +3766,8 @@ void InitializeImportMetaObject(v8::Local<v8::Context> context,
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) return;
-  auto& g_moduleRegistry = moduleState->registry;
 
-  std::string modulePath;
-  for (auto& kv : g_moduleRegistry) {
-    v8::Local<v8::Module> registered = kv.second.Get(isolate);
-    if (!registered.IsEmpty() && registered == module) {
-      modulePath = kv.first;
-      break;
-    }
-  }
+  std::string modulePath = FindKeyForModule(*moduleState, isolate, module);
   if (modulePath.empty()) return;
 
   std::string moduleUrl;

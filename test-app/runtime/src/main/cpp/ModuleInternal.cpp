@@ -704,11 +704,13 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
             return Local<Value>();
         }
         auto& g_moduleRegistry = *registryPtr;
+        UnindexModuleForIsolate(isolate, path);
         auto it = g_moduleRegistry.find(path);
         if (it != g_moduleRegistry.end()) {
             it->second.Reset();
         }
         g_moduleRegistry[path].Reset(isolate, module);
+        IndexModuleForIsolate(isolate, path, module);
     }
 
     // 4) Instantiate (link) with ResolveModuleCallback

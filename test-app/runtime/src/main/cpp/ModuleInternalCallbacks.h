@@ -36,6 +36,21 @@ void QuiesceModuleLoadsForIsolate(v8::Isolate* isolate);
 // ever called on the isolate's own JS thread during module resolution/loading.
 void RemoveModuleFromRegistry(const std::string& canonicalPath);
 
+// The canonical registry key whose live entry is `mod`, or empty when the
+// module is not registered for `isolate`. O(1) via the loader state's
+// identity-hash index.
+std::string LookupModuleKeyForModule(v8::Isolate* isolate,
+                                     v8::Local<v8::Module> mod);
+
+// Keep the identity-hash index in step with a registry write performed outside
+// ModuleInternalCallbacks.cpp. Unindex first, while the key's outgoing module
+// is still reachable — once its handle is Reset its hash is unrecoverable and
+// the bucket entry would leak — then index the incoming one after the write.
+void UnindexModuleForIsolate(v8::Isolate* isolate,
+                             const std::string& canonicalKey);
+void IndexModuleForIsolate(v8::Isolate* isolate, const std::string& canonicalKey,
+                           v8::Local<v8::Module> mod);
+
 // Authoritative HTTP URL loader for dev-served ESM. This compiles and
 // registers the module under its canonical URL key without evaluating it.
 v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(
