@@ -677,10 +677,17 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
 
     if (isHttpModule) {
         RunModuleGraphLoadPumped(isolate, context, requestPath, 60.0);
+        // The loader throws the classifier's reason (status, MIME or
+        // transport); catch it so it lands in the message instead of staying
+        // pending on the isolate behind a C++ throw.
+        TryCatch tcLoad(isolate);
         MaybeLocal<Module> maybeMod = LoadHttpModuleForUrl(isolate, context, requestPath);
         if (!maybeMod.ToLocal(&module)) {
-            std::string reason = TakeLastHttpFetchErrorReason();
             std::string message = "Cannot load ES module " + requestPath;
+            if (tcLoad.HasCaught()) {
+                throw NativeScriptException(tcLoad, message);
+            }
+            std::string reason = TakeLastHttpFetchErrorReason();
             if (!reason.empty()) {
                 message.append(" — ");
                 message.append(reason);

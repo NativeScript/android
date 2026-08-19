@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cstring>
 #include <memory>
@@ -431,14 +432,144 @@ static void PermitAllStrictMode(JEnv& env) {
     }
 }
 
-bool HttpFetchText(const std::string& url, std::string& out, std::string& contentType, int& status) {
-    out.clear();
-    contentType.clear();
-    status = 0;
+// ── The module response policy ───────────────────────────────
+//
+// Module scripts are strict about MIME: the HTML spec's "fetch a single module
+// script" fails the fetch outright for anything that is not a JavaScript or
+// JSON MIME type, where a classic script would sniff and run it anyway. That
+// strictness is the whole point — an SPA dev server answering an unknown path
+// with `200 text/html` should say so, not hand HTML to the parser and produce
+// `Unexpected token '<'` from somewhere deep in the graph.
+//
+// Both transports classify here, so the synchronous fallback and the async
+// walk cannot disagree about what a response means.
+
+// "text/javascript; charset=utf-8" → "text/javascript": parameters stripped,
+// trimmed, lowercased.
+static std::string MimeEssence(const std::string& contentType) {
+    size_t semi = contentType.find(';');
+    std::string essence =
+            semi == std::string::npos ? contentType : contentType.substr(0, semi);
+    size_t begin = essence.find_first_not_of(" \t");
+    if (begin == std::string::npos) {
+        return "";
+    }
+    size_t end = essence.find_last_not_of(" \t");
+    essence = essence.substr(begin, end - begin + 1);
+    for (char& c : essence) {
+        c = (char)tolower((unsigned char)c);
+    }
+    return essence;
+}
+
+// The HTML spec's JavaScript MIME type essence list, verbatim.
+static bool IsJavaScriptMimeEssence(const std::string& essence) {
+    static const char* const kJavaScriptEssences[] = {"application/ecmascript",
+                                                      "application/javascript",
+                                                      "application/x-ecmascript",
+                                                      "application/x-javascript",
+                                                      "text/ecmascript",
+                                                      "text/javascript",
+                                                      "text/javascript1.0",
+                                                      "text/javascript1.1",
+                                                      "text/javascript1.2",
+                                                      "text/javascript1.3",
+                                                      "text/javascript1.4",
+                                                      "text/javascript1.5",
+                                                      "text/jscript",
+                                                      "text/livescript",
+                                                      "text/x-ecmascript",
+                                                      "text/x-javascript"};
+    for (const char* candidate : kJavaScriptEssences) {
+        if (essence == candidate) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// A JSON MIME type is application/json, text/json, or any `+json` subtype.
+static bool IsJsonMimeEssence(const std::string& essence) {
+    if (essence == "application/json" || essence == "text/json") {
+        return true;
+    }
+    const std::string suffix = "+json";
+    return essence.size() > suffix.size() &&
+           essence.compare(essence.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+// `transportOk` means a response arrived at all; everything else about it —
+// status, MIME, emptiness — is policy decided here. `body` is moved into the
+// result on success.
+static void ClassifyModuleResponse(const std::string& url, bool transportOk, int status,
+                                   const std::string& contentType, std::string& body,
+                                   ModuleFetchResult& result) {
+    result.status = status;
+    result.contentType = contentType;
+
+    if (!transportOk) {
+        result.failureReason = "HTTP import failed: " + url + " (network error)";
+        return;
+    }
+    if (status == 204 || status == 205) {
+        // "No content" carries no module, which the web treats as a network
+        // error for a module script rather than as an empty module.
+        result.failureReason =
+                "HTTP import failed: " + url + " (status=" + std::to_string(status) +
+                ", no content)";
+        return;
+    }
+    if (status < 200 || status >= 300) {
+        result.failureReason =
+                "HTTP import failed: " + url + " (status=" + std::to_string(status) + ")";
+        return;
+    }
+
+    const std::string essence = MimeEssence(contentType);
+    if (essence.empty()) {
+        result.failureReason =
+                "Expected a JavaScript module but '" + url + "' responded with no MIME type";
+        return;
+    }
+
+    if (IsJsonMimeEssence(essence)) {
+        if (body.empty()) {
+            result.failureReason =
+                    "Expected a JSON module but '" + url + "' responded with an empty body";
+            return;
+        }
+        result.kind = ModuleResponseKind::kJson;
+    } else if (IsJavaScriptMimeEssence(essence)) {
+        result.kind = ModuleResponseKind::kJavaScript;
+        // An empty 2xx JavaScript body is a valid module: type-only TypeScript
+        // modules transform to zero runtime code and dev servers serve them as
+        // empty 200s. Failing here would kill the whole graph with a misleading
+        // "status=200".
+        if (body.empty()) {
+            body = "export {};\n";
+            TNS_DEBUG(Esm, "[http-loader] empty 2xx body for %s — serving canonical empty module",
+                           url.c_str());
+        }
+    } else {
+        result.failureReason = "Expected a JavaScript module but '" + url +
+                               "' responded with MIME type '" + essence + "'";
+        return;
+    }
+
+    result.ok = true;
+    result.body = std::move(body);
+}
+
+bool HttpFetchModule(const std::string& url, ModuleFetchResult& result) {
+    result = ModuleFetchResult();
     ClearLastHttpFetchErrorReason();
 
+    // Security gate: the single point of enforcement for all HTTP module
+    // loading, checked before any network turn.
     if (!IsRemoteUrlAllowed(url)) {
-        status = 403;
+        result.status = 403;
+        result.failureReason =
+                "HTTP import blocked: remote module loading is not allowed for " + url;
         TNS_DEBUG(Esm, "[http-esm][security][blocked] %s", url.c_str());
         return false;
     }
@@ -452,29 +583,35 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     // never reach for it.
     const std::string canonicalKey = CanonicalizeHttpUrlKey(url);
 
-    bool ok = PerformHttpFetchOnceSync(url, canonicalKey, out, contentType, status);
-    if (!ok) {
+    std::string body;
+    std::string contentType;
+    int status = 0;
+    bool transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status);
+    if (!transportOk) {
+        // One retry, and only for a transport error: an HTTP status is an
+        // answer, not a failure to communicate, so asking again would just
+        // repeat it.
         TNS_DEBUG(Esm, "[http-loader] retrying %s after initial fetch error", url.c_str());
         usleep(120 * 1000);
-        ok = PerformHttpFetchOnceSync(url, canonicalKey, out, contentType, status);
+        transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status);
     }
-    if (!ok || status < 200 || status >= 300) {
+
+    ClassifyModuleResponse(url, transportOk, status, contentType, body, result);
+
+    if (!result.ok) {
+        TNS_DEBUG(Esm, "[http-loader][fetch-sync][reject] %s", result.failureReason.c_str());
         return false;
     }
-    if (out.empty()) {
-        out = "export {};\n";
-        TNS_DEBUG(Esm, "[http-loader] empty 2xx body for %s — serving canonical empty module",
-                       url.c_str());
-    }
-    TNS_DEBUG(Esm, "[http-loader] fetched status=%d content-type=%s bytes=%llu", status,
-                   contentType.empty() ? "<none>" : contentType.c_str(),
-                   (unsigned long long)out.size());
+
+    TNS_DEBUG(Esm, "[http-loader] fetched status=%d content-type=%s bytes=%llu", result.status,
+                   result.contentType.empty() ? "<none>" : result.contentType.c_str(),
+                   (unsigned long long)result.body.size());
     if (urlLogEnabled) {
         const auto netMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                                    std::chrono::steady_clock::now() - netStart)
                                    .count();
         TNS_DEBUG(Fetch, "[http-loader][fetch][network] %s bytes=%lu ms=%lld", url.c_str(),
-                         (unsigned long)out.size(), (long long)netMs);
+                         (unsigned long)result.body.size(), (long long)netMs);
     }
 
     InvokeHttpFetchYield();
@@ -565,6 +702,11 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
         jmethodID getErrorStream =
                 isHttp ? env.GetMethodID(clsHttp, "getErrorStream", "()Ljava/io/InputStream;")
                        : nullptr;
+        // Once a status line has been read the server has answered, and every
+        // body-side failure below stops being a transport error: an empty 404
+        // is an answer, and reporting it as "network error" would both hide
+        // the status and earn a pointless retry.
+        bool haveStatus = false;
         if (isHttp && getResponseCode) {
             status = env.CallIntMethod(conn, getResponseCode);
             std::string excClass, excMsg;
@@ -576,6 +718,7 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
                      url.c_str(), excClass.c_str(), excMsg.c_str());
                 return false;
             }
+            haveStatus = status > 0;
         }
 
         jmethodID getInputStream =
@@ -583,64 +726,78 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
         jobject inStream = nullptr;
         if (isHttp && status >= 400 && getErrorStream) {
             inStream = env.CallObjectMethod(conn, getErrorStream);
+            env.ExceptionClear();
         }
         if (!inStream) {
+            // On an error status with no error body, getInputStream throws
+            // FileNotFoundException rather than returning null.
             inStream = env.CallObjectMethod(conn, getInputStream);
-        }
-        {
             std::string excClass, excMsg;
             if (DrainPendingJniException(env, excClass, excMsg)) {
-                RecordLastHttpFetchError("get-input-stream", excClass, excMsg);
-                TNS_DEBUG(Esm,
-                     "[http-esm][fetch][exception] stage=get-input-stream url=%s class=%s "
-                     "msg=%s",
-                     url.c_str(), excClass.c_str(), excMsg.c_str());
-                return false;
+                if (!haveStatus) {
+                    RecordLastHttpFetchError("get-input-stream", excClass, excMsg);
+                    TNS_DEBUG(Esm,
+                         "[http-esm][fetch][exception] stage=get-input-stream url=%s class=%s "
+                         "msg=%s",
+                         url.c_str(), excClass.c_str(), excMsg.c_str());
+                    return false;
+                }
+                inStream = nullptr;
             }
         }
-        if (!inStream) return false;
+        if (!inStream && !haveStatus) return false;
 
-        jclass clsIS = env.GetObjectClass(inStream);
-        jmethodID readMethod = env.GetMethodID(clsIS, "read", "([B)I");
-        jmethodID closeIS = env.GetMethodID(clsIS, "close", "()V");
-
-        jclass clsBAOS = env.FindClass("java/io/ByteArrayOutputStream");
-        jmethodID baosCtor = env.GetMethodID(clsBAOS, "<init>", "()V");
-        jmethodID baosWrite = env.GetMethodID(clsBAOS, "write", "([BII)V");
-        jmethodID baosToByteArray = env.GetMethodID(clsBAOS, "toByteArray", "()[B");
-        jmethodID baosClose = env.GetMethodID(clsBAOS, "close", "()V");
-        jobject baos = env.NewObject(clsBAOS, baosCtor);
-
-        jbyteArray buffer = env.NewByteArray(8192);
         bool readFailed = false;
-        while (true) {
-            jint n = env.CallIntMethod(inStream, readMethod, buffer);
-            std::string excClass, excMsg;
-            if (DrainPendingJniException(env, excClass, excMsg)) {
-                RecordLastHttpFetchError("read-body", excClass, excMsg);
-                TNS_DEBUG(Esm,
-                     "[http-esm][fetch][exception] stage=read-body url=%s class=%s msg=%s",
-                     url.c_str(), excClass.c_str(), excMsg.c_str());
-                readFailed = true;
-                break;
+        if (inStream) {
+            jclass clsIS = env.GetObjectClass(inStream);
+            jmethodID readMethod = env.GetMethodID(clsIS, "read", "([B)I");
+            jmethodID closeIS = env.GetMethodID(clsIS, "close", "()V");
+
+            jclass clsBAOS = env.FindClass("java/io/ByteArrayOutputStream");
+            jmethodID baosCtor = env.GetMethodID(clsBAOS, "<init>", "()V");
+            jmethodID baosWrite = env.GetMethodID(clsBAOS, "write", "([BII)V");
+            jmethodID baosToByteArray = env.GetMethodID(clsBAOS, "toByteArray", "()[B");
+            jmethodID baosClose = env.GetMethodID(clsBAOS, "close", "()V");
+            jobject baos = env.NewObject(clsBAOS, baosCtor);
+
+            jbyteArray buffer = env.NewByteArray(8192);
+            while (true) {
+                jint n = env.CallIntMethod(inStream, readMethod, buffer);
+                std::string excClass, excMsg;
+                if (DrainPendingJniException(env, excClass, excMsg)) {
+                    RecordLastHttpFetchError("read-body", excClass, excMsg);
+                    TNS_DEBUG(Esm,
+                         "[http-esm][fetch][exception] stage=read-body url=%s class=%s msg=%s",
+                         url.c_str(), excClass.c_str(), excMsg.c_str());
+                    readFailed = true;
+                    break;
+                }
+                if (n < 0) break;
+                if (n == 0) continue;
+                env.CallVoidMethod(baos, baosWrite, buffer, 0, n);
             }
-            if (n < 0) break;
-            if (n == 0) continue;
-            env.CallVoidMethod(baos, baosWrite, buffer, 0, n);
-        }
 
-        env.CallVoidMethod(inStream, closeIS);
-        if (readFailed) {
+            env.CallVoidMethod(inStream, closeIS);
+            if (!readFailed) {
+                jbyteArray bytes =
+                        static_cast<jbyteArray>(env.CallObjectMethod(baos, baosToByteArray));
+                env.CallVoidMethod(baos, baosClose);
+                if (bytes) {
+                    jsize len = env.GetArrayLength(bytes);
+                    out.resize(static_cast<size_t>(len));
+                    if (len > 0) {
+                        env.GetByteArrayRegion(bytes, 0, len, reinterpret_cast<jbyte*>(&out[0]));
+                    }
+                } else {
+                    readFailed = true;
+                }
+            }
+        }
+        // A truncated read only matters when the body is what the caller
+        // needs: on a non-2xx the status alone decides the outcome, so keep
+        // the answer rather than turning it into a retryable network error.
+        if (readFailed && (!haveStatus || (status >= 200 && status < 300))) {
             return false;
-        }
-        jbyteArray bytes = static_cast<jbyteArray>(env.CallObjectMethod(baos, baosToByteArray));
-        env.CallVoidMethod(baos, baosClose);
-
-        if (!bytes) return false;
-        jsize len = env.GetArrayLength(bytes);
-        out.resize(static_cast<size_t>(len));
-        if (len > 0) {
-            env.GetByteArrayRegion(bytes, 0, len, reinterpret_cast<jbyte*>(&out[0]));
         }
 
         jmethodID getContentType =
@@ -651,14 +808,16 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
         }
 
         if (status == 0) status = 200;
-        const bool emptyNon2xx = out.empty() && (status < 200 || status >= 300);
-        if (emptyNon2xx) {
-            return false;
-        }
+        // A cache-bust mark is only satisfied by a response that actually
+        // carried the new body; a 404 leaves it armed for the next attempt.
         if (status >= 200 && status < 300 && bustRequested) {
             ClearCacheBustForUrl(canonicalKey);
         }
-        return status >= 200 && status < 300;
+        // Pure transport: true means a response arrived. Whether that response
+        // is a usable module — status, MIME, emptiness — is
+        // ClassifyModuleResponse's call, so both fetch paths answer it the
+        // same way.
+        return true;
     } catch (NativeScriptException& nse) {
         std::string what = nse.what() ? nse.what() : "";
         if (what.empty()) {
@@ -683,10 +842,15 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
 }
 
 void FetchModuleBodyAsync(const std::string& url,
-                          std::function<void(bool ok, int status, std::string body)> completion) {
+                          std::function<void(ModuleFetchResult result)> completion) {
+    // Security gate: single point of enforcement, same as HttpFetchModule.
     if (!IsRemoteUrlAllowed(url)) {
         TNS_DEBUG(Esm, "[http-esm][security][blocked] %s", url.c_str());
-        completion(false, 403, std::string());
+        ModuleFetchResult blocked;
+        blocked.status = 403;
+        blocked.failureReason =
+                "HTTP import blocked: remote module loading is not allowed for " + url;
+        completion(std::move(blocked));
         return;
     }
 
@@ -715,33 +879,33 @@ void FetchModuleBodyAsync(const std::string& url,
             }
         } detachGuard{jvm, attachedHere};
 
-        std::string out;
+        std::string body;
         std::string contentType;
         int status = 0;
         const auto start = std::chrono::steady_clock::now();
-        bool ok = PerformHttpFetchOnceSync(url, canonicalKey, out, contentType, status);
-        if (!ok) {
+        bool transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status);
+        if (!transportOk) {
+            // Transport error → one retry, the same single-retry policy the
+            // sync path applies.
             TNS_DEBUG(Esm, "[http-loader][fetch-async] retrying %s after transport error",
                            url.c_str());
             usleep(120 * 1000);
-            ok = PerformHttpFetchOnceSync(url, canonicalKey, out, contentType, status);
+            transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status);
         }
-        ok = ok && status >= 200 && status < 300;
-        if (ok && out.empty()) {
-            out = "export {};\n";
-        }
-        if (!ok) {
-            TNS_DEBUG(Esm, "[http-loader][fetch-async][error] url=%s status=%d", url.c_str(),
-                           status);
-        }
-        if (ok && LogCategoryEnabled(LogCategory::Fetch)) {
+
+        ModuleFetchResult result;
+        ClassifyModuleResponse(url, transportOk, status, contentType, body, result);
+
+        if (!result.ok) {
+            TNS_DEBUG(Esm, "[http-loader][fetch-async][reject] %s", result.failureReason.c_str());
+        } else if (LogCategoryEnabled(LogCategory::Fetch)) {
             const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                                     std::chrono::steady_clock::now() - start)
                                     .count();
             TNS_DEBUG(Fetch, "[http-loader][fetch][async] %s bytes=%lu ms=%lld", url.c_str(),
-                             (unsigned long)out.size(), (long long)ms);
+                             (unsigned long)result.body.size(), (long long)ms);
         }
-        completion(ok, status, std::move(out));
+        completion(std::move(result));
     }).detach();
 }
 

@@ -228,6 +228,10 @@ static bool ShouldTraceRegistryKey(const std::string& rawKey,
 static const char* ModuleStatusToString(v8::Module::Status status);
 static void KillAsyncGraphLoadsForIsolate(v8::Isolate* isolate);
 static bool IsCurrentIsolateWorker(v8::Isolate* isolate);
+static v8::MaybeLocal<v8::Module> CompileJsonTextAsEsModule(
+    v8::Isolate* isolate, v8::Local<v8::Context> context,
+    const std::string& jsonText, const std::string& registryAbsPath,
+    const std::string& displayUrl);
 static void RejectAndClearInvalidatedModuleState(v8::Isolate* isolate,
                                                  v8::Local<v8::Context> context,
                                                  const std::string& registryKey);
@@ -676,37 +680,38 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
       "synchronous fetch. This should not happen; please report it.",
       requestedUrl.c_str());
 
-  std::string body;
-  std::string contentType;
-  int status = 0;
-  if (!HttpFetchText(requestedUrl, body, contentType, status) || body.empty()) {
+  ModuleFetchResult fetched;
+  if (!HttpFetchModule(requestedUrl, fetched)) {
     TNS_DEBUG(Esm, "[http-esm][load][fetch-fail] request=%s key=%s status=%d",
-                   requestedUrl.c_str(), registryKey.c_str(), status);
-    if (IsDebuggable()) {
-      std::string msg = "HTTP import failed: " + requestedUrl +
-                        " (status=" + std::to_string(status) + ")";
-      isolate->ThrowException(v8::Exception::Error(
-          ArgConverter::ConvertToV8String(isolate, msg)));
-    }
+                   requestedUrl.c_str(), registryKey.c_str(), fetched.status);
+    // The classifier's reason names the URL and the cause (status, MIME or
+    // transport); a generic message here would lose all of it. V8 requires an
+    // exception whenever a resolve callback returns empty, so this is thrown
+    // in every build.
+    isolate->ThrowException(v8::Exception::Error(
+        ArgConverter::ConvertToV8String(isolate, fetched.failureReason)));
     return v8::MaybeLocal<v8::Module>();
   }
 
-  v8::MaybeLocal<v8::Module> loaded =
-      CompileModuleForResolveRegisterOnly(isolate, context, body, registryKey);
+  if (fetched.kind == ModuleResponseKind::kJson) {
+    return CompileJsonTextAsEsModule(isolate, context, fetched.body, registryKey,
+                                     requestedUrl);
+  }
+
+  v8::MaybeLocal<v8::Module> loaded = CompileModuleForResolveRegisterOnly(
+      isolate, context, fetched.body, registryKey);
   if (loaded.IsEmpty()) {
     TNS_DEBUG(Esm, "[http-esm][load][compile-fail] request=%s key=%s bytes=%zu",
-                   requestedUrl.c_str(), registryKey.c_str(), body.size());
-    if (IsDebuggable()) {
-      std::string msg = "HTTP import compile failed: " + requestedUrl;
-      isolate->ThrowException(v8::Exception::Error(
-          ArgConverter::ConvertToV8String(isolate, msg)));
-    }
+                   requestedUrl.c_str(), registryKey.c_str(), fetched.body.size());
+    std::string msg = "HTTP import compile failed: " + requestedUrl;
+    isolate->ThrowException(v8::Exception::Error(
+        ArgConverter::ConvertToV8String(isolate, msg)));
     return v8::MaybeLocal<v8::Module>();
   }
 
   TNS_DEBUG(Esm, "[http-esm][load][ok] request=%s key=%s type=%s bytes=%zu",
                  requestedUrl.c_str(), registryKey.c_str(),
-                 contentType.c_str(), body.size());
+                 fetched.contentType.c_str(), fetched.body.size());
   return loaded;
 }
 
@@ -1587,12 +1592,12 @@ static void AsyncGraphMaybeComplete(const std::shared_ptr<AsyncGraphLoad>& load,
   }
 }
 
-// A fetched body arrived on the isolate's JS thread: compile + register it,
-// then walk its requests. Runs outside any V8 scope, so it enters the isolate
-// the same way other cross-thread callbacks do.
+// A fetch verdict arrived on the isolate's JS thread: compile + register the
+// module, then walk its requests. Runs outside any V8 scope, so it enters the
+// isolate the same way other cross-thread callbacks do.
 static void AsyncGraphOnFetchCompleted(
     const std::shared_ptr<AsyncGraphLoad>& load, const std::string& url,
-    bool ok, int status, const std::shared_ptr<std::string>& body) {
+    const std::shared_ptr<ModuleFetchResult>& fetched) {
   if (load->dead.load(std::memory_order_acquire)) return;
   v8::Isolate* isolate = load->isolate;
   if (Runtime::GetRuntime(isolate) == nullptr) return;
@@ -1610,19 +1615,35 @@ static void AsyncGraphOnFetchCompleted(
   const bool isRoot = (key == load->rootKey);
 
   if (!load->failed) {
-    if (!ok) {
+    if (!fetched->ok) {
       if (isRoot) {
         load->failed = true;
-        load->failureMessage = "HTTP import failed: " + url +
-                               " (status=" + std::to_string(status) + ")";
+        load->failureMessage = fetched->failureReason;
       } else {
-        TNS_DEBUG(Esm, "[graph][dep-fetch-fail] %s status=%d (left to sync resolver)",
-                       url.c_str(), status);
+        TNS_DEBUG(Esm, "[graph][dep-fetch-fail] %s (left to sync resolver)",
+                       fetched->failureReason.c_str());
+      }
+    } else if (fetched->kind == ModuleResponseKind::kJson) {
+      // JSON compiles, instantiates and evaluates in one step and carries no
+      // module requests, so there is nothing further to walk from here.
+      load->fetchedCount++;
+      v8::TryCatch tcJson(isolate);
+      if (CompileJsonTextAsEsModule(isolate, context, fetched->body, key, url)
+              .IsEmpty()) {
+        if (isRoot) {
+          load->failed = true;
+          load->failureMessage = "JSON module failed to compile: " + url;
+        } else {
+          TNS_DEBUG(Esm, "[graph][dep-json-fail] %s (left to sync resolver)",
+                         url.c_str());
+        }
+      } else {
+        load->compiledCount++;
       }
     } else {
       load->fetchedCount++;
       v8::MaybeLocal<v8::Module> maybeMod =
-          CompileModuleForResolveRegisterOnly(isolate, context, *body, key);
+          CompileModuleForResolveRegisterOnly(isolate, context, fetched->body, key);
       v8::Local<v8::Module> mod;
       if (!maybeMod.ToLocal(&mod)) {
         if (isRoot) {
@@ -1727,8 +1748,7 @@ static void AsyncGraphEnqueue(const std::shared_ptr<AsyncGraphLoad>& load,
   load->pendingFetches++;
   std::shared_ptr<AsyncGraphLoad> loadRef = load;
   const std::string url = target;
-  FetchModuleBodyAsync(url, [loadRef, url](bool ok, int status,
-                                           std::string body) {
+  FetchModuleBodyAsync(url, [loadRef, url](ModuleFetchResult result) {
     // Arbitrary thread. Hop to the isolate's home thread as a nestable v8
     // foreground task — delivery is a property of the isolate, not of the
     // thread that started the fetch, and the pumped walk's
@@ -1742,11 +1762,10 @@ static void AsyncGraphEnqueue(const std::shared_ptr<AsyncGraphLoad>& load,
         platform != nullptr ? platform->LookupEventLoop(loadRef->isolate)
                             : nullptr;
     if (loop == nullptr) return;
-    auto bodyPtr = std::make_shared<std::string>(std::move(body));
+    auto resultPtr = std::make_shared<ModuleFetchResult>(std::move(result));
     loop->PostV8Task(
-        std::make_unique<FetchCompletionTask>([loadRef, url, ok, status,
-                                               bodyPtr]() {
-          AsyncGraphOnFetchCompleted(loadRef, url, ok, status, bodyPtr);
+        std::make_unique<FetchCompletionTask>([loadRef, url, resultPtr]() {
+          AsyncGraphOnFetchCompleted(loadRef, url, resultPtr);
         }),
         /*nestable=*/true, /*delaySeconds=*/0);
   });
@@ -2158,11 +2177,15 @@ static void RejectAndClearInvalidatedModuleState(v8::Isolate* isolate,
 // ─────────────────────────────────────────────────────────────
 // JSON module → synthetic ES module
 
-// Compile a `.json` file as an ES module whose default export is the parsed
-// JSON value. Handles registry insertion and eager evaluation.
-static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(
+// Wrap JSON source as an ES module with the parsed value as its default
+// export. Shared by the filesystem path and the HTTP path so a served JSON
+// module and an imported .json file behave identically; `displayUrl` only
+// names the module in stack traces. Handles registry insertion and eager
+// evaluation.
+static v8::MaybeLocal<v8::Module> CompileJsonTextAsEsModule(
     v8::Isolate* isolate, v8::Local<v8::Context> context,
-    const std::string& absPath, const std::string& registryAbsPath) {
+    const std::string& jsonText, const std::string& registryAbsPath,
+    const std::string& displayUrl) {
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) {
     return v8::MaybeLocal<v8::Module>();
@@ -2171,7 +2194,7 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(
 
   // JSON modules are compiled eagerly to kEvaluated, so a registered entry is
   // complete and must be reused — recompiling would mint a second module
-  // identity (and namespace) for the same file on every resolve.
+  // identity (and namespace) for the same source on every resolve.
   auto existingIt = g_moduleRegistry.find(registryAbsPath);
   if (existingIt != g_moduleRegistry.end()) {
     v8::Local<v8::Module> existing = existingIt->second.Get(isolate);
@@ -2183,13 +2206,12 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(
     g_moduleRegistry.erase(existingIt);
   }
 
-  TNS_DEBUG(Esm, "[resolver][json] wrapping %s", absPath.c_str());
+  TNS_DEBUG(Esm, "[json] wrapping %s", displayUrl.c_str());
 
-  std::string jsonText = Runtime::GetRuntime(isolate)->ReadFileText(absPath);
   std::string moduleSource = "export default " + jsonText + ";";
   v8::Local<v8::String> sourceText =
       ArgConverter::ConvertToV8String(isolate, moduleSource);
-  std::string url = "file://" + absPath;
+  const std::string& url = displayUrl;
 
   v8::Local<v8::String> urlString;
   if (!v8::String::NewFromUtf8(isolate, url.c_str(),
@@ -2224,6 +2246,15 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(
   g_moduleRegistry[registryAbsPath].Reset(isolate, jsonModule);
   IndexRegisteredModule(*moduleState, registryAbsPath, jsonModule);
   return v8::MaybeLocal<v8::Module>(jsonModule);
+}
+
+// The filesystem entry point: read the file, then share the wrap.
+static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(
+    v8::Isolate* isolate, v8::Local<v8::Context> context,
+    const std::string& absPath, const std::string& registryAbsPath) {
+  const std::string jsonText = Runtime::GetRuntime(isolate)->ReadFileText(absPath);
+  return CompileJsonTextAsEsModule(isolate, context, jsonText, registryAbsPath,
+                                   "file://" + absPath);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2375,7 +2406,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(
       return v8::MaybeLocal<v8::Module>();
     }
     case ModuleResolution::Kind::kHttp:
-      // Security: HttpFetchText gates remote module access centrally.
+      // Security: HttpFetchModule gates remote module access centrally.
       return LoadHttpModuleForUrl(isolate, context, resolution.url);
     case ModuleResolution::Kind::kNodePolyfill: {
       const std::string& key = resolution.specifier;  // e.g. "node:url"
@@ -2476,6 +2507,10 @@ static void FinishHttpDynamicImport(v8::Isolate* isolate,
                      key.c_str());
     }
   }
+  // The loader throws the classifier's reason (status, MIME or transport) on
+  // failure; catch it here so it becomes the waiters' rejection instead of a
+  // generic message left beside a pending exception.
+  v8::TryCatch tcLoad(isolate);
   v8::MaybeLocal<v8::Module> modMaybe =
       LoadHttpModuleForUrl(isolate, context, requestUrl);
   if (!modMaybe.IsEmpty()) {
@@ -2584,10 +2619,13 @@ static void FinishHttpDynamicImport(v8::Isolate* isolate,
       return;
     }
   }
-  RejectHttpDynamicWaiters(
-      isolate, context, key,
-      v8::Exception::Error(
-          ArgConverter::ConvertToV8String(isolate, "HTTP fetch/compile failed")));
+  v8::Local<v8::Value> reason =
+      tcLoad.HasCaught()
+          ? tcLoad.Exception()
+          : v8::Exception::Error(ArgConverter::ConvertToV8String(
+                isolate, "HTTP fetch/compile failed: " + requestUrl));
+  tcLoad.Reset();
+  RejectHttpDynamicWaiters(isolate, context, key, reason);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -3091,7 +3129,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     }
 
     // ── HTTP(S) fast path ──
-    // Security: HttpFetchText gates remote module access centrally.
+    // Security: HttpFetchModule gates remote module access centrally.
     if (!normalizedSpec.empty() &&
         (StartsWith(normalizedSpec, "http://") ||
          StartsWith(normalizedSpec, "https://"))) {

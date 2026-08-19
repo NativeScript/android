@@ -67,40 +67,55 @@ struct CanonicalizationConfig {
 // module under exactly one URL and never varies it for freshness.
 std::string CanonicalizeHttpUrlKey(const std::string& url);
 
-// Minimal text fetch for HTTP ESM loader. Returns true on 2xx.
-// - out: response body
-// - contentType: Content-Type header if present
-// - status: HTTP status code
-//
-// Synchronous fetch with one retry — this is the fallback path for
-// anything the async module-graph walk missed. Empty 2xx bodies are
-// normalized to the canonical empty module (`export {};\n`).
-bool HttpFetchText(const std::string& url, std::string& out,
-                   std::string& contentType, int& status);
+// What a module response turned out to be. Decided once, by the shared
+// classifier, for whichever transport produced the response.
+enum class ModuleResponseKind {
+    kJavaScript,
+    kJson,
+};
 
-// Asynchronous single-URL module body fetch — the I/O primitive behind the
-// phase-1 module-graph walk (see StartModuleGraphLoad in
-// ModuleInternalCallbacks.h). Same semantics as HttpFetchText, minus the
-// JS-thread block:
+// The outcome of fetching one module over HTTP. Both transports produce this
+// same verdict, so the synchronous fallback and the async graph walk cannot
+// drift apart on what counts as a usable module.
+struct ModuleFetchResult {
+    bool ok = false;
+    int status = 0;
+    ModuleResponseKind kind = ModuleResponseKind::kJavaScript;
+    // Normalized: an empty 2xx JavaScript body becomes the canonical empty
+    // module. Meaningful only when `ok`.
+    std::string body;
+    std::string contentType;  // as received, parameters included
+    // Reader-facing explanation, non-empty exactly when `!ok`. This is the text
+    // that reaches the importer's rejection, so it names the URL and the cause.
+    std::string failureReason;
+};
+
+// Synchronous module fetch with one retry on transport error — the fallback
+// path for anything the module-graph walk missed. Blocks the calling thread.
+// Returns `result.ok`.
+bool HttpFetchModule(const std::string& url, ModuleFetchResult& result);
+
+// Asynchronous single-URL module fetch — the I/O primitive behind the
+// module-graph walk (see StartModuleGraphLoad in ModuleInternalCallbacks.h).
+// Same response policy as HttpFetchModule, minus the JS-thread block:
 //   - security gate (IsRemoteUrlAllowed) checked up front,
 //   - a JNI HttpURLConnection GET on a background thread with the same
 //     request shape as the sync path (cache-bust nonce, zero-cache headers,
-//     no cookies) and one retry on transport error,
-//   - empty 2xx bodies normalize to the canonical empty module.
-// `completion(ok, status, body)` is invoked exactly once, on an arbitrary
-// thread — callers must hop to their JS thread before touching V8.
+//     no cookies) and one retry on transport error.
+// `completion(result)` is invoked exactly once, on an arbitrary thread —
+// callers must hop to their JS thread before touching V8.
 void FetchModuleBodyAsync(
     const std::string& url,
-    std::function<void(bool ok, int status, std::string body)> completion);
+    std::function<void(ModuleFetchResult result)> completion);
 
 // Return the most recent low-level fetch error reason for the calling
 // thread, or an empty string if the last fetch succeeded (or no fetch
 // has run on this thread yet). Take semantics — the slot is cleared on
 // read. Android-only diagnostic for splicing JNI exceptions into JS
-// errors when HttpFetchText returns status=0.
+// errors when the transport never reached an HTTP status.
 std::string TakeLastHttpFetchErrorReason();
 
-// Register a "yield" callback that `HttpFetchText` should invoke around its
+// Register a "yield" callback that `HttpFetchModule` should invoke around its
 // synchronous network turn so the caller can pump its own runloop (e.g. the
 // JS-thread looper so a placeholder UI can repaint during cold-boot).
 //
