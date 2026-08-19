@@ -17,6 +17,7 @@
 
 #include "ArgConverter.h"
 #include "JEnv.h"
+#include "ModuleInternal.h"
 #include "ModuleInternalCallbacks.h"
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
@@ -1101,6 +1102,10 @@ bool BuildNsModuleBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> 
     InstallDevFunction(isolate, context, binding, "getLoadedModuleUrls",
                        GetLoadedModuleUrlsCallback);
     InstallDevFunction(isolate, context, binding, "setDevBootComplete", SetDevBootCompleteCallback);
+
+    if (!ModuleInternal::InstallCreateRequireBinding(context, binding)) {
+        return false;
+    }
 
     if (IsDebuggable()) {
         auto canonicalizeCb = [](const v8::FunctionCallbackInfo<v8::Value>& info) {

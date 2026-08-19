@@ -73,6 +73,8 @@ set(RUNTIME_BUILTIN_JS
         ${RUNTIME_BUILTIN_JS_DIR}/events.js
         ${RUNTIME_BUILTIN_JS_DIR}/inspect.js
         ${RUNTIME_BUILTIN_JS_DIR}/json-helper.js
+        ${RUNTIME_BUILTIN_JS_DIR}/node-module.js
+        ${RUNTIME_BUILTIN_JS_DIR}/node-url.js
         ${RUNTIME_BUILTIN_JS_DIR}/node-util.js
         ${RUNTIME_BUILTIN_JS_DIR}/ns-module.js
         ${RUNTIME_BUILTIN_JS_DIR}/ns-runtime.js

@@ -29,6 +29,7 @@ const intrinsics = {
   Set,
   String,
   TypeError,
+  URL,
 
   // Well-known symbols.
   SymbolIterator: Symbol.iterator,
@@ -40,6 +41,7 @@ const intrinsics = {
   // Statics.
   ArrayBufferIsView: ArrayBuffer.isView,
   ArrayIsArray: Array.isArray,
+  decodeURIComponent,
   JSONStringify: JSON.stringify,
   NumberIsFinite: Number.isFinite,
   NumberIsNaN: Number.isNaN,
@@ -82,8 +84,11 @@ const intrinsics = {
   SetPrototypeHas: uncurryThis(Set.prototype.has),
   SetPrototypeValues: uncurryThis(Set.prototype.values),
   StringPrototypeCharCodeAt: uncurryThis(String.prototype.charCodeAt),
+  StringPrototypeEndsWith: uncurryThis(String.prototype.endsWith),
   StringPrototypeIndexOf: uncurryThis(String.prototype.indexOf),
+  StringPrototypeLastIndexOf: uncurryThis(String.prototype.lastIndexOf),
   StringPrototypeSlice: uncurryThis(String.prototype.slice),
+  StringPrototypeStartsWith: uncurryThis(String.prototype.startsWith),
   SymbolPrototypeToString: uncurryThis(Symbol.prototype.toString),
 
   // Iterator-protocol escape hatches: the captured `next` of the live map/set

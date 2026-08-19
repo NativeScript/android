@@ -178,6 +178,15 @@ class Runtime {
         }
 
         /*
+         * This runtime's CommonJS loader. `ns:module`'s createRequire mints its
+         * requires through it, so the require it hands out is the very one the
+         * loader builds for every module.
+         */
+        ModuleInternal* GetModuleInternal() {
+            return &m_module;
+        }
+
+        /*
          * Milliseconds since this runtime's time origin, on the monotonic
          * clock. Not inline: v8::Platform is only forward-declared through
          * v8.h here.

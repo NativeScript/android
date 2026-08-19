@@ -48,6 +48,9 @@ module.exports = somethingTheCallSiteNeeds;
   contract.
 - `ns-module.js` is the `ns:module` loader-control surface and `ns-runtime.js`
   is the `ns:runtime` live config surface (`setConfig`/`getConfig`).
+- `node-module.js` re-exports `ns:module`'s `createRequire` as the `node:module`
+  shim, and `node-url.js` is the `node:url` shim (`fileURLToPath` /
+  `pathToFileURL`), the one shim with no `ns:` counterpart to adapt.
 - Destructure `binding` and `primordials` once, at the top of the file, so the
   file's dependencies are visible and greppable.
 

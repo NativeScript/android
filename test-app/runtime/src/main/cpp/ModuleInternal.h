@@ -85,7 +85,15 @@ class ModuleInternal {
          * ModuleEvaluationPolicy.
          */
         static v8::Local<v8::Value> LoadESModule(v8::Isolate* isolate, const std::string& path,
-                                                 ModuleEvaluationPolicy policy);
+                                                 const ModuleEvaluationOptions& options);
+
+        /*
+         * Installs `createRequire` on the `ns:module` binding object. Kept here rather
+         * than with the dev-loader members because it hands out the very require the
+         * CommonJS loader builds for every module.
+         */
+        static bool InstallCreateRequireBinding(v8::Local<v8::Context> context,
+                                                v8::Local<v8::Object> binding);
 
         /*
          * Read + compile `path` as an ES module WITHOUT registering, instantiating or
@@ -121,19 +129,33 @@ class ModuleInternal {
 
         static void RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+        static void CreateRequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+
         void RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args);
 
         v8::Local<v8::String> WrapModuleContent(const std::string& path);
 
-        v8::Local<v8::Object> LoadImpl(v8::Isolate* isolate, const std::string& moduleName, const std::string& baseDir, bool& isData);
+        v8::Local<v8::Object> LoadImpl(v8::Isolate* isolate, const std::string& moduleName,
+                                       const std::string& baseDir, bool& isData,
+                                       const ModuleEvaluationOptions& options);
 
-        v8::Local<v8::Object> LoadModule(v8::Isolate* isolate, const std::string& path, const std::string& moduleCacheKey);
+        v8::Local<v8::Object> LoadModule(v8::Isolate* isolate, const std::string& path,
+                                         const std::string& moduleCacheKey,
+                                         const ModuleEvaluationOptions& options);
 
         v8::Local<v8::Object> LoadData(v8::Isolate* isolate, const std::string& path);
 
         v8::Local<v8::Script> LoadScript(v8::Isolate* isolate, const std::string& modulePath, const v8::Local<v8::String>& fullRequiredModulePath);
 
-        v8::Local<v8::Function> GetRequireFunction(v8::Isolate* isolate, const std::string& dirName);
+        /*
+         * A require bound to `dirName`, whose ES module loads evaluate under `options`.
+         * The options ride along as trailing arguments to the require factory, so
+         * nothing about them is ambient — and they are resolved once at mint time,
+         * never per require() call.
+         */
+        v8::Local<v8::Function> GetRequireFunction(v8::Isolate* isolate,
+                                                   const std::string& dirName,
+                                                   const ModuleEvaluationOptions& options);
 
         v8::ScriptCompiler::CachedData* TryLoadScriptCache(const std::string& path);
 

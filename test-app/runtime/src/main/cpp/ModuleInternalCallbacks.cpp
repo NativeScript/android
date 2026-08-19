@@ -53,11 +53,6 @@ static inline bool EndsWith(const std::string& value, const std::string& suffix)
   return std::equal(suffix.rbegin(), suffix.rend(), value.rbegin());
 }
 
-// Node.js built-in namespace check (node:url, node:module, node:path, ...).
-static bool IsNodeBuiltinModule(const std::string& moduleName) {
-  return moduleName.rfind("node:", 0) == 0;
-}
-
 // Filesystem: `path` names an existing regular file.
 static bool IsFile(const std::string& path) {
   struct stat st;
@@ -1235,7 +1230,6 @@ struct ModuleResolution {
   enum class Kind {
     kUnresolved,    // nothing locatable; the caller decides how to report it
     kBuiltin,       // ns:/node: — served from the builtin registry
-    kNodePolyfill,  // node: name with no builtin and no file — in-memory shim
     kHttp,          // absolute http(s) URL
     kFile,          // absolute filesystem path, confirmed to be a regular file
   };
@@ -1302,8 +1296,9 @@ static ModuleResolution ResolveSpecifierToPath(v8::Isolate* isolate,
   if (rawSpec.empty()) return result;
 
   // Builtins resolve before any path handling, so a file can never shadow one.
-  if (NsBuiltinModules::IsRegistered(rawSpec) ||
-      NsBuiltinModules::IsNsScheme(rawSpec)) {
+  // The whole scheme is claimed, registered or not, so an unknown `node:` name
+  // fails as a missing builtin instead of falling through to the filesystem.
+  if (NsBuiltinModules::IsBuiltinScheme(rawSpec)) {
     result.kind = ModuleResolution::Kind::kBuiltin;
     result.specifier = rawSpec;
     return result;
@@ -1520,13 +1515,6 @@ static ModuleResolution ResolveSpecifierToPath(v8::Isolate* isolate,
   if (found) {
     result.kind = ModuleResolution::Kind::kFile;
     result.path = NormalizePath(absPath);
-    return result;
-  }
-
-  // node: names with no registered builtin and no file on disk get an
-  // in-memory polyfill module rather than a resolution failure.
-  if (IsNodeBuiltinModule(spec)) {
-    result.kind = ModuleResolution::Kind::kNodePolyfill;
     return result;
   }
 
@@ -2406,108 +2394,6 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(
 }
 
 // ─────────────────────────────────────────────────────────────
-// node: builtin polyfills (Android). iOS ships node:url only; Android has
-// carried node:url / node:module / node:path shims for longer. Kept here to
-// avoid a behavior regression relative to current Android main.
-static const char* NodeUrlPolyfill() {
-  return "// In-memory polyfill for node:url\n"
-         "export function fileURLToPath(url) {\n"
-         "  if (typeof url === 'string') {\n"
-         "    if (url.startsWith('file://')) {\n"
-         "      return decodeURIComponent(url.slice(7));\n"
-         "    }\n"
-         "    return url;\n"
-         "  }\n"
-         "  if (url && typeof url.href === 'string') {\n"
-         "    return fileURLToPath(url.href);\n"
-         "  }\n"
-         "  throw new Error('Invalid URL');\n"
-         "}\n"
-         "\n"
-         "export function pathToFileURL(path) {\n"
-         "  const encoded = encodeURIComponent(path).replace(/%2F/g, '/');\n"
-         "  return new URL('file://' + encoded);\n"
-         "}\n";
-}
-
-static const char* NodeModulePolyfill() {
-  return "// In-memory polyfill for node:module\n"
-         "export function createRequire(filename) {\n"
-         "  if (typeof require === 'function') {\n"
-         "    return require;\n"
-         "  }\n"
-         "  return function(id) {\n"
-         "    throw new Error('Module ' + id + ' not found. NativeScript require() not available.');\n"
-         "  };\n"
-         "}\n"
-         "export default { createRequire };\n";
-}
-
-static const char* NodePathPolyfill() {
-  return "// In-memory polyfill for node:path\n"
-         "export const sep = '/';\n"
-         "export const delimiter = ':';\n"
-         "\n"
-         "export function basename(path, ext) {\n"
-         "  const name = path.split('/').pop() || '';\n"
-         "  return ext && name.endsWith(ext) ? name.slice(0, -ext.length) : name;\n"
-         "}\n"
-         "\n"
-         "export function dirname(path) {\n"
-         "  const parts = path.split('/');\n"
-         "  return parts.slice(0, -1).join('/') || '/';\n"
-         "}\n"
-         "\n"
-         "export function extname(path) {\n"
-         "  const name = basename(path);\n"
-         "  const dot = name.lastIndexOf('.');\n"
-         "  return dot > 0 ? name.slice(dot) : '';\n"
-         "}\n"
-         "\n"
-         "export function join(...paths) {\n"
-         "  return paths.filter(Boolean).join('/').replace(/\\/+/g, '/');\n"
-         "}\n"
-         "\n"
-         "export function resolve(...paths) {\n"
-         "  let resolved = '';\n"
-         "  for (let path of paths) {\n"
-         "    if (path.startsWith('/')) {\n"
-         "      resolved = path;\n"
-         "    } else {\n"
-         "      resolved = join(resolved, path);\n"
-         "    }\n"
-         "  }\n"
-         "  return resolved || '/';\n"
-         "}\n"
-         "\n"
-         "export function isAbsolute(path) {\n"
-         "  return path.startsWith('/');\n"
-         "}\n"
-         "\n"
-         "export default { basename, dirname, extname, join, resolve, isAbsolute, sep, delimiter };\n";
-}
-
-// Compile + register a node: builtin polyfill under `key`. Returns the
-// compiled (but not instantiated) module on success.
-static v8::MaybeLocal<v8::Module> CompileNodeBuiltinPolyfill(
-    v8::Isolate* isolate, v8::Local<v8::Context> context,
-    const std::string& spec, const std::string& key) {
-  const std::string builtinName = spec.substr(5);  // drop "node:"
-  const char* polyfill = nullptr;
-  if (builtinName == "url") polyfill = NodeUrlPolyfill();
-  else if (builtinName == "module") polyfill = NodeModulePolyfill();
-  else if (builtinName == "path") polyfill = NodePathPolyfill();
-  else {
-    isolate->ThrowException(v8::Exception::Error(ArgConverter::ConvertToV8String(
-        isolate, NsBuiltinModules::NotFoundMessage(spec))));
-    return v8::MaybeLocal<v8::Module>();
-  }
-  // The polyfill source is the runtime's own, so a compile failure here is a
-  // runtime bug: keep the parse error rather than masking it.
-  return CompileModuleForResolveRegisterOnly(isolate, context, polyfill, key);
-}
-
-// ─────────────────────────────────────────────────────────────
 // ResolveModuleCallback — invoked by V8 to resolve `import X from '<spec>'`.
 //
 // Every resolution decision belongs to ResolveSpecifierToPath, shared with the
@@ -2558,21 +2444,6 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(
     case ModuleResolution::Kind::kHttp:
       // Security: HttpFetchModule gates remote module access centrally.
       return LoadHttpModuleForUrl(isolate, context, resolution.url);
-    case ModuleResolution::Kind::kNodePolyfill: {
-      const std::string& key = resolution.specifier;  // e.g. "node:url"
-      auto itExisting = g_moduleRegistry.find(key);
-      if (itExisting != g_moduleRegistry.end()) {
-        v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
-        if (!existing.IsEmpty() &&
-            existing->GetStatus() != v8::Module::kErrored) {
-          return v8::MaybeLocal<v8::Module>(existing);
-        }
-        RemoveModuleFromRegistry(key);
-      }
-      // On failure CompileNodeBuiltinPolyfill has already thrown (unknown
-      // builtin, or compile failure); do not overwrite that exception.
-      return CompileNodeBuiltinPolyfill(isolate, context, key, key);
-    }
     case ModuleResolution::Kind::kUnresolved: {
       // Surfaced as an exception rather than left to ReadFileText, which would
       // abort trying to open a directory.
