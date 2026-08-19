@@ -173,7 +173,6 @@ const surface = {
   configureLoader: binding.configureLoader,
   invalidateModules: binding.invalidateModules,
   getLoadedModuleUrls: binding.getLoadedModuleUrls,
-  setDevBootComplete: binding.setDevBootComplete,
   createRequire,
   createPumpingRequire,
 };

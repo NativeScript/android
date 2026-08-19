@@ -30,8 +30,8 @@ namespace tns {
 //     normally arrive,
 //   - eviction plumbing (an eviction-driven fetch nonce that defeats
 //     any HTTP cache layer between the runtime and the origin),
-//   - the dev-boot-complete signal that disarms cold-boot-only
-//     behaviors (host yield pump),
+//   - the boot-evaluation flag that arms the cold-boot looper pump only
+//     while an entry module is evaluating (derived by the runtime itself),
 //   - the remote-module security gate, seeded once from nativescript.config
 //     at boot and never exposed on ns:runtime getConfig/setConfig.
 
@@ -135,16 +135,14 @@ void RegisterHttpFetchYield(void (*callback)());
 // The nonce is transport-only and never affects module identity.
 void MarkUrlsForCacheBust(const std::vector<std::string>& urls);
 
-// Flip the dev-boot-complete signal: sets the JS-visible
-// `__NS_HMR_BOOT_COMPLETE__` global and the native atomic that gates the
-// cold-boot-only behaviors (JS-thread looper pump between synchronous
-// fetches). Exposed to JS as ns:module
-// `setDevBootComplete(value?: boolean)`.
-void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context,
-                        bool value);
+// Arm/disarm this thread's boot-evaluation window: while nonzero, the yield
+// inside synchronous HTTP fetches may pump the JS thread's looper (safe only
+// while the entry module is evaluating — nothing else owns the looper yet).
+// Balanced RAII-style by ModuleInternal::Load.
+void SetBootEvaluationActive(bool active);
 
-// Clear the transport's process-wide state (cache-bust marks, boot-complete
-// flag). MUST be called inside Runtime::DestroyRuntime() before isolate
+// Clear the transport's process-wide state (cache-bust marks). MUST be
+// called inside Runtime::DestroyRuntime() before isolate
 // disposal — and only for the MAIN isolate (worker teardown must not wipe
 // shared state the main isolate still uses).
 void CleanupHttpLoaderGlobals();
@@ -184,7 +182,6 @@ bool IsDebuggable();
 //                                      canonicalization vocabulary)
 //   - invalidateModules(urls)         (registry + cache eviction)
 //   - getLoadedModuleUrls()           (registry introspection)
-//   - setDevBootComplete(value?)      (boot-complete signal)
 //   - canonicalizeHttpUrlKey(url)     (debug builds only; test diagnostic)
 //
 // Worker teardown across HMR cycles is userland: the dev client intercepts

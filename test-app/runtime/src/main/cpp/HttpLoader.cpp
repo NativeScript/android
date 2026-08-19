@@ -150,27 +150,21 @@ bool IsRemoteUrlAllowed(const std::string& url) {
     return false;
 }
 
-static void SetBooleanGlobal(v8::Isolate* isolate, v8::Local<v8::Context> context, const char* key,
-                             bool value) {
-    context->Global()
-            ->Set(context, ToV8String(isolate, key), v8::Boolean::New(isolate, value))
-            .FromMaybe(false);
-}
-
 // ─────────────────────────────────────────────────────────────
-// Dev-boot completion flag
+// Boot-evaluation flag
 
-static std::atomic<bool> g_devSessionBootComplete{false};
+// Nonzero while this thread is evaluating an entry module (main or worker) —
+// the only window in which the fetch yield may pump the looper: during entry
+// evaluation nothing else owns it, while pumping mid-app would re-enter
+// arbitrary user code under a synchronous fetch. Thread-local because a fetch
+// and the entry evaluation that triggered it always share a thread, so a
+// worker booting never arms the main thread's pump. The runtime derives this
+// itself — there is no client signal to forget.
+static thread_local int t_bootEvaluationDepth = 0;
 
-static inline bool IsDevSessionBootComplete() {
-    return g_devSessionBootComplete.load(std::memory_order_relaxed);
-}
+void SetBootEvaluationActive(bool active) { t_bootEvaluationDepth += active ? 1 : -1; }
 
-void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context, bool value) {
-    SetBooleanGlobal(isolate, context, "__NS_HMR_BOOT_COMPLETE__", value);
-    g_devSessionBootComplete.store(value, std::memory_order_relaxed);
-    TNS_DEBUG(Esm, "[dev-boot] __NS_HMR_BOOT_COMPLETE__=%s", value ? "true" : "false");
-}
+static inline bool IsBootEvaluationActive() { return t_bootEvaluationDepth > 0; }
 
 // ─────────────────────────────────────────────────────────────
 // Canonical module keys
@@ -913,7 +907,7 @@ void FetchModuleBodyAsync(const std::string& url,
 static void MaybePumpJSThreadDuringBoot() {
     v8::Isolate* isolate = v8::Isolate::TryGetCurrent();
     if (isolate == nullptr) return;
-    if (IsDevSessionBootComplete()) return;
+    if (!IsBootEvaluationActive()) return;
     if (isolate->GetData((uint32_t)Runtime::IsolateData::RUNTIME) == nullptr) return;
 
     isolate->PerformMicrotaskCheckpoint();
@@ -933,8 +927,9 @@ static inline void InvokeHttpFetchYield() {
 }
 
 void CleanupHttpLoaderGlobals() {
+    // The boot-evaluation flag is thread-local and RAII-balanced by
+    // ModuleInternal::Load, so it needs no reset here.
     ClearAllCacheBustMarks();
-    g_devSessionBootComplete.store(false, std::memory_order_relaxed);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1089,19 +1084,6 @@ void GetLoadedModuleUrlsCallback(const v8::FunctionCallbackInfo<v8::Value>& info
     info.GetReturnValue().Set(result);
 }
 
-void SetDevBootCompleteCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
-    v8::Isolate* isolate = info.GetIsolate();
-    v8::HandleScope scope(isolate);
-    v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
-
-    bool value = true;
-    if (info.Length() >= 1 && !info[0]->IsUndefined() && !info[0]->IsNull()) {
-        value = info[0]->BooleanValue(isolate);
-    }
-
-    tns::SetDevBootComplete(isolate, ctx, value);
-}
-
 }  // namespace
 
 bool BuildNsModuleBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> binding) {
@@ -1111,7 +1093,6 @@ bool BuildNsModuleBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> 
     InstallDevFunction(isolate, context, binding, "invalidateModules", InvalidateModulesCallback);
     InstallDevFunction(isolate, context, binding, "getLoadedModuleUrls",
                        GetLoadedModuleUrlsCallback);
-    InstallDevFunction(isolate, context, binding, "setDevBootComplete", SetDevBootCompleteCallback);
 
     if (!ModuleInternal::InstallCreateRequireBinding(context, binding)) {
         return false;

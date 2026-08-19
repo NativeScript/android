@@ -446,6 +446,13 @@ void ModuleInternal::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Va
 void ModuleInternal::Load(Local<Context> context, const string& path) {
     TNSPERF();
     auto isolate = m_isolate;
+    // Entry evaluation is this thread's boot window: while it is active, the
+    // yield inside synchronous HTTP fetches may pump the looper (nothing else
+    // owns it yet). Balanced on every exit path, throws included.
+    struct BootEvalScope {
+        BootEvalScope() { SetBootEvaluationActive(true); }
+        ~BootEvalScope() { SetBootEvaluationActive(false); }
+    } bootEvalScope;
     if (IsHttpModulePath(path) || IsESModule(path)) {
         // The entry runs before this thread's event loop does, so its graph can
         // only make progress from the pump inside LoadESModule.

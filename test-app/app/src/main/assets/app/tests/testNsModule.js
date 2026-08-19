@@ -5,14 +5,16 @@ describe("ns:module", function () {
         expect(typeof nsModule.configureLoader).toBe("function");
         expect(typeof nsModule.invalidateModules).toBe("function");
         expect(typeof nsModule.getLoadedModuleUrls).toBe("function");
-        expect(typeof nsModule.setDevBootComplete).toBe("function");
+        expect(typeof nsModule.createRequire).toBe("function");
+        expect(typeof nsModule.createPumpingRequire).toBe("function");
         expect(nsModule.terminateAllWorkers).toBeUndefined();
         expect(global.__NS_DEV__).toBeUndefined();
     });
 
     it("exposes exactly the declared surface", function () {
         var nsModule = require("ns:module");
-        var expected = ["configureLoader", "getLoadedModuleUrls", "invalidateModules", "setDevBootComplete"];
+        var expected = ["configureLoader", "createPumpingRequire", "createRequire",
+                        "getLoadedModuleUrls", "invalidateModules"];
         if (typeof nsModule.canonicalizeHttpUrlKey === "function") {
             expected.push("canonicalizeHttpUrlKey");
         }
@@ -32,15 +34,12 @@ describe("ns:module", function () {
         });
     });
 
-    it("setDevBootComplete flips the JS-visible boot-complete global", function () {
+    // Boot state is derived natively from the entry-evaluation window; there is
+    // no client signal and no JS-visible mirror.
+    it("exposes no boot-complete signal", function () {
         var nsModule = require("ns:module");
-        nsModule.setDevBootComplete(true);
-        expect(global.__NS_HMR_BOOT_COMPLETE__).toBe(true);
-        nsModule.setDevBootComplete(false);
-        expect(global.__NS_HMR_BOOT_COMPLETE__).toBe(false);
-        nsModule.setDevBootComplete();
-        expect(global.__NS_HMR_BOOT_COMPLETE__).toBe(true);
-        nsModule.setDevBootComplete(false);
+        expect(nsModule.setDevBootComplete).toBeUndefined();
+        expect(global.__NS_HMR_BOOT_COMPLETE__).toBeUndefined();
     });
 });
 
