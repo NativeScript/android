@@ -31,6 +31,11 @@ inline constexpr double kModuleEvaluateDeadlineSeconds = 60.0;
 //   kAsync       - evaluate and hand the caller the capability promise.
 enum class ModuleEvaluationPolicy { kSyncStrict, kSyncPumping, kAsync };
 
+// The state of an entry module's evaluation promise. kNone means the path
+// names no registered ES module — a classic script settles synchronously and
+// never has one, so it needs no boot backstop.
+enum class EntryEvaluationState { kNone, kPending, kFulfilled, kRejected };
+
 struct ModuleEvaluationOptions {
     enum class TimeoutBehavior { kReturnPending, kThrow };
 
@@ -115,6 +120,17 @@ class ModuleInternal {
          */
         static v8::MaybeLocal<v8::Promise> PendingEntryEvaluation(v8::Isolate* isolate,
                                                                   const std::string& path);
+
+        /*
+         * The same probe, but reporting the promise's state rather than only
+         * "pending or not" — the boot backstop must tell a rejection from a
+         * successful settle. Cheap enough to call once per pump slice: a registry
+         * hit plus Evaluate(), which returns the existing capability promise.
+         * `rejectionReason` (when non-null) receives the reason's text on kRejected.
+         */
+        static EntryEvaluationState PollEntryEvaluation(v8::Isolate* isolate,
+                                                        const std::string& path,
+                                                        std::string* rejectionReason);
 
         static int MODULE_PROLOGUE_LENGTH;
     private:

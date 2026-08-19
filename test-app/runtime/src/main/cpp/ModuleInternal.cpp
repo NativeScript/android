@@ -453,6 +453,13 @@ void ModuleInternal::Load(Local<Context> context, const string& path) {
         BootEvalScope() { SetBootEvaluationActive(true); }
         ~BootEvalScope() { SetBootEvaluationActive(false); }
     } bootEvalScope;
+
+    // The ES module branch compiles and links against
+    // isolate->GetCurrentContext(); a caller that enters the isolate through a
+    // fresh Isolate::Scope has no current context, and CompileModule would
+    // dereference a null native context. The require branch never needed this
+    // because Function::Call enters the context it is handed.
+    Context::Scope context_scope(context);
     if (IsHttpModulePath(path) || IsESModule(path)) {
         // The entry runs before this thread's event loop does, so its graph can
         // only make progress from the pump inside LoadESModule.
@@ -1052,9 +1059,11 @@ MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> co
     return MaybeLocal<Promise>();
 }
 
-MaybeLocal<Promise> ModuleInternal::PendingEntryEvaluation(Isolate* isolate,
-                                                           const std::string& path) {
-    if (!IsESModule(path) && !IsHttpModulePath(path)) {
+// The shared probe behind both entry-evaluation queries: a registry hit plus
+// Evaluate(), which hands back the SAME capability promise rather than
+// re-running anything, so it is cheap enough to call from a pump loop.
+static MaybeLocal<Promise> EntryEvaluationPromise(Isolate* isolate, const std::string& path) {
+    if (!ModuleInternal::IsESModule(path) && !IsHttpModulePath(path)) {
         return MaybeLocal<Promise>();
     }
     auto* registryPtr = ModuleRegistryFor(isolate);
@@ -1066,22 +1075,53 @@ MaybeLocal<Promise> ModuleInternal::PendingEntryEvaluation(Isolate* isolate,
         return MaybeLocal<Promise>();
     }
     Local<Module> mod = it->second.Get(isolate);
+    // A TLA-parked module reports kEvaluated while its promise is still
+    // pending, so the status is the gate to *having* a promise, never to its
+    // state.
     if (mod.IsEmpty() || mod->GetStatus() != Module::kEvaluated) {
         return MaybeLocal<Promise>();
     }
-    // Evaluate() on an already-evaluated module hands back the same capability
-    // promise without re-running anything.
     TryCatch tc(isolate);
     Local<Context> context = isolate->GetCurrentContext();
     Local<Value> result;
     if (!mod->Evaluate(context).ToLocal(&result) || !result->IsPromise()) {
         return MaybeLocal<Promise>();
     }
-    Local<Promise> promise = result.As<Promise>();
+    return MaybeLocal<Promise>(result.As<Promise>());
+}
+
+MaybeLocal<Promise> ModuleInternal::PendingEntryEvaluation(Isolate* isolate,
+                                                           const std::string& path) {
+    Local<Promise> promise;
+    if (!EntryEvaluationPromise(isolate, path).ToLocal(&promise)) {
+        return MaybeLocal<Promise>();
+    }
     if (promise->State() != Promise::kPending) {
         return MaybeLocal<Promise>();
     }
     return MaybeLocal<Promise>(promise);
+}
+
+EntryEvaluationState ModuleInternal::PollEntryEvaluation(Isolate* isolate, const std::string& path,
+                                                         std::string* rejectionReason) {
+    Local<Promise> promise;
+    if (!EntryEvaluationPromise(isolate, path).ToLocal(&promise)) {
+        return EntryEvaluationState::kNone;
+    }
+    switch (promise->State()) {
+        case Promise::kPending:
+            return EntryEvaluationState::kPending;
+        case Promise::kFulfilled:
+            return EntryEvaluationState::kFulfilled;
+        case Promise::kRejected:
+            break;
+    }
+    if (rejectionReason != nullptr) {
+        Local<Value> reason = promise->Result();
+        *rejectionReason =
+                reason.IsEmpty() ? "<no reason>" : ArgConverter::ToString(isolate, reason);
+    }
+    return EntryEvaluationState::kRejected;
 }
 
 // The root entry point for an ES module graph: compile + register the root,

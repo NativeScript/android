@@ -355,20 +355,67 @@ void Runtime::Unlock() {
 #endif
 }
 
-static void PumpPendingHttpModuleGraph(v8::Isolate* isolate) {
-  if (!tns::HasPendingAsyncModuleGraphWork()) {
+// The boot backstop: hold the launching thread until boot has actually
+// finished. Two independent things can leave it unfinished, and BOTH must hold
+// the pump — an in-flight module-graph load, and an entry whose own evaluation
+// promise is still pending (a top-level await parked on anything at all: a
+// nested import() doing its own async work, a native init that completes
+// later). Gating on graph work alone let the second case return to Java with
+// the entry half-evaluated.
+//
+// A settled entry simply exits the loop — a script-style app finishing
+// normally, Node-like. Only the two failures below are fatal, and both are
+// reported in every build.
+static void HoldBootBackstop(v8::Isolate* isolate, const std::string& entryPath) {
+  std::string entryRejectionReason;
+  bool entryPending =
+          ModuleInternal::PollEntryEvaluation(isolate, entryPath, &entryRejectionReason) ==
+          EntryEvaluationState::kPending;
+  bool entryRejected = false;
+
+  if (!entryPending && !tns::HasPendingAsyncModuleGraphWork()) {
     return;
   }
+
+  const double deadlineSeconds = 2 * kModuleEvaluateDeadlineSeconds;
   const auto start = std::chrono::steady_clock::now();
-  while (tns::HasPendingAsyncModuleGraphWork()) {
+  std::shared_ptr<EventLoop> eventLoop = Runtime::GetRuntime(isolate) != nullptr
+                                                 ? Runtime::GetRuntime(isolate)->GetEventLoop()
+                                                 : nullptr;
+
+  while (entryPending || tns::HasPendingAsyncModuleGraphWork()) {
+    if (std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >
+        deadlineSeconds) {
+      break;
+    }
+    if (eventLoop != nullptr) {
+      eventLoop->RunNestableV8Tasks();
+    }
     isolate->PerformMicrotaskCheckpoint();
     ALooper_pollOnce(10, nullptr, nullptr, nullptr);
     isolate->PerformMicrotaskCheckpoint();
-    if (std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >
-        kModuleEvaluateDeadlineSeconds) {
-      DEBUG_WRITE("PumpPendingHttpModuleGraph: deadline expired with pending async module work");
-      break;
+
+    if (entryPending) {
+      EntryEvaluationState state =
+              ModuleInternal::PollEntryEvaluation(isolate, entryPath, &entryRejectionReason);
+      // Once it settles, stop probing for good.
+      entryPending = state == EntryEvaluationState::kPending;
+      if (state == EntryEvaluationState::kRejected) {
+        entryRejected = true;
+        break;
+      }
     }
+  }
+
+  if (entryRejected) {
+    throw NativeScriptException(
+            "Fatal: the main entry module's evaluation rejected during boot: " +
+            entryRejectionReason);
+  }
+  if (entryPending) {
+    throw NativeScriptException("Fatal: the main entry module '" + entryPath +
+                                "' never settled within " +
+                                std::to_string(static_cast<int>(deadlineSeconds)) + "s");
   }
 }
 
@@ -378,13 +425,15 @@ void Runtime::RunModule(JNIEnv* _env, jobject obj, jstring scriptFile) {
   string filePath = ArgConverter::jstringToString(scriptFile);
   auto context = this->GetContext();
   m_module.Load(context, filePath);
-  PumpPendingHttpModuleGraph(m_isolate);
+  // Java resolves package.json's `main` before handing the path over, so the
+  // entry the backstop probes is the very one that was just evaluated.
+  HoldBootBackstop(m_isolate, filePath);
 }
 
 void Runtime::RunModule(const char* moduleName) {
   auto context = this->GetContext();
   m_module.Load(context, moduleName);
-  PumpPendingHttpModuleGraph(m_isolate);
+  HoldBootBackstop(m_isolate, moduleName);
 }
 
 void Runtime::RunWorker(const std::string& filePath) {
