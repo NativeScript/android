@@ -195,6 +195,15 @@ public:
     static bool IsInLooperCallback();
 
     /**
+     * Blocks the calling thread until this loop's internal lane has work (the
+     * eventfd or timerfd is readable) or `timeoutMs` elapses, whichever comes
+     * first, without consuming either fd and without entering the looper - so
+     * it is safe where IsInLooperCallback forbids polling. Pumps pair it with
+     * RunNestableV8Tasks, which drains the queue directly.
+     */
+    void WaitForInternalWork(int timeoutMs);
+
+    /**
      * Runs at most one due ordered-lane entry, then performs a microtask
      * checkpoint. Invoked by Java EventLoopHandler.handleMessage once per
      * token, on the home thread.

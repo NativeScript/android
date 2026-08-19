@@ -1303,10 +1303,14 @@ MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> co
         isolate->PerformMicrotaskCheckpoint();
         if (options.pumpRunLoop) {
             // Nested ALooper_pollOnce inside an fd callback dangles the outer
-            // poll's Response& (see EventLoop::IsInLooperCallback); the direct
-            // drains above keep the graph moving, so only yield the CPU here.
+            // poll's Response& (see EventLoop::IsInLooperCallback); wait on
+            // the loop's own fds instead - same wakeups, no looper re-entry.
             if (EventLoop::IsInLooperCallback()) {
-                usleep(1000);
+                if (eventLoop != nullptr) {
+                    eventLoop->WaitForInternalWork(10);
+                } else {
+                    usleep(1000);
+                }
             } else {
                 ALooper_pollOnce(10 /* ms */, nullptr, nullptr, nullptr);
             }
@@ -1339,7 +1343,13 @@ MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> co
 
         pumpAsyncProgress();
         if (!options.pumpRunLoop) {
-            usleep(1000);  // 1ms delay for non-HTTP top-level await polling
+            // Wakes on the next internal-lane task (fetch completion, TLA
+            // continuation) instead of a fixed spin interval.
+            if (eventLoop != nullptr) {
+                eventLoop->WaitForInternalWork(10);
+            } else {
+                usleep(1000);
+            }
         }
     }
 

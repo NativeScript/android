@@ -403,9 +403,14 @@ static void HoldBootBackstop(v8::Isolate* isolate, const std::string& entryPath)
     isolate->PerformMicrotaskCheckpoint();
     // See EventLoop::IsInLooperCallback: a nested poll corrupts the outer
     // poll's response state. Boot normally reaches this outside any dispatch,
-    // but an HTTP entry re-run from a dev-session task must not poll.
+    // but an HTTP entry re-run from a dev-session task must not poll - it
+    // waits on the loop's own fds instead: same wakeups, no looper re-entry.
     if (EventLoop::IsInLooperCallback()) {
-      usleep(1000);
+      if (eventLoop != nullptr) {
+        eventLoop->WaitForInternalWork(10);
+      } else {
+        usleep(1000);
+      }
     } else {
       ALooper_pollOnce(10, nullptr, nullptr, nullptr);
     }

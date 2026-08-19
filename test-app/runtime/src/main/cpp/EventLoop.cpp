@@ -1,6 +1,7 @@
 #include "EventLoop.h"
 
 #include <android/api-level.h>
+#include <poll.h>
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
@@ -584,6 +585,21 @@ struct LooperCallbackScope {
 }  // namespace
 
 bool EventLoop::IsInLooperCallback() { return t_looperCallbackDepth > 0; }
+
+void EventLoop::WaitForInternalWork(int timeoutMs) {
+    struct pollfd fds[2];
+    nfds_t count = 0;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (eventFd_ != -1) fds[count++] = {eventFd_, POLLIN, 0};
+        if (timerFd_ != -1) fds[count++] = {timerFd_, POLLIN, 0};
+    }
+    if (count == 0) {
+        usleep(static_cast<useconds_t>(timeoutMs) * 1000);
+        return;
+    }
+    poll(fds, count, timeoutMs);
+}
 
 int EventLoop::EventFdCallback(int fd, int events, void* data) {
     LooperCallbackScope callbackScope;

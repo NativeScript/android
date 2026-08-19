@@ -1769,10 +1769,14 @@ bool RunModuleGraphLoadPumped(v8::Isolate* isolate,
     }
     if (*done) break;
     // Polling the looper from inside one of its fd callbacks dangles the
-    // outer poll's Response& (see EventLoop::IsInLooperCallback); the direct
-    // drain above still delivers fetch completions, so just yield instead.
+    // outer poll's Response& (see EventLoop::IsInLooperCallback); wait on the
+    // loop's own fds instead - same wakeups, no looper re-entry.
     if (EventLoop::IsInLooperCallback()) {
-      usleep(1000);
+      if (eventLoop != nullptr) {
+        eventLoop->WaitForInternalWork(10);
+      } else {
+        usleep(1000);
+      }
     } else {
       ALooper_pollOnce(10 /* ms */, nullptr, nullptr, nullptr);
     }
