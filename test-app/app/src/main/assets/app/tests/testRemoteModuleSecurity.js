@@ -38,8 +38,11 @@ describe("Remote Module Security", function() {
         });
         
         it("should allow HTTPS module imports in debug mode", function(done) {
-            // Test HTTPS URL - should be allowed in debug mode
-            import("https://192.0.2.1:5173/test-module.js").then(function(module) {
+            // A closed loopback port, not an unroutable host: HTTPS bypasses the
+            // cleartext policy that makes the plain-HTTP cases fail instantly, so
+            // an unroutable address would burn the transport's 15s connect
+            // timeout twice (once per retry) and blow the spec timeout.
+            import("https://127.0.0.1:1/test-module.js").then(function(module) {
                 expect(module).toBeDefined();
                 done();
             }).catch(function(error) {
@@ -55,30 +58,13 @@ describe("Remote Module Security", function() {
     describe("Security Configuration", function() {
         
         it("should have security configuration in package.json", function() {
-            var context = com.tns.Runtime.getCurrentRuntime().getContext();
-            var assetManager = context.getAssets();
-            
-            try {
-                var inputStream = assetManager.open("app/package.json");
-                var reader = new java.io.BufferedReader(new java.io.InputStreamReader(inputStream));
-                var sb = new java.lang.StringBuilder();
-                var line;
-                
-                while ((line = reader.readLine()) !== null) {
-                    sb.append(line);
-                }
-                reader.close();
-                
-                var jsonString = sb.toString();
-                var config = JSON.parse(jsonString);
-                
-                // Verify security config structure
-                expect(config.security).toBeDefined();
-                expect(typeof config.security.allowRemoteModules).toBe("boolean");
-                expect(Array.isArray(config.security.remoteModuleAllowlist)).toBe(true);
-            } catch (e) {
-                fail("Failed to read package.json: " + e.message);
-            }
+            // require() of a .json goes through the loader's own JSON route, so
+            // this reads the same file the native security gate was seeded from.
+            var config = require("~/package.json");
+
+            expect(config.security).toBeDefined();
+            expect(typeof config.security.allowRemoteModules).toBe("boolean");
+            expect(Array.isArray(config.security.remoteModuleAllowlist)).toBe(true);
         });
         
         it("should parse security allowRemoteModules from package.json", function() {
@@ -88,9 +74,11 @@ describe("Remote Module Security", function() {
         });
         
         it("should parse security remoteModuleAllowlist from package.json", function() {
+            // A Java String[], not a JS Array — it indexes and reports a length
+            // but fails Array.isArray.
             var allowlist = com.tns.Runtime.getSecurityRemoteModuleAllowlist();
             expect(allowlist).not.toBeNull();
-            expect(Array.isArray(allowlist)).toBe(true);
+            expect(typeof allowlist.length).toBe("number");
             expect(allowlist.length).toBeGreaterThan(0);
             
             // Verify our test allowlist entries are present
@@ -177,7 +165,8 @@ describe("Remote Module Security", function() {
         // Test dynamic imports (ImportModuleDynamicallyCallback path)
         
         it("should attempt to load HTTPS module dynamically in debug mode", function(done) {
-            var url = "https://10.255.255.1:5173/dynamic-module.js";
+            // Closed loopback port — see the HTTPS note above.
+            var url = "https://127.0.0.1:1/dynamic-module.js";
             
             import(url).then(function(module) {
                 expect(module).toBeDefined();

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext is permitted for loopback only, so the in-app ModuleTestServer
+  fixture host is reachable while every other cleartext destination stays
+  blocked by platform policy. testRemoteModuleSecurity depends on that: its
+  unroutable hosts must fail fast rather than wait out a connect timeout.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

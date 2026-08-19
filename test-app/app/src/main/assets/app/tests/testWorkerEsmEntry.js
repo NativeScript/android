@@ -1,0 +1,129 @@
+// An ES module worker entry takes the same RunModule branch — and the same
+// boot evaluation options — the app's main entry takes, so these pin that
+// destination even though the suite cannot re-drive the app's own boot.
+// The `.mjs` entries are spawned app-root-absolute on purpose: a relative
+// worker path is resolved against the caller's directory only on the CommonJS
+// route, so an ES module entry needs a path that already stands on its own.
+describe("worker ES module entries", function () {
+    var originalTimeout;
+
+    beforeEach(function () {
+        originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 15000;
+    });
+
+    afterEach(function () {
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+    });
+
+    it("runs a synchronous ES module worker entry, statics and all", function (done) {
+        var worker = new Worker("~/tests/esmEntrySyncWorker.mjs");
+        worker.onmessage = function (msg) {
+            expect(msg.data).toBe("esm-entry:ping");
+            worker.terminate();
+            done();
+        };
+        worker.postMessage("ping");
+    });
+
+    it("runs an ES module worker entry whose top-level await parks past the yield window",
+       function (done) {
+        // The park is non-nestable, so the in-place window cannot settle it:
+        // the entry finishes from the real event loop afterwards, and the
+        // message queue enables on settle rather than being lost.
+        var worker = new Worker("~/tests/esmEntryTlaWorker.mjs");
+        worker.onmessage = function (msg) {
+            expect(msg.data).toBe("tla-entry:ok:ping");
+            worker.terminate();
+            done();
+        };
+        worker.postMessage("ping");
+    });
+
+    // WHATWG parity: the worker's message queue is enabled when its entry
+    // script finishes evaluating, and from then on messages dispatch whether
+    // or not a handler exists. A handler registered later (from a timer)
+    // misses messages delivered in between — exactly as on the web.
+    it("drops messages dispatched before a late-registered onmessage, like the web", function (done) {
+        var worker = new Worker("./lateHandlerWorker.js");
+        var received = [];
+        worker.onmessage = function (msg) {
+            received.push(msg.data);
+            if (msg.data === "ready") {
+                worker.postMessage("second");
+            } else {
+                expect(received).toEqual(["ready", "late:second"]);
+                worker.terminate();
+                done();
+            }
+        };
+        // Posted before the entry finishes evaluating: buffered, then
+        // dispatched into a global with no handler yet — dropped.
+        worker.postMessage("early");
+    });
+});
+
+// A worker inherits a copy of its parent's loader vocabulary, taken on the
+// parent's thread as the worker is constructed and installed before the worker
+// loads any module.
+describe("worker loader-vocabulary inheritance", function () {
+    var originalTimeout;
+
+    function setLeaf(target) {
+        require("ns:module").configureLoader({
+            importMap: { imports: { "ns-worker-leaf": target } },
+        });
+    }
+
+    beforeEach(function () {
+        originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 15000;
+    });
+
+    afterEach(function () {
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+        // The map is isolate-wide state, so it must not outlive this describe.
+        require("ns:module").configureLoader({ importMap: { imports: {} } });
+    });
+
+    it("gives a worker spawned after configureLoader the parent's map", function (done) {
+        setLeaf("~/esm/vocab/leafA.mjs");
+
+        var worker = new Worker("./importMapWorker.js");
+        worker.onmessage = function (msg) {
+            expect(msg.data.ok ? "resolved" : "failed: " + msg.data.error).toBe("resolved");
+            expect(msg.data.name).toBe("vocab-a");
+            worker.terminate();
+            done();
+        };
+        worker.postMessage("ns-worker-leaf");
+    });
+
+    it("leaves a running worker on the map it was spawned with", function (done) {
+        setLeaf("~/esm/vocab/leafB.mjs");
+
+        var worker = new Worker("./importMapWorker.js");
+        worker.onmessage = function (msg) {
+            expect(msg.data.ok ? "resolved" : "failed: " + msg.data.error).toBe("resolved");
+            expect(msg.data.name).toBe("vocab-b");
+            worker.terminate();
+            done();
+        };
+
+        // Reconfigure the parent only after the worker exists, then ask it to
+        // resolve: the worker answers from the copy taken at its spawn.
+        setLeaf("~/esm/vocab/leafC.mjs");
+        worker.postMessage("ns-worker-leaf");
+    });
+
+    it("still applies a later configureLoader on the parent's own isolate", function (done) {
+        setLeaf("~/esm/vocab/leafC.mjs");
+        import("ns-worker-leaf").then(function (mod) {
+            expect(mod.name).toBe("vocab-c");
+            done();
+        }).catch(function (error) {
+            expect("rejected: " + String((error && error.message) || error)).toBe("resolved");
+            done();
+        });
+    });
+});

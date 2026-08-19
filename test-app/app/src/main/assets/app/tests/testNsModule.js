@@ -29,7 +29,9 @@ describe("ns:module", function () {
             expect(ns.configureLoader).toBe(nsModule.configureLoader);
             done();
         }).catch(function (error) {
-            fail("import('ns:module') rejected: " + error.message);
+            // fail() throws in this Jasmine, which inside a promise chain
+            // surfaces as an opaque timeout instead of the real reason.
+            expect("rejected: " + String((error && error.message) || error)).toBe("resolved");
             done();
         });
     });
@@ -66,44 +68,70 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
         expect(typeof canon).toBe("function");
     });
 
-    // Unconfigured, canonicalization is purely mechanical: the fragment goes
-    // and the query stays. Which params are cache-busters and which paths are
-    // dev endpoints is client vocabulary the runtime no longer guesses.
-    it("unconfigured: strips the fragment and nothing else", function () {
-        checkKey("http://h/app/foo.js#frag", "http://h/app/foo.js");
-        checkKey("http://h/app/foo.js?t=123&v=9#frag", "http://h/app/foo.js?t=123&v=9");
-    });
-
-    it("unconfigured: leaves every query param in the key", function () {
-        checkKey("http://h/app/foo.js?t=123&v=9&import=1", "http://h/app/foo.js?t=123&v=9&import=1");
-        checkKey("https://cdn.example.com/lib.js?token=abc", "https://cdn.example.com/lib.js?token=abc");
-    });
-
-    it("treats module identity as literally the URL — no path-tag collapses", function () {
-        checkKey("http://h/app/m/foo.js", "http://h/app/m/foo.js");
-        checkKey("http://h/app/rt", "http://h/app/rt");
-    });
-
-    it("honors a client-supplied canonicalization vocabulary via configureLoader", function () {
-        var canon = getCanon();
-        if (typeof canon !== "function") {
-            pending("ns:module.canonicalizeHttpUrlKey not exposed (release build)");
-            return;
-        }
-        // Neutral vocabulary: the mechanics under test are the runtime's, the
-        // strings are the client's to choose.
-        require("ns:module").configureLoader({
-            canonicalization: {
-                stripParams: ["cachebust", "rev"],
-                forPathPrefixes: ["/dev/"],
-                preserveQueryFor: ["/dev/metadata"],
-            },
+    // Unconfigured, the runtime knows no client vocabulary: it strips the
+    // fragment and nothing else. Which params are cache-busters and which
+    // paths are dev endpoints arrives through configureLoader.
+    describe("unconfigured (mechanical only)", function () {
+        it("keeps every query param, cache-buster-looking or not", function () {
+            checkKey("http://h/app/core?p=x&t=123&v=9&import=1",
+                     "http://h/app/core?p=x&t=123&v=9&import=1");
         });
-        // Under a configured dev prefix, the named params drop and the rest sort.
-        expect(canon("http://h/dev/core?p=x&cachebust=123&rev=9")).toBe("http://h/dev/core?p=x");
-        // preserveQueryFor wins over the dev prefix: the query IS the identity.
-        expect(canon("http://h/dev/metadata?c=a&cachebust=42")).toBe("http://h/dev/metadata?c=a&cachebust=42");
-        // Outside every configured prefix, the query is untouched.
-        expect(canon("https://cdn.example.com/lib.js?cachebust=abc")).toBe("https://cdn.example.com/lib.js?cachebust=abc");
+
+        it("leaves public URLs untouched", function () {
+            checkKey("https://cdn.example.com/lib.js?token=abc",
+                     "https://cdn.example.com/lib.js?token=abc");
+        });
+
+        it("treats module identity as literally the URL — no path-tag collapses", function () {
+            checkKey("http://h/app/m/foo.js", "http://h/app/m/foo.js");
+            checkKey("http://h/app/rt", "http://h/app/rt");
+        });
+
+        it("still drops the fragment", function () {
+            checkKey("http://h/app/m/foo.js#frag", "http://h/app/m/foo.js");
+            checkKey("https://cdn.example.com/lib.js?token=abc#frag",
+                     "https://cdn.example.com/lib.js?token=abc");
+        });
+    });
+
+    // The canonicalization vocabulary is per-isolate loader state, so each spec
+    // installs it and restores the unconfigured shape afterwards. (Jasmine
+    // 2.0.1 has no beforeAll/afterAll.)
+    describe("with a client-supplied vocabulary", function () {
+        beforeEach(function () {
+            if (typeof getCanon() !== "function") {
+                return;
+            }
+            require("ns:module").configureLoader({
+                canonicalization: {
+                    stripParams: ["t", "v", "import"],
+                    forPathPrefixes: ["/dev/"],
+                    preserveQueryFor: ["/dev/metadata"],
+                },
+            });
+        });
+
+        afterEach(function () {
+            if (typeof getCanon() !== "function") {
+                return;
+            }
+            require("ns:module").configureLoader({
+                canonicalization: { stripParams: [], forPathPrefixes: [], preserveQueryFor: [] },
+            });
+        });
+
+        it("strips the configured cache-busters under a configured prefix", function () {
+            checkKey("http://h/dev/core?p=x&t=123&v=9&import=1", "http://h/dev/core?p=x");
+        });
+
+        it("lets preserveQueryFor win under a configured prefix", function () {
+            checkKey("http://h/dev/metadata?c=a&t=42", "http://h/dev/metadata?c=a&t=42");
+        });
+
+        it("leaves paths outside the configured prefixes alone", function () {
+            checkKey("http://h/app/core?p=x&t=123", "http://h/app/core?p=x&t=123");
+            checkKey("https://cdn.example.com/lib.js?token=abc",
+                     "https://cdn.example.com/lib.js?token=abc");
+        });
     });
 });
