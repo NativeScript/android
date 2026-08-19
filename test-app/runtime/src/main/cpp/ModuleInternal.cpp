@@ -878,6 +878,15 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
 }
 
 MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const std::string& path) {
+    // The resolver only ever hands over a path it already probed, but the ENTRY
+    // routes (app main, worker main) reach here straight from the caller's
+    // specifier — so the existence check has to live here, or a missing entry
+    // reads a null FILE* instead of failing with a name.
+    struct stat st;
+    if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) {
+        throw NativeScriptException("Cannot find module " + path);
+    }
+
     string url = "file://" + path;
     string content = Runtime::GetRuntime(isolate)->ReadFileText(path);
 
