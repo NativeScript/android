@@ -125,8 +125,8 @@ bool HasPrefix(const std::string& specifier, const char* prefix) {
 /*
  * A builtin module is a singleton per realm, so every cache here is per
  * runtime: workers get their own exports objects and their own synthetic
- * modules. The process-global g_moduleRegistry deliberately holds none of
- * this. Touched only from its own runtime's thread.
+ * modules. The ES module registry deliberately holds none of this. Touched
+ * only from its own runtime's thread.
  */
 struct RealmState {
     robin_hood::unordered_map<std::string, Persistent<Object>*> exports;

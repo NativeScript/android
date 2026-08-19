@@ -1182,10 +1182,10 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         if (registryPtr == nullptr) {
             return Local<Value>();
         }
-        auto& g_moduleRegistry = *registryPtr;
+        auto& registry = *registryPtr;
 
-        auto existingIt = g_moduleRegistry.find(canonicalPath);
-        if (existingIt != g_moduleRegistry.end()) {
+        auto existingIt = registry.find(canonicalPath);
+        if (existingIt != registry.end()) {
             Local<Module> existing = existingIt->second.Get(isolate);
             Module::Status status = existing.IsEmpty() ? Module::kErrored : existing->GetStatus();
             if (status == Module::kErrored) {
@@ -1216,8 +1216,8 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
             // call and pays no wait.
             RunModuleGraphLoadPumped(isolate, context, canonicalPath,
                                      kModuleEvaluateDeadlineSeconds);
-            auto walkedIt = g_moduleRegistry.find(canonicalPath);
-            if (walkedIt != g_moduleRegistry.end()) {
+            auto walkedIt = registry.find(canonicalPath);
+            if (walkedIt != registry.end()) {
                 Local<Module> walked = walkedIt->second.Get(isolate);
                 if (!walked.IsEmpty() && walked->GetStatus() != Module::kErrored) {
                     module = walked;
@@ -1236,11 +1236,11 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
             }
 
             UnindexModuleForIsolate(isolate, canonicalPath);
-            auto it = g_moduleRegistry.find(canonicalPath);
-            if (it != g_moduleRegistry.end()) {
+            auto it = registry.find(canonicalPath);
+            if (it != registry.end()) {
                 it->second.Reset();
             }
-            g_moduleRegistry[canonicalPath].Reset(isolate, module);
+            registry[canonicalPath].Reset(isolate, module);
             IndexModuleForIsolate(isolate, canonicalPath, module);
         }
     }

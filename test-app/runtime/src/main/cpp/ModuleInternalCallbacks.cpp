@@ -615,7 +615,7 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
   if (moduleState == nullptr) {
     return v8::MaybeLocal<v8::Module>();
   }
-  auto& g_moduleRegistry = moduleState->registry;
+  auto& registry = moduleState->registry;
   const std::string registryKey = CanonicalizeRegistryKey(urlStr);
   if (LogCategoryEnabled(LogCategory::Esm) &&
       ShouldTraceRegistryKey(urlStr, registryKey)) {
@@ -625,8 +625,8 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
 
   // Checked before compiling: recompiling a key that is already registered
   // would mint a second module identity while importers hold the first.
-  auto itExisting = g_moduleRegistry.find(registryKey);
-  if (itExisting != g_moduleRegistry.end()) {
+  auto itExisting = registry.find(registryKey);
+  if (itExisting != registry.end()) {
     v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
     if (!existing.IsEmpty()) {
       return hs.Escape(existing);
@@ -655,15 +655,12 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
     }
   }
   UnindexRegistryKey(*moduleState, isolate, registryKey);
-  g_moduleRegistry[registryKey].Reset(isolate, mod);
+  registry[registryKey].Reset(isolate, mod);
   IndexRegisteredModule(*moduleState, registryKey, mod);
   return hs.Escape(mod);
 }
 
-// Each access site binds a local reference (e.g.
-// `auto& g_moduleRegistry = moduleState->registry;`) so the bodies below read
-// as though the maps were plain globals. Accessors return null once teardown
-// has begun.
+// Returns null once teardown has begun.
 ModuleHandleMap* ModuleRegistryFor(v8::Isolate* isolate) {
   auto* state = ModuleLoaderStateFor(isolate);
   return state == nullptr ? nullptr : &state->registry;
@@ -737,14 +734,14 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
   if (moduleState == nullptr) {
     return v8::MaybeLocal<v8::Module>();
   }
-  auto& g_moduleRegistry = moduleState->registry;
+  auto& registry = moduleState->registry;
   const std::string registryKey = CanonicalizeHttpUrlKey(requestedUrl);
 
   TNS_DEBUG(Esm, "[http-esm][load][begin] request=%s key=%s",
                  requestedUrl.c_str(), registryKey.c_str());
 
-  auto itExisting = g_moduleRegistry.find(registryKey);
-  if (itExisting != g_moduleRegistry.end()) {
+  auto itExisting = registry.find(registryKey);
+  if (itExisting != registry.end()) {
     v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
     if (!existing.IsEmpty() && existing->GetStatus() != v8::Module::kErrored) {
       TNS_DEBUG(Esm, "[http-esm][load][cache-hit] key=%s", registryKey.c_str());
@@ -1740,9 +1737,9 @@ static void AsyncGraphEnqueue(const std::shared_ptr<AsyncGraphLoad>& load,
   v8::Isolate* isolate = load->isolate;
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) return;
-  auto& g_moduleRegistry = moduleState->registry;
-  auto it = g_moduleRegistry.find(key);
-  if (it != g_moduleRegistry.end()) {
+  auto& registry = moduleState->registry;
+  auto it = registry.find(key);
+  if (it != registry.end()) {
     v8::Local<v8::Module> existing = it->second.Get(isolate);
     if (!existing.IsEmpty() && existing->GetStatus() != v8::Module::kErrored) {
       if (existing->GetStatus() == v8::Module::kUninstantiated) {
@@ -1904,7 +1901,7 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) return;
-  auto& g_moduleRegistry = moduleState->registry;
+  auto& registry = moduleState->registry;
   const std::string registryKey = CanonicalizeRegistryKey(canonicalPath);
 
   const LoaderVocabulary& vocabulary = moduleState->vocabulary;
@@ -1930,10 +1927,10 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
                    classify(registryKey));
   }
 
-  size_t regPre = g_moduleRegistry.size();
+  size_t regPre = registry.size();
 
-  auto it = g_moduleRegistry.find(registryKey);
-  if (it != g_moduleRegistry.end()) {
+  auto it = registry.find(registryKey);
+  if (it != registry.end()) {
     bool isHttpKey =
         StartsWith(registryKey, "http://") || StartsWith(registryKey, "https://");
     if (!isHttpKey) {
@@ -1941,14 +1938,14 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
     }
     UnindexRegistryKey(*moduleState, isolate, registryKey);
     it->second.Reset();
-    g_moduleRegistry.erase(it);
+    registry.erase(it);
   } else {
     TNS_DEBUG(Esm, "[resolver][remove:miss] key not found (%s)",
                    registryKey.c_str());
   }
 
   TNS_DEBUG(Esm, "[resolver][remove:post] reg %lu->%lu", (unsigned long)regPre,
-                 (unsigned long)g_moduleRegistry.size());
+                 (unsigned long)registry.size());
 }
 
 std::vector<std::string> GetLoadedModuleUrls() {
@@ -1956,10 +1953,10 @@ std::vector<std::string> GetLoadedModuleUrls() {
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) return urls;
-  auto& g_moduleRegistry = moduleState->registry;
-  urls.reserve(g_moduleRegistry.size());
+  auto& registry = moduleState->registry;
+  urls.reserve(registry.size());
 
-  for (const auto& entry : g_moduleRegistry) {
+  for (const auto& entry : registry) {
     const std::string& key = entry.first;
     if (key.empty()) continue;
     if (StartsWith(key, "blob:") || key.find("://") != std::string::npos) {
@@ -1975,7 +1972,7 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
                        const std::vector<std::string>& urls) {
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) return;
-  auto& g_moduleRegistry = moduleState->registry;
+  auto& registry = moduleState->registry;
   if (urls.empty()) return;
 
   robin_hood::unordered_set<std::string> seen;
@@ -1992,7 +1989,7 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
 
   size_t hits = 0, misses = 0;
   for (const auto& url : uniqueUrls) {
-    bool present = g_moduleRegistry.find(url) != g_moduleRegistry.end();
+    bool present = registry.find(url) != registry.end();
     if (present) hits++;
     else misses++;
     TNS_DEBUG(Registry, "invalidate %s key=%s", present ? "HIT " : "MISS",
@@ -2012,7 +2009,7 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
   TNS_DEBUG(Registry, "invalidate summary unique=%lu hits=%lu misses=%lu "
                       "(registry now=%lu)",
                       (unsigned long)uniqueUrls.size(), (unsigned long)hits,
-                      (unsigned long)misses, (unsigned long)g_moduleRegistry.size());
+                      (unsigned long)misses, (unsigned long)registry.size());
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2073,10 +2070,10 @@ static bool QueueHttpDynamicWaiterIfInFlight(
     v8::Local<v8::Module> module, v8::Local<v8::Promise::Resolver> resolver) {
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) return false;
-  auto& g_modulesInFlight = moduleState->modulesInFlight;
+  auto& modulesInFlight = moduleState->modulesInFlight;
   if (registryKey.empty() || module.IsEmpty() ||
       !IsModuleEvaluationInProgress(module->GetStatus()) ||
-      g_modulesInFlight.find(registryKey) == g_modulesInFlight.end()) {
+      modulesInFlight.find(registryKey) == modulesInFlight.end()) {
     return false;
   }
   moduleState->httpDynamicWaiters[registryKey].emplace_back(isolate, resolver);
@@ -2127,11 +2124,11 @@ static void ResolveHttpDynamicWaiters(v8::Isolate* isolate,
   // So every piece of state that can route a new import onto the waiter list
   // is cleared FIRST; a re-entrant import then takes the registry-hit path.
   std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
-  auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
-  auto waitIt = g_httpDynamicWaiters.find(registryKey);
-  if (waitIt != g_httpDynamicWaiters.end()) {
+  auto& httpDynamicWaiters = moduleState->httpDynamicWaiters;
+  auto waitIt = httpDynamicWaiters.find(registryKey);
+  if (waitIt != httpDynamicWaiters.end()) {
     resolvers.swap(waitIt->second);
-    g_httpDynamicWaiters.erase(waitIt);
+    httpDynamicWaiters.erase(waitIt);
   }
   moduleState->modulesInFlight.erase(registryKey);
 
@@ -2149,11 +2146,11 @@ static void RejectHttpDynamicWaiters(v8::Isolate* isolate,
   // rejection handler that retries this URL must not join a flushed waiter
   // list.
   std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
-  auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
-  auto waitIt = g_httpDynamicWaiters.find(registryKey);
-  if (waitIt != g_httpDynamicWaiters.end()) {
+  auto& httpDynamicWaiters = moduleState->httpDynamicWaiters;
+  auto waitIt = httpDynamicWaiters.find(registryKey);
+  if (waitIt != httpDynamicWaiters.end()) {
     resolvers.swap(waitIt->second);
-    g_httpDynamicWaiters.erase(waitIt);
+    httpDynamicWaiters.erase(waitIt);
   }
   moduleState->modulesInFlight.erase(registryKey);
 
@@ -2182,14 +2179,14 @@ static void RejectAndClearInvalidatedModuleState(v8::Isolate* isolate,
                                                  const std::string& registryKey) {
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) return;
-  auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
+  auto& httpDynamicWaiters = moduleState->httpDynamicWaiters;
   moduleState->modulesInFlight.erase(registryKey);
 
-  auto dynamicWaitIt = g_httpDynamicWaiters.find(registryKey);
-  if (dynamicWaitIt != g_httpDynamicWaiters.end()) {
+  auto dynamicWaitIt = httpDynamicWaiters.find(registryKey);
+  if (dynamicWaitIt != httpDynamicWaiters.end()) {
     std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
     resolvers.swap(dynamicWaitIt->second);
-    g_httpDynamicWaiters.erase(dynamicWaitIt);
+    httpDynamicWaiters.erase(dynamicWaitIt);
     RejectResolversForInvalidation(isolate, context, resolvers, registryKey);
   }
   TNS_DEBUG(Esm, "[resolver][invalidate-state] cleared in-flight state for %s",
@@ -2212,20 +2209,20 @@ static v8::MaybeLocal<v8::Module> CompileJsonTextAsEsModule(
   if (moduleState == nullptr) {
     return v8::MaybeLocal<v8::Module>();
   }
-  auto& g_moduleRegistry = moduleState->registry;
+  auto& registry = moduleState->registry;
 
   // JSON modules are compiled eagerly to kEvaluated, so a registered entry is
   // complete and must be reused — recompiling would mint a second module
   // identity (and namespace) for the same source on every resolve.
-  auto existingIt = g_moduleRegistry.find(registryAbsPath);
-  if (existingIt != g_moduleRegistry.end()) {
+  auto existingIt = registry.find(registryAbsPath);
+  if (existingIt != registry.end()) {
     v8::Local<v8::Module> existing = existingIt->second.Get(isolate);
     if (!existing.IsEmpty() && existing->GetStatus() == v8::Module::kEvaluated) {
       return v8::MaybeLocal<v8::Module>(existing);
     }
     UnindexRegistryKey(*moduleState, isolate, registryAbsPath);
     existingIt->second.Reset();
-    g_moduleRegistry.erase(existingIt);
+    registry.erase(existingIt);
   }
 
   TNS_DEBUG(Esm, "[json] wrapping %s", displayUrl.c_str());
@@ -2263,9 +2260,9 @@ static v8::MaybeLocal<v8::Module> CompileJsonTextAsEsModule(
   if (evalResult.IsEmpty()) return v8::MaybeLocal<v8::Module>();
 
   UnindexRegistryKey(*moduleState, isolate, registryAbsPath);
-  auto it = g_moduleRegistry.find(registryAbsPath);
-  if (it != g_moduleRegistry.end()) it->second.Reset();
-  g_moduleRegistry[registryAbsPath].Reset(isolate, jsonModule);
+  auto it = registry.find(registryAbsPath);
+  if (it != registry.end()) it->second.Reset();
+  registry[registryAbsPath].Reset(isolate, jsonModule);
   IndexRegisteredModule(*moduleState, registryAbsPath, jsonModule);
   return v8::MaybeLocal<v8::Module>(jsonModule);
 }
@@ -2295,7 +2292,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(
   if (moduleState == nullptr) {
     return v8::MaybeLocal<v8::Module>();
   }
-  auto& g_moduleRegistry = moduleState->registry;
+  auto& registry = moduleState->registry;
 
   v8::String::Utf8Value specUtf8(isolate, specifier);
   const std::string rawSpec = *specUtf8 ? *specUtf8 : "";
@@ -2349,8 +2346,8 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(
   // simply rejoins the graph V8 is currently linking — that is how import
   // cycles terminate, the same way Node/Blink break them with the module-map
   // self-insert.
-  auto it = g_moduleRegistry.find(registryAbsPath);
-  if (it != g_moduleRegistry.end()) {
+  auto it = registry.find(registryAbsPath);
+  if (it != registry.end()) {
     v8::Local<v8::Module> existing = it->second.Get(isolate);
     if (!existing.IsEmpty() && existing->GetStatus() != v8::Module::kErrored) {
       TNS_DEBUG(Esm, "[resolver] cache hit %s (status=%s)", absPath.c_str(),
@@ -2374,7 +2371,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(
       return v8::MaybeLocal<v8::Module>();
     }
     UnindexRegistryKey(*moduleState, isolate, registryAbsPath);
-    g_moduleRegistry[registryAbsPath].Reset(isolate, mod);
+    registry[registryAbsPath].Reset(isolate, mod);
     IndexRegisteredModule(*moduleState, registryAbsPath, mod);
     return v8::MaybeLocal<v8::Module>(mod);
   } catch (NativeScriptException& ex) {
@@ -2543,9 +2540,9 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   if (moduleState == nullptr) {
     return v8::MaybeLocal<v8::Promise>();
   }
-  auto& g_moduleRegistry = moduleState->registry;
-  auto& g_modulesInFlight = moduleState->modulesInFlight;
-  auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
+  auto& registry = moduleState->registry;
+  auto& modulesInFlight = moduleState->modulesInFlight;
+  auto& httpDynamicWaiters = moduleState->httpDynamicWaiters;
 
   v8::String::Utf8Value specUtf8(isolate, specifier);
   const char* cSpec = (*specUtf8) ? *specUtf8 : "<invalid>";
@@ -2647,8 +2644,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       TNS_DEBUG(Esm, "[dyn-import][blob] trying blob URL %s key=%s",
                      normalizedSpec.c_str(), blobRegistryKey.c_str());
 
-      auto existingIt = g_moduleRegistry.find(blobRegistryKey);
-      if (existingIt != g_moduleRegistry.end()) {
+      auto existingIt = registry.find(blobRegistryKey);
+      if (existingIt != registry.end()) {
         v8::Local<v8::Module> existing = existingIt->second.Get(isolate);
         if (!existing.IsEmpty()) {
           v8::Module::Status existingStatus = existing->GetStatus();
@@ -2658,8 +2655,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           if (existingStatus == v8::Module::kErrored) {
             RemoveModuleFromRegistry(blobRegistryKey);
           } else if (IsModuleEvaluationInProgress(existingStatus)) {
-            g_modulesInFlight.insert(blobRegistryKey);
-            g_httpDynamicWaiters[blobRegistryKey].emplace_back(isolate, resolver);
+            modulesInFlight.insert(blobRegistryKey);
+            httpDynamicWaiters[blobRegistryKey].emplace_back(isolate, resolver);
             TNS_DEBUG(Esm,
                    "[dyn-import][blob-await] queued waiter for %s status=%s",
                    blobRegistryKey.c_str(), ModuleStatusToString(existingStatus));
@@ -2674,15 +2671,15 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         }
       }
 
-      if (g_modulesInFlight.find(blobRegistryKey) != g_modulesInFlight.end()) {
+      if (modulesInFlight.find(blobRegistryKey) != modulesInFlight.end()) {
         TNS_DEBUG(Esm, "[dyn-import][blob] coalesce in-flight %s",
                        blobRegistryKey.c_str());
-        g_httpDynamicWaiters[blobRegistryKey].emplace_back(isolate, resolver);
+        httpDynamicWaiters[blobRegistryKey].emplace_back(isolate, resolver);
         return scope.Escape(resolver->GetPromise());
       }
 
-      g_modulesInFlight.insert(blobRegistryKey);
-      g_httpDynamicWaiters[blobRegistryKey].emplace_back(isolate, resolver);
+      modulesInFlight.insert(blobRegistryKey);
+      httpDynamicWaiters[blobRegistryKey].emplace_back(isolate, resolver);
 
       v8::TryCatch tc(isolate);
       v8::Local<v8::Object> globalObj = context->Global();
@@ -3027,22 +3024,22 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // vocabulary of its own.
       bool isVolatile = IsVolatileUrl(vocabulary, normalizedSpec);
       if (isVolatile) {
-        auto ex = g_moduleRegistry.find(key);
-        if (ex != g_moduleRegistry.end()) {
+        auto ex = registry.find(key);
+        if (ex != registry.end()) {
           TNS_DEBUG(Esm, "[dyn-import][http-cache] drop volatile %s", key.c_str());
           RemoveModuleFromRegistry(key);
         }
       }
       // Coalesce concurrent dynamic imports for the same HTTP key.
-      auto inflight = g_modulesInFlight.find(key) != g_modulesInFlight.end();
+      auto inflight = modulesInFlight.find(key) != modulesInFlight.end();
       if (inflight) {
         TNS_DEBUG(Esm, "[dyn-import][http] coalesce in-flight %s", key.c_str());
-        g_httpDynamicWaiters[key].emplace_back(isolate, resolver);
+        httpDynamicWaiters[key].emplace_back(isolate, resolver);
         return scope.Escape(resolver->GetPromise());
       }
       // If module was already compiled, resolve immediately.
-      auto itExisting = g_moduleRegistry.find(key);
-      if (itExisting != g_moduleRegistry.end()) {
+      auto itExisting = registry.find(key);
+      if (itExisting != registry.end()) {
         v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
         if (!existing.IsEmpty()) {
           TNS_DEBUG(Esm, "[dyn-import][http-cache] hit %s status=%s", key.c_str(),
@@ -3065,10 +3062,10 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
             return scope.Escape(resolver->GetPromise());
           } else {
             if (st != v8::Module::kEvaluated) {
-              g_modulesInFlight.insert(key);
+              modulesInFlight.insert(key);
               TNS_DEBUG(Esm, "[dyn-import][http-cache] awaiting evaluation %s",
                              key.c_str());
-              g_httpDynamicWaiters[key].emplace_back(isolate, resolver);
+              httpDynamicWaiters[key].emplace_back(isolate, resolver);
               if (st == v8::Module::kUninstantiated) {
                 v8::TryCatch tcInstantiate(isolate);
                 if (!existing->InstantiateModule(context, &ResolveModuleCallback)
@@ -3178,8 +3175,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         }
       }
       // Mark in-flight and start the async graph load.
-      g_modulesInFlight.insert(key);
-      g_httpDynamicWaiters[key].emplace_back(isolate, resolver);
+      modulesInFlight.insert(key);
+      httpDynamicWaiters[key].emplace_back(isolate, resolver);
       const std::string requestUrl = normalizedSpec;
       StartModuleGraphLoad(
           isolate, context, requestUrl,
