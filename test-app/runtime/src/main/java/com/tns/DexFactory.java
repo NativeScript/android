@@ -120,13 +120,24 @@ public class DexFactory {
         // strip the `com.tns.gen` off the base extended class name
         String desiredDexClassName = this.getClassToProxyName(fullClassName);
 
+        // A named proxy (`Base.extend('a.b.C', {...})` / @JavaProxy) asks for
+        // exactly that Java class name; the substitutions below are for the
+        // anonymous form only, where the name is derived from the base.
+        boolean isNamedProxy = !fullClassName.startsWith(COM_TNS_GEN_PREFIX) && fullClassName.contains(".");
+
         // when interfaces are extended as classes, we still want to preserve
         // just the interface name without the extra file, line, column information
-        if (!baseClassName.isEmpty() && isInterface) {
+        if (!baseClassName.isEmpty() && isInterface && !isNamedProxy) {
             fullClassName = COM_TNS_GEN_PREFIX + classToProxy;
         }
 
-        File dexFile = this.getDexFile(desiredDexClassName);
+        // The thumb only changes on reinstall, so a cache key of name + thumb
+        // cannot see an edit to the proxy's contents: under HMR a named
+        // proxy's new method overrides would silently load the previous dex.
+        // The digest carries the contents into the file name.
+        String contentDigest = computeContentDigest(classToProxy, methodOverrides, implementedInterfaces, isInterface);
+
+        File dexFile = this.getDexFile(desiredDexClassName, contentDigest);
 
         // generate dex file
         if (dexFile == null) {
@@ -136,10 +147,10 @@ public class DexFactory {
             }
 
             String dexFilePath;
-            if (isInterface) {
-                dexFilePath = this.generateDex(name, classToProxy, methodOverrides, implementedInterfaces, isInterface);
+            if (isInterface && !isNamedProxy) {
+                dexFilePath = this.generateDex(name, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface);
             } else {
-                dexFilePath = this.generateDex(desiredDexClassName, classToProxy, methodOverrides, implementedInterfaces, isInterface);
+                dexFilePath = this.generateDex(desiredDexClassName, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface);
             }
             dexFile = new File(dexFilePath);
             long stopGenTime = System.nanoTime();
@@ -251,11 +262,50 @@ public class DexFactory {
         return classToProxy;
     }
 
-    private File getDexFile(String className) throws InvalidClassException {
+    /**
+     * Digest of everything that shapes the generated proxy besides its name,
+     * so the dex cache key changes when the proxy's contents do. Sorted, so
+     * JS property-enumeration order cannot produce a spurious miss.
+     */
+    private static String computeContentDigest(String classToProxy, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) {
+        StringBuilder canonical = new StringBuilder(classToProxy).append('\n').append(isInterface);
+        if (methodOverrides != null) {
+            String[] sortedOverrides = methodOverrides.clone();
+            java.util.Arrays.sort(sortedOverrides);
+            for (String override : sortedOverrides) {
+                canonical.append('\n').append(override);
+            }
+        }
+        if (implementedInterfaces != null) {
+            String[] sortedInterfaces = implementedInterfaces.clone();
+            java.util.Arrays.sort(sortedInterfaces);
+            for (String iface : sortedInterfaces) {
+                canonical.append('').append(iface);
+            }
+        }
+        try {
+            byte[] hash = java.security.MessageDigest.getInstance("SHA-256")
+                          .digest(canonical.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(10);
+            for (int i = 0; i < 5; i++) {
+                hex.append(String.format("%02x", hash[i]));
+            }
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            // SHA-256 is mandatory on Android; a digestless key only loses
+            // cache freshness, never correctness of a fresh generation.
+            return null;
+        }
+    }
+
+    private File getDexFile(String className, String contentDigest) throws InvalidClassException {
         String classToProxyFile = className.replace("$", "_");
 
         if (this.dexThumb != null) {
             classToProxyFile += "-" + this.dexThumb;
+        }
+        if (contentDigest != null) {
+            classToProxyFile += "-" + contentDigest;
         }
 
         String dexFilePath = dexDir + "/" + classToProxyFile + ".dex";
@@ -274,7 +324,7 @@ public class DexFactory {
         return null;
     }
 
-    private String generateDex(String proxyName, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
+    private String generateDex(String proxyName, String contentDigest, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
         Class<?> classToProxy = Class.forName(className);
 
         HashSet<String> methodOverridesSet = null;

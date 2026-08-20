@@ -26,6 +26,17 @@ public class ProxyGenerator {
     }
 
     public String generateProxy(String proxyName, ClassDescriptor classToProxy, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, boolean isInterface, AnnotationDescriptor[] annotations) throws IOException {
+        return generateProxy(proxyName, null, classToProxy, methodOverrides, implementedInterfaces, isInterface, annotations);
+    }
+
+    /**
+     * cacheDigest, when present, becomes part of the proxy's file name. The
+     * thumb only changes on reinstall, so name + thumb alone cannot see an
+     * edit to the proxy's contents (method overrides, interfaces) - the
+     * digest is what makes such an edit miss the cache instead of silently
+     * loading the previous dex.
+     */
+    public String generateProxy(String proxyName, String cacheDigest, ClassDescriptor classToProxy, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, boolean isInterface, AnnotationDescriptor[] annotations) throws IOException {
         ApplicationWriter aw = new ApplicationWriter();
         aw.visit();
 
@@ -37,7 +48,14 @@ public class ProxyGenerator {
         String proxyFileName;
 
         if (proxyName.contains(".")) {
+            // Thumb-suffix dotted names like the anonymous ones: DexFactory's
+            // cache probe (getDexFile) and purge (purgeDexesByThumb) both key
+            // on the thumb, so an unsuffixed file regenerates every launch and
+            // its stale .jar survives — and gets reused — across app versions.
             proxyFileName = proxyName;
+            if (proxyThumb != null) {
+                proxyFileName += "-" + proxyThumb;
+            }
         } else {
             proxyFileName = classToProxy.getName().replace('$', '_');
             if (!isInterface) {
@@ -46,6 +64,10 @@ public class ProxyGenerator {
             if (proxyThumb != null) {
                 proxyFileName += "-" + proxyThumb;
             }
+        }
+        // After the thumb, so purgeDexesByThumb keeps matching old generations.
+        if (cacheDigest != null) {
+            proxyFileName += "-" + cacheDigest;
         }
 
         if (IsLogEnabled) {
