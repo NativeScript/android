@@ -736,11 +736,17 @@ EventLoop::PumpResult EventLoop::PumpUntil(double deadlineSeconds,
     const auto deadline = std::chrono::steady_clock::now() +
                           std::chrono::duration<double>(deadlineSeconds);
     for (;;) {
+        // Both probes: IsExecutionTerminating is true only while JS frames
+        // unwind with the termination exception active, so a pump parked with
+        // nothing queued would never observe TerminateExecution through it.
+        // Termination outranks settlement: consuming a settled result means
+        // running more JS, which a terminating isolate must not do.
+        if (terminationRequested_.load(std::memory_order_acquire) ||
+            isolate_->IsExecutionTerminating()) {
+            return PumpResult::kTerminated;
+        }
         if (settled()) {
             return PumpResult::kSettled;
-        }
-        if (isolate_->IsExecutionTerminating()) {
-            return PumpResult::kTerminated;
         }
         if (IsStopped()) {
             // a stopped loop drops every post, so nothing can settle anymore
@@ -767,7 +773,9 @@ EventLoop::PumpResult EventLoop::PumpUntil(double deadlineSeconds,
             }
         }
         if (settled()) {
-            return PumpResult::kSettled;
+            // back through the loop head, where termination outranks the
+            // settlement this drain produced
+            continue;
         }
         if (ranLooperWork == 0) {
             WaitForInternalWork(10, /*pumpDeliverable=*/drainLooperWork);

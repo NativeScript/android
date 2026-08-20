@@ -10,6 +10,7 @@
 #include "CrashBreadcrumbs.h"
 #include "JEnv.h"
 #include "JniLocalRef.h"
+#include "ModuleInternal.h"
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
 #include "NativeScriptPlatform.h"
@@ -147,6 +148,12 @@ void WorkerWrapper::Terminate() {
         // The only v8 call that is legal from another thread - interrupts any
         // JS currently running on the worker (e.g. a busy loop).
         isolate->TerminateExecution();
+        // A pump parked with nothing queued runs no JS, so the interrupt
+        // above never materializes for it - the loop's own flag ends it.
+        auto loop = NativeScriptPlatform::Instance()->LookupEventLoop(isolate);
+        if (loop != nullptr) {
+            loop->NoteTerminationRequested();
+        }
     }
 
 #ifdef APPLICATION_IN_DEBUG
@@ -739,8 +746,11 @@ void WorkerWrapper::CreateInspector(Isolate* isolate) {
         return;
     }
 
-    // Same url scheme the module loader reports in Debugger.scriptParsed.
-    std::string url = "file://" + workerPath_;
+    // Same url the module loader reports in Debugger.scriptParsed: an http(s)
+    // entry already IS that url, only a filesystem path needs the scheme.
+    std::string url = ModuleInternal::IsHttpModulePath(workerPath_)
+                              ? workerPath_
+                              : "file://" + workerPath_;
 
     auto* client = new WorkerInspectorClient(workerId_, isolate, ALooper_forThread(), url);
     {

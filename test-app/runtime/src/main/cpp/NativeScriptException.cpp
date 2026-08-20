@@ -1049,7 +1049,10 @@ string NativeScriptException::GetFullMessage(const TryCatch& tc,
   } else {
     ss << endl << "File: (<unknown>";
   }
-  ss << ":" << message->GetLineNumber(context).ToChecked() << ":"
+  // An isolate that started terminating while this message was being
+  // formatted answers Nothing to every query below - a missing line number
+  // must degrade the report, not abort the process.
+  ss << ":" << message->GetLineNumber(context).FromMaybe(0) << ":"
      << message->GetStartColumn() << ")" << endl
      << endl;
   ss << "StackTrace: " << endl << stackTraceMessage << endl;
@@ -1135,7 +1138,7 @@ string NativeScriptException::GetErrorMessage(const Local<Message>& message,
   bool hasFullErrorMessage = false;
   auto v8FullMessage = ArgConverter::ConvertToV8String(isolate, "fullMessage");
   if (error->IsObject() &&
-      error.As<Object>()->Has(context, v8FullMessage).ToChecked()) {
+      error.As<Object>()->Has(context, v8FullMessage).FromMaybe(false)) {
     hasFullErrorMessage = true;
     Local<Value> errMsgVal;
     error.As<Object>()->Get(context, v8FullMessage).ToLocal(&errMsgVal);

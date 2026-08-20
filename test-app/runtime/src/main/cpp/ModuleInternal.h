@@ -95,6 +95,15 @@ class ModuleInternal {
         static bool IsESModule(const std::string& path);
 
         /*
+         * Whether `path` names a module the HTTP loader owns. Classifies the
+         * NORMALIZED form: a scheme separator collapsed by a path normalizer
+         * (`http:/host/...`) must still route to the HTTP loader, or the same
+         * string classifies as a filesystem path and repairs itself only after
+         * taking the wrong branch.
+         */
+        static bool IsHttpModulePath(const std::string& path);
+
+        /*
          * Compile/link/evaluate an ES module; returns its namespace object. `options`
          * decide how the graph's evaluation promise is settled — see
          * ModuleEvaluationPolicy.
@@ -212,9 +221,26 @@ class ModuleInternal {
                                                    const std::string& dirName,
                                                    const ModuleEvaluationOptions& options);
 
-        v8::ScriptCompiler::CachedData* TryLoadScriptCache(const std::string& path);
+        /*
+         * A V8 code cache produced by a classic-script compile and one produced by a
+         * module compile are not interchangeable, and a `.js` file is reachable both
+         * ways — require() compiles it classic, an `import` of the same file compiles
+         * it as a module. Sharing one cache file would make each path reject and
+         * overwrite the other's blob on every load, so the kind is part of the name.
+         */
+        enum class ScriptCacheKind {
+            Classic,
+            Module,
+        };
 
-        void SaveScriptCache(const v8::Local<v8::Script> script, const std::string& path);
+        static v8::ScriptCompiler::CachedData* TryLoadScriptCache(const std::string& path,
+                                                                  ScriptCacheKind kind);
+
+        // Takes ownership of `cache`.
+        static void SaveScriptCache(const v8::ScriptCompiler::CachedData* cache,
+                                    const std::string& path, ScriptCacheKind kind);
+
+        static void SaveScriptCache(const v8::Local<v8::Script> script, const std::string& path);
 
         ModulePathKind GetModulePathKind(const std::string& path);
 

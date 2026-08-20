@@ -4,18 +4,6 @@
 #include <string>
 #include <vector>
 
-// Forward declare v8 types to keep this header lightweight and avoid
-// requiring V8 headers at include sites.
-namespace v8 {
-class Isolate;
-template <class T>
-class Local;
-class Object;
-class Function;
-class Context;
-class Value;
-}  // namespace v8
-
 namespace tns {
 
 // HttpLoader: the native half of the NativeScript HTTP module-loader
@@ -45,9 +33,9 @@ namespace tns {
 // client via ns:module `configureLoader({ canonicalization: {...} })`. It is
 // per-isolate loader vocabulary — installed through SetCanonicalizationConfig
 // in ModuleInternalCallbacks.h — so CanonicalizeHttpUrlKey runs on the
-// isolate's own thread only. The transport canonicalizes at its JS-thread
-// entry points (HttpFetchModule, FetchModuleBodyAsync) and nowhere else;
-// background fetch threads only ever carry keys computed for them.
+// isolate's own thread only. The transport never canonicalizes: every entry
+// point takes the canonical key as a parameter, so an off-thread key is
+// impossible to produce by construction.
 //
 // When unconfigured, canonicalization is purely mechanical (fragment strip).
 struct CanonicalizationConfig {
@@ -101,7 +89,11 @@ struct ModuleFetchResult {
 // Synchronous module fetch with one retry on transport error — the fallback
 // path for anything the module-graph walk missed. Blocks the calling thread.
 // Returns `result.ok`.
-bool HttpFetchModule(const std::string& url, ModuleFetchResult& result);
+// `canonicalKey` is the module's canonical registry key, computed by the
+// caller on its isolate's thread — the transport must never canonicalize,
+// since that reads per-isolate loader vocabulary.
+bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
+                     ModuleFetchResult& result);
 
 // Asynchronous single-URL module fetch — the I/O primitive behind the
 // module-graph walk (see StartModuleGraphLoad in ModuleInternalCallbacks.h).
@@ -112,8 +104,18 @@ bool HttpFetchModule(const std::string& url, ModuleFetchResult& result);
 //     and one retry on transport error.
 // `completion(result)` is invoked exactly once, on an arbitrary thread —
 // callers must hop to their JS thread before touching V8.
+// `canonicalKey` as for HttpFetchModule: computed on the calling isolate's
+// thread and carried, because the fetch and its completion run on background
+// threads that cannot read per-isolate vocabulary.
+//
+// Concurrency is capped (kMaxConcurrentModuleFetches). iOS gets the same cap
+// per host from NSURLSession; here it is process-wide, because the fetch
+// threads are a process resource and a dev session's modules all come from
+// one origin anyway. Over the cap the request is queued and picked up by a
+// fetch thread as one frees — the CALLER never blocks, so this stays safe to
+// call from the JS thread.
 void FetchModuleBodyAsync(
-    const std::string& url,
+    const std::string& url, const std::string& canonicalKey,
     std::function<void(ModuleFetchResult result)> completion);
 
 // Mark a set of canonical registry keys so that the NEXT network fetch of
@@ -153,30 +155,5 @@ bool IsRemoteUrlAllowed(const std::string& url);
 // Mirrors com.tns.Runtime.isDebuggable(), cached once via the security
 // config init. Fail-safe false until initialized.
 bool IsDebuggable();
-
-// ─────────────────────────────────────────────────────────────
-// The `ns:module` builtin binding
-//
-// Populates the native half of the `ns:module` builtin module — the one
-// namespace carrying every JS-callable dev primitive that any tooling can
-// depend on. Called from NsBuiltinModules::BuildBinding the first time a
-// realm resolves `ns:module` (via require, static import, or import());
-// ns-module.js shapes and freezes the exports.
-//
-// `ns:module` members:
-//   - configureLoader(config)         (import map + volatile patterns +
-//                                      canonicalization vocabulary)
-//   - invalidateModules(urls)         (registry + cache eviction)
-//   - getLoadedModuleUrls()           (registry introspection)
-//   - canonicalizeHttpUrlKey(url)     (debug builds only; test diagnostic)
-//
-// Worker teardown across HMR cycles is userland: the dev client intercepts
-// the global `Worker` constructor and terminates tracked instances
-// (worker.terminate() cascades to nested workers via Runtime::DestroyRuntime).
-//
-// Returns false (with an exception pending or a failed Set) when the
-// binding could not be populated.
-bool BuildNsModuleBinding(v8::Local<v8::Context> context,
-                          v8::Local<v8::Object> binding);
 
 }  // namespace tns
