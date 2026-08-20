@@ -37,7 +37,14 @@ public class ProxyGenerator {
         String proxyFileName;
 
         if (proxyName.contains(".")) {
+            // Thumb-suffix dotted names like the anonymous ones: DexFactory's
+            // cache probe (getDexFile) and purge (purgeDexesByThumb) both key
+            // on the thumb, so an unsuffixed file regenerates every launch and
+            // its stale .jar survives — and gets reused — across app versions.
             proxyFileName = proxyName;
+            if (proxyThumb != null) {
+                proxyFileName += "-" + proxyThumb;
+            }
         } else {
             proxyFileName = classToProxy.getName().replace('$', '_');
             if (!isInterface) {

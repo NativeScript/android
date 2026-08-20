@@ -120,9 +120,14 @@ public class DexFactory {
         // strip the `com.tns.gen` off the base extended class name
         String desiredDexClassName = this.getClassToProxyName(fullClassName);
 
+        // A named proxy (`Base.extend('a.b.C', {...})` / @JavaProxy) asks for
+        // exactly that Java class name; the substitutions below are for the
+        // anonymous form only, where the name is derived from the base.
+        boolean isNamedProxy = !fullClassName.startsWith(COM_TNS_GEN_PREFIX) && fullClassName.contains(".");
+
         // when interfaces are extended as classes, we still want to preserve
         // just the interface name without the extra file, line, column information
-        if (!baseClassName.isEmpty() && isInterface) {
+        if (!baseClassName.isEmpty() && isInterface && !isNamedProxy) {
             fullClassName = COM_TNS_GEN_PREFIX + classToProxy;
         }
 
@@ -136,7 +141,7 @@ public class DexFactory {
             }
 
             String dexFilePath;
-            if (isInterface) {
+            if (isInterface && !isNamedProxy) {
                 dexFilePath = this.generateDex(name, classToProxy, methodOverrides, implementedInterfaces, isInterface);
             } else {
                 dexFilePath = this.generateDex(desiredDexClassName, classToProxy, methodOverrides, implementedInterfaces, isInterface);
