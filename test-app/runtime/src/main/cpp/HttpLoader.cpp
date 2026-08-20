@@ -151,6 +151,27 @@ bool IsRemoteUrlAllowed(const std::string& url) {
 // ─────────────────────────────────────────────────────────────
 // Canonical module keys
 
+std::string NormalizeHttpModuleUrl(const std::string& path) {
+    if (path.empty()) {
+        return path;
+    }
+
+    std::string normalized = path;
+    if (StartsWith(normalized, "file://http://") || StartsWith(normalized, "file://https://")) {
+        normalized = normalized.substr(strlen("file://"));
+    }
+
+    // A path normalizer that collapses `//` into `/` (Java's, or a URL that
+    // travelled through one) leaves the scheme separator one slash short.
+    if (normalized.rfind("http:/", 0) == 0 && normalized.rfind("http://", 0) != 0) {
+        normalized.insert(5, "/");
+    } else if (normalized.rfind("https:/", 0) == 0 && normalized.rfind("https://", 0) != 0) {
+        normalized.insert(6, "/");
+    }
+
+    return normalized;
+}
+
 std::string CanonicalizeHttpUrlKey(const std::string& url) {
     std::string normalizedUrl = url;
     if (StartsWith(normalizedUrl, "file://http://") || StartsWith(normalizedUrl, "file://https://")) {
@@ -359,9 +380,14 @@ struct StrictModeScope {
     jobject savedPolicy = nullptr;
 
     explicit StrictModeScope(JEnv& env) {
+        // Every bail must clear: FindClass/GetMethodID return null WITH an
+        // exception pending, and leaving one armed makes the caller's next
+        // JNI call illegal.
+        JNIEnv* raw = env;
         clsStrict = env.FindClass("android/os/StrictMode");
         jclass clsPolicyBuilder = env.FindClass("android/os/StrictMode$ThreadPolicy$Builder");
         if (!clsStrict || !clsPolicyBuilder) {
+            raw->ExceptionClear();
             return;
         }
         jmethodID getThreadPolicy = env.GetStaticMethodID(
@@ -369,18 +395,21 @@ struct StrictModeScope {
         jmethodID setter = env.GetStaticMethodID(
                 clsStrict, "setThreadPolicy", "(Landroid/os/StrictMode$ThreadPolicy;)V");
         if (!getThreadPolicy || !setter) {
+            raw->ExceptionClear();
             return;
         }
         // No captured policy means no way back, so leave the thread alone
         // rather than relaxing it permanently.
         jobject captured = env.CallStaticObjectMethod(clsStrict, getThreadPolicy);
         if (!captured) {
+            raw->ExceptionClear();
             return;
         }
 
         jmethodID builderCtor = env.GetMethodID(clsPolicyBuilder, "<init>", "()V");
-        jobject builder = env.NewObject(clsPolicyBuilder, builderCtor);
+        jobject builder = builderCtor ? env.NewObject(clsPolicyBuilder, builderCtor) : nullptr;
         if (!builder) {
+            raw->ExceptionClear();
             return;
         }
         jmethodID permitAll = env.GetMethodID(clsPolicyBuilder, "permitAll",
@@ -391,12 +420,15 @@ struct StrictModeScope {
         jobject policy = build ? env.CallObjectMethod(builder2 ? builder2 : builder, build)
                                : nullptr;
         if (!policy) {
+            raw->ExceptionClear();
             return;
         }
         env.CallStaticVoidMethod(clsStrict, setter, policy);
-        // Armed only once the permissive policy is actually in force.
+        // Armed only once the permissive policy is actually in force. The
+        // saved policy is a global ref so the restore does not depend on any
+        // JNI local frame the caller pushed around this scope.
         setThreadPolicy = setter;
-        savedPolicy = captured;
+        savedPolicy = env.NewGlobalRef(captured);
         jni = env;
     }
 
@@ -406,6 +438,7 @@ struct StrictModeScope {
     ~StrictModeScope() {
         if (jni == nullptr) return;
         jni->CallStaticVoidMethod(clsStrict, setThreadPolicy, savedPolicy);
+        jni->DeleteGlobalRef(savedPolicy);
         jni->ExceptionClear();
     }
 };
@@ -630,27 +663,28 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
                        url.c_str(), excClass.c_str(), excMsg.c_str());
     };
 
-    try {
-        JEnv env;
-        JNIEnv* raw = env;
+    JEnv env;
+    JNIEnv* raw = env;
 
-        // Request setup alone burns a couple of dozen local refs (a jstring
-        // per header, one per drained exception), and the sync path runs
-        // inside a caller's frame — V8's resolve walk — that must not be left
-        // holding them. Pushed first, so everything scoped inside it,
-        // StrictModeScope included, is torn down while its refs are still live.
-        const bool framePushed = raw->PushLocalFrame(64) == JNI_OK;
-        if (!framePushed) {
-            raw->ExceptionClear();
+    // Request setup alone burns a couple of dozen local refs (a jstring per
+    // header, one per drained exception), and the sync path runs inside a
+    // caller's frame — V8's resolve walk — that must not be left holding
+    // them. Declared OUTSIDE the try: a caught NativeScriptException may hold
+    // the Java throwable as a local ref in this frame, which the handlers
+    // below read — the pop must come after them, not during the unwind.
+    const bool framePushed = raw->PushLocalFrame(64) == JNI_OK;
+    if (!framePushed) {
+        raw->ExceptionClear();
+    }
+    struct LocalFrame {
+        JNIEnv* jni;
+        bool pushed;
+        ~LocalFrame() {
+            if (pushed) jni->PopLocalFrame(nullptr);
         }
-        struct LocalFrame {
-            JNIEnv* jni;
-            bool pushed;
-            ~LocalFrame() {
-                if (pushed) jni->PopLocalFrame(nullptr);
-            }
-        } localFrame{raw, framePushed};
+    } localFrame{raw, framePushed};
 
+    try {
         StrictModeScope strictMode(env);
 
         jclass clsURL = env.FindClass("java/net/URL");

@@ -68,6 +68,13 @@ struct CanonicalizationConfig {
 // module under exactly one URL and never varies it for freshness.
 std::string CanonicalizeHttpUrlKey(const std::string& url);
 
+// Undoes what a path normalizer did to an http(s) URL — unwraps a `file://`
+// prefix the resolver may have put in front, and re-doubles a scheme
+// separator collapsed to a single slash (`http:/host/...`). Every consumer
+// that classifies or keys a module URL must run this first, or the same
+// module string routes/keys differently at different sites.
+std::string NormalizeHttpModuleUrl(const std::string& path);
+
 // What a module response turned out to be. Decided once, by the shared
 // classifier, for whichever transport produced the response.
 enum class ModuleResponseKind {
