@@ -331,6 +331,10 @@ bool Timers::RunIfEarliest(double now, double otherDue) {
         // task is no longer in queue to be executed
         task->queued_ = false;
 #ifdef NS_TIMERS_NESTING_CLAMP
+        // save/restore, not reset: the event-loop pump dispatches timers
+        // nested inside an outer timer's callback, and the outer callback's
+        // remaining setTimeout calls must keep the outer nesting level
+        const int enclosingNesting = nesting;
         nesting = task->nestingLevel_;
 #endif
         if (task->repeats_) {
@@ -363,7 +367,7 @@ bool Timers::RunIfEarliest(double now, double otherDue) {
         }
 
 #ifdef NS_TIMERS_NESTING_CLAMP
-        nesting = 0;
+        nesting = enclosingNesting;
 #endif
 
         if (tc.HasCaught() &&

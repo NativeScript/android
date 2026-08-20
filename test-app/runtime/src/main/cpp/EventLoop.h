@@ -197,11 +197,40 @@ public:
     /**
      * Blocks the calling thread until this loop's internal lane has work (the
      * eventfd or timerfd is readable) or `timeoutMs` elapses, whichever comes
-     * first, without consuming either fd and without entering the looper - so
-     * it is safe where IsInLooperCallback forbids polling. Pumps pair it with
-     * RunNestableV8Tasks, which drains the queue directly.
+     * first, without entering the looper - so it is safe where
+     * IsInLooperCallback forbids polling. Returns immediately when internal
+     * work is already due. Eventfd units left over from entries a direct
+     * drain (RunNestableV8Tasks) consumed are swallowed first, so the wait
+     * only wakes for new work instead of spinning on stale readability.
      */
     void WaitForInternalWork(int timeoutMs);
+
+    /**
+     * Runs every ordered-lane item that is due NOW - Java-token entries and
+     * timer-source items alike, in due order - directly from the calling
+     * (home) thread, without waiting for their Handler messages. The messages
+     * still arrive later and die as leftover tokens: a token whose item was
+     * drained early finds nothing due and no-ops, and its claim cell is
+     * retired by the dispatch gate as usual. Bounded to a short slice so a
+     * callback minting due-now work (a setTimeout(0) chain) cannot pin the
+     * caller past its own deadline checks. Returns the number of items run.
+     */
+    int RunDueOrderedEntries();
+
+    enum class PumpResult { kSettled, kDeadline, kTerminated };
+
+    /**
+     * Drives this loop in place on the home thread until `settled()` returns
+     * true or `deadlineSeconds` elapses: nestable v8 tasks, a microtask
+     * checkpoint, and due ordered-lane work per iteration, idling in
+     * WaitForInternalWork between slices. The one pump primitive behind
+     * module evaluation, the graph walk, and the boot backstop - JS frames
+     * are on the stack throughout, so non-nestable v8 tasks and plain
+     * internal posts stay queued, exactly as in the inspector pause loops.
+     * Returns kTerminated when the isolate is terminating or the loop has
+     * been shut down; `settled` may throw and the exception propagates.
+     */
+    PumpResult PumpUntil(double deadlineSeconds, const std::function<bool()>& settled);
 
     /**
      * Runs at most one due ordered-lane entry, then performs a microtask
@@ -228,6 +257,10 @@ private:
         // this entry (written when its timerfd deadline fired), so a later
         // timer fire must not issue a second one
         bool signaled = false;
+        // internal entries only: an eventfd unit backs this entry, so a
+        // direct (unit-free) drain that consumes it must count the unit as
+        // leftover for WaitForInternalWork to swallow
+        bool unitIssued = false;
     };
     struct Lane {
         std::deque<Entry> immediate;
@@ -248,9 +281,15 @@ private:
                                                 bool requireSignaledDelayed, double now);
     // earliest due entry time in the lane, or a negative value if none is due
     static double PeekDueLocked(Lane& lane, double now);
+    // same, but only over entries matching TakeDueLocked's nestable/v8 filter
+    static double PeekDueFilteredLocked(Lane& lane, bool nestableOnly, bool v8Only, double now);
     void ArmTimerLocked(double now);
     void RunEntry(Entry& entry);
     void RunOneInternal();
+    // one due slot across the ordered domain (entries + timer source); true
+    // when a slot was consumed. The body behind both RunOrderedTask (one call
+    // per Java token) and RunDueOrderedEntries (looped by the pumps).
+    bool RunOneOrderedDue();
 
     static int EventFdCallback(int fd, int events, void* data);
     static int TimerFdCallback(int fd, int events, void* data);
@@ -307,6 +346,10 @@ private:
     int eventFd_ = -1;
     int timerFd_ = -1;
     bool stopped_ = false;
+    // units written to eventFd_ whose entries a direct drain already ran;
+    // consumed by WaitForInternalWork (or by an EventFdCallback that finds
+    // nothing due). Guarded by mutex_.
+    uint64_t leftoverUnits_ = 0;
 
     // process-wide JNI cache, written once under the first bind's lock (the
     // main runtime binds before any worker thread exists)

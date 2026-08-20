@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <ctime>
@@ -133,9 +134,10 @@ void EventLoop::BindToCurrentThread() {
 
     // flush work buffered before the home thread was known
     auto now = now_ms();
-    for (size_t i = 0; i < internal_.immediate.size(); i++) {
+    for (auto& entry : internal_.immediate) {
         uint64_t value = 1;
         write(eventFd_, &value, sizeof(value));
+        entry.unitIssued = true;
     }
     ArmTimerLocked(now);
     for (auto& entry : ordered_.immediate) {
@@ -204,6 +206,7 @@ void EventLoop::PostInternalLocked(Entry entry, double delayMs) {
     auto now = now_ms();
     if (delayMs <= 0) {
         entry.time = now;
+        entry.unitIssued = eventFd_ != -1;
         internal_.immediate.push_back(std::move(entry));
         if (eventFd_ != -1) {
             uint64_t value = 1;
@@ -451,6 +454,28 @@ double EventLoop::PeekDueLocked(Lane& lane, double now) {
     return due;
 }
 
+double EventLoop::PeekDueFilteredLocked(Lane& lane, bool nestableOnly, bool v8Only, double now) {
+    auto matches = [&](const Entry& e) {
+        return (!nestableOnly || e.nestable) && (!v8Only || e.task != nullptr);
+    };
+    double due = -1;
+    for (const auto& e : lane.immediate) {
+        if (matches(e)) {
+            due = e.time;
+            break;
+        }
+    }
+    for (const auto& pair : lane.delayed) {
+        if (pair.first > now) {
+            break;
+        }
+        if (matches(pair.second) && (due < 0 || pair.first < due)) {
+            due = pair.first;
+        }
+    }
+    return due;
+}
+
 void EventLoop::ArmTimerLocked(double now) {
     if (timerFd_ == -1) {
         return;
@@ -503,11 +528,15 @@ void EventLoop::RunOneInternal() {
             return;
         }
         entry = TakeDueLocked(internal_, false, false, true, now_ms());
-    }
-    if (entry == nullptr) {
-        // leftover unit: the work it represented ran early from a nested loop
-        // drain
-        return;
+        if (entry == nullptr) {
+            // leftover unit: the work it represented ran early from a direct
+            // drain - this dispatch just consumed it, so it is no longer
+            // WaitForInternalWork's to swallow
+            if (leftoverUnits_ > 0) {
+                leftoverUnits_--;
+            }
+            return;
+        }
     }
     RunEntry(*entry);
 }
@@ -527,10 +556,20 @@ void EventLoop::RunNestableV8Tasks() {
             if (stopped_) {
                 return;
             }
+            const size_t delayedBefore = internal_.delayed.size();
             entry = TakeDueLocked(internal_, true, true, false, now_ms());
-        }
-        if (entry == nullptr) {
-            return;
+            if (entry == nullptr) {
+                return;
+            }
+            if (entry->unitIssued) {
+                leftoverUnits_++;
+            }
+            if (internal_.delayed.size() != delayedBefore) {
+                // a drained delayed entry may leave the timerfd armed (or
+                // expired unread) for it; rearming to the queue's new
+                // earliest also discards the stale expiration
+                ArmTimerLocked(now_ms());
+            }
         }
         // the pause loops call this from inside v8 inspector frames - a C++
         // exception must not unwind through them
@@ -538,38 +577,100 @@ void EventLoop::RunNestableV8Tasks() {
     }
 }
 
-void EventLoop::RunOrderedTask() {
-    // one anonymous token = one due slot across the whole ordered domain:
-    // pick the earliest due item among the ordered entries and the timer
-    // source, whichever it is. Timers and entries only ever run on this
-    // thread, so the peeked winner can't be taken by anyone else before we
-    // re-lock (a concurrent post can only add later work).
+bool EventLoop::RunOneOrderedDue() {
+    // one due slot across the whole ordered domain: pick the earliest due
+    // item among the ordered entries and the timer source, whichever it is.
+    // Timers and entries only ever run on this thread, so the peeked winner
+    // can't be taken by anyone else before we re-lock (a concurrent post can
+    // only add later work).
     auto now = now_ms();
     double entryDue;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (stopped_) {
-            return;
+            return false;
         }
         entryDue = PeekDueLocked(ordered_, now);
     }
     if (timerSource_ != nullptr && timerSource_->RunIfEarliest(now, entryDue)) {
-        return;
+        return true;
     }
     if (entryDue < 0) {
-        // leftover token: nothing in the domain is due yet
-        return;
+        // leftover token, or an idle drain: nothing in the domain is due yet
+        return false;
     }
     std::unique_ptr<Entry> entry;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (stopped_) {
-            return;
+            return false;
         }
         entry = TakeDueLocked(ordered_, false, false, false, now_ms());
     }
-    if (entry != nullptr) {
-        RunEntry(*entry);
+    if (entry == nullptr) {
+        return false;
+    }
+    RunEntry(*entry);
+    return true;
+}
+
+void EventLoop::RunOrderedTask() {
+    // one anonymous token = one due slot; a token whose item a pump drained
+    // early finds nothing due and dies here
+    RunOneOrderedDue();
+}
+
+int EventLoop::RunDueOrderedEntries() {
+    // Bounded slice: a callback that keeps minting due-now work (a
+    // setTimeout(0) chain) must not pin the calling pump past its own
+    // deadline checks, so the drain yields after a few milliseconds and the
+    // pump comes back for the rest on its next iteration.
+    constexpr double kSliceMs = 8.0;
+    const double start = now_ms();
+    int ran = 0;
+    while (RunOneOrderedDue()) {
+        ran++;
+        if (now_ms() - start >= kSliceMs) {
+            break;
+        }
+    }
+    return ran;
+}
+
+EventLoop::PumpResult EventLoop::PumpUntil(double deadlineSeconds,
+                                           const std::function<bool()>& settled) {
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::duration<double>(deadlineSeconds);
+    for (;;) {
+        if (settled()) {
+            return PumpResult::kSettled;
+        }
+        if (isolate_ != nullptr && isolate_->IsExecutionTerminating()) {
+            return PumpResult::kTerminated;
+        }
+        if (IsStopped()) {
+            // a stopped loop drops every post, so nothing can settle anymore
+            return PumpResult::kTerminated;
+        }
+        if (std::chrono::steady_clock::now() >= deadline) {
+            return PumpResult::kDeadline;
+        }
+        RunNestableV8Tasks();
+        {
+            // work may enqueue microtasks without entering JS; scopes are
+            // re-entrant, so callers already holding them pay nothing
+            v8::Locker locker(isolate_);
+            v8::Isolate::Scope isolateScope(isolate_);
+            v8::HandleScope handleScope(isolate_);
+            isolate_->PerformMicrotaskCheckpoint();
+        }
+        const int ranOrdered = RunDueOrderedEntries();
+        if (settled()) {
+            return PumpResult::kSettled;
+        }
+        if (ranOrdered == 0) {
+            WaitForInternalWork(10);
+        }
     }
 }
 
@@ -589,12 +690,44 @@ bool EventLoop::IsInLooperCallback() { return t_looperCallbackDepth > 0; }
 void EventLoop::WaitForInternalWork(int timeoutMs) {
     struct pollfd fds[2];
     nfds_t count = 0;
+    bool sleepOnly = false;
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (eventFd_ != -1) fds[count++] = {eventFd_, POLLIN, 0};
-        if (timerFd_ != -1) fds[count++] = {timerFd_, POLLIN, 0};
+        if (stopped_) {
+            sleepOnly = true;
+        } else {
+            const double now = now_ms();
+            // Drainable work already due: the caller's drain runs it, waiting
+            // would only add latency. The filter must match RunNestableV8Tasks
+            // (nestable v8 tasks only) — a due entry the pump cannot take must
+            // not turn the wait into a no-op.
+            if (PeekDueFilteredLocked(internal_, /*nestableOnly=*/true, /*v8Only=*/true, now) >=
+                0) {
+                return;
+            }
+            // units whose entries a direct drain already consumed keep the
+            // eventfd readable; swallow them or the poll below returns
+            // immediately on every call
+            while (leftoverUnits_ > 0 && eventFd_ != -1) {
+                uint64_t value;
+                if (read(eventFd_, &value, sizeof(value)) != sizeof(value)) {
+                    break;
+                }
+                leftoverUnits_--;
+            }
+            // A due entry the drain cannot take (non-nestable task, plain fn
+            // post) pins its unread unit in the eventfd, so the fds cannot go
+            // quiet — polling them would spin. Plain sleep is the only honest
+            // wait until the looper resumes and runs it.
+            if (PeekDueLocked(internal_, now) >= 0) {
+                sleepOnly = true;
+            } else {
+                if (eventFd_ != -1) fds[count++] = {eventFd_, POLLIN, 0};
+                if (timerFd_ != -1) fds[count++] = {timerFd_, POLLIN, 0};
+            }
+        }
     }
-    if (count == 0) {
+    if (sleepOnly || count == 0) {
         usleep(static_cast<useconds_t>(timeoutMs) * 1000);
         return;
     }
@@ -635,6 +768,7 @@ int EventLoop::TimerFdCallback(int fd, int events, void* data) {
             }
             if (!pair.second.signaled) {
                 pair.second.signaled = true;
+                pair.second.unitIssued = true;
                 due++;
             }
         }

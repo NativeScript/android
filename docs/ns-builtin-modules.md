@@ -779,13 +779,22 @@ graph walk, and — doubled, at 120 seconds — the boot backstop, so the waits
 stay ordered: transport timeouts < module deadline < boot backstop. The local
 entry's short yield is deliberately *not* derived from that constant: it is an
 independent one-second literal in `BootEntryEvaluationOptions`, with
-`return-pending` behavior and no looper slicing. An HTTP entry instead gets the
-full deadline, throws on expiry, and does slice the looper, because the tooling
-driving it needs the rejection reason synchronously. The backstop itself is
-`HoldBootBackstop` in
-`Runtime.cpp`, called from both `Runtime::RunModule` overloads; it pumps
-nestable V8 tasks, microtask checkpoints and `ALooper_pollOnce` until the entry
-and all async graph work settle.
+`return-pending` behavior. An HTTP entry instead gets the full deadline and
+throws on expiry, because the tooling driving it needs the rejection reason
+synchronously. The backstop itself is `HoldBootBackstop` in `Runtime.cpp`,
+called from both `Runtime::RunModule` overloads; it pumps the isolate's event
+loop in place (`EventLoop::PumpUntil`) until the entry and all async graph
+work settle.
+
+Every pump on Android — a pumping require, the graph walk, the boot backstop —
+runs the same `EventLoop::PumpUntil` slice: nestable V8 tasks, a microtask
+checkpoint, and the loop's own **ordered lane drained directly** (JS timers
+ride Java `Handler` messages, which cannot dispatch while the pump's JS frames
+hold the thread — the drain is what lets an entry or a pumped graph parked on
+`setTimeout` settle in-pump). The pump never re-enters the platform looper, so
+on Android `pumpRunLoop` is validated and carried but adds nothing beyond that
+baseline; the option's cross-platform meaning and its warnings above are
+unchanged.
 
 Workers copy the loader vocabulary from the parent at spawn
 (`CaptureLoaderVocabulary` on the parent's thread, `InstallLoaderVocabulary`
