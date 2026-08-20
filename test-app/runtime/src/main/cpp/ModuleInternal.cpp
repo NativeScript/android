@@ -8,45 +8,110 @@
 #include "ModuleInternalCallbacks.h"
 #include "BuiltinLoader.h"
 #include "File.h"
+#include "HttpLoader.h"
 #include "JniLocalRef.h"
 #include "ArgConverter.h"
-#include "V8GlobalHelpers.h"
 #include "NativeScriptAssert.h"
 #include "Constants.h"
 #include "CrashBreadcrumbs.h"
+#include "EventLoop.h"
 #include "NativeScriptException.h"
 #include "NsBuiltinModules.h"
 #include "napi/NapiModules.h"
 #include "Util.h"
 #include "SimpleProfiler.h"
-#include "include/v8.h"
 #include "CallbackHandlers.h"
 #include "ManualInstrumentation.h"
 #include "Runtime.h"
+#include "TraceLog.h"
 #include <sstream>
-#include <mutex>
 #include <libgen.h>
 #include <dlfcn.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <utime.h>
 #include <unistd.h>
+#include <chrono>
+#include <cmath>
+#include <cstring>
 
 using namespace v8;
 using namespace std;
 using namespace tns;
 
-// Global module registry for ES modules: maps absolute file paths → compiled Module handles
-std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
+// Classifies the NORMALIZED form: a scheme separator collapsed by a path
+// normalizer (`http:/host/...`) must still route to the HTTP loader, or the
+// same string classifies as a filesystem path and repairs itself only after
+// taking the wrong branch.
+static bool IsHttpModulePath(const std::string& path) {
+    const std::string normalized = NormalizeHttpModuleUrl(path);
+    return normalized.rfind("http://", 0) == 0 || normalized.rfind("https://", 0) == 0;
+}
 
-// Helper function to check if a module name looks like an optional external module
-bool ModuleInternal::IsLikelyOptionalModule(const std::string& moduleName) {
-    // Check if it's a bare module name (no path separators) that could be an npm package
-    if (moduleName.find('/') == std::string::npos && moduleName.find('\\') == std::string::npos &&
-        moduleName[0] != '.' && moduleName[0] != '~' && moduleName[0] != '/') {
-        return true;
+// What a rejected evaluation promise says about itself.
+struct RejectionDetail {
+    // The reason's own text: an Error's `message`, or the reason stringified.
+    std::string message;
+    // A bounded rendering of the reason's `stack`, filled only when asked for.
+    std::string stackPreview;
+};
+
+// `detail`, when non-null, receives the reason's parts unjoined; reading the
+// stack costs a property get plus a copy, so callers pass null unless a trace
+// is actually going to be emitted.
+static std::string PromiseRejectionMessage(Isolate* isolate, Local<Promise> promise,
+                                           const std::string& path,
+                                           RejectionDetail* detail = nullptr) {
+    std::string errorMessage = "Module evaluation promise rejected: " + path;
+    TryCatch tc(isolate);
+    Local<Value> reason = promise->Result();
+    if (reason.IsEmpty()) {
+        return errorMessage;
     }
-    return false;
+    std::string reasonText;
+    Local<Context> context = isolate->GetCurrentContext();
+    if (reason->IsObject()) {
+        Local<Object> errorObj = reason.As<Object>();
+        Local<Value> messageVal;
+        if (errorObj->Get(context, ArgConverter::ConvertToV8String(isolate, "message"))
+                    .ToLocal(&messageVal) &&
+            messageVal->IsString()) {
+            v8::String::Utf8Value messageUtf8(isolate, messageVal);
+            if (*messageUtf8) {
+                reasonText.assign(*messageUtf8);
+            }
+        }
+        Local<Value> stackVal;
+        if (detail != nullptr &&
+            errorObj->Get(context, ArgConverter::ConvertToV8String(isolate, "stack"))
+                    .ToLocal(&stackVal) &&
+            stackVal->IsString()) {
+            v8::String::Utf8Value stackUtf8(isolate, stackVal);
+            if (*stackUtf8) {
+                std::string stack(*stackUtf8);
+                detail->stackPreview = stack.size() > 240 ? stack.substr(0, 240) + "…" : stack;
+            }
+        }
+    } else {
+        auto maybeReasonStr = reason->ToString(context);
+        if (!maybeReasonStr.IsEmpty()) {
+            v8::String::Utf8Value reasonUtf8(isolate, maybeReasonStr.ToLocalChecked());
+            if (*reasonUtf8) {
+                reasonText.assign(*reasonUtf8);
+            }
+        }
+    }
+    if (!reasonText.empty()) {
+        errorMessage.append(" — ");
+        errorMessage.append(reasonText);
+    }
+    if (detail != nullptr) {
+        detail->message = std::move(reasonText);
+    }
+    if (tc.HasCaught()) {
+        tc.Reset();
+    }
+    return errorMessage;
 }
 
 // A package-style specifier: neither a path nor a scheme, so it may be claimed
@@ -59,6 +124,9 @@ static bool IsBareSpecifier(const std::string& specifier) {
 
     return specifier.find(':') == std::string::npos;
 }
+
+static ModuleEvaluationOptions BootEntryEvaluationOptions(bool isHttpModule);
+static ModuleEvaluationOptions RequireEvaluationOptions(ModuleEvaluationPolicy policy);
 
 // Helper function to check if a file path is an ES module (.mjs) but not a source map (.mjs.map)
 bool ModuleInternal::IsESModule(const std::string& path) {
@@ -124,26 +192,94 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
 
     m_requireFactoryFunction = new Persistent<Function>(isolate, requireFactoryFunction);
 
-    auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
+    auto external = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
+
+    // Only the require factory receives this one, so the evaluation options it
+    // forwards were validated at mint time.
+    auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback, external);
     auto requireFunc = requireFuncTemplate->GetFunction(context).ToLocalChecked();
-    global->Set(context, ArgConverter::ConvertToV8String(isolate, "__nativeRequire"), requireFunc);
     m_requireFunction = new Persistent<Function>(isolate, requireFunc);
+
+    // App code can reach this one, so it reads nothing but the specifier and the
+    // calling directory: a caller must not be able to hand itself a pumping
+    // policy, an unbounded deadline or a looper-slicing require.
+    auto publicRequireTemplate = FunctionTemplate::New(isolate, RequirePublicCallback, external);
+    global->Set(context, ArgConverter::ConvertToV8String(isolate, "__nativeRequire"),
+                publicRequireTemplate->GetFunction(context).ToLocalChecked());
 
     Local<Function> globalRequire;
 
     if (!baseDir.empty()) {
-        globalRequire = GetRequireFunction(isolate, baseDir);
+        globalRequire = GetRequireFunction(isolate, baseDir, RequireEvaluationOptions(
+                ModuleEvaluationPolicy::kSyncStrict));
     } else {
-        globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH);
+        globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH,
+                                           RequireEvaluationOptions(
+                                                   ModuleEvaluationPolicy::kSyncStrict));
     }
     global->Set(context, ArgConverter::ConvertToV8String(isolate, "require"), globalRequire);
 }
 
-Local<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const string& dirName) {
+// How an entry module's graph settles. For local modules the bound is a yield,
+// not a timeout: the default pump runs only nestable V8 tasks while these JS
+// frames are on the stack, so a TLA parked on anything else can never settle
+// in-place — give it one short window, then return and let the real event
+// loop (or the draining boot backstop) finish it after the turn. HTTP entries
+// must settle in-pump — the dev client needs the rejection reason
+// synchronously — so they get the full deadline and the looper-equivalent
+// drain, the same split iOS makes with its runloop slice.
+static ModuleEvaluationOptions BootEntryEvaluationOptions(bool isHttpModule) {
+    ModuleEvaluationOptions options;
+    options.policy = ModuleEvaluationPolicy::kSyncPumping;
+    options.deadlineSeconds = isHttpModule ? kModuleEvaluateDeadlineSeconds : 1.0;
+    options.timeoutBehavior = isHttpModule
+                                      ? ModuleEvaluationOptions::TimeoutBehavior::kThrow
+                                      : ModuleEvaluationOptions::TimeoutBehavior::kReturnPending;
+    options.pumpRunLoop = isHttpModule;
+    return options;
+}
+
+// How a graph reached through require() settles. A pumping require must settle
+// or throw — handing back a half-initialized namespace is what the strict
+// policy exists to prevent — so it gets the full deadline. By default the
+// pump runs nestable v8 tasks and microtasks only, matching iOS: running JS
+// timers or loop posts in the middle of an arbitrary require is opt-in
+// (pumpRunLoop), because those callbacks execute underneath the require's JS
+// frames.
+static ModuleEvaluationOptions RequireEvaluationOptions(ModuleEvaluationPolicy policy) {
+    ModuleEvaluationOptions options;
+    options.policy = policy;
+    if (policy == ModuleEvaluationPolicy::kSyncPumping) {
+        options.deadlineSeconds = kModuleEvaluateDeadlineSeconds;
+        options.timeoutBehavior = ModuleEvaluationOptions::TimeoutBehavior::kThrow;
+        options.pumpRunLoop = false;
+    }
+    return options;
+}
+
+// The require cache is keyed by directory AND by the options the require was
+// minted with: a pumping require for a directory must never be served from a
+// strict require cached for the same directory, in either direction.
+static std::string RequireCacheKey(const std::string& dirName,
+                                   const ModuleEvaluationOptions& options) {
+    std::string key = dirName;
+    key += '\x1f';
+    key += std::to_string(static_cast<int>(options.policy));
+    key += '\x1f';
+    key += std::to_string(options.deadlineSeconds);
+    key += '\x1f';
+    key += (options.timeoutBehavior == ModuleEvaluationOptions::TimeoutBehavior::kThrow) ? '1' : '0';
+    key += options.pumpRunLoop ? '1' : '0';
+    return key;
+}
+
+Local<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const string& dirName,
+                                                   const ModuleEvaluationOptions& options) {
     TNSPERF();
     Local<Function> requireFunc;
 
-    auto itFound = m_requireCache.find(dirName);
+    const std::string cacheKey = RequireCacheKey(dirName, options);
+    auto itFound = m_requireCache.find(cacheKey);
 
     if (itFound != m_requireCache.end()) {
         requireFunc = Local<Function>::New(isolate, *itFound->second);
@@ -154,12 +290,18 @@ Local<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const strin
 
         auto requireInternalFunc = Local<Function>::New(isolate, *m_requireFunction);
 
-        Local<Value> args[2] {
-            requireInternalFunc, ArgConverter::ConvertToV8String(isolate, dirName)
+        Local<Value> args[6] {
+            requireInternalFunc,
+            ArgConverter::ConvertToV8String(isolate, dirName),
+            Integer::New(isolate, static_cast<int>(options.policy)),
+            Number::New(isolate, options.deadlineSeconds),
+            v8::Boolean::New(isolate, options.timeoutBehavior ==
+                                              ModuleEvaluationOptions::TimeoutBehavior::kThrow),
+            v8::Boolean::New(isolate, options.pumpRunLoop)
         };
         Local<Value> result;
         auto thiz = Object::New(isolate);
-        auto success = requireFuncFactory->Call(context, thiz, 2, args).ToLocal(&result);
+        auto success = requireFuncFactory->Call(context, thiz, 6, args).ToLocal(&result);
 
         NS_CHECK(success && !result.IsEmpty() && result->IsFunction());
 
@@ -167,16 +309,141 @@ Local<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const strin
 
         auto poFunc = new Persistent<Function>(isolate, requireFunc);
 
-        m_requireCache.emplace(dirName, poFunc);
+        m_requireCache.emplace(cacheKey, poFunc);
     }
 
     return requireFunc;
 }
 
-void ModuleInternal::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void ModuleInternal::CreateRequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+    if (args.Length() < 1 || !args[0]->IsString()) {
+        isolate->ThrowException(Exception::TypeError(ArgConverter::ConvertToV8String(
+                isolate, "createRequire expects a base directory string")));
+        return;
+    }
+
+    Runtime* runtime = Runtime::TryGetRuntime(isolate);
+    ModuleInternal* moduleInternal = runtime != nullptr ? runtime->GetModuleInternal() : nullptr;
+    if (moduleInternal == nullptr) {
+        isolate->ThrowException(Exception::Error(ArgConverter::ConvertToV8String(
+                isolate, "createRequire is unavailable: this isolate has no module loader")));
+        return;
+    }
+
+    string dirName = ArgConverter::ConvertToString(args[0].As<String>());
+    const bool pumping = args.Length() > 1 && args[1]->BooleanValue(isolate);
+    ModuleEvaluationOptions options = RequireEvaluationOptions(
+            pumping ? ModuleEvaluationPolicy::kSyncPumping : ModuleEvaluationPolicy::kSyncStrict);
+
+    // ns-module.js has already validated these and passes undefined for anything
+    // the caller left out, so each present value simply overrides its default.
+    if (args.Length() > 2 && args[2]->IsNumber()) {
+        double deadlineSeconds = args[2].As<Number>()->Value();
+        // A NaN or infinite window makes the pump's deadline arithmetic
+        // undefined, and a non-positive one is no window at all.
+        if (std::isfinite(deadlineSeconds) && deadlineSeconds > 0.0) {
+            options.deadlineSeconds = deadlineSeconds;
+        }
+    }
+    if (args.Length() > 3 && args[3]->IsBoolean()) {
+        options.timeoutBehavior = args[3]->BooleanValue(isolate)
+                                          ? ModuleEvaluationOptions::TimeoutBehavior::kThrow
+                                          : ModuleEvaluationOptions::TimeoutBehavior::kReturnPending;
+    }
+    if (args.Length() > 4 && args[4]->IsBoolean()) {
+        options.pumpRunLoop = args[4]->BooleanValue(isolate);
+    }
+
+    args.GetReturnValue().Set(moduleInternal->GetRequireFunction(isolate, dirName, options));
+}
+
+bool ModuleInternal::InstallCreateRequireBinding(Local<Context> context, Local<Object> binding) {
+    Isolate* isolate = v8::Isolate::GetCurrent();
+    Local<Function> fn;
+    if (!Function::New(context, ModuleInternal::CreateRequireCallback).ToLocal(&fn)) {
+        return false;
+    }
+    fn->SetName(ArgConverter::ConvertToV8String(isolate, "createRequire"));
+    return binding->CreateDataProperty(context,
+                                       ArgConverter::ConvertToV8String(isolate, "createRequire"),
+                                       fn)
+            .FromMaybe(false);
+}
+
+// Node's `determineSpecificType` (lib/internal/errors.js), so an
+// ERR_INVALID_ARG_TYPE-shaped message reads the same here as it does there.
+// Deliberately side-effect free: no getter, no user `toString`, no `inspect`.
+static std::string DescribeValueForTypeError(Isolate* isolate, Local<Value> value) {
+    if (value.IsEmpty() || value->IsUndefined()) {
+        return "undefined";
+    }
+    if (value->IsNull()) {
+        return "null";
+    }
+
+    if (value->IsFunction()) {
+        std::string name = ArgConverter::ToString(isolate, value.As<v8::Function>()->GetName());
+        return name.empty() ? "an instance of Function" : "function " + name;
+    }
+
+    if (value->IsObject()) {
+        std::string ctorName = ArgConverter::ToString(isolate,
+                                                      value.As<Object>()->GetConstructorName());
+        return ctorName.empty() ? "an object" : "an instance of " + ctorName;
+    }
+
+    // A primitive: `type <typeof> (<value>)`.
+    const char* typeName = "object";
+    std::string rendered;
+    if (value->IsBoolean()) {
+        typeName = "boolean";
+        rendered = value->IsTrue() ? "true" : "false";
+    } else if (value->IsNumber()) {
+        typeName = "number";
+        double number = value.As<v8::Number>()->Value();
+        // String(-0) is "0", but Node renders the sign, and losing it here would
+        // hide exactly the distinction the message is meant to surface.
+        rendered = (number == 0 && std::signbit(number)) ? "-0"
+                                                         : ArgConverter::ToString(isolate, value);
+    } else if (value->IsBigInt()) {
+        typeName = "bigint";
+        rendered = ArgConverter::ToString(isolate, value) + "n";
+    } else if (value->IsSymbol()) {
+        typeName = "symbol";
+        Local<Value> description = value.As<v8::Symbol>()->Description(isolate);
+        rendered = "Symbol(" + (description->IsUndefined()
+                                        ? std::string()
+                                        : ArgConverter::ToString(isolate, description)) +
+                   ")";
+    } else {
+        rendered = ArgConverter::ToString(isolate, value);
+    }
+
+    if (rendered.size() > 28) {
+        rendered = rendered.substr(0, 25) + "...";
+    }
+    return "type " + std::string(typeName) + " (" + rendered + ")";
+}
+
+void ModuleInternal::DispatchRequire(const v8::FunctionCallbackInfo<v8::Value>& args,
+                                     bool honorEvaluationOptions) {
+    auto isolate = args.GetIsolate();
+
+    // Every path below assumes a string specifier — the builtin probe, the
+    // http(s) guard and the filesystem resolution all read it — so reject a
+    // non-string before any of them rather than casting one unchecked.
+    if (args.Length() < 1 || !args[0]->IsString()) {
+        Local<Value> received = args.Length() < 1 ? Local<Value>() : args[0];
+        isolate->ThrowException(Exception::TypeError(ArgConverter::ConvertToV8String(
+                isolate, "The \"id\" argument must be of type string. Received " +
+                                 DescribeValueForTypeError(isolate, received))));
+        return;
+    }
+
     try {
         auto thiz = static_cast<ModuleInternal*>(args.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
-        thiz->RequireCallbackImpl(args);
+        thiz->RequireCallbackImpl(args, honorEvaluationOptions);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -190,11 +457,20 @@ void ModuleInternal::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& 
     }
 }
 
-void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void ModuleInternal::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    DispatchRequire(args, true /* honorEvaluationOptions */);
+}
+
+void ModuleInternal::RequirePublicCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    DispatchRequire(args, false /* honorEvaluationOptions */);
+}
+
+void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args,
+                                         bool honorEvaluationOptions) {
     auto isolate = args.GetIsolate();
 
-    if (args.Length() != 2) {
-        throw NativeScriptException(string("require should be called with two parameters"));
+    if (args.Length() < 2) {
+        throw NativeScriptException(string("require should be called with at least two parameters"));
     }
     if (!args[0]->IsString()) {
         throw NativeScriptException(string("require's first parameter should be string"));
@@ -235,11 +511,48 @@ void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Valu
         return;
     }
 
+    // URL-based modules must be loaded via dynamic import().
+    if (moduleName.rfind("http://", 0) == 0 || moduleName.rfind("https://", 0) == 0) {
+        throw NativeScriptException("NativeScript: require() of URL module is not supported: " +
+                                    moduleName + ". Use dynamic import() instead.");
+    }
+
     tns::instrumentation::Frame frame("RequireCallback " + moduleName);
     string callingModuleDirName = ArgConverter::ConvertToString(args[1].As<String>());
     auto isData = false;
 
-    auto moduleObj = LoadImpl(isolate, moduleName, callingModuleDirName, isData);
+    ModuleEvaluationOptions evaluationOptions =
+            RequireEvaluationOptions(ModuleEvaluationPolicy::kSyncStrict);
+    if (honorEvaluationOptions) {
+        // The require factory forwards the options its require was minted with;
+        // an absent policy is the strict default every ordinary require uses.
+        ModuleEvaluationPolicy policy = ModuleEvaluationPolicy::kSyncStrict;
+        if (args.Length() > 2 && args[2]->IsInt32() &&
+            args[2].As<Int32>()->Value() ==
+                    static_cast<int>(ModuleEvaluationPolicy::kSyncPumping)) {
+            policy = ModuleEvaluationPolicy::kSyncPumping;
+        }
+        evaluationOptions = RequireEvaluationOptions(policy);
+        if (args.Length() > 3 && args[3]->IsNumber()) {
+            double deadlineSeconds = args[3].As<Number>()->Value();
+            // A NaN or infinite window makes the pump's deadline arithmetic
+            // undefined, and a non-positive one is no window at all.
+            if (std::isfinite(deadlineSeconds) && deadlineSeconds > 0.0) {
+                evaluationOptions.deadlineSeconds = deadlineSeconds;
+            }
+        }
+        if (args.Length() > 4 && args[4]->IsBoolean()) {
+            evaluationOptions.timeoutBehavior =
+                    args[4]->BooleanValue(isolate)
+                            ? ModuleEvaluationOptions::TimeoutBehavior::kThrow
+                            : ModuleEvaluationOptions::TimeoutBehavior::kReturnPending;
+        }
+        if (args.Length() > 5 && args[5]->IsBoolean()) {
+            evaluationOptions.pumpRunLoop = args[5]->BooleanValue(isolate);
+        }
+    }
+
+    auto moduleObj = LoadImpl(isolate, moduleName, callingModuleDirName, isData, evaluationOptions);
 
     if (isData) {
         NS_DCHECK(!moduleObj.IsEmpty());
@@ -267,10 +580,37 @@ void ModuleInternal::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Va
 void ModuleInternal::Load(Local<Context> context, const string& path) {
     TNSPERF();
     auto isolate = m_isolate;
+    // The ES module branch compiles and links against
+    // isolate->GetCurrentContext(); a caller that enters the isolate through a
+    // fresh Isolate::Scope has no current context, and CompileModule would
+    // dereference a null native context. The require branch never needed this
+    // because Function::Call enters the context it is handed.
+    Context::Scope context_scope(context);
+    const bool isHttpModule = IsHttpModulePath(path);
+    if (isHttpModule || IsESModule(path)) {
+        if (isHttpModule) {
+            TNS_DEBUG(Esm, "run-module http-esm begin %s", NormalizeHttpModuleUrl(path).c_str());
+        }
+        // The entry runs before this thread's event loop does, so its graph can
+        // only make progress from the pump inside LoadESModule.
+        LoadESModule(isolate, path, BootEntryEvaluationOptions(isHttpModule));
+        if (isHttpModule) {
+            TNS_DEBUG(Esm, "run-module http-esm ok %s", NormalizeHttpModuleUrl(path).c_str());
+        }
+        return;
+    }
     auto globalObject = context->Global();
     auto require = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "require")).ToLocalChecked().As<Function>();
     Local<Value> args[] = { ArgConverter::ConvertToV8String(isolate, path) };
-    require->Call(context, globalObject, 1, args);
+    // A failed entry must throw through this boundary in every build — the
+    // caller (boot, or a worker's onerror routing) owns the report, and the
+    // boot backstop must never pump with an exception pending on the isolate.
+    TryCatch tc(isolate);
+    Local<Value> result;
+    const bool ok = require->Call(context, globalObject, 1, args).ToLocal(&result);
+    if (!ok || tc.HasCaught()) {
+        throw NativeScriptException(tc, "require() failed for module " + path);
+    }
 }
 
 void ModuleInternal::LoadWorker(Local<Context> context, const string& path) {
@@ -278,7 +618,11 @@ void ModuleInternal::LoadWorker(Local<Context> context, const string& path) {
     auto isolate = m_isolate;
     TryCatch tc(isolate);
 
-    Load(context, path);
+    try {
+        Load(context, path);
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    }
 
     if (tc.HasCaught()) {
         // This will handle any errors that occur when first loading a script (new worker)
@@ -289,15 +633,37 @@ void ModuleInternal::LoadWorker(Local<Context> context, const string& path) {
     }
 }
 
-void ModuleInternal::CheckFileExists(Isolate* isolate, const std::string& path, const std::string& baseDir) {
+std::string ModuleInternal::CheckFileExists(Isolate* isolate, const std::string& path, const std::string& baseDir) {
     JEnv env;
     JniLocalRef jsModulename(env.NewStringUTF(path.c_str()));
     JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
 
-    env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsBaseDir);
+    // Throws a NativeScriptException (through JEnv's pending-exception check)
+    // when nothing resolves, so the conversion below only ever sees a hit.
+    JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID,
+                                                        (jstring) jsModulename,
+                                                        (jstring) jsBaseDir));
+
+    return ArgConverter::jstringToString((jstring) jsModulePath);
 }
 
-Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleName, const string& baseDir, bool& isData) {
+// The trailing extension without its dot, or an empty string when the last
+// segment has none. A leading dot names a hidden file, not an extension.
+static std::string PathExtension(const std::string& path) {
+    size_t dot = path.find_last_of('.');
+    if (dot == std::string::npos || dot + 1 >= path.size()) {
+        return std::string();
+    }
+    size_t slash = path.find_last_of('/');
+    if (slash != std::string::npos && (dot < slash || dot == slash + 1)) {
+        return std::string();
+    }
+    return path.substr(dot + 1);
+}
+
+Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleName,
+                                       const string& baseDir, bool& isData,
+                                       const ModuleEvaluationOptions& options) {
     auto pathKind = GetModulePathKind(moduleName);
     auto cachePathKey = (pathKind == ModulePathKind::Global) ? moduleName : (baseDir + "*" + moduleName);
 
@@ -355,12 +721,12 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleNam
         if (it2 == m_loadedModules.end()) {
             if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".mjs") || Util::EndsWith(path, ".so")) {
                 isData = false;
-                result = LoadModule(isolate, path, cachePathKey);
+                result = LoadModule(isolate, path, cachePathKey, options);
             } else if (Util::EndsWith(path, ".json")) {
                 isData = true;
                 result = LoadData(isolate, path);
             } else {
-                string errMsg = "Unsupported file extension: " + path;
+                string errMsg = "Unsupported file extension: " + PathExtension(path);
                 throw NativeScriptException(errMsg);
             }
         } else {
@@ -377,7 +743,74 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleNam
     return result;
 }
 
-Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& modulePath, const string& moduleCacheKey) {
+static bool NamespaceHasOwn(Isolate* isolate, Local<Context> context, Local<Object> ns,
+                            const char* name) {
+    return ns->HasOwnProperty(context, ArgConverter::ConvertToV8String(isolate, name))
+            .FromMaybe(false);
+}
+
+// The live compiled module behind a registry key, or empty.
+static Local<Module> RegisteredModuleForPath(Isolate* isolate, const std::string& canonicalPath) {
+    auto* registryPtr = ModuleRegistryFor(isolate);
+    if (registryPtr == nullptr) {
+        return Local<Module>();
+    }
+    auto it = registryPtr->find(canonicalPath);
+    if (it == registryPtr->end()) {
+        return Local<Module>();
+    }
+    return it->second.Get(isolate);
+}
+
+// What `require()` of an ES module hands back, per Node's
+// populateCJSExportsFromESM: an explicit `module.exports` export wins outright;
+// a namespace with no default export, or one that already declares
+// __esModule, passes through untouched; everything else gets the facade so
+// transpiled consumers reading `_mod.__esModule ? _mod.default : _mod` find the
+// default. Export names are arbitrary strings, hence the own-property probes.
+static Local<Value> RequireExportsForNamespace(Isolate* isolate, Local<Context> context,
+                                               Local<Object> ns,
+                                               const std::string& canonicalPath) {
+    TryCatch tc(isolate);
+
+    if (NamespaceHasOwn(isolate, context, ns, "module.exports")) {
+        Local<Value> moduleExports;
+        if (!ns->Get(context, ArgConverter::ConvertToV8String(isolate, "module.exports"))
+                    .ToLocal(&moduleExports)) {
+            throw NativeScriptException(
+                    tc, "Cannot read the 'module.exports' export of " + canonicalPath);
+        }
+        return moduleExports;
+    }
+
+    bool hasDefault = NamespaceHasOwn(isolate, context, ns, "default");
+    bool hasEsModuleMarker = NamespaceHasOwn(isolate, context, ns, "__esModule");
+    if (!hasDefault || hasEsModuleMarker) {
+        return ns;
+    }
+
+    Local<Module> target = RegisteredModuleForPath(isolate, canonicalPath);
+    if (target.IsEmpty()) {
+        // The load that produced this namespace registered the module under this
+        // very key, so a miss means the registry and the namespace disagree —
+        // returning the bare namespace would drop __esModule and misroute every
+        // transpiled consumer downstream.
+        throw NativeScriptException(
+                "require() cannot build the exports facade for " + canonicalPath +
+                ": the module evaluated but is absent from the registry under its canonical key");
+    }
+
+    Local<Module> facade;
+    if (!GetOrCreateRequireFacade(isolate, context, target, canonicalPath).ToLocal(&facade)) {
+        throw NativeScriptException("Cannot build the require() exports facade for " +
+                                    canonicalPath);
+    }
+    return facade->GetModuleNamespace();
+}
+
+Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& modulePath,
+                                         const string& moduleCacheKey,
+                                         const ModuleEvaluationOptions& options) {
     string frameName("LoadModule " + modulePath);
     tns::instrumentation::Frame frame(frameName);
     CrashBreadcrumbs::ModuleScope moduleBreadcrumb(modulePath.c_str());
@@ -398,13 +831,27 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
 
     // Check if this is an ES module (.mjs)
     if (Util::EndsWith(modulePath, ".mjs")) {
-        // For ES modules, load using the ES module system
-        Local<Value> moduleNamespace = LoadESModule(isolate, modulePath);
-        
-        // Create a wrapper object that behaves like a CommonJS module
-        // but exports the ES module namespace
-        moduleObj->Set(context, ArgConverter::ConvertToV8String(isolate, "exports"), moduleNamespace);
-        
+        // require()'s route into the ES module system, which cannot wait: an
+        // async graph is refused rather than pumped.
+        Local<Value> moduleNamespace = LoadESModule(isolate, modulePath, options);
+
+        // A load that produced no namespace produced no module either — an
+        // isolate torn down mid-load, or a graph that never settled. Caching the
+        // empty exports object would intern that failure for the process.
+        if (moduleNamespace.IsEmpty()) {
+            throw NativeScriptException("ES module load returned empty value " + modulePath);
+        }
+        if (!moduleNamespace->IsObject()) {
+            throw NativeScriptException("Failed to load ES module " + modulePath);
+        }
+
+        // `module.exports` is what Node's populateCJSExportsFromESM produces for
+        // this namespace, not the namespace itself.
+        Local<Value> esmExports = RequireExportsForNamespace(isolate, context,
+                                                             moduleNamespace.As<Object>(),
+                                                             CanonicalizeRegistryKey(modulePath));
+        moduleObj->Set(context, ArgConverter::ConvertToV8String(isolate, "exports"), esmExports);
+
         tempModule.SaveToCache();
         result = moduleObj;
         return result;
@@ -472,18 +919,23 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
         }
         moduleFunc = maybeFunc.ToLocalChecked();
     } else {
-        string errMsg = "Unsupported file extension: " + modulePath;
+        string errMsg = "Unsupported file extension: " + PathExtension(modulePath);
         throw NativeScriptException(errMsg);
     }
 
     SET_PROFILER_FRAME();
 
     auto fileName = ArgConverter::ConvertToV8String(isolate, modulePath);
-    char pathcopy[1024];
-    strcpy(pathcopy, modulePath.c_str());
-    string strDirName(dirname(pathcopy));
+    // dirname() semantics without its fixed-size copy: module paths can
+    // exceed any stack buffer (PATH_MAX is 4096 and node_modules nests).
+    const size_t lastSlash = modulePath.find_last_of('/');
+    string strDirName = lastSlash == string::npos ? "."
+                        : lastSlash == 0          ? "/"
+                                                  : modulePath.substr(0, lastSlash);
     auto dirName = ArgConverter::ConvertToV8String(isolate, strDirName);
-    auto require = GetRequireFunction(isolate, strDirName);
+    // A module's own require inherits the options it was loaded under, so a
+    // pumping require's whole dependency tree keeps pumping.
+    auto require = GetRequireFunction(isolate, strDirName, options);
     Local<Value> requireArgs[5] {
         moduleObj, exportsObj, require, fileName, dirName
     };
@@ -562,7 +1014,12 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
     tns::instrumentation::Frame frame(frameName);
     Local<Object> json;
 
-    auto jsonData = Runtime::GetRuntime(m_isolate)->ReadFileText(path);
+    Runtime* runtime = Runtime::TryGetRuntime(m_isolate);
+    if (runtime == nullptr) {
+        throw NativeScriptException("Cannot read JSON module " + path +
+                                    ": the isolate has no runtime");
+    }
+    auto jsonData = runtime->ReadFileText(path);
 
     TryCatch tc(isolate);
 
@@ -592,15 +1049,32 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
     return json;
 }
 
-Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path) {
-    auto context = isolate->GetCurrentContext();
+MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const std::string& path) {
+    // The resolver only ever hands over a path it already probed, but the ENTRY
+    // routes (app main, worker main) reach here straight from the caller's
+    // specifier — so the existence check has to live here, or a missing entry
+    // reads a null FILE* instead of failing with a name.
+    struct stat st;
+    if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) {
+        throw NativeScriptException("Cannot find module " + path);
+    }
 
-    // 1) Prepare URL & source
     string url = "file://" + path;
-    string content = Runtime::GetRuntime(isolate)->ReadFileText(path);
-    
+    // An exists-but-unreadable file, or one deleted between the stat above and
+    // the open, reads as "" — which compiles into a perfectly valid empty
+    // module unless the failure is told apart from an empty file here.
+    bool readOk = false;
+    Runtime* runtime = Runtime::TryGetRuntime(isolate);
+    if (runtime == nullptr) {
+        throw NativeScriptException("Cannot read module " + path +
+                                    ": the isolate has no runtime");
+    }
+    string content = runtime->ReadFileText(path, readOk);
+    if (!readOk) {
+        throw NativeScriptException("Cannot read module " + path);
+    }
+
     Local<String> sourceText = ArgConverter::ConvertToV8String(isolate, content);
-    ScriptCompiler::CachedData* cacheData = nullptr; // TODO: Implement cache support for ES modules
 
     Local<String> urlString;
     if (!String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
@@ -610,97 +1084,514 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     ScriptOrigin origin(urlString, 0, 0, false, -1, Local<Value>(), false, false,
                         true  // ← is_module
     );
-    ScriptCompiler::Source source(sourceText, origin, cacheData);
+    ScriptCompiler::Source source(sourceText, origin);
 
-    // 2) Compile with its own TryCatch
-    Local<Module> module;
-    {
-        TryCatch tcCompile(isolate);
-        MaybeLocal<Module> maybeMod = ScriptCompiler::CompileModule(
-            isolate, &source,
-            cacheData ? ScriptCompiler::kConsumeCodeCache : ScriptCompiler::kNoCompileOptions);
+    return ScriptCompiler::CompileModule(isolate, &source);
+}
 
-        if (!maybeMod.ToLocal(&module)) {
-            if (tcCompile.HasCaught()) {
-                throw NativeScriptException(tcCompile, "Cannot compile ES module " + path);
-            } else {
-                throw NativeScriptException(string("Cannot compile ES module ") + path);
-            }
+// Phase diagnostics for one module's trip through the loader.
+static void LogEsmPhase(const std::string& canonicalPath, const char* phase, const char* status,
+                        const char* classification = "", const char* extra = "") {
+    if (classification && classification[0] != '\0') {
+        if (extra && extra[0] != '\0') {
+            TNS_DEBUG(Esm, "[%s][%s][%s] %s %s", phase, status, classification,
+                      canonicalPath.c_str(), extra);
+        } else {
+            TNS_DEBUG(Esm, "[%s][%s][%s] %s", phase, status, classification, canonicalPath.c_str());
+        }
+    } else {
+        if (extra && extra[0] != '\0') {
+            TNS_DEBUG(Esm, "[%s][%s] %s %s", phase, status, canonicalPath.c_str(), extra);
+        } else {
+            TNS_DEBUG(Esm, "[%s][%s] %s", phase, status, canonicalPath.c_str());
+        }
+    }
+}
+
+// A V8 module status as it appears in a trace line.
+static const char* DescribeModuleStatus(Module::Status status) {
+    switch (status) {
+        case Module::kUninstantiated:
+            return "uninstantiated";
+        case Module::kInstantiating:
+            return "instantiating";
+        case Module::kInstantiated:
+            return "instantiated";
+        case Module::kEvaluating:
+            return "evaluating";
+        case Module::kEvaluated:
+            return "evaluated";
+        case Module::kErrored:
+            return "errored";
+    }
+
+    return "unknown";
+}
+
+struct V8FailureRule {
+    const char* needle;
+    const char* label;
+};
+
+// What the message of a failed compile/link/evaluate says the failure was, for
+// the trace line. Heuristic on purpose: V8 reports these as plain messages, so
+// the rules are matched in order and the first hit wins.
+static const char* ClassifyV8Failure(Isolate* isolate, TryCatch& tc,
+                                     std::initializer_list<V8FailureRule> rules) {
+    if (!tc.HasCaught()) {
+        return "unknown";
+    }
+    Local<Message> msg = tc.Message();
+    if (msg.IsEmpty()) {
+        return "unknown";
+    }
+    v8::String::Utf8Value text(isolate, msg->Get());
+    if (*text == nullptr) {
+        return "unknown";
+    }
+    std::string m(*text);
+    for (const V8FailureRule& rule : rules) {
+        if (m.find(rule.needle) != std::string::npos) {
+            return rule.label;
+        }
+    }
+    return "unknown";
+}
+
+namespace {
+
+// `require()` cannot wait, so an async graph is refused rather than evaluated.
+// Never evicts: the module is perfectly loadable through import().
+[[noreturn]] void ThrowAsyncGraphRefusal(const std::string& canonicalPath) {
+    LogEsmPhase(canonicalPath, "evaluate", "refused", "async-graph");
+    throw NativeScriptException("require() cannot load ES module '" + canonicalPath +
+                                "': the module graph contains top-level await. Use import() or "
+                                "createPumpingRequire from ns:module instead.");
+}
+
+// The pump advances the loop with nestable tasks and microtask checkpoints, and
+// V8 ignores a checkpoint while the isolate is already draining the microtask
+// queue — so a graph whose top-level await resumes through a promise reaction
+// could never settle from here. Refused up front, before evaluation, so the
+// graph stays instantiated and import() can still load it.
+[[noreturn]] void ThrowMicrotaskPumpRefusal(const std::string& canonicalPath) {
+    LogEsmPhase(canonicalPath, "evaluate", "refused", "microtask-context");
+    throw NativeScriptException(
+            "createPumpingRequire cannot settle module graph '" + canonicalPath +
+            "' from inside a microtask (after an await or inside a promise callback): the event "
+            "loop cannot be pumped re-entrantly. Call it from a task context, or use import().");
+}
+
+// Evicts the module and surfaces the rejection reason. Always throws, in every
+// build — the reason has to reach the boundary handler that reports it.
+[[noreturn]] void ThrowModuleEvaluationRejection(Isolate* isolate, Local<Promise> promise,
+                                                 TryCatch& tc,
+                                                 const std::string& canonicalPath) {
+    RemoveModuleFromRegistry(isolate, canonicalPath);
+    LogEsmPhase(canonicalPath, "evaluate", "promise-rejected");
+    const bool traceEsm = LogCategoryEnabled(LogCategory::Esm);
+    RejectionDetail rejection;
+    std::string detail = PromiseRejectionMessage(isolate, promise, canonicalPath,
+                                                 traceEsm ? &rejection : nullptr);
+    if (traceEsm) {
+        TNS_DEBUG(Esm, "[evaluate][promise-rejected:detail] path=%s message=%s stack=%s",
+                  canonicalPath.c_str(), rejection.message.c_str(),
+                  rejection.stackPreview.c_str());
+    }
+    if (!tc.HasCaught()) {
+        Local<Value> reason = promise->Result();
+        if (!reason.IsEmpty()) {
+            isolate->ThrowException(reason);
+        }
+    }
+    if (tc.HasCaught()) {
+        throw NativeScriptException(tc, detail);
+    }
+    throw NativeScriptException(detail);
+}
+
+}  // namespace
+
+MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> context,
+                                             Local<Module> module,
+                                             const std::string& canonicalPath,
+                                             const ModuleEvaluationOptions& options) {
+    if (options.policy == ModuleEvaluationPolicy::kSyncStrict) {
+        if (module->IsGraphAsync()) {
+            // Refusing before evaluation leaves the graph at kInstantiated, so a
+            // later import() can still evaluate it, and keeps this diagnosis ahead
+            // of whatever runtime error the graph would have produced first.
+            ThrowAsyncGraphRefusal(canonicalPath);
+        }
+        if (module->GetStatus() == Module::kEvaluating) {
+            // Re-entered through a cycle while the graph is still on the stack; its
+            // namespace holds whatever has been initialized so far.
+            return MaybeLocal<Promise>();
         }
     }
 
-    // 3) Register for resolution callback
-    // Safe Global handle management: Clear any existing entry first
-    auto it = g_moduleRegistry.find(path);
-    if (it != g_moduleRegistry.end()) {
-        // Clear the existing Global handle before replacing it
-        it->second.Reset();
+    if (options.policy == ModuleEvaluationPolicy::kSyncPumping && module->IsGraphAsync() &&
+        v8::MicrotasksScope::IsRunningMicrotasks(isolate)) {
+        // Only an async graph needs the pump; a synchronous one settles on its own
+        // and stays legal from anywhere. Entry modules also arrive here, but from
+        // native at task level, so they never trip this.
+        ThrowMicrotaskPumpRefusal(canonicalPath);
     }
 
-    // Now safely set the new module handle
-    g_moduleRegistry[path].Reset(isolate, module);
+    LogEsmPhase(canonicalPath, "evaluate", "begin");
+    TryCatch tcEval(isolate);
+    Local<Value> result;
+    if (!module->Evaluate(context).ToLocal(&result)) {
+        RemoveModuleFromRegistry(isolate, canonicalPath);
+        LogEsmPhase(canonicalPath, "evaluate", "fail",
+                    ClassifyV8Failure(isolate, tcEval,
+                                      {{"is not defined", "reference"},
+                                       {"TypeError", "type"},
+                                       {"Cannot read properties", "type-nullish"}}));
+        if (tcEval.HasCaught()) {
+            throw NativeScriptException(tcEval, "Cannot evaluate module " + canonicalPath);
+        }
+        throw NativeScriptException(string("Cannot evaluate module ") + canonicalPath);
+    }
+    LogEsmPhase(canonicalPath, "evaluate", "ok");
 
-    // 4) Instantiate (link) with ResolveModuleCallback
-    {
+    if (!result->IsPromise()) {
+        return MaybeLocal<Promise>();
+    }
+    LogEsmPhase(canonicalPath, "evaluate", "promise");
+    Local<Promise> promise = result.As<Promise>();
+
+    if (options.policy == ModuleEvaluationPolicy::kAsync) {
+        return promise;
+    }
+
+    TryCatch promiseTc(isolate);
+
+    if (options.policy == ModuleEvaluationPolicy::kSyncStrict) {
+        Promise::PromiseState state = promise->State();
+        if (state == Promise::kRejected) {
+            ThrowModuleEvaluationRejection(isolate, promise, promiseTc, canonicalPath);
+        }
+        if (state == Promise::kPending) {
+            // V8 guarantees a settled capability for a graph that reported
+            // !IsGraphAsync, so reaching here means the graph classification and the
+            // evaluation disagree — never paper over it with a half-initialized
+            // namespace.
+            throw NativeScriptException("ES module " + canonicalPath +
+                                        " left its evaluation promise pending on a graph reported "
+                                        "as synchronous");
+        }
+        LogEsmPhase(canonicalPath, "evaluate", "promise-resolved");
+        return MaybeLocal<Promise>();
+    }
+
+    // Top-level await can depend on native async work: fetch completions and
+    // TLA continuations arrive as nestable v8 tasks, which every pump runs.
+    // JS timers and worker messages live outside that lane, and Java Handler
+    // messages cannot dispatch while these JS frames hold the thread — only a
+    // pumpRunLoop pump drains them directly (the iOS split: its default pump
+    // never slices the runloop either). Non-nestable v8 tasks stay queued in
+    // both modes, like the inspector pause loops.
+    Runtime* runtime = Runtime::TryGetRuntime(isolate);
+    std::shared_ptr<EventLoop> eventLoop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
+
+    bool settled = false;
+    // Probed before the first pump iteration: a synchronous graph's evaluation
+    // promise is already settled when Evaluate() returns, so it never pays for
+    // a pump slice.
+    const auto probe = [&]() {
+        if (promiseTc.HasCaught()) {
+            return true;
+        }
+        Promise::PromiseState state = promise->State();
+        if (state == Promise::kPending) {
+            return false;
+        }
+        settled = true;
+        if (state == Promise::kRejected) {
+            ThrowModuleEvaluationRejection(isolate, promise, promiseTc, canonicalPath);
+        }
+        LogEsmPhase(canonicalPath, "evaluate", "promise-resolved");
+        return true;
+    };
+
+    if (!probe() && eventLoop != nullptr) {
+        if (eventLoop->PumpUntil(options.deadlineSeconds, probe, options.pumpRunLoop) ==
+            EventLoop::PumpResult::kTerminated) {
+            // terminating isolate (worker.terminate) or a stopped loop: no
+            // outcome to report, and no timeout to mislabel it with
+            return MaybeLocal<Promise>();
+        }
+    }
+
+    if (!settled && promise->State() == Promise::kPending) {
+        LogEsmPhase(canonicalPath, "evaluate", "promise-timeout");
+        if (options.timeoutBehavior == ModuleEvaluationOptions::TimeoutBehavior::kThrow) {
+            RemoveModuleFromRegistry(isolate, canonicalPath);
+            throw NativeScriptException("Top-level await timed out for ES module " + canonicalPath);
+        }
+    }
+
+    return MaybeLocal<Promise>();
+}
+
+// The shared probe behind both entry-evaluation queries: a registry hit plus
+// Evaluate(), which hands back the SAME capability promise rather than
+// re-running anything, so it is cheap enough to call from a pump loop.
+static MaybeLocal<Promise> EntryEvaluationPromise(Isolate* isolate, const std::string& path) {
+    if (!ModuleInternal::IsESModule(path) && !IsHttpModulePath(path)) {
+        return MaybeLocal<Promise>();
+    }
+    auto* registryPtr = ModuleRegistryFor(isolate);
+    if (registryPtr == nullptr) {
+        return MaybeLocal<Promise>();
+    }
+    auto it = registryPtr->find(CanonicalizeRegistryKey(path));
+    if (it == registryPtr->end()) {
+        return MaybeLocal<Promise>();
+    }
+    Local<Module> mod = it->second.Get(isolate);
+    // A TLA-parked module reports kEvaluated while its promise is still
+    // pending, so the status is the gate to *having* a promise, never to its
+    // state.
+    if (mod.IsEmpty() || mod->GetStatus() != Module::kEvaluated) {
+        return MaybeLocal<Promise>();
+    }
+    TryCatch tc(isolate);
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Value> result;
+    if (!mod->Evaluate(context).ToLocal(&result) || !result->IsPromise()) {
+        return MaybeLocal<Promise>();
+    }
+    return MaybeLocal<Promise>(result.As<Promise>());
+}
+
+MaybeLocal<Promise> ModuleInternal::PendingEntryEvaluation(Isolate* isolate,
+                                                           const std::string& path) {
+    Local<Promise> promise;
+    if (!EntryEvaluationPromise(isolate, path).ToLocal(&promise)) {
+        return MaybeLocal<Promise>();
+    }
+    if (promise->State() != Promise::kPending) {
+        return MaybeLocal<Promise>();
+    }
+    return MaybeLocal<Promise>(promise);
+}
+
+EntryEvaluationState ModuleInternal::PollEntryEvaluation(Isolate* isolate, const std::string& path,
+                                                         std::string* rejectionReason) {
+    Local<Promise> promise;
+    if (!EntryEvaluationPromise(isolate, path).ToLocal(&promise)) {
+        return EntryEvaluationState::kNone;
+    }
+    switch (promise->State()) {
+        case Promise::kPending:
+            return EntryEvaluationState::kPending;
+        case Promise::kFulfilled:
+            return EntryEvaluationState::kFulfilled;
+        case Promise::kRejected:
+            break;
+    }
+    if (rejectionReason != nullptr) {
+        Local<Value> reason = promise->Result();
+        if (reason.IsEmpty()) {
+            *rejectionReason = "<no reason>";
+        } else {
+            // A reason whose `toString` throws — or a Symbol, which cannot be
+            // stringified at all — must not leave the isolate poisoned: this runs
+            // from the boot pump, where the caller has no exception to observe.
+            TryCatch tc(isolate);
+            *rejectionReason = ArgConverter::ToString(isolate, reason);
+            if (tc.HasCaught()) {
+                *rejectionReason = "<unprintable reason>";
+                tc.Reset();
+            }
+        }
+    }
+    return EntryEvaluationState::kRejected;
+}
+
+// The root entry point for an ES module graph: compile + register the root,
+// then instantiate and evaluate it once. Dependencies are compiled and
+// registered by ResolveModuleCallback while V8 walks the graph from here;
+// nothing below the root evaluates on its own.
+Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path,
+                                          const ModuleEvaluationOptions& options) {
+    auto context = isolate->GetCurrentContext();
+    const bool isHttpModule = IsHttpModulePath(path);
+    // The key the resolver would derive for this same module as someone's
+    // dependency. Keying the root by anything else mints a second identity for
+    // one file, so a cycle back to the root would not terminate on its entry.
+    const std::string canonicalPath = CanonicalizeRegistryKey(path);
+    const std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : canonicalPath;
+
+    auto logPhase = [&canonicalPath](const char* phase, const char* status,
+                                     const char* classification = "", const char* extra = "") {
+        LogEsmPhase(canonicalPath, phase, status, classification, extra);
+    };
+
+    Local<Module> module;
+
+    if (isHttpModule) {
+        logPhase("compile", "delegate-http");
+        RunModuleGraphLoadPumped(isolate, context, requestPath, kModuleEvaluateDeadlineSeconds);
+        if (isolate->IsExecutionTerminating()) {
+            // no outcome to report, and the sync loader below must not start
+            // a blocking fetch on a terminating isolate
+            return Local<Value>();
+        }
+        // The loader throws the classifier's reason (status, MIME or
+        // transport); catch it so it lands in the message instead of staying
+        // pending on the isolate behind a C++ throw.
+        TryCatch tcLoad(isolate);
+        MaybeLocal<Module> maybeMod = LoadHttpModuleForUrl(isolate, context, requestPath);
+        if (!maybeMod.ToLocal(&module)) {
+            logPhase("compile", "fail", "http-loader");
+            std::string message = "Cannot load ES module " + canonicalPath;
+            if (tcLoad.HasCaught()) {
+                throw NativeScriptException(tcLoad, message);
+            }
+            throw NativeScriptException(message);
+        }
+        logPhase("compile", "ok", "http-loader");
+        if (module->GetStatus() == Module::kEvaluated) {
+            // A top-level-await graph reports kEvaluated while its capability
+            // promise is still pending, so the namespace here may be in its TDZ;
+            // require() refuses the graph whatever the load order, matching Node.
+            if (options.policy == ModuleEvaluationPolicy::kSyncStrict && module->IsGraphAsync()) {
+                ThrowAsyncGraphRefusal(canonicalPath);
+            }
+            return module->GetModuleNamespace();
+        }
+    } else {
+        auto* registryPtr = ModuleRegistryFor(isolate);
+        if (registryPtr == nullptr) {
+            return Local<Value>();
+        }
+        auto& registry = *registryPtr;
+
+        auto existingIt = registry.find(canonicalPath);
+        if (existingIt != registry.end()) {
+            Local<Module> existing = existingIt->second.Get(isolate);
+            Module::Status status = existing.IsEmpty() ? Module::kErrored : existing->GetStatus();
+            if (existing.IsEmpty()) {
+                TNS_DEBUG(Esm, "[cache] dropping empty registry entry %s", canonicalPath.c_str());
+            } else {
+                TNS_DEBUG(Esm, "[cache] hit %s status=%s", canonicalPath.c_str(),
+                          DescribeModuleStatus(status));
+            }
+            if (status == Module::kErrored) {
+                RemoveModuleFromRegistry(isolate, canonicalPath);
+            } else if (status == Module::kEvaluated) {
+                // A top-level-await graph reports kEvaluated while its capability
+                // promise is still pending, so the namespace here may be in its TDZ;
+                // require() refuses the graph whatever the load order, matching Node.
+                if (options.policy == ModuleEvaluationPolicy::kSyncStrict &&
+                    existing->IsGraphAsync()) {
+                    ThrowAsyncGraphRefusal(canonicalPath);
+                }
+                return existing->GetModuleNamespace();
+            } else if (status == Module::kUninstantiated || status == Module::kInstantiated) {
+                // Recompiling would mint a second module identity while importers still
+                // hold this one; reuse it and let InstantiateModule below no-op
+                // (kInstantiated) or link it (kUninstantiated).
+                logPhase("compile", "reuse-registry");
+                module = existing;
+            }
+        }
+
+        const bool reusedFromRegistry = !module.IsEmpty();
+
+        if (module.IsEmpty()) {
+            logPhase("compile", "begin");
+            // Discovery pre-pass for local roots too: a local graph can reach HTTP
+            // edges, and without this they hit the resolver cold and fetch serially,
+            // one blocking request at a time. The walk compiles and registers the
+            // whole closure up front — including this root — so instantiation
+            // resolves as pure lookup. A graph with no HTTP edges settles inside the
+            // call and pays no wait.
+            RunModuleGraphLoadPumped(isolate, context, canonicalPath,
+                                     kModuleEvaluateDeadlineSeconds);
+            auto walkedIt = registry.find(canonicalPath);
+            if (walkedIt != registry.end()) {
+                Local<Module> walked = walkedIt->second.Get(isolate);
+                if (!walked.IsEmpty() && walked->GetStatus() != Module::kErrored) {
+                    module = walked;
+                }
+            }
+        }
+
+        if (module.IsEmpty()) {
+            TryCatch tcCompile(isolate);
+            if (!CompileFileEsModule(isolate, canonicalPath).ToLocal(&module)) {
+                logPhase("compile", "fail",
+                         ClassifyV8Failure(
+                                 isolate, tcCompile,
+                                 {{"Unexpected token", "syntax"},
+                                  {"SyntaxError", "syntax"},
+                                  {"Cannot use import statement outside a module", "not-a-module"}}));
+                if (tcCompile.HasCaught()) {
+                    throw NativeScriptException(tcCompile, "Cannot compile ES module " + canonicalPath);
+                } else {
+                    throw NativeScriptException(string("Cannot compile ES module ") + canonicalPath);
+                }
+            }
+
+            UnindexModuleForIsolate(isolate, canonicalPath);
+            auto it = registry.find(canonicalPath);
+            if (requestPath != canonicalPath || path != canonicalPath) {
+                TNS_DEBUG(Esm, "[register] raw=%s request=%s canonical=%s existing=%s", path.c_str(),
+                          requestPath.c_str(), canonicalPath.c_str(),
+                          it != registry.end() ? "yes" : "no");
+            }
+            if (it != registry.end()) {
+                it->second.Reset();
+            }
+            registry[canonicalPath].Reset(isolate, module);
+            IndexModuleForIsolate(isolate, canonicalPath, module);
+        }
+        if (!reusedFromRegistry) {
+            logPhase("compile", "ok");
+        }
+    }
+
+    // Instantiate (link) with ResolveModuleCallback
+    if (module->GetStatus() < Module::kInstantiated) {
+        logPhase("instantiate", "begin");
         TryCatch tcLink(isolate);
         bool linked = module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false);
 
         if (!linked) {
+            logPhase("instantiate", "fail",
+                     ClassifyV8Failure(
+                             isolate, tcLink,
+                             {{"Cannot find module", "resolve"},
+                              {"failed to resolve module specifier", "resolve"},
+                              {"does not provide an export named", "link-export"}}));
             if (tcLink.HasCaught()) {
-                throw NativeScriptException(tcLink, "Cannot instantiate module " + path);
+                throw NativeScriptException(tcLink, "Cannot instantiate module " + canonicalPath);
             } else {
-                throw NativeScriptException(string("Cannot instantiate module ") + path);
+                throw NativeScriptException(string("Cannot instantiate module ") + canonicalPath);
             }
         }
+        logPhase("instantiate", "ok");
     }
 
-    // 5) Evaluate with its own TryCatch
-    Local<Value> result;
-    {
-        TryCatch tcEval(isolate);
-        if (!module->Evaluate(context).ToLocal(&result)) {
-            if (tcEval.HasCaught()) {
-                throw NativeScriptException(tcEval, "Cannot evaluate module " + path);
-            } else {
-                throw NativeScriptException(string("Cannot evaluate module ") + path);
-            }
-        }
+    // Evaluate the graph under the caller's options.
+    EvaluateModuleGraph(isolate, context, module, canonicalPath, options);
 
-        // Handle the case where evaluation returns a Promise (for top-level await)
-        if (result->IsPromise()) {
-            Local<Promise> promise = result.As<Promise>();
-            
-            // Process microtasks to allow Promise resolution
-            int maxAttempts = 100;
-            int attempts = 0;
-
-            while (attempts < maxAttempts) {
-                isolate->PerformMicrotaskCheckpoint();
-                Promise::PromiseState state = promise->State();
-
-                if (state != Promise::kPending) {
-                    if (state == Promise::kRejected) {
-                        Local<Value> reason = promise->Result();
-                        isolate->ThrowException(reason);
-                        throw NativeScriptException(string("Module evaluation promise rejected: ") + path);
-                    }
-                    break;
-                }
-
-                attempts++;
-                usleep(100);  // 0.1ms delay
-            }
-        }
-    }
-
-    // 6) Return the namespace
     return module->GetModuleNamespace();
 }
 
 Local<String> ModuleInternal::WrapModuleContent(const string& path) {
     TNSPERF();
 
-    string content = Runtime::GetRuntime(m_isolate)->ReadFileText(path);
+    Runtime* runtime = Runtime::TryGetRuntime(m_isolate);
+    if (runtime == nullptr) {
+        throw NativeScriptException("Cannot read module " + path +
+                                    ": the isolate has no runtime");
+    }
+    string content = runtime->ReadFileText(path);
 
     // TODO: Use statically allocated buffer for better performance
     string result(MODULE_PROLOGUE);

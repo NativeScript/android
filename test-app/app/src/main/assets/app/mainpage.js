@@ -87,6 +87,18 @@ require('./tests/testPrimordials');
 require('./tests/testInspect');
 // The ns:/node: builtin modules
 require('./tests/testNsUtil');
+require('./tests/testNsRuntime');
+require('./tests/testNsModule');
+// Remote-module security gate (debug builds allow remote modules outright)
+require('./tests/testRemoteModuleSecurity');
+// The ES module loader: require(esm) interop and the createRequire factories
+require('./tests/testEsmInterop');
+require('./tests/testCreateRequire');
+require('./tests/testNodeUrlModule');
+require('./tests/testImportMetaResolution');
+require('./tests/testWorkerEsmEntry');
+// Fetches from the in-app loopback fixture server, so it goes last
+require('./tests/testEsmHttpLoader');
 // Node-API addon surface
 require('./tests/NapiTests');
 require('./tests/NapiCoverageTests');

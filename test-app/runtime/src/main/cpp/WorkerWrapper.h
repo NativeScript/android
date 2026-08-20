@@ -16,6 +16,7 @@
 #endif
 
 #include "ConcurrentQueue.h"
+#include "ModuleInternalCallbacks.h"
 #include "WorkerMessage.h"
 #include "v8.h"
 
@@ -60,8 +61,9 @@ public:
 
     /*
      * parent -> worker. Queues a serialized message and wakes the worker
-     * looper. Messages posted before the worker finishes bootstrapping are
-     * drained right after the worker script runs.
+     * looper. Messages posted before the worker finishes bootstrapping stay
+     * buffered until the entry has finished evaluating - for a module entry
+     * that is when its evaluation promise settles, not when the script returns.
      */
     void PostMessage(std::shared_ptr<worker::Message> message);
 
@@ -92,6 +94,16 @@ public:
                                                  const std::string& filename,
                                                  const std::string& stackTrace,
                                                  int lineno);
+
+    /*
+     * WHATWG parity: the worker's implicit port message queue starts disabled;
+     * the worker thread calls this once the entry script has finished
+     * evaluating (including after a pending top-level await settles). From then
+     * on every buffered and future message dispatches whether or not a handler
+     * exists — a handler installed later (e.g. from a timer) misses earlier
+     * messages, exactly as on the web.
+     */
+    void EnableMessageQueue();
 
     /*
      * Registry of live workers, keyed by workerId. Replaces the old
@@ -141,7 +153,9 @@ public:
 
 private:
     void BackgroundLooper(std::shared_ptr<WorkerWrapper> self);
-    void DrainPendingTasks();
+    // returns the number of inbox messages dispatched, for the event loop's
+    // pump drain hook to count as progress
+    int DrainPendingTasks();
     void QuitLooper();
     static int DrainCallback(int fd, int events, void* data);
     static void FireMessageOnParentWorkerObject(int workerId,
@@ -159,16 +173,31 @@ private:
     Runtime* runtime_;
 
     const int workerId_;
+    // The entry's canonical resolved path, produced by the module resolver on
+    // the parent's thread: the worker has its own module registry and working
+    // directory, so nothing on this side can redo a relative resolution.
     const std::string workerPath_;
     const std::string callingDir_;
     const std::string threadName_;
     const int priority_;
+
+    // The parent's loader vocabulary, copied on the parent's thread when this
+    // wrapper is constructed and installed on the worker's own isolate before
+    // it loads anything. Nothing is shared, so nothing needs synchronizing —
+    // and a live worker deliberately does not observe a later configureLoader
+    // on the parent (the dev client restarts workers on vocabulary updates).
+    const LoaderVocabulary inheritedVocabulary_;
 
     v8::Persistent<v8::Object>* poWorker_;
 
     std::atomic_bool isClosing_;
     std::atomic_bool isTerminating_;
     std::atomic_bool isDisposed_;
+    // False until the entry script has finished evaluating
+    // (EnableMessageQueue); DrainPendingTasks leaves the queue untouched while
+    // disabled. Written and read on the worker thread only - the atomic is
+    // belt-and-braces, not a cross-thread channel.
+    std::atomic_bool messagesEnabled_;
 
     ConcurrentQueue queue_;
 

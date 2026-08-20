@@ -117,6 +117,10 @@ class Runtime {
             return m_state.get();
         }
 
+        bool IsMainThread() const {
+            return m_isMainThread;
+        }
+
         jobject GetJavaRuntime() const;
 
         ObjectManager* GetObjectManager() const;
@@ -151,6 +155,11 @@ class Runtime {
         static v8::Platform* platform;
 
         std::string ReadFileText(const std::string& filePath);
+        /*
+         * `ok` distinguishes an unreadable file from an empty one — callers that
+         * compile what they read must not treat the first as valid empty source.
+         */
+        std::string ReadFileText(const std::string& filePath, bool& ok);
 
         /*
          * The main runtime's event loop, set once when the main runtime
@@ -171,6 +180,15 @@ class Runtime {
          */
         std::shared_ptr<EventLoop> GetEventLoop() const {
             return m_eventLoop;
+        }
+
+        /*
+         * This runtime's CommonJS loader. `ns:module`'s createRequire mints its
+         * requires through it, so the require it hands out is the very one the
+         * loader builds for every module.
+         */
+        ModuleInternal* GetModuleInternal() {
+            return &m_module;
         }
 
         /*

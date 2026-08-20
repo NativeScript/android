@@ -330,7 +330,19 @@ bool Timers::RunIfEarliest(double now, double otherDue) {
         auto task = it->second;
         // task is no longer in queue to be executed
         task->queued_ = false;
+        // Java-dispatched callback with no live runtime: log-and-drop, never
+        // throw across the boundary
+        Runtime* runtime = Runtime::TryGetRuntime(isolate);
+        if (runtime == nullptr) {
+            DEBUG_WRITE("Timers: dropping timer %d, its runtime is gone", ref.id);
+            removeTask(task);
+            return true;
+        }
 #ifdef NS_TIMERS_NESTING_CLAMP
+        // save/restore, not reset: the event-loop pump dispatches timers
+        // nested inside an outer timer's callback, and the outer callback's
+        // remaining setTimeout calls must keep the outer nesting level
+        const int enclosingNesting = nesting;
         nesting = task->nestingLevel_;
 #endif
         if (task->repeats_) {
@@ -342,7 +354,6 @@ bool Timers::RunIfEarliest(double now, double otherDue) {
             addTask(task);
         }
         v8::Local<v8::Function> cb = task->callback_.Get(isolate);
-        Runtime* runtime = Runtime::GetRuntime(isolate);
         v8::Local<v8::Context> context = runtime->GetContext();
         Context::Scope context_scope(context);
         TryCatch tc(isolate);
@@ -363,12 +374,22 @@ bool Timers::RunIfEarliest(double now, double otherDue) {
         }
 
 #ifdef NS_TIMERS_NESTING_CLAMP
-        nesting = 0;
+        nesting = enclosingNesting;
 #endif
 
         if (tc.HasCaught() &&
             !NativeScriptException::ContainUncaughtCallbackException(isolate, tc)) {
-            NativeScriptException(tc).ReThrowToJava();
+            if (EventLoop::IsPumping()) {
+                // A pump drained this slot and keeps making JNI calls after we
+                // return, so arming a pending Java exception here is illegal;
+                // the loop reports it from its next token dispatch instead.
+                auto eventLoop = runtime->GetEventLoop();
+                if (eventLoop != nullptr) {
+                    eventLoop->DeferJavaThrow(std::make_shared<NativeScriptException>(tc));
+                }
+            } else {
+                NativeScriptException(tc).ReThrowToJava();
+            }
         }
 
 

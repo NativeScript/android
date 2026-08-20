@@ -47,6 +47,24 @@ class Module {
         return ApplicationFilesPath;
     }
 
+    /**
+     * Resolves an entry-module path for runModule. A non-absolute, scheme-less
+     * name is an app-root-relative module name (the @JavaScriptImplementation
+     * convention) and goes through the same resolution require uses - extension
+     * and directory probing included - so the native side only ever receives a
+     * loadable identity: an absolute path or a URL. Missing entries throw here,
+     * with require's wording, instead of failing against the process cwd.
+     */
+    static String resolveEntryPath(String path) {
+        if (path.isEmpty() || path.startsWith("/") || path.contains("://")) {
+            return path;
+        }
+        String relative = (path.startsWith("./") || path.startsWith("../") || path.startsWith("~/"))
+                          ? path
+                          : "./" + path;
+        return resolvePath(relative, ApplicationFilesPath + ModulesFilesPath);
+    }
+
     @RuntimeCallable
     private static String resolvePath(String path, String baseDir) {
         // The baseDir is the directory path of the calling module.

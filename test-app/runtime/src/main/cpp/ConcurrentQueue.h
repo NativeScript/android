@@ -21,6 +21,8 @@ struct ConcurrentQueue {
 public:
     void Initialize(ALooper* looper, ALooper_callbackFunc performWork, void* data);
     void Push(std::shared_ptr<worker::Message> message);
+    void Signal();
+    bool IsEmpty();
     std::vector<std::shared_ptr<worker::Message>> PopAll();
     void Terminate();
 

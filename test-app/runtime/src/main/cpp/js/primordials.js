@@ -2,7 +2,7 @@
 
 // Snapshot of the intrinsics the other builtins depend on, taken before any
 // user code can reach the globals. Runs first and is handed to every other
-// builtin as the fourth fixed parameter.
+// builtin as the fifth fixed parameter.
 //
 // Instance methods are exposed "uncurried" (Node's idiom): the receiver
 // becomes the first argument, so `ArrayPrototypeSlice(list, 0)` reads the
@@ -11,7 +11,6 @@
 
 const FunctionPrototypeCall = Function.prototype.call;
 const FunctionPrototypeBind = Function.prototype.bind;
-const FunctionPrototypeApply = Function.prototype.apply;
 
 // bind() with `this` pinned to call(): uncurryThis(fn) === fn.call.bind(fn),
 // but without reading `fn.call`.
@@ -25,10 +24,10 @@ const intrinsics = {
   Error,
   Map,
   Number,
-  Proxy,
   Set,
   String,
   TypeError,
+  URL,
 
   // Well-known symbols.
   SymbolIterator: Symbol.iterator,
@@ -40,6 +39,7 @@ const intrinsics = {
   // Statics.
   ArrayBufferIsView: ArrayBuffer.isView,
   ArrayIsArray: Array.isArray,
+  decodeURIComponent,
   JSONStringify: JSON.stringify,
   NumberIsFinite: Number.isFinite,
   NumberIsNaN: Number.isNaN,
@@ -64,7 +64,6 @@ const intrinsics = {
   DatePrototypeGetTime: uncurryThis(Date.prototype.getTime),
   DatePrototypeToISOString: uncurryThis(Date.prototype.toISOString),
   DatePrototypeToJSON: uncurryThis(Date.prototype.toJSON),
-  FunctionPrototypeApply: uncurryThis(FunctionPrototypeApply),
   FunctionPrototypeCall: uncurryThis(FunctionPrototypeCall),
   FunctionPrototypeToString: uncurryThis(Function.prototype.toString),
   MapPrototypeDelete: uncurryThis(Map.prototype.delete),
@@ -73,8 +72,6 @@ const intrinsics = {
   MapPrototypeSet: uncurryThis(Map.prototype.set),
   ObjectPrototypePropertyIsEnumerable: uncurryThis(Object.prototype.propertyIsEnumerable),
   ObjectPrototypeToString: uncurryThis(Object.prototype.toString),
-  PromisePrototypeCatch: uncurryThis(Promise.prototype.catch),
-  PromisePrototypeThen: uncurryThis(Promise.prototype.then),
   RegExpPrototypeTest: uncurryThis(RegExp.prototype.test),
   RegExpPrototypeToString: uncurryThis(RegExp.prototype.toString),
   SetPrototypeAdd: uncurryThis(Set.prototype.add),
@@ -82,8 +79,11 @@ const intrinsics = {
   SetPrototypeHas: uncurryThis(Set.prototype.has),
   SetPrototypeValues: uncurryThis(Set.prototype.values),
   StringPrototypeCharCodeAt: uncurryThis(String.prototype.charCodeAt),
+  StringPrototypeEndsWith: uncurryThis(String.prototype.endsWith),
   StringPrototypeIndexOf: uncurryThis(String.prototype.indexOf),
+  StringPrototypeLastIndexOf: uncurryThis(String.prototype.lastIndexOf),
   StringPrototypeSlice: uncurryThis(String.prototype.slice),
+  StringPrototypeStartsWith: uncurryThis(String.prototype.startsWith),
   SymbolPrototypeToString: uncurryThis(Symbol.prototype.toString),
 
   // Iterator-protocol escape hatches: the captured `next` of the live map/set

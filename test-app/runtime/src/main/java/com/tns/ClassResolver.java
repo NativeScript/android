@@ -1,6 +1,9 @@
 package com.tns;
 
+import android.util.Log;
+
 import com.tns.system.classes.loading.ClassStorageService;
+import com.tns.system.classes.loading.LookedUpClassNotFound;
 
 import java.io.IOException;
 
@@ -26,7 +29,28 @@ class ClassResolver {
         }
 
         if (clazz == null) {
-            clazz = classStorageService.retrieveClass(className);
+            try {
+                clazz = classStorageService.retrieveClass(className);
+            } catch (LookedUpClassNotFound notFound) {
+                // A named proxy (`Base.extend('a.b.C', {...})` / @JavaProxy)
+                // whose class the static binding generator never compiled — it
+                // only scans assets/app, and dev servers keep most source off
+                // disk. The proxy generator accepts dotted names for classes
+                // and interfaces alike, so supply the class the same way
+                // anonymous extends are supplied.
+                Log.w("JS", "Class " + className + " not precompiled; generating at runtime. Framework references resolve only if dex injection into the app class loader succeeds.");
+                try {
+                    clazz = dexFactory.resolveClass(canonicalBaseClassName, name, className, methodOverrides, implementedInterfaces, isInterface);
+                } catch (Throwable generationFailure) {
+                    // The precise not-found is the actionable error; a failed
+                    // generation attempt is its detail, not its replacement.
+                    notFound.addSuppressed(generationFailure);
+                    throw notFound;
+                }
+                if (clazz == null) {
+                    throw notFound;
+                }
+            }
         }
 
         return clazz;

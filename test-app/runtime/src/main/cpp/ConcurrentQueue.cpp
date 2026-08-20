@@ -58,6 +58,20 @@ void ConcurrentQueue::Push(std::shared_ptr<worker::Message> message) {
     }
 }
 
+void ConcurrentQueue::Signal() {
+    std::unique_lock<std::mutex> lock(initializationMutex_);
+    if (terminated_ || this->fd_ == -1) {
+        return;
+    }
+    uint64_t value = 1;
+    write(this->fd_, &value, sizeof(value));
+}
+
+bool ConcurrentQueue::IsEmpty() {
+    std::unique_lock<std::mutex> mlock(this->mutex_);
+    return this->messagesQueue_.empty();
+}
+
 std::vector<std::shared_ptr<worker::Message>> ConcurrentQueue::PopAll() {
     std::unique_lock<std::mutex> mlock(this->mutex_);
     std::vector<std::shared_ptr<worker::Message>> messages;

@@ -26,6 +26,57 @@ using namespace v8;
 
 namespace tns {
 
+namespace {
+
+/*
+ * Reports a worker entry that failed to evaluate, with the web's order: the
+ * worker scope's own `onerror` gets first refusal (a truthy return consumes the
+ * failure) and only an unconsumed one reaches the parent's Worker object.
+ * Mirrors the worker branch of the unhandled-rejection path in
+ * NativeScriptException.cpp, which this rejection no longer travels: attaching
+ * a rejection handler to the entry's evaluation promise marks it handled.
+ */
+void ReportEntryRejection(Isolate* isolate, Local<Value> reason,
+                          const std::shared_ptr<WorkerWrapper>& wrapper) {
+    auto context = isolate->GetCurrentContext();
+
+    std::string message = "Unhandled promise rejection: ";
+    Local<String> detail;
+    if (!reason.IsEmpty() && reason->ToDetailString(context).ToLocal(&detail)) {
+        message += ArgConverter::ConvertToString(detail);
+    }
+
+    std::string stackTrace;
+    if (!reason.IsEmpty()) {
+        auto stack = Exception::GetStackTrace(reason);
+        if (!stack.IsEmpty()) {
+            stackTrace = NativeScriptException::GetErrorStackTrace(stack);
+        }
+    }
+
+    Local<Value> onError;
+    if (context->Global()
+                ->Get(context, ArgConverter::ConvertToV8String(isolate, "onerror"))
+                .ToLocal(&onError) &&
+        onError->IsFunction()) {
+        Local<Value> args[] = {ArgConverter::ConvertToV8String(isolate, message)};
+        Local<Value> result;
+        // A handler that throws has not consumed anything - the failure falls
+        // through to the parent, as if no handler had been installed.
+        TryCatch tc(isolate);
+        if (onError.As<Function>()
+                    ->Call(context, Undefined(isolate), 1, args)
+                    .ToLocal(&result) &&
+            !result.IsEmpty() && result->BooleanValue(isolate)) {
+            return;
+        }
+    }
+
+    wrapper->PassUncaughtExceptionFromWorkerToParent(message, "", stackTrace, 0);
+}
+
+}  // namespace
+
 WorkerWrapper::WorkerWrapper(Isolate* parentIsolate, int workerId, std::string workerPath,
                              std::string callingDir, int priority,
                              Local<Object> workerObject)
@@ -40,10 +91,13 @@ WorkerWrapper::WorkerWrapper(Isolate* parentIsolate, int workerId, std::string w
           // workerPath_ (not workerPath) - the parameter was just moved from
           threadName_("W" + std::to_string(workerId) + ": " + workerPath_),
           priority_(priority),
+          // Runs on the parent's thread, so this is the parent's live vocabulary.
+          inheritedVocabulary_(CaptureLoaderVocabulary(parentIsolate)),
           poWorker_(new Persistent<Object>(parentIsolate, workerObject)),
           isClosing_(false),
           isTerminating_(false),
           isDisposed_(false),
+          messagesEnabled_(false),
           javaLooperRef_(nullptr) {}
 
 void WorkerWrapper::Start() {
@@ -139,15 +193,10 @@ int WorkerWrapper::DrainCallback(int fd, int events, void* data) {
     return 1;
 }
 
-void WorkerWrapper::DrainPendingTasks() {
+int WorkerWrapper::DrainPendingTasks() {
     Isolate* isolate = workerIsolate_.load();
     if (isolate == nullptr || isTerminating_) {
-        return;
-    }
-
-    auto messages = queue_.PopAll();
-    if (messages.empty()) {
-        return;
+        return 0;
     }
 
     v8::Locker locker(isolate);
@@ -157,10 +206,26 @@ void WorkerWrapper::DrainPendingTasks() {
     Context::Scope context_scope(context);
     auto globalObject = context->Global();
 
+    // WHATWG parity: the implicit port's message queue starts disabled and is
+    // enabled once the entry script has finished evaluating (including after a
+    // pending top-level await settles). Until then messages stay buffered here;
+    // afterwards every message dispatches whether or not a handler exists — a
+    // handler installed later misses earlier messages, exactly as on the web.
+    if (!messagesEnabled_.load(std::memory_order_acquire)) {
+        return 0;
+    }
+
+    auto messages = queue_.PopAll();
+    if (messages.empty()) {
+        return 0;
+    }
+
+    int dispatched = 0;
     for (auto& message : messages) {
         if (isTerminating_ || isClosing_) {
             break;
         }
+        dispatched++;
 
         TryCatch tc(isolate);
 
@@ -186,6 +251,12 @@ void WorkerWrapper::DrainPendingTasks() {
             CallbackHandlers::CallWorkerScopeOnErrorHandle(isolate, tc);
         }
     }
+    return dispatched;
+}
+
+void WorkerWrapper::EnableMessageQueue() {
+    messagesEnabled_.store(true, std::memory_order_release);
+    queue_.Signal();
 }
 
 void WorkerWrapper::FireMessageOnParentWorkerObject(int workerId,
@@ -366,6 +437,13 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
             // native looper backing the Java one - fds added here are pumped
             // by Looper.loop().
             queue_.Initialize(ALooper_forThread(), WorkerWrapper::DrainCallback, this);
+            // The inbox rides its own fd, which a pump never polls; the hook
+            // lets a looper-equivalent pump drain it (the loop's Shutdown, on
+            // this thread, unregisters it before `this` can die).
+            auto pumpLoop = runtime_->GetEventLoop();
+            if (pumpLoop != nullptr) {
+                pumpLoop->SetPumpDrainHook([this]() { return DrainPendingTasks(); });
+            }
 
             Isolate* isolate = runtime_->GetIsolate();
 
@@ -379,6 +457,9 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
                 auto context = runtime_->GetContext();
                 Context::Scope context_scope(context);
 
+                // Before any module load runs in this isolate.
+                InstallLoaderVocabulary(isolate, inheritedVocabulary_);
+
 #ifdef APPLICATION_IN_DEBUG
                 // Expose this worker to an attached Chrome DevTools frontend
                 // as a child target, mirroring the iOS runtime. Created before
@@ -389,6 +470,63 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
 
                 if (!isTerminating_) {
                     runtime_->RunWorker(workerPath_);
+
+                    // WHATWG parity: enable the implicit port's message queue
+                    // once the entry has finished evaluating. RunWorker returns
+                    // settled for classic scripts and pumped HTTP entries; a
+                    // local top-level-await entry that outlived its settle
+                    // window enables when its evaluation promise settles —
+                    // rejected included, since a broken worker still drains its
+                    // inbox into a listenerless global, as on the web.
+                    Local<Promise> pendingEntry;
+                    if (!ModuleInternal::PendingEntryEvaluation(isolate, workerPath_)
+                                 .ToLocal(&pendingEntry)) {
+                        EnableMessageQueue();
+                    } else {
+                        // Neither handler may capture anything: they resolve the
+                        // wrapper by id because the worker may be gone by the
+                        // time the entry settles. Both run on this thread, in
+                        // this isolate.
+                        auto onFulfilled = [](const v8::FunctionCallbackInfo<Value>& info) {
+                            auto wrapper = WorkerWrapper::GetById(
+                                    info.Data().As<v8::Int32>()->Value());
+                            if (wrapper != nullptr) {
+                                wrapper->EnableMessageQueue();
+                            }
+                        };
+                        // A rejection needs its own handler: sharing the fulfill
+                        // one would mark the entry's evaluation promise handled
+                        // and drop the failure on the floor.
+                        auto onRejected = [](const v8::FunctionCallbackInfo<Value>& info) {
+                            auto wrapper = WorkerWrapper::GetById(
+                                    info.Data().As<v8::Int32>()->Value());
+                            if (wrapper == nullptr) {
+                                return;
+                            }
+                            wrapper->EnableMessageQueue();
+                            if (wrapper->IsTerminating() || wrapper->IsDisposed()) {
+                                return;
+                            }
+                            auto isolate = info.GetIsolate();
+                            ReportEntryRejection(isolate,
+                                                 info.Length() > 0
+                                                         ? info[0]
+                                                         : Undefined(isolate).As<Value>(),
+                                                 wrapper);
+                        };
+                        auto workerIdData = v8::Integer::New(isolate, workerId_);
+                        Local<Function> enableFn;
+                        Local<Function> reportFn;
+                        if (Function::New(context, onFulfilled, workerIdData)
+                                    .ToLocal(&enableFn) &&
+                            Function::New(context, onRejected, workerIdData)
+                                    .ToLocal(&reportFn)) {
+                            pendingEntry->Then(context, enableFn, reportFn)
+                                    .FromMaybe(Local<Promise>());
+                        } else {
+                            EnableMessageQueue();
+                        }
+                    }
                 }
             }
 
@@ -602,10 +740,7 @@ void WorkerWrapper::CreateInspector(Isolate* isolate) {
     }
 
     // Same url scheme the module loader reports in Debugger.scriptParsed.
-    // workerPath_ may still be relative to the caller's dir at this point
-    // (resolution happens in require); callingDir_ ends with '/'.
-    std::string url =
-            "file://" + (workerPath_[0] == '/' ? workerPath_ : callingDir_ + workerPath_);
+    std::string url = "file://" + workerPath_;
 
     auto* client = new WorkerInspectorClient(workerId_, isolate, ALooper_forThread(), url);
     {

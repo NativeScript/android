@@ -1,12 +1,14 @@
 #include "EventLoop.h"
 
 #include <android/api-level.h>
+#include <poll.h>
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <cerrno>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <ctime>
@@ -26,6 +28,15 @@ double now_ms() {
     clock_gettime(CLOCK_MONOTONIC, &res);
     return 1000.0 * res.tv_sec + (double) res.tv_nsec / 1e6;
 }
+
+// Depth, not a flag: a pumped callback can start a nested pump (a drained
+// timer calling a pumping require).
+thread_local int t_pumpDepth = 0;
+
+struct PumpScope {
+    PumpScope() { ++t_pumpDepth; }
+    ~PumpScope() { --t_pumpDepth; }
+};
 
 // runs one unit of work without letting a C++ exception escape into an
 // ALooper callback frame
@@ -132,9 +143,10 @@ void EventLoop::BindToCurrentThread() {
 
     // flush work buffered before the home thread was known
     auto now = now_ms();
-    for (size_t i = 0; i < internal_.immediate.size(); i++) {
+    for (auto& entry : internal_.immediate) {
         uint64_t value = 1;
         write(eventFd_, &value, sizeof(value));
+        entry.unitIssued = true;
     }
     ArmTimerLocked(now);
     for (auto& entry : ordered_.immediate) {
@@ -162,6 +174,8 @@ void EventLoop::Shutdown() {
     internal_.delayed.clear();
     ordered_.immediate.clear();
     ordered_.delayed.clear();
+    deferredJavaThrows_.clear();
+    pumpDrainHook_ = nullptr;
     if (eventFd_ != -1) {
         ALooper_removeFd(looper_, eventFd_);
         close(eventFd_);
@@ -203,6 +217,7 @@ void EventLoop::PostInternalLocked(Entry entry, double delayMs) {
     auto now = now_ms();
     if (delayMs <= 0) {
         entry.time = now;
+        entry.unitIssued = eventFd_ != -1;
         internal_.immediate.push_back(std::move(entry));
         if (eventFd_ != -1) {
             uint64_t value = 1;
@@ -408,13 +423,22 @@ bool EventLoop::IsStopped() {
     return stopped_;
 }
 
-std::unique_ptr<EventLoop::Entry> EventLoop::TakeDueLocked(Lane& lane, bool nestableOnly,
-                                                           bool v8Only,
+bool EventLoop::MatchesFilter(const Entry& e, DrainFilter filter) {
+    switch (filter) {
+        case DrainFilter::kAny:
+            return true;
+        case DrainFilter::kNestableV8:
+            return e.nestable && e.task != nullptr;
+        case DrainFilter::kPumpDeliverable:
+            return e.nestable && !e.bare;
+    }
+    return false;
+}
+
+std::unique_ptr<EventLoop::Entry> EventLoop::TakeDueLocked(Lane& lane, DrainFilter filter,
                                                            bool requireSignaledDelayed,
                                                            double now) {
-    auto matches = [&](const Entry& e) {
-        return (!nestableOnly || e.nestable) && (!v8Only || e.task != nullptr);
-    };
+    auto matches = [&](const Entry& e) { return MatchesFilter(e, filter); };
     auto imIt = lane.immediate.begin();
     while (imIt != lane.immediate.end() && !matches(*imIt)) {
         ++imIt;
@@ -446,6 +470,26 @@ double EventLoop::PeekDueLocked(Lane& lane, double now) {
     if (!lane.delayed.empty() && lane.delayed.begin()->first <= now &&
         (due < 0 || lane.delayed.begin()->first < due)) {
         due = lane.delayed.begin()->first;
+    }
+    return due;
+}
+
+double EventLoop::PeekDueFilteredLocked(Lane& lane, DrainFilter filter, double now) {
+    auto matches = [&](const Entry& e) { return MatchesFilter(e, filter); };
+    double due = -1;
+    for (const auto& e : lane.immediate) {
+        if (matches(e)) {
+            due = e.time;
+            break;
+        }
+    }
+    for (const auto& pair : lane.delayed) {
+        if (pair.first > now) {
+            break;
+        }
+        if (matches(pair.second) && (due < 0 || pair.first < due)) {
+            due = pair.first;
+        }
     }
     return due;
 }
@@ -501,17 +545,78 @@ void EventLoop::RunOneInternal() {
         if (stopped_) {
             return;
         }
-        entry = TakeDueLocked(internal_, false, false, true, now_ms());
-    }
-    if (entry == nullptr) {
-        // leftover unit: the work it represented ran early from a nested loop
-        // drain
-        return;
+        entry = TakeDueLocked(internal_, DrainFilter::kAny, true, now_ms());
+        if (entry == nullptr) {
+            // leftover unit: the work it represented ran early from a direct
+            // drain - this dispatch just consumed it, so it is no longer
+            // WaitForInternalWork's to swallow
+            if (leftoverUnits_ > 0) {
+                leftoverUnits_--;
+            }
+            return;
+        }
     }
     RunEntry(*entry);
 }
 
+bool EventLoop::IsPumping() { return t_pumpDepth > 0; }
+
+void EventLoop::DeferJavaThrow(std::shared_ptr<NativeScriptException> ex) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) {
+        return;
+    }
+    deferredJavaThrows_.push_back(std::move(ex));
+    // the wakeup: an empty ordered entry whose token forces a nativeRunTask
+    // visit once the looper resumes, even if a drain consumes the entry first
+    PostOrderedLocked(Entry{nullptr, []() {}, true, false, 0}, 0);
+}
+
+void EventLoop::ReportDeferredJavaError() {
+    std::shared_ptr<NativeScriptException> ex;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (deferredJavaThrows_.empty()) {
+            return;
+        }
+        ex = std::move(deferredJavaThrows_.front());
+        deferredJavaThrows_.pop_front();
+    }
+    ex->ReThrowToJava();
+}
+
+void EventLoop::SetPumpDrainHook(std::function<int()> hook) {
+    // home thread only, like every consumer of pumpDrainHook_
+    pumpDrainHook_ = std::move(hook);
+}
+
+// Runs `body` without letting a C++ exception escape, deferring the Java-side
+// report while a pump is on the stack (RunGuarded's direct ReThrowToJava arms
+// a pending JNI exception, which is only legal when returning to Java is the
+// next act).
+void EventLoop::GuardEntryRun(const std::function<void()>& body) {
+    if (!IsPumping()) {
+        RunGuarded(body);
+        return;
+    }
+    try {
+        body();
+    } catch (NativeScriptException& ex) {
+        // what() may read a JNI local ref that cannot outlive this dispatch,
+        // so only its text is carried
+        DeferJavaThrow(std::make_shared<NativeScriptException>(std::string(ex.what())));
+    } catch (std::exception& ex) {
+        DEBUG_WRITE_FORCE("Error: c++ exception in event loop task: %s", ex.what());
+    } catch (...) {
+        DEBUG_WRITE_FORCE("Error: unknown c++ exception in event loop task!");
+    }
+}
+
 void EventLoop::RunNestableV8Tasks() {
+    RunDueInternalWork(DrainFilter::kNestableV8);
+}
+
+void EventLoop::RunDueInternalWork(DrainFilter filter) {
     // bounded to the entries present at call time so a task that reposts
     // can't wedge the inspector pause loop that called us
     size_t budget;
@@ -526,53 +631,213 @@ void EventLoop::RunNestableV8Tasks() {
             if (stopped_) {
                 return;
             }
-            entry = TakeDueLocked(internal_, true, true, false, now_ms());
-        }
-        if (entry == nullptr) {
-            return;
+            const size_t delayedBefore = internal_.delayed.size();
+            entry = TakeDueLocked(internal_, filter, false, now_ms());
+            if (entry == nullptr) {
+                return;
+            }
+            if (entry->unitIssued) {
+                leftoverUnits_++;
+            }
+            if (internal_.delayed.size() != delayedBefore) {
+                // a drained delayed entry may leave the timerfd armed (or
+                // expired unread) for it; rearming to the queue's new
+                // earliest also discards the stale expiration
+                ArmTimerLocked(now_ms());
+            }
         }
         // the pause loops call this from inside v8 inspector frames - a C++
         // exception must not unwind through them
-        RunGuarded([&] { RunEntry(*entry); });
+        GuardEntryRun([&] { RunEntry(*entry); });
     }
 }
 
-void EventLoop::RunOrderedTask() {
-    // one anonymous token = one due slot across the whole ordered domain:
-    // pick the earliest due item among the ordered entries and the timer
-    // source, whichever it is. Timers and entries only ever run on this
-    // thread, so the peeked winner can't be taken by anyone else before we
-    // re-lock (a concurrent post can only add later work).
+bool EventLoop::RunOneOrderedDue() {
+    // one due slot across the whole ordered domain: pick the earliest due
+    // item among the ordered entries and the timer source, whichever it is.
+    // Timers and entries only ever run on this thread, so the peeked winner
+    // can't be taken by anyone else before we re-lock (a concurrent post can
+    // only add later work).
     auto now = now_ms();
     double entryDue;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (stopped_) {
-            return;
+            return false;
         }
         entryDue = PeekDueLocked(ordered_, now);
     }
     if (timerSource_ != nullptr && timerSource_->RunIfEarliest(now, entryDue)) {
-        return;
+        // fn entries get their checkpoint in RunEntry; a timer callback runs
+        // under kAuto, which skips the depth-0 drain whenever a pump's JS
+        // frames are on the stack, so drain here or a microtask enqueued by
+        // one timer runs after the next timer instead of before it
+        v8::Locker locker(isolate_);
+        v8::Isolate::Scope isolateScope(isolate_);
+        v8::HandleScope handleScope(isolate_);
+        isolate_->PerformMicrotaskCheckpoint();
+        return true;
     }
     if (entryDue < 0) {
-        // leftover token: nothing in the domain is due yet
-        return;
+        // leftover token, or an idle drain: nothing in the domain is due yet
+        return false;
     }
     std::unique_ptr<Entry> entry;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (stopped_) {
-            return;
+            return false;
         }
-        entry = TakeDueLocked(ordered_, false, false, false, now_ms());
+        entry = TakeDueLocked(ordered_, DrainFilter::kAny, false, now_ms());
     }
-    if (entry != nullptr) {
+    if (entry == nullptr) {
+        return false;
+    }
+    if (IsPumping()) {
+        // an ordered entry's failure is its own report, never the pumping
+        // require's; on the token path the throw belongs to nativeRunTask
+        GuardEntryRun([&] { RunEntry(*entry); });
+    } else {
         RunEntry(*entry);
+    }
+    return true;
+}
+
+void EventLoop::RunOrderedTask() {
+    // one anonymous token = one due slot; a token whose item a pump drained
+    // early finds nothing due and dies here
+    RunOneOrderedDue();
+}
+
+int EventLoop::RunDueOrderedEntries() {
+    // Bounded slice: a callback that keeps minting due-now work (a
+    // setTimeout(0) chain) must not pin the calling pump past its own
+    // deadline checks, so the drain yields after a few milliseconds and the
+    // pump comes back for the rest on its next iteration.
+    constexpr double kSliceMs = 8.0;
+    const double start = now_ms();
+    int ran = 0;
+    while (!isolate_->IsExecutionTerminating() && RunOneOrderedDue()) {
+        ran++;
+        if (now_ms() - start >= kSliceMs) {
+            break;
+        }
+    }
+    return ran;
+}
+
+EventLoop::PumpResult EventLoop::PumpUntil(double deadlineSeconds,
+                                           const std::function<bool()>& settled,
+                                           bool drainLooperWork) {
+    // home thread only: the drains below take ordered/timer slots and eventfd
+    // units that the looper's own dispatch owns on that thread
+    NS_DCHECK(looper_ == nullptr || ALooper_forThread() == looper_);
+    PumpScope pumpScope;
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::duration<double>(deadlineSeconds);
+    for (;;) {
+        if (settled()) {
+            return PumpResult::kSettled;
+        }
+        if (isolate_->IsExecutionTerminating()) {
+            return PumpResult::kTerminated;
+        }
+        if (IsStopped()) {
+            // a stopped loop drops every post, so nothing can settle anymore
+            return PumpResult::kTerminated;
+        }
+        if (std::chrono::steady_clock::now() >= deadline) {
+            return PumpResult::kDeadline;
+        }
+        RunDueInternalWork(drainLooperWork ? DrainFilter::kPumpDeliverable
+                                           : DrainFilter::kNestableV8);
+        {
+            // work may enqueue microtasks without entering JS; scopes are
+            // re-entrant, so callers already holding them pay nothing
+            v8::Locker locker(isolate_);
+            v8::Isolate::Scope isolateScope(isolate_);
+            v8::HandleScope handleScope(isolate_);
+            isolate_->PerformMicrotaskCheckpoint();
+        }
+        int ranLooperWork = 0;
+        if (drainLooperWork) {
+            ranLooperWork = RunDueOrderedEntries();
+            if (pumpDrainHook_ != nullptr) {
+                ranLooperWork += pumpDrainHook_();
+            }
+        }
+        if (settled()) {
+            return PumpResult::kSettled;
+        }
+        if (ranLooperWork == 0) {
+            WaitForInternalWork(10, /*pumpDeliverable=*/drainLooperWork);
+        }
     }
 }
 
+namespace {
+// Depth, not a flag: an fd callback can dispatch JS that lands back in
+// another callback through a nested drain.
+thread_local int t_looperCallbackDepth = 0;
+
+struct LooperCallbackScope {
+    LooperCallbackScope() { ++t_looperCallbackDepth; }
+    ~LooperCallbackScope() { --t_looperCallbackDepth; }
+};
+}  // namespace
+
+bool EventLoop::IsInLooperCallback() { return t_looperCallbackDepth > 0; }
+
+void EventLoop::WaitForInternalWork(int timeoutMs, bool pumpDeliverable) {
+    const DrainFilter filter =
+            pumpDeliverable ? DrainFilter::kPumpDeliverable : DrainFilter::kNestableV8;
+    struct pollfd fds[2];
+    nfds_t count = 0;
+    bool sleepOnly = false;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (stopped_) {
+            sleepOnly = true;
+        } else {
+            const double now = now_ms();
+            // Drainable work already due: the caller's drain runs it, waiting
+            // would only add latency. The filter must match the drain mode of
+            // the pump idling here — a due entry the drain cannot take must
+            // not turn the wait into a no-op.
+            if (PeekDueFilteredLocked(internal_, filter, now) >= 0) {
+                return;
+            }
+            // units whose entries a direct drain already consumed keep the
+            // eventfd readable; swallow them or the poll below returns
+            // immediately on every call
+            while (leftoverUnits_ > 0 && eventFd_ != -1) {
+                uint64_t value;
+                if (read(eventFd_, &value, sizeof(value)) != sizeof(value)) {
+                    break;
+                }
+                leftoverUnits_--;
+            }
+            // A due entry the drain cannot take (non-nestable task, plain fn
+            // post) pins its unread unit in the eventfd, so the fds cannot go
+            // quiet — polling them would spin. Plain sleep is the only honest
+            // wait until the looper resumes and runs it.
+            if (PeekDueLocked(internal_, now) >= 0) {
+                sleepOnly = true;
+            } else {
+                if (eventFd_ != -1) fds[count++] = {eventFd_, POLLIN, 0};
+                if (timerFd_ != -1) fds[count++] = {timerFd_, POLLIN, 0};
+            }
+        }
+    }
+    if (sleepOnly || count == 0) {
+        usleep(static_cast<useconds_t>(timeoutMs) * 1000);
+        return;
+    }
+    poll(fds, count, timeoutMs);
+}
+
 int EventLoop::EventFdCallback(int fd, int events, void* data) {
+    LooperCallbackScope callbackScope;
     uint64_t value;
     // EFD_SEMAPHORE: consumes exactly one unit; while more remain the fd stays
     // readable and ALooper calls back next poll, interleaving with Java
@@ -586,6 +851,7 @@ int EventLoop::EventFdCallback(int fd, int events, void* data) {
 }
 
 int EventLoop::TimerFdCallback(int fd, int events, void* data) {
+    LooperCallbackScope callbackScope;
     uint64_t expirations;
     if (read(fd, &expirations, sizeof(expirations)) != sizeof(expirations)) {
         return 1;
@@ -604,6 +870,7 @@ int EventLoop::TimerFdCallback(int fd, int events, void* data) {
             }
             if (!pair.second.signaled) {
                 pair.second.signaled = true;
+                pair.second.unitIssued = true;
                 due++;
             }
         }
@@ -621,7 +888,11 @@ int EventLoop::TimerFdCallback(int fd, int events, void* data) {
 extern "C" JNIEXPORT void JNICALL Java_com_tns_EventLoopHandler_nativeRunTask(
         JNIEnv* env, jclass clazz, jlong nativeLoopPtr) {
     try {
-        reinterpret_cast<tns::EventLoop*>(nativeLoopPtr)->RunOrderedTask();
+        auto* loop = reinterpret_cast<tns::EventLoop*>(nativeLoopPtr);
+        loop->RunOrderedTask();
+        // returning to Java is the next act, so a report a pump had to defer
+        // is safe to arm here
+        loop->ReportDeferredJavaError();
     } catch (tns::NativeScriptException& e) {
         e.ReThrowToJava();
     } catch (std::exception& e) {

@@ -183,6 +183,9 @@ std::shared_ptr<Persistent<Value>> MakeOwnedPersistent(Isolate* isolate,
 
 }  // namespace
 
+// The throwable is held as a JNI LOCAL ref, and the message is rendered
+// lazily from it (what()/ToString) - so the exception must be consumed
+// before any JNI local frame enclosing this construction is popped.
 NativeScriptException::NativeScriptException(JEnv& env)
     : m_javascriptException(nullptr) {
   m_javaException = JniLocalRef(env.ExceptionOccurred());

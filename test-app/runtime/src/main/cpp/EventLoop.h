@@ -16,6 +16,8 @@
 
 namespace tns {
 
+class NativeScriptException;
+
 /**
  * A producer of ordered-lane work that keeps its own bookkeeping (Timers).
  * The EventLoop's token drain consults it so timers and ordered entries form
@@ -184,13 +186,118 @@ public:
     void RunNestableV8Tasks();
 
     /**
+     * True while the calling thread is inside one of this process's ALooper
+     * fd callbacks. Android's Looper::pollInner holds a Response& into its
+     * response vector across each callback; a nested ALooper_pollOnce on the
+     * same looper clears and reallocates that vector, so the outer poll
+     * resumes over freed memory. Any code that pumps the looper (module
+     * evaluation, the boot backstop, the fetch yield) must consult this and
+     * drain queues directly instead of polling when it is set.
+     */
+    static bool IsInLooperCallback();
+
+    /**
+     * Blocks the calling thread until this loop's internal lane has work (the
+     * eventfd or timerfd is readable) or `timeoutMs` elapses, whichever comes
+     * first, without entering the looper - so it is safe where
+     * IsInLooperCallback forbids polling. Returns immediately when work the
+     * caller's drain can take is already due; `pumpDeliverable` selects which
+     * filter that is, and must match the drain mode of the pump that idles
+     * here - a due entry the drain cannot take must not no-op the wait.
+     * Eventfd units left over from entries a direct drain consumed are
+     * swallowed first, so the wait only wakes for new work instead of
+     * spinning on stale readability.
+     */
+    void WaitForInternalWork(int timeoutMs, bool pumpDeliverable = false);
+
+    /**
+     * Runs every ordered-lane item that is due NOW - Java-token entries and
+     * timer-source items alike, in due order - directly from the calling
+     * (home) thread, without waiting for their Handler messages. The messages
+     * still arrive later and die as leftover tokens: a token whose item was
+     * drained early finds nothing due and no-ops, and its claim cell is
+     * retired by the dispatch gate as usual. Bounded to a short slice so a
+     * callback minting due-now work (a setTimeout(0) chain) cannot pin the
+     * caller past its own deadline checks. Returns the number of items run.
+     */
+    int RunDueOrderedEntries();
+
+    enum class PumpResult { kSettled, kDeadline, kTerminated };
+
+    /**
+     * Drives this loop in place on the home thread until `settled()` returns
+     * true or `deadlineSeconds` elapses, idling in WaitForInternalWork
+     * between slices. The one pump primitive behind module evaluation, the
+     * graph walk, and the boot backstop; `settled` may throw and the
+     * exception propagates. Returns kTerminated when the isolate is
+     * terminating or the loop has been shut down.
+     *
+     * `drainLooperWork` picks what a pump iteration runs, mirroring the iOS
+     * pump's pumpRunLoop split:
+     *  - false: nestable v8 tasks and a microtask checkpoint only, exactly
+     *    like the inspector pause loops (iOS's default pump body).
+     *  - true (the looper-equivalent drain, standing in for iOS's runloop
+     *    slice): additionally runs due ordered-lane work (JS timers included)
+     *    and plain internal-lane posts (worker->parent messages, Node-API
+     *    completions), plus the registered pump drain hook. Non-nestable v8
+     *    tasks stay queued in both modes (the v8 nestability contract: JS
+     *    frames are on the stack throughout), and so do bare posts - their
+     *    fns lock a DIFFERENT isolate, and running one under a caller
+     *    holding this isolate's Locker nests Lockers across isolates.
+     */
+    PumpResult PumpUntil(double deadlineSeconds, const std::function<bool()>& settled,
+                         bool drainLooperWork);
+
+    /**
+     * True while the calling thread is inside PumpUntil. Callback code that
+     * would arm a pending Java exception (env.Throw) must defer it through
+     * DeferJavaThrow instead while this holds: the pump keeps making JNI
+     * calls after the callback returns.
+     */
+    static bool IsPumping();
+
+    /**
+     * Queues an exception to be raised on the Java side from the next
+     * ordered-token dispatch - the point where returning to Java is the next
+     * act - and posts the wakeup that guarantees such a dispatch happens.
+     * The exception must not hold JNI local refs (capture the message text
+     * instead when it might).
+     */
+    void DeferJavaThrow(std::shared_ptr<NativeScriptException> ex);
+
+    /**
+     * Registers extra home-thread work for looper-equivalent pump drains
+     * (the worker inbox, which rides its own fd the pump never polls).
+     * Returns the number of items it ran. Home thread only; cleared by
+     * Shutdown; pass nullptr to unregister early.
+     */
+    void SetPumpDrainHook(std::function<int()> hook);
+
+    /**
      * Runs at most one due ordered-lane entry, then performs a microtask
      * checkpoint. Invoked by Java EventLoopHandler.handleMessage once per
      * token, on the home thread.
      */
     void RunOrderedTask();
 
+    /**
+     * Raises one deferred exception (DeferJavaThrow) as a pending Java
+     * exception. Called by nativeRunTask after each token dispatch, where
+     * returning to Java is the next act; one exception per dispatch, each
+     * defer having posted its own wakeup token.
+     */
+    void ReportDeferredJavaError();
+
 private:
+    // which internal-lane entries a drain may take
+    enum class DrainFilter {
+        kAny,           // the looper's own dispatch (RunOneInternal)
+        kNestableV8,    // inspector pause loops and drain-off pumps
+        // looper-equivalent pumps: nestable v8 tasks and plain fn posts;
+        // never bare posts (they lock a different isolate) and never
+        // non-nestable tasks
+        kPumpDeliverable,
+    };
     struct Entry {
         // exactly one of task/fn is set; fn entries are never drained by
         // RunNestableV8Tasks (plain posts didn't run during debugger pauses
@@ -208,11 +315,17 @@ private:
         // this entry (written when its timerfd deadline fired), so a later
         // timer fire must not issue a second one
         bool signaled = false;
+        // internal entries only: an eventfd unit backs this entry, so a
+        // direct (unit-free) drain that consumes it must count the unit as
+        // leftover for WaitForInternalWork to swallow
+        bool unitIssued = false;
     };
     struct Lane {
         std::deque<Entry> immediate;
         std::multimap<double, Entry> delayed;
     };
+
+    static bool MatchesFilter(const Entry& e, DrainFilter filter);
 
     // all *Locked members require mutex_ to be held.
     // requireSignaledDelayed must be true on the eventfd unit-consuming path:
@@ -224,13 +337,25 @@ private:
     // drains consume no units at all.
     void PostInternalLocked(Entry entry, double delayMs);
     void PostOrderedLocked(Entry entry, double delayMs);
-    static std::unique_ptr<Entry> TakeDueLocked(Lane& lane, bool nestableOnly, bool v8Only,
+    static std::unique_ptr<Entry> TakeDueLocked(Lane& lane, DrainFilter filter,
                                                 bool requireSignaledDelayed, double now);
     // earliest due entry time in the lane, or a negative value if none is due
     static double PeekDueLocked(Lane& lane, double now);
+    // same, but only over entries matching TakeDueLocked's filter
+    static double PeekDueFilteredLocked(Lane& lane, DrainFilter filter, double now);
     void ArmTimerLocked(double now);
     void RunEntry(Entry& entry);
+    // RunGuarded, but pump-aware: defers the Java-side report while a pump is
+    // on the stack instead of arming a pending JNI exception mid-pump
+    void GuardEntryRun(const std::function<void()>& body);
+    // one bounded pass over the internal lane's due entries under `filter`;
+    // the body behind RunNestableV8Tasks and the pumps' internal drains
+    void RunDueInternalWork(DrainFilter filter);
     void RunOneInternal();
+    // one due slot across the ordered domain (entries + timer source); true
+    // when a slot was consumed. The body behind both RunOrderedTask (one call
+    // per Java token) and RunDueOrderedEntries (looped by the pumps).
+    bool RunOneOrderedDue();
 
     static int EventFdCallback(int fd, int events, void* data);
     static int TimerFdCallback(int fd, int events, void* data);
@@ -287,6 +412,15 @@ private:
     int eventFd_ = -1;
     int timerFd_ = -1;
     bool stopped_ = false;
+    // units written to eventFd_ whose entries a direct drain already ran;
+    // consumed by WaitForInternalWork (or by an EventFdCallback that finds
+    // nothing due). Guarded by mutex_.
+    uint64_t leftoverUnits_ = 0;
+    // exceptions deferred by pump drains, raised one per token dispatch by
+    // ReportDeferredJavaError. Guarded by mutex_.
+    std::deque<std::shared_ptr<NativeScriptException>> deferredJavaThrows_;
+    // extra looper-equivalent pump work (the worker inbox); home-thread only
+    std::function<int()> pumpDrainHook_;
 
     // process-wide JNI cache, written once under the first bind's lock (the
     // main runtime binds before any worker thread exists)

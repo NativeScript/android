@@ -24,7 +24,6 @@ class AppConfig {
         DiscardUncaughtJsExceptions("discardUncaughtJsExceptions", false),
         EnableLineBreakpoins("enableLineBreakpoints", false),
         EnableMultithreadedJavascript("enableMultithreadedJavascript", false),
-        LogScriptLoading("logScriptLoading", false),
         // Appended last: native code reads this array by ordinal.
         UncaughtErrorPolicy("uncaughtErrorPolicy", "report");
 
@@ -84,9 +83,6 @@ class AppConfig {
                 if (rootObject.has(KnownKeys.Profiling.getName())) {
                     String profiling = rootObject.getString(KnownKeys.Profiling.getName());
                     values[KnownKeys.Profiling.ordinal()] = profiling;
-                }
-                if (rootObject.has(KnownKeys.LogScriptLoading.getName())) {
-                    values[KnownKeys.LogScriptLoading.ordinal()] = rootObject.getBoolean(KnownKeys.LogScriptLoading.getName());
                 }
                 if (rootObject.has(KnownKeys.DiscardUncaughtJsExceptions.getName())) {
                     boolean discard = rootObject.getBoolean(KnownKeys.DiscardUncaughtJsExceptions.getName());
@@ -223,11 +219,6 @@ class AppConfig {
 
     public boolean getEnableMultithreadedJavascript() {
         return (boolean)values[KnownKeys.EnableMultithreadedJavascript.ordinal()];
-    }
-
-    public boolean getLogScriptLoading() {
-    Object v = values[KnownKeys.LogScriptLoading.ordinal()];
-    return (v instanceof Boolean) ? ((Boolean)v).booleanValue() : false;
     }
 
     // Security conf

@@ -73,7 +73,11 @@ set(RUNTIME_BUILTIN_JS
         ${RUNTIME_BUILTIN_JS_DIR}/events.js
         ${RUNTIME_BUILTIN_JS_DIR}/inspect.js
         ${RUNTIME_BUILTIN_JS_DIR}/json-helper.js
+        ${RUNTIME_BUILTIN_JS_DIR}/node-module.js
+        ${RUNTIME_BUILTIN_JS_DIR}/node-url.js
         ${RUNTIME_BUILTIN_JS_DIR}/node-util.js
+        ${RUNTIME_BUILTIN_JS_DIR}/ns-module.js
+        ${RUNTIME_BUILTIN_JS_DIR}/ns-runtime.js
         ${RUNTIME_BUILTIN_JS_DIR}/ns-util.js
         ${RUNTIME_BUILTIN_JS_DIR}/performance.js
         ${RUNTIME_BUILTIN_JS_DIR}/primordials.js
@@ -227,8 +231,8 @@ add_library(
         src/main/cpp/URLImpl.cpp
         src/main/cpp/URLSearchParamsImpl.cpp
         src/main/cpp/URLPatternImpl.cpp
-        src/main/cpp/HMRSupport.cpp
-        src/main/cpp/DevFlags.cpp
+        src/main/cpp/HttpLoader.cpp
+        src/main/cpp/TraceLog.cpp
 
         # Node-API: vendored upstream implementation plus the embedder half
         # (env lifecycle, module registry, async work, threadsafe functions)

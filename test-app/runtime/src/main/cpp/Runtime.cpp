@@ -1,10 +1,11 @@
 #include "Runtime.h"
 
 #include <console/Console.h>
-#include <dlfcn.h>
+
 #include <unistd.h>
 
 #include <chrono>
+#include <cinttypes>
 #include <mutex>
 #include <sstream>
 #include <thread>
@@ -16,13 +17,14 @@
 #include "Constants.h"
 #include "CrashBreadcrumbs.h"
 #include "ErrorEvents.h"
+#include "EventLoop.h"
 #include "Events.h"
 #include "File.h"
 #include "FrameCallbacks.h"
+#include "HttpLoader.h"
 #include "Interop.h"
 #include "IsolateTracked.h"
 #include "JType.h"
-#include "JsArgConverter.h"
 #include "JsArgToArrayConverter.h"
 #include "ManualInstrumentation.h"
 #include "MetadataNode.h"
@@ -38,17 +40,15 @@
 #include "SimpleAllocator.h"
 #include "SimpleProfiler.h"
 #include "StructuredClone.h"
+#include "TraceLog.h"
 #include "URLImpl.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
 #include "Util.h"
-#include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include "Version.h"
 #include "WeakRef.h"
 #include "include/libplatform/libplatform.h"
-#include "include/zipconf.h"
-#include "libplatform/libplatform.h"
 #include "sys/system_properties.h"
 
 #ifdef APPLICATION_IN_DEBUG
@@ -83,6 +83,9 @@ void LogAndAbortUncaught() {
 }
 
 void Runtime::Init(JavaVM* vm, void* reserved) {
+  // Before anything worth tracing runs, so NS_DEBUG covers boot itself.
+  tns::InitializeLogCategoriesFromEnvironment();
+
   __android_log_print(ANDROID_LOG_INFO, "TNS.Runtime",
                       "NativeScript Runtime Version %s, commit %s",
                       NATIVE_SCRIPT_RUNTIME_VERSION,
@@ -260,7 +263,7 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
     }
 
     JniLocalRef uncaughtErrorPolicy(env->GetObjectArrayElement(
-        args, (jsize)15 /* KnownKeys.UncaughtErrorPolicy */));
+        args, (jsize)14 /* KnownKeys.UncaughtErrorPolicy */));
     if (!uncaughtErrorPolicy.IsNull()) {
       auto policy = ArgConverter::jstringToString(uncaughtErrorPolicy);
       if (policy == "throw") {
@@ -338,6 +341,13 @@ std::string Runtime::ReadFileText(const std::string& filePath) {
   return File::ReadText(filePath);
 }
 
+std::string Runtime::ReadFileText(const std::string& filePath, bool& ok) {
+#ifdef APPLICATION_IN_DEBUG
+  std::lock_guard<std::mutex> lock(m_fileWriteMutex);
+#endif
+  return File::ReadText(filePath, ok);
+}
+
 void Runtime::Lock() {
 #ifdef APPLICATION_IN_DEBUG
   m_fileWriteMutex.lock();
@@ -350,17 +360,95 @@ void Runtime::Unlock() {
 #endif
 }
 
+// The boot backstop: hold the launching thread until boot has actually
+// finished. Two independent things can leave it unfinished, and BOTH must hold
+// the pump — an in-flight module-graph load, and an entry whose own evaluation
+// promise is still pending (a top-level await parked on anything at all: a
+// nested import() doing its own async work, a native init that completes
+// later). Gating on graph work alone let the second case return to Java with
+// the entry half-evaluated.
+//
+// A settled entry simply exits the loop — a script-style app finishing
+// normally, Node-like. Only the two failures below are fatal, and both are
+// reported in every build.
+static void HoldBootBackstop(v8::Isolate* isolate, const std::string& entryPath) {
+  // The entry can already be rejected on the first poll: LoadESModule takes the
+  // registry-hit path for an already-evaluated module without re-entering
+  // EvaluateModuleGraph, so a re-run of a previously failed entry arrives here
+  // carrying its rejection.
+  std::string entryRejectionReason;
+  EntryEvaluationState entryState =
+          ModuleInternal::PollEntryEvaluation(isolate, entryPath, &entryRejectionReason);
+  bool entryPending = entryState == EntryEvaluationState::kPending;
+  bool entryRejected = entryState == EntryEvaluationState::kRejected;
+
+  if (!entryPending && !entryRejected && !tns::HasPendingAsyncModuleGraphWork()) {
+    return;
+  }
+
+  const double deadlineSeconds = 2 * kModuleEvaluateDeadlineSeconds;
+  Runtime* runtime = Runtime::TryGetRuntime(isolate);
+  std::shared_ptr<EventLoop> eventLoop =
+          runtime != nullptr ? runtime->GetEventLoop() : nullptr;
+
+  if (!entryRejected && eventLoop != nullptr) {
+    // The backstop always takes the looper-equivalent drain — it stands where
+    // iOS pumps its runloop, and Java Handler messages cannot dispatch while
+    // this frame holds the launching thread — so an entry parked on a JS
+    // timer or a worker reply settles here.
+    const EventLoop::PumpResult result = eventLoop->PumpUntil(
+            deadlineSeconds,
+            [&]() {
+              if (entryPending) {
+                EntryEvaluationState state = ModuleInternal::PollEntryEvaluation(
+                        isolate, entryPath, &entryRejectionReason);
+                // Once it settles, stop probing for good.
+                entryPending = state == EntryEvaluationState::kPending;
+                entryRejected = state == EntryEvaluationState::kRejected;
+              }
+              return entryRejected ||
+                     (!entryPending && !tns::HasPendingAsyncModuleGraphWork());
+            },
+            /*drainLooperWork=*/true);
+    if (result == EventLoop::PumpResult::kTerminated && !entryRejected) {
+      // terminating isolate or stopped loop: no outcome to report, and no
+      // timeout to mislabel it with
+      return;
+    }
+  }
+
+  // Evict before throwing: the entry would otherwise stay registered at
+  // kEvaluated with a failed capability, and the registry-hit path of a later
+  // RunModule on this isolate would never surface the failure again.
+  if (entryRejected) {
+    tns::RemoveModuleFromRegistry(isolate, tns::CanonicalizeRegistryKey(entryPath));
+    throw NativeScriptException(
+            "Fatal: the main entry module's evaluation rejected during boot: " +
+            entryRejectionReason);
+  }
+  if (entryPending) {
+    tns::RemoveModuleFromRegistry(isolate, tns::CanonicalizeRegistryKey(entryPath));
+    throw NativeScriptException("Fatal: the main entry module '" + entryPath +
+                                "' never settled within " +
+                                std::to_string(static_cast<int>(deadlineSeconds)) + "s");
+  }
+}
+
 void Runtime::RunModule(JNIEnv* _env, jobject obj, jstring scriptFile) {
   JEnv env(_env);
 
   string filePath = ArgConverter::jstringToString(scriptFile);
   auto context = this->GetContext();
   m_module.Load(context, filePath);
+  // Java resolves package.json's `main` before handing the path over, so the
+  // entry the backstop probes is the very one that was just evaluated.
+  HoldBootBackstop(m_isolate, filePath);
 }
 
 void Runtime::RunModule(const char* moduleName) {
   auto context = this->GetContext();
   m_module.Load(context, moduleName);
+  HoldBootBackstop(m_isolate, moduleName);
 }
 
 void Runtime::RunWorker(const std::string& filePath) {
@@ -1014,6 +1102,22 @@ void Runtime::DestroyRuntime() {
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_id2RuntimeCache.erase(m_id);
+  }
+  // Flag this isolate's in-flight async graph loads dead and Reset their
+  // context Globals while the isolate is still alive, so fetch completions
+  // still queued on background threads become no-ops. This MUST precede the
+  // event-loop Shutdown: a post the stopped loop rejects is destroyed on the
+  // POSTING (background) thread, and quiescing first guarantees such a task
+  // holds only already-Reset Globals by then. The rest of the loader state
+  // (registries, waiters, loader vocabulary) lives in a RuntimeState slot and
+  // is destroyed with it below. Worker isolates quiesce the same way.
+  tns::QuiesceModuleLoadsForIsolate(m_isolate);
+  // The isolate->runtime mapping must outlive the quiesce: a fetch completion
+  // that finds GetRuntime(isolate) == nullptr bails without decrementing its
+  // load's accounting, so erasing first would leave a not-yet-dead load
+  // permanently un-completable.
+  {
+    std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_isolate2RuntimesCache.erase(m_isolate);
   }
   if (m_eventLoop != nullptr) {
@@ -1042,7 +1146,6 @@ void Runtime::DestroyRuntime() {
   m_dispatchUnhandledRejectionFunc.Reset();
   m_dispatchRejectionHandledFunc.Reset();
   m_dispatchNativeUncaughtErrorFunc.Reset();
-
   // Both hold v8::Global handles to JS callbacks, so their entries must be
   // dropped here rather than in ~Runtime, which runs after Isolate::Dispose --
   // resetting a Global then writes into a freed handle table. Doing it here
@@ -1050,6 +1153,13 @@ void Runtime::DestroyRuntime() {
   // isolate (RunMainThreadEntry) after it had already been disposed.
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
   FrameCallbacks::RemoveIsolateEntries(m_isolate);
+
+  // The transport's process-wide state (the cache-bust marks) is shared
+  // across isolates; only the main isolate may clear it (worker teardown must
+  // not wipe the main isolate's session).
+  if (m_isMainThread) {
+    tns::CleanupHttpLoaderGlobals();
+  }
 
   // V8 does not run weak callbacks when an isolate is disposed, so anything
   // still bound to one has to be deleted explicitly, here, while the isolate

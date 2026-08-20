@@ -6,7 +6,11 @@
 
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
+#include "HttpLoader.h"
+#include "NativeScriptAssert.h"
+#include "Runtime.h"
 #include "RuntimeState.h"
+#include "TraceLog.h"
 #include "console/Console.h"
 #include "robin_hood.h"
 
@@ -31,9 +35,79 @@ struct Registration {
  * never carries compatibility code.
  */
 constexpr Registration kRegistry[] = {
+        {"ns:module", BuiltinId::kNsModule},
+        {"ns:runtime", BuiltinId::kNsRuntime},
         {"ns:util", BuiltinId::kNsUtil},
+        {"node:module", BuiltinId::kNodeModule},
+        {"node:url", BuiltinId::kNodeUrl},
         {"node:util", BuiltinId::kNodeUtil},
 };
+
+constexpr const char* kDebugKey = "debug";
+
+void ThrowTypeError(Isolate* isolate, const std::string& message) {
+    isolate->ThrowException(Exception::TypeError(ArgConverter::ConvertToV8String(isolate, message)));
+}
+
+bool EnsureMainIsolateWrite(Isolate* isolate, const std::string& key) {
+    Runtime* runtime = Runtime::GetRuntime(isolate);
+    if (runtime == nullptr || !runtime->IsMainThread()) {
+        ThrowTypeError(isolate, "'" + key +
+                                        "' is process-wide and can only be set from the main "
+                                        "isolate");
+        return false;
+    }
+    return true;
+}
+
+void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
+    Isolate* isolate = info.GetIsolate();
+    if (info.Length() < 2 || !info[0]->IsString()) {
+        ThrowTypeError(isolate, "setConfig expects (key: string, value)");
+        return;
+    }
+    std::string key = ArgConverter::ConvertToString(info[0].As<String>());
+    if (key == kDebugKey) {
+        if (!EnsureMainIsolateWrite(isolate, key)) {
+            return;
+        }
+        if (!info[1]->IsString()) {
+            ThrowTypeError(isolate, "'" + key + "' must be a comma-separated category string (" +
+                                            tns::AllLogCategoryNames() +
+                                            "), or '' to disable tracing");
+            return;
+        }
+        // The list replaces the whole mask, so a caller never has to know what
+        // was already on to turn something off.
+        std::string value = ArgConverter::ConvertToString(info[1].As<String>());
+        bool hadUnknown = false;
+        uint32_t mask = tns::ParseLogCategories(value, &hadUnknown);
+        tns::SetEnabledLogCategories(mask);
+        if (hadUnknown) {
+            DEBUG_WRITE_FORCE(
+                    "ns:runtime setConfig('debug', '%s'): ignoring unknown categories; valid "
+                    "categories are %s",
+                    value.c_str(), tns::AllLogCategoryNames().c_str());
+        }
+        return;
+    }
+    ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
+}
+
+void GetConfigCallback(const FunctionCallbackInfo<Value>& info) {
+    Isolate* isolate = info.GetIsolate();
+    if (info.Length() < 1 || !info[0]->IsString()) {
+        ThrowTypeError(isolate, "getConfig expects (key: string)");
+        return;
+    }
+    std::string key = ArgConverter::ConvertToString(info[0].As<String>());
+    if (key == kDebugKey) {
+        info.GetReturnValue().Set(
+                ArgConverter::ConvertToV8String(isolate, tns::EnabledLogCategoryNames()));
+        return;
+    }
+    ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
+}
 
 const Registration* Find(const std::string& specifier) {
     for (const Registration& registration : kRegistry) {
@@ -51,8 +125,8 @@ bool HasPrefix(const std::string& specifier, const char* prefix) {
 /*
  * A builtin module is a singleton per realm, so every cache here is per
  * runtime: workers get their own exports objects and their own synthetic
- * modules. The process-global g_moduleRegistry deliberately holds none of
- * this. Touched only from its own runtime's thread.
+ * modules. The ES module registry deliberately holds none of this. Touched
+ * only from its own runtime's thread.
  */
 struct RealmState {
     robin_hood::unordered_map<std::string, Persistent<Object>*> exports;
@@ -88,6 +162,26 @@ MaybeLocal<Object> BuildBinding(Local<Context> context, BuiltinId builtin) {
     Local<Object> binding = Object::New(isolate);
 
     switch (builtin) {
+        case BuiltinId::kNsModule: {
+            if (!BuildNsModuleBinding(context, binding)) {
+                return MaybeLocal<Object>();
+            }
+            break;
+        }
+        case BuiltinId::kNsRuntime: {
+            Local<v8::Function> setConfig, getConfig;
+            if (!v8::Function::New(context, SetConfigCallback).ToLocal(&setConfig) ||
+                !v8::Function::New(context, GetConfigCallback).ToLocal(&getConfig) ||
+                !binding->Set(context, ArgConverter::ConvertToV8String(isolate, "setConfig"),
+                              setConfig)
+                         .FromMaybe(false) ||
+                !binding->Set(context, ArgConverter::ConvertToV8String(isolate, "getConfig"),
+                              getConfig)
+                         .FromMaybe(false)) {
+                return MaybeLocal<Object>();
+            }
+            break;
+        }
         case BuiltinId::kNsUtil: {
             // The console formatter is built once per realm; ns:util
             // re-exports that instance instead of creating a second one.
