@@ -39,7 +39,14 @@ class ClassResolver {
                 // and interfaces alike, so supply the class the same way
                 // anonymous extends are supplied.
                 Log.w("JS", "Class " + className + " not precompiled; generating at runtime. Framework references resolve only if dex injection into the app class loader succeeds.");
-                clazz = dexFactory.resolveClass(canonicalBaseClassName, name, className, methodOverrides, implementedInterfaces, isInterface);
+                try {
+                    clazz = dexFactory.resolveClass(canonicalBaseClassName, name, className, methodOverrides, implementedInterfaces, isInterface);
+                } catch (Throwable generationFailure) {
+                    // The precise not-found is the actionable error; a failed
+                    // generation attempt is its detail, not its replacement.
+                    notFound.addSuppressed(generationFailure);
+                    throw notFound;
+                }
                 if (clazz == null) {
                     throw notFound;
                 }

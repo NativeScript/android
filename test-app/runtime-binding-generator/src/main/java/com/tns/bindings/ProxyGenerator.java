@@ -26,6 +26,17 @@ public class ProxyGenerator {
     }
 
     public String generateProxy(String proxyName, ClassDescriptor classToProxy, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, boolean isInterface, AnnotationDescriptor[] annotations) throws IOException {
+        return generateProxy(proxyName, null, classToProxy, methodOverrides, implementedInterfaces, isInterface, annotations);
+    }
+
+    /**
+     * cacheDigest, when present, becomes part of the proxy's file name. The
+     * thumb only changes on reinstall, so name + thumb alone cannot see an
+     * edit to the proxy's contents (method overrides, interfaces) - the
+     * digest is what makes such an edit miss the cache instead of silently
+     * loading the previous dex.
+     */
+    public String generateProxy(String proxyName, String cacheDigest, ClassDescriptor classToProxy, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, boolean isInterface, AnnotationDescriptor[] annotations) throws IOException {
         ApplicationWriter aw = new ApplicationWriter();
         aw.visit();
 
@@ -53,6 +64,10 @@ public class ProxyGenerator {
             if (proxyThumb != null) {
                 proxyFileName += "-" + proxyThumb;
             }
+        }
+        // After the thumb, so purgeDexesByThumb keeps matching old generations.
+        if (cacheDigest != null) {
+            proxyFileName += "-" + cacheDigest;
         }
 
         if (IsLogEnabled) {
