@@ -357,23 +357,45 @@ public class NativeScriptSyncServiceSocketImpl {
             return lengthInt;
         }
 
+        /*
+         * Written through a sibling temp file renamed over the target, because
+         * the app keeps running JS while files stream in: rename(2) within a
+         * directory is atomic, so a runtime thread that requires this path
+         * mid-sync gets either the whole previous file or the whole new one.
+         * Writing in place cannot be made safe from the reader side -- the
+         * truncate lands before any lock a reader could share, and each runtime
+         * (main, every worker) reads on its own thread.
+         */
         private void createOrOverrideFile(String fileName, byte[] content) throws IOException {
-            File fileToCreate = prepareFile(fileName);
+            File fileToCreate = new File(DEVICE_APP_DIR, fileName);
+            File parentDir = fileToCreate.getParentFile();
+
+            if (parentDir != null) {
+                parentDir.mkdirs();
+            }
+
+            File temp = null;
             try {
+                // Same directory as the target: rename is only atomic within one
+                // filesystem, and a sibling is the one placement that guarantees it.
+                temp = File.createTempFile("livesync", ".tmp", parentDir);
 
-                fileToCreate.getParentFile().mkdirs();
-                FileOutputStream fos = new FileOutputStream(fileToCreate.getCanonicalPath());
-                if(runtime != null) {
-                    runtime.lock();
+                FileOutputStream fos = new FileOutputStream(temp);
+                try {
+                    fos.write(content);
+                } finally {
+                    fos.close();
                 }
-                fos.write(content);
-                fos.close();
 
+                if (!temp.renameTo(fileToCreate)) {
+                    throw new IOException(String.format("failed to rename %s onto the target", temp.getAbsolutePath()));
+                }
+                temp = null;
             } catch (Exception e) {
                 throw new IOException(String.format("\nLiveSync: failed to write file: %s\nOriginal Exception: %s", fileName, e.toString()));
             } finally {
-                if(runtime != null) {
-                    runtime.unlock();
+                if (temp != null) {
+                    temp.delete();
                 }
             }
         }
@@ -385,14 +407,6 @@ public class NativeScriptSyncServiceSocketImpl {
                 }
 
             fileOrDirectory.delete();
-        }
-
-        private File prepareFile(String fileName) {
-            File fileToCreate = new File(DEVICE_APP_DIR, fileName);
-            if (fileToCreate.exists()) {
-                fileToCreate.delete();
-            }
-            return fileToCreate;
         }
 
         /*
