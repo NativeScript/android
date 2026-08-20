@@ -2164,17 +2164,14 @@ void MetadataNode::EnableProfiler(bool enableProfiler) {
 }
 
 bool MetadataNode::IsJavascriptKeyword(const std::string &word) {
-    static set<string> keywords;
-
-    if (keywords.empty()) {
-        string kw[] { "abstract", "arguments", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue", "debugger", "default", "delete", "do",
-                      "double", "else", "enum", "eval", "export", "extends", "false", "final", "finally", "float", "for", "function", "goto", "if", "implements",
-                      "import", "in", "instanceof", "int", "interface", "let", "long", "native", "new", "null", "package", "private", "protected", "public", "return",
-                      "short", "static", "super", "switch", "synchronized", "this", "throw", "throws", "transient", "true", "try", "typeof", "var", "void", "volatile", "while", "with", "yield"
-                    };
-
-        keywords = set<string>(kw, kw + sizeof(kw)/sizeof(kw[0]));
-    }
+    // Initialized in place rather than filled on first call: every runtime's
+    // thread reaches this, and a lazy fill races the reads.
+    static const set<string> keywords {
+        "abstract", "arguments", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue", "debugger", "default", "delete", "do",
+        "double", "else", "enum", "eval", "export", "extends", "false", "final", "finally", "float", "for", "function", "goto", "if", "implements",
+        "import", "in", "instanceof", "int", "interface", "let", "long", "native", "new", "null", "package", "private", "protected", "public", "return",
+        "short", "static", "super", "switch", "synchronized", "this", "throw", "throws", "transient", "true", "try", "typeof", "var", "void", "volatile", "while", "with", "yield"
+    };
 
     return keywords.find(word) != keywords.end();
 }

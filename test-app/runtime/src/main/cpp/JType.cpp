@@ -1,6 +1,8 @@
 #include "JType.h"
 #include "NativeScriptAssert.h"
 
+#include <mutex>
+
 namespace tns {
 Type JType::getClassType(int retType) {
     Type classReturnType = static_cast<Type>(retType);
@@ -87,14 +89,21 @@ jdouble JType::DoubleValue(JEnv env, jobject value) {
     return env.CallDoubleMethod(value, Double->valueMethodId);
 }
 
+/*
+ * The boxed-primitive handles are process-global, resolved lazily by whichever
+ * runtime boxes first -- main and workers race for that on their own threads.
+ * call_once both serializes the resolution and orders it: the pointer becomes
+ * visible only once Init has filled clazz/ctor/valueMethodId, so no thread can
+ * reach a published instance whose handles are still unset.
+ */
 void JType::EnsureInstance(JEnv env, JType** instance, Type type) {
-    if ((*instance) != nullptr) {
-        return;
-    }
+    static std::once_flag flags[static_cast<size_t>(Type::Null) + 1];
 
-    *instance = new JType();
-
-    (*instance)->Init(env, type);
+    std::call_once(flags[static_cast<size_t>(type)], [&] {
+        auto* created = new JType();
+        created->Init(env, type);
+        *instance = created;
+    });
 }
 
 void JType::Init(JEnv env, Type type) {

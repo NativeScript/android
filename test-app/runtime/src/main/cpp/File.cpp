@@ -21,23 +21,39 @@ string File::ReadText(const string& filePath) {
 }
 
 string File::ReadText(const string& filePath, bool& ok) {
-    int len;
-    bool isNew;
-    const char* content = ReadText(filePath, len, isNew);
+    ok = false;
 
-    ok = content != nullptr;
-
-    if (content == nullptr) {
+    FILE* file = fopen(filePath.c_str(), READ_BINARY);
+    if (file == nullptr) {
+        // A path that never existed, or one deleted between a caller's stat and
+        // this open. Callers surface their own error; reading on regardless
+        // aborts the process on a null FILE*.
+        DEBUG_WRITE_FORCE("File::ReadText: cannot open %s", filePath.c_str());
         return string();
     }
 
-    string s(content, len);
-
-    if (isNew) {
-        delete[] content;
+    fseek(file, 0, SEEK_END);
+    auto size = ftell(file);
+    if (size < 0) {
+        DEBUG_WRITE_FORCE("File::ReadText: cannot size %s", filePath.c_str());
+        fclose(file);
+        return string();
     }
+    rewind(file);
 
-    return s;
+    // Read straight into the string that is returned: main and worker runtimes
+    // read modules concurrently from their own threads, so there is no scratch
+    // buffer to share, and the caller needs a string either way.
+    string content(static_cast<size_t>(size), '\0');
+    auto bytesRead = fread(content.data(), 1, static_cast<size_t>(size), file);
+    fclose(file);
+
+    // A short read is a truncated file, not a failure to open; `size` is only
+    // what the directory entry claimed.
+    content.resize(bytesRead);
+
+    ok = true;
+    return content;
 }
 
 void* File::ReadBinary(const string& filePath, int& length) {
@@ -70,41 +86,6 @@ bool File::WriteBinary(const string& filePath, const void* data, int length) {
 
     return writtenBytes == length;
 }
-
-const char* File::ReadText(const string& filePath, int& charLength, bool& isNew) {
-    charLength = 0;
-    isNew = false;
-
-    FILE* file = fopen(filePath.c_str(), "rb");
-    if (file == nullptr) {
-        // A path that never existed, or one deleted between a caller's stat and
-        // this open. Callers surface their own error; reading on regardless
-        // aborts the process on a null FILE*.
-        DEBUG_WRITE_FORCE("File::ReadText: cannot open %s", filePath.c_str());
-        return nullptr;
-    }
-    fseek(file, 0, SEEK_END);
-
-    charLength = ftell(file);
-    isNew = charLength > BUFFER_SIZE;
-
-    rewind(file);
-
-    if (isNew) {
-        char* newBuffer = new char[charLength];
-        fread(newBuffer, 1, charLength, file);
-        fclose(file);
-
-        return newBuffer;
-    }
-
-    fread(Buffer, 1, charLength, file);
-    fclose(file);
-
-    return Buffer;
-}
-
-char* File::Buffer = new char[BUFFER_SIZE];
 
 const char* File::WRITE_BINARY = "wb";
 const char* File::READ_BINARY = "rb";

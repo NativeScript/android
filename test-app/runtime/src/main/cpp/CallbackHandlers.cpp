@@ -24,46 +24,57 @@
 #include "WorkerWrapper.h"
 #include <unistd.h>
 #include <dlfcn.h>
+#include <mutex>
 
 using namespace v8;
 using namespace std;
 using namespace tns;
 
 void CallbackHandlers::Init(Isolate *isolate) {
-    JEnv env;
+    /*
+     * Runs once per runtime, on that runtime's own thread, so everything
+     * process-global here is resolved under call_once: a starting worker must
+     * not rewrite handles the isolates already running are reading, even
+     * though it would write back the same values.
+     */
+    static std::once_flag globalHandlesOnce;
+    std::call_once(globalHandlesOnce, [] {
+        JEnv env;
 
-    JAVA_LANG_STRING = env.FindClass("java/lang/String");
-    NS_CHECK(JAVA_LANG_STRING != nullptr);
+        JAVA_LANG_STRING = env.FindClass("java/lang/String");
+        NS_CHECK(JAVA_LANG_STRING != nullptr);
 
-    RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
-    NS_CHECK(RUNTIME_CLASS != nullptr);
+        RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
+        NS_CHECK(RUNTIME_CLASS != nullptr);
 
-    RESOLVE_CLASS_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "resolveClass",
-                                              "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;Z)Ljava/lang/Class;");
-    NS_CHECK(RESOLVE_CLASS_METHOD_ID != nullptr);
+        RESOLVE_CLASS_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "resolveClass",
+                                                  "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;Z)Ljava/lang/Class;");
+        NS_CHECK(RESOLVE_CLASS_METHOD_ID != nullptr);
 
-    CURRENT_OBJECTID_FIELD_ID = env.GetFieldID(RUNTIME_CLASS, "currentObjectId", "I");
-    NS_CHECK(CURRENT_OBJECTID_FIELD_ID != nullptr);
+        CURRENT_OBJECTID_FIELD_ID = env.GetFieldID(RUNTIME_CLASS, "currentObjectId", "I");
+        NS_CHECK(CURRENT_OBJECTID_FIELD_ID != nullptr);
 
-    MAKE_INSTANCE_STRONG_ID = env.GetMethodID(RUNTIME_CLASS, "makeInstanceStrong",
-                                              "(Ljava/lang/Object;I)V");
-    NS_CHECK(MAKE_INSTANCE_STRONG_ID != nullptr);
+        MAKE_INSTANCE_STRONG_ID = env.GetMethodID(RUNTIME_CLASS, "makeInstanceStrong",
+                                                  "(Ljava/lang/Object;I)V");
+        NS_CHECK(MAKE_INSTANCE_STRONG_ID != nullptr);
 
-    GET_TYPE_METADATA = env.GetStaticMethodID(RUNTIME_CLASS, "getTypeMetadata",
-                                              "(Ljava/lang/String;I)[Ljava/lang/String;");
-    NS_CHECK(GET_TYPE_METADATA != nullptr);
+        GET_TYPE_METADATA = env.GetStaticMethodID(RUNTIME_CLASS, "getTypeMetadata",
+                                                  "(Ljava/lang/String;I)[Ljava/lang/String;");
+        NS_CHECK(GET_TYPE_METADATA != nullptr);
 
-    ENABLE_VERBOSE_LOGGING_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "enableVerboseLogging",
-                                                       "()V");
-    NS_CHECK(ENABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
+        ENABLE_VERBOSE_LOGGING_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "enableVerboseLogging",
+                                                           "()V");
+        NS_CHECK(ENABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
 
-    DISABLE_VERBOSE_LOGGING_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "disableVerboseLogging",
-                                                        "()V");
-    NS_CHECK(DISABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
+        DISABLE_VERBOSE_LOGGING_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "disableVerboseLogging",
+                                                            "()V");
+        NS_CHECK(DISABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
 
+        MethodCache::Init();
+    });
+
+    // Per isolate: writes into this runtime's own MetadataNode cache.
     MetadataNode::Init(isolate);
-
-    MethodCache::Init();
 }
 
 /*
