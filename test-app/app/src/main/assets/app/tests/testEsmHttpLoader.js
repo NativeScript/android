@@ -356,6 +356,29 @@ describe("HTTP ESM Loader", function () {
                     reportRejection(error, done);
                 });
             });
+
+            it("applies the referrer's scope to dynamic import()", function (done) {
+                // The host names a dynamic import's referrer by script origin
+                // (a file:// URL), not by registry key; the origin must land on
+                // the same canonical key the scope prefixes match, or scoped
+                // lookups silently fall through to top-level imports.
+                var insideScope = appRoot + "/esm/scoped/inside/";
+                var scopes = {};
+                scopes[insideScope] = { "ns-scoped-leaf": origin + "/esm/graph-leaf.mjs?k=in" };
+                setMap({
+                    imports: { "ns-scoped-leaf": origin + "/esm/graph-leaf.mjs?k=top" },
+                    scopes: scopes,
+                });
+
+                import("~/esm/scoped/inside/dynamic.mjs").then(function (mod) {
+                    return mod.load();
+                }).then(function (leafMod) {
+                    expect(leafMod.name).toBe("in");
+                    done();
+                }).catch(function (error) {
+                    reportRejection(error, done);
+                });
+            });
         });
 
         // An imperative API rejects bad input loudly, the way WebIDL does on the
