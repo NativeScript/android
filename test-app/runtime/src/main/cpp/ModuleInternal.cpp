@@ -626,12 +626,13 @@ void ModuleInternal::Load(Local<Context> context, const string& path) {
         }
         // Callers reach here with a project-relative name as readily as an
         // absolute one: `Runtime.createJSInstance` hands over whatever a
-        // generated binding's @JavaScriptImplementation carries, and
-        // java.io.File has already flattened `./bundle.mjs` to `bundle.mjs`.
-        // The require branch below resolves such a name against the app root;
-        // the ES module branch goes straight to the filesystem, so anchor it
-        // here or it fails as "Cannot find module" from whatever the process
-        // cwd happens to be.
+        // generated binding's @JavaScriptImplementation carries, and that is
+        // `./bundle.mjs` by SBG convention — a module name in the app-root
+        // namespace, not a filesystem path. The require branch below resolves
+        // such names against the app root; the ES module branch stats the
+        // string as-is (after CanonicalizeRegistryKey folds `./` away), so
+        // anchor it here or it resolves against the process cwd and fails as
+        // "Cannot find module bundle.mjs".
         LoadESModule(isolate, AnchorToAppRoot(path, isHttpModule), BootEntryEvaluationOptions(isHttpModule));
         if (isHttpModule) {
             TNS_DEBUG(Esm, "run-module http-esm ok %s", NormalizeHttpModuleUrl(path).c_str());
