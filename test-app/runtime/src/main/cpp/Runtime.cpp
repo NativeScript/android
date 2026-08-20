@@ -335,29 +335,11 @@ Runtime::~Runtime() {
 }
 
 std::string Runtime::ReadFileText(const std::string& filePath) {
-#ifdef APPLICATION_IN_DEBUG
-  std::lock_guard<std::mutex> lock(m_fileWriteMutex);
-#endif
   return File::ReadText(filePath);
 }
 
 std::string Runtime::ReadFileText(const std::string& filePath, bool& ok) {
-#ifdef APPLICATION_IN_DEBUG
-  std::lock_guard<std::mutex> lock(m_fileWriteMutex);
-#endif
   return File::ReadText(filePath, ok);
-}
-
-void Runtime::Lock() {
-#ifdef APPLICATION_IN_DEBUG
-  m_fileWriteMutex.lock();
-#endif
-}
-
-void Runtime::Unlock() {
-#ifdef APPLICATION_IN_DEBUG
-  m_fileWriteMutex.unlock();
-#endif
 }
 
 // The boot backstop: hold the launching thread until boot has actually
