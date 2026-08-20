@@ -233,11 +233,6 @@ void InitializeImportMetaObject(v8::Local<v8::Context> context,
 // through the copy taken at spawn.
 bool SetImportMap(const std::string& json, std::string* error);
 
-// Run the same parse `SetImportMap` runs and throw the result away. Lets
-// `configureLoader` validate the whole call before installing any section,
-// without the parsed representation leaving the loader implementation.
-bool ValidateImportMapJson(const std::string& json, std::string* error);
-
 // Set URL patterns that should bypass module cache (e.g. "?v=", "/hot/")
 // on the calling isolate.
 void SetVolatilePatterns(const std::vector<std::string>& patterns);
@@ -251,5 +246,37 @@ const CanonicalizationConfig* CanonicalizationConfigForCurrentIsolate();
 // isolate. Its presence replaces the mechanical default entirely — empty
 // vectors are honored as explicit policy.
 void SetCanonicalizationConfig(CanonicalizationConfig config);
+
+// ── The `ns:module` builtin binding ──────────────────────────
+//
+// Populates the native half of the `ns:module` builtin module — the one
+// namespace carrying every JS-callable dev primitive that any tooling can
+// depend on. Called from NsBuiltinModules::BuildBinding the first time a
+// realm resolves `ns:module` (via require, static import, or import());
+// ns-module.js shapes and freezes the exports.
+//
+// The runtime's dev surface is deliberately small: it exposes *mechanism*
+// only (resolution config, registry eviction, registry introspection). All
+// HMR *policy* — boot orchestration, `import.meta.hot`, full reload, CSS
+// apply, WebSocket protocol, worker teardown — lives in the JS dev client
+// (`@nativescript/vite`). The surface is reachable exclusively through the
+// `ns:module` builtin module; there is no global.
+//
+// `ns:module` members:
+//   - configureLoader(config)         (import map + volatile patterns +
+//                                      canonicalization vocabulary)
+//   - invalidateModules(urls)         (registry + cache eviction)
+//   - getLoadedModuleUrls()           (registry introspection)
+//   - createRequire(path)             (a CommonJS require for `path`)
+//   - canonicalizeHttpUrlKey(url)     (debug builds only; test diagnostic)
+//
+// Worker teardown across HMR cycles is userland: the dev client intercepts
+// the global `Worker` constructor and terminates tracked instances
+// (worker.terminate() cascades to nested workers via Runtime::DestroyRuntime).
+//
+// Returns false (with an exception pending or a failed Set) when the
+// binding could not be populated.
+bool BuildNsModuleBinding(v8::Local<v8::Context> context,
+                          v8::Local<v8::Object> binding);
 
 }  // namespace tns

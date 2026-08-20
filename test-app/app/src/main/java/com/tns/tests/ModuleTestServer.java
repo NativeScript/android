@@ -196,6 +196,23 @@ public final class ModuleTestServer {
             return;
         }
 
+        if ("/esm/worker-entry.mjs".equals(path)) {
+            // A worker entry served over HTTP, importing one relative dependency
+            // so the entry exercises the graph walk and not just the root fetch.
+            String body = "import { WORKER_TAG } from \"./worker-entry-dep.mjs\";\n"
+                    + "globalThis.onmessage = function (msg) {\n"
+                    + "    postMessage(WORKER_TAG + \":\" + msg.data);\n"
+                    + "};\n";
+            respond(socket, "200 OK", JS_MIME, body.getBytes(UTF8));
+            return;
+        }
+
+        if ("/esm/worker-entry-dep.mjs".equals(path)) {
+            String body = "export const WORKER_TAG = \"http-worker-entry\";\n";
+            respond(socket, "200 OK", JS_MIME, body.getBytes(UTF8));
+            return;
+        }
+
         if ("/esm/syntax-error.mjs".equals(path)) {
             // Deliberately unparseable: pins that the loader surfaces V8's real
             // compile error instead of a generic failure.

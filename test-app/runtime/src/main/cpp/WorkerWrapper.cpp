@@ -10,6 +10,7 @@
 #include "CrashBreadcrumbs.h"
 #include "JEnv.h"
 #include "JniLocalRef.h"
+#include "ModuleInternal.h"
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
 #include "NativeScriptPlatform.h"
@@ -739,8 +740,11 @@ void WorkerWrapper::CreateInspector(Isolate* isolate) {
         return;
     }
 
-    // Same url scheme the module loader reports in Debugger.scriptParsed.
-    std::string url = "file://" + workerPath_;
+    // Same url the module loader reports in Debugger.scriptParsed: an http(s)
+    // entry already IS that url, only a filesystem path needs the scheme.
+    std::string url = ModuleInternal::IsHttpModulePath(workerPath_)
+                              ? workerPath_
+                              : "file://" + workerPath_;
 
     auto* client = new WorkerInspectorClient(workerId_, isolate, ALooper_forThread(), url);
     {

@@ -6,7 +6,7 @@
 
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
-#include "HttpLoader.h"
+#include "ModuleInternalCallbacks.h"
 #include "NativeScriptAssert.h"
 #include "Runtime.h"
 #include "RuntimeState.h"
@@ -163,6 +163,9 @@ MaybeLocal<Object> BuildBinding(Local<Context> context, BuiltinId builtin) {
 
     switch (builtin) {
         case BuiltinId::kNsModule: {
+            // The module loader's control surface (ModuleInternalCallbacks.cpp).
+            // The binding builder decides build-dependent membership;
+            // ns-module.js only shapes and freezes whatever arrives.
             if (!BuildNsModuleBinding(context, binding)) {
                 return MaybeLocal<Object>();
             }

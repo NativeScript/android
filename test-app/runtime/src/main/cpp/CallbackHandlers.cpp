@@ -15,7 +15,9 @@
 #include <fstream>
 #include <cstdio>
 #include <chrono>
+#include "HttpLoader.h"
 #include "MethodCache.h"
+#include "ModuleInternal.h"
 #include "SimpleProfiler.h"
 #include "Runtime.h"
 #include "WorkerMessage.h"
@@ -1215,11 +1217,17 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
 
         int priority = GetWorkerThreadPriority(isolate, context, args);
 
-        // TODO: Validate worker path and call worker.onerror if the script does not exist
+        // An http(s) entry has no filesystem form to validate or to resolve
+        // against the caller's directory: it is already absolute, and the
+        // module loader's HTTP branch fetches it on the worker's own thread
+        // under the same security gate every other remote load passes. The
+        // URL is what the worker registers its entry under, so it is also what
+        // the settle gate probes — it must reach the wrapper unrewritten.
+        const bool isHttpEntry = ModuleInternal::IsHttpModulePath(workerPath);
 
         // Resolve tilde paths before creating the worker
         std::string resolvedPath = workerPath;
-        if (!workerPath.empty() && workerPath[0] == '~') {
+        if (!isHttpEntry && !workerPath.empty() && workerPath[0] == '~') {
             // Convert ~/path to ApplicationPath/path
             std::string tail = workerPath.size() >= 2 && workerPath[1] == '/' ? workerPath.substr(2) : workerPath.substr(1);
             resolvedPath = Constants::APP_ROOT_FOLDER_PATH + tail;
@@ -1232,7 +1240,9 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
          * app-root-relative resolution, mirroring the iOS runtime.
          */
         std::string currentDir = Constants::APP_ROOT_FOLDER_PATH;
-        auto stack = StackTrace::CurrentStackTrace(isolate, 1, StackTrace::kScriptName);
+        auto stack = isHttpEntry
+                             ? Local<StackTrace>()
+                             : StackTrace::CurrentStackTrace(isolate, 1, StackTrace::kScriptName);
         if (!stack.IsEmpty() && stack->GetFrameCount() > 0) {
             auto currentExecutingScriptName = stack->GetFrame(isolate, 0)->GetScriptName();
             auto currentExecutingScriptNameStr = ArgConverter::ConvertToString(
@@ -1248,22 +1258,30 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
             }
         }
 
-        // Will throw if the path is invalid or the file doesn't exist. The
-        // worker runs on its own thread, with its own working directory and
-        // module registry, so it gets the canonical path resolved here rather
-        // than the spec: nothing on the other side can redo this resolution,
-        // and the entry's registry key must be the file that was validated.
+        // The worker runs on its own thread, with its own working directory
+        // and module registry, so it gets the entry resolved here rather than
+        // the spec: nothing on the other side can redo this resolution, and
+        // the entry's registry key must be what was resolved here.
         std::string entryPath;
-        try {
-            entryPath = ModuleInternal::CheckFileExists(isolate, resolvedPath, currentDir);
-        } catch (NativeScriptException& e) {
-            if (currentDir == Constants::APP_ROOT_FOLDER_PATH) {
-                throw;
+        if (isHttpEntry) {
+            // Repaired, not canonicalized: the canonical key depends on the
+            // worker's own canonicalization vocabulary, which is installed on
+            // its isolate, and both the loader and the settle gate derive it
+            // there from this URL.
+            entryPath = NormalizeHttpModuleUrl(resolvedPath);
+        } else {
+            // Throws if the path is invalid or the file doesn't exist.
+            try {
+                entryPath = ModuleInternal::CheckFileExists(isolate, resolvedPath, currentDir);
+            } catch (NativeScriptException& e) {
+                if (currentDir == Constants::APP_ROOT_FOLDER_PATH) {
+                    throw;
+                }
+                // not found next to the caller - retry against the app root
+                entryPath = ModuleInternal::CheckFileExists(isolate, resolvedPath,
+                                                            Constants::APP_ROOT_FOLDER_PATH);
+                currentDir = Constants::APP_ROOT_FOLDER_PATH;
             }
-            // not found next to the caller - retry against the app root
-            entryPath = ModuleInternal::CheckFileExists(isolate, resolvedPath,
-                                                        Constants::APP_ROOT_FOLDER_PATH);
-            currentDir = Constants::APP_ROOT_FOLDER_PATH;
         }
 
         auto workerId = WorkerWrapper::NextWorkerId();

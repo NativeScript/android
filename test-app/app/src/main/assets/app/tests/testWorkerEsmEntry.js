@@ -61,6 +61,20 @@ describe("worker ES module entries", function () {
         worker.postMessage("ping");
     });
 
+    // An http(s) worker specifier bypasses the filesystem check entirely: the
+    // entry is fetched, compiled and registered under its canonical URL key on
+    // the worker's own thread, which is also the key the settle gate probes.
+    it("runs a worker whose entry is an http URL", function (done) {
+        var origin = "http://127.0.0.1:" + com.tns.tests.ModuleTestServer.ensureStarted();
+        var worker = new Worker(origin + "/esm/worker-entry.mjs");
+        worker.onmessage = function (msg) {
+            expect(msg.data).toBe("http-worker-entry:ping");
+            worker.terminate();
+            done();
+        };
+        worker.postMessage("ping");
+    });
+
     // Extension resolution tries `.js` before `.mjs`, and no `.js` sibling
     // exists, so the ES module entry is what answers. Its top-level await also
     // parks past the yield window, so the message posted here proves the

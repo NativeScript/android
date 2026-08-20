@@ -39,11 +39,7 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-// Classifies the NORMALIZED form: a scheme separator collapsed by a path
-// normalizer (`http:/host/...`) must still route to the HTTP loader, or the
-// same string classifies as a filesystem path and repairs itself only after
-// taking the wrong branch.
-static bool IsHttpModulePath(const std::string& path) {
+bool ModuleInternal::IsHttpModulePath(const std::string& path) {
     const std::string normalized = NormalizeHttpModuleUrl(path);
     return normalized.rfind("http://", 0) == 0 || normalized.rfind("https://", 0) == 0;
 }
@@ -979,7 +975,7 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, c
 
     DEBUG_WRITE("Compiling script (module %s)", path.c_str());
     //
-    auto cacheData = TryLoadScriptCache(path);
+    auto cacheData = TryLoadScriptCache(path, ScriptCacheKind::Classic);
 
     auto fullRequiredModulePathWithSchema = ArgConverter::ConvertToV8String(isolate, "file://" + path);
     ScriptOrigin origin(fullRequiredModulePathWithSchema);
@@ -1084,9 +1080,30 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
     ScriptOrigin origin(urlString, 0, 0, false, -1, Local<Value>(), false, false,
                         true  // ← is_module
     );
-    ScriptCompiler::Source source(sourceText, origin);
 
-    return ScriptCompiler::CompileModule(isolate, &source);
+    // The Source takes ownership of the CachedData, so the pointer stays valid
+    // for the `rejected` read below and is freed with the Source.
+    ScriptCompiler::CachedData* cacheData = TryLoadScriptCache(path, ScriptCacheKind::Module);
+    ScriptCompiler::Source source(sourceText, origin, cacheData);
+
+    Local<Module> module;
+    if (!ScriptCompiler::CompileModule(isolate, &source,
+                                       cacheData != nullptr
+                                               ? ScriptCompiler::kConsumeCodeCache
+                                               : ScriptCompiler::kNoCompileOptions)
+                 .ToLocal(&module)) {
+        return MaybeLocal<Module>();
+    }
+
+    // A rejected cache (stale, or produced under different V8 flags) still
+    // compiles — V8 falls back to a full parse — but leaves the file on disk
+    // unusable forever unless it is republished from this compile.
+    if (Constants::V8_CACHE_COMPILED_CODE && (cacheData == nullptr || cacheData->rejected)) {
+        SaveScriptCache(ScriptCompiler::CreateCodeCache(module->GetUnboundModuleScript()), path,
+                        ScriptCacheKind::Module);
+    }
+
+    return MaybeLocal<Module>(module);
 }
 
 // Phase diagnostics for one module's trip through the loader.
@@ -1339,7 +1356,7 @@ MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> co
 // Evaluate(), which hands back the SAME capability promise rather than
 // re-running anything, so it is cheap enough to call from a pump loop.
 static MaybeLocal<Promise> EntryEvaluationPromise(Isolate* isolate, const std::string& path) {
-    if (!ModuleInternal::IsESModule(path) && !IsHttpModulePath(path)) {
+    if (!ModuleInternal::IsESModule(path) && !ModuleInternal::IsHttpModulePath(path)) {
         return MaybeLocal<Promise>();
     }
     auto* registryPtr = ModuleRegistryFor(isolate);
@@ -1602,13 +1619,14 @@ Local<String> ModuleInternal::WrapModuleContent(const string& path) {
     return ArgConverter::ConvertToV8String(m_isolate, result);
 }
 
-ScriptCompiler::CachedData* ModuleInternal::TryLoadScriptCache(const std::string& path) {
+ScriptCompiler::CachedData* ModuleInternal::TryLoadScriptCache(const std::string& path,
+                                                               ScriptCacheKind kind) {
     TNSPERF();
     if (!Constants::V8_CACHE_COMPILED_CODE) {
         return nullptr;
     }
 
-    auto cachePath = path + ".cache";
+    auto cachePath = path + (kind == ScriptCacheKind::Module ? ".mcache" : ".cache");
 
     struct stat result;
     if (stat(cachePath.c_str(), &result) == 0) {
@@ -1632,20 +1650,22 @@ ScriptCompiler::CachedData* ModuleInternal::TryLoadScriptCache(const std::string
     return new ScriptCompiler::CachedData(reinterpret_cast<uint8_t*>(data), length, ScriptCompiler::CachedData::BufferOwned);
 }
 
-void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::string& path) {
+void ModuleInternal::SaveScriptCache(const ScriptCompiler::CachedData* cache,
+                                     const std::string& path, ScriptCacheKind kind) {
+    if (cache == nullptr) {
+        return;
+    }
     if (!Constants::V8_CACHE_COMPILED_CODE) {
+        delete cache;
         return;
     }
 
     tns::instrumentation::Frame frame("SaveScriptCache");
 
-    Local<UnboundScript> unboundScript = script->GetUnboundScript();
-    ScriptCompiler::CachedData* cachedData = ScriptCompiler::CreateCodeCache(unboundScript);
-
-    int length = cachedData->length;
-    auto cachePath = path + ".cache";
-    File::WriteBinary(cachePath, cachedData->data, length);
-    delete cachedData;
+    int length = cache->length;
+    auto cachePath = path + (kind == ScriptCacheKind::Module ? ".mcache" : ".cache");
+    File::WriteBinary(cachePath, cache->data, length);
+    delete cache;
     // make sure cache and js file have the same modification date
     struct stat result;
     struct utimbuf new_times;
@@ -1656,6 +1676,16 @@ void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::stri
         new_times.modtime = jsLastModifiedTime;
     }
     utime(cachePath.c_str(), &new_times);
+}
+
+void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::string& path) {
+    if (!Constants::V8_CACHE_COMPILED_CODE) {
+        return;
+    }
+
+    Local<UnboundScript> unboundScript = script->GetUnboundScript();
+    SaveScriptCache(ScriptCompiler::CreateCodeCache(unboundScript), path,
+                    ScriptCacheKind::Classic);
 }
 
 ModuleInternal::ModulePathKind ModuleInternal::GetModulePathKind(const std::string& path) {
