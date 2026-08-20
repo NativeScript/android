@@ -3766,7 +3766,12 @@ bool BuildNsModuleBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> 
             }
         };
         v8::Local<v8::Function> fn;
-        if (v8::Function::New(context, canonicalizeCb).ToLocal(&fn)) {
+        if (!v8::Function::New(context, canonicalizeCb).ToLocal(&fn)) {
+            // The member is absent-by-design in release, but a debug build
+            // must not report the binding built with a pending exception.
+            return false;
+        }
+        {
             fn->SetName(ToV8String(isolate, "canonicalizeHttpUrlKey"));
             if (!binding
                          ->CreateDataProperty(context, ToV8String(isolate, "canonicalizeHttpUrlKey"),

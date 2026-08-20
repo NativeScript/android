@@ -898,40 +898,72 @@ std::deque<ModuleFetchJob> g_fetchQueue;
 size_t g_fetchThreadCount = 0;
 
 void RunModuleFetchJob(const ModuleFetchJob& job) {
-    std::string body;
-    std::string contentType;
-    int status = 0;
-    const auto start = std::chrono::steady_clock::now();
-    bool bustApplied = false;
-    bool transportOk = PerformHttpFetchOnceSync(job.url, job.canonicalKey, body, contentType,
-                                                status, bustApplied);
-    if (!transportOk) {
-        // Transport error → one retry, the same single-retry policy the
-        // sync path applies.
-        TNS_DEBUG(Esm, "[http-loader][fetch-async] retrying %s after transport error",
-                       job.url.c_str());
-        usleep(120 * 1000);
-        transportOk = PerformHttpFetchOnceSync(job.url, job.canonicalKey, body, contentType, status,
-                                               bustApplied);
-    }
-
+    // Nothing may escape this function: it runs at the top of a detached
+    // thread, where an unwinding exception is std::terminate for the whole
+    // process — and a throw past the caller's loop would also strand the
+    // queue bookkeeping. The fetch phase converts an escaped exception into a
+    // transport-error result so the completion still runs exactly once; the
+    // completion itself gets a log-only guard, since by then delivery has
+    // either happened or cannot be retried.
     ModuleFetchResult result;
-    ClassifyModuleResponse(job.url, transportOk, status, contentType, body, result);
+    try {
+        std::string body;
+        std::string contentType;
+        int status = 0;
+        const auto start = std::chrono::steady_clock::now();
+        bool bustApplied = false;
+        bool transportOk = PerformHttpFetchOnceSync(job.url, job.canonicalKey, body, contentType,
+                                                    status, bustApplied);
+        if (!transportOk) {
+            // Transport error → one retry, the same single-retry policy the
+            // sync path applies.
+            TNS_DEBUG(Esm, "[http-loader][fetch-async] retrying %s after transport error",
+                           job.url.c_str());
+            usleep(120 * 1000);
+            transportOk = PerformHttpFetchOnceSync(job.url, job.canonicalKey, body, contentType,
+                                                   status, bustApplied);
+        }
 
-    if (result.ok && bustApplied) {
-        ClearCacheBustForUrl(job.canonicalKey);
+        ClassifyModuleResponse(job.url, transportOk, status, contentType, body, result);
+
+        if (result.ok && bustApplied) {
+            ClearCacheBustForUrl(job.canonicalKey);
+        }
+
+        if (!result.ok) {
+            TNS_DEBUG(Esm, "[http-loader][fetch-async][reject] %s", result.failureReason.c_str());
+        } else if (LogCategoryEnabled(LogCategory::Fetch)) {
+            const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    std::chrono::steady_clock::now() - start)
+                                    .count();
+            TNS_DEBUG(Fetch, "[http-loader][fetch][async] %s bytes=%lu ms=%lld", job.url.c_str(),
+                             (unsigned long)result.body.size(), (long long)ms);
+        }
+    } catch (NativeScriptException& e) {
+        result = ModuleFetchResult{};
+        result.failureReason = "HTTP import failed: " + job.url + " (network error)";
+        DEBUG_WRITE_FORCE("[http-loader][fetch-async] native exception fetching %s: %s",
+                          job.url.c_str(), e.what());
+    } catch (const std::exception& e) {
+        result = ModuleFetchResult{};
+        result.failureReason = "HTTP import failed: " + job.url + " (network error)";
+        DEBUG_WRITE_FORCE("[http-loader][fetch-async] c++ exception fetching %s: %s",
+                          job.url.c_str(), e.what());
+    } catch (...) {
+        result = ModuleFetchResult{};
+        result.failureReason = "HTTP import failed: " + job.url + " (network error)";
+        DEBUG_WRITE_FORCE("[http-loader][fetch-async] unknown exception fetching %s",
+                          job.url.c_str());
     }
 
-    if (!result.ok) {
-        TNS_DEBUG(Esm, "[http-loader][fetch-async][reject] %s", result.failureReason.c_str());
-    } else if (LogCategoryEnabled(LogCategory::Fetch)) {
-        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                std::chrono::steady_clock::now() - start)
-                                .count();
-        TNS_DEBUG(Fetch, "[http-loader][fetch][async] %s bytes=%lu ms=%lld", job.url.c_str(),
-                         (unsigned long)result.body.size(), (long long)ms);
+    try {
+        job.completion(std::move(result));
+    } catch (const std::exception& e) {
+        DEBUG_WRITE_FORCE("[http-loader][fetch-async] completion threw for %s: %s",
+                          job.url.c_str(), e.what());
+    } catch (...) {
+        DEBUG_WRITE_FORCE("[http-loader][fetch-async] completion threw for %s", job.url.c_str());
     }
-    job.completion(std::move(result));
 }
 
 // A fetch thread serves its own job and then drains the queue, so the JVM
