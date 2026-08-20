@@ -696,8 +696,7 @@ public class Runtime {
     }
 
     public void runModule(File jsFile) throws NativeScriptException {
-        String filePath = jsFile.getPath();
-        runModule(getRuntimeId(), filePath);
+        runModule(getRuntimeId(), Module.resolveEntryPath(jsFile.getPath()));
     }
 
     public Object runScript(File jsFile) throws NativeScriptException {

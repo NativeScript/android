@@ -593,15 +593,6 @@ void ModuleInternal::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Va
     funcPtr(args);
 }
 
-static std::string AnchorToAppRoot(const std::string& path, bool isHttpModule) {
-    if (isHttpModule || path.empty() || path[0] == '/' || path.rfind("file://", 0) == 0 ||
-        Constants::APP_ROOT_FOLDER_PATH.empty()) {
-        return path;
-    }
-    const std::string relative = path.rfind("./", 0) == 0 ? path.substr(2) : path;
-    return Constants::APP_ROOT_FOLDER_PATH + relative;
-}
-
 void ModuleInternal::Load(Local<Context> context, const string& path) {
     TNSPERF();
     auto isolate = m_isolate;
@@ -624,16 +615,9 @@ void ModuleInternal::Load(Local<Context> context, const string& path) {
         if (isHttpModule) {
             TNS_DEBUG(Esm, "run-module http-esm begin %s", NormalizeHttpModuleUrl(path).c_str());
         }
-        // Callers reach here with a project-relative name as readily as an
-        // absolute one: `Runtime.createJSInstance` hands over whatever a
-        // generated binding's @JavaScriptImplementation carries, and that is
-        // `./bundle.mjs` by SBG convention — a module name in the app-root
-        // namespace, not a filesystem path. The require branch below resolves
-        // such names against the app root; the ES module branch stats the
-        // string as-is (after CanonicalizeRegistryKey folds `./` away), so
-        // anchor it here or it resolves against the process cwd and fails as
-        // "Cannot find module bundle.mjs".
-        LoadESModule(isolate, AnchorToAppRoot(path, isHttpModule), BootEntryEvaluationOptions(isHttpModule));
+        // The entry runs before this thread's event loop does, so its graph can
+        // only make progress from the pump inside LoadESModule.
+        LoadESModule(isolate, path, BootEntryEvaluationOptions(isHttpModule));
         if (isHttpModule) {
             TNS_DEBUG(Esm, "run-module http-esm ok %s", NormalizeHttpModuleUrl(path).c_str());
         }
