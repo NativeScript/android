@@ -392,19 +392,29 @@ static void HoldBootBackstop(v8::Isolate* isolate, const std::string& entryPath)
           runtime != nullptr ? runtime->GetEventLoop() : nullptr;
 
   if (!entryRejected && eventLoop != nullptr) {
-    // The pump drains due ordered-lane work too: an entry parked on a JS
-    // timer settles here — Java Handler messages cannot dispatch while this
-    // frame holds the launching thread.
-    eventLoop->PumpUntil(deadlineSeconds, [&]() {
-      if (entryPending) {
-        EntryEvaluationState state =
-                ModuleInternal::PollEntryEvaluation(isolate, entryPath, &entryRejectionReason);
-        // Once it settles, stop probing for good.
-        entryPending = state == EntryEvaluationState::kPending;
-        entryRejected = state == EntryEvaluationState::kRejected;
-      }
-      return entryRejected || (!entryPending && !tns::HasPendingAsyncModuleGraphWork());
-    });
+    // The backstop always takes the looper-equivalent drain — it stands where
+    // iOS pumps its runloop, and Java Handler messages cannot dispatch while
+    // this frame holds the launching thread — so an entry parked on a JS
+    // timer or a worker reply settles here.
+    const EventLoop::PumpResult result = eventLoop->PumpUntil(
+            deadlineSeconds,
+            [&]() {
+              if (entryPending) {
+                EntryEvaluationState state = ModuleInternal::PollEntryEvaluation(
+                        isolate, entryPath, &entryRejectionReason);
+                // Once it settles, stop probing for good.
+                entryPending = state == EntryEvaluationState::kPending;
+                entryRejected = state == EntryEvaluationState::kRejected;
+              }
+              return entryRejected ||
+                     (!entryPending && !tns::HasPendingAsyncModuleGraphWork());
+            },
+            /*drainLooperWork=*/true);
+    if (result == EventLoop::PumpResult::kTerminated && !entryRejected) {
+      // terminating isolate or stopped loop: no outcome to report, and no
+      // timeout to mislabel it with
+      return;
+    }
   }
 
   // Evict before throwing: the entry would otherwise stay registered at

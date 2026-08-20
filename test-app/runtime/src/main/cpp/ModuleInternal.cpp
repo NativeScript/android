@@ -31,7 +31,6 @@
 #include <time.h>
 #include <utime.h>
 #include <unistd.h>
-#include <android/looper.h>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -39,27 +38,6 @@
 using namespace v8;
 using namespace std;
 using namespace tns;
-
-static std::string NormalizeHttpModuleUrl(const std::string& path) {
-    if (path.empty()) {
-        return path;
-    }
-
-    std::string normalized = path;
-    if (normalized.rfind("file://http://", 0) == 0 || normalized.rfind("file://https://", 0) == 0) {
-        normalized = normalized.substr(strlen("file://"));
-    }
-
-    // A path normalizer that collapses `//` into `/` (Java's, or a URL that
-    // travelled through one) leaves the scheme separator one slash short.
-    if (normalized.rfind("http:/", 0) == 0 && normalized.rfind("http://", 0) != 0) {
-        normalized.insert(5, "/");
-    } else if (normalized.rfind("https:/", 0) == 0 && normalized.rfind("https://", 0) != 0) {
-        normalized.insert(6, "/");
-    }
-
-    return normalized;
-}
 
 // Classifies the NORMALIZED form: a scheme separator collapsed by a path
 // normalizer (`http:/host/...`) must still route to the HTTP loader, or the
@@ -243,12 +221,13 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
 }
 
 // How an entry module's graph settles. For local modules the bound is a yield,
-// not a timeout: only nestable V8 tasks and due ordered-lane work can run
-// while these JS frames are on the stack, so a TLA parked on a non-nestable
-// foreground task can never settle in-pump — give it one short window, then
-// return and let the real event loop finish it after the turn. HTTP entries
+// not a timeout: the default pump runs only nestable V8 tasks while these JS
+// frames are on the stack, so a TLA parked on anything else can never settle
+// in-place — give it one short window, then return and let the real event
+// loop (or the draining boot backstop) finish it after the turn. HTTP entries
 // must settle in-pump — the dev client needs the rejection reason
-// synchronously — so they get the full deadline.
+// synchronously — so they get the full deadline and the looper-equivalent
+// drain, the same split iOS makes with its runloop slice.
 static ModuleEvaluationOptions BootEntryEvaluationOptions(bool isHttpModule) {
     ModuleEvaluationOptions options;
     options.policy = ModuleEvaluationPolicy::kSyncPumping;
@@ -262,10 +241,11 @@ static ModuleEvaluationOptions BootEntryEvaluationOptions(bool isHttpModule) {
 
 // How a graph reached through require() settles. A pumping require must settle
 // or throw — handing back a half-initialized namespace is what the strict
-// policy exists to prevent — so it gets the full deadline. The pump drains
-// this loop's own lanes only (nestable v8 tasks, due JS timers), never the
-// platform looper: re-entering arbitrary looper sources from the middle of a
-// require would run UI callbacks underneath JS frames.
+// policy exists to prevent — so it gets the full deadline. By default the
+// pump runs nestable v8 tasks and microtasks only, matching iOS: running JS
+// timers or loop posts in the middle of an arbitrary require is opt-in
+// (pumpRunLoop), because those callbacks execute underneath the require's JS
+// frames.
 static ModuleEvaluationOptions RequireEvaluationOptions(ModuleEvaluationPolicy policy) {
     ModuleEvaluationOptions options;
     options.policy = policy;
@@ -1305,12 +1285,13 @@ MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> co
         return MaybeLocal<Promise>();
     }
 
-    // Top-level await can depend on native async work (fetch completions and
-    // TLA continuations arrive as nestable v8 tasks) and on JS timers, which
-    // live in the ordered lane — Java Handler messages cannot dispatch while
-    // these JS frames hold the thread, so the pump drains due ordered work
-    // directly. Like the inspector pause loops, non-nestable v8 tasks stay
-    // queued.
+    // Top-level await can depend on native async work: fetch completions and
+    // TLA continuations arrive as nestable v8 tasks, which every pump runs.
+    // JS timers and worker messages live outside that lane, and Java Handler
+    // messages cannot dispatch while these JS frames hold the thread — only a
+    // pumpRunLoop pump drains them directly (the iOS split: its default pump
+    // never slices the runloop either). Non-nestable v8 tasks stay queued in
+    // both modes, like the inspector pause loops.
     Runtime* runtime = Runtime::TryGetRuntime(isolate);
     std::shared_ptr<EventLoop> eventLoop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
 
@@ -1335,7 +1316,7 @@ MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> co
     };
 
     if (!probe() && eventLoop != nullptr) {
-        if (eventLoop->PumpUntil(options.deadlineSeconds, probe) ==
+        if (eventLoop->PumpUntil(options.deadlineSeconds, probe, options.pumpRunLoop) ==
             EventLoop::PumpResult::kTerminated) {
             // terminating isolate (worker.terminate) or a stopped loop: no
             // outcome to report, and no timeout to mislabel it with
@@ -1454,6 +1435,11 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     if (isHttpModule) {
         logPhase("compile", "delegate-http");
         RunModuleGraphLoadPumped(isolate, context, requestPath, kModuleEvaluateDeadlineSeconds);
+        if (isolate->IsExecutionTerminating()) {
+            // no outcome to report, and the sync loader below must not start
+            // a blocking fetch on a terminating isolate
+            return Local<Value>();
+        }
         // The loader throws the classifier's reason (status, MIME or
         // transport); catch it so it lands in the message instead of staying
         // pending on the isolate behind a C++ throw.

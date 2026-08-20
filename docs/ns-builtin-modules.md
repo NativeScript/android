@@ -501,7 +501,10 @@ export { handler as "module.exports" };
 ### Pumping requires
 
 `createPumpingRequire` lifts the top-level-await refusal by driving the loop —
-running nestable tasks and draining microtasks — until the graph settles.
+running nestable tasks and draining microtasks — until the graph settles. That
+default slice services engine work only: a graph whose settling depends on a
+JS timer, a worker reply, or anything else riding the platform loop needs
+`pumpRunLoop: true` (see below), on both platforms.
 
 Options are validated once, **when the require is minted**; a `require()` call
 itself does no option work. Unknown keys throw rather than being silently
@@ -511,7 +514,7 @@ ignored.
 |---|---|---|---|
 | `deadlineSeconds` | positive finite number | `60` | how long the graph gets to settle in-pump. Governs the **evaluation-settle phase only** — the graph walk's fetch deadline is separate and unaffected. |
 | `onTimeout` | `"throw"` \| `"return-pending"` | `"throw"` | what an expired deadline means. `"return-pending"` hands back a namespace whose evaluation is still in flight. |
-| `pumpRunLoop` | boolean | `false` | also give the platform's own loop a slice per pump iteration, for graphs whose progress depends on native transports rather than engine tasks. |
+| `pumpRunLoop` | boolean | `false` | also run the platform loop's own due work each pump iteration — a run-loop slice on iOS, the looper-equivalent drain on Android (JS timers, worker messages, plain loop posts) — for graphs whose progress depends on more than engine tasks and microtasks. |
 
 Validation errors, all `TypeError`:
 
@@ -620,7 +623,9 @@ event loop. Only nestable tasks can run while the entry's frames are on the
 stack, so a top-level await parked on anything else could never settle in
 place; returning instead of throwing is the Node shape. Should the entry's
 evaluation promise still be pending when the yield ends, a **boot backstop**
-holds the process until it settles, **bounded at twice the module deadline**.
+holds the process until it settles, **bounded at twice the module deadline** —
+and the backstop, unlike the yield, drains the loop's own due work (JS timers
+and worker messages included), so an entry parked on those settles there.
 
 The trade-off: an ES module entry's own **static** imports resolve *before* its
 body runs, so anything that needs `configureLoader` to have run must be reached
@@ -676,7 +681,10 @@ entry is evaluated from `Runtime::RunModule`, which returns to Java when boot
 finishes — so the boot backstop is on the path of every app, not just the ones
 that park. Its two failures are fatal and reported in every build:
 `Fatal: the main entry module's evaluation rejected during boot: <reason>` and
-`Fatal: the main entry module '<path>' never settled within 120s`.
+`Fatal: the main entry module '<path>' never settled within 120s`. A
+**CommonJS** main that throws is fatal the same way: the failure is rethrown
+through the boot boundary (prefixed `require() failed for module <path>`)
+rather than left pending under the backstop, in every build.
 
 ## The internal require
 
@@ -775,26 +783,42 @@ thread as **nestable** V8 foreground tasks on that isolate's event loop, so
 A local entry counts as an ES module when its path ends in `.mjs`. The module
 deadline is a single constant, `kModuleEvaluateDeadlineSeconds` = 60 seconds
 (`ModuleInternal.h`), shared by the HTTP entry's settle window, the pumped
-graph walk, and — doubled, at 120 seconds — the boot backstop, so the waits
-stay ordered: transport timeouts < module deadline < boot backstop. The local
-entry's short yield is deliberately *not* derived from that constant: it is an
-independent one-second literal in `BootEntryEvaluationOptions`, with
-`return-pending` behavior. An HTTP entry instead gets the full deadline and
-throws on expiry, because the tooling driving it needs the rejection reason
-synchronously. The backstop itself is `HoldBootBackstop` in `Runtime.cpp`,
-called from both `Runtime::RunModule` overloads; it pumps the isolate's event
-loop in place (`EventLoop::PumpUntil`) until the entry and all async graph
-work settle.
+graph walk, and — doubled, at 120 seconds — the boot backstop. The waits are
+*designed* to nest — transport timeouts within the module deadline within the
+boot backstop — but the transport numbers are per-attempt bounds (connect) and
+per-read inactivity bounds (read), not totals: a retried fetch or a slowly
+dripping response can legally spend longer than one connect+read sum, and the
+deadline above it is what actually cuts the wait off. The local entry's short
+yield is deliberately *not* derived from that constant: it is an independent
+one-second literal in `BootEntryEvaluationOptions`, with `return-pending`
+behavior. An HTTP entry instead gets the full deadline and throws on expiry,
+because the tooling driving it needs the rejection reason synchronously. The
+backstop itself is `HoldBootBackstop` in `Runtime.cpp`, called from both
+`Runtime::RunModule` overloads; it pumps the isolate's event loop in place
+(`EventLoop::PumpUntil`) until the entry and all async graph work settle.
 
-Every pump on Android — a pumping require, the graph walk, the boot backstop —
-runs the same `EventLoop::PumpUntil` slice: nestable V8 tasks, a microtask
-checkpoint, and the loop's own **ordered lane drained directly** (JS timers
-ride Java `Handler` messages, which cannot dispatch while the pump's JS frames
-hold the thread — the drain is what lets an entry or a pumped graph parked on
-`setTimeout` settle in-pump). The pump never re-enters the platform looper, so
-on Android `pumpRunLoop` is validated and carried but adds nothing beyond that
-baseline; the option's cross-platform meaning and its warnings above are
-unchanged.
+Every pump on Android runs the same `EventLoop::PumpUntil` primitive, in one
+of two modes that mirror the iOS pump exactly:
+
+- **The default slice** — nestable V8 tasks plus a microtask checkpoint —
+  is all a pumping require gets unless it opts in, matching iOS's default
+  pump body. Work outside that lane (JS timers, worker messages, `Handler`
+  posts) does not run: it rides Java `Handler` messages or its own fds, which
+  cannot dispatch while the pump's JS frames hold the thread.
+- **`pumpRunLoop: true` adds the looper-equivalent drain**, standing exactly
+  where iOS slices its run loop: due ordered-lane work (JS timers) and plain
+  internal-lane posts (worker messages, Node-API completions) run directly
+  from the pump, which is what lets a graph parked on `setTimeout` or a
+  worker reply settle in-pump. The boot backstop and the pumped graph walk
+  always drain, just as iOS's boot path always pumps its run loop. The pump
+  still never re-enters the platform looper itself, and non-nestable V8
+  tasks stay queued in both modes.
+
+The drain runs the loop's own work *early*, while the looper is blocked: a
+due timer callback can execute in the middle of a `require()` — before
+`Handler.post` runnables queued ahead of it — and can observe the require in
+progress. That is inherent to pumping (iOS's run-loop slice does the same)
+and is the reason the default mode stays conservative.
 
 Workers copy the loader vocabulary from the parent at spawn
 (`CaptureLoaderVocabulary` on the parent's thread, `InstallLoaderVocabulary`

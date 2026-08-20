@@ -184,10 +184,11 @@ describe("createRequire", function () {
 
         // A timer's Handler token cannot dispatch while the pumping require
         // holds the thread, so this settles only through the pump's direct
-        // ordered-lane drain.
-        it("settles a top-level await parked on a JS timer while pumping", function (done) {
+        // ordered-lane drain — which pumpRunLoop opts into.
+        it("settles a top-level await parked on a JS timer when pumpRunLoop is set", function (done) {
             onFreshTask(function () {
-                var pumpingRequire = nsModule.createPumpingRequire(fixtureDir + "/anything.js");
+                var pumpingRequire = nsModule.createPumpingRequire(fixtureDir + "/anything.js",
+                                                                   { pumpRunLoop: true });
                 var result = "";
                 try {
                     result = String(pumpingRequire("./timer-tla.mjs").value);
@@ -195,6 +196,19 @@ describe("createRequire", function () {
                     result = "threw: " + ((e && e.message) || e);
                 }
                 expect(result).toBe("timer-ok");
+                done();
+            });
+        });
+
+        // Contract: the default pump runs engine tasks and microtasks only
+        // (the iOS default), so without pumpRunLoop the same timer-parked
+        // graph must hit its deadline instead of settling.
+        it("does not run JS timers under the default pump options", function (done) {
+            onFreshTask(function () {
+                var pumpingRequire = nsModule.createPumpingRequire(fixtureDir + "/anything.js",
+                                                                   { deadlineSeconds: 0.5 });
+                var refusal = messageOf(function () { pumpingRequire("./timer-tla-gated.mjs"); });
+                expect(refusal).toContain("Top-level await timed out for ES module");
                 done();
             });
         });

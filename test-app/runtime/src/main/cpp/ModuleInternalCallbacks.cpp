@@ -1,7 +1,6 @@
 // ModuleInternalCallbacks.cpp
 #include "ModuleInternalCallbacks.h"
 
-#include <android/looper.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <v8.h>
@@ -621,9 +620,13 @@ std::string CanonicalizeRegistryKey(const std::string& key) {
   const char* classification = "path";
   bool traceEvenWithoutChange = false;
 
-  if (StartsWith(key, "http://") || StartsWith(key, "https://") ||
-      StartsWith(key, "file://http://") || StartsWith(key, "file://https://")) {
-    registryKey = CanonicalizeHttpUrlKey(key);
+  // Repair-first, exactly like IsHttpModulePath: a collapsed scheme
+  // separator (`http:/host/...`) must key as the URL it routes as, or the
+  // loader registers a module under a key the probes and evictions of the
+  // raw string can never find.
+  const std::string repaired = NormalizeHttpModuleUrl(key);
+  if (StartsWith(repaired, "http://") || StartsWith(repaired, "https://")) {
+    registryKey = CanonicalizeHttpUrlKey(repaired);
     classification = "http";
   } else if (StartsWith(key, "file://")) {
     registryKey = NormalizePath(FileURLToPath(key));
@@ -1750,12 +1753,21 @@ bool RunModuleGraphLoadPumped(v8::Isolate* isolate,
 
   // Fetch completions are nestable v8 foreground tasks on the isolate's event
   // loop, which the pump drains directly. A graph with no HTTP edges is
-  // already done here, so the pump never runs.
+  // already done here, so the pump never runs. The walk always takes the
+  // looper-equivalent drain — it stands where iOS pumps its runloop, so a
+  // fetch that needs a timer or a worker reply to complete still progresses.
   Runtime* runtime = Runtime::TryGetRuntime(isolate);
   std::shared_ptr<EventLoop> eventLoop =
       runtime != nullptr ? runtime->GetEventLoop() : nullptr;
   if (!*done && eventLoop != nullptr) {
-    eventLoop->PumpUntil(timeoutSeconds, [&]() { return *done; });
+    if (eventLoop->PumpUntil(timeoutSeconds, [&]() { return *done; },
+                             /*drainLooperWork=*/true) ==
+        EventLoop::PumpResult::kTerminated) {
+      // terminating isolate or stopped loop: nothing can complete the walk,
+      // and the sync takeover below must not start a blocking fetch
+      TNS_DEBUG(Esm, "[graph][pumped][terminated] root=%s", root.c_str());
+      return *done;
+    }
   }
   if (!*done) {
     TNS_DEBUG(

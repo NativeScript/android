@@ -193,10 +193,10 @@ int WorkerWrapper::DrainCallback(int fd, int events, void* data) {
     return 1;
 }
 
-void WorkerWrapper::DrainPendingTasks() {
+int WorkerWrapper::DrainPendingTasks() {
     Isolate* isolate = workerIsolate_.load();
     if (isolate == nullptr || isTerminating_) {
-        return;
+        return 0;
     }
 
     v8::Locker locker(isolate);
@@ -212,18 +212,20 @@ void WorkerWrapper::DrainPendingTasks() {
     // afterwards every message dispatches whether or not a handler exists — a
     // handler installed later misses earlier messages, exactly as on the web.
     if (!messagesEnabled_.load(std::memory_order_acquire)) {
-        return;
+        return 0;
     }
 
     auto messages = queue_.PopAll();
     if (messages.empty()) {
-        return;
+        return 0;
     }
 
+    int dispatched = 0;
     for (auto& message : messages) {
         if (isTerminating_ || isClosing_) {
             break;
         }
+        dispatched++;
 
         TryCatch tc(isolate);
 
@@ -249,6 +251,7 @@ void WorkerWrapper::DrainPendingTasks() {
             CallbackHandlers::CallWorkerScopeOnErrorHandle(isolate, tc);
         }
     }
+    return dispatched;
 }
 
 void WorkerWrapper::EnableMessageQueue() {
@@ -434,6 +437,13 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
             // native looper backing the Java one - fds added here are pumped
             // by Looper.loop().
             queue_.Initialize(ALooper_forThread(), WorkerWrapper::DrainCallback, this);
+            // The inbox rides its own fd, which a pump never polls; the hook
+            // lets a looper-equivalent pump drain it (the loop's Shutdown, on
+            // this thread, unregisters it before `this` can die).
+            auto pumpLoop = runtime_->GetEventLoop();
+            if (pumpLoop != nullptr) {
+                pumpLoop->SetPumpDrainHook([this]() { return DrainPendingTasks(); });
+            }
 
             Isolate* isolate = runtime_->GetIsolate();
 

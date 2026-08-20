@@ -798,7 +798,14 @@ void CallbackHandlers::QueueMacrotaskCallback(const v8::FunctionCallbackInfo<v8:
         // the ordered lane rides the Java MessageQueue, so the callback runs
         // as a macrotask in strict FIFO order with JS timers and Handler.post
         eventLoop->PostOrdered([isolate, callback]() {
-            auto runtime = Runtime::GetRuntime(isolate);
+            // Java-dispatched callback with no live runtime: log-and-drop,
+            // never throw across the boundary
+            auto runtime = Runtime::TryGetRuntime(isolate);
+            if (runtime == nullptr) {
+                DEBUG_WRITE("__ns__queueMacrotask: dropping macrotask, its runtime is gone");
+                callback->Reset();
+                return;
+            }
             auto context = runtime->GetContext();
             Context::Scope context_scope(context);
             TryCatch tc(isolate);
@@ -807,7 +814,17 @@ void CallbackHandlers::QueueMacrotaskCallback(const v8::FunctionCallbackInfo<v8:
             callback->Reset();
             if (tc.HasCaught() &&
             !NativeScriptException::ContainUncaughtCallbackException(isolate, tc)) {
-                NativeScriptException(tc).ReThrowToJava();
+                if (EventLoop::IsPumping()) {
+                    // A pump drained this entry and keeps making JNI calls
+                    // after we return; the loop reports the exception from
+                    // its next token dispatch instead.
+                    auto loop = runtime->GetEventLoop();
+                    if (loop != nullptr) {
+                        loop->DeferJavaThrow(std::make_shared<NativeScriptException>(tc));
+                    }
+                } else {
+                    NativeScriptException(tc).ReThrowToJava();
+                }
             }
         });
     } catch (NativeScriptException &e) {

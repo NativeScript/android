@@ -153,7 +153,9 @@ public:
 
 private:
     void BackgroundLooper(std::shared_ptr<WorkerWrapper> self);
-    void DrainPendingTasks();
+    // returns the number of inbox messages dispatched, for the event loop's
+    // pump drain hook to count as progress
+    int DrainPendingTasks();
     void QuitLooper();
     static int DrainCallback(int fd, int events, void* data);
     static void FireMessageOnParentWorkerObject(int workerId,
