@@ -90,6 +90,58 @@ describe("worker ES module entries", function () {
         worker.postMessage("ping");
     });
 
+    // The worker isolate is published before its entry runs, so terminate()
+    // can interrupt an entry that is still evaluating - here one parked on a
+    // promise that never settles, inside the pump that waits for it.
+    it("survives terminate() while an entry is parked in top-level await", function (done) {
+        var ITERATIONS = 3;
+        var FALLBACK_TERMINATE = 700;
+        var SETTLE_AFTER = 700;
+        var errors = [];
+
+        function iteration(remaining) {
+            if (remaining === 0) {
+                expect(errors).toEqual([]);
+                // A worker spawned after the terminated ones still works.
+                var next = new Worker("~/tests/esmEntrySyncWorker.mjs");
+                next.onmessage = function (msg) {
+                    expect(msg.data).toBe("esm-entry:ping");
+                    next.terminate();
+                    done();
+                };
+                next.postMessage("ping");
+                return;
+            }
+
+            var worker = new Worker("./esmEntryNeverSettlesWorker.mjs");
+            var terminated = false;
+
+            function terminateOnce() {
+                if (terminated) {
+                    return;
+                }
+                terminated = true;
+                worker.terminate();
+                setTimeout(function () {
+                    iteration(remaining - 1);
+                }, SETTLE_AFTER);
+            }
+
+            worker.onerror = function (e) {
+                errors.push(String((e && e.message) || e));
+            };
+            worker.onmessage = function (msg) {
+                expect(msg.data).toBe("never-settles:started");
+                terminateOnce();
+            };
+            // The evaluation pump is bounded, so a start message that never
+            // arrives must not push the terminate past the window it targets.
+            setTimeout(terminateOnce, FALLBACK_TERMINATE);
+        }
+
+        iteration(ITERATIONS);
+    });
+
     // WHATWG parity: the worker's message queue is enabled when its entry
     // script finishes evaluating, and from then on messages dispatch whether
     // or not a handler exists. A handler registered later (from a timer)
