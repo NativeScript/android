@@ -739,7 +739,11 @@ EventLoop::PumpResult EventLoop::PumpUntil(double deadlineSeconds,
         if (settled()) {
             return PumpResult::kSettled;
         }
-        if (isolate_->IsExecutionTerminating()) {
+        // Both probes: IsExecutionTerminating is true only while JS frames
+        // unwind with the termination exception active, so a pump parked with
+        // nothing queued would never observe TerminateExecution through it.
+        if (terminationRequested_.load(std::memory_order_acquire) ||
+            isolate_->IsExecutionTerminating()) {
             return PumpResult::kTerminated;
         }
         if (IsStopped()) {

@@ -197,6 +197,18 @@ public:
     static bool IsInLooperCallback();
 
     /**
+     * Marks this loop's isolate as termination-requested. Callable from any
+     * thread. Pumps consult it alongside Isolate::IsExecutionTerminating,
+     * which per its contract is true only while JS frames are unwinding with
+     * the termination exception active - a pump parked with nothing queued
+     * never runs JS, so TerminateExecution alone cannot end it before the
+     * deadline.
+     */
+    void NoteTerminationRequested() {
+        terminationRequested_.store(true, std::memory_order_release);
+    }
+
+    /**
      * Blocks the calling thread until this loop's internal lane has work (the
      * eventfd or timerfd is readable) or `timeoutMs` elapses, whichever comes
      * first, without entering the looper - so it is safe where
@@ -400,6 +412,8 @@ private:
     Lane internal_;
     Lane ordered_;
     std::atomic<uint64_t> claimCells_[kClaimCells] = {};
+    // Set by NoteTerminationRequested (any thread), read by PumpUntil.
+    std::atomic_bool terminationRequested_{false};
     // ordered-lane source with its own bookkeeping (Timers); home-thread only
     OrderedTaskSource* timerSource_ = nullptr;
     // bare ordered tokens posted before the bind; flushed by Bind

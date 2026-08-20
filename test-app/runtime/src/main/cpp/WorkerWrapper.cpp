@@ -148,6 +148,12 @@ void WorkerWrapper::Terminate() {
         // The only v8 call that is legal from another thread - interrupts any
         // JS currently running on the worker (e.g. a busy loop).
         isolate->TerminateExecution();
+        // A pump parked with nothing queued runs no JS, so the interrupt
+        // above never materializes for it - the loop's own flag ends it.
+        auto loop = NativeScriptPlatform::Instance()->LookupEventLoop(isolate);
+        if (loop != nullptr) {
+            loop->NoteTerminationRequested();
+        }
     }
 
 #ifdef APPLICATION_IN_DEBUG
