@@ -413,6 +413,34 @@ describe("HTTP ESM Loader", function () {
                 }).toThrowError(TypeError, /canonicalization\.forPathPrefixes\[0\] must be a string/);
             });
 
+            // A function is an object to the engine, and JSON.stringify answers
+            // the literal text "undefined" for one rather than failing, so it
+            // has to be turned away before the map parser ever sees it.
+            it("rejects a function importMap and leaves the installed map in place", function (done) {
+                nsModule.configureLoader({
+                    importMap: { imports: { "ns-fnmap-leaf": "~/esm/vocab/leafA.mjs" } },
+                });
+
+                expect(function () {
+                    nsModule.configureLoader({ importMap: function () {} });
+                }).toThrowError(TypeError, /importMap must be an object or a JSON string/);
+
+                function restore() {
+                    nsModule.configureLoader({ importMap: { imports: {} } });
+                }
+
+                // A bare specifier resolves only through the map, so it still
+                // importing proves the rejected call replaced nothing.
+                import("ns-fnmap-leaf").then(function (mod) {
+                    expect(mod.name).toBe("vocab-a");
+                    restore();
+                    done();
+                }).catch(function (error) {
+                    restore();
+                    reportRejection(error, done);
+                });
+            });
+
             it("rejects a non-array invalidateModules argument", function () {
                 expect(function () {
                     nsModule.invalidateModules("x");

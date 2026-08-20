@@ -30,8 +30,6 @@ namespace tns {
 //     normally arrive,
 //   - eviction plumbing (an eviction-driven fetch nonce that defeats
 //     any HTTP cache layer between the runtime and the origin),
-//   - the boot-evaluation flag that arms the cold-boot looper pump only
-//     while an entry module is evaluating (derived by the runtime itself),
 //   - the remote-module security gate, seeded once from nativescript.config
 //     at boot and never exposed on ns:runtime getConfig/setConfig.
 
@@ -48,9 +46,8 @@ namespace tns {
 // per-isolate loader vocabulary — installed through SetCanonicalizationConfig
 // in ModuleInternalCallbacks.h — so CanonicalizeHttpUrlKey runs on the
 // isolate's own thread only. The transport canonicalizes at its JS-thread
-// entry points (HttpFetchModule, FetchModuleBodyAsync, MarkUrlsForCacheBust)
-// and nowhere else; background fetch threads only ever carry keys computed
-// for them.
+// entry points (HttpFetchModule, FetchModuleBodyAsync) and nowhere else;
+// background fetch threads only ever carry keys computed for them.
 //
 // When unconfigured, canonicalization is purely mechanical (fragment strip).
 struct CanonicalizationConfig {
@@ -112,40 +109,16 @@ void FetchModuleBodyAsync(
     const std::string& url,
     std::function<void(ModuleFetchResult result)> completion);
 
-// Return the most recent low-level fetch error reason for the calling
-// thread, or an empty string if the last fetch succeeded (or no fetch
-// has run on this thread yet). Take semantics — the slot is cleared on
-// read. Android-only diagnostic for splicing JNI exceptions into JS
-// errors when the transport never reached an HTTP status.
-std::string TakeLastHttpFetchErrorReason();
-
-// Register a "yield" callback that `HttpFetchModule` invokes once, after a
-// successful fetch, so the caller can pump its own runloop (e.g. the JS-thread
-// looper so a placeholder UI can repaint during cold-boot).
-//
-// Default: a built-in pump that no-ops unless the calling thread has an
-// isolate and is inside an entry-module evaluation window opened by
-// SetBootEvaluationActive (see `MaybePumpJSThreadDuringBoot` in
-// HttpLoader.cpp).
-//
-// Pass `nullptr` to disable any yielding (used by hosts that drive their own
-// run loop or by tests that want bit-for-bit deterministic fetch timing).
-// Safe to call from any thread; reads use acquire/release ordering.
-void RegisterHttpFetchYield(void (*callback)());
-
-// Mark a URL set (canonicalized internally) so that the NEXT network
-// fetch of each URL carries a unique `__ns_dev_nonce` query parameter,
-// guaranteeing no HTTP cache layer between the runtime and the origin
-// can satisfy the request. Called by `InvalidateModules` for the
-// eviction set; marks are consumed when a fresh body arrives.
+// Mark a set of canonical registry keys so that the NEXT network fetch of
+// each carries a unique `__ns_dev_nonce` query parameter, guaranteeing no
+// HTTP cache layer between the runtime and the origin can satisfy the
+// request. Called by `InvalidateModules` for the eviction set; marks are
+// consumed when a fresh body arrives.
+// The keys are inserted verbatim: canonicalization belongs to the caller's
+// isolate thread (see CanonicalizeHttpUrlKey), and the transport's own
+// background threads have no isolate to read the vocabulary from.
 // The nonce is transport-only and never affects module identity.
-void MarkUrlsForCacheBust(const std::vector<std::string>& urls);
-
-// Arm/disarm this thread's boot-evaluation window: while nonzero, the yield
-// inside synchronous HTTP fetches may pump the JS thread's looper (safe only
-// while the entry module is evaluating — nothing else owns the looper yet).
-// Balanced RAII-style by ModuleInternal::Load.
-void SetBootEvaluationActive(bool active);
+void MarkKeysForCacheBust(const std::vector<std::string>& canonicalKeys);
 
 // Clear the transport's process-wide state (cache-bust marks). MUST be
 // called inside Runtime::DestroyRuntime() before isolate

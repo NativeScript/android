@@ -40,11 +40,6 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-static bool IsHttpModulePath(const std::string& path) {
-    return path.rfind("http://", 0) == 0 || path.rfind("https://", 0) == 0 ||
-           path.rfind("file://http://", 0) == 0 || path.rfind("file://https://", 0) == 0;
-}
-
 static std::string NormalizeHttpModuleUrl(const std::string& path) {
     if (path.empty()) {
         return path;
@@ -64,6 +59,15 @@ static std::string NormalizeHttpModuleUrl(const std::string& path) {
     }
 
     return normalized;
+}
+
+// Classifies the NORMALIZED form: a scheme separator collapsed by a path
+// normalizer (`http:/host/...`) must still route to the HTTP loader, or the
+// same string classifies as a filesystem path and repairs itself only after
+// taking the wrong branch.
+static bool IsHttpModulePath(const std::string& path) {
+    const std::string normalized = NormalizeHttpModuleUrl(path);
+    return normalized.rfind("http://", 0) == 0 || normalized.rfind("https://", 0) == 0;
 }
 
 // What a rejected evaluation promise says about itself.
@@ -239,12 +243,12 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
 }
 
 // How an entry module's graph settles. For local modules the bound is a yield,
-// not a timeout: only nestable V8 tasks can run while these JS frames are on
-// the stack, so a TLA parked on a non-nestable foreground task can never settle
-// in-pump — give it one short window, then return and let the real event loop
-// finish it after the turn. HTTP entries must settle in-pump — the dev client
-// needs the rejection reason synchronously — so they get the full deadline and
-// the looper slices their transport needs.
+// not a timeout: only nestable V8 tasks and due ordered-lane work can run
+// while these JS frames are on the stack, so a TLA parked on a non-nestable
+// foreground task can never settle in-pump — give it one short window, then
+// return and let the real event loop finish it after the turn. HTTP entries
+// must settle in-pump — the dev client needs the rejection reason
+// synchronously — so they get the full deadline.
 static ModuleEvaluationOptions BootEntryEvaluationOptions(bool isHttpModule) {
     ModuleEvaluationOptions options;
     options.policy = ModuleEvaluationPolicy::kSyncPumping;
@@ -258,10 +262,10 @@ static ModuleEvaluationOptions BootEntryEvaluationOptions(bool isHttpModule) {
 
 // How a graph reached through require() settles. A pumping require must settle
 // or throw — handing back a half-initialized namespace is what the strict
-// policy exists to prevent — so it gets the full deadline. It never slices the
-// looper by default: outside boot the loop belongs to the app, and re-entering
-// arbitrary looper sources from the middle of a require would run UI callbacks
-// underneath JS frames.
+// policy exists to prevent — so it gets the full deadline. The pump drains
+// this loop's own lanes only (nestable v8 tasks, due JS timers), never the
+// platform looper: re-entering arbitrary looper sources from the middle of a
+// require would run UI callbacks underneath JS frames.
 static ModuleEvaluationOptions RequireEvaluationOptions(ModuleEvaluationPolicy policy) {
     ModuleEvaluationOptions options;
     options.policy = policy;
@@ -339,7 +343,7 @@ void ModuleInternal::CreateRequireCallback(const v8::FunctionCallbackInfo<v8::Va
         return;
     }
 
-    Runtime* runtime = Runtime::GetRuntime(isolate);
+    Runtime* runtime = Runtime::TryGetRuntime(isolate);
     ModuleInternal* moduleInternal = runtime != nullptr ? runtime->GetModuleInternal() : nullptr;
     if (moduleInternal == nullptr) {
         isolate->ThrowException(Exception::Error(ArgConverter::ConvertToV8String(
@@ -596,14 +600,6 @@ void ModuleInternal::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Va
 void ModuleInternal::Load(Local<Context> context, const string& path) {
     TNSPERF();
     auto isolate = m_isolate;
-    // Entry evaluation is this thread's boot window: while it is active, the
-    // yield inside synchronous HTTP fetches may pump the looper (nothing else
-    // owns it yet). Balanced on every exit path, throws included.
-    struct BootEvalScope {
-        BootEvalScope() { SetBootEvaluationActive(true); }
-        ~BootEvalScope() { SetBootEvaluationActive(false); }
-    } bootEvalScope;
-
     // The ES module branch compiles and links against
     // isolate->GetCurrentContext(); a caller that enters the isolate through a
     // fresh Isolate::Scope has no current context, and CompileModule would
@@ -626,7 +622,15 @@ void ModuleInternal::Load(Local<Context> context, const string& path) {
     auto globalObject = context->Global();
     auto require = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "require")).ToLocalChecked().As<Function>();
     Local<Value> args[] = { ArgConverter::ConvertToV8String(isolate, path) };
-    require->Call(context, globalObject, 1, args);
+    // A failed entry must throw through this boundary in every build — the
+    // caller (boot, or a worker's onerror routing) owns the report, and the
+    // boot backstop must never pump with an exception pending on the isolate.
+    TryCatch tc(isolate);
+    Local<Value> result;
+    const bool ok = require->Call(context, globalObject, 1, args).ToLocal(&result);
+    if (!ok || tc.HasCaught()) {
+        throw NativeScriptException(tc, "require() failed for module " + path);
+    }
 }
 
 void ModuleInternal::LoadWorker(Local<Context> context, const string& path) {
@@ -942,9 +946,12 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
     SET_PROFILER_FRAME();
 
     auto fileName = ArgConverter::ConvertToV8String(isolate, modulePath);
-    char pathcopy[1024];
-    strcpy(pathcopy, modulePath.c_str());
-    string strDirName(dirname(pathcopy));
+    // dirname() semantics without its fixed-size copy: module paths can
+    // exceed any stack buffer (PATH_MAX is 4096 and node_modules nests).
+    const size_t lastSlash = modulePath.find_last_of('/');
+    string strDirName = lastSlash == string::npos ? "."
+                        : lastSlash == 0          ? "/"
+                                                  : modulePath.substr(0, lastSlash);
     auto dirName = ArgConverter::ConvertToV8String(isolate, strDirName);
     // A module's own require inherits the options it was loaded under, so a
     // pumping require's whole dependency tree keeps pumping.
@@ -1027,7 +1034,12 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
     tns::instrumentation::Frame frame(frameName);
     Local<Object> json;
 
-    auto jsonData = Runtime::GetRuntime(m_isolate)->ReadFileText(path);
+    Runtime* runtime = Runtime::TryGetRuntime(m_isolate);
+    if (runtime == nullptr) {
+        throw NativeScriptException("Cannot read JSON module " + path +
+                                    ": the isolate has no runtime");
+    }
+    auto jsonData = runtime->ReadFileText(path);
 
     TryCatch tc(isolate);
 
@@ -1072,7 +1084,12 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
     // the open, reads as "" — which compiles into a perfectly valid empty
     // module unless the failure is told apart from an empty file here.
     bool readOk = false;
-    string content = Runtime::GetRuntime(isolate)->ReadFileText(path, readOk);
+    Runtime* runtime = Runtime::TryGetRuntime(isolate);
+    if (runtime == nullptr) {
+        throw NativeScriptException("Cannot read module " + path +
+                                    ": the isolate has no runtime");
+    }
+    string content = runtime->ReadFileText(path, readOk);
     if (!readOk) {
         throw NativeScriptException("Cannot read module " + path);
     }
@@ -1288,68 +1305,41 @@ MaybeLocal<Promise> tns::EvaluateModuleGraph(Isolate* isolate, Local<Context> co
         return MaybeLocal<Promise>();
     }
 
-    // Top-level await can depend on native async work such as fetch(), which
-    // needs both V8 microtasks and the looper to advance. An await whose
-    // resolution arrives as a v8 foreground task never settles from checkpoints
-    // alone; JS frames are on the stack, so like the inspector pause loops only
-    // nestable tasks may run here.
-    Runtime* runtime = Runtime::GetRuntime(isolate);
+    // Top-level await can depend on native async work (fetch completions and
+    // TLA continuations arrive as nestable v8 tasks) and on JS timers, which
+    // live in the ordered lane — Java Handler messages cannot dispatch while
+    // these JS frames hold the thread, so the pump drains due ordered work
+    // directly. Like the inspector pause loops, non-nestable v8 tasks stay
+    // queued.
+    Runtime* runtime = Runtime::TryGetRuntime(isolate);
     std::shared_ptr<EventLoop> eventLoop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
 
-    auto pumpAsyncProgress = [&]() {
-        if (eventLoop != nullptr) {
-            eventLoop->RunNestableV8Tasks();
+    bool settled = false;
+    // Probed before the first pump iteration: a synchronous graph's evaluation
+    // promise is already settled when Evaluate() returns, so it never pays for
+    // a pump slice.
+    const auto probe = [&]() {
+        if (promiseTc.HasCaught()) {
+            return true;
         }
-        isolate->PerformMicrotaskCheckpoint();
-        if (options.pumpRunLoop) {
-            // Nested ALooper_pollOnce inside an fd callback dangles the outer
-            // poll's Response& (see EventLoop::IsInLooperCallback); wait on
-            // the loop's own fds instead - same wakeups, no looper re-entry.
-            if (EventLoop::IsInLooperCallback()) {
-                if (eventLoop != nullptr) {
-                    eventLoop->WaitForInternalWork(10);
-                } else {
-                    usleep(1000);
-                }
-            } else {
-                ALooper_pollOnce(10 /* ms */, nullptr, nullptr, nullptr);
-            }
-            isolate->PerformMicrotaskCheckpoint();
+        Promise::PromiseState state = promise->State();
+        if (state == Promise::kPending) {
+            return false;
         }
+        settled = true;
+        if (state == Promise::kRejected) {
+            ThrowModuleEvaluationRejection(isolate, promise, promiseTc, canonicalPath);
+        }
+        LogEsmPhase(canonicalPath, "evaluate", "promise-resolved");
+        return true;
     };
 
-    const auto deadline =
-            std::chrono::steady_clock::now() +
-            std::chrono::milliseconds(static_cast<int64_t>(options.deadlineSeconds * 1000.0));
-    bool settled = false;
-
-    // State is checked before the first pump: a synchronous graph's evaluation
-    // promise is already settled when Evaluate() returns, so it exits here
-    // without paying for a looper slice.
-    while (!promiseTc.HasCaught()) {
-        Promise::PromiseState state = promise->State();
-        if (state != Promise::kPending) {
-            settled = true;
-            if (state == Promise::kRejected) {
-                ThrowModuleEvaluationRejection(isolate, promise, promiseTc, canonicalPath);
-            }
-            LogEsmPhase(canonicalPath, "evaluate", "promise-resolved");
-            break;
-        }
-
-        if (std::chrono::steady_clock::now() >= deadline) {
-            break;
-        }
-
-        pumpAsyncProgress();
-        if (!options.pumpRunLoop) {
-            // Wakes on the next internal-lane task (fetch completion, TLA
-            // continuation) instead of a fixed spin interval.
-            if (eventLoop != nullptr) {
-                eventLoop->WaitForInternalWork(10);
-            } else {
-                usleep(1000);
-            }
+    if (!probe() && eventLoop != nullptr) {
+        if (eventLoop->PumpUntil(options.deadlineSeconds, probe) ==
+            EventLoop::PumpResult::kTerminated) {
+            // terminating isolate (worker.terminate) or a stopped loop: no
+            // outcome to report, and no timeout to mislabel it with
+            return MaybeLocal<Promise>();
         }
     }
 
@@ -1474,11 +1464,6 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
             std::string message = "Cannot load ES module " + canonicalPath;
             if (tcLoad.HasCaught()) {
                 throw NativeScriptException(tcLoad, message);
-            }
-            std::string reason = TakeLastHttpFetchErrorReason();
-            if (!reason.empty()) {
-                message.append(" — ");
-                message.append(reason);
             }
             throw NativeScriptException(message);
         }
@@ -1615,7 +1600,12 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
 Local<String> ModuleInternal::WrapModuleContent(const string& path) {
     TNSPERF();
 
-    string content = Runtime::GetRuntime(m_isolate)->ReadFileText(path);
+    Runtime* runtime = Runtime::TryGetRuntime(m_isolate);
+    if (runtime == nullptr) {
+        throw NativeScriptException("Cannot read module " + path +
+                                    ": the isolate has no runtime");
+    }
+    string content = runtime->ReadFileText(path);
 
     // TODO: Use statically allocated buffer for better performance
     string result(MODULE_PROLOGUE);

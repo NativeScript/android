@@ -387,42 +387,24 @@ static void HoldBootBackstop(v8::Isolate* isolate, const std::string& entryPath)
   }
 
   const double deadlineSeconds = 2 * kModuleEvaluateDeadlineSeconds;
-  const auto start = std::chrono::steady_clock::now();
-  std::shared_ptr<EventLoop> eventLoop = Runtime::GetRuntime(isolate) != nullptr
-                                                 ? Runtime::GetRuntime(isolate)->GetEventLoop()
-                                                 : nullptr;
+  Runtime* runtime = Runtime::TryGetRuntime(isolate);
+  std::shared_ptr<EventLoop> eventLoop =
+          runtime != nullptr ? runtime->GetEventLoop() : nullptr;
 
-  while (!entryRejected && (entryPending || tns::HasPendingAsyncModuleGraphWork())) {
-    if (std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >
-        deadlineSeconds) {
-      break;
-    }
-    if (eventLoop != nullptr) {
-      eventLoop->RunNestableV8Tasks();
-    }
-    isolate->PerformMicrotaskCheckpoint();
-    // See EventLoop::IsInLooperCallback: a nested poll corrupts the outer
-    // poll's response state. Boot normally reaches this outside any dispatch,
-    // but an HTTP entry re-run from a dev-session task must not poll - it
-    // waits on the loop's own fds instead: same wakeups, no looper re-entry.
-    if (EventLoop::IsInLooperCallback()) {
-      if (eventLoop != nullptr) {
-        eventLoop->WaitForInternalWork(10);
-      } else {
-        usleep(1000);
+  if (!entryRejected && eventLoop != nullptr) {
+    // The pump drains due ordered-lane work too: an entry parked on a JS
+    // timer settles here — Java Handler messages cannot dispatch while this
+    // frame holds the launching thread.
+    eventLoop->PumpUntil(deadlineSeconds, [&]() {
+      if (entryPending) {
+        EntryEvaluationState state =
+                ModuleInternal::PollEntryEvaluation(isolate, entryPath, &entryRejectionReason);
+        // Once it settles, stop probing for good.
+        entryPending = state == EntryEvaluationState::kPending;
+        entryRejected = state == EntryEvaluationState::kRejected;
       }
-    } else {
-      ALooper_pollOnce(10, nullptr, nullptr, nullptr);
-    }
-    isolate->PerformMicrotaskCheckpoint();
-
-    if (entryPending) {
-      EntryEvaluationState state =
-              ModuleInternal::PollEntryEvaluation(isolate, entryPath, &entryRejectionReason);
-      // Once it settles, stop probing for good.
-      entryPending = state == EntryEvaluationState::kPending;
-      entryRejected = state == EntryEvaluationState::kRejected;
-    }
+      return entryRejected || (!entryPending && !tns::HasPendingAsyncModuleGraphWork());
+    });
   }
 
   // Evict before throwing: the entry would otherwise stay registered at

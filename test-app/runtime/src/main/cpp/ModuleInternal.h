@@ -28,8 +28,9 @@ inline constexpr double kModuleEvaluateDeadlineSeconds = 60.0;
 //                  ever evaluates, and the capability promise must already be
 //                  settled when Evaluate() returns.
 //   kSyncPumping - drive this thread in place until the promise settles or the
-//                  window closes. Only legal while nothing else owns the loop
-//                  (entry evaluation), and only nestable V8 tasks can run.
+//                  window closes: nestable V8 tasks, microtask checkpoints,
+//                  and due ordered-lane work (JS timers). Non-nestable tasks
+//                  stay queued, as in the inspector pause loops.
 //   kAsync       - evaluate and hand the caller the capability promise.
 enum class ModuleEvaluationPolicy { kSyncStrict, kSyncPumping, kAsync };
 
@@ -48,8 +49,10 @@ struct ModuleEvaluationOptions {
     double deadlineSeconds = 0.0;
     // kSyncPumping only: what an expired window means.
     TimeoutBehavior timeoutBehavior = TimeoutBehavior::kReturnPending;
-    // kSyncPumping only: also give the Android looper a slice per iteration, for
-    // graphs whose progress depends on native transports rather than V8 tasks.
+    // kSyncPumping only. Contract surface (createPumpingRequire validates and
+    // carries it); on Android the pump always drains this loop's own lanes —
+    // internal v8 tasks and due JS timers — and never re-enters the platform
+    // looper, so the option adds nothing here.
     bool pumpRunLoop = false;
 };
 

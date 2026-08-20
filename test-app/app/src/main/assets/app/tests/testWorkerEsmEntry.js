@@ -40,6 +40,17 @@ describe("worker ES module entries", function () {
         worker.postMessage("ping");
     });
 
+    it("runs an ES module worker entry whose top-level await parks on a JS timer",
+       function (done) {
+        var worker = new Worker("~/tests/esmEntryTimerWorker.mjs");
+        worker.onmessage = function (msg) {
+            expect(msg.data).toBe("timer-entry:ok:ping");
+            worker.terminate();
+            done();
+        };
+        worker.postMessage("ping");
+    });
+
     it("runs an ES module worker entry spawned through a relative path", function (done) {
         var worker = new Worker("./esmEntryRelativeWorker.mjs");
         worker.onmessage = function (msg) {

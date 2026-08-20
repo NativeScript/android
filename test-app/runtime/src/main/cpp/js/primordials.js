@@ -11,7 +11,6 @@
 
 const FunctionPrototypeCall = Function.prototype.call;
 const FunctionPrototypeBind = Function.prototype.bind;
-const FunctionPrototypeApply = Function.prototype.apply;
 
 // bind() with `this` pinned to call(): uncurryThis(fn) === fn.call.bind(fn),
 // but without reading `fn.call`.
@@ -25,7 +24,6 @@ const intrinsics = {
   Error,
   Map,
   Number,
-  Proxy,
   Set,
   String,
   TypeError,
@@ -66,7 +64,6 @@ const intrinsics = {
   DatePrototypeGetTime: uncurryThis(Date.prototype.getTime),
   DatePrototypeToISOString: uncurryThis(Date.prototype.toISOString),
   DatePrototypeToJSON: uncurryThis(Date.prototype.toJSON),
-  FunctionPrototypeApply: uncurryThis(FunctionPrototypeApply),
   FunctionPrototypeCall: uncurryThis(FunctionPrototypeCall),
   FunctionPrototypeToString: uncurryThis(Function.prototype.toString),
   MapPrototypeDelete: uncurryThis(Map.prototype.delete),
@@ -75,8 +72,6 @@ const intrinsics = {
   MapPrototypeSet: uncurryThis(Map.prototype.set),
   ObjectPrototypePropertyIsEnumerable: uncurryThis(Object.prototype.propertyIsEnumerable),
   ObjectPrototypeToString: uncurryThis(Object.prototype.toString),
-  PromisePrototypeCatch: uncurryThis(Promise.prototype.catch),
-  PromisePrototypeThen: uncurryThis(Promise.prototype.then),
   RegExpPrototypeTest: uncurryThis(RegExp.prototype.test),
   RegExpPrototypeToString: uncurryThis(RegExp.prototype.toString),
   SetPrototypeAdd: uncurryThis(Set.prototype.add),

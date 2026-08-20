@@ -177,10 +177,11 @@ void StartModuleGraphLoad(
         onComplete);
 
 // Synchronous wrapper for callers that need the graph ready before
-// continuing: starts the walk, then pumps the current thread's Android Looper
-// until it settles or `timeoutSeconds` elapses. A graph with no http(s) edges
-// completes entirely inside StartModuleGraphLoad, so this returns without
-// entering the wait loop at all — a disk-only load pays no looper slice.
+// continuing: starts the walk, then pumps the isolate's event loop in place
+// (EventLoop::PumpUntil) until it settles or `timeoutSeconds` elapses. A
+// graph with no http(s) edges completes entirely inside StartModuleGraphLoad,
+// so this returns without entering the pump at all — a disk-only load pays
+// no pump slice.
 // Returns true when the walk completed (regardless of root success — the
 // caller's own load path reports root failures).
 bool RunModuleGraphLoadPumped(v8::Isolate* isolate,

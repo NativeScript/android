@@ -195,7 +195,6 @@ static std::string ResolveHttpRelative(const std::string& referrerUrl,
 // Forward declarations for helpers referenced before their definitions.
 static const char* ModuleStatusToString(v8::Module::Status status);
 static void KillAsyncGraphLoadsForIsolate(v8::Isolate* isolate);
-static bool IsCurrentIsolateWorker(v8::Isolate* isolate);
 static v8::MaybeLocal<v8::Module> CompileJsonTextAsEsModule(
     v8::Isolate* isolate, v8::Local<v8::Context> context,
     const std::string& jsonText, const std::string& registryAbsPath,
@@ -1120,6 +1119,13 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
     return result;
   }
 
+  // blob: names a registry key, never a filesystem path — the callers' blob
+  // branches own it, so it must not burn stat() probes under the app root.
+  if (StartsWith(rawSpec, "blob:")) {
+    result.specifier = rawSpec;
+    return result;
+  }
+
   std::string spec = rawSpec;
   // Repair 'http:/host' (single slash) left by upstream path joins, so the URL
   // takes the HTTP path instead of becoming '/app/http:/host'.
@@ -1319,16 +1325,6 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
   return result;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Worker isolate detection: iOS keys off Caches::Get(isolate)->isWorker.
-// Android encodes the same signal by installing a WORKER_WRAPPER pointer in
-// the isolate's data slot on worker isolates only (see Runtime.h).
-static bool IsCurrentIsolateWorker(v8::Isolate* isolate) {
-  if (isolate == nullptr) return false;
-  return isolate->GetData((uint32_t)Runtime::IsolateData::WORKER_WRAPPER) !=
-         nullptr;
-}
-
 // Monotonic microseconds since some fixed epoch — matches iOS's
 // CFAbsoluteTimeGetCurrent() semantic (used for internal timing only, never
 // exposed to JS).
@@ -1506,7 +1502,7 @@ static void AsyncGraphOnFetchCompleted(
     const std::shared_ptr<ModuleFetchResult>& fetched) {
   if (load->dead.load(std::memory_order_acquire)) return;
   v8::Isolate* isolate = load->isolate;
-  if (Runtime::GetRuntime(isolate) == nullptr) return;
+  if (Runtime::TryGetRuntime(isolate) == nullptr) return;
 
   v8::Locker locker(isolate);
   v8::Isolate::Scope isolate_scope(isolate);
@@ -1752,34 +1748,14 @@ bool RunModuleGraphLoadPumped(v8::Isolate* isolate,
                        [done](bool /*ok*/, const std::string& /*errorMessage*/,
                               v8::Local<v8::Context>) { *done = true; });
 
-  // Manual pump ("until either all is settled or the app takes over"). Fetch
-  // completions are nestable v8 foreground tasks on the isolate's event loop,
-  // drained directly; the short ALooper slice stays as the idle-wait and still
-  // services the other looper-delivered work the walk indirectly depends on. A
-  // graph with no HTTP edges is already done here, so the loop body never runs.
-  Runtime* runtime = Runtime::GetRuntime(isolate);
+  // Fetch completions are nestable v8 foreground tasks on the isolate's event
+  // loop, which the pump drains directly. A graph with no HTTP edges is
+  // already done here, so the pump never runs.
+  Runtime* runtime = Runtime::TryGetRuntime(isolate);
   std::shared_ptr<EventLoop> eventLoop =
       runtime != nullptr ? runtime->GetEventLoop() : nullptr;
-  const auto deadline =
-      std::chrono::steady_clock::now() +
-      std::chrono::milliseconds(static_cast<int64_t>(timeoutSeconds * 1000.0));
-  while (!*done && std::chrono::steady_clock::now() < deadline) {
-    if (eventLoop != nullptr) {
-      eventLoop->RunNestableV8Tasks();
-    }
-    if (*done) break;
-    // Polling the looper from inside one of its fd callbacks dangles the
-    // outer poll's Response& (see EventLoop::IsInLooperCallback); wait on the
-    // loop's own fds instead - same wakeups, no looper re-entry.
-    if (EventLoop::IsInLooperCallback()) {
-      if (eventLoop != nullptr) {
-        eventLoop->WaitForInternalWork(10);
-      } else {
-        usleep(1000);
-      }
-    } else {
-      ALooper_pollOnce(10 /* ms */, nullptr, nullptr, nullptr);
-    }
+  if (!*done && eventLoop != nullptr) {
+    eventLoop->PumpUntil(timeoutSeconds, [&]() { return *done; });
   }
   if (!*done) {
     TNS_DEBUG(
@@ -1918,7 +1894,7 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
   // `__ns_dev_nonce` query param — the network sees a URL it has never
   // cached and must go to origin. The nonce is transport-only; module
   // identity stays the canonical URL.
-  MarkUrlsForCacheBust(uniqueUrls);
+  MarkKeysForCacheBust(uniqueUrls);
 
   TNS_DEBUG(Registry, "invalidate summary unique=%lu hits=%lu misses=%lu "
                       "(registry now=%lu)",
@@ -2192,7 +2168,15 @@ static v8::MaybeLocal<v8::Module> CompileJsonTextAsEsModule(
 static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(
     v8::Isolate* isolate, v8::Local<v8::Context> context,
     const std::string& absPath, const std::string& registryAbsPath) {
-  const std::string jsonText = Runtime::GetRuntime(isolate)->ReadFileText(absPath);
+  Runtime* runtime = Runtime::TryGetRuntime(isolate);
+  if (runtime == nullptr) {
+    // Resolve-callback contract: an empty return needs an exception scheduled,
+    // and a C++ throw here would unwind through InstantiateModule.
+    isolate->ThrowException(v8::Exception::Error(ArgConverter::ConvertToV8String(
+        isolate, "Cannot read JSON module " + absPath + ": the isolate has no runtime")));
+    return v8::MaybeLocal<v8::Module>();
+  }
+  const std::string jsonText = runtime->ReadFileText(absPath);
   return CompileJsonTextAsEsModule(isolate, context, jsonText, registryAbsPath,
                                    "file://" + absPath);
 }
@@ -2241,7 +2225,6 @@ static v8::MaybeLocal<v8::Module> LoadResolvedModule(
     return v8::MaybeLocal<v8::Module>();
   }
   auto& registry = moduleState->registry;
-  const bool isWorker = IsCurrentIsolateWorker(isolate);
 
   switch (resolution.kind) {
     case ModuleResolution::Kind::kBuiltin: {
@@ -2316,10 +2299,8 @@ static v8::MaybeLocal<v8::Module> LoadResolvedModule(
     IndexRegisteredModule(*moduleState, registryAbsPath, mod);
     return v8::MaybeLocal<v8::Module>(mod);
   } catch (NativeScriptException& ex) {
-    if (isWorker) {
-      DEBUG_WRITE("[resolver] Worker failed to compile '%s' -> '%s'",
-                  resolution.specifier.c_str(), absPath.c_str());
-    }
+    TNS_DEBUG(Esm, "[resolver] failed to compile '%s' -> '%s'",
+              resolution.specifier.c_str(), absPath.c_str());
     ex.ReThrowToV8();
     return v8::MaybeLocal<v8::Module>();
   }
@@ -3200,7 +3181,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         resolver
             ->Reject(context, v8::Exception::Error(
                                   ArgConverter::ConvertToV8String(isolate, msg)))
-            .Check();
+            .FromMaybe(false);
         return scope.Escape(resolver->GetPromise());
       }
     }
@@ -3217,7 +3198,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         v8::Local<v8::Value> ex = BuildModuleFailureReason(
             isolate, resolveTc, "Evaluation failed for module", normalizedSpec);
         resolveTc.Reset();
-        resolver->Reject(context, ex).Check();
+        resolver->Reject(context, ex).FromMaybe(false);
         return scope.Escape(resolver->GetPromise());
       }
       if (!evalResult.IsEmpty() && evalResult->IsPromise()) {
@@ -3301,11 +3282,27 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                 : v8::Exception::Error(ArgConverter::ConvertToV8String(
                       isolate, "TDZ on default after eval (generic)"));
         tc3.Reset();
-        resolver->Reject(context, tdzError).Check();
+        resolver->Reject(context, tdzError).FromMaybe(false);
         return scope.Escape(resolver->GetPromise());
       }
     }
-    resolver->Resolve(context, module->GetModuleNamespace()).Check();
+    {
+      // Resolving reads `then` off the namespace; a module exporting `then`
+      // can make that read throw (TDZ in a cycle) — that is the importer's
+      // rejection, never a CHECK.
+      v8::TryCatch tcResolve(isolate);
+      if (resolver->Resolve(context, module->GetModuleNamespace()).IsNothing()) {
+        v8::Local<v8::Value> reason =
+            tcResolve.HasCaught()
+                ? tcResolve.Exception()
+                : v8::Exception::Error(ArgConverter::ConvertToV8String(
+                      isolate,
+                      "Cannot resolve the namespace of " + normalizedSpec));
+        tcResolve.Reset();
+        resolver->Reject(context, reason).FromMaybe(false);
+        return scope.Escape(resolver->GetPromise());
+      }
+    }
     TNS_DEBUG(Esm, "[dyn-import] resolved %s", normalizedSpec.c_str());
   } catch (NativeScriptException& ex) {
     TNS_DEBUG(Esm, "[dyn-import] native failed %s", normalizedSpec.c_str());

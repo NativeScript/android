@@ -182,6 +182,23 @@ describe("createRequire", function () {
             });
         });
 
+        // A timer's Handler token cannot dispatch while the pumping require
+        // holds the thread, so this settles only through the pump's direct
+        // ordered-lane drain.
+        it("settles a top-level await parked on a JS timer while pumping", function (done) {
+            onFreshTask(function () {
+                var pumpingRequire = nsModule.createPumpingRequire(fixtureDir + "/anything.js");
+                var result = "";
+                try {
+                    result = String(pumpingRequire("./timer-tla.mjs").value);
+                } catch (e) {
+                    result = "threw: " + ((e && e.message) || e);
+                }
+                expect(result).toBe("timer-ok");
+                done();
+            });
+        });
+
         it("refuses to pump a top-level-await graph from inside a microtask", function (done) {
             var pumpingRequire = nsModule.createPumpingRequire(fixtureDir + "/anything.js");
             Promise.resolve().then(function () {
