@@ -68,6 +68,7 @@ include_directories(
 # drifts from the directory contents.
 set(RUNTIME_BUILTIN_JS_DIR ${PROJECT_SOURCE_DIR}/src/main/cpp/js)
 set(RUNTIME_BUILTIN_JS
+        ${RUNTIME_BUILTIN_JS_DIR}/abort-signal.js
         ${RUNTIME_BUILTIN_JS_DIR}/blob-url.js
         ${RUNTIME_BUILTIN_JS_DIR}/error-events.js
         ${RUNTIME_BUILTIN_JS_DIR}/events.js

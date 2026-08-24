@@ -22,12 +22,15 @@ const intrinsics = {
   // Constructors.
   Date,
   Error,
+  FinalizationRegistry,
   Map,
   Number,
+  RangeError,
   Set,
   String,
   TypeError,
   URL,
+  WeakRef,
 
   // Well-known symbols.
   SymbolIterator: Symbol.iterator,
@@ -42,6 +45,7 @@ const intrinsics = {
   decodeURIComponent,
   JSONStringify: JSON.stringify,
   NumberIsFinite: Number.isFinite,
+  NumberIsInteger: Number.isInteger,
   NumberIsNaN: Number.isNaN,
   NumberParseFloat: Number.parseFloat,
   NumberParseInt: Number.parseInt,
@@ -64,6 +68,8 @@ const intrinsics = {
   DatePrototypeGetTime: uncurryThis(Date.prototype.getTime),
   DatePrototypeToISOString: uncurryThis(Date.prototype.toISOString),
   DatePrototypeToJSON: uncurryThis(Date.prototype.toJSON),
+  FinalizationRegistryPrototypeRegister: uncurryThis(FinalizationRegistry.prototype.register),
+  FinalizationRegistryPrototypeUnregister: uncurryThis(FinalizationRegistry.prototype.unregister),
   FunctionPrototypeCall: uncurryThis(FunctionPrototypeCall),
   FunctionPrototypeToString: uncurryThis(Function.prototype.toString),
   MapPrototypeDelete: uncurryThis(Map.prototype.delete),
@@ -85,6 +91,7 @@ const intrinsics = {
   StringPrototypeSlice: uncurryThis(String.prototype.slice),
   StringPrototypeStartsWith: uncurryThis(String.prototype.startsWith),
   SymbolPrototypeToString: uncurryThis(Symbol.prototype.toString),
+  WeakRefPrototypeDeref: uncurryThis(WeakRef.prototype.deref),
 
   // Iterator-protocol escape hatches: the captured `next` of the live map/set
   // iterator prototypes, so entries can be walked with early exit even after

@@ -80,6 +80,8 @@ require('./tests/testURLSearchParamsImpl.js');
 require('./tests/testQueueMicrotask');
 require('./tests/testErrorEvents');
 require('./tests/testUnhandledRejections');
+// AbortController/AbortSignal (abort/timeout/any) on top of EventTarget
+require('./tests/testAbortSignal');
 require('./tests/testEscapeException');
 require('./tests/testUncaughtErrorPolicy');
 // Runtime builtins keep working when app code replaces the intrinsics they use

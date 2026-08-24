@@ -1,7 +1,7 @@
 // Lint setup for the runtime's builtin JavaScript
 // (test-app/runtime/src/main/cpp/js). Each file is compiled by BuiltinLoader
 // as a FUNCTION BODY with the fixed parameters `exports`, `require`, `module`,
-// `binding` and `primordials` (see that directory's README.md), which are
+// `binding`, `primordials` and `internals` (see that directory's README.md), which are
 // declared as globals here. no-undef is the typo net for binding-bag destructures and
 // native-global usage alike; no-restricted-properties keeps the captured
 // intrinsics from being read off the live globals again.
@@ -16,6 +16,7 @@ const capturedStatics = [
   ['ArrayBuffer', 'isView', 'ArrayBufferIsView'],
   ['JSON', 'stringify', 'JSONStringify'],
   ['Number', 'isFinite', 'NumberIsFinite'],
+  ['Number', 'isInteger', 'NumberIsInteger'],
   ['Number', 'isNaN', 'NumberIsNaN'],
   ['Number', 'parseFloat', 'NumberParseFloat'],
   ['Number', 'parseInt', 'NumberParseInt'],
@@ -31,7 +32,7 @@ const capturedStatics = [
 
 // Captured constructors. A destructure from `primordials` shadows the global,
 // so these only fire on the unguarded reference.
-const restrictedGlobals = ['Date', 'Map', 'Number', 'Proxy', 'Set', 'String', 'TypeError'].map((name) => ({
+const restrictedGlobals = ['Date', 'FinalizationRegistry', 'Map', 'Number', 'Proxy', 'RangeError', 'Set', 'String', 'TypeError', 'WeakRef'].map((name) => ({
   name,
   message: `Destructure ${name} from primordials — builtins must not read intrinsics off globals user code can replace.`,
 }));
@@ -55,6 +56,7 @@ export default [
         module: 'readonly',
         binding: 'readonly',
         primordials: 'readonly',
+        internals: 'readonly',
         global: 'readonly',
         console: 'readonly',
         URL: 'readonly',

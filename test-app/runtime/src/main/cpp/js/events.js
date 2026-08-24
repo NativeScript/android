@@ -34,9 +34,25 @@ Event.prototype.stopImmediatePropagation = function () {
 // A listener that throws must not stop other listeners: route the thrown
 // value to the native fatal tail instead of ever recursively dispatching
 // another `error` event from inside dispatch. The error-events layer
-// installs the real reporter via _installListenerErrorReporter (before any
-// user code runs); until then a thrown listener is swallowed.
+// installs the real reporter via internals.setListenerErrorReporter (before
+// any user code runs); until then a thrown listener is swallowed.
 var reportListenerError = function (e) {};
+internals.setListenerErrorReporter = function (fn) {
+  reportListenerError = fn;
+};
+
+// Internal listener-mutation hook. A target (in practice: AbortSignal, on
+// its prototype) may carry a function under this symbol; it is called with
+// (target, type, newCount) from every path that changes a listener list —
+// add, remove, and the once-splice inside dispatch. The key travels only
+// through `internals`, so the accounting cannot be bypassed the way an
+// overridable addEventListener could.
+var kListenerChanged = Symbol("listenerChanged");
+internals.kListenerChanged = kListenerChanged;
+function notifyListenerChanged(target, type, count) {
+  var hook = target[kListenerChanged];
+  if (hook !== undefined) { hook(target, type, count); }
+}
 
 function EventTargetImpl() { this._listeners = ObjectCreate(null); }
 EventTargetImpl.prototype.addEventListener = function (type, callback, options) {
@@ -55,6 +71,7 @@ EventTargetImpl.prototype.addEventListener = function (type, callback, options) 
     if (list[i].callback === callback && list[i].capture === capture) { return; }
   }
   ArrayPrototypePush(list, { callback: callback, once: once, capture: capture });
+  notifyListenerChanged(this, type, list.length);
 };
 EventTargetImpl.prototype.removeEventListener = function (type, callback, options) {
   type = String(type);
@@ -69,6 +86,7 @@ EventTargetImpl.prototype.removeEventListener = function (type, callback, option
   for (var i = 0; i < list.length; i++) {
     if (list[i].callback === callback && list[i].capture === capture) {
       ArrayPrototypeSplice(list, i, 1);
+      notifyListenerChanged(this, type, list.length);
       return;
     }
   }
@@ -85,7 +103,10 @@ EventTargetImpl.prototype.dispatchEvent = function (event) {
       var entry = snapshot[i];
       var idx = ArrayPrototypeIndexOf(list, entry);
       if (idx === -1) { continue; }  // removed since snapshot
-      if (entry.once) { ArrayPrototypeSplice(list, idx, 1); }
+      if (entry.once) {
+        ArrayPrototypeSplice(list, idx, 1);
+        notifyListenerChanged(this, event.type, list.length);
+      }
       var cb = entry.callback;
       try {
         if (typeof cb === "function") {
@@ -107,14 +128,6 @@ EventTargetImpl.prototype.dispatchEvent = function (event) {
 // is intentionally NOT made an EventTarget; only the three methods are
 // bound onto it.
 var globalTarget = new EventTargetImpl();
-// Called by the error-events layer to install the native listener-error
-// reporter into this closure. One-shot: the backing target leaks to app
-// code via event.target, so the hook removes itself after the install
-// (which happens during runtime init, before any user code runs).
-globalTarget._installListenerErrorReporter = function (fn) {
-  reportListenerError = fn;
-  delete globalTarget._installListenerErrorReporter;
-};
 g.addEventListener = function (type, callback, options) {
   return globalTarget.addEventListener(type, callback, options);
 };
