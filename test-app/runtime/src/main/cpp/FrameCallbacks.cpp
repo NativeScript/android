@@ -151,8 +151,12 @@ void ResolveFrameCallbacksClass(JEnv& env) {
 using EntryId = uintptr_t;
 
 struct FrameCallbackEntry {
-    FrameCallbackEntry(Isolate* isolate, Local<Function> callback, EntryId id)
-        : isolate_(isolate), callback_(isolate, callback), id_(id) {
+    FrameCallbackEntry(Isolate* isolate, Local<Function> callback, EntryId id,
+                       bool isAnimationFrame = false)
+        : isolate_(isolate),
+          callback_(isolate, callback),
+          id_(id),
+          isAnimationFrame_(isAnimationFrame) {
     }
 
     ~FrameCallbackEntry() {
@@ -200,6 +204,13 @@ struct FrameCallbackEntry {
     Isolate* isolate_;
     Global<Function> callback_;
     EntryId id_;
+    /*
+     * requestAnimationFrame entries are anonymous one-shots addressed only by
+     * their returned handle: they never dedupe by function, take the single
+     * spec-mandated timestamp argument, and cancelAnimationFrame may only
+     * touch entries carrying this flag.
+     */
+    bool isAnimationFrame_;
     jobject javaCallback_ = nullptr;
 
 private:
@@ -273,15 +284,23 @@ void Dispatch(EntryId id, int64_t frameTimeNanos) {
 
     entry->MarkUnscheduled();
 
+    Local<Value> timelineMillis =
+            Number::New(isolate, Performance::MonotonicNanosToTimelineMillis(
+                                         isolate, frameTimeNanos));
     Local<Value> args[2] = {
             Number::New(isolate, (double) frameTimeNanos),
-            Number::New(isolate, Performance::MonotonicNanosToTimelineMillis(
-                                         isolate, frameTimeNanos)),
+            timelineMillis,
     };
 
     TryCatch tc(isolate);
 
-    cb->Call(context, context->Global(), 2, args);  // ignore JS return value
+    if (entry->isAnimationFrame_) {
+        // spec signature: a single DOMHighResTimeStamp on this isolate's
+        // performance timeline
+        cb->Call(context, context->Global(), 1, &timelineMillis);
+    } else {
+        cb->Call(context, context->Global(), 2, args);  // ignore JS return value
+    }
 
     // Re-resolve: the callback may have rescheduled or removed itself.
     entry = FindEntryById(id);
@@ -436,6 +455,58 @@ void FrameCallbacks::RemoveFrameCallback(const FunctionCallbackInfo<Value>& args
     }
 }
 
+void FrameCallbacks::RequestAnimationFrame(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+    Locker locker(isolate);
+    Isolate::Scope isolateScope(isolate);
+    HandleScope handleScope(isolate);
+    Local<Context> context = isolate->GetCurrentContext();
+    Context::Scope contextScope(context);
+
+    if (args.Length() < 1 || !args[0]->IsFunction()) {
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8Literal(
+                isolate, "Animation frame callback argument is not a function")));
+        return;
+    }
+
+    // Every call registers its own entry: the spec runs a function as many
+    // times as it was requested, so no dedupe by function here.
+    EntryId id = ++entryCount_;
+    FrameCallbackEntry* entry;
+    {
+        std::lock_guard<std::mutex> lock(entriesMutex_);
+        auto inserted = entries_.emplace(
+                id, std::make_unique<FrameCallbackEntry>(
+                            isolate, args[0].As<Function>(), id,
+                            /* isAnimationFrame */ true));
+        NS_DCHECK(inserted.second && "Frame callback ID should not be duplicated");
+        entry = inserted.first->second.get();
+    }
+
+    entry->MarkScheduled();
+    Post(entry, 0);
+    args.GetReturnValue().Set(Number::New(isolate, (double) id));
+}
+
+void FrameCallbacks::CancelAnimationFrame(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+    Locker locker(isolate);
+    Isolate::Scope isolateScope(isolate);
+    HandleScope handleScope(isolate);
+    Local<Context> context = isolate->GetCurrentContext();
+    Context::Scope contextScope(context);
+
+    // per spec an unknown or malformed handle is a silent no-op
+    if (args.Length() < 1 || !args[0]->IsNumber()) {
+        return;
+    }
+    EntryId id = (EntryId) args[0]->IntegerValue(context).FromMaybe(0);
+    FrameCallbackEntry* entry = FindEntryById(id);
+    if (entry != nullptr && entry->isAnimationFrame_) {
+        entry->MarkRemoved();
+    }
+}
+
 void FrameCallbacks::RemoveIsolateEntries(Isolate* isolate) {
     // Detached first, destroyed after the mutex is released: the destructors
     // call into Java.
@@ -454,6 +525,15 @@ void FrameCallbacks::RemoveIsolateEntries(Isolate* isolate) {
 }
 
 void FrameCallbacks::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
+    globalTemplate->Set(
+            ArgConverter::ConvertToV8String(isolate, "requestAnimationFrame"),
+            FunctionTemplate::New(isolate, RequestAnimationFrame));
+    globalTemplate->Set(
+            ArgConverter::ConvertToV8String(isolate, "cancelAnimationFrame"),
+            FunctionTemplate::New(isolate, CancelAnimationFrame));
+    // kept for backwards compatibility with callers that predate
+    // requestAnimationFrame; unlike it, these dedupe by function, take an
+    // optional delay, and hand the callback the raw frame time as well
     globalTemplate->Set(
             ArgConverter::ConvertToV8String(isolate, "__postFrameCallback"),
             FunctionTemplate::New(isolate, PostFrameCallback));

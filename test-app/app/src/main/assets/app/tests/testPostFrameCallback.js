@@ -141,6 +141,100 @@ describe("test PostFrameCallback", function () {
   });
 });
 
+describe("requestAnimationFrame", function () {
+  const defaultWaitTime = 300;
+
+  it("is exposed under the standard global names", () => {
+    expect(typeof global.requestAnimationFrame).toBe("function");
+    expect(typeof global.cancelAnimationFrame).toBe("function");
+  });
+
+  it("throws on non-function callbacks and ignores bogus cancel handles", () => {
+    expect(() => global.requestAnimationFrame()).toThrowError(TypeError);
+    expect(() => global.requestAnimationFrame(null)).toThrowError(TypeError);
+    expect(() => global.requestAnimationFrame("")).toThrowError(TypeError);
+    expect(() => global.cancelAnimationFrame()).not.toThrow();
+    expect(() => global.cancelAnimationFrame(null)).not.toThrow();
+    expect(() => global.cancelAnimationFrame(-1)).not.toThrow();
+    expect(() => global.cancelAnimationFrame(Number.MAX_SAFE_INTEGER)).not.toThrow();
+  });
+
+  it("returns a handle and passes a single performance-timeline timestamp", (done) => {
+    const handle = global.requestAnimationFrame(function (timestamp) {
+      expect(arguments.length).toBe(1);
+      expect(typeof timestamp).toBe("number");
+      const now = performance.now();
+      expect(timestamp).toBeGreaterThan(0);
+      expect(timestamp).not.toBeGreaterThan(now);
+      expect(now - timestamp).toBeLessThan(250);
+      done();
+    });
+    expect(typeof handle).toBe("number");
+    expect(handle).toBeGreaterThan(0);
+  });
+
+  it("runs the same function once per request", (done) => {
+    let callCount = 0;
+    const callback = () => {
+      callCount++;
+    };
+    const first = global.requestAnimationFrame(callback);
+    const second = global.requestAnimationFrame(callback);
+    expect(second).not.toBe(first);
+    setTimeout(() => {
+      expect(callCount).toBe(2);
+      done();
+    }, defaultWaitTime);
+  });
+
+  it("cancels only the cancelled request", (done) => {
+    let cancelledRan = false;
+    let keptRan = false;
+    const cancelled = global.requestAnimationFrame(() => {
+      cancelledRan = true;
+    });
+    global.requestAnimationFrame(() => {
+      keptRan = true;
+    });
+    global.cancelAnimationFrame(cancelled);
+    setTimeout(() => {
+      expect(cancelledRan).toBe(false);
+      expect(keptRan).toBe(true);
+      done();
+    }, defaultWaitTime);
+  });
+
+  it("chains frames when the callback re-requests itself", (done) => {
+    const timestamps = [];
+    const callback = (timestamp) => {
+      timestamps.push(timestamp);
+      if (timestamps.length === 1) {
+        global.requestAnimationFrame(callback);
+      }
+    };
+    global.requestAnimationFrame(callback);
+    setTimeout(() => {
+      expect(timestamps.length).toBe(2);
+      expect(timestamps[1]).not.toBeLessThan(timestamps[0]);
+      done();
+    }, defaultWaitTime);
+  });
+
+  it("does not disturb __postFrameCallback dedupe for the same function", (done) => {
+    let callCount = 0;
+    const callback = () => {
+      callCount++;
+    };
+    global.__postFrameCallback(callback);
+    global.requestAnimationFrame(callback);
+    global.__postFrameCallback(callback);
+    setTimeout(() => {
+      expect(callCount).toBe(2);
+      done();
+    }, defaultWaitTime);
+  });
+});
+
 // The two implementations behind __postFrameCallback (NDK AChoreographer,
 // android.view.Choreographer for API < 24) must be indistinguishable from JS.
 // A modern device always selects the NDK one, so the Java bridge is only

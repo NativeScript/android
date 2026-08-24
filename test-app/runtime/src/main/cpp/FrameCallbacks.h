@@ -10,8 +10,15 @@
 namespace tns {
 
 /*
- * __postFrameCallback(fn[, delayMillis]) / __removeFrameCallback(fn): schedule
- * a JS function for the next display frame.
+ * requestAnimationFrame(fn) / cancelAnimationFrame(handle): the standard
+ * animation-frame surface. Each request registers its own one-shot entry and
+ * returns a handle; fn receives a single DOMHighResTimeStamp on the isolate's
+ * performance timeline.
+ *
+ * __postFrameCallback(fn[, delayMillis]) / __removeFrameCallback(fn): the
+ * compatibility surface predating requestAnimationFrame. Schedules a JS
+ * function for the next display frame, deduping by function: rescheduling a
+ * callback that is already pending is a no-op.
  *
  * fn receives two arguments:
  *   fn(frameTimeNanos, performanceMillis)
@@ -25,9 +32,8 @@ namespace tns {
  *   - android.view.Choreographer (com.tns.FrameCallbacks), for API 21-23,
  *     where the NDK API does not exist.
  * Scheduling is per calling thread, so a worker schedules against its own
- * looper. Rescheduling a callback that is already pending is a no-op, and
- * removal only marks the entry: a posted frame callback cannot be recalled, so
- * the dispatch drops it instead.
+ * looper. Cancellation on either surface only marks the entry: a posted frame
+ * callback cannot be recalled, so the dispatch drops it instead.
  */
 class FrameCallbacks {
 public:
@@ -42,6 +48,8 @@ public:
     static void RemoveIsolateEntries(v8::Isolate* isolate);
 
 private:
+    static void RequestAnimationFrame(const v8::FunctionCallbackInfo<v8::Value>& args);
+    static void CancelAnimationFrame(const v8::FunctionCallbackInfo<v8::Value>& args);
     static void PostFrameCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     static void RemoveFrameCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 };
