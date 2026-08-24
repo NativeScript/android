@@ -60,11 +60,17 @@ namespace tns {
 
 void Timers::Init(v8::Isolate *isolate, v8::Local<v8::ObjectTemplate> &globalObjectTemplate) {
     isolate_ = isolate;
-    // TODO: remove the __ns__ prefix once this is validated
-    SetMethod(isolate, globalObjectTemplate, "__ns__setTimeout", SetTimeoutCallback, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
-    SetMethod(isolate, globalObjectTemplate, "__ns__setInterval", SetIntervalCallback, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
-    SetMethod(isolate, globalObjectTemplate, "__ns__clearTimeout", ClearTimer, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
-    SetMethod(isolate, globalObjectTemplate, "__ns__clearInterval", ClearTimer, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
+    Local<External> data = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
+    // the __ns__-prefixed variants are kept for backwards compatibility with
+    // callers that predate the timers being exposed under their standard names
+    SetMethod(isolate, globalObjectTemplate, "setTimeout", SetTimeoutCallback, data);
+    SetMethod(isolate, globalObjectTemplate, "setInterval", SetIntervalCallback, data);
+    SetMethod(isolate, globalObjectTemplate, "clearTimeout", ClearTimer, data);
+    SetMethod(isolate, globalObjectTemplate, "clearInterval", ClearTimer, data);
+    SetMethod(isolate, globalObjectTemplate, "__ns__setTimeout", SetTimeoutCallback, data);
+    SetMethod(isolate, globalObjectTemplate, "__ns__setInterval", SetIntervalCallback, data);
+    SetMethod(isolate, globalObjectTemplate, "__ns__clearTimeout", ClearTimer, data);
+    SetMethod(isolate, globalObjectTemplate, "__ns__clearInterval", ClearTimer, data);
 
     // PrepareV8Runtime bound the loop to this thread's looper before any
     // builtin initialization runs

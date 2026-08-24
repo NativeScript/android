@@ -91,8 +91,6 @@ describe("event loop ordered macrotasks", function () {
         Promise.resolve().then(() => order.push("microtask"));
     });
 
-    // native timers (__ns__*): the app-level `setTimeout` global in this test
-    // app is an old Handler-based polyfill, not the runtime timers
     it("stays FIFO-ordered with native setTimeout(0)", function (done) {
         const order = [];
         __ns__queueMacrotask(() => order.push("macro1"));

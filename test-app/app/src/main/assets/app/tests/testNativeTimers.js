@@ -16,6 +16,33 @@ describe('native timer', () => {
         expect(clearInterval).toBeDefined();
     });
 
+    it('is exposed under the standard global names', () => {
+        expect(typeof global.setTimeout).toBe('function');
+        expect(typeof global.setInterval).toBe('function');
+        expect(typeof global.clearTimeout).toBe('function');
+        expect(typeof global.clearInterval).toBe('function');
+    });
+
+    it('triggers and cancels via the standard global names', (done) => {
+        let cancelledFired = false;
+        const cancelled = global.setTimeout(() => {
+            cancelledFired = true;
+        }, 50);
+        global.clearTimeout(cancelled);
+        let intervalCalls = 0;
+        const itv = global.setInterval(() => {
+            intervalCalls++;
+            if (intervalCalls >= 2) {
+                global.clearInterval(itv);
+            }
+        }, 20);
+        global.setTimeout(() => {
+            expect(cancelledFired).toBe(false);
+            expect(intervalCalls).toBe(2);
+            done();
+        }, 200);
+    });
+
     it('triggers timeout', (done) => {
         const now = Date.now();
         setTimeout(() => {
