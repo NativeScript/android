@@ -29,6 +29,8 @@ const intrinsics = {
   Set,
   String,
   TypeError,
+  Uint8Array,
+  Uint32Array,
   URL,
   WeakRef,
 

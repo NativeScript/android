@@ -66,12 +66,38 @@ module.exports = somethingTheCallSiteNeeds;
 - Destructure `binding` and `primordials` once, at the top of the file, so the
   file's dependencies are visible and greppable.
 
+## Eager and lazy builtins
+
+Most builtins run during `Runtime::PrepareV8Runtime` and install their globals
+themselves. A **lazy** builtin instead exports its interfaces and is run by
+`LazyGlobals` (`src/main/cpp/LazyGlobals.cpp`), which registers each global it
+backs as a lazy data property on the global template: the first read of the
+name runs the file, caches its `module.exports` per isolate so sibling names
+share one run, and V8 replaces the property with a plain data property. Until
+then nothing of it exists — no compile, no run, no allocation.
+`text-encoding.js` (`TextEncoder`/`TextDecoder`) and `base64.js`
+(`atob`/`btoa`) are the current ones; new globals join by adding a row to
+`kLazyGlobals`.
+
+The two extra rules a lazy builtin lives by:
+
+- **It runs at an arbitrary point in the isolate's life, not at init.** The
+  `internals` channel is therefore off limits: its producers publish during
+  their own init, and a consumer that reads a key it does not find fails at
+  first use instead of loudly at boot. Anything a lazy builtin needs from
+  another builtin has to come through `require` or its `binding`.
+- **It must not install anything on `globalThis`.** The C++ tier owns
+  placement; a file that self-installs would have to run to do it, which is
+  the thing being avoided.
+
 ## Rules
 
-- Run at isolate init, before any user code: capture any global you rely on
-  (e.g. `globalThis.Event`) eagerly so later monkey-patching can't break you.
-  For intrinsics that is what `primordials` is; for everything else
-  (`URLSearchParams`, …) capture it into a file-level `const`.
+- Eager builtins run at isolate init, before any user code: capture any global
+  you rely on (e.g. `globalThis.Event`) eagerly so later monkey-patching can't
+  break you. For intrinsics that is what `primordials` is; for everything else
+  (`URLSearchParams`, …) capture it into a file-level `const`. A lazy builtin
+  gets the same pristine `primordials`, but the live globals it would capture
+  are whatever user code left behind, so it should not reach for them at all.
 - No `import`/`export` — these are classic function bodies, not modules.
 - ESLint (`eslint.config.mjs` at the repo root, `npm run lint`) declares
   `exports`, `require`, `module`, `binding`, `primordials` and the reachable

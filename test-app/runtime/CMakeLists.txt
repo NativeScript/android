@@ -69,6 +69,7 @@ include_directories(
 set(RUNTIME_BUILTIN_JS_DIR ${PROJECT_SOURCE_DIR}/src/main/cpp/js)
 set(RUNTIME_BUILTIN_JS
         ${RUNTIME_BUILTIN_JS_DIR}/abort-signal.js
+        ${RUNTIME_BUILTIN_JS_DIR}/base64.js
         ${RUNTIME_BUILTIN_JS_DIR}/blob-url.js
         ${RUNTIME_BUILTIN_JS_DIR}/error-events.js
         ${RUNTIME_BUILTIN_JS_DIR}/events.js
@@ -84,6 +85,7 @@ set(RUNTIME_BUILTIN_JS
         ${RUNTIME_BUILTIN_JS_DIR}/primordials.js
         ${RUNTIME_BUILTIN_JS_DIR}/require-factory.js
         ${RUNTIME_BUILTIN_JS_DIR}/structured-clone.js
+        ${RUNTIME_BUILTIN_JS_DIR}/text-encoding.js
         ${RUNTIME_BUILTIN_JS_DIR}/weak-ref.js
 )
 set(RUNTIME_BUILTINS_GENERATED_DIR ${PROJECT_SOURCE_DIR}/src/main/cpp/generated)
@@ -168,6 +170,7 @@ add_library(
         src/main/cpp/ArrayElementAccessor.cpp
         src/main/cpp/ArrayHelper.cpp
         src/main/cpp/AssetExtractor.cpp
+        src/main/cpp/Base64.cpp
         src/main/cpp/BuiltinLoader.cpp
         src/main/cpp/CallbackHandlers.cpp
         src/main/cpp/ConcurrentQueue.cpp
@@ -189,6 +192,7 @@ add_library(
         src/main/cpp/JsArgConverter.cpp
         src/main/cpp/JsArgToArrayConverter.cpp
         src/main/cpp/JSONObjectHelper.cpp
+        src/main/cpp/LazyGlobals.cpp
         src/main/cpp/Logger.cpp
         src/main/cpp/ManualInstrumentation.cpp
         src/main/cpp/MetadataMethodInfo.cpp
@@ -215,6 +219,7 @@ add_library(
         src/main/cpp/SimpleProfiler.cpp
         src/main/cpp/StructuredClone.cpp
         src/main/cpp/StructuredSerialization.cpp
+        src/main/cpp/TextEncoding.cpp
         src/main/cpp/Util.cpp
         src/main/cpp/V8GlobalHelpers.cpp
         src/main/cpp/V8StringConstants.cpp
