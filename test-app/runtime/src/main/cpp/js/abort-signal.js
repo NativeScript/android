@@ -3,27 +3,44 @@
 // abort / timeout / any statics, modeled on Node's
 // internal/abort_controller.js.
 //
-// Deliberate deviations from Node:
-// - No DOMException in this runtime: the default abort and timeout reasons
-//   are Error instances with `name` patched ("AbortError" / "TimeoutError"),
-//   the same stand-in performance.js and structured-clone.js use.
-// - No WeakRef bookkeeping: a timeout() timer holds its signal strongly until
-//   it fires (retention is bounded by the delay, and looper timers don't
-//   gate process liveness the way Node's do), and any() links source ->
-//   dependent strongly, unlinking as soon as either side aborts.
+// GC contract (Node-equivalent, see docs/abort-signal.md):
+// - A timeout() timer and every any() link hold only WeakRefs, so a signal
+//   nobody can observe is collectable before its abort would ever fire, and
+//   per-request composites never accumulate on a long-lived source.
+// - Weakness alone would drop aborts for signals that are listened-to but
+//   otherwise unreachable, so gcPersistentSignals strong-holds exactly the
+//   signals whose abort someone can still observe: live timeout signals and
+//   live non-empty composites while they have abort listeners, and timeout
+//   sources a composite follows until their timer fires. The listener
+//   accounting comes from the events builtin's kListenerChanged hook, which
+//   fires from every listener-list mutation path and cannot be bypassed
+//   from app code.
+//
+// Deliberate deviation from Node: no DOMException in this runtime — the
+// default abort and timeout reasons are Error instances with `name` patched
+// ("AbortError" / "TimeoutError"), the same stand-in performance.js and
+// structured-clone.js use.
 const {
   ArrayPrototypeIndexOf,
   ArrayPrototypePush,
   ArrayPrototypeSplice,
   Error,
+  FinalizationRegistry,
+  FinalizationRegistryPrototypeRegister,
+  FinalizationRegistryPrototypeUnregister,
   FunctionPrototypeCall,
   NumberIsInteger,
   ObjectDefineProperty,
   ObjectGetOwnPropertyDescriptor,
   RangeError,
+  Set,
+  SetPrototypeAdd,
+  SetPrototypeDelete,
   SymbolIterator,
   SymbolToStringTag,
   TypeError,
+  WeakRef,
+  WeakRefPrototypeDeref,
 } = primordials;
 var g = globalThis;
 // Init order (PrepareV8Runtime): events.js ran immediately before this builtin,
@@ -32,9 +49,13 @@ var g = globalThis;
 const EventTarget = g.EventTarget;
 const Event = g.Event;
 const setTimeout = g.setTimeout;
+const clearTimeout = g.clearTimeout;
 const dispatchEvent = EventTarget.prototype.dispatchEvent;
 const addEventListener = EventTarget.prototype.addEventListener;
 const removeEventListener = EventTarget.prototype.removeEventListener;
+// The binding is the events builtin's export; the one-shot returns the
+// symbol under which EventTargetImpl looks up the listener-mutation hook.
+const kListenerChanged = binding._takeListenerChangedKey();
 
 // Construction token: AbortSignal instances come only from the factories in
 // this module (the controller, and the abort/timeout/any statics).
@@ -52,8 +73,25 @@ function timeoutError() {
   return e;
 }
 
+// The strong holds described in the header. Entries leave on abort, on the
+// last abort-listener removal, or when a composite loses its last source
+// (at which point nothing can ever abort it).
+const gcPersistentSignals = new Set();
+
+// Cancels the pending native timer of a collected timeout() signal.
+const timerRegistry = new FinalizationRegistry(function (timerId) {
+  clearTimeout(timerId);
+});
+
 let createAbortSignal;
 let signalAbort;
+let listenerChanged;
+let dependentPrune;
+let sourcePrune;
+// Prune callbacks arrive as posted GC-cleanup tasks; the registries are
+// constructed after the static block assigns the callbacks.
+let dependentPruneRegistry;
+let sourcePruneRegistry;
 
 class AbortSignal extends EventTarget {
   #aborted = false;
@@ -63,12 +101,16 @@ class AbortSignal extends EventTarget {
   // order is where it was first set; cleared assignments free the slot).
   #onabort = null;
   #onabortWrapper = null;
-  // any() linkage. #sources: the plain signals a live composite follows
-  // (null on plain signals and once aborted — composites never nest, any()
-  // flattens). #dependents: the live composites following this signal.
+  #isTimeout = false;
+  // any() linkage, all WeakRefs. #sources: the plain sources a live
+  // composite follows (null on plain signals and once aborted — composites
+  // never nest, any() flattens). #dependents: the live composites following
+  // this signal. #selfRef: the one WeakRef identity other signals hold for
+  // this one; doubles as the unregister token for the prune registries.
   #composite = false;
   #sources = null;
   #dependents = null;
+  #selfRef = null;
 
   constructor(token) {
     if (token !== kInternal) {
@@ -157,9 +199,20 @@ class AbortSignal extends EventTarget {
       );
     }
     const signal = createAbortSignal(false, undefined);
-    setTimeout(function () {
-      signalAbort(signal, timeoutError());
+    signal.#isTimeout = true;
+    // The timer closes over a WeakRef so an unobservable signal is
+    // collectable before it fires; the registry cancels the native timer if
+    // that happens. While the signal has abort listeners the hook below
+    // strong-holds it, so a pending observable abort is never dropped.
+    const ref = new WeakRef(signal);
+    const timerId = setTimeout(function () {
+      const s = WeakRefPrototypeDeref(ref);
+      if (s !== undefined) {
+        FinalizationRegistryPrototypeUnregister(timerRegistry, s);
+        signalAbort(s, timeoutError());
+      }
     }, delay);
+    FinalizationRegistryPrototypeRegister(timerRegistry, signal, timerId, signal);
     return signal;
   }
 
@@ -199,32 +252,50 @@ class AbortSignal extends EventTarget {
       }
     }
     result.#sources = [];
+    const resultRef = (result.#selfRef = new WeakRef(result));
     for (let i = 0; i < list.length; i++) {
       const s = list[i];
       if (s.#composite) {
-        // A live composite's sources are all live (it would have aborted with
-        // them otherwise); one with no sources can never abort and
+        // A live composite's sources are all live (it would have aborted
+        // with them otherwise); one with no sources can never abort and
         // contributes nothing.
         const underlying = s.#sources;
         for (let j = 0; j < underlying.length; j++) {
-          AbortSignal.#link(result, underlying[j]);
+          const src = WeakRefPrototypeDeref(underlying[j]);
+          if (src !== undefined) {
+            AbortSignal.#link(result, resultRef, src);
+          }
         }
       } else {
-        AbortSignal.#link(result, s);
+        AbortSignal.#link(result, resultRef, s);
       }
     }
     return result;
   }
 
-  static #link(result, source) {
-    if (ArrayPrototypeIndexOf(result.#sources, source) !== -1) {
+  static #link(result, resultRef, source) {
+    let sourceRef = source.#selfRef;
+    if (sourceRef === null) {
+      sourceRef = source.#selfRef = new WeakRef(source);
+    }
+    if (ArrayPrototypeIndexOf(result.#sources, sourceRef) !== -1) {
       return;
     }
-    ArrayPrototypePush(result.#sources, source);
+    ArrayPrototypePush(result.#sources, sourceRef);
     if (source.#dependents === null) {
       source.#dependents = [];
     }
-    ArrayPrototypePush(source.#dependents, result);
+    ArrayPrototypePush(source.#dependents, resultRef);
+    // A timeout source followed only weakly would be collectable once app
+    // code drops it, silently never aborting the composite: hold it until
+    // its timer fires (retention bounded by the delay).
+    if (source.#isTimeout && !source.#aborted) {
+      SetPrototypeAdd(gcPersistentSignals, source);
+    }
+    FinalizationRegistryPrototypeRegister(
+      dependentPruneRegistry, result, { sourceRef, resultRef }, resultRef);
+    FinalizationRegistryPrototypeRegister(
+      sourcePruneRegistry, source, { sourceRef, resultRef }, resultRef);
   }
 
   static {
@@ -235,20 +306,26 @@ class AbortSignal extends EventTarget {
       return signal;
     };
 
-    // Detach an aborted composite from the sources it was following so a
-    // long-lived source doesn't retain it (and its listeners) forever.
+    // Detach an aborted composite from the sources it was following, and
+    // drop both prune registrations (their WeakRefs are dead weight once the
+    // links are gone).
     const unlink = (signal) => {
       const sources = signal.#sources;
       if (sources === null) {
         return;
       }
       signal.#sources = null;
+      const selfRef = signal.#selfRef;
+      if (selfRef !== null) {
+        FinalizationRegistryPrototypeUnregister(dependentPruneRegistry, selfRef);
+        FinalizationRegistryPrototypeUnregister(sourcePruneRegistry, selfRef);
+      }
       for (let i = 0; i < sources.length; i++) {
-        const dependents = sources[i].#dependents;
-        if (dependents !== null) {
-          const idx = ArrayPrototypeIndexOf(dependents, signal);
+        const source = WeakRefPrototypeDeref(sources[i]);
+        if (source !== undefined && source.#dependents !== null) {
+          const idx = ArrayPrototypeIndexOf(source.#dependents, selfRef);
           if (idx !== -1) {
-            ArrayPrototypeSplice(dependents, idx, 1);
+            ArrayPrototypeSplice(source.#dependents, idx, 1);
           }
         }
       }
@@ -269,14 +346,15 @@ class AbortSignal extends EventTarget {
       }
       signal.#aborted = true;
       signal.#reason = reason;
+      SetPrototypeDelete(gcPersistentSignals, signal);
       unlink(signal);
       const dependents = signal.#dependents;
       signal.#dependents = null;
       const toAbort = [];
       if (dependents !== null) {
         for (let i = 0; i < dependents.length; i++) {
-          const d = dependents[i];
-          if (!d.#aborted) {
+          const d = WeakRefPrototypeDeref(dependents[i]);
+          if (d !== undefined && !d.#aborted) {
             d.#aborted = true;
             d.#reason = reason;
             ArrayPrototypePush(toAbort, d);
@@ -285,12 +363,81 @@ class AbortSignal extends EventTarget {
       }
       fireAbort(signal);
       for (let i = 0; i < toAbort.length; i++) {
-        unlink(toAbort[i]);
-        fireAbort(toAbort[i]);
+        const d = toAbort[i];
+        SetPrototypeDelete(gcPersistentSignals, d);
+        unlink(d);
+        fireAbort(d);
+      }
+    };
+
+    // Listener accounting (events.js kListenerChanged hook, installed on the
+    // prototype below): a live timeout signal or non-empty composite is
+    // strong-held exactly while an abort listener could observe its abort.
+    listenerChanged = (signal, type, count) => {
+      if (type !== "abort") {
+        return;
+      }
+      if (signal.#aborted) {
+        SetPrototypeDelete(gcPersistentSignals, signal);
+        return;
+      }
+      const needsPersist =
+        signal.#isTimeout ||
+        (signal.#composite &&
+          signal.#sources !== null &&
+          signal.#sources.length > 0);
+      if (!needsPersist) {
+        return;
+      }
+      if (count > 0) {
+        SetPrototypeAdd(gcPersistentSignals, signal);
+      } else {
+        SetPrototypeDelete(gcPersistentSignals, signal);
+      }
+    };
+
+    // A collected composite leaves each surviving source's dependent list,
+    // and its remaining pair registrations go with it.
+    dependentPrune = ({ sourceRef, resultRef }) => {
+      FinalizationRegistryPrototypeUnregister(sourcePruneRegistry, resultRef);
+      const source = WeakRefPrototypeDeref(sourceRef);
+      if (source === undefined || source.#dependents === null) {
+        return;
+      }
+      const idx = ArrayPrototypeIndexOf(source.#dependents, resultRef);
+      if (idx !== -1) {
+        ArrayPrototypeSplice(source.#dependents, idx, 1);
+      }
+    };
+
+    // A collected source leaves the composite's source list; a composite
+    // with no sources left can never abort, so it stops being strong-held
+    // even if listeners remain.
+    sourcePrune = ({ sourceRef, resultRef }) => {
+      const composite = WeakRefPrototypeDeref(resultRef);
+      if (composite === undefined || composite.#sources === null) {
+        return;
+      }
+      const idx = ArrayPrototypeIndexOf(composite.#sources, sourceRef);
+      if (idx !== -1) {
+        ArrayPrototypeSplice(composite.#sources, idx, 1);
+      }
+      if (composite.#sources.length === 0) {
+        SetPrototypeDelete(gcPersistentSignals, composite);
       }
     };
   }
 }
+
+dependentPruneRegistry = new FinalizationRegistry(dependentPrune);
+sourcePruneRegistry = new FinalizationRegistry(sourcePrune);
+
+ObjectDefineProperty(AbortSignal.prototype, kListenerChanged, {
+  value: listenerChanged,
+  writable: false,
+  enumerable: false,
+  configurable: false,
+});
 
 class AbortController {
   #signal = createAbortSignal(false, undefined);

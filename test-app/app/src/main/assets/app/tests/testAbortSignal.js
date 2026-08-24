@@ -248,3 +248,131 @@ describe("AbortController / AbortSignal", function () {
         expect(function () { signalGetter.call({}); }).toThrowError(TypeError);
     });
 });
+
+describe("AbortSignal GC behavior", function () {
+    // WeakRef clearing and FinalizationRegistry cleanup both need turns of
+    // the runloop after a collection (cleanup arrives as posted V8 tasks),
+    // so every spec polls with a collect per turn instead of asserting
+    // synchronously after __collect().
+    function pollGC(predicate, cb) {
+        let turns = 0;
+        (function poll() {
+            __collect();
+            if (predicate() || turns >= 100) {
+                cb();
+                return;
+            }
+            turns++;
+            setTimeout(poll, 20);
+        })();
+    }
+
+    it("finalization registry cleanup runs on this runtime (substrate)", function (done) {
+        let fired = false;
+        const registry = new FinalizationRegistry(function () { fired = true; });
+        (function () { registry.register({}, 0); })();
+        pollGC(function () { return fired; }, function () {
+            expect(fired).toBe(true);
+            done();
+        });
+    });
+
+    it("an unobserved timeout signal is collectable before its timer fires", function (done) {
+        const wr = (function () {
+            return new WeakRef(AbortSignal.timeout(60000));
+        })();
+        pollGC(function () { return wr.deref() === undefined; }, function () {
+            expect(wr.deref()).toBeUndefined();
+            done();
+        });
+    });
+
+    it("a listened timeout signal survives GC and still aborts", function (done) {
+        let reasonName = null;
+        (function () {
+            AbortSignal.timeout(300).addEventListener("abort", function (event) {
+                reasonName = event.target.reason.name;
+            });
+        })();
+        __collect();
+        pollGC(function () { return reasonName !== null; }, function () {
+            expect(reasonName).toBe("TimeoutError");
+            done();
+        });
+    });
+
+    it("an unobserved composite is collectable while its source lives", function (done) {
+        const controller = new AbortController();
+        const wr = (function () {
+            return new WeakRef(AbortSignal.any([controller.signal]));
+        })();
+        pollGC(function () { return wr.deref() === undefined; }, function () {
+            expect(wr.deref()).toBeUndefined();
+            expect(function () { controller.abort(); }).not.toThrow();
+            done();
+        });
+    });
+
+    it("a listened composite with a live source survives GC and aborts", function (done) {
+        const controller = new AbortController();
+        let got = null;
+        (function () {
+            AbortSignal.any([controller.signal]).addEventListener("abort", function (event) {
+                got = event.target.reason;
+            });
+        })();
+        __collect();
+        setTimeout(function () {
+            __collect();
+            const reason = new Error("late abort");
+            controller.abort(reason);
+            expect(got).toBe(reason);
+            done();
+        }, 50);
+    });
+
+    it("a composite keeps a dropped timeout source alive until it fires", function (done) {
+        let reasonName = null;
+        (function () {
+            AbortSignal.any([AbortSignal.timeout(300)]).addEventListener("abort", function (event) {
+                reasonName = event.target.reason.name;
+            });
+        })();
+        __collect();
+        pollGC(function () { return reasonName !== null; }, function () {
+            expect(reasonName).toBe("TimeoutError");
+            done();
+        });
+    });
+
+    it("a listened composite is released once its last source dies", function (done) {
+        const wr = (function () {
+            const controller = new AbortController();
+            const composite = AbortSignal.any([controller.signal]);
+            composite.addEventListener("abort", function () {});
+            return new WeakRef(composite);
+        })();
+        // First the source must be collected (nothing holds it), then the
+        // prune callback empties the composite's sources and drops it from
+        // the persistent set, and only then can the composite itself go.
+        pollGC(function () { return wr.deref() === undefined; }, function () {
+            expect(wr.deref()).toBeUndefined();
+            done();
+        });
+    });
+
+    it("removing the last abort listener releases a timeout signal", function (done) {
+        let wr = null;
+        (function () {
+            const signal = AbortSignal.timeout(60000);
+            const listener = function () {};
+            signal.addEventListener("abort", listener);
+            signal.removeEventListener("abort", listener);
+            wr = new WeakRef(signal);
+        })();
+        pollGC(function () { return wr.deref() === undefined; }, function () {
+            expect(wr.deref()).toBeUndefined();
+            done();
+        });
+    });
+});

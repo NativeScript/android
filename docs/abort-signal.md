@@ -27,6 +27,35 @@ constructor` — instances come from a controller or one of the statics.
   follows `a` and `b` directly. Per spec, every affected signal's
   `aborted`/`reason` flips before the first `abort` event fires.
 
+## GC contract
+
+The implementation is GC-transparent the way Node's is: internal references
+never keep an unobservable signal alive, and never let an observable abort
+be dropped.
+
+- A `timeout()` timer closes over a `WeakRef`, so a signal nobody can
+  observe is collectable before it fires; a `FinalizationRegistry` cancels
+  the pending native timer when that happens.
+- `any()` links are `WeakRef`s in both directions (source → dependent and
+  dependent → source), with prune registries clearing dead entries — so
+  per-request composites never accumulate on a long-lived source, and a
+  collected source leaves its composites' source lists (a composite whose
+  sources are all gone can never abort and stops being retained).
+- Weakness alone would silently drop the abort of a signal that is
+  listened-to but otherwise unreachable, so a strong `gcPersistentSignals`
+  set holds exactly the signals whose abort someone can still observe: live
+  timeout signals and live non-empty composites while they have `abort`
+  listeners (`onabort` counts — it registers a real listener), plus timeout
+  sources a composite follows, until their timer fires. The listener
+  accounting comes from an internal symbol-keyed hook the events builtin
+  calls from every listener-list mutation path (add, remove, and `once`
+  removal during dispatch); the key is handed to the abort builtin in a
+  one-shot during init and never reaches app code, so the accounting cannot
+  be bypassed via a captured `EventTarget.prototype.addEventListener`.
+
+Entries leave the persistent set on abort, on the last abort-listener
+removal, or when a composite loses its last source.
+
 ## Deviations from Node / the web
 
 - **No `DOMException`.** As with [structuredClone](structured-clone.md) and
@@ -34,14 +63,6 @@ constructor` — instances come from a controller or one of the statics.
   instances with `name` patched: `"AbortError"` (default abort) and
   `"TimeoutError"` (timeout). `instanceof DOMException` checks cannot work;
   match on `reason.name`.
-- **No `WeakRef` bookkeeping.** Node wraps timeout signals and `any()`
-  linkage in `WeakRef`s/`FinalizationRegistry`s so an unobserved signal can
-  be collected early and timers never keep the process alive. Here a
-  `timeout()` timer holds its signal strongly until it fires — retention is
-  bounded by the delay, and looper timers don't gate process liveness — and
-  `any()` links source → dependent strongly, unlinking as soon as either
-  side aborts. The visible behavior is the same; only collection timing
-  differs.
 - Abort events carry no `isTrusted` flag (the runtime's `Event` doesn't
   model it).
 

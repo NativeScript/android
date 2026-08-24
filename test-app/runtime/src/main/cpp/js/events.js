@@ -38,6 +38,19 @@ Event.prototype.stopImmediatePropagation = function () {
 // user code runs); until then a thrown listener is swallowed.
 var reportListenerError = function (e) {};
 
+// Internal listener-mutation hook. A target (in practice: AbortSignal, on
+// its prototype) may carry a function under this symbol; it is called with
+// (target, type, newCount) from every path that changes a listener list —
+// add, remove, and the once-splice inside dispatch. The key never reaches
+// app code (handed to the abort-signal builtin through a one-shot below),
+// so the accounting cannot be bypassed the way an overridable
+// addEventListener could.
+var kListenerChanged = Symbol("listenerChanged");
+function notifyListenerChanged(target, type, count) {
+  var hook = target[kListenerChanged];
+  if (hook !== undefined) { hook(target, type, count); }
+}
+
 function EventTargetImpl() { this._listeners = ObjectCreate(null); }
 EventTargetImpl.prototype.addEventListener = function (type, callback, options) {
   if (callback === null || callback === undefined) { return; }
@@ -55,6 +68,7 @@ EventTargetImpl.prototype.addEventListener = function (type, callback, options) 
     if (list[i].callback === callback && list[i].capture === capture) { return; }
   }
   ArrayPrototypePush(list, { callback: callback, once: once, capture: capture });
+  notifyListenerChanged(this, type, list.length);
 };
 EventTargetImpl.prototype.removeEventListener = function (type, callback, options) {
   type = String(type);
@@ -69,6 +83,7 @@ EventTargetImpl.prototype.removeEventListener = function (type, callback, option
   for (var i = 0; i < list.length; i++) {
     if (list[i].callback === callback && list[i].capture === capture) {
       ArrayPrototypeSplice(list, i, 1);
+      notifyListenerChanged(this, type, list.length);
       return;
     }
   }
@@ -85,7 +100,10 @@ EventTargetImpl.prototype.dispatchEvent = function (event) {
       var entry = snapshot[i];
       var idx = ArrayPrototypeIndexOf(list, entry);
       if (idx === -1) { continue; }  // removed since snapshot
-      if (entry.once) { ArrayPrototypeSplice(list, idx, 1); }
+      if (entry.once) {
+        ArrayPrototypeSplice(list, idx, 1);
+        notifyListenerChanged(this, event.type, list.length);
+      }
       var cb = entry.callback;
       try {
         if (typeof cb === "function") {
@@ -114,6 +132,14 @@ var globalTarget = new EventTargetImpl();
 globalTarget._installListenerErrorReporter = function (fn) {
   reportListenerError = fn;
   delete globalTarget._installListenerErrorReporter;
+};
+// One-shot handoff of the listener-mutation hook key to the abort-signal
+// builtin, which Events::Init runs next with this export as its binding.
+// Same lifecycle as _installListenerErrorReporter: consumed during runtime
+// init, gone before user code can reach the backing target.
+globalTarget._takeListenerChangedKey = function () {
+  delete globalTarget._takeListenerChangedKey;
+  return kListenerChanged;
 };
 g.addEventListener = function (type, callback, options) {
   return globalTarget.addEventListener(type, callback, options);
