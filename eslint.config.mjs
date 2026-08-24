@@ -16,6 +16,7 @@ const capturedStatics = [
   ['ArrayBuffer', 'isView', 'ArrayBufferIsView'],
   ['JSON', 'stringify', 'JSONStringify'],
   ['Number', 'isFinite', 'NumberIsFinite'],
+  ['Number', 'isInteger', 'NumberIsInteger'],
   ['Number', 'isNaN', 'NumberIsNaN'],
   ['Number', 'parseFloat', 'NumberParseFloat'],
   ['Number', 'parseInt', 'NumberParseInt'],
@@ -31,7 +32,7 @@ const capturedStatics = [
 
 // Captured constructors. A destructure from `primordials` shadows the global,
 // so these only fire on the unguarded reference.
-const restrictedGlobals = ['Date', 'Map', 'Number', 'Proxy', 'Set', 'String', 'TypeError'].map((name) => ({
+const restrictedGlobals = ['Date', 'Map', 'Number', 'Proxy', 'RangeError', 'Set', 'String', 'TypeError'].map((name) => ({
   name,
   message: `Destructure ${name} from primordials — builtins must not read intrinsics off globals user code can replace.`,
 }));

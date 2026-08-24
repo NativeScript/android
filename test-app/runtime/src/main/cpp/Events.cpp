@@ -22,4 +22,11 @@ void Events::Init(Local<Context> context) {
     }
 
     runtime->GlobalEventTarget().Reset(isolate, result.As<Object>());
+
+    // AbortController/AbortSignal (internal/abort-signal.js) build directly on
+    // the event primitives installed above; no native binding, no export.
+    Local<Value> abortResult;
+    if (!BuiltinLoader::RunBuiltin(context, BuiltinId::kAbortSignal).ToLocal(&abortResult)) {
+        throw NativeScriptException("Events::Init: the abort-signal bootstrap failed");
+    }
 }
