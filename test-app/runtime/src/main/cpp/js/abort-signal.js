@@ -53,9 +53,9 @@ const clearTimeout = g.clearTimeout;
 const dispatchEvent = EventTarget.prototype.dispatchEvent;
 const addEventListener = EventTarget.prototype.addEventListener;
 const removeEventListener = EventTarget.prototype.removeEventListener;
-// The binding is the events builtin's export; the one-shot returns the
-// symbol under which EventTargetImpl looks up the listener-mutation hook.
-const kListenerChanged = binding._takeListenerChangedKey();
+// Published by events.js: the symbol under which EventTargetImpl looks up
+// the listener-mutation hook.
+const kListenerChanged = internals.kListenerChanged;
 
 // Construction token: AbortSignal instances come only from the factories in
 // this module (the controller, and the abort/timeout/any statics).

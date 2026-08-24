@@ -9,8 +9,8 @@ build time a CMake custom command runs `tools/js2c.mjs`, which embeds them into
 ## Contract (Node's module wrapper + internalBinding idiom)
 
 Every file is compiled as a **function body** via `v8::ScriptCompiler::CompileFunction`
-with the fixed parameters `exports`, `require`, `module`, `binding` and
-`primordials`:
+with the fixed parameters `exports`, `require`, `module`, `binding`,
+`primordials` and `internals`:
 
 ```js
 const { someNative, anotherNative } = binding;
@@ -29,6 +29,18 @@ module.exports = somethingTheCallSiteNeeds;
   Requiring a module that is still loading throws rather than recursing.
 - `primordials` is the frozen intrinsics snapshot built by `primordials.js`
   (see below), the same object for every builtin in an isolate.
+- `internals` is one plain per-isolate object handed identically to every
+  builtin and reachable from nowhere else — the private channel for
+  cross-builtin capabilities that must never leak to app code (the
+  `kListenerChanged` hook key events.js publishes for abort-signal.js, the
+  `setListenerErrorReporter` setter error-events.js calls). Producers
+  publish during their init, consumers read during theirs, so the
+  `PrepareV8Runtime` ordering is the dependency graph; a missing key fails
+  loudly at init, not at first use. **Interim mechanism**: if cross-builtin
+  needs outgrow one shared object (many producers, lazy consumers), migrate
+  to a Node-style private internal-module tier — `require("internal/…")`
+  resolved for builtins only, never through the public `ns:`/`node:`
+  registry — and fold `internals` into it.
 - **`module.exports` is the export channel** — whatever it holds when the file
   finishes is what `RunBuiltin` hands back to C++ (used for factory functions
   and init results). Both CommonJS styles work: replace the whole export with

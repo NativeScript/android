@@ -24,11 +24,11 @@ void Events::Init(Local<Context> context) {
     runtime->GlobalEventTarget().Reset(isolate, result.As<Object>());
 
     // AbortController/AbortSignal (internal/abort-signal.js) build directly on
-    // the event primitives installed above. The events export is its binding:
-    // the abort builtin takes the one-shot listener-mutation hook key from it
-    // (_takeListenerChangedKey) for its GC-liveness accounting.
+    // the event primitives installed above; the listener-mutation hook key for
+    // its GC-liveness accounting arrives through the shared `internals`
+    // parameter, published by the events builtin.
     Local<Value> abortResult;
-    if (!BuiltinLoader::RunBuiltin(context, BuiltinId::kAbortSignal, result).ToLocal(&abortResult)) {
+    if (!BuiltinLoader::RunBuiltin(context, BuiltinId::kAbortSignal).ToLocal(&abortResult)) {
         throw NativeScriptException("Events::Init: the abort-signal bootstrap failed");
     }
 }

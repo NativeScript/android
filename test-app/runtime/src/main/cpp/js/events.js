@@ -34,18 +34,21 @@ Event.prototype.stopImmediatePropagation = function () {
 // A listener that throws must not stop other listeners: route the thrown
 // value to the native fatal tail instead of ever recursively dispatching
 // another `error` event from inside dispatch. The error-events layer
-// installs the real reporter via _installListenerErrorReporter (before any
-// user code runs); until then a thrown listener is swallowed.
+// installs the real reporter via internals.setListenerErrorReporter (before
+// any user code runs); until then a thrown listener is swallowed.
 var reportListenerError = function (e) {};
+internals.setListenerErrorReporter = function (fn) {
+  reportListenerError = fn;
+};
 
 // Internal listener-mutation hook. A target (in practice: AbortSignal, on
 // its prototype) may carry a function under this symbol; it is called with
 // (target, type, newCount) from every path that changes a listener list —
-// add, remove, and the once-splice inside dispatch. The key never reaches
-// app code (handed to the abort-signal builtin through a one-shot below),
-// so the accounting cannot be bypassed the way an overridable
-// addEventListener could.
+// add, remove, and the once-splice inside dispatch. The key travels only
+// through `internals`, so the accounting cannot be bypassed the way an
+// overridable addEventListener could.
 var kListenerChanged = Symbol("listenerChanged");
+internals.kListenerChanged = kListenerChanged;
 function notifyListenerChanged(target, type, count) {
   var hook = target[kListenerChanged];
   if (hook !== undefined) { hook(target, type, count); }
@@ -125,22 +128,6 @@ EventTargetImpl.prototype.dispatchEvent = function (event) {
 // is intentionally NOT made an EventTarget; only the three methods are
 // bound onto it.
 var globalTarget = new EventTargetImpl();
-// Called by the error-events layer to install the native listener-error
-// reporter into this closure. One-shot: the backing target leaks to app
-// code via event.target, so the hook removes itself after the install
-// (which happens during runtime init, before any user code runs).
-globalTarget._installListenerErrorReporter = function (fn) {
-  reportListenerError = fn;
-  delete globalTarget._installListenerErrorReporter;
-};
-// One-shot handoff of the listener-mutation hook key to the abort-signal
-// builtin, which Events::Init runs next with this export as its binding.
-// Same lifecycle as _installListenerErrorReporter: consumed during runtime
-// init, gone before user code can reach the backing target.
-globalTarget._takeListenerChangedKey = function () {
-  delete globalTarget._takeListenerChangedKey;
-  return kListenerChanged;
-};
 g.addEventListener = function (type, callback, options) {
   return globalTarget.addEventListener(type, callback, options);
 };

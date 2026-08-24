@@ -11,11 +11,16 @@ public:
     /*
      * Compiles the builtin identified by id as a function body with the fixed
      * parameters `exports`, `require`, `module`, `binding` (Node's module
-     * wrapper plus its internalBinding idiom) and `primordials`, calls it with
-     * the given bag of natives (or undefined when omitted) plus this isolate's
-     * frozen intrinsics snapshot, and returns the resulting `module.exports`.
-     * `require` reaches the builtin modules (NsBuiltinModules) and nothing
-     * else. The snapshot is produced by the kPrimordials builtin on first use
+     * wrapper plus its internalBinding idiom), `primordials` and `internals`,
+     * calls it with the given bag of natives (or undefined when omitted), this
+     * isolate's frozen intrinsics snapshot, and the isolate's shared internals
+     * object, and returns the resulting `module.exports`. `require` reaches
+     * the builtin modules (NsBuiltinModules) and nothing else. `internals` is
+     * one plain object per isolate handed identically to every builtin and
+     * never exposed anywhere app code can reach: the channel for
+     * cross-builtin capabilities (see the js README; interim until a
+     * Node-style private internal-module tier exists).
+     * The snapshot is produced by the kPrimordials builtin on first use
      * and cached per isolate, so it is taken before any user code can replace
      * a global.
      * Scripts carry an "internal/<name>.js" origin so runtime frames are
