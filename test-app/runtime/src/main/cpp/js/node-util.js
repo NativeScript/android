@@ -11,6 +11,18 @@
 // surfaces can diverge without either one carrying the other's baggage.
 
 const { ObjectFreeze } = primordials;
-const { inspect, format } = require("ns:util");
+const util = require("ns:util");
+const { inspect, format } = util;
 
-module.exports = ObjectFreeze({ inspect, format });
+// Node exposes the two encoding interfaces on util; they stay lazy here for
+// the same reason they are lazy on ns:util.
+module.exports = ObjectFreeze({
+  inspect,
+  format,
+  get TextEncoder() {
+    return util.TextEncoder;
+  },
+  get TextDecoder() {
+    return util.TextDecoder;
+  },
+});

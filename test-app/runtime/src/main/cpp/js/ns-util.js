@@ -148,4 +148,16 @@ function format(...args) {
   return str;
 }
 
-module.exports = ObjectFreeze({ inspect, format });
+// `binding.TextEncoder`/`.TextDecoder` are lazy: reading either one runs the
+// text-encoding builtin, so the reads stay inside these getters instead of
+// joining the destructuring at the top of the file.
+module.exports = ObjectFreeze({
+  inspect,
+  format,
+  get TextEncoder() {
+    return binding.TextEncoder;
+  },
+  get TextDecoder() {
+    return binding.TextDecoder;
+  },
+});

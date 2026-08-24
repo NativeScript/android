@@ -39,6 +39,15 @@ constexpr const char* kInternalsParamName = "internals";
 constexpr size_t kParamCount = 6;
 
 /*
+ * `module.exports` of every builtin that has run in this isolate, indexed by
+ * id. Per isolate because a builtin is a singleton per realm, so workers run
+ * their own copy of a file and export their own objects.
+ */
+struct BuiltinExportsState {
+    v8::Global<Object> exports[static_cast<unsigned>(BuiltinId::kCount)];
+};
+
+/*
  * This runtime's intrinsics snapshot, builtin require and shared internals
  * object. Per-runtime state rather than an isolate-keyed shared map, so
  * reaching it needs no lock and it is released with the runtime, while the
@@ -256,6 +265,34 @@ MaybeLocal<Value> BuiltinLoader::RunBuiltin(Local<Context> context, BuiltinId id
     }
 
     return CallBuiltin(context, id, binding, primordials, internals);
+}
+
+MaybeLocal<Object> BuiltinLoader::GetExports(Local<Context> context, BuiltinId id,
+                                             BindingFactory bindingFactory) {
+    Isolate* isolate = v8::Isolate::GetCurrent();
+    auto* state = RuntimeState::For<BuiltinExportsState>(isolate);
+    if (state == nullptr) {
+        return MaybeLocal<Object>();
+    }
+
+    const unsigned index = static_cast<unsigned>(id);
+    if (!state->exports[index].IsEmpty()) {
+        return state->exports[index].Get(isolate);
+    }
+
+    Local<Object> binding;
+    if (bindingFactory != nullptr && !bindingFactory(context).ToLocal(&binding)) {
+        return MaybeLocal<Object>();
+    }
+
+    Local<Value> result;
+    if (!RunBuiltin(context, id, binding).ToLocal(&result) || !result->IsObject()) {
+        return MaybeLocal<Object>();
+    }
+
+    Local<Object> exports = result.As<Object>();
+    state->exports[index].Reset(isolate, exports);
+    return exports;
 }
 
 }  // namespace tns

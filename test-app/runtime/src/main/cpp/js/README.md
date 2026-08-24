@@ -72,12 +72,15 @@ Most builtins run during `Runtime::PrepareV8Runtime` and install their globals
 themselves. A **lazy** builtin instead exports its interfaces and is run by
 `LazyGlobals` (`src/main/cpp/LazyGlobals.cpp`), which registers each global it
 backs as a lazy data property on the global template: the first read of the
-name runs the file, caches its `module.exports` per isolate so sibling names
-share one run, and V8 replaces the property with a plain data property. Until
-then nothing of it exists — no compile, no run, no allocation.
-`text-encoding.js` (`TextEncoder`/`TextDecoder`) and `base64.js`
-(`atob`/`btoa`) are the current ones; new globals join by adding a row to
-`kLazyGlobals`.
+name runs the file through the per-isolate exports cache
+(`BuiltinLoader::GetExports`) so sibling names share one run, and V8 replaces
+the property with a plain data property. That cache is the same one the
+`ns:`/`node:` module registry uses, so a module re-exporting a lazy builtin's
+interfaces (`ns:util`'s `TextEncoder`) hands out the objects the globals hold,
+in either access order. Until then nothing of it exists — no compile, no run,
+no allocation. `text-encoding.js` (`TextEncoder`/`TextDecoder`) and
+`base64.js` (`atob`/`btoa`) are the current ones; new globals join by adding a
+row to `kLazyGlobals`.
 
 The two extra rules a lazy builtin lives by:
 

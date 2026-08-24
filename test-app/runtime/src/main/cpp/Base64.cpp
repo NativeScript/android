@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "BuiltinLoader.h"
 #include "Util.h"
 
 using namespace v8;
@@ -167,14 +168,18 @@ void AtobCallback(const FunctionCallbackInfo<Value>& info) {
     }
 }
 
-}  // namespace
-
-Local<Object> Base64::CreateBinding(Local<Context> context) {
+MaybeLocal<Object> CreateBinding(Local<Context> context) {
     Isolate* isolate = v8::Isolate::GetCurrent();
     Local<Object> binding = Object::New(isolate);
     tns::SetMethodNoSideEffect(context, binding, "btoa", BtoaCallback);
     tns::SetMethodNoSideEffect(context, binding, "atob", AtobCallback);
     return binding;
+}
+
+}  // namespace
+
+MaybeLocal<Object> Base64::GetExports(Local<Context> context) {
+    return BuiltinLoader::GetExports(context, BuiltinId::kBase64, CreateBinding);
 }
 
 }  // namespace tns

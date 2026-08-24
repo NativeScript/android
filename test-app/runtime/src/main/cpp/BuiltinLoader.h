@@ -9,6 +9,13 @@ namespace tns {
 class BuiltinLoader {
 public:
     /*
+     * Builds the bag of natives a builtin receives as its `binding` parameter.
+     * GetExports calls it only when the builtin actually runs, so a call site
+     * that hits the cache pays nothing for it.
+     */
+    using BindingFactory = v8::MaybeLocal<v8::Object> (*)(v8::Local<v8::Context>);
+
+    /*
      * Compiles the builtin identified by id as a function body with the fixed
      * parameters `exports`, `require`, `module`, `binding` (Node's module
      * wrapper plus its internalBinding idiom), `primordials` and `internals`,
@@ -32,6 +39,18 @@ public:
     static v8::MaybeLocal<v8::Value> RunBuiltin(
             v8::Local<v8::Context> context, BuiltinId id,
             v8::Local<v8::Value> binding = v8::Local<v8::Value>());
+
+    /*
+     * The builtin's `module.exports`, running it at most once per isolate.
+     * Every entry point that reaches the same file — the `ns:`/`node:` module
+     * registry, the lazy-global tier, another builtin's `require` — shares
+     * that one run, so a value a file exports is the same object through all
+     * of them. Empty when the builtin failed to run (an exception is pending)
+     * or exported a non-object.
+     */
+    static v8::MaybeLocal<v8::Object> GetExports(v8::Local<v8::Context> context,
+                                                 BuiltinId id,
+                                                 BindingFactory binding);
 };
 
 }  // namespace tns

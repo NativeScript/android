@@ -13,7 +13,13 @@ namespace tns {
  */
 class TextEncoding {
 public:
-    static v8::Local<v8::Object> CreateBinding(v8::Local<v8::Context> context);
+    /*
+     * The builtin's exports, `{ TextEncoder, TextDecoder }`, from the one run
+     * it gets per isolate. The lazy globals and `ns:util` both hand out these
+     * objects, so require("ns:util").TextDecoder === globalThis.TextDecoder
+     * whichever is reached first.
+     */
+    static v8::MaybeLocal<v8::Object> GetExports(v8::Local<v8::Context> context);
 
     // Bytes of decoder state the builtin must hand back on every decode call.
     static constexpr int kDecoderStateSize = 16;

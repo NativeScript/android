@@ -59,6 +59,7 @@ Rules:
 |---|---|
 | `inspect(value[, options])` | Formats any value for human consumption: depth-limited, output-capped, cycle-safe, never invokes getters (except a guarded `error.stack` read and custom `toString` overrides, which are honored). `options.depth` (number) overrides the default depth of 2. Other option keys are reserved. |
 | `format(fmt, ...args)` | Node-style printf formatting: `%s`, `%d`, `%i`, `%f`, `%j`, `%o`, `%O`, `%%`. Extra arguments are appended space-separated, objects rendered via `inspect`. When `fmt` is not a string or contains no substitutions, all arguments are formatted and joined with spaces. `console.*` routes its arguments through this, so `console.log("%d apples", 3)` works. |
+| `TextEncoder` / `TextDecoder` | The WHATWG encoding interfaces, **the very same class objects the globals of those names hold** (`require("ns:util").TextDecoder === globalThis.TextDecoder`). Reading either member is what materializes them, so requiring the module costs nothing extra. |
 
 ```js
 const { inspect, format } = require("ns:util");
@@ -76,6 +77,13 @@ inspect(cyclic); // '{ name: "root", self: [Circular] }'
 format("%s took %dms", "boot", 12.5); // "boot took 12.5ms"
 format("%j", { ok: true }); // '{"ok":true}'
 format("100% sure", "extra"); // "100% sure extra"  (no placeholder consumed)
+```
+
+```js
+const { TextEncoder, TextDecoder } = require("ns:util");
+
+TextDecoder === globalThis.TextDecoder; // true
+new TextDecoder().decode(new TextEncoder().encode("héllo")); // "héllo"
 ```
 
 **Stability caveat (verbatim from Node's contract):** the output of `inspect`
@@ -400,7 +408,7 @@ unmodified where a shim exists:
 
 | module | exports | notes |
 |---|---|---|
-| `node:util` | `inspect`, `format` | Re-exports `ns:util`'s members unchanged (`nodeUtil.inspect === nsUtil.inspect`) from a **distinct, separately frozen module object**. Documented as partial. |
+| `node:util` | `inspect`, `format`, `TextEncoder`, `TextDecoder` | Re-exports `ns:util`'s members unchanged (`nodeUtil.inspect === nsUtil.inspect`) from a **distinct, separately frozen module object**. `TextEncoder`/`TextDecoder` are the globals of those names, as they are in Node. Documented as partial. |
 | `node:url` | `fileURLToPath`, `pathToFileURL` | Node-strict converters between `file:` URLs and paths. Documented as partial — no `URL`/`URLSearchParams` re-exports (both are globals), no legacy `url.parse`/`format`/`resolve`. |
 | `node:module` | `createRequire` | Re-exports `ns:module`'s `createRequire` unchanged from a **distinct, separately frozen module object**. `createPumpingRequire` is deliberately absent: it has no Node counterpart, so code written against this shim keeps running on Node. `require.resolve`/`.cache`/`.main` are not implemented, and neither is any other `node:module` member (`Module`, `builtinModules`, `isBuiltin`, `register`, `syncBuiltinESMExports`). Documented as partial. |
 

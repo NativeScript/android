@@ -21,6 +21,12 @@ The tier is the intended home for further web globals (`Blob`, `fetch`,
 `test-app/runtime/src/main/cpp/js/README.md` for the rules a lazy builtin
 lives by.
 
+The per-isolate exports cache behind the tier (`BuiltinLoader::GetExports`) is
+shared with the `ns:`/`node:` module registry: `require("ns:util").TextDecoder`
+and `require("node:util").TextDecoder` are the very class objects the globals
+hold, whichever entry point is reached first
+(see [ns-builtin-modules](ns-builtin-modules.md)).
+
 ## TextEncoder / TextDecoder
 
 Node's split: `js/text-encoding.js` owns the WebIDL surface (brand checks via

@@ -2,8 +2,6 @@
 
 #include "ArgConverter.h"
 #include "Base64.h"
-#include "BuiltinLoader.h"
-#include "RuntimeState.h"
 #include "TextEncoding.h"
 
 using namespace v8;
@@ -12,59 +10,25 @@ namespace tns {
 
 namespace {
 
-using BindingFactory = Local<Object> (*)(Local<Context>);
+/*
+ * The builtin's `module.exports`, from the single run it gets per isolate
+ * (BuiltinLoader::GetExports). Two globals out of the same file therefore
+ * cost one run, and so does a module that exports the same interfaces.
+ */
+using ExportsAccessor = MaybeLocal<Object> (*)(Local<Context>);
 
 struct LazyGlobalEntry {
     const char* name;
-    BuiltinId builtin;
     const char* exportName;  // key of `name` in the builtin's module.exports
-    BindingFactory binding;  // natives the builtin needs, null if it needs none
+    ExportsAccessor exports;
 };
 
 constexpr LazyGlobalEntry kLazyGlobals[] = {
-        {"TextEncoder", BuiltinId::kTextEncoding, "TextEncoder",
-         TextEncoding::CreateBinding},
-        {"TextDecoder", BuiltinId::kTextEncoding, "TextDecoder",
-         TextEncoding::CreateBinding},
-        {"atob", BuiltinId::kBase64, "atob", Base64::CreateBinding},
-        {"btoa", BuiltinId::kBase64, "btoa", Base64::CreateBinding},
+        {"TextEncoder", "TextEncoder", TextEncoding::GetExports},
+        {"TextDecoder", "TextDecoder", TextEncoding::GetExports},
+        {"atob", "atob", Base64::GetExports},
+        {"btoa", "btoa", Base64::GetExports},
 };
-
-// One entry per builtin this tier can run, so two globals from the same file
-// cost one run.
-struct LazyGlobalsState {
-    v8::Global<Object> exports[static_cast<unsigned>(BuiltinId::kCount)];
-};
-
-MaybeLocal<Object> GetExports(Local<Context> context,
-                              const LazyGlobalEntry& entry) {
-    Isolate* isolate = v8::Isolate::GetCurrent();
-    auto* state = RuntimeState::For<LazyGlobalsState>(isolate);
-    if (state == nullptr) {
-        return MaybeLocal<Object>();
-    }
-
-    const unsigned index = static_cast<unsigned>(entry.builtin);
-    if (!state->exports[index].IsEmpty()) {
-        return state->exports[index].Get(isolate);
-    }
-
-    Local<Value> binding;
-    if (entry.binding != nullptr) {
-        binding = entry.binding(context);
-    }
-
-    Local<Value> result;
-    if (!BuiltinLoader::RunBuiltin(context, entry.builtin, binding)
-                 .ToLocal(&result) ||
-        !result->IsObject()) {
-        return MaybeLocal<Object>();
-    }
-
-    Local<Object> exports = result.As<Object>();
-    state->exports[index].Reset(isolate, exports);
-    return exports;
-}
 
 void LazyGlobalGetter(Local<v8::Name> property,
                       const PropertyCallbackInfo<Value>& info) {
@@ -74,7 +38,7 @@ void LazyGlobalGetter(Local<v8::Name> property,
     Local<Context> context = isolate->GetCurrentContext();
 
     Local<Object> exports;
-    if (!GetExports(context, *entry).ToLocal(&exports)) {
+    if (!entry->exports(context).ToLocal(&exports)) {
         return;
     }
     Local<Value> value;
