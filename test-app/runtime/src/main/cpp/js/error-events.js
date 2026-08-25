@@ -29,7 +29,7 @@ PromiseRejectionEvent.prototype.constructor = PromiseRejectionEvent;
 // A listener that throws must not stop other listeners: route the thrown
 // value to the native fatal tail instead of ever recursively dispatching
 // another `error` event from inside dispatch.
-internals.setListenerErrorReporter(function (e) {
+require("internal/events").setListenerErrorReporter(function (e) {
   try { nativeReportFatal(e, (e && e.stack) || ""); } catch (ignored) {}
 });
 

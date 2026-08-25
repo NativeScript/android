@@ -92,11 +92,11 @@ Both paths produce the same two arguments with the same exactness.
   asynchronous relative to `mark()`/`measure()` but precedes timer callbacks
   scheduled in the same turn. Callback exceptions are routed to
   `reportError`, so one throwing observer does not starve the others.
-- **No `DOMException`.** Errors the specs express as `DOMException` — the
-  `SyntaxError` for a missing mark name, the `InvalidModificationError` for
-  switching an observer between the `entryTypes` and `type` forms — are
-  `Error` instances with `name` patched. `err.name` checks work;
-  `instanceof DOMException` does not.
+- Errors the specs express as `DOMException` — the `SyntaxError` for a
+  missing mark name, the `InvalidModificationError` for switching an
+  observer between the `entryTypes` and `type` forms — are real
+  `DOMException`s: both `err.name` and `instanceof DOMException` checks
+  work.
 - Browser-only surface is absent: no resource/navigation timing, no
   `eventCounts`, and no `PerformanceTiming`-attribute resolution in
   `measure()`.

@@ -48,7 +48,7 @@ Two differences are intentional:
 
 ## Deviations from the specification
 
-- **`DataCloneError` is an `Error`, not a `DOMException`.** This runtime has no `DOMException`, so failures throw an `Error` whose `name` is set to `"DataCloneError"`. Detect failures with `e.name === "DataCloneError"`; `instanceof DOMException` cannot work.
+- **`DataCloneError` is a `DOMException`.** Failures throw a `DOMException` named `"DataCloneError"`, from the JS argument checks and the native serializer alike, so both `e.name === "DataCloneError"` and `instanceof DOMException` detect them. (The serializer falls back to a `DataCloneError`-named `Error` only when the builtin can no longer run, e.g. during isolate teardown.)
 - **Only `ArrayBuffer` is transferable.** The spec's other transferable types — `MessagePort`, `ImageBitmap`, `ReadableStream` and friends — do not exist here. A non-`ArrayBuffer` in the transfer list is a `DataCloneError`.
 - **Host objects are not cloneable by `structuredClone`.** The spec leaves platform objects to each host; here every native/interop wrapper is rejected with a `DataCloneError`, because a JavaScript copy detached from its native counterpart would be a wrapper around nothing. Worker `postMessage` deliberately differs — see above.
 

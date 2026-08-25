@@ -26,17 +26,15 @@ std::vector<uint8_t> builtinCache[static_cast<unsigned>(BuiltinId::kCount)];
  * parameters, mirroring Node's module wrapper: a file exports through
  * `module.exports`/`exports`, reaches sibling builtin modules through
  * `require`, natives arrive as properties of the `binding` bag (Node's
- * internalBinding idiom), intrinsics as properties of `primordials` and
- * cross-builtin capabilities as properties of `internals`; each file
- * destructures what it needs.
+ * internalBinding idiom) and intrinsics as properties of `primordials`; each
+ * file destructures what it needs.
  */
 constexpr const char* kExportsParamName = "exports";
 constexpr const char* kRequireParamName = "require";
 constexpr const char* kModuleParamName = "module";
 constexpr const char* kBindingParamName = "binding";
 constexpr const char* kPrimordialsParamName = "primordials";
-constexpr const char* kInternalsParamName = "internals";
-constexpr size_t kParamCount = 6;
+constexpr size_t kParamCount = 5;
 
 /*
  * `module.exports` of every builtin that has run in this isolate, indexed by
@@ -48,43 +46,19 @@ struct BuiltinExportsState {
 };
 
 /*
- * This runtime's intrinsics snapshot, builtin require and shared internals
- * object. Per-runtime state rather than an isolate-keyed shared map, so
- * reaching it needs no lock and it is released with the runtime, while the
- * isolate is still alive.
+ * This runtime's intrinsics snapshot and builtin require. Per-runtime state
+ * rather than an isolate-keyed shared map, so reaching it needs no lock and
+ * it is released with the runtime, while the isolate is still alive.
  */
 struct BuiltinRealm {
     v8::Global<v8::Object> primordials;
     v8::Global<v8::Function> builtinRequire;
-    v8::Global<v8::Object> internals;
 };
 
 /*
- * Per-isolate `internals` object handed to every builtin: the private channel
- * for cross-builtin capabilities (hook keys, setters) that must never reach
- * app code. Producers publish during their init, consumers read during
- * theirs, so PrepareV8Runtime's ordering is the dependency graph.
- */
-MaybeLocal<Object> GetInternals(Local<Context> context) {
-    Isolate* isolate = v8::Isolate::GetCurrent();
-
-    auto* realm = RuntimeState::For<BuiltinRealm>(isolate);
-    if (realm == nullptr) {
-        return MaybeLocal<Object>();
-    }
-
-    if (!realm->internals.IsEmpty()) {
-        return realm->internals.Get(isolate);
-    }
-
-    Local<Object> internals = Object::New(isolate);
-    realm->internals.Reset(isolate, internals);
-    return internals;
-}
-
-/*
- * The `require` every builtin receives: builtin specifiers only, so a builtin
- * can never reach application code or the filesystem.
+ * The `require` every builtin receives: builtin specifiers only — including
+ * the internal tier app code can never name — so a builtin can never reach
+ * application code or the filesystem.
  */
 void BuiltinRequireCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
@@ -99,7 +73,7 @@ void BuiltinRequireCallback(const FunctionCallbackInfo<Value>& info) {
     Local<Object> exports;
     if (NsBuiltinModules::GetExports(context, specifier).ToLocal(&exports)) {
         info.GetReturnValue().Set(exports);
-    } else if (!NsBuiltinModules::IsRegistered(specifier)) {
+    } else if (!NsBuiltinModules::IsRegistered(specifier, /* includeInternal */ true)) {
         isolate->ThrowException(Exception::Error(ArgConverter::ConvertToV8String(
                 isolate, NsBuiltinModules::NotFoundMessage(specifier))));
     }
@@ -149,8 +123,7 @@ MaybeLocal<v8::Function> CompileBuiltin(Local<Context> context, BuiltinId id) {
             ArgConverter::ConvertToV8String(isolate, kRequireParamName),
             ArgConverter::ConvertToV8String(isolate, kModuleParamName),
             ArgConverter::ConvertToV8String(isolate, kBindingParamName),
-            ArgConverter::ConvertToV8String(isolate, kPrimordialsParamName),
-            ArgConverter::ConvertToV8String(isolate, kInternalsParamName)};
+            ArgConverter::ConvertToV8String(isolate, kPrimordialsParamName)};
 
     Local<v8::Function> fn;
     if (!blob.empty()) {
@@ -189,7 +162,7 @@ MaybeLocal<v8::Function> CompileBuiltin(Local<Context> context, BuiltinId id) {
 }
 
 MaybeLocal<Value> CallBuiltin(Local<Context> context, BuiltinId id, Local<Value> binding,
-                              Local<Value> primordials, Local<Object> internals) {
+                              Local<Value> primordials) {
     Isolate* isolate = v8::Isolate::GetCurrent();
 
     Local<v8::Function> fn;
@@ -211,7 +184,7 @@ MaybeLocal<Value> CallBuiltin(Local<Context> context, BuiltinId id, Local<Value>
 
     Local<Value> args[] = {exportsObj, require, moduleObj,
                            binding.IsEmpty() ? Undefined(isolate).As<Value>() : binding,
-                           primordials, internals};
+                           primordials};
     if (fn->Call(context, Undefined(isolate), static_cast<int>(kParamCount), args).IsEmpty()) {
         return MaybeLocal<Value>();
     }
@@ -225,7 +198,7 @@ MaybeLocal<Value> CallBuiltin(Local<Context> context, BuiltinId id, Local<Value>
  * Builtins compiled later in the isolate's life get the same pristine
  * snapshot.
  */
-MaybeLocal<Object> GetPrimordials(Local<Context> context, Local<Object> internals) {
+MaybeLocal<Object> GetPrimordials(Local<Context> context) {
     Isolate* isolate = v8::Isolate::GetCurrent();
 
     auto* realm = RuntimeState::For<BuiltinRealm>(isolate);
@@ -238,8 +211,7 @@ MaybeLocal<Object> GetPrimordials(Local<Context> context, Local<Object> internal
     }
 
     Local<Value> result;
-    if (!CallBuiltin(context, BuiltinId::kPrimordials, Local<Value>(), Undefined(isolate),
-                     internals)
+    if (!CallBuiltin(context, BuiltinId::kPrimordials, Local<Value>(), Undefined(isolate))
                  .ToLocal(&result) ||
         !result->IsObject()) {
         return MaybeLocal<Object>();
@@ -254,17 +226,12 @@ MaybeLocal<Object> GetPrimordials(Local<Context> context, Local<Object> internal
 
 MaybeLocal<Value> BuiltinLoader::RunBuiltin(Local<Context> context, BuiltinId id,
                                             Local<Value> binding) {
-    Local<Object> internals;
-    if (!GetInternals(context).ToLocal(&internals)) {
-        return MaybeLocal<Value>();
-    }
-
     Local<Object> primordials;
-    if (!GetPrimordials(context, internals).ToLocal(&primordials)) {
+    if (!GetPrimordials(context).ToLocal(&primordials)) {
         return MaybeLocal<Value>();
     }
 
-    return CallBuiltin(context, id, binding, primordials, internals);
+    return CallBuiltin(context, id, binding, primordials);
 }
 
 MaybeLocal<Object> BuiltinLoader::GetExports(Local<Context> context, BuiltinId id,

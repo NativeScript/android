@@ -2,6 +2,7 @@
 
 #include "ArgConverter.h"
 #include "Base64.h"
+#include "BuiltinLoader.h"
 #include "TextEncoding.h"
 
 using namespace v8;
@@ -23,11 +24,25 @@ struct LazyGlobalEntry {
     ExportsAccessor exports;
 };
 
+/*
+ * Exports accessor for a builtin with no natives of its own; modules with a
+ * binding (TextEncoding, Base64) own a hand-written accessor instead.
+ */
+template <BuiltinId id>
+MaybeLocal<Object> BuiltinExports(Local<Context> context) {
+    return BuiltinLoader::GetExports(context, id, nullptr);
+}
+
 constexpr LazyGlobalEntry kLazyGlobals[] = {
         {"TextEncoder", "TextEncoder", TextEncoding::GetExports},
         {"TextDecoder", "TextDecoder", TextEncoding::GetExports},
         {"atob", "atob", Base64::GetExports},
         {"btoa", "btoa", Base64::GetExports},
+        {"DOMException", "DOMException", BuiltinExports<BuiltinId::kDomException>},
+        // events.js is an eager builtin (Events::Init), so this row never runs
+        // a file: the read hits the exports cache and only the placement is
+        // lazy.
+        {"CustomEvent", "CustomEvent", BuiltinExports<BuiltinId::kEvents>},
 };
 
 void LazyGlobalGetter(Local<v8::Name> property,

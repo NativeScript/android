@@ -4,21 +4,23 @@
 //
 // This file exports the two functions instead of installing them; the C++
 // lazy-global tier (LazyGlobals) places them and is what runs this file, on
-// the first read of either name. Nothing here may depend on a builtin that
-// runs after it, so `internals` is off limits — see the README.
+// the first read of either name. Anything needed from a sibling builtin
+// comes through `require` or `binding`, never init order — see the README.
 //
-// Deliberate deviation from the spec: no DOMException in this runtime, so the
-// failure is an Error with `name` patched to "InvalidCharacterError", the same
-// stand-in abort-signal.js and performance.js use. The native ops answer null
-// on failure rather than throwing, so that shape stays here.
-const { Error, TypeError } = primordials;
+// The native ops answer null on failure rather than throwing, so the
+// exception shape — an "InvalidCharacterError" DOMException, per the HTML
+// spec — stays here, required on first failure so well-formed input never
+// runs the dom-exception builtin.
+const { TypeError } = primordials;
 
 const { atob: decodeBase64, btoa: encodeBase64 } = binding;
 
+let DOMException;
 function invalidCharacterError() {
-  const e = new Error("Invalid character");
-  e.name = "InvalidCharacterError";
-  return e;
+  if (DOMException === undefined) {
+    ({ DOMException } = require("internal/dom-exception"));
+  }
+  return new DOMException("Invalid character", "InvalidCharacterError");
 }
 
 function btoa(data) {

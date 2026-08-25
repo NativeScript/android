@@ -4,8 +4,8 @@
 //
 // This file exports the two interfaces instead of installing them; the C++
 // lazy-global tier (LazyGlobals) places them and is what runs this file, on
-// the first read of either name. Nothing here may depend on a builtin that
-// runs after it, so `internals` is off limits — see the README.
+// the first read of either name. Anything needed from a sibling builtin
+// comes through `require` or `binding`, never init order — see the README.
 //
 // The supported encodings (utf-8, utf-16le, utf-16be, windows-1252) with
 // their complete label sets, the decoders and the UTF-8 encoder all live in

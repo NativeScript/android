@@ -71,6 +71,7 @@ set(RUNTIME_BUILTIN_JS
         ${RUNTIME_BUILTIN_JS_DIR}/abort-signal.js
         ${RUNTIME_BUILTIN_JS_DIR}/base64.js
         ${RUNTIME_BUILTIN_JS_DIR}/blob-url.js
+        ${RUNTIME_BUILTIN_JS_DIR}/dom-exception.js
         ${RUNTIME_BUILTIN_JS_DIR}/error-events.js
         ${RUNTIME_BUILTIN_JS_DIR}/events.js
         ${RUNTIME_BUILTIN_JS_DIR}/inspect.js

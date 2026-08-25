@@ -15,8 +15,9 @@ namespace tns {
  * with a plain data property so later reads cost nothing.
  *
  * A builtin behind this tier runs at an arbitrary point in the isolate's life
- * rather than during init, so it may only consume `internals` keys published
- * by eager builtins (see src/main/cpp/js/README.md).
+ * rather than during init, so anything it needs from a sibling builtin must
+ * come through `require` or its `binding`, never from init order (see
+ * src/main/cpp/js/README.md).
  */
 class LazyGlobals {
 public:

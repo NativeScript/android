@@ -37,13 +37,19 @@ struct Registration {
      * `node:` shim, which reaches its `ns:` module through require instead).
      */
     BuiltinLoader::BindingFactory binding;
+    /*
+     * The internal tier (src/main/cpp/js/README.md): resolvable only through
+     * the require builtins receive, never through the module system, so the
+     * file's exports can carry capabilities app code must not reach.
+     */
+    bool internalOnly = false;
 };
 
 /*
- * The v1 registry (docs/ns-builtin-modules.md). One specifier, one source
- * file: a `node:` shim is its own builtin that requires the `ns:` module it
- * adapts, so the two module objects stay distinct and the standard module
- * never carries compatibility code.
+ * The v1 registry (docs/ns-builtin-modules.md) plus the internal tier. One
+ * specifier, one source file: a `node:` shim is its own builtin that requires
+ * the `ns:` module it adapts, so the two module objects stay distinct and the
+ * standard module never carries compatibility code.
  */
 constexpr Registration kRegistry[] = {
         {"ns:module", BuiltinId::kNsModule, NsModuleBinding},
@@ -52,6 +58,8 @@ constexpr Registration kRegistry[] = {
         {"node:module", BuiltinId::kNodeModule, nullptr},
         {"node:url", BuiltinId::kNodeUrl, nullptr},
         {"node:util", BuiltinId::kNodeUtil, nullptr},
+        {"internal/dom-exception", BuiltinId::kDomException, nullptr, true},
+        {"internal/events", BuiltinId::kEvents, nullptr, true},
 };
 
 constexpr const char* kDebugKey = "debug";
@@ -303,8 +311,9 @@ bool NsBuiltinModules::IsNsScheme(const std::string& specifier) {
     return HasPrefix(specifier, kNsPrefix);
 }
 
-bool NsBuiltinModules::IsRegistered(const std::string& specifier) {
-    return Find(specifier) != nullptr;
+bool NsBuiltinModules::IsRegistered(const std::string& specifier, bool includeInternal) {
+    const Registration* registration = Find(specifier);
+    return registration != nullptr && (includeInternal || !registration->internalOnly);
 }
 
 std::string NsBuiltinModules::NotFoundMessage(const std::string& specifier) {
@@ -357,6 +366,15 @@ MaybeLocal<Object> NsBuiltinModules::GetExports(Local<Context> context,
 
 MaybeLocal<Module> NsBuiltinModules::GetModule(Local<Context> context,
                                                const std::string& specifier) {
+    /*
+     * The module system is the app-facing entry point; the internal tier only
+     * exists behind the require builtins receive.
+     */
+    const Registration* registration = Find(specifier);
+    if (registration == nullptr || registration->internalOnly) {
+        return MaybeLocal<Module>();
+    }
+
     Isolate* isolate = v8::Isolate::GetCurrent();
     RealmState* realmState = GetRealm(isolate);
     if (realmState == nullptr) {

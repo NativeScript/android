@@ -9,8 +9,8 @@ build time a CMake custom command runs `tools/js2c.mjs`, which embeds them into
 ## Contract (Node's module wrapper + internalBinding idiom)
 
 Every file is compiled as a **function body** via `v8::ScriptCompiler::CompileFunction`
-with the fixed parameters `exports`, `require`, `module`, `binding`,
-`primordials` and `internals`:
+with the fixed parameters `exports`, `require`, `module`, `binding` and
+`primordials`:
 
 ```js
 const { someNative, anotherNative } = binding;
@@ -27,20 +27,21 @@ module.exports = somethingTheCallSiteNeeds;
   `No such built-in module: <specifier>`. It is how a `node:` shim consumes the
   `ns:` module it adapts, and it materializes that module on first use.
   Requiring a module that is still loading throws rather than recursing.
+  It also resolves the **internal tier** (`internal/events`,
+  `internal/dom-exception`): registry rows marked internal-only in
+  `NsBuiltinModules.cpp` that the module system refuses, so only builtins can
+  name them — Node's internal-module idiom. This is the one channel for
+  cross-builtin capabilities that must never leak to app code (the
+  `kListenerChanged` hook key abort-signal.js takes from events.js, the
+  `setListenerErrorReporter` setter error-events.js calls): the producer puts
+  the capability in its `module.exports`, the consumer requires it.
+  `require("internal/…")` at first use runs the file through the shared
+  exports cache — for a consumer of an eager producer that is a cache hit,
+  and a miss runs the producer on demand. A consumer can therefore never
+  observe a missing capability: it gets the exports, or the require throws
+  (circular require, or the producer failing to run).
 - `primordials` is the frozen intrinsics snapshot built by `primordials.js`
   (see below), the same object for every builtin in an isolate.
-- `internals` is one plain per-isolate object handed identically to every
-  builtin and reachable from nowhere else — the private channel for
-  cross-builtin capabilities that must never leak to app code (the
-  `kListenerChanged` hook key events.js publishes for abort-signal.js, the
-  `setListenerErrorReporter` setter error-events.js calls). Producers
-  publish during their init, consumers read during theirs, so the
-  `PrepareV8Runtime` ordering is the dependency graph; a missing key fails
-  loudly at init, not at first use. **Interim mechanism**: if cross-builtin
-  needs outgrow one shared object (many producers, lazy consumers), migrate
-  to a Node-style private internal-module tier — `require("internal/…")`
-  resolved for builtins only, never through the public `ns:`/`node:`
-  registry — and fold `internals` into it.
 - **`module.exports` is the export channel** — whatever it holds when the file
   finishes is what `RunBuiltin` hands back to C++ (used for factory functions
   and init results). Both CommonJS styles work: replace the whole export with
@@ -78,17 +79,20 @@ the property with a plain data property. That cache is the same one the
 `ns:`/`node:` module registry uses, so a module re-exporting a lazy builtin's
 interfaces (`ns:util`'s `TextEncoder`) hands out the objects the globals hold,
 in either access order. Until then nothing of it exists — no compile, no run,
-no allocation. `text-encoding.js` (`TextEncoder`/`TextDecoder`) and
-`base64.js` (`atob`/`btoa`) are the current ones; new globals join by adding a
-row to `kLazyGlobals`.
+no allocation. `text-encoding.js` (`TextEncoder`/`TextDecoder`), `base64.js`
+(`atob`/`btoa`) and `dom-exception.js` (`DOMException`) are the current ones;
+new globals join by adding a row to `kLazyGlobals`.
+
+An **eager** file can also feed the tier: `events.js` (eager, `Events::Init`)
+exports `CustomEvent`, and the `CustomEvent` row reads it through the same
+exports cache — the run happened at init, so only the placement is lazy.
 
 The two extra rules a lazy builtin lives by:
 
-- **It runs at an arbitrary point in the isolate's life, not at init.** The
-  `internals` channel is therefore off limits: its producers publish during
-  their own init, and a consumer that reads a key it does not find fails at
-  first use instead of loudly at boot. Anything a lazy builtin needs from
-  another builtin has to come through `require` or its `binding`.
+- **It runs at an arbitrary point in the isolate's life, not at init.**
+  Anything it needs from another builtin has to come through `require`
+  (including the internal tier) or its `binding` — never from init-order
+  assumptions.
 - **It must not install anything on `globalThis`.** The C++ tier owns
   placement; a file that self-installs would have to run to do it, which is
   the thing being avoided.

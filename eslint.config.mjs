@@ -1,7 +1,7 @@
 // Lint setup for the runtime's builtin JavaScript
 // (test-app/runtime/src/main/cpp/js). Each file is compiled by BuiltinLoader
 // as a FUNCTION BODY with the fixed parameters `exports`, `require`, `module`,
-// `binding`, `primordials` and `internals` (see that directory's README.md), which are
+// `binding` and `primordials` (see that directory's README.md), which are
 // declared as globals here. no-undef is the typo net for binding-bag destructures and
 // native-global usage alike; no-restricted-properties keeps the captured
 // intrinsics from being read off the live globals again.
@@ -56,7 +56,6 @@ export default [
         module: 'readonly',
         binding: 'readonly',
         primordials: 'readonly',
-        internals: 'readonly',
         global: 'readonly',
         console: 'readonly',
         URL: 'readonly',

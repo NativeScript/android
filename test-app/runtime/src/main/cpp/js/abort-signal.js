@@ -16,15 +16,13 @@
 //   fires from every listener-list mutation path and cannot be bypassed
 //   from app code.
 //
-// Deliberate deviation from Node: no DOMException in this runtime — the
-// default abort and timeout reasons are Error instances with `name` patched
-// ("AbortError" / "TimeoutError"), the same stand-in performance.js and
-// structured-clone.js use.
+// The default abort and timeout reasons are DOMExceptions ("AbortError" /
+// "TimeoutError"), required from the internal tier on first use so an app
+// that never aborts never runs the dom-exception builtin.
 const {
   ArrayPrototypeIndexOf,
   ArrayPrototypePush,
   ArrayPrototypeSplice,
-  Error,
   FinalizationRegistry,
   FinalizationRegistryPrototypeRegister,
   FinalizationRegistryPrototypeUnregister,
@@ -54,23 +52,31 @@ const dispatchEvent = EventTarget.prototype.dispatchEvent;
 const addEventListener = EventTarget.prototype.addEventListener;
 const removeEventListener = EventTarget.prototype.removeEventListener;
 // Published by events.js: the symbol under which EventTargetImpl looks up
-// the listener-mutation hook.
-const kListenerChanged = internals.kListenerChanged;
+// the listener-mutation hook. events.js already ran (Events::Init), so this
+// require is a cache hit; a miss would run it on demand rather than fail.
+const { kListenerChanged } = require("internal/events");
 
 // Construction token: AbortSignal instances come only from the factories in
 // this module (the controller, and the abort/timeout/any statics).
 const kInternal = {};
 
+let DOMException;
+function getDOMException() {
+  if (DOMException === undefined) {
+    ({ DOMException } = require("internal/dom-exception"));
+  }
+  return DOMException;
+}
+
 function abortError() {
-  const e = new Error("This operation was aborted");
-  e.name = "AbortError";
-  return e;
+  return new (getDOMException())("This operation was aborted", "AbortError");
 }
 
 function timeoutError() {
-  const e = new Error("The operation was aborted due to timeout");
-  e.name = "TimeoutError";
-  return e;
+  return new (getDOMException())(
+    "The operation was aborted due to timeout",
+    "TimeoutError"
+  );
 }
 
 // The strong holds described in the header. Entries leave on abort, on the

@@ -7,13 +7,10 @@
 // else is portable JS, kept in sync with the iOS runtime's copy of this file,
 // which runs against the same bag.
 //
-// Deliberate deviations from the specs:
-// - Observer callbacks are delivered from a microtask rather than a queued
-//   task. Delivery is still asynchronous relative to mark()/measure(), but it
-//   precedes timer callbacks scheduled in the same turn.
-// - Failures the specs express as DOMException (SyntaxError,
-//   InvalidModificationError) are Error instances with `name` patched —
-//   DOMException does not exist in this runtime.
+// Deliberate deviation from the specs: observer callbacks are delivered from
+// a microtask rather than a queued task. Delivery is still asynchronous
+// relative to mark()/measure(), but it precedes timer callbacks scheduled in
+// the same turn.
 const { now, timeOrigin } = binding;
 const {
   ArrayPrototypeIndexOf,
@@ -21,7 +18,6 @@ const {
   ArrayPrototypeSlice,
   ArrayPrototypeSort,
   ArrayPrototypeSplice,
-  Error,
   FunctionPrototypeCall,
   Number,
   NumberIsFinite,
@@ -60,11 +56,15 @@ function illegalConstructor() {
   return new TypeError("Illegal constructor");
 }
 
-// SyntaxError / InvalidModificationError stand-in (see header).
+// The specs' SyntaxError / InvalidModificationError / DataCloneError
+// failures, required from the internal tier on first use so the
+// dom-exception builtin only ever runs on a throw.
+let DOMException;
 function domException(message, name) {
-  const e = new Error(message);
-  e.name = name;
-  return e;
+  if (DOMException === undefined) {
+    ({ DOMException } = require("internal/dom-exception"));
+  }
+  return new DOMException(message, name);
 }
 
 // WebIDL sequence<DOMString> conversion: only an object with a callable
