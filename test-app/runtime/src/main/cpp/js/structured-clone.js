@@ -4,19 +4,17 @@
 // WebIDL sequence handling for `transfer`; the clone itself is native
 // (v8::ValueSerializer round-tripped in this isolate).
 //
-// Deviations from the HTML spec, both forced by the platform:
-// - There is no DOMException here, so a clone failure throws an Error whose
-//   `name` is "DataCloneError" (same shape as the native-exception errors in
-//   docs/error-handling.md). `instanceof DOMException` checks cannot work.
-// - Only ArrayBuffers are transferable. MessagePort, ImageBitmap and the
-//   native/interop wrapper objects have no serialization form in this runtime,
-//   so they are rejected rather than half-supported.
+// Deviation from the HTML spec, forced by the platform: only ArrayBuffers are
+// transferable. MessagePort, ImageBitmap and the native/interop wrapper
+// objects have no serialization form in this runtime, so they are rejected
+// rather than half-supported. Clone failures are "DataCloneError"
+// DOMExceptions, from here and from the native serializer alike
+// (StructuredSerialization.cpp builds the same class).
 
 const { clone } = binding;
 const {
   ArrayBufferPrototypeGetByteLength,
   ArrayPrototypePush,
-  Error,
   FunctionPrototypeCall,
   SymbolIterator,
   TypeError,
@@ -24,10 +22,12 @@ const {
 
 var g = globalThis;
 
+let DOMException;
 function dataCloneError(message) {
-  var e = new Error(message);
-  e.name = "DataCloneError";
-  return e;
+  if (DOMException === undefined) {
+    ({ DOMException } = require("internal/dom-exception"));
+  }
+  return new DOMException(message, "DataCloneError");
 }
 
 // Brand check through the captured byteLength getter: it is the one thing only

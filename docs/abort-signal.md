@@ -50,20 +50,20 @@ be dropped.
   accounting comes from an internal symbol-keyed hook the events builtin
   calls from every listener-list mutation path (add, remove, and `once`
   removal during dispatch); the key travels only through the builtin-only
-  `internals` object (see `test-app/runtime/src/main/cpp/js/README.md`) and
-  never reaches app code, so the accounting cannot be bypassed via a
-  captured `EventTarget.prototype.addEventListener`.
+  `require("internal/events")` tier (see
+  `test-app/runtime/src/main/cpp/js/README.md`) and never reaches app code,
+  so the accounting cannot be bypassed via a captured
+  `EventTarget.prototype.addEventListener`.
 
 Entries leave the persistent set on abort, on the last abort-listener
 removal, or when a composite loses its last source.
 
+Default reasons are real `DOMException`s — `"AbortError"` for a plain abort,
+`"TimeoutError"` for `timeout()` — so both `reason.name` and
+`instanceof DOMException` checks work.
+
 ## Deviations from Node / the web
 
-- **No `DOMException`.** As with [structuredClone](structured-clone.md) and
-  the [Performance API](performance.md), default reasons are `Error`
-  instances with `name` patched: `"AbortError"` (default abort) and
-  `"TimeoutError"` (timeout). `instanceof DOMException` checks cannot work;
-  match on `reason.name`.
 - Abort events carry no `isTrusted` flag (the runtime's `Event` doesn't
   model it).
 

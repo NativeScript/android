@@ -3,6 +3,7 @@
 #include "NativeScriptAssert.h"
 
 #include "ArgConverter.h"
+#include "BuiltinLoader.h"
 
 using namespace v8;
 
@@ -11,6 +12,37 @@ namespace serialization {
 
 void ThrowDataCloneError(Isolate* isolate, const std::string& message) {
     Local<Context> context = isolate->GetCurrentContext();
+
+    /*
+     * The spec's DataCloneError is a DOMException; build it through the
+     * builtin's exports cache so native and JS throw sites produce the same
+     * class. Delegates may call into JS here — V8 allows it, and Node's
+     * serializer delegates do the same. The fallback covers a builtin that
+     * can no longer run (isolate teardown, broken realm).
+     */
+    Local<Object> domException;
+    {
+        TryCatch tc(isolate);
+        Local<Object> exports;
+        Local<Value> ctor;
+        if (BuiltinLoader::GetExports(context, BuiltinId::kDomException, nullptr)
+                    .ToLocal(&exports) &&
+            exports->Get(context, ArgConverter::ConvertToV8String(isolate, "DOMException"))
+                    .ToLocal(&ctor) &&
+            ctor->IsFunction()) {
+            Local<Value> args[] = {ArgConverter::ConvertToV8String(isolate, message),
+                                   ArgConverter::ConvertToV8String(isolate, "DataCloneError")};
+            Local<Object> instance;
+            if (ctor.As<v8::Function>()->NewInstance(context, 2, args).ToLocal(&instance)) {
+                domException = instance;
+            }
+        }
+    }
+    if (!domException.IsEmpty()) {
+        isolate->ThrowException(domException);
+        return;
+    }
+
     Local<Value> error =
             Exception::Error(ArgConverter::ConvertToV8String(isolate, message));
     bool success =

@@ -21,6 +21,8 @@ shared.runWorkerTests();
 shared.runPerformanceTests();
 shared.runStructuredCloneTests();
 shared.runTextEncodingTests();
+shared.runDOMExceptionTests();
+shared.runEventsTests();
 require("./tests/testWebAssembly");
 require("./tests/testEventLoop");
 require("./tests/testMultithreadedJavascript");

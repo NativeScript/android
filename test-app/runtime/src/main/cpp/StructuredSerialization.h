@@ -28,9 +28,9 @@ enum class HostObjectPolicy {
 };
 
 /*
- * Throws the runtime's DataCloneError. There is no DOMException here, so it is
- * an Error carrying that name — the shape the shared cross-runtime suite
- * detects clone failures by.
+ * Throws a "DataCloneError" DOMException, the same class the JS half of
+ * structuredClone raises. Falls back to a "DataCloneError"-named Error when
+ * the dom-exception builtin cannot run.
  */
 void ThrowDataCloneError(v8::Isolate* isolate, const std::string& message);
 
