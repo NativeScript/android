@@ -33,11 +33,12 @@ Node's split: `js/text-encoding.js` owns the WebIDL surface (brand checks via
 private fields, enumerable prototype members, `Symbol.toStringTag`),
 `TextEncoding.cpp` owns the bytes.
 
-- **Encodings**: utf-8, utf-16le, utf-16be and windows-1252, each with its
-  complete WHATWG label set; an unknown label throws `RangeError`. (Precedent:
-  Node without ICU ships utf-8/utf-16le; utf-16be and windows-1252 are cheap,
-  and windows-1252 covers the `ascii`/`latin1`/`iso-8859-1` aliases web code
-  actually uses.)
+- **Decoder encodings**: the `TextDecoder` constructor resolves utf-8,
+  utf-16le, utf-16be and windows-1252, each with its complete WHATWG label
+  set; an unknown label throws `RangeError`. (Precedent: Node without ICU
+  ships utf-8/utf-16le; utf-16be and windows-1252 are cheap, and windows-1252
+  covers the `ascii`/`latin1`/`iso-8859-1` aliases web code actually uses.)
+  `TextEncoder` is UTF-8-only and takes no label, as the spec defines it.
 - **Streaming**: full `decode(…, { stream: true })` support. Incomplete
   sequences (split BOMs and split utf-16 code units included) carry across
   calls in a 16-byte `Uint8Array` the builtin owns — no per-instance native

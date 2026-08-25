@@ -46,6 +46,11 @@ describe("ns:util", function () {
                     done();
                 }
             };
+            worker.onerror = function (error) {
+                fail("worker (" + order + ") failed: " + error.message);
+                worker.terminate();
+                done();
+            };
             worker.postMessage(order);
         });
     });

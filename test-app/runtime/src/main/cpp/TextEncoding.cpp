@@ -580,24 +580,32 @@ void EncodeUtf8Callback(const FunctionCallbackInfo<Value>& info) {
     info.GetReturnValue().Set(Uint8Array::New(buffer, 0, length));
 }
 
+// encodeInto status codes, mirrored in text-encoding.js.
+constexpr int32_t kEncodeIntoOk = 0;
+constexpr int32_t kEncodeIntoBadDestination = 1;
+// Fast path only: the view's buffer is still on the V8 heap and Buffer() would
+// allocate to materialize it, which a fast callback must not do. The builtin
+// retries through encodeIntoFallback, which always runs the slow callback.
+constexpr int32_t kEncodeIntoRetrySlow = 2;
+
 // Writes as much of `source` as fits into `destination` without splitting an
-// encoded code point, and reports {read, written} through `results` — a
-// Uint32Array the builtin owns, so the op returns only the destination
-// type check and stays expressible as a fast call. A destination that is a
-// Uint8Array but detached or empty is a zero-length write, not a failure.
-bool EncodeIntoImpl(Isolate* isolate, Local<Value> sourceValue,
-                    Local<Value> destinationValue, Local<Value> resultsValue) {
+// encoded code point, and reports {read, written} through `results` — the
+// Uint32Array the binding owns, so the op returns only a status code and
+// stays expressible as a fast call. A destination that is a Uint8Array but
+// detached or empty is a zero-length write, not a failure.
+int32_t EncodeIntoImpl(Isolate* isolate, Local<Value> sourceValue,
+                       Local<Value> destinationValue, Local<Value> resultsValue) {
     if (!destinationValue->IsUint8Array()) {
-        return false;
+        return kEncodeIntoBadDestination;
     }
     if (!sourceValue->IsString() || !resultsValue->IsUint32Array()) {
-        return true;
+        return kEncodeIntoOk;
     }
 
     Local<Uint32Array> results = resultsValue.As<Uint32Array>();
     uint32_t* resultData = static_cast<uint32_t*>(results->Buffer()->Data());
     if (resultData == nullptr || results->Length() < 2) {
-        return true;
+        return kEncodeIntoOk;
     }
     resultData += results->ByteOffset() / sizeof(uint32_t);
     resultData[0] = 0;
@@ -607,7 +615,7 @@ bool EncodeIntoImpl(Isolate* isolate, Local<Value> sourceValue,
     void* base = destination->Buffer()->Data();
     const size_t capacity = destination->ByteLength();
     if (base == nullptr || capacity == 0) {
-        return true;
+        return kEncodeIntoOk;
     }
 
     size_t read = 0;
@@ -616,7 +624,7 @@ bool EncodeIntoImpl(Isolate* isolate, Local<Value> sourceValue,
             capacity, v8::String::WriteFlags::kReplaceInvalidUtf8, &read);
     resultData[0] = static_cast<uint32_t>(read);
     resultData[1] = static_cast<uint32_t>(written);
-    return true;
+    return kEncodeIntoOk;
 }
 
 void EncodeIntoCallback(const FunctionCallbackInfo<Value>& info) {
@@ -625,14 +633,64 @@ void EncodeIntoCallback(const FunctionCallbackInfo<Value>& info) {
 }
 
 #if NATIVESCRIPT_ENABLE_FAST_API
-// Fast-call overload of encodeInto. It allocates nothing on the V8 heap and
-// calls no JS.
-bool FastEncodeInto(Local<Value> receiver, Local<Value> source,
-                    Local<Value> destination, Local<Value> results,
-                    // NOLINTNEXTLINE(runtime/references)
-                    FastApiCallbackOptions& options) {
+// Fast-call overload of encodeInto, live once a call site tiers up. A fast
+// callback must not allocate on the JS heap, which shapes all three inputs:
+// the kSeqOneByteString parameter keeps cons and two-byte sources on the slow
+// callback (WriteUtf8V2 flattens, which allocates) and the latin-1 units are
+// encoded by hand; a view whose buffer is still on-heap is declined with
+// kEncodeIntoRetrySlow rather than materialized.
+int32_t FastEncodeInto(Local<Value> receiver, const FastOneByteString& source,
+                       Local<Value> destinationValue, Local<Value> resultsValue,
+                       // NOLINTNEXTLINE(runtime/references)
+                       FastApiCallbackOptions& options) {
     HandleScope scope(options.isolate);
-    return EncodeIntoImpl(options.isolate, source, destination, results);
+    if (!destinationValue->IsUint8Array()) {
+        return kEncodeIntoBadDestination;
+    }
+    if (!resultsValue->IsUint32Array()) {
+        return kEncodeIntoOk;
+    }
+    Local<Uint8Array> destination = destinationValue.As<Uint8Array>();
+    Local<Uint32Array> results = resultsValue.As<Uint32Array>();
+    if (!destination->HasBuffer() || !results->HasBuffer()) {
+        return kEncodeIntoRetrySlow;
+    }
+
+    uint32_t* resultData = static_cast<uint32_t*>(results->Buffer()->Data());
+    if (resultData == nullptr || results->Length() < 2) {
+        return kEncodeIntoOk;
+    }
+    resultData += results->ByteOffset() / sizeof(uint32_t);
+    resultData[0] = 0;
+    resultData[1] = 0;
+
+    void* base = destination->Buffer()->Data();
+    const size_t capacity = destination->ByteLength();
+    if (base == nullptr || capacity == 0) {
+        return kEncodeIntoOk;
+    }
+    uint8_t* out = static_cast<uint8_t*>(base) + destination->ByteOffset();
+
+    size_t read = 0;
+    size_t written = 0;
+    for (; read < source.length; read++) {
+        const uint8_t unit = static_cast<uint8_t>(source.data[read]);
+        if (unit < 0x80) {
+            if (written + 1 > capacity) {
+                break;
+            }
+            out[written++] = unit;
+        } else {
+            if (written + 2 > capacity) {
+                break;
+            }
+            out[written++] = 0xC0 | (unit >> 6);
+            out[written++] = 0x80 | (unit & 0x3F);
+        }
+    }
+    resultData[0] = static_cast<uint32_t>(read);
+    resultData[1] = static_cast<uint32_t>(written);
+    return kEncodeIntoOk;
 }
 
 const CFunction kFastEncodeInto = CFunction::Make(FastEncodeInto);
@@ -653,6 +711,18 @@ MaybeLocal<Object> CreateBinding(Local<Context> context) {
 #else
     tns::SetMethod(context, binding, "encodeInto", EncodeIntoCallback);
 #endif
+    // Same slow callback with no fast overload: where the fast path answers
+    // kEncodeIntoRetrySlow, the builtin finishes the call through this name.
+    tns::SetMethod(context, binding, "encodeIntoFallback", EncodeIntoCallback);
+
+    // Native ArrayBuffers carry a real backing store from birth, so the fast
+    // path's HasBuffer test always passes for the results array.
+    Local<ArrayBuffer> resultsBuffer = ArrayBuffer::New(isolate, 2 * sizeof(uint32_t));
+    if (!binding->Set(context, ArgConverter::ConvertToV8String(isolate, "encodeIntoResults"),
+                      Uint32Array::New(resultsBuffer, 0, 2))
+                 .FromMaybe(false)) {
+        return MaybeLocal<Object>();
+    }
 
     return binding;
 }

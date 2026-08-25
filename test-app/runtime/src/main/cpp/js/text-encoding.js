@@ -19,10 +19,16 @@ const {
   SymbolToStringTag,
   TypeError,
   Uint8Array,
-  Uint32Array,
 } = primordials;
 
-const { labelToEncoding, decode, encodeUtf8, encodeInto } = binding;
+const {
+  labelToEncoding,
+  decode,
+  encodeUtf8,
+  encodeInto,
+  encodeIntoFallback,
+  encodeIntoResults,
+} = binding;
 
 // Indexed by the encoding ids labelToEncoding returns.
 const kEncodingNames = ["utf-8", "utf-16le", "utf-16be", "windows-1252"];
@@ -35,10 +41,12 @@ const kFlagStream = 4;
 // Mirrors TextEncoding::kDecoderStateSize.
 const kDecoderStateSize = 16;
 
-// encodeInto reports {read, written} through this rather than allocating a
-// result object natively; the op is synchronous, so one buffer serves every
-// encoder in the isolate.
-const encodeIntoResults = new Uint32Array(2);
+// Mirror the kEncodeInto* status codes in TextEncoding.cpp. The op reports
+// {read, written} through binding.encodeIntoResults rather than allocating a
+// result object per call; it is synchronous, so that one native Uint32Array
+// serves every encoder in the isolate.
+const kEncodeIntoBadDestination = 1;
+const kEncodeIntoRetrySlow = 2;
 
 // WebIDL dictionary conversion: undefined and null mean "all defaults",
 // anything else must be an object.
@@ -74,7 +82,11 @@ class TextEncoder {
   encodeInto(source, destination) {
     TextEncoder.#check(this);
     const text = `${source}`;
-    if (!encodeInto(text, destination, encodeIntoResults)) {
+    let code = encodeInto(text, destination, encodeIntoResults);
+    if (code === kEncodeIntoRetrySlow) {
+      code = encodeIntoFallback(text, destination, encodeIntoResults);
+    }
+    if (code === kEncodeIntoBadDestination) {
       throw new TypeError(
         'The "destination" argument must be an instance of Uint8Array'
       );
