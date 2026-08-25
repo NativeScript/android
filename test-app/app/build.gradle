@@ -664,14 +664,53 @@ task 'extractAllJars' {
     }
 }
 
+// Since API 36.1 the SDK can ship platforms only in minor-versioned directories
+// (e.g. android-37.0) with no plain android-37 alias, so the directory name can't be
+// derived from android.compileSdkVersion alone — it has to be resolved against disk.
+def resolveCompileSdkPlatformName(File sdkDirectory, String compileSdkVersion) {
+    def platformsDir = new File(sdkDirectory, "platforms")
+    if (new File(platformsDir, compileSdkVersion).isDirectory()) {
+        return compileSdkVersion
+    }
+
+    def baseMatch = compileSdkVersion =~ /^android-(\d+)$/
+    if (baseMatch.matches()) {
+        def apiLevel = baseMatch.group(1)
+        def bestName = null
+        def bestMinor = -1
+        platformsDir.listFiles()?.each { dir ->
+            if (!dir.isDirectory()) {
+                return
+            }
+            // Strict android-N.M only — extension dirs like android-33-ext4 are not base platforms
+            def minorMatch = dir.name =~ /^android-(\d+)\.(\d+)$/
+            if (minorMatch.matches() && minorMatch.group(1) == apiLevel) {
+                def minor = minorMatch.group(2) as int
+                if (minor > bestMinor) {
+                    bestMinor = minor
+                    bestName = dir.name
+                }
+            }
+        }
+        if (bestName != null) {
+            return bestName
+        }
+    }
+
+    throw new GradleException("No Android SDK platform directory found for ${compileSdkVersion} in ${platformsDir}. " +
+            "Install the matching SDK Platform with the Android SDK Manager.")
+}
+
 task 'collectAllJars' {
     dependsOn extractAllJars
     description "gathers all paths to jar dependencies before building metadata with them"
 
     def sdkPath = android.sdkDirectory.getAbsolutePath()
-    def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
 
     doFirst {
+        def platformName = resolveCompileSdkPlatformName(android.sdkDirectory, android.compileSdkVersion)
+        def androidJar = sdkPath + "/platforms/" + platformName + "/android.jar"
+
         def allJarPaths = new LinkedList<String>()
         allJarPaths.add(androidJar)
         allJarPaths.addAll(pluginsJarLibraries)
@@ -1042,12 +1081,13 @@ task generateTypescriptDefinitions(type: BuildToolTask) {
     }
 
     def paramz = new ArrayList<String>()
-    def includeDirs = ["com.android.support", "/platforms/" + android.compileSdkVersion]
 
     workingDir "$BUILD_TOOLS_PATH"
     mainClass = "-jar"
 
     doFirst {
+        def includeDirs = ["com.android.support", "/platforms/" + resolveCompileSdkPlatformName(android.sdkDirectory, android.compileSdkVersion)]
+
         delete "$TYPINGS_PATH"
 
         // Resolved against the project when building from source; an empty rootPath leaves it
