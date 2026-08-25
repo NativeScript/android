@@ -12,6 +12,49 @@ describe("ns:util", function () {
         expect(require("ns:util")).toBe(util);
     });
 
+    it("exposes the encoding interfaces the globals expose", function () {
+        expect(typeof util.TextEncoder).toBe("function");
+        expect(typeof util.TextDecoder).toBe("function");
+        // One run of the text-encoding builtin backs both entry points, so the
+        // classes are identical objects no matter which is reached first.
+        expect(util.TextEncoder).toBe(globalThis.TextEncoder);
+        expect(util.TextDecoder).toBe(globalThis.TextDecoder);
+    });
+
+    it("round trips text through the module's encoding interfaces", function () {
+        var bytes = new util.TextEncoder().encode("héllo");
+        expect(bytes instanceof Uint8Array).toBe(true);
+        expect(bytes.length).toBe(6);
+        expect(new util.TextDecoder().decode(bytes)).toBe("héllo");
+    });
+
+    it("keeps the classes identical in a fresh isolate, whichever is touched first", function (done) {
+        var orders = ["global-first", "util-first"];
+        var replies = 0;
+        orders.forEach(function (order) {
+            var worker = new Worker("./nsUtilEncodingOrderWorker.js");
+            worker.onmessage = function (msg) {
+                expect(msg.data).toEqual({
+                    order: order,
+                    encoder: true,
+                    decoder: true,
+                    roundTrip: "ok",
+                });
+                worker.terminate();
+                replies++;
+                if (replies === orders.length) {
+                    done();
+                }
+            };
+            worker.onerror = function (error) {
+                fail("worker (" + order + ") failed: " + error.message);
+                worker.terminate();
+                done();
+            };
+            worker.postMessage(order);
+        });
+    });
+
     it("throws for an unknown builtin", function () {
         expect(function () {
             require("ns:definitely-not-a-module");
@@ -158,6 +201,15 @@ describe("node:util", function () {
         expect(Object.isFrozen(nodeUtil)).toBe(true);
         expect(nodeUtil.inspect).toBe(util.inspect);
         expect(nodeUtil.format).toBe(util.format);
+        expect(nodeUtil.TextEncoder).toBe(util.TextEncoder);
+        expect(nodeUtil.TextDecoder).toBe(util.TextDecoder);
+    });
+
+    it("exposes Node's encoding interfaces, identical to the globals", function () {
+        expect(Object.keys(nodeUtil).sort()).toEqual(["TextDecoder", "TextEncoder", "format", "inspect"]);
+        expect(nodeUtil.TextEncoder).toBe(globalThis.TextEncoder);
+        expect(nodeUtil.TextDecoder).toBe(globalThis.TextDecoder);
+        expect(new nodeUtil.TextDecoder("utf-8").decode(new nodeUtil.TextEncoder().encode("ok"))).toBe("ok");
     });
 
     it("is a singleton per realm", function () {

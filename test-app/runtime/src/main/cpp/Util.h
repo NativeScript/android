@@ -110,6 +110,13 @@ void SetMethod(v8::Isolate* isolate,
                const char* name,
                v8::FunctionCallback callback,
                v8::Local<v8::Value> data = v8::Local<v8::Value>());
+// Whether the runtime registers v8::CFunction fast-call overloads next to the
+// slow callbacks. Android runs V8 with the optimizing tiers enabled, so a
+// registered overload is live once a call site tiers up; embeds that build V8
+// jitless can define this to 0 to drop the overloads entirely.
+#ifndef NATIVESCRIPT_ENABLE_FAST_API
+#define NATIVESCRIPT_ENABLE_FAST_API 1
+#endif
 void SetFastMethod(v8::Isolate* isolate,
                    v8::Local<v8::Template> that,
                    const char* name,

@@ -26,6 +26,7 @@
 #include "IsolateTracked.h"
 #include "JType.h"
 #include "JsArgToArrayConverter.h"
+#include "LazyGlobals.h"
 #include "ManualInstrumentation.h"
 #include "MetadataNode.h"
 #include "ModuleBinding.h"
@@ -968,6 +969,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   SimpleProfiler::Init(isolate, globalTemplate);
 
   CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
+
+  // Lazy web globals (TextEncoder/TextDecoder, atob/btoa): registered on the
+  // template so the builtins behind them run only on first use, in every
+  // isolate — workers included.
+  LazyGlobals::Init(isolate, globalTemplate);
 
   Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
 
