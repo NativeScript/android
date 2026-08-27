@@ -1,3 +1,53 @@
+# [9.1.0](https://github.com/NativeScript/android/compare/v9.0.5...v9.1.0) (2026-08-27)
+
+
+### Bug Fixes
+
+* bound Map/Set inspection and harden review findings ([d90a469](https://github.com/NativeScript/android/commit/d90a4698b20182893814d0040e740e7f06a14590))
+* clear pending exception before rejecting a builtin dynamic import ([a45d1ad](https://github.com/NativeScript/android/commit/a45d1adb46828311e3b15a7f371a3292e0794dc3))
+* **console:** find custom toString on deep prototype chains ([d0192f2](https://github.com/NativeScript/android/commit/d0192f2a9b98d52ba35d8e0a9e72a6b77f651208))
+* don't abort on worker termination during module load ([#1993](https://github.com/NativeScript/android/issues/1993)) ([73df473](https://github.com/NativeScript/android/commit/73df47301979356f5bcde048da86acd59bed6c5c))
+* **inspector:** make the Tracing domain protocol-correct and faster ([e597308](https://github.com/NativeScript/android/commit/e59730851e0167afe116a288a3c40623ba55e832))
+* isolate/runtime lifetime — worker startup race, teardown use-after-free, and leaks ([#2006](https://github.com/NativeScript/android/issues/2006)) ([19faa3d](https://github.com/NativeScript/android/commit/19faa3d2c9a0aa16a45ba2eb36f649637889a78c))
+* lock the remaining process-global state shared across isolates ([7c9c3db](https://github.com/NativeScript/android/commit/7c9c3db3512fe6f097c14ebfa8ef28dd9186e260))
+* **metadata-generator:** read Kotlin metadata leniently ([f36b01c](https://github.com/NativeScript/android/commit/f36b01c230e9847ece26ffca12ceb5f04e20bd48))
+* preserve jsparser CommonJS package boundary ([#1984](https://github.com/NativeScript/android/issues/1984)) ([e6d0d3d](https://github.com/NativeScript/android/commit/e6d0d3d481af5d4aee07258d561669c38d88b499))
+* release ObjectManager's JS handles and JNI weak refs at teardown ([#2008](https://github.com/NativeScript/android/issues/2008)) ([e612f1b](https://github.com/NativeScript/android/commit/e612f1b80b90d214bbd8ff6dbc51a2b8387d2f64))
+* resolve SDK platform dir for minor-versioned platforms (android-37.0) ([5b16e19](https://github.com/NativeScript/android/commit/5b16e191a540ac081007e76a71f3ee20c203f7c4))
+* restore native tombstones and record runtime crash breadcrumbs ([#2007](https://github.com/NativeScript/android/issues/2007)) ([7e1fdab](https://github.com/NativeScript/android/commit/7e1fdabf757bfc87721d620d3074d2050eddabb1))
+* runtime lifetime — deferred leaks, cross-isolate sharing, startup robustness ([#2013](https://github.com/NativeScript/android/issues/2013)) ([e2ede45](https://github.com/NativeScript/android/commit/e2ede45c502eb474a612455a5bc232b8324125d2))
+* stop Kotlin internal members leaking into metadata and typings ([4fbb006](https://github.com/NativeScript/android/commit/4fbb00671a4404ac26a8162711bbb7dc129ae360))
+* **url:** resync cached searchParams when search/href changes ([e63bf62](https://github.com/NativeScript/android/commit/e63bf62cba698b19239fc2a815d0f77c6b6e8659))
+
+
+### Features
+
+* Ada v4 ([#1988](https://github.com/NativeScript/android/issues/1988)) ([c22ad60](https://github.com/NativeScript/android/commit/c22ad607d11036d6a581f25e48a758efea334d28))
+* add AbortController and AbortSignal ([#2025](https://github.com/NativeScript/android/issues/2025)) ([6ebb265](https://github.com/NativeScript/android/commit/6ebb265d923aeabb3c0951986fde00e475f4b05e))
+* add DOMException and CustomEvent as lazy globals ([#2027](https://github.com/NativeScript/android/issues/2027)) ([4e7f207](https://github.com/NativeScript/android/commit/4e7f2076d0065d1bf157efe18f54dd7d7d73b0f4))
+* add TextEncoder/TextDecoder and atob/btoa on a lazy-global tier ([#2026](https://github.com/NativeScript/android/issues/2026)) ([f69b684](https://github.com/NativeScript/android/commit/f69b6840dc9ec4ae58894729b78e17624e4b6036))
+* budgeted console formatter (inspect builtin) ([#1991](https://github.com/NativeScript/android/issues/1991)) ([c1e1631](https://github.com/NativeScript/android/commit/c1e1631e20c76cd5ae748d6b107b8e3f77436763))
+* ESM loader robustness, HTTP module loader, ns:module dev surface ([#1965](https://github.com/NativeScript/android/issues/1965)) ([bce6698](https://github.com/NativeScript/android/commit/bce66986c7ea744c49793009d4da387c33699853))
+* expose requestAnimationFrame under the standard global names ([d1fc925](https://github.com/NativeScript/android/commit/d1fc925f1a146c70dea8cf74d606fee4b361373d))
+* expose timers under the standard global names ([4da75c2](https://github.com/NativeScript/android/commit/4da75c2ac5c294bf513147f1c36ddf59afbde82e))
+* Node-API (napi) surface for plugin developers ([#2004](https://github.com/NativeScript/android/issues/2004)) ([c26048c](https://github.com/NativeScript/android/commit/c26048c915cfb44d66554a051ac7ed6e3a6998a7))
+* Node-style primordials for runtime builtins ([#1990](https://github.com/NativeScript/android/issues/1990)) ([98b63ba](https://github.com/NativeScript/android/commit/98b63ba9a635a60df6f8472f5c7f8c70a1216d15))
+* ns:util builtin module (inspect, format) ([#1992](https://github.com/NativeScript/android/issues/1992)) ([7ff8e85](https://github.com/NativeScript/android/commit/7ff8e8524334a12d50e3e76b877d27206d864c83))
+* per-runtime EventLoop - v8 platform tasks + two-lane scheduler (Java MessageQueue / ALooper fd) ([#2003](https://github.com/NativeScript/android/issues/2003)) ([fd7b6c6](https://github.com/NativeScript/android/commit/fd7b6c6b42ed31a539faae2773dfbab3ac4e85d0))
+* robust loader improvements ([#2021](https://github.com/NativeScript/android/issues/2021)) ([25de01a](https://github.com/NativeScript/android/commit/25de01ab3f39194d2ef546c87d4c272d12bc5fcd))
+* structuredClone global (HTML structured clone, ArrayBuffer transfer) ([#2000](https://github.com/NativeScript/android/issues/2000)) ([f284059](https://github.com/NativeScript/android/commit/f2840598e893c6aff5895f8a07458be9d065a449))
+* **typings:** describe Kotlin internals and nullability in generated definitions ([48f7ab5](https://github.com/NativeScript/android/commit/48f7ab522a65a996d738a610fb75d52261b06cfe))
+* upgrade V8 to 14.9.207.39 ([#1987](https://github.com/NativeScript/android/issues/1987)) ([c08a91b](https://github.com/NativeScript/android/commit/c08a91b37b276b123ebd21218d2e642ac8d8ae9c))
+* web-compliant error handling ([#1985](https://github.com/NativeScript/android/issues/1985)) ([34196a7](https://github.com/NativeScript/android/commit/34196a70a6f20b86aabad328a66e2f10403c0655))
+* WHATWG performance API (hr-time, user timing, performance timeline) ([#2001](https://github.com/NativeScript/android/issues/2001)) ([345f16f](https://github.com/NativeScript/android/commit/345f16faa65532e04aaac837fd6c1a6dee1bd10f))
+
+
+### BREAKING CHANGES
+
+* upgrade V8 to 14.9.207.39 ([#1987](https://github.com/NativeScript/android/issues/1987)) ([c08a91b](https://github.com/NativeScript/android/commit/c08a91b37b276b123ebd21218d2e642ac8d8ae9c))
+
+
+
 ## [9.0.5](https://github.com/NativeScript/android/compare/v9.0.4...v9.0.5) (2026-07-13)
 
 
