@@ -73,6 +73,22 @@ describe("HTTP ESM Loader", function () {
             });
         });
 
+        // A query or fragment on a specifier that names a file is URL syntax
+        // the filesystem never sees. The same statement in a served module
+        // keeps it — see "query-bearing specifiers from a served referrer".
+        it("drops the query when a local import names a file", function (done) {
+            import("~/esm/relative/query-entry.mjs?v=entry").then(function (module) {
+                expect(module.viaDefault).toBe("relative-import-success");
+                expect(module.viaNamed).toBe("relative-import-success");
+                return module.loadWithQuery();
+            }).then(function (dependency) {
+                expect(dependency.relativeValue).toBe("relative-import-success");
+                done();
+            }).catch(function (error) {
+                reportRejection(error, done);
+            });
+        });
+
         it("should surface helpful errors for unresolved bare specifiers", function (done) {
             import("bare-spec-example").then(function (mod) {
                 // A placeholder module default-exports a Proxy whose get trap
@@ -90,6 +106,76 @@ describe("HTTP ESM Loader", function () {
                 expect(formatError(error)).toContain("bare-spec-example");
                 done();
             });
+        });
+    });
+
+    // A served module's relative and root-absolute imports resolve against its
+    // URL, and a query on them is part of the resulting module's identity:
+    // `/esm/query.mjs?v=a` and `/esm/query.mjs` are two modules to the server,
+    // exactly as `/ns/asm?path=...` and `/ns/asm` are to a dev server. Every
+    // specifier shape must reach the server with its query intact.
+    describe("query-bearing specifiers from a served referrer", function () {
+        useHttpTimeout();
+
+        var nsModule = require("ns:module");
+        var formsUrl = origin + "/esm/query-forms.mjs";
+
+        afterEach(function () {
+            nsModule.configureLoader({ importMap: { imports: {} } });
+        });
+
+        it("keeps the query on static root-absolute and relative imports", function (done) {
+            withTimeout(import(formsUrl), 10000, "import " + formsUrl)
+                .then(function (mod) {
+                    expect(mod.path).toBe("/esm/query.mjs");
+                    expect(mod.query).toContain("v=root-abs");
+                    expect(mod.relativeQuery).toContain("v=relative");
+                    // `export *` and `export { default }` name one URL, so
+                    // they share one evaluated instance.
+                    expect(mod.default.query).toContain("v=root-abs");
+                    expect(mod.default.evaluatedAt).toBe(mod.evaluatedAt);
+                    done();
+                })
+                .catch(function (error) {
+                    reportRejection(error, done);
+                });
+        });
+
+        it("keeps the query on dynamic root-absolute and relative imports", function (done) {
+            var forms;
+            withTimeout(import(formsUrl), 10000, "import " + formsUrl)
+                .then(function (mod) {
+                    forms = mod;
+                    return withTimeout(forms.loadRootAbs(), 10000, "dynamic root-absolute import");
+                })
+                .then(function (rootAbs) {
+                    expect(rootAbs.path).toBe("/esm/query.mjs");
+                    expect(rootAbs.query).toContain("v=dyn-root");
+                    return withTimeout(forms.loadRelative(), 10000, "dynamic relative import");
+                })
+                .then(function (relative) {
+                    expect(relative.path).toBe("/esm/query.mjs");
+                    expect(relative.query).toContain("v=dyn-rel");
+                    done();
+                })
+                .catch(function (error) {
+                    reportRejection(error, done);
+                });
+        });
+
+        it("keeps the query through an import-map prefix entry", function (done) {
+            nsModule.configureLoader({
+                importMap: { imports: { "ns-test-esm/": origin + "/esm/" } },
+            });
+            withTimeout(import("ns-test-esm/query.mjs?v=prefix"), 10000, "prefix-mapped import")
+                .then(function (mod) {
+                    expect(mod.path).toBe("/esm/query.mjs");
+                    expect(mod.query).toContain("v=prefix");
+                    done();
+                })
+                .catch(function (error) {
+                    reportRejection(error, done);
+                });
         });
     });
 

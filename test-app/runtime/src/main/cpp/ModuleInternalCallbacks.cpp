@@ -1147,16 +1147,6 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
     spec.insert(6, "/");
   }
 
-  // Query and fragment only mean something to a server, so a non-http
-  // specifier drops them before anything looks it up. Applied here, in the one
-  // seam both import forms go through, so `./x.js?v=1` names the same module
-  // whether it arrives as a static import or an import().
-  if (!(StartsWith(spec, "http://") || StartsWith(spec, "https://"))) {
-    size_t cut = spec.find_first_of("?#");
-    if (cut != std::string::npos) spec = spec.substr(0, cut);
-    if (spec.empty()) return result;
-  }
-
   TNS_DEBUG(Esm, "[resolver][spec] %s", spec.c_str());
 
   // The import map is consulted before any other resolution: bare specifiers
@@ -1221,6 +1211,24 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
       result.url = resolvedHttp;
       return result;
     }
+  }
+
+  // A query or fragment is URL syntax, never part of a file name, so
+  // `import './x.js?v=1'` names x.js on disk. It is dropped only here, after
+  // every HTTP outcome has returned: for a served module the query is part of
+  // its identity (`/ns/asm?path=A` and `/ns/asm` are two modules to the
+  // server), and that holds for a root-absolute or relative specifier just as
+  // it does for an absolute URL. Applied in this one seam, so a static import
+  // and an import() of `./x.js?v=1` name the same file.
+  {
+    size_t cut = spec.find_first_of("?#");
+    if (cut != std::string::npos) {
+      std::string stripped = spec.substr(0, cut);
+      TNS_DEBUG(Esm, "[resolver][strip-query] %s -> %s", spec.c_str(),
+                     stripped.c_str());
+      spec = stripped;
+    }
+    if (spec.empty()) return result;
   }
 
   // Build the filesystem candidates for this specifier shape. The specifier may
@@ -2533,21 +2541,10 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     return builtinScope.Escape(builtinResolver->GetPromise());
   }
 
+  // The specifier reaches the shared seam verbatim. Whether its query is
+  // identity (a served module) or noise (a file) is the seam's decision, made
+  // the same way for a static import and an import().
   std::string normalizedSpec = rawSpec;
-  // remove query/hash ONLY for non-HTTP specs
-  bool isHttpLike =
-      (!normalizedSpec.empty() && (StartsWith(normalizedSpec, "http://") ||
-                                    StartsWith(normalizedSpec, "https://")));
-  if (!isHttpLike) {
-    size_t qpos = normalizedSpec.find_first_of("?#");
-    if (qpos != std::string::npos) {
-      normalizedSpec = normalizedSpec.substr(0, qpos);
-    }
-  }
-  if (normalizedSpec != rawSpec) {
-    TNS_DEBUG(Esm, "[dyn-import][normalize] %s -> %s", rawSpec.c_str(),
-                   normalizedSpec.c_str());
-  }
 
   v8::EscapableHandleScope scope(isolate);
 
@@ -2578,6 +2575,16 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     normalizedSpec = dynamicResolution.specifier;
     TNS_DEBUG(Esm, "[dyn-import][import-map] rewrite: %s -> %s",
                    rawSpec.c_str(), normalizedSpec.c_str());
+  }
+  // A relative or root-absolute specifier from a served referrer resolves to
+  // a URL the specifier itself never spells out. Routing on that URL keeps
+  // such an import() on the async fetch path with its absolute-URL siblings.
+  if (dynamicResolution.kind == ModuleResolution::Kind::kHttp &&
+      !dynamicResolution.url.empty() &&
+      dynamicResolution.url != normalizedSpec) {
+    TNS_DEBUG(Esm, "[dyn-import][http-rel] %s -> %s", normalizedSpec.c_str(),
+                   dynamicResolution.url.c_str());
+    normalizedSpec = dynamicResolution.url;
   }
 
   try {
