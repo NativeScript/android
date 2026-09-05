@@ -154,6 +154,21 @@ public final class ModuleTestServer {
             return;
         }
 
+        if ("/esm/query-forms.mjs".equals(path)) {
+            // Every specifier shape a served module can use to reach a sibling
+            // whose query is its identity. The server must receive each query
+            // intact: `/esm/query.mjs?v=x` and `/esm/query.mjs` are different
+            // modules to it, as `/ns/asm?path=...` and `/ns/asm` are to a dev
+            // server.
+            String body = "export * from \"/esm/query.mjs?v=root-abs\";\n"
+                    + "export { default } from \"/esm/query.mjs?v=root-abs\";\n"
+                    + "export { query as relativeQuery } from \"./query.mjs?v=relative\";\n"
+                    + "export function loadRootAbs() { return import(\"/esm/query.mjs?v=dyn-root\"); }\n"
+                    + "export function loadRelative() { return import(\"./query.mjs?v=dyn-rel\"); }\n";
+            respond(socket, "200 OK", JS_MIME, body.getBytes(UTF8));
+            return;
+        }
+
         if ("/esm/html-fallback.mjs".equals(path)) {
             // The SPA-fallback shape: an unknown path answered with the index
             // document, 200 OK. The module loader must reject it on MIME rather
