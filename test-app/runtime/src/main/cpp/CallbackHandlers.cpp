@@ -1106,71 +1106,151 @@ jobjectArray CallbackHandlers::GetJavaStringArray(JEnv &env, int length) {
     return (jobjectArray) env.NewGlobalRef(tmpArr);
 }
 
+namespace {
+
+const int kDefaultWorkerPriority = 10; // android.os.Process.THREAD_PRIORITY_BACKGROUND
+
+const char *const kWorkerPriorityNames =
+        "'lowest', 'background', 'lessFavorable', 'default', 'moreFavorable', "
+        "'foreground', 'display', 'urgentDisplay', 'video', 'audio', 'urgentAudio' "
+        "or a number between -20 and 19";
+
+// The android.os.Process THREAD_PRIORITY_* nice values, under their camelCase
+// names; anything else is a caller error.
+bool MapWorkerPriorityName(const std::string &name, int &priority) {
+    if (name == "lowest") {
+        priority = 19;
+    } else if (name == "background") {
+        priority = 10;
+    } else if (name == "lessFavorable") {
+        priority = 1;
+    } else if (name == "default") {
+        priority = 0;
+    } else if (name == "moreFavorable") {
+        priority = -1;
+    } else if (name == "foreground") {
+        priority = -2;
+    } else if (name == "display") {
+        priority = -4;
+    } else if (name == "urgentDisplay") {
+        priority = -8;
+    } else if (name == "video") {
+        priority = -10;
+    } else if (name == "audio") {
+        priority = -16;
+    } else if (name == "urgentAudio") {
+        priority = -19;
+    } else {
+        return false;
+    }
+    return true;
+}
+
+// Nice values outside the kernel's range are clamped rather than rejected:
+// a caller asking for "as low as possible" gets it.
+int ClampWorkerPriority(Local<Context> context, Local<Value> value) {
+    int priority = value->Int32Value(context).FromMaybe(kDefaultWorkerPriority);
+    if (priority < -20) {
+        return -20;
+    }
+    if (priority > 19) {
+        return 19;
+    }
+    return priority;
+}
+
+// Carries a real TypeError instance so `catch (e) { e instanceof TypeError }`
+// holds in JS; NewThreadCallback's catch block rethrows it unchanged.
+[[noreturn]] void ThrowWorkerOptionTypeError(Isolate *isolate, const std::string &message) {
+    Local<Value> error = Exception::TypeError(ArgConverter::ConvertToV8String(isolate, message));
+    throw NativeScriptException(isolate, error, message);
+}
+
+// Reads `key` from `object`. A false return means the getter threw: the
+// exception is already pending on the isolate and construction must stop
+// without running anything else on it.
+bool ReadWorkerOption(Isolate *isolate, Local<Context> context, Local<Object> object,
+                      const char *key, Local<Value> &out) {
+    return object->Get(context, ArgConverter::ConvertToV8String(isolate, key)).ToLocal(&out);
+}
+
 /*
- * Resolves the `androidPriority` Worker option to an android.os.Process
- * thread priority (nice value). Accepts the THREAD_PRIORITY_* names in
- * camelCase or a raw nice value clamped to [-20, 19].
- * Defaults to THREAD_PRIORITY_BACKGROUND (10), the previously hardcoded value.
+ * Resolves the Worker thread priority to an android.os.Process nice value from
+ * `android.priority`, falling back to the deprecated top-level
+ * `androidPriority`. Defaults to THREAD_PRIORITY_BACKGROUND (10).
+ * Returns false when an option getter threw (see ReadWorkerOption).
  */
-static int GetWorkerThreadPriority(Isolate *isolate, Local<Context> context,
-                                   const v8::FunctionCallbackInfo<v8::Value> &args) {
-    const int defaultPriority = 10; // android.os.Process.THREAD_PRIORITY_BACKGROUND
+bool GetWorkerThreadPriority(Isolate *isolate, Local<Context> context,
+                             const v8::FunctionCallbackInfo<v8::Value> &args, int &priority) {
+    priority = kDefaultWorkerPriority;
 
     if (args.Length() < 2 || !args[1]->IsObject()) {
-        return defaultPriority;
+        return true;
     }
 
     auto options = args[1].As<Object>();
-    Local<Value> value;
-    if (!options->Get(context, ArgConverter::ConvertToV8String(isolate, "androidPriority"))
-                 .ToLocal(&value) ||
-        value->IsNullOrUndefined()) {
-        return defaultPriority;
+    bool resolved = false;
+
+    Local<Value> androidVal;
+    if (!ReadWorkerOption(isolate, context, options, "android", androidVal)) {
+        return false;
+    }
+    if (!androidVal->IsNullOrUndefined()) {
+        if (!androidVal->IsObject()) {
+            ThrowWorkerOptionTypeError(isolate, "Worker option \"android\" must be an object.");
+        }
+
+        Local<Value> priorityVal;
+        if (!ReadWorkerOption(isolate, context, androidVal.As<Object>(), "priority", priorityVal)) {
+            return false;
+        }
+        if (!priorityVal->IsUndefined()) {
+            if (priorityVal->IsNumber()) {
+                priority = ClampWorkerPriority(context, priorityVal);
+            } else if (!priorityVal->IsString() ||
+                       !MapWorkerPriorityName(
+                               ArgConverter::ConvertToString(priorityVal.As<String>()), priority)) {
+                ThrowWorkerOptionTypeError(
+                        isolate, std::string("Worker option \"android.priority\" must be one of ") +
+                                 kWorkerPriorityNames + ".");
+            }
+            resolved = true;
+        }
     }
 
-    if (value->IsNumber()) {
-        int priority = value->Int32Value(context).FromMaybe(defaultPriority);
-        if (priority < -20) {
-            priority = -20;
-        } else if (priority > 19) {
-            priority = 19;
-        }
-        return priority;
+    Local<Value> legacyVal;
+    if (!ReadWorkerOption(isolate, context, options, "androidPriority", legacyVal)) {
+        return false;
+    }
+    if (legacyVal->IsNullOrUndefined()) {
+        return true;
     }
 
-    if (value->IsString()) {
-        auto name = ArgConverter::ConvertToString(value.As<String>());
-        if (name == "lowest") {
-            return 19;
-        } else if (name == "background") {
-            return 10;
-        } else if (name == "lessFavorable") {
-            return 1;
-        } else if (name == "default") {
-            return 0;
-        } else if (name == "moreFavorable") {
-            return -1;
-        } else if (name == "foreground") {
-            return -2;
-        } else if (name == "display") {
-            return -4;
-        } else if (name == "urgentDisplay") {
-            return -8;
-        } else if (name == "video") {
-            return -10;
-        } else if (name == "audio") {
-            return -16;
-        } else if (name == "urgentAudio") {
-            return -19;
-        }
+    static std::once_flag warnedDeprecated;
+    std::call_once(warnedDeprecated, []() {
+        DEBUG_WRITE_FORCE("NativeScript: the Worker option \"androidPriority\" is deprecated. "
+                          "Use \"android\": { \"priority\": ... } instead.");
+    });
+
+    if (resolved) {
+        return true;
+    }
+
+    if (legacyVal->IsNumber()) {
+        priority = ClampWorkerPriority(context, legacyVal);
+        return true;
+    }
+    if (legacyVal->IsString() &&
+        MapWorkerPriorityName(ArgConverter::ConvertToString(legacyVal.As<String>()), priority)) {
+        return true;
     }
 
     throw NativeScriptException(
-            "Invalid value for the Worker 'androidPriority' option. Expected one of: "
-            "'lowest', 'background', 'lessFavorable', 'default', 'moreFavorable', "
-            "'foreground', 'display', 'urgentDisplay', 'video', 'audio', 'urgentAudio' "
-            "or a number between -20 and 19.");
+            std::string("Invalid value for the Worker 'androidPriority' option. Expected one of: ") +
+            kWorkerPriorityNames + ".");
 }
+
+}  // namespace
 
 void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
@@ -1226,7 +1306,10 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
             throw NativeScriptException("Worker constructor expects a string URL or URL object.");
         }
 
-        int priority = GetWorkerThreadPriority(isolate, context, args);
+        int priority;
+        if (!GetWorkerThreadPriority(isolate, context, args, priority)) {
+            return;
+        }
 
         // An http(s) entry has no filesystem form to validate or to resolve
         // against the caller's directory: it is already absolute, and the

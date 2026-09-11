@@ -204,6 +204,13 @@ NativeScriptException::NativeScriptException(const string& message,
       m_message(message),
       m_stackTrace(stackTrace) {}
 
+NativeScriptException::NativeScriptException(Isolate* isolate,
+                                             Local<Value> error,
+                                             const string& message)
+    : m_javascriptException(MakeOwnedPersistent(isolate, error)),
+      m_javaException(JniLocalRef()),
+      m_message(message) {}
+
 NativeScriptException::NativeScriptException(TryCatch& tc,
                                              const string& message)
     : m_javaException(JniLocalRef()) {

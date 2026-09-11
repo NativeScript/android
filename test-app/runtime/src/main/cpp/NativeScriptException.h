@@ -33,6 +33,14 @@ class NativeScriptException : public std::exception {
                         const std::string& stackTrace);
 
   /*
+   * Generates a NativeScriptException carrying an already-built JS error
+   * value. ReThrowToV8 throws that value unchanged, so a TypeError reaches
+   * JS as a TypeError.
+   */
+  NativeScriptException(v8::Isolate* isolate, v8::Local<v8::Value> error,
+                        const std::string& message);
+
+  /*
    * Generates a NativeScriptException with javascript error from TryCatch and a
    * prepend message if any
    */
