@@ -1146,17 +1146,23 @@ bool MapWorkerPriorityName(const std::string &name, int &priority) {
     return true;
 }
 
-// Nice values outside the kernel's range are clamped rather than rejected:
-// a caller asking for "as low as possible" gets it.
-int ClampWorkerPriority(Local<Context> context, Local<Value> value) {
-    int priority = value->Int32Value(context).FromMaybe(kDefaultWorkerPriority);
+// Nice values outside the kernel's range are clamped rather than rejected: a
+// caller asking for "as low as possible" gets it. Clamping happens on the
+// double, before any integer conversion - ToInt32 wraps modulo 2^32, which
+// would turn a value past the range into an in-range one. NaN sits on no point
+// of the scale and is left to the caller to accept or reject.
+std::optional<int> ClampWorkerPriority(Local<Value> value) {
+    double priority = value.As<Number>()->Value();
+    if (std::isnan(priority)) {
+        return std::nullopt;
+    }
     if (priority < -20) {
         return -20;
     }
     if (priority > 19) {
         return 19;
     }
-    return priority;
+    return static_cast<int>(priority);
 }
 
 // Carries a real TypeError instance so `catch (e) { e instanceof TypeError }`
@@ -1205,15 +1211,22 @@ bool GetWorkerThreadPriority(Isolate *isolate, Local<Context> context,
             return false;
         }
         if (!priorityVal->IsUndefined()) {
+            std::optional<int> resolvedPriority;
             if (priorityVal->IsNumber()) {
-                priority = ClampWorkerPriority(context, priorityVal);
-            } else if (!priorityVal->IsString() ||
-                       !MapWorkerPriorityName(
-                               ArgConverter::ConvertToString(priorityVal.As<String>()), priority)) {
+                resolvedPriority = ClampWorkerPriority(priorityVal);
+            } else if (priorityVal->IsString()) {
+                int named;
+                if (MapWorkerPriorityName(ArgConverter::ConvertToString(priorityVal.As<String>()),
+                                          named)) {
+                    resolvedPriority = named;
+                }
+            }
+            if (!resolvedPriority) {
                 ThrowWorkerOptionTypeError(
                         isolate, std::string("Worker option \"android.priority\" must be one of ") +
                                  kWorkerPriorityNames + ".");
             }
+            priority = *resolvedPriority;
             resolved = true;
         }
     }
@@ -1237,7 +1250,9 @@ bool GetWorkerThreadPriority(Isolate *isolate, Local<Context> context,
     }
 
     if (legacyVal->IsNumber()) {
-        priority = ClampWorkerPriority(context, legacyVal);
+        // The deprecated option takes NaN as nice 0 (THREAD_PRIORITY_DEFAULT)
+        // rather than rejecting it.
+        priority = ClampWorkerPriority(legacyVal).value_or(0);
         return true;
     }
     if (legacyVal->IsString() &&

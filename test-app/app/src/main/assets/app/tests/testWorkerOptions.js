@@ -81,6 +81,22 @@ describe("Worker platform options", function () {
         });
     });
 
+    it("clamps a nice value past the range of a 32-bit integer", function (done) {
+        reportPriority({ android: { priority: 4294967295 } }, done, function (priority) {
+            expect(priority).toBe(19);
+        });
+    });
+
+    // Asserted by starting the worker rather than by the reported nice value,
+    // for the same privilege reason as the negative names above.
+    it("accepts a nice value past the negative end of a 32-bit integer", function () {
+        var worker;
+        expect(function () {
+            worker = new Worker(entry, { android: { priority: -4294967296 } });
+        }).not.toThrow();
+        worker.terminate();
+    });
+
     it("still honors the deprecated androidPriority option", function (done) {
         reportPriority({ androidPriority: "lowest" }, done, function (priority) {
             expect(priority).toBe(19);
@@ -148,6 +164,12 @@ describe("Worker platform options", function () {
        function () {
         expect(function () {
             new Worker(entry, { android: { priority: {} } });
+        }).toThrowError(TypeError, /"android\.priority"/);
+    });
+
+    it("throws a TypeError for a NaN android.priority", function () {
+        expect(function () {
+            new Worker(entry, { android: { priority: NaN } });
         }).toThrowError(TypeError, /"android\.priority"/);
     });
 });
