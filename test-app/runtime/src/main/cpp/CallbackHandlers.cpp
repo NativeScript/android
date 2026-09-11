@@ -12,6 +12,7 @@
 #include "v8-profiler.h"
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <sstream>
 #include <fstream>
@@ -1280,9 +1281,12 @@ bool GetWorkerThreadPriority(Isolate *isolate, Local<Context> context,
 }
 
 constexpr double kBytesPerMegabyte = 1024 * 1024;
-// Bounds the double-to-size_t conversion below; v8 clamps heap sizes far under
-// this on every device, so nothing real is excluded.
-constexpr double kMaxLimitMegabytes = 1024.0 * 1024.0;
+// Bounds the double-to-size_t conversion below: converting a byte count that
+// does not fit size_t is undefined, and size_t is 32 bits on armeabi-v7a and
+// x86. The division floors, so the product always fits. v8 clamps heap sizes
+// far under this on every device, so nothing real is excluded.
+constexpr size_t kMaxLimitMegabytes =
+        std::numeric_limits<size_t>::max() / static_cast<size_t>(kBytesPerMegabyte);
 
 // v8 needs the reservation to be a whole number of table segments and no larger
 // than its compile-time maximum; whole megabytes satisfy the first on every
@@ -1317,11 +1321,13 @@ bool ReadMegabyteLimit(Isolate *isolate, Local<Context> context, Local<Object> r
     }
 
     double parsed = value.As<Number>()->Value();
-    if (!std::isfinite(parsed) || parsed * kBytesPerMegabyte < 1 || parsed > kMaxLimitMegabytes) {
+    if (!std::isfinite(parsed) || parsed * kBytesPerMegabyte < 1 ||
+        parsed > static_cast<double>(kMaxLimitMegabytes)) {
         ThrowWorkerOptionRangeError(isolate,
                                     "Worker option \"" + name +
                                             "\" must be a finite number of megabytes worth at "
-                                            "least one byte and at most 1048576.");
+                                            "least one byte and at most " +
+                                            std::to_string(kMaxLimitMegabytes) + ".");
     }
 
     megabytes = parsed;

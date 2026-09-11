@@ -100,9 +100,12 @@ describe("Worker resourceLimits", function () {
         }).toThrowError(RangeError, /"resourceLimits\.maxYoungGenerationSizeMb"/);
     });
 
+    // The cap is derived from size_t, so it differs per ABI: 4095 MB where
+    // size_t is 32 bits (armeabi-v7a, x86), (2^44 - 1) MB where it is 64. The
+    // value has to sit above both for the spec to mean anything on every ABI.
     it("throws a RangeError for a maxOldGenerationSizeMb too large to hold in bytes", function () {
         expect(function () {
-            new Worker(echoEntry, { resourceLimits: { maxOldGenerationSizeMb: Number.MAX_VALUE } });
+            new Worker(echoEntry, { resourceLimits: { maxOldGenerationSizeMb: Math.pow(2, 53) } });
         }).toThrowError(RangeError, /"resourceLimits\.maxOldGenerationSizeMb"/);
     });
 
