@@ -54,7 +54,7 @@ means deliberately unsupported.
 | `threadName` | shim | Always `undefined`. |
 | `workerData` | shim | Always `null` — see below. |
 | `parentPort` | shim | `null` on the main isolate. Inside a worker, a `MessagePort`-shaped `EventTarget` over the worker's existing parent channel: `postMessage` forwards to the global `postMessage`, `message`/`messageerror` are re-dispatched from the worker global scope, `start()` and `close()` are no-ops. It is **not** a real port: not transferable, no queue of its own. |
-| `Worker` | shim | A class over the runtime's global `Worker` with a small Node-style emitter (`on`/`once`/`off`/`removeListener`) for `message`, `messageerror`, `error`, `online` and `exit`. `postMessage(value, transfer)` and `terminate()` forward. `online` is emitted off a microtask after construction, not from the thread. Unsupported options throw a `TypeError` naming the option: `workerData`, `env`, `eval`, `transferList`, and `stdin`/`stdout`/`stderr` when explicitly truthy. The runtime's own `Worker` options (`androidPriority`) ride along untouched — the native constructor ignores keys it does not know. |
+| `Worker` | shim | A class over the runtime's global `Worker` with a small Node-style emitter (`on`/`once`/`off`/`removeListener`) for `message`, `messageerror`, `error`, `online` and `exit`. `postMessage(value, transfer)` and `terminate()` forward. `online` is emitted off a microtask after construction, not from the thread. `exit` (always code `0`) fires exactly once, when the thread has ended, whether the worker was terminated or ended by its own `close()`; `terminate()` resolves at the same point. Unsupported options throw a `TypeError` naming the option: `workerData`, `env`, `eval`, `transferList`, and `stdin`/`stdout`/`stderr` when explicitly truthy. The runtime's own `Worker` options (`androidPriority`) ride along untouched — the native constructor ignores keys it does not know. |
 | `postMessageToThread` | throws | `Error: postMessageToThread is not supported in this runtime`. |
 | `moveMessagePortToContext` | throws | `Error: moveMessagePortToContext is not supported in this runtime`. |
 | `locks` | absent | Web Locks are not implemented; the property does not exist. |
@@ -72,12 +72,16 @@ Values are cloned on the way in and deserialized fresh on each read, so
 mutating the object you passed does not reach a reader, and two readers never
 share one object.
 
-### `exit` comes only from `terminate()`
+### `exit` fires when the thread has ended, always with code `0`
 
-The runtime has no thread-exit signal — nothing reports that a worker's isolate
-finished. `terminate()` therefore resolves with `0` and emits `exit` with code
-`0` on the way, and that is the only path that emits it. A worker that ends by
-its own `close()` produces no `exit`.
+`exit` is emitted once, from the runtime's end-of-worker notification, so every
+`message` and `error` the worker produced before it ended has been delivered
+first. Node reports the thread's exit code; this runtime has none to report, so
+the code is `0` whichever way the worker ended — `terminate()`, its own
+`close()`, an uncaught error or a missing entry. `terminate()` resolves with
+`0` at the same moment `exit` fires. A parent that is itself tearing down never
+delivers the notification, so a `terminate()` awaited from a dying isolate
+stays pending, as it does in Node when the parent process exits.
 
 ### A worker error carries no `error` object, and the worker scope's `onerror` is not an event
 
@@ -264,3 +268,40 @@ rather than raising a `DataCloneError`, which is long-standing behaviour app
 code relies on. Transfer is not part of that leniency — a port in a worker
 transfer list is validated exactly as it is everywhere else, since degrading a
 transfer would strand the port's sibling.
+
+## Worker lifetime
+
+**A `Worker` is held strongly by the runtime from the moment it is constructed
+until its thread ends**, the way a browser keeps a running worker's handle
+alive. Dropping every reference to one does not stop it: it keeps running, and
+it keeps dispatching `message` and `error` events at the handlers installed on
+it.
+
+```js
+(function () {
+  const worker = new Worker("./worker.js");
+  worker.onmessage = handle;   // still fires; nothing here holds `worker`
+  worker.postMessage("go");
+})();
+```
+
+Being a GC root also means a `Worker` is a well-behaved key: put one in a
+`WeakMap`, `WeakSet` or `WeakRef` and the entry survives for as long as the
+worker runs.
+
+The root is released when the worker ends — `terminate()`, or the worker's own
+`close()`. `terminate()` only starts the wind-down: the object stays rooted
+until the worker thread has actually finished and reported that to the parent.
+From then on the object is collectable like any other, and the runtime drops
+the native side with it. Nothing about a *finished* worker is kept alive.
+
+### `nsworkerended`
+
+When the worker's thread has finished, the runtime dispatches a plain `Event`
+named `nsworkerended` on the `Worker` object. It is **internal and
+non-standard** — the web has no end-of-worker event, and the name is
+deliberately outside the standard namespace. It exists so that
+`node:worker_threads` can report `'exit'` for a worker that ended by its own
+`close()`; app code should not rely on it. The event is best effort: a worker
+whose parent is already tearing down never delivers it, because the parent's
+own teardown disposes the worker anyway.

@@ -110,6 +110,8 @@ require('./tests/testCreateRequire');
 require('./tests/testNodeUrlModule');
 require('./tests/testImportMetaResolution');
 require('./tests/testWorkerEsmEntry');
+// Worker wrapper reachability across GC (strong while running, collectable after)
+require('./tests/testWorkerLifetime');
 // Fetches from the in-app loopback fixture server, so it goes last
 require('./tests/testEsmHttpLoader');
 // Node-API addon surface
