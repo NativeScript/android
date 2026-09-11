@@ -17,6 +17,7 @@
 
 #include "ConcurrentQueue.h"
 #include "ModuleInternalCallbacks.h"
+#include "Runtime.h"
 #include "WorkerMessage.h"
 #include "v8.h"
 
@@ -45,7 +46,7 @@ class WorkerInspectorClient;
 class WorkerWrapper : public std::enable_shared_from_this<WorkerWrapper> {
 public:
     WorkerWrapper(v8::Isolate* parentIsolate, int workerId, std::string workerPath,
-                  std::string callingDir, int priority,
+                  std::string callingDir, int priority, IsolateLimits limits,
                   v8::Local<v8::Object> workerObject);
 
     int WorkerId() const { return workerId_; }
@@ -104,6 +105,14 @@ public:
      * messages, exactly as on the web.
      */
     void EnableMessageQueue();
+
+    /*
+     * Whether the worker's heap cap was hit. The bootstrap checks it to stop
+     * before running anything else in an isolate v8 is terminating.
+     */
+    bool HeapLimitExceeded() const {
+        return heapLimitExceeded_.load(std::memory_order_acquire);
+    }
 
     /*
      * Registry of live workers, keyed by workerId. Replaces the old
@@ -180,6 +189,7 @@ private:
     const std::string callingDir_;
     const std::string threadName_;
     const int priority_;
+    const IsolateLimits limits_;
 
     // The parent's loader vocabulary, copied on the parent's thread when this
     // wrapper is constructed and installed on the worker's own isolate before
@@ -198,6 +208,20 @@ private:
     // disabled. Written and read on the worker thread only - the atomic is
     // belt-and-braces, not a cross-thread channel.
     std::atomic_bool messagesEnabled_;
+
+    // Reporting material for OnNearHeapLimit, built on the parent's thread:
+    // the callback runs inside a GC, where nothing may be allocated on the
+    // worker isolate and no handle may be created.
+    std::string heapLimitMessage_;
+    std::atomic_bool heapLimitExceeded_;
+
+    /*
+     * Runs on the worker thread from inside a GC. Reports the exhausted heap
+     * to the parent, asks v8 to terminate this isolate and hands back a raised
+     * limit so the in-progress GC can finish.
+     */
+    static size_t OnNearHeapLimit(void* data, size_t currentHeapLimit,
+                                  size_t initialHeapLimit);
 
     ConcurrentQueue queue_;
 
