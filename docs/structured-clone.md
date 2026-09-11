@@ -1,6 +1,6 @@
 # structuredClone
 
-The runtime exposes the WHATWG [`structuredClone(value, options)`](https://html.spec.whatwg.org/multipage/structured-data.html#dom-structuredclone) global. It performs a deep, structure-preserving copy of `value` using V8's structured clone serializer — the same one worker `postMessage` uses — optionally taking ownership of `ArrayBuffer`s named in `options.transfer`.
+The runtime exposes the WHATWG [`structuredClone(value, options)`](https://html.spec.whatwg.org/multipage/structured-data.html#dom-structuredclone) global. It performs a deep, structure-preserving copy of `value` using V8's structured clone serializer — the same one worker `postMessage` uses — optionally taking ownership of the `ArrayBuffer`s and `MessagePort`s named in `options.transfer`.
 
 ```js
 const clone = structuredClone({ when: new Date(), tags: new Set(["a"]) });
@@ -12,7 +12,7 @@ buffer.byteLength; // 0 — the memory now belongs to `moved`
 
 ## Surface
 
-`structuredClone(value)` returns a clone of `value`. `structuredClone(value, { transfer })` additionally transfers every `ArrayBuffer` in `transfer`.
+`structuredClone(value)` returns a clone of `value`. `structuredClone(value, { transfer })` additionally transfers every `ArrayBuffer` and `MessagePort` in `transfer`.
 
 - `value` is required; calling with no arguments throws a `TypeError`.
 - `options` may be `undefined` or `null` (both mean "no transfer"); anything else must be an object, or a `TypeError` is thrown.
@@ -24,13 +24,15 @@ The clone preserves the shape of the graph, not just the values: an object refer
 
 `SharedArrayBuffer` is **shared, not copied**: the clone is a second `SharedArrayBuffer` over the same memory, so writes through either are visible through the other.
 
-Not cloneable — each throws (see the deviations below): functions, symbols, `WeakMap`/`WeakSet`/`WeakRef`, `Promise`, and every native/interop object (Java proxies and the objects the metadata layer hands out), which have no serialized form.
+Not cloneable — each throws (see the deviations below): functions, symbols, `WeakMap`/`WeakSet`/`WeakRef`, `Promise`, and every native/interop object (Java proxies and the objects the metadata layer hands out), which have no serialized form. A `MessagePort` is transferable but never cloneable, so one found in the graph has to be in the transfer list.
 
 ## Transfer semantics
 
-Listed buffers are validated before anything is serialized: each entry must be an `ArrayBuffer`, must not already be detached, must be detachable, and must appear at most once. A violation throws before the source buffers are touched, so a rejected call never leaves a half-transferred graph behind.
+The list is validated before anything is serialized: each entry must be an `ArrayBuffer` or a `MessagePort`, must not already be detached (an `ArrayBuffer` must additionally be detachable), and must appear at most once. A violation throws before the sources are touched, and nothing is detached or handed over until the whole graph has serialized successfully — a rejected call never leaves a half-transferred graph behind. The guarantee covers transfer state only: serializing the graph runs user getters, and a getter's own side effects (closing a listed port, say) are not rolled back — a port closed that way makes the call fail, already closed.
 
 On success the memory changes hands rather than being copied: the source buffer is detached (`byteLength` becomes 0, and every typed array over it becomes zero-length) and the clone receives the original backing store. A transferred buffer need not appear inside `value` at all; a buffer reached through a typed array in `value` is transferred as a unit, so the cloned view sees the original bytes.
+
+A transferred `MessagePort` is closed as a handle on this side while its queue and its channel membership move to the clone. Unlike a buffer, a port that *is* reachable in `value` must also be listed — an unlisted one is a `DataCloneError`, since a copied port would be a port to nowhere. [worker-threads.md](worker-threads.md) has the full transfer matrix and the exact `DataCloneError` messages.
 
 ## Worker `postMessage`
 
@@ -44,12 +46,12 @@ worker.postMessage({ pixels: buffer }, [buffer]);  // buffer is detached here,
 Two differences are intentional:
 
 - **The transfer list must be an array.** Omitting it, or passing `undefined` or `null`, means "transfer nothing"; every other non-array value is a `TypeError`. The WebIDL iterable-to-sequence conversion that lets `structuredClone` take a `Set` or any iterable lives in the JavaScript wrapper around `structuredClone`; `postMessage` is native all the way down and has no such wrapper.
-- **Host objects degrade instead of throwing.** Posting a native/interop object delivers an empty object to the receiver rather than raising a `DataCloneError`. This is long-standing shipped behavior, and app code relies on it; `structuredClone`, being new, follows the spec and rejects. The asymmetry is encoded in exactly one place — the `HostObjectPolicy` enum in `test-app/runtime/src/main/cpp/StructuredSerialization.h` — and unifying the two on rejection is a breaking change that needs the iOS runtime to move at the same time.
+- **Host objects degrade instead of throwing.** Posting a native/interop object delivers an empty object to the receiver rather than raising a `DataCloneError`. This is long-standing shipped behavior, and app code relies on it; `structuredClone`, being new, follows the spec and rejects. The asymmetry is encoded in exactly one place — the `HostObjectPolicy` enum in `test-app/runtime/src/main/cpp/StructuredSerialization.h` — and unifying the two on rejection is a breaking change that needs the iOS runtime to move at the same time. `MessagePort` is outside the leniency: a port is rejected or transferred, never degraded, because an empty object in the receiver would strand its sibling.
 
 ## Deviations from the specification
 
 - **`DataCloneError` is a `DOMException`.** Failures throw a `DOMException` named `"DataCloneError"`, from the JS argument checks and the native serializer alike, so both `e.name === "DataCloneError"` and `instanceof DOMException` detect them. (The serializer falls back to a `DataCloneError`-named `Error` only when the builtin can no longer run, e.g. during isolate teardown.)
-- **Only `ArrayBuffer` is transferable.** The spec's other transferable types — `MessagePort`, `ImageBitmap`, `ReadableStream` and friends — do not exist here. A non-`ArrayBuffer` in the transfer list is a `DataCloneError`.
+- **Only `ArrayBuffer` and `MessagePort` are transferable.** The spec's other transferable types — `ImageBitmap`, `ReadableStream` and friends — do not exist here, and neither do the runtime's own native/interop wrapper objects, which have no serialized form. Anything else in the transfer list is a `DataCloneError`. Port transfer has rules of its own (a port may not travel on itself, a port in the graph must be listed); [worker-threads.md](worker-threads.md) has the full matrix and the exact messages.
 - **Host objects are not cloneable by `structuredClone`.** The spec leaves platform objects to each host; here every native/interop wrapper is rejected with a `DataCloneError`, because a JavaScript copy detached from its native counterpart would be a wrapper around nothing. Worker `postMessage` deliberately differs — see above.
 
 `SharedArrayBuffer` follows the spec: it is shared rather than copied, and it is not transferable (listing one throws a `DataCloneError`).

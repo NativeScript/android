@@ -8,6 +8,8 @@
 #include "ArgConverter.h"
 #include "CallbackHandlers.h"
 #include "CrashBreadcrumbs.h"
+#include "ErrorEvents.h"
+#include "EventLoop.h"
 #include "JEnv.h"
 #include "JniLocalRef.h"
 #include "ModuleInternal.h"
@@ -15,6 +17,7 @@
 #include "NativeScriptException.h"
 #include "NativeScriptPlatform.h"
 #include "Runtime.h"
+#include "WorkerEvents.h"
 
 #include <unistd.h>
 
@@ -28,6 +31,24 @@ using namespace v8;
 namespace tns {
 
 namespace {
+
+/*
+ * An uncaught exception from a JS callback the event loop's internal lane
+ * drove. While a pump is on the stack, returning to Java is not the next act
+ * and arming a pending Java exception would be illegal, so the loop raises it
+ * from its next ordered dispatch instead.
+ */
+void ReportFromEventLoopEntry(Isolate* isolate, TryCatch& tc) {
+    if (EventLoop::IsPumping()) {
+        auto runtime = Runtime::TryGetRuntime(isolate);
+        auto eventLoop = runtime == nullptr ? nullptr : runtime->GetEventLoop();
+        if (eventLoop != nullptr) {
+            eventLoop->DeferJavaThrow(std::make_shared<NativeScriptException>(tc));
+        }
+        return;
+    }
+    NativeScriptException(tc).ReThrowToJava();
+}
 
 /*
  * Reports a worker entry that failed to evaluate, with the web's order: the
@@ -62,13 +83,26 @@ void ReportEntryRejection(Isolate* isolate, Local<Value> reason,
         onError->IsFunction()) {
         Local<Value> args[] = {ArgConverter::ConvertToV8String(isolate, message)};
         Local<Value> result;
-        // A handler that throws has not consumed anything - the failure falls
-        // through to the parent, as if no handler had been installed.
         TryCatch tc(isolate);
-        if (onError.As<Function>()
-                    ->Call(context, Undefined(isolate), 1, args)
-                    .ToLocal(&result) &&
-            !result.IsEmpty() && result->BooleanValue(isolate)) {
+        bool called = onError.As<Function>()
+                              ->Call(context, Undefined(isolate), 1, args)
+                              .ToLocal(&result);
+        if (called && !result.IsEmpty() && result->BooleanValue(isolate)) {
+            // Truthy return means handled, which is where the web stops
+            // propagation.
+            return;
+        }
+        if (!called && tc.HasCaught() && !tc.HasTerminated()) {
+            // A handler that threw replaces the reason it was offered: its own
+            // error reaches the parent, and the original does not.
+            Local<Value> thrown = tc.Exception();
+            std::string thrownStack;
+            auto stack = Exception::GetStackTrace(thrown);
+            if (!stack.IsEmpty()) {
+                thrownStack = NativeScriptException::GetErrorStackTrace(stack);
+            }
+            wrapper->PassUncaughtExceptionFromWorkerToParent(
+                    ArgConverter::ToString(isolate, thrown), "", thrownStack, 0);
             return;
         }
     }
@@ -252,7 +286,6 @@ int WorkerWrapper::DrainPendingTasks() {
     HandleScope handle_scope(isolate);
     auto context = runtime_->GetContext();
     Context::Scope context_scope(context);
-    auto globalObject = context->Global();
 
     // WHATWG parity: the implicit port's message queue starts disabled and is
     // enabled once the entry script has finished evaluating (including after a
@@ -262,6 +295,15 @@ int WorkerWrapper::DrainPendingTasks() {
     if (!messagesEnabled_.load(std::memory_order_acquire)) {
         return 0;
     }
+
+    // Messages dispatch on the EventTarget backing the global scope's listener
+    // methods rather than on globalThis, so app code replacing
+    // globalThis.dispatchEvent cannot intercept delivery.
+    auto& globalEventTarget = runtime_->GlobalEventTarget();
+    if (globalEventTarget.IsEmpty()) {
+        return 0;
+    }
+    auto globalTarget = globalEventTarget.Get(isolate);
 
     auto messages = queue_.PopAll();
     if (messages.empty()) {
@@ -277,23 +319,7 @@ int WorkerWrapper::DrainPendingTasks() {
 
         TryCatch tc(isolate);
 
-        Local<Value> callback;
-        if (!globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "onmessage"))
-                     .ToLocal(&callback) ||
-            !callback->IsFunction()) {
-            DEBUG_WRITE(
-                    "WORKER: couldn't fire a worker's `onmessage` callback because it isn't implemented!");
-            continue;
-        }
-
-        Local<Value> data;
-        if (message->Deserialize(isolate, context).ToLocal(&data)) {
-            auto event = Object::New(isolate);
-            event->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "data"),
-                                     data, PropertyAttribute::ReadOnly);
-            Local<Value> args[] = {event};
-            callback.As<Function>()->Call(context, Undefined(isolate), 1, args);
-        }
+        WorkerEvents::EmitMessage(isolate, globalTarget, message);
 
         if (tc.HasCaught() && !isTerminating_) {
             CallbackHandlers::CallWorkerScopeOnErrorHandle(isolate, tc);
@@ -322,7 +348,7 @@ void WorkerWrapper::FireMessageOnParentWorkerObject(int workerId,
 
     if (wrapper->poWorker_ == nullptr || wrapper->poWorker_->IsEmpty()) {
         DEBUG_WRITE(
-                "MAIN: couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been cleared.",
+                "MAIN: couldn't deliver a worker(id=%d) message because the worker has been cleared.",
                 workerId);
         return;
     }
@@ -332,37 +358,14 @@ void WorkerWrapper::FireMessageOnParentWorkerObject(int workerId,
     Context::Scope context_scope(context);
 
     try {
-        Local<Value> callback;
-        if (!worker->Get(context, ArgConverter::ConvertToV8String(isolate, "onmessage"))
-                     .ToLocal(&callback) ||
-            !callback->IsFunction()) {
-            DEBUG_WRITE(
-                    "MAIN: couldn't fire a worker(id=%d) object's `onmessage` callback because it isn't implemented.",
-                    workerId);
-            return;
+        // A listener that throws has no JS frame below it to unwind into, so it
+        // is reported here the way a timer callback's exception is.
+        TryCatch tc(isolate);
+        WorkerEvents::EmitMessage(isolate, worker, message);
+        if (tc.HasCaught() &&
+            !NativeScriptException::ContainUncaughtCallbackException(isolate, tc)) {
+            ReportFromEventLoopEntry(isolate, tc);
         }
-
-        Local<Value> data;
-        {
-            // Reading runs JS (a DOMException is rebuilt through its
-            // constructor), so a failure here must not stay pending on the
-            // isolate past this callout.
-            TryCatch tc(isolate);
-            if (!message->Deserialize(isolate, context).ToLocal(&data)) {
-                if (!tc.HasTerminated() && tc.HasCaught()) {
-                    DEBUG_WRITE_FORCE("MAIN: worker(id=%d) message could not be read: %s",
-                                      workerId,
-                                      ArgConverter::ToString(isolate, tc.Exception()).c_str());
-                }
-                return;
-            }
-        }
-
-        auto event = Object::New(isolate);
-        event->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "data"), data,
-                                 PropertyAttribute::ReadOnly);
-        Local<Value> args[] = {event};
-        callback.As<Function>()->Call(context, Undefined(isolate), 1, args);
     } catch (NativeScriptException& ex) {
         ex.ReThrowToV8();
     }
@@ -410,7 +413,7 @@ void WorkerWrapper::FireErrorOnParentWorkerObject(int workerId, const std::strin
     try {
         if (wrapper->poWorker_ == nullptr || wrapper->poWorker_->IsEmpty()) {
             DEBUG_WRITE(
-                    "MAIN: couldn't fire a worker(id=%d) object's `onerror` callback because the worker has been cleared.",
+                    "MAIN: couldn't deliver a worker(id=%d) error because the worker has been cleared.",
                     workerId);
             return;
         }
@@ -418,38 +421,38 @@ void WorkerWrapper::FireErrorOnParentWorkerObject(int workerId, const std::strin
         auto worker = Local<Object>::New(isolate, *wrapper->poWorker_);
         auto context = Runtime::GetRuntime(isolate)->GetContext();
 
-        Local<Value> callback;
-        bool hasOnError =
-                worker->Get(context, ArgConverter::ConvertToV8String(isolate, "onerror"))
-                        .ToLocal(&callback) &&
-                callback->IsFunction();
-
-        if (hasOnError) {
-            auto errEvent = Object::New(isolate);
-            errEvent->Set(context, ArgConverter::ConvertToV8String(isolate, "message"),
-                          ArgConverter::ConvertToV8String(isolate, message));
-            errEvent->Set(context, ArgConverter::ConvertToV8String(isolate, "stackTrace"),
-                          ArgConverter::ConvertToV8String(isolate, stackTrace));
-            errEvent->Set(context, ArgConverter::ConvertToV8String(isolate, "filename"),
-                          ArgConverter::ConvertToV8String(isolate, filename));
-            errEvent->Set(context, ArgConverter::ConvertToV8String(isolate, "lineno"),
-                          Number::New(isolate, lineno));
-
-            Local<Value> args[] = {errEvent};
-
-            // If the handler returns a truthy value the exception is handled
-            // and must not be raised to application level
-            Local<Value> result;
-            callback.As<Function>()->Call(context, Undefined(isolate), 1, args).ToLocal(&result);
-            if (!result.IsEmpty() && result->BooleanValue(isolate)) {
-                return;
+        TryCatch tc(isolate);
+        bool handled = WorkerEvents::EmitError(isolate, worker, message, filename, stackTrace,
+                                               lineno);
+        if (tc.HasCaught()) {
+            // A listener that threw replaces the error it was handed; nothing
+            // further is reported for the original.
+            if (!NativeScriptException::ContainUncaughtCallbackException(isolate, tc)) {
+                ReportFromEventLoopEntry(isolate, tc);
             }
+            return;
+        }
+        if (handled) {
+            return;
         }
 
-        DEBUG_WRITE(
-                "Unhandled exception in '%s' thread. file: %s, line %d, message: %s\nStackTrace: %s",
-                threadName.c_str(), filename.c_str(), lineno, message.c_str(),
-                stackTrace.c_str());
+        // HTML: an error the Worker object leaves unhandled is reported to the
+        // parent's global scope. Only primitives crossed the isolate boundary,
+        // so the error object is rebuilt from them here.
+        Local<Value> error =
+                Exception::Error(ArgConverter::ConvertToV8String(isolate, message));
+        if (error->IsObject() && !stackTrace.empty()) {
+            (void)error.As<Object>()
+                    ->Set(context, ArgConverter::ConvertToV8String(isolate, "stack"),
+                          ArgConverter::ConvertToV8String(isolate, stackTrace))
+                    .FromMaybe(false);
+        }
+        if (!ErrorEvents::DispatchError(isolate, error, message, stackTrace)) {
+            DEBUG_WRITE_FORCE(
+                    "Unhandled exception in '%s' thread. file: %s, line %d, message: %s\nStackTrace: %s",
+                    threadName.c_str(), filename.c_str(), lineno, message.c_str(),
+                    stackTrace.c_str());
+        }
     } catch (NativeScriptException& ex) {
         ex.ReThrowToV8();
     }

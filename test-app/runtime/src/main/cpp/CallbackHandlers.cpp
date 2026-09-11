@@ -1898,13 +1898,16 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate *isolate, TryCatch &
         std::string message, source, stackTrace;
         int lineno;
 
-        // will account for exceptions thrown inside the error handler
+        // A scope handler that threw replaces the error it was offered: the
+        // parent sees the handler's own error, and only that one.
         if (innerTc.HasCaught()) {
             ExtractTryCatchInfo(isolate, context, innerTc, message, source, stackTrace, lineno);
             wrapper->PassUncaughtExceptionFromWorkerToParent(message, source, stackTrace, lineno);
+            return;
         }
 
-        // bubble up to the main thread's Worker object `onerror`
+        // Unhandled at the worker scope - including when there is no scope
+        // handler at all - so it becomes the parent's error event.
         ExtractTryCatchInfo(isolate, context, tc, message, source, stackTrace, lineno);
         wrapper->PassUncaughtExceptionFromWorkerToParent(message, source, stackTrace, lineno);
     } catch (NativeScriptException &ex) {

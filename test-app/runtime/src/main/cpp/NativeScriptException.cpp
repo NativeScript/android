@@ -816,10 +816,12 @@ void PromiseRejectionTracker::ScheduleDrain() {
  * Gives a worker's global `onerror` a chance to handle a rejected reason,
  * mirroring CallbackHandlers::CallWorkerScopeOnErrorHandle (which passes the
  * message as a string). Returns true when the handler signalled it consumed
- * the error (truthy return).
+ * the error (truthy return). A handler that throws replaces the reason:
+ * `thrown` receives its exception, and the caller forwards that instead of the
+ * original, the way the other worker error paths do.
  */
 static bool GiveWorkerOnErrorAChance(Isolate* isolate, Local<Context> context,
-                                     const string& message) {
+                                     const string& message, Local<Value>* thrown) {
   auto global = context->Global();
   Local<Value> onErrorVal;
   if (!global->Get(context, ArgConverter::ConvertToV8String(isolate, "onerror"))
@@ -834,7 +836,13 @@ static bool GiveWorkerOnErrorAChance(Isolate* isolate, Local<Context> context,
   TryCatch tc(isolate);
   bool success =
       onError->Call(context, Undefined(isolate), 1, args).ToLocal(&result);
-  return success && !result.IsEmpty() && result->BooleanValue(isolate);
+  if (!success) {
+    if (tc.HasCaught() && !tc.HasTerminated()) {
+      *thrown = tc.Exception();
+    }
+    return false;
+  }
+  return !result.IsEmpty() && result->BooleanValue(isolate);
 }
 
 void PromiseRejectionTracker::Drain() {
@@ -905,10 +913,24 @@ void PromiseRejectionTracker::Drain() {
                                                      reason)) {
           string message =
               "Unhandled promise rejection: " + ToDetailString(isolate, reason);
-          if (!GiveWorkerOnErrorAChance(isolate, context, message) &&
+          Local<Value> thrown;
+          if (!GiveWorkerOnErrorAChance(isolate, context, message, &thrown) &&
               !workerWrapper->IsTerminating() && !workerWrapper->IsDisposed()) {
+            string forwarded = message;
+            string forwardedStack = stackTrace;
+            if (!thrown.IsEmpty()) {
+              forwarded = ToDetailString(isolate, thrown);
+              // The handler's own stack replaces the reason's; an accessor
+              // that throws costs the stack, never the forward.
+              forwardedStack = "";
+              auto stack = Exception::GetStackTrace(thrown);
+              if (!stack.IsEmpty()) {
+                forwardedStack =
+                    NativeScriptException::GetErrorStackTrace(stack);
+              }
+            }
             workerWrapper->PassUncaughtExceptionFromWorkerToParent(
-                message, "", stackTrace, 0);
+                forwarded, "", forwardedStack, 0);
           }
         }
       } else {
