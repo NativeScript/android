@@ -777,9 +777,25 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
                                    const bool forceLog) {
   tns::instrumentation::Frame frame("Runtime.PrepareV8Runtime");
 
+  PendingIsolateSetup setup = std::exchange(s_pendingIsolateSetup, {});
+
   Isolate::CreateParams create_params;
 
   create_params.array_buffer_allocator = &g_allocator;
+  if (setup.limits.maxOldGenerationSizeBytes.has_value()) {
+    create_params.constraints.set_max_old_generation_size_in_bytes(
+        *setup.limits.maxOldGenerationSizeBytes);
+  }
+  if (setup.limits.maxYoungGenerationSizeBytes.has_value()) {
+    create_params.constraints.set_max_young_generation_size_in_bytes(
+        *setup.limits.maxYoungGenerationSizeBytes);
+  }
+#ifdef V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM
+  if (setup.limits.jsDispatchTableReservationBytes.has_value()) {
+    create_params.js_dispatch_table_reservation_size =
+        *setup.limits.jsDispatchTableReservationBytes;
+  }
+#endif
 
   // Also initializes V8 for the process if this runtime wins the election, and
   // otherwise waits for the runtime that did.
@@ -810,6 +826,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
   HandleScope handleScope(isolate);
+
+  if (setup.nearHeapLimitCallback != nullptr) {
+    isolate->AddNearHeapLimitCallback(setup.nearHeapLimitCallback,
+                                      setup.nearHeapLimitData);
+  }
 
   // Sets a structure with v8 String constants on the isolate object at slot 1
   auto consts = new V8StringConstants::PerIsolateV8Constants(isolate);
@@ -1232,6 +1253,11 @@ int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 std::shared_ptr<EventLoop> Runtime::s_mainEventLoop;
 
 thread_local Runtime* Runtime::s_currentRuntime = nullptr;
+thread_local PendingIsolateSetup Runtime::s_pendingIsolateSetup;
+
+void Runtime::SetPendingIsolateSetup(PendingIsolateSetup setup) {
+  s_pendingIsolateSetup = std::move(setup);
+}
 
 napi_env Runtime::GetNapiEnvIfAlive(const Runtime* runtime) {
   if (runtime == nullptr) {

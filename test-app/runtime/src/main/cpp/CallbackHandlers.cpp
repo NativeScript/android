@@ -10,7 +10,10 @@
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
 #include "v8-profiler.h"
+#include <cmath>
 #include <iostream>
+#include <limits>
+#include <optional>
 #include <sstream>
 #include <fstream>
 #include <cstdio>
@@ -1172,6 +1175,18 @@ std::optional<int> ClampWorkerPriority(Local<Value> value) {
     throw NativeScriptException(isolate, error, message);
 }
 
+[[noreturn]] void ThrowWorkerOptionRangeError(Isolate *isolate, const std::string &message) {
+    Local<Value> error = Exception::RangeError(ArgConverter::ConvertToV8String(isolate, message));
+    throw NativeScriptException(isolate, error, message);
+}
+
+#ifndef V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM
+[[noreturn]] void ThrowWorkerOptionError(Isolate *isolate, const std::string &message) {
+    Local<Value> error = Exception::Error(ArgConverter::ConvertToV8String(isolate, message));
+    throw NativeScriptException(isolate, error, message);
+}
+#endif
+
 // Reads `key` from `object`. A false return means the getter threw: the
 // exception is already pending on the isolate and construction must stop
 // without running anything else on it.
@@ -1265,6 +1280,128 @@ bool GetWorkerThreadPriority(Isolate *isolate, Local<Context> context,
             kWorkerPriorityNames + ".");
 }
 
+constexpr double kBytesPerMegabyte = 1024 * 1024;
+// Bounds the double-to-size_t conversion below: converting a byte count that
+// does not fit size_t is undefined, and size_t is 32 bits on armeabi-v7a and
+// x86. The division floors, so the product always fits. v8 clamps heap sizes
+// far under this on every device, so nothing real is excluded.
+constexpr size_t kMaxLimitMegabytes =
+        std::numeric_limits<size_t>::max() / static_cast<size_t>(kBytesPerMegabyte);
+
+// v8 needs the reservation to be a whole number of table segments and no larger
+// than its compile-time maximum; whole megabytes satisfy the first on every
+// platform's segment size, and 256 is the maximum.
+constexpr double kMaxJsDispatchTableSizeMb = 256;
+
+#ifdef V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM
+// Every isolate otherwise reserves 256 MB of address space for its JS dispatch
+// table; 64 MB still holds four million dispatch entries, far more than a
+// worker allocates. Only workers get the smaller reservation - the main
+// isolate keeps v8's default.
+constexpr size_t kDefaultWorkerJsDispatchTableBytes = 64 * 1024 * 1024;
+#endif
+
+// Reads one megabyte-valued `resourceLimits` key into `megabytes`, leaving it
+// empty when the key is absent (v8's own default stays in place). Returns false
+// when the getter threw (see ReadWorkerOption). A present value must be a
+// finite number worth at least one byte and at most kMaxLimitMegabytes.
+bool ReadMegabyteLimit(Isolate *isolate, Local<Context> context, Local<Object> resourceLimits,
+                       const char *key, std::optional<double> &megabytes) {
+    Local<Value> value;
+    if (!ReadWorkerOption(isolate, context, resourceLimits, key, value)) {
+        return false;
+    }
+    if (value->IsUndefined()) {
+        return true;
+    }
+
+    std::string name = std::string("resourceLimits.") + key;
+    if (!value->IsNumber()) {
+        ThrowWorkerOptionTypeError(isolate, "Worker option \"" + name + "\" must be a number.");
+    }
+
+    double parsed = value.As<Number>()->Value();
+    if (!std::isfinite(parsed) || parsed * kBytesPerMegabyte < 1 ||
+        parsed > static_cast<double>(kMaxLimitMegabytes)) {
+        ThrowWorkerOptionRangeError(isolate,
+                                    "Worker option \"" + name +
+                                            "\" must be a finite number of megabytes worth at "
+                                            "least one byte and at most " +
+                                            std::to_string(kMaxLimitMegabytes) + ".");
+    }
+
+    megabytes = parsed;
+    return true;
+}
+
+/*
+ * Node's `resourceLimits` shape. Unknown keys are ignored, so the options Node
+ * has and this runtime cannot honor (codeRangeSizeMb, stackSizeMb) stay
+ * harmless to pass. Returns false when a getter threw (see ReadWorkerOption).
+ */
+bool ParseWorkerResourceLimits(Isolate *isolate, Local<Context> context,
+                               const v8::FunctionCallbackInfo<v8::Value> &args,
+                               IsolateLimits &limits) {
+    if (args.Length() < 2 || !args[1]->IsObject()) {
+        return true;
+    }
+
+    Local<Value> value;
+    if (!ReadWorkerOption(isolate, context, args[1].As<Object>(), "resourceLimits", value)) {
+        return false;
+    }
+    if (value->IsNullOrUndefined()) {
+        return true;
+    }
+    if (!value->IsObject()) {
+        ThrowWorkerOptionTypeError(isolate, "Worker option \"resourceLimits\" must be an object.");
+    }
+    Local<Object> resourceLimits = value.As<Object>();
+
+    std::optional<double> megabytes;
+
+    if (!ReadMegabyteLimit(isolate, context, resourceLimits, "maxOldGenerationSizeMb", megabytes)) {
+        return false;
+    }
+    if (megabytes) {
+        limits.maxOldGenerationSizeBytes =
+                static_cast<size_t>(*megabytes * kBytesPerMegabyte);
+    }
+
+    megabytes.reset();
+    if (!ReadMegabyteLimit(isolate, context, resourceLimits, "maxYoungGenerationSizeMb",
+                           megabytes)) {
+        return false;
+    }
+    if (megabytes) {
+        limits.maxYoungGenerationSizeBytes =
+                static_cast<size_t>(*megabytes * kBytesPerMegabyte);
+    }
+
+    megabytes.reset();
+    if (!ReadMegabyteLimit(isolate, context, resourceLimits, "jsDispatchTableSizeMb", megabytes)) {
+        return false;
+    }
+    if (megabytes) {
+        if (*megabytes != std::floor(*megabytes) || *megabytes < 1 ||
+            *megabytes > kMaxJsDispatchTableSizeMb) {
+            ThrowWorkerOptionRangeError(
+                    isolate, "Worker option \"resourceLimits.jsDispatchTableSizeMb\" must be a "
+                             "whole number of megabytes between 1 and 256.");
+        }
+#ifdef V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM
+        limits.jsDispatchTableReservationBytes =
+                static_cast<size_t>(*megabytes) * static_cast<size_t>(kBytesPerMegabyte);
+#else
+        ThrowWorkerOptionError(isolate,
+                               "Worker option \"resourceLimits.jsDispatchTableSizeMb\" requires a "
+                               "v8 build with a configurable JS dispatch table.");
+#endif
+    }
+
+    return true;
+}
+
 }  // namespace
 
 void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
@@ -1322,9 +1459,17 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         }
 
         int priority;
-        if (!GetWorkerThreadPriority(isolate, context, args, priority)) {
+        IsolateLimits resourceLimits;
+        if (!GetWorkerThreadPriority(isolate, context, args, priority) ||
+            !ParseWorkerResourceLimits(isolate, context, args, resourceLimits)) {
             return;
         }
+
+#ifdef V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM
+        if (!resourceLimits.jsDispatchTableReservationBytes.has_value()) {
+            resourceLimits.jsDispatchTableReservationBytes = kDefaultWorkerJsDispatchTableBytes;
+        }
+#endif
 
         // An http(s) entry has no filesystem form to validate or to resolve
         // against the caller's directory: it is already absolute, and the
@@ -1401,8 +1546,8 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         // here on the main thread where class loading is safe.
         WorkerWrapper::EnsureJniCached();
 
-        auto wrapper = std::make_shared<WorkerWrapper>(isolate, workerId, entryPath,
-                                                       currentDir, priority, thiz);
+        auto wrapper = std::make_shared<WorkerWrapper>(isolate, workerId, entryPath, currentDir,
+                                                       priority, std::move(resourceLimits), thiz);
         WorkerWrapper::Insert(workerId, wrapper);
 
         DEBUG_WRITE("Called Worker constructor id=%d", workerId);

@@ -1039,6 +1039,11 @@ string NativeScriptException::GetFullMessage(const TryCatch& tc,
   v8::Local<v8::Context> context = isolate->GetEnteredOrMicrotaskContext();
 
   auto message = tc.Message();
+  // An isolate v8 has been told to terminate hands back an exception with no
+  // v8::Message at all, and every read below needs a real handle.
+  if (message.IsEmpty()) {
+    return jsExceptionMessage;
+  }
 
   stringstream ss;
   ss << jsExceptionMessage;

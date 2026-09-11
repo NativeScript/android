@@ -79,7 +79,7 @@ void ReportEntryRejection(Isolate* isolate, Local<Value> reason,
 }  // namespace
 
 WorkerWrapper::WorkerWrapper(Isolate* parentIsolate, int workerId, std::string workerPath,
-                             std::string callingDir, int priority,
+                             std::string callingDir, int priority, IsolateLimits limits,
                              Local<Object> workerObject)
         : parentIsolate_(parentIsolate),
           // runs on the parent's thread, where the parent runtime is alive
@@ -92,6 +92,7 @@ WorkerWrapper::WorkerWrapper(Isolate* parentIsolate, int workerId, std::string w
           // workerPath_ (not workerPath) - the parameter was just moved from
           threadName_("W" + std::to_string(workerId) + ": " + workerPath_),
           priority_(priority),
+          limits_(std::move(limits)),
           // Runs on the parent's thread, so this is the parent's live vocabulary.
           inheritedVocabulary_(CaptureLoaderVocabulary(parentIsolate)),
           poWorker_(new Persistent<Object>(parentIsolate, workerObject)),
@@ -99,7 +100,15 @@ WorkerWrapper::WorkerWrapper(Isolate* parentIsolate, int workerId, std::string w
           isTerminating_(false),
           isDisposed_(false),
           messagesEnabled_(false),
-          javaLooperRef_(nullptr) {}
+          heapLimitExceeded_(false),
+          javaLooperRef_(nullptr) {
+    heapLimitMessage_ = "Worker JS heap out of memory";
+    if (limits_.maxOldGenerationSizeBytes.has_value()) {
+        heapLimitMessage_ += " (maxOldGenerationSizeMb: " +
+                             std::to_string(*limits_.maxOldGenerationSizeBytes / (1024 * 1024)) +
+                             ")";
+    }
+}
 
 void WorkerWrapper::Start() {
     auto self = shared_from_this();
@@ -169,6 +178,38 @@ void WorkerWrapper::Terminate() {
 #endif
 
     QuitLooper();
+}
+
+size_t WorkerWrapper::OnNearHeapLimit(void* data, size_t currentHeapLimit,
+                                      size_t initialHeapLimit) {
+    auto* worker = static_cast<WorkerWrapper*>(data);
+
+    // Node's allowance: raising the limit lets the in-progress GC finish
+    // instead of aborting the process, and the isolate is being torn down
+    // anyway. The same raised limit has to come back on every later
+    // invocation, because returning a lower one is fatal to v8.
+    constexpr size_t kHeapLimitAllowance = 16 * 1024 * 1024;
+    size_t raisedLimit = currentHeapLimit + kHeapLimitAllowance;
+
+    if (worker->heapLimitExceeded_.exchange(true, std::memory_order_acq_rel)) {
+        return raisedLimit;
+    }
+
+    // Marshals strings onto the parent's loop and touches no v8 handle, which
+    // is the only kind of reporting allowed from inside a GC.
+    worker->PassUncaughtExceptionFromWorkerToParent(worker->heapLimitMessage_, worker->workerPath_,
+                                                    "", 0);
+
+    // Terminate() below only reaches workerIsolate_, which the bootstrap
+    // publishes once the runtime is up - and a worker can exhaust its heap
+    // before that. The isolate being collected is the one to interrupt.
+    Isolate* isolate = Isolate::GetCurrent();
+    if (isolate != nullptr) {
+        isolate->TerminateExecution();
+    }
+    worker->Terminate();
+
+    return raisedLimit;
 }
 
 void WorkerWrapper::Close() {
@@ -429,6 +470,13 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
             // per-worker com.tns.Runtime (which creates the worker isolate on
             // this thread via initNativeScript -> PrepareV8Runtime).
             JniLocalRef callingDir(env.NewStringUTF(callingDir_.c_str()));
+            // The isolate is created on this thread inside the call below,
+            // which has no parameter to carry any of this; the thread-local
+            // slot is the channel. The near-heap-limit callback is armed for
+            // every worker, capped or not - without it an isolate that
+            // exhausts its heap aborts the whole process instead of surfacing
+            // on the parent's Worker object.
+            Runtime::SetPendingIsolateSetup({limits_, WorkerWrapper::OnNearHeapLimit, this});
             runtimeId = env.CallStaticIntMethod(RUNTIME_CLASS, INIT_WORKER_RUNTIME_METHOD_ID,
                                                 workerId_, (jstring) callingDir);
             runtime_ = Runtime::GetRuntime(runtimeId);
@@ -478,60 +526,65 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
                 if (!isTerminating_) {
                     runtime_->RunWorker(workerPath_);
 
-                    // WHATWG parity: enable the implicit port's message queue
-                    // once the entry has finished evaluating. RunWorker returns
-                    // settled for classic scripts and pumped HTTP entries; a
-                    // local top-level-await entry that outlived its settle
-                    // window enables when its evaluation promise settles —
-                    // rejected included, since a broken worker still drains its
-                    // inbox into a listenerless global, as on the web.
-                    Local<Promise> pendingEntry;
-                    if (!ModuleInternal::PendingEntryEvaluation(isolate, workerPath_)
-                                 .ToLocal(&pendingEntry)) {
-                        EnableMessageQueue();
-                    } else {
-                        // Neither handler may capture anything: they resolve the
-                        // wrapper by id because the worker may be gone by the
-                        // time the entry settles. Both run on this thread, in
-                        // this isolate.
-                        auto onFulfilled = [](const v8::FunctionCallbackInfo<Value>& info) {
-                            auto wrapper = WorkerWrapper::GetById(
-                                    info.Data().As<v8::Int32>()->Value());
-                            if (wrapper != nullptr) {
-                                wrapper->EnableMessageQueue();
-                            }
-                        };
-                        // A rejection needs its own handler: sharing the fulfill
-                        // one would mark the entry's evaluation promise handled
-                        // and drop the failure on the floor.
-                        auto onRejected = [](const v8::FunctionCallbackInfo<Value>& info) {
-                            auto wrapper = WorkerWrapper::GetById(
-                                    info.Data().As<v8::Int32>()->Value());
-                            if (wrapper == nullptr) {
-                                return;
-                            }
-                            wrapper->EnableMessageQueue();
-                            if (wrapper->IsTerminating() || wrapper->IsDisposed()) {
-                                return;
-                            }
-                            auto isolate = info.GetIsolate();
-                            ReportEntryRejection(isolate,
-                                                 info.Length() > 0
-                                                         ? info[0]
-                                                         : Undefined(isolate).As<Value>(),
-                                                 wrapper);
-                        };
-                        auto workerIdData = v8::Integer::New(isolate, workerId_);
-                        Local<Function> enableFn;
-                        Local<Function> reportFn;
-                        if (Function::New(context, onFulfilled, workerIdData)
-                                    .ToLocal(&enableFn) &&
-                            Function::New(context, onRejected, workerIdData)
-                                    .ToLocal(&reportFn)) {
-                            pendingEntry->Then(context, enableFn, reportFn)
-                                    .FromMaybe(Local<Promise>());
-                        } else {
+                    // The near-heap-limit callback has already reported to
+                    // the parent and asked v8 to terminate this isolate;
+                    // everything below would run JS on it.
+                    if (!HeapLimitExceeded()) {
+                        // WHATWG parity: enable the implicit port's message queue
+                        // once the entry has finished evaluating. RunWorker returns
+                        // settled for classic scripts and pumped HTTP entries; a
+                        // local top-level-await entry that outlived its settle
+                        // window enables when its evaluation promise settles —
+                        // rejected included, since a broken worker still drains its
+                        // inbox into a listenerless global, as on the web.
+                        Local<Promise> pendingEntry;
+                        if (!ModuleInternal::PendingEntryEvaluation(isolate, workerPath_)
+                                     .ToLocal(&pendingEntry)) {
                             EnableMessageQueue();
+                        } else {
+                            // Neither handler may capture anything: they resolve the
+                            // wrapper by id because the worker may be gone by the
+                            // time the entry settles. Both run on this thread, in
+                            // this isolate.
+                            auto onFulfilled = [](const v8::FunctionCallbackInfo<Value>& info) {
+                                auto wrapper = WorkerWrapper::GetById(
+                                        info.Data().As<v8::Int32>()->Value());
+                                if (wrapper != nullptr) {
+                                    wrapper->EnableMessageQueue();
+                                }
+                            };
+                            // A rejection needs its own handler: sharing the fulfill
+                            // one would mark the entry's evaluation promise handled
+                            // and drop the failure on the floor.
+                            auto onRejected = [](const v8::FunctionCallbackInfo<Value>& info) {
+                                auto wrapper = WorkerWrapper::GetById(
+                                        info.Data().As<v8::Int32>()->Value());
+                                if (wrapper == nullptr) {
+                                    return;
+                                }
+                                wrapper->EnableMessageQueue();
+                                if (wrapper->IsTerminating() || wrapper->IsDisposed()) {
+                                    return;
+                                }
+                                auto isolate = info.GetIsolate();
+                                ReportEntryRejection(isolate,
+                                                     info.Length() > 0
+                                                             ? info[0]
+                                                             : Undefined(isolate).As<Value>(),
+                                                     wrapper);
+                            };
+                            auto workerIdData = v8::Integer::New(isolate, workerId_);
+                            Local<Function> enableFn;
+                            Local<Function> reportFn;
+                            if (Function::New(context, onFulfilled, workerIdData)
+                                        .ToLocal(&enableFn) &&
+                                Function::New(context, onRejected, workerIdData)
+                                        .ToLocal(&reportFn)) {
+                                pendingEntry->Then(context, enableFn, reportFn)
+                                        .FromMaybe(Local<Promise>());
+                            } else {
+                                EnableMessageQueue();
+                            }
                         }
                     }
                 }
@@ -609,6 +662,9 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
             v8::Locker locker(isolate);
             Isolate::Scope isolate_scope(isolate);
             HandleScope handle_scope(isolate);
+            // v8 keeps the registration until the isolate is disposed, and a
+            // final GC during disposal would find `this` mid-teardown.
+            isolate->RemoveNearHeapLimitCallback(WorkerWrapper::OnNearHeapLimit, 0);
             runtime_->DestroyRuntime();
         }
         isolate->Dispose();

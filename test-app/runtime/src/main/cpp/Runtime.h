@@ -14,6 +14,7 @@
 #include "EventLoop.h"
 #include <atomic>
 #include <condition_variable>
+#include <optional>
 #include <memory>
 #include <mutex>
 #include <android/looper.h>
@@ -26,6 +27,31 @@ typedef struct napi_env__* napi_env;
 namespace tns {
 class PromiseRejectionTracker;
 class RuntimeState;
+
+// Per-isolate caps handed to Isolate::New. Every entry is optional; an absent
+// one leaves V8's own default in place. Values are bytes.
+struct IsolateLimits {
+    std::optional<size_t> maxOldGenerationSizeBytes;
+    std::optional<size_t> maxYoungGenerationSizeBytes;
+    // Only honored by a V8 build that defines
+    // V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM; ignored otherwise.
+    std::optional<size_t> jsDispatchTableReservationBytes;
+};
+
+/*
+ * What a worker's isolate needs at creation time. The isolate is created on
+ * the worker thread deep inside the Java initWorkerRuntime call, with no
+ * parameter to carry any of this, so WorkerWrapper leaves it in a thread-local
+ * slot immediately before that call and PrepareV8Runtime takes it. The main
+ * isolate never sets one and gets an empty setup.
+ */
+struct PendingIsolateSetup {
+    IsolateLimits limits;
+    // Armed before anything runs in the isolate: without it a worker that
+    // exhausts its heap aborts the whole process.
+    v8::NearHeapLimitCallback nearHeapLimitCallback = nullptr;
+    void* nearHeapLimitData = nullptr;
+};
 
 class Runtime {
     public:
@@ -48,6 +74,13 @@ class Runtime {
         };
 
         ~Runtime();
+
+        /*
+         * Arms the setup the next isolate created on THIS thread is given.
+         * Consumed by PrepareV8Runtime, so it has to be set on the thread that
+         * will create the isolate and immediately before creation.
+         */
+        static void SetPendingIsolateSetup(PendingIsolateSetup setup);
 
         static Runtime* GetRuntime(int runtimeId);
 
@@ -391,6 +424,7 @@ class Runtime {
         static std::shared_ptr<EventLoop> s_mainEventLoop;
 
         static thread_local Runtime* s_currentRuntime;
+        static thread_local PendingIsolateSetup s_pendingIsolateSetup;
 
 #ifdef APPLICATION_IN_DEBUG
         std::mutex m_fileWriteMutex;
