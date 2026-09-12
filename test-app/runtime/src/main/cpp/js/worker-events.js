@@ -12,6 +12,7 @@
 const { ObjectDefineProperty, ObjectSetPrototypeOf } = primordials;
 
 const {
+  Event,
   EventTarget,
   defineEventHandler,
   dispatchEventRethrowing,
@@ -73,6 +74,15 @@ function emitError(message, filename, lineno, stackTrace) {
   return event.defaultPrevented;
 }
 
+// The parent-side end-of-worker callout, invoked by native with the Worker
+// object as `this` once the worker's thread has finished — its own close() as
+// much as a terminate(). `nsworkerended` is internal and non-standard: the web
+// has no end-of-worker event, and the node:worker_threads shim is what turns
+// this into an 'exit'.
+function emitEnded() {
+  dispatchEventRethrowing(this, new Event("nsworkerended"));
+}
+
 ObjectSetPrototypeOf(g.Worker.prototype, EventTarget.prototype);
 defineEventHandler(g.Worker.prototype, "message");
 defineEventHandler(g.Worker.prototype, "messageerror");
@@ -99,4 +109,4 @@ for (const name of ["onmessage", "onmessageerror"]) {
   });
 }
 
-module.exports = { emitMessage, emitError };
+module.exports = { emitMessage, emitError, emitEnded };
