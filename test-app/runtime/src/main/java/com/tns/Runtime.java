@@ -71,10 +71,6 @@ public class Runtime {
         return SUPPORTS_OPTIMIZED_NATIVE ? notifyGcFast(runtimeId) : notifyGcLegacy(runtimeId);
     }
 
-    private native void lock(int runtimeId);
-
-    private native void unlock(int runtimeId);
-
     private native boolean passExceptionToJsNative(int runtimeId, Throwable ex, String message, String fullStackTrace, String jsStackTrace, boolean isDiscarded);
 
     @CriticalNative
@@ -766,12 +762,20 @@ public class Runtime {
         notifyGc(runtimeId);
     }
 
+    /**
+     * @deprecated No-op. This paired the runtime's file reads against LiveSync's
+     * writes, which now land atomically via a temp file renamed over the target,
+     * so readers need no lock. Retained because it is public API.
+     */
+    @Deprecated
     public void lock() {
-        lock(runtimeId);
     }
 
+    /**
+     * @deprecated No-op. See {@link #lock()}.
+     */
+    @Deprecated
     public void unlock() {
-        unlock(runtimeId);
     }
 
     public static void initInstanceFromPossibleNonMainThread(final Object instance) {

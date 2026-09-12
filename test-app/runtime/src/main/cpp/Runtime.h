@@ -178,9 +178,6 @@ class Runtime {
         jboolean PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring message, jstring fullStackTrace, jstring jsStackTrace, jboolean isDiscarded);
         void DestroyRuntime();
 
-        void Lock();
-        void Unlock();
-
         int GetId();
 
         v8::Local<v8::Context> GetContext();
@@ -426,9 +423,6 @@ class Runtime {
         static thread_local Runtime* s_currentRuntime;
         static thread_local PendingIsolateSetup s_pendingIsolateSetup;
 
-#ifdef APPLICATION_IN_DEBUG
-        std::mutex m_fileWriteMutex;
-#endif
 };
 }
 
