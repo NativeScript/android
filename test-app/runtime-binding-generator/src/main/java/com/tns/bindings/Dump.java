@@ -23,6 +23,7 @@ public class Dump {
     static final String runtimeClass = LCOM_TNS_RUNTIME;
     static final String callJSMethodName = "callJSMethod";
     static final String initInstanceMethodName = "initInstance";
+    static final String RUNTIME_ID_FIELD_NAME = "runtimeId__ns";
 
     static final StringBuffer methodDescriptorBuilder = new StringBuffer();
 
@@ -449,6 +450,8 @@ public class Dump {
             mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_DIRECT_RANGE, objectClass, "<init>", ctorSignature, args);
         }
 
+        generateRuntimeIdInitialization(mv, thisRegister, tnsClassSignature);
+
         if (!isApplicationClass(classTo)) {
             generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
         }
@@ -473,6 +476,20 @@ public class Dump {
                            { 3, 1, 2, 0 }); //invoke callJSMethod(this, "init", true, params)
     }
 
+    /*
+     * Seeds runtimeId__ns with NativeScriptRuntimeBound.INVALID_RUNTIME_ID, which a
+     * dex field's zero default does not give us - 0 is the main runtime's id. Runs
+     * as early as a constructor can touch the instance, which still leaves the
+     * superclass constructor above it reading 0; a proxied method called from there
+     * resolves to the main runtime, finds no object id registered, and reports that
+     * instead. It cannot run earlier: the verifier rejects field access on an
+     * uninitialized reference.
+     */
+    private void generateRuntimeIdInitialization(MethodVisitor mv, int thisRegister, String tnsClassSignature) {
+        mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, thisRegister - 1, -1);
+        mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT, tnsClassSignature, RUNTIME_ID_FIELD_NAME, "I", thisRegister - 1, thisRegister);
+    }
+
     private void generateInitializedBlock(MethodVisitor mv, int thisRegister, String classSignature, String tnsClassSignature) {
         mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET_BOOLEAN, tnsClassSignature, "__initialized", "Z", thisRegister - 2, thisRegister); //put __initialized in local var 1
         Label label = new Label();
@@ -493,6 +510,28 @@ public class Dump {
 
         generateEqualsSuper(cv);
         generateHashCodeSuper(cv);
+        generateGetRuntimeId(cv, tnsClassSignature);
+        generateSetRuntimeId(cv, tnsClassSignature);
+    }
+
+    // 2 registers, 1 parameter: 'this' takes the last one, v0 is left as scratch
+    private void generateGetRuntimeId(ClassVisitor cv, String tnsClassSignature) {
+        MethodVisitor mv = cv.visitMethod(org.ow2.asmdex.Opcodes.ACC_PUBLIC, "getRuntimeId__ns", "I", null, null);
+        mv.visitCode();
+        mv.visitMaxs(2, 0);
+        mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET, tnsClassSignature, RUNTIME_ID_FIELD_NAME, "I", 0, 1);
+        mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_RETURN, 0);
+        mv.visitEnd();
+    }
+
+    // 2 registers, 2 parameters: v0 is 'this' and v1 the id, leaving no scratch
+    private void generateSetRuntimeId(ClassVisitor cv, String tnsClassSignature) {
+        MethodVisitor mv = cv.visitMethod(org.ow2.asmdex.Opcodes.ACC_PUBLIC, "setRuntimeId__ns", "VI", null, null);
+        mv.visitCode();
+        mv.visitMaxs(2, 0);
+        mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT, tnsClassSignature, RUNTIME_ID_FIELD_NAME, "I", 1, 0);
+        mv.visitInsn(org.ow2.asmdex.Opcodes.INSN_RETURN_VOID);
+        mv.visitEnd();
     }
 
     private void generateEqualsSuper(ClassVisitor cv) {
@@ -804,10 +843,14 @@ public class Dump {
     private void generateFields(ClassVisitor cv) {
         FieldVisitor fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE, "__initialized", "Z", null, null);
         fv.visitEnd();
+
+        // seeded per constructor, see generateRuntimeIdInitialization
+        fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE, RUNTIME_ID_FIELD_NAME, "I", null, null);
+        fv.visitEnd();
     }
 
-    static final String[] classImplentedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;" };
-    static final String[] interfaceImplementedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", "" };
+    static final String[] classImplentedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", "Lcom/tns/NativeScriptRuntimeBound;" };
+    static final String[] interfaceImplementedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", "Lcom/tns/NativeScriptRuntimeBound;", "" };
 
     private ClassVisitor generateClass(ApplicationWriter aw, ClassDescriptor classTo, String classSignature, String tnsClassSignature, HashSet<ClassDescriptor> implementedInterfaces, AnnotationDescriptor[] annotations) {
         ClassVisitor cv;
@@ -817,7 +860,7 @@ public class Dump {
         ArrayList<String> interfacesToImplement = new ArrayList(Arrays.asList(classImplentedInterfaces));
 
         if (classTo.isInterface()) {
-            interfaceImplementedInterfaces[1] = classSignature; //new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", classSignature };
+            interfaceImplementedInterfaces[interfaceImplementedInterfaces.length - 1] = classSignature;
             for (String interfaceToImpl : interfaceImplementedInterfaces) {
                 if (!interfacesToImplement.contains(interfaceToImpl)) {
                     interfacesToImplement.add(interfaceToImpl);
