@@ -1,5 +1,9 @@
 # Runtime documentation
 
+- [V8 fast calls through Node-API](node-api-fast-calls.md) — the unstable
+  `node_api_ns_*` extension that lets an addon's hot leaf functions be called
+  from optimized JS with unboxed arguments: gating, the two-path contract,
+  types and flags, throwing from a fast callback, and where it actually pays.
 - [Node-API](node-api.md) — the standard `napi_*` C ABI for native addons:
   building against the prefab package, registering and requiring addons,
   threading and finalizer contracts, and the documented divergences from Node
