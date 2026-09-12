@@ -69,6 +69,11 @@ public:
  * Shutdown are silently dropped, preserving the old LooperTasks "message to a
  * terminated runtime" semantics; leftover wakeups (tokens or eventfd units
  * whose work was drained early) are no-ops.
+ *
+ * No entry is ever destroyed while mutex_ is held: an entry's destructor may
+ * post (a dropped message carrying a transferred port sentinels the port's
+ * sibling, possibly on this loop), so Shutdown moves the lanes out and lets
+ * them die after the unlock.
  */
 class EventLoop {
 public:

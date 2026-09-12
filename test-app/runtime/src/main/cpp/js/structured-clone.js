@@ -4,10 +4,10 @@
 // WebIDL sequence handling for `transfer`; the clone itself is native
 // (v8::ValueSerializer round-tripped in this isolate).
 //
-// Deviation from the HTML spec, forced by the platform: only ArrayBuffers are
-// transferable. MessagePort, ImageBitmap and the native/interop wrapper
-// objects have no serialization form in this runtime, so they are rejected
-// rather than half-supported. Clone failures are "DataCloneError"
+// Deviation from the HTML spec, forced by the platform: ArrayBuffers and
+// MessagePorts are transferable, nothing else is. ImageBitmap and the
+// native/interop wrapper objects have no serialization form in this runtime,
+// so they are rejected rather than half-supported. Clone failures are "DataCloneError"
 // DOMExceptions, from here and from the native serializer alike
 // (StructuredSerialization.cpp builds the same class).
 
@@ -16,6 +16,7 @@ const {
   ArrayBufferPrototypeGetByteLength,
   ArrayPrototypePush,
   FunctionPrototypeCall,
+  ObjectPrototypeIsPrototypeOf,
   SymbolIterator,
   TypeError,
 } = primordials;
@@ -44,6 +45,19 @@ function isArrayBuffer(value) {
   } catch (notAnArrayBuffer) {
     return false;
   }
+}
+
+// The port check runs only for entries the ArrayBuffer test already rejected,
+// so a transfer list of buffers never runs the messaging builtin.
+let MessagePort;
+function isMessagePort(value) {
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+  if (MessagePort === undefined) {
+    ({ MessagePort } = require("internal/message-channel"));
+  }
+  return ObjectPrototypeIsPrototypeOf(MessagePort.prototype, value);
 }
 
 // WebIDL `sequence<object>` conversion: only an object with a callable
@@ -80,7 +94,7 @@ function toTransferList(value) {
       break;
     }
     var item = step.value;
-    if (!isArrayBuffer(item)) {
+    if (!isArrayBuffer(item) && !isMessagePort(item)) {
       throw dataCloneError("structuredClone: value in transfer list is not transferable");
     }
     ArrayPrototypePush(list, item);
