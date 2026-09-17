@@ -727,7 +727,7 @@ class ObjectManager {
   static jmethodID PROCESS_CANARY_BATCH_METHOD_ID;
   static jmethodID STRENGTHEN_INSTANCE_METHOD_ID;
 
-  v8::Persistent<v8::Function>* m_poJsWrapperFunc;
+  v8::Persistent<v8::Function>* m_poJsWrapperFunc = nullptr;
   v8::Persistent<v8::ObjectTemplate> m_jsWrapperTemplate;
 };
 
