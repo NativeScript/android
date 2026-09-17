@@ -306,6 +306,9 @@ Runtime::~Runtime() {
       s_isolate2RuntimesCache.erase(it);
     }
   }
+  // Same backstop for the breadcrumb slot Init took: the table is small and
+  // fixed, so slots lost to failed bootstraps would crowd out live runtimes.
+  CrashBreadcrumbs::UnregisterRuntime(m_id);
 
   delete this->m_objectManager;
   // idempotent backstop for the matched erase WorkerWrapper does right after
@@ -865,9 +868,11 @@ void Runtime::ElectMainRuntime() {
     s_mainRuntimeElected = true;
     s_mainRuntimeFailed = false;
     m_isMainThread = true;
-    // Once per process: V8::Initialize freezes the flag list, and setting a
-    // flag afterwards aborts.
-    InitializeV8();
+    // Once per process, not once per election: a main runtime that failed
+    // hands the election back, and V8 aborts both on a second
+    // InitializePlatform and on a flag set after V8::Initialize froze the list.
+    static std::once_flag v8Initialized;
+    std::call_once(v8Initialized, InitializeV8);
     return;
   }
 
@@ -888,14 +893,37 @@ void Runtime::SignalMainRuntimeReady(bool failed) {
   {
     std::lock_guard<std::mutex> lock(s_mainInitMutex);
     if (failed) {
-      // Hand the election back so a later bootstrap can retry.
+      // Hand the election back so a later bootstrap can retry. A main runtime
+      // that already signalled readiness and failed afterwards withdraws it
+      // too, so nothing waiting on the next main runtime starts against this
+      // one.
       s_mainRuntimeElected = false;
       s_mainRuntimeFailed = true;
+      s_mainThreadInitialized.store(false, std::memory_order_release);
     } else {
       s_mainThreadInitialized.store(true, std::memory_order_release);
     }
   }
   s_mainInitReady.notify_all();
+}
+
+void Runtime::UnwindFailedBootstrap(int runtimeId) {
+  Runtime* runtime = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
+    auto it = s_id2RuntimeCache.find(runtimeId);
+    if (it != s_id2RuntimeCache.end()) {
+      runtime = it->second;
+    }
+  }
+  if (runtime == nullptr) {
+    return;
+  }
+  // Only the bootstrapping thread can reach this runtime: no application JS
+  // has run on it, so nothing has handed it to another thread or started a
+  // worker from it.
+  runtime->UnwindFailedInit();
+  delete runtime;
 }
 
 void Runtime::UnwindFailedInit() {
@@ -913,6 +941,12 @@ void Runtime::UnwindFailedInit() {
       DestroyRuntime();
     }
     m_isolate->Dispose();
+    // The ~Runtime backstop keys on m_isolate, which is cleared below, so the
+    // platform's loop entry has to go here. Left behind, it would hand the
+    // stopped loop to the next isolate allocated at this address.
+    if (m_eventLoop != nullptr) {
+      NativeScriptPlatform::Instance()->IsolateDisposed(m_isolate, m_eventLoop);
+    }
     m_isolate = nullptr;
   }
 
@@ -1229,7 +1263,15 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   // Do not build metadata (which should be static for the process) for non-main
   // threads
   if (m_isMainThread) {
-    MetadataNode::BuildMetadata(filesPath);
+    // Once per process, like V8 itself: the tree is process-wide state that
+    // outlives the runtime that built it, so a main runtime elected after an
+    // earlier one failed past this point reads the tree already there. Only
+    // the elected main runtime gets here, one at a time.
+    static bool metadataBuilt = false;
+    if (!metadataBuilt) {
+      MetadataNode::BuildMetadata(filesPath);
+      metadataBuilt = true;
+    }
   }
 
   auto enableProfiler = !profilerOutputDir.empty();
@@ -1249,6 +1291,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   JEnv::PinThreadEnv(JEnv());
 
   if (m_isMainThread) {
+    s_mainRuntime.store(this, std::memory_order_release);
     // Releases any runtime waiting in ElectMainRuntime: the metadata tree and
     // the main event loop they depend on are published by now.
     SignalMainRuntimeReady(false /* failed */);
@@ -1327,6 +1370,9 @@ void Runtime::DestroyRuntime() {
     s_current.id = -1;
     JEnv::UnpinThreadEnv();
   }
+  Runtime* self = this;
+  s_mainRuntime.compare_exchange_strong(self, nullptr,
+                                        std::memory_order_acq_rel);
   // The events state holds v8::Global handles (backing event target, dispatch
   // closures and tracked promise rejections) - reset them while the isolate
   // is still alive.
@@ -1419,6 +1465,7 @@ bool Runtime::s_mainRuntimeFailed = false;
 v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 std::shared_ptr<EventLoop> Runtime::s_mainEventLoop;
+std::atomic<Runtime*> Runtime::s_mainRuntime{nullptr};
 
 thread_local Runtime::CurrentRuntime Runtime::s_current;
 thread_local PendingIsolateSetup Runtime::s_pendingIsolateSetup;
