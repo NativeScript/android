@@ -260,7 +260,7 @@ class ObjectManager {
 
   static jmethodID CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID;
 
-  v8::Persistent<v8::Function>* m_poJsWrapperFunc;
+  v8::Persistent<v8::Function>* m_poJsWrapperFunc = nullptr;
 };
 }  // namespace tns
 

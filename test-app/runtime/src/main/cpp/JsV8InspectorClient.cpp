@@ -909,7 +909,11 @@ JsV8InspectorClient* JsV8InspectorClient::GetInstance() {
     // handleMessageOnSocketThread also calls this from the socket thread, so a
     // concurrent first call is possible: construct, then publish with a CAS and
     // discard our copy if another thread won the race.
-    auto* created = new JsV8InspectorClient(Runtime::GetRuntime(0)->GetIsolate());
+    Runtime* mainRuntime = Runtime::GetMainRuntime();
+    if (mainRuntime == nullptr) {
+        throw NativeScriptException("Cannot create the inspector: the main runtime is not initialized");
+    }
+    auto* created = new JsV8InspectorClient(mainRuntime->GetIsolate());
     JsV8InspectorClient* expected = nullptr;
     if (!instance.compare_exchange_strong(expected, created, std::memory_order_acq_rel,
                                           std::memory_order_acquire)) {
