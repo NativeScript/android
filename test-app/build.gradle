@@ -153,6 +153,17 @@ allprojects {
         mavenCentral()
     }
     beforeEvaluate { project ->
+        // Subprojects see the root's extra properties (outLogger, nativescriptDependencies,
+        // additional_gradle.properties values, ...) as their own, since Gradle no longer
+        // resolves undeclared properties from the parent project. -P values are left alone
+        // so they keep precedence in the subproject.
+        def startProjectProperties = gradle.startParameter.projectProperties
+        rootProject.ext.properties.each { name, value ->
+            if (!startProjectProperties.containsKey(name)) {
+                project.ext.set(name, value)
+            }
+        }
+
         if (rootProject.hasProperty("userDefinedGradleProperties")) {
             rootProject.ext.userDefinedGradleProperties.each { entry ->
                 def propertyName = entry.getKey()

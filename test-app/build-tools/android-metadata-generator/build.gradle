@@ -45,8 +45,8 @@ compileJava {
 compileJava.outputs.dir("$rootDir/dist/classes")
 
 compileKotlin {
-    kotlinOptions {
-        jvmTarget = '17'
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
         allWarningsAsErrors = true
     }
 }
@@ -61,7 +61,7 @@ dependencies {
 
     api "org.apache.bcel:bcel:${ns_default_bcel_version}"
     api "com.google.code.gson:gson:${ns_default_gson_version}"
-    api group: 'org.jetbrains.kotlin', name: 'kotlin-metadata-jvm', version: "${ns_default_kotlinx_metadata_jvm_version}"
+    api "org.jetbrains.kotlin:kotlin-metadata-jvm:${ns_default_kotlinx_metadata_jvm_version}"
     implementation files("./src/libs/dx.jar")
 
     testImplementation "junit:junit:${ns_default_junit_version}"
