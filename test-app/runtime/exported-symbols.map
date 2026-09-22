@@ -5,8 +5,23 @@
  * matched by both a global: and a local: pattern in favour of global:, so the
  * internals cannot be carved back out with a "local: v8::internal::*" entry.
  *
+ * The case rule alone is not enough, because inline code in the public headers
+ * calls out-of-line helpers that live in the private namespaces:
+ * v8::Object::GetInternalField() reaches
+ * v8::internal::Internals::GetCurrentIsolate(), every cppgc::Member<T> store
+ * reaches cppgc::internal::WriteBarrier, MakeGarbageCollected reaches the
+ * allocation trait. A plugin compiled against the public headers cannot link
+ * without them, so they are listed one by one below rather than re-admitted as
+ * v8::internal::* / cppgc::internal::*, which would put tens of thousands of
+ * symbols back. A name belongs in that group only if an inline body under
+ * include/ references it -- static data members included, since the barrier and
+ * pointer-compression fast paths read them directly. Match the whole class, or
+ * the bare function name followed by *, so an entry survives a signature change
+ * across a V8 bump.
+ *
  * Patterns must stay unquoted -- a quoted string is matched literally, not as a
- * wildcard.
+ * wildcard. An unquoted pattern cannot contain a parenthesis either, so an
+ * overload set can only be narrowed down to its name, never to one signature.
  */
 {
   global:
@@ -20,6 +35,36 @@
       v8::api_internal::*;
       v8::platform::*;
       cppgc::[A-Z]*;
+
+      v8::internal::CopyTracedReference*;
+      v8::internal::DisposeTracedReference*;
+      v8::internal::GlobalizeTracedReference*;
+      v8::internal::Internals::CheckInitializedImpl*;
+      v8::internal::Internals::GetCurrentIsolate*;
+      v8::internal::MoveTracedReference*;
+      v8::internal::ShouldThrowOnError*;
+      v8::internal::StrongRootAllocatorBase::*;
+      v8::internal::VerifyHandleIsNonEmpty*;
+      cppgc::internal::BaseObjectSizeTrait::*;
+      cppgc::internal::CageBaseGlobal::*;
+      cppgc::internal::CagedHeapBase::*;
+      cppgc::internal::DCheckImpl*;
+      cppgc::internal::EnsureGCInfoIndexTrait::*;
+      cppgc::internal::ExplicitManagementImpl::*;
+      cppgc::internal::Fatal*;
+      cppgc::internal::MakeGarbageCollectedTraitInternal::*;
+      cppgc::internal::NameTraitBase::*;
+      cppgc::internal::PersistentRegion::*;
+      cppgc::internal::PersistentRegionBase::*;
+      cppgc::internal::PersistentRegionLock::*;
+      cppgc::internal::PrefinalizerRegistration::*;
+      cppgc::internal::SameThreadEnabledCheckingPolicyBase::*;
+      cppgc::internal::StrongCrossThreadPersistentPolicy::*;
+      cppgc::internal::StrongPersistentPolicy::*;
+      cppgc::internal::TraceTraitFromInnerAddressImpl::*;
+      cppgc::internal::WeakCrossThreadPersistentPolicy::*;
+      cppgc::internal::WeakPersistentPolicy::*;
+      cppgc::internal::WriteBarrier::*;
     };
   local:
     *;
