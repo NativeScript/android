@@ -71,13 +71,9 @@ task createDistDir {
 
 def getCCacheVersion = { ->
     try {
-        def ccacheVersionOutput = new ByteArrayOutputStream()
-        exec {
+        return providers.exec {
             commandLine "ccache", "--version"
-            standardOutput = ccacheVersionOutput
-        }
-
-        return ccacheVersionOutput.toString().trim()
+        }.standardOutput.asText.get().trim()
     } catch (all) {
         return 'CCache not found!'
     }
@@ -461,7 +457,7 @@ def getRunTestsBuildArguments = { taskName ->
     } else {
         arguments.add("./gradlew")
     }
-    arguments += ["-b", "runtests.gradle", taskName]
+    arguments += ["-p", "runtests", taskName]
     if (onlyX86) {
         arguments.add("-PonlyX86")
     }
