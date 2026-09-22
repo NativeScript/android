@@ -34,7 +34,13 @@ module.exports = somethingTheCallSiteNeeds;
   cross-builtin capabilities that must never leak to app code (the
   `kListenerChanged` hook key abort-signal.js takes from events.js, the
   `setListenerErrorReporter` setter error-events.js calls): the producer puts
-  the capability in its `module.exports`, the consumer requires it.
+  the capability in its `module.exports`, the consumer requires it. The
+  `internal/events` bag publishes `globalEventTarget`, `CustomEvent`,
+  `kListenerChanged`, `setListenerErrorReporter`, `Event`, `EventTarget`,
+  `defineEventHandler` and `dispatchEventRethrowing` — the base classes and the
+  handler-attribute helper are there because a lazy builtin may not read live
+  globals (see the rule two sections down), so this is the sanctioned door to
+  them.
   `require("internal/…")` at first use runs the file through the shared
   exports cache — for a consumer of an eager producer that is a cache hit,
   and a miss runs the producer on demand. A consumer can therefore never
@@ -80,8 +86,17 @@ the property with a plain data property. That cache is the same one the
 interfaces (`ns:util`'s `TextEncoder`) hands out the objects the globals hold,
 in either access order. Until then nothing of it exists — no compile, no run,
 no allocation. `text-encoding.js` (`TextEncoder`/`TextDecoder`), `base64.js`
-(`atob`/`btoa`) and `dom-exception.js` (`DOMException`) are the current ones;
-new globals join by adding a row to `kLazyGlobals`.
+(`atob`/`btoa`), `dom-exception.js` (`DOMException`), `message-event.js`
+(`MessageEvent`), `message-channel.js` (`MessagePort`/`MessageChannel`) and
+`broadcast-channel.js` (`BroadcastChannel`) are the current ones; new globals
+join by adding a row to `kLazyGlobals`.
+
+Two neighbours of that set are deliberately not in it. `worker-events.js` is
+**eager**: it defines the handler attributes on `Worker.prototype` and the
+worker global scope, which have to exist before app code assigns one.
+`node-worker-threads.js` is a **public builtin module** (`node:worker_threads`)
+rather than a lazy global — it is reached by specifier, so nothing places a
+name for it.
 
 An **eager** file can also feed the tier: `events.js` (eager, `Events::Init`)
 exports `CustomEvent`, and the `CustomEvent` row reads it through the same
@@ -105,6 +120,12 @@ The two extra rules a lazy builtin lives by:
   (`URLSearchParams`, …) capture it into a file-level `const`. A lazy builtin
   gets the same pristine `primordials`, but the live globals it would capture
   are whatever user code left behind, so it should not reach for them at all.
+- The per-instance wrappers `defineEventHandler` creates live on the target's
+  **own listener bag**, under a private symbol — never in a WeakMap keyed by
+  the target. An ObjectManager-registered object (a `Worker`) can be
+  resurrected by its finalizer while its thread is alive, and a resurrected
+  object's weak-collection entries are already gone, so a WeakMap would hand
+  the revived object a fresh, empty handler map.
 - No `import`/`export` — these are classic function bodies, not modules.
 - ESLint (`eslint.config.mjs` at the repo root, `npm run lint`) declares
   `exports`, `require`, `module`, `binding`, `primordials` and the reachable

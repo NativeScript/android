@@ -19,6 +19,11 @@
   and the lazy-global tier that runs their builtins only on first use.
 - [Error handling](error-handling.md) — global `error`/`unhandledrejection` events, `reportError`, catching Java exceptions in JS (`error.nativeException`), forwarding JS throws to Java callers (`interop.escapeException`), JS stacks on Java exceptions (`com.tns.JavaScriptStackTrace`), configuration flags, and crash-reporter integration.
 - [structuredClone](structured-clone.md) — the WHATWG `structuredClone(value, { transfer })` global: what clones, how graph identity and cycles are preserved, `ArrayBuffer` transfer, and the `DataCloneError` `DOMException` on failure.
+- [Messaging and `node:worker_threads`](worker-threads.md) — `MessagePort`,
+  `MessageChannel`, `BroadcastChannel` and `MessageEvent`, the
+  `node:worker_threads` real-vs-shim table and its documented deviations,
+  the strong-until-closed port lifetime, HTML port enabling, and the
+  transfer support matrix with its `DataCloneError` messages.
 - [Implementing additional Chrome DevTools protocol Domains](extending-inspector.md)
 
 ## Knowledge

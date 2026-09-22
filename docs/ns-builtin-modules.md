@@ -380,14 +380,17 @@ npm packages that require Node builtins by their prefixed names can run
 unmodified where a shim exists:
 
 - A shim implements a documented **subset** of the corresponding Node module's
-  API, backed by `ns:` modules. Unimplemented members are simply absent
+  API, backed by the runtime's own modules. Unimplemented members are simply absent
   (so `typeof util.promisify === "function"` feature-checks behave
-  correctly); they are never present-but-throwing.
+  correctly); they are never present-but-throwing. The one exception is a
+  member whose silent absence would read as a delivery bug rather than as a
+  missing feature — it may be present and throw, and the table below names
+  every such member.
 - **One source file per specifier.** A shim is its own module that consumes
-  the `ns:` module it adapts through the internal require, and it owns *all*
-  the adaptation — argument shapes, option names, aliases, anything that has
-  to track Node. A standard `ns:` module never contains compatibility code
-  and never knows a shim exists.
+  the module it adapts through the internal require, and it owns *all* the
+  adaptation — argument shapes, option names, aliases, anything that has to
+  track Node. A standard `ns:` module never contains compatibility code and
+  never knows a shim exists.
 - Shims are **lazy**: a shim's source is only evaluated when its specifier is
   first resolved, so an app that never touches the `node:` scheme never pays
   for one.
@@ -411,6 +414,7 @@ unmodified where a shim exists:
 | `node:util` | `inspect`, `format`, `TextEncoder`, `TextDecoder` | Re-exports `ns:util`'s members unchanged (`nodeUtil.inspect === nsUtil.inspect`) from a **distinct, separately frozen module object**. `TextEncoder`/`TextDecoder` are the globals of those names, as they are in Node. Documented as partial. |
 | `node:url` | `fileURLToPath`, `pathToFileURL` | Node-strict converters between `file:` URLs and paths. Documented as partial — no `URL`/`URLSearchParams` re-exports (both are globals), no legacy `url.parse`/`format`/`resolve`. |
 | `node:module` | `createRequire` | Re-exports `ns:module`'s `createRequire` unchanged from a **distinct, separately frozen module object**. `createPumpingRequire` is deliberately absent: it has no Node counterpart, so code written against this shim keeps running on Node. `require.resolve`/`.cache`/`.main` are not implemented, and neither is any other `node:module` member (`Module`, `builtinModules`, `isBuiltin`, `register`, `syncBuiltinESMExports`). Documented as partial. |
+| `node:worker_threads` | the messaging and thread surface — see [worker-threads.md](worker-threads.md) | The channel half (`MessagePort`, `MessageChannel`, `BroadcastChannel`, `receiveMessageOnPort`) is the real implementation, the same objects the globals of those names hold; the thread half is a bridge over the runtime's own `Worker`. It has no `ns:` counterpart — the surface tracks Node's, so there is nothing for a standard module to own. The one place it breaks the absent-not-throwing rule below is deliberate: `postMessageToThread` and `moveMessagePortToContext` are present and throw an `Error` naming themselves, because silently missing thread-addressed messaging reads as a delivery bug rather than as an unsupported call. Documented as partial. |
 
 `node:url`'s parsing goes through the URL intrinsic, so `file://localhost/x` is
 accepted (the URL spec folds a `localhost` authority to none) while any other
@@ -719,21 +723,28 @@ shims are built on, so it is normative: both runtimes provide it.
   Android-only) note in between.
 - Internal runtime machinery must never be reachable through the scheme.
 
-That last rule holds because public modules and internal builtins are **two
-separate loading paths**, not one registry with a per-entry flag:
+That last rule holds because every registry row carries its tier, and the two
+resolvers read the same table differently:
 
-- The **public registry** is a table mapping specifier → builtin, and it is the
-  only thing the `ns:`/`node:` resolver consults. A specifier absent from it
-  does not resolve, full stop. Today it holds six entries: `ns:module`,
-  `ns:runtime`, `ns:util`, `node:module`, `node:url`, `node:util`.
-- **Internal builtins** (the intrinsics snapshot, the require factory, the
-  console formatter, and so on) are invoked directly from their own native call
-  sites. They are never named in the public registry, so there is no specifier
-  that could reach them and nothing to mark private.
+- The **`ns:`/`node:` resolver** — the app-facing one, behind `require()`,
+  `import` and `import()` — serves only rows *not* marked internal-only. An
+  internal-only specifier fails exactly as a name absent from the table does.
+  Seven rows are public today: `ns:module`, `ns:runtime`, `ns:util`,
+  `node:module`, `node:url`, `node:util`, `node:worker_threads`.
+- The **internal require** builtins receive (previous section) is the only
+  thing that can name an internal-only row. Five rows are marked that way:
+  `internal/broadcast-channel`, `internal/dom-exception`, `internal/events`,
+  `internal/message-channel`, `internal/message-event`. Their exports carry
+  capabilities app code must not hold — listener-accounting hook keys, the
+  error-reporter setter, base classes that must be the runtime's own rather
+  than whatever a global currently names.
+- Builtins with **no row at all** (the intrinsics snapshot, the require
+  factory, the console formatter) are invoked straight from their native call
+  sites. There is no specifier that could reach them and nothing to mark.
 
-Adding an internal builtin therefore cannot accidentally expose it; exposing
-one is an explicit registry entry, which is also the change this document has
-to describe.
+So a builtin is unreachable from app code unless a registry row says
+otherwise, and exposing one means editing that row's tier — which is also the
+change this document has to describe.
 
 ## Source-text modules: deliberately not supported
 

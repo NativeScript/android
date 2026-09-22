@@ -46,7 +46,13 @@ void ConcurrentQueue::Push(std::shared_ptr<worker::Message> message) {
     }
 
     {
+        // Checked under the queue mutex, where Terminate() also flips it while
+        // emptying the queue: a push that loses the race is dropped rather than
+        // landing in a queue nothing will ever pop again.
         std::unique_lock<std::mutex> mlock(this->mutex_);
+        if (terminated_) {
+            return;
+        }
         this->messagesQueue_.push(message);
     }
 
@@ -85,28 +91,32 @@ std::vector<std::shared_ptr<worker::Message>> ConcurrentQueue::PopAll() {
 }
 
 void ConcurrentQueue::Terminate() {
-    // Must run on the looper's own thread: removing an fd concurrently with an
-    // in-flight callback dispatch is racy.
-    std::unique_lock<std::mutex> lock(initializationMutex_);
-    terminated_ = true;
-
-    if (this->fd_ != -1) {
-        ALooper_removeFd(this->looper_, this->fd_);
-        close(this->fd_);
-        this->fd_ = -1;
-    }
-
-    if (this->looper_ != nullptr) {
-        ALooper_release(this->looper_);
-        this->looper_ = nullptr;
-    }
-
-    // Release anything a racing Push() enqueued before it observed
-    // terminated_ - nothing will drain the queue from here on.
+    // Whatever is still queued is destroyed after both locks are released: a
+    // message owns transferred buffers and ports, and destroying a port takes
+    // its sibling group's lock and posts to the sibling's loop.
+    std::queue<std::shared_ptr<worker::Message>> dropped;
     {
+        // Must run on the looper's own thread: removing an fd concurrently with
+        // an in-flight callback dispatch is racy.
+        std::unique_lock<std::mutex> lock(initializationMutex_);
+        terminated_ = true;
+
+        if (this->fd_ != -1) {
+            ALooper_removeFd(this->looper_, this->fd_);
+            close(this->fd_);
+            this->fd_ = -1;
+        }
+
+        if (this->looper_ != nullptr) {
+            ALooper_release(this->looper_);
+            this->looper_ = nullptr;
+        }
+    }
+    {
+        // Release anything a racing Push() enqueued before it observed
+        // terminated_ - nothing will drain the queue from here on.
         std::unique_lock<std::mutex> mlock(this->mutex_);
-        std::queue<std::shared_ptr<worker::Message>> empty;
-        this->messagesQueue_.swap(empty);
+        dropped.swap(this->messagesQueue_);
     }
 }
 

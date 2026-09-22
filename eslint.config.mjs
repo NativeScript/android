@@ -32,7 +32,7 @@ const capturedStatics = [
 
 // Captured constructors. A destructure from `primordials` shadows the global,
 // so these only fire on the unguarded reference.
-const restrictedGlobals = ['Date', 'FinalizationRegistry', 'Map', 'Number', 'Proxy', 'RangeError', 'Set', 'String', 'TypeError', 'Uint8Array', 'Uint32Array', 'WeakRef'].map((name) => ({
+const restrictedGlobals = ['Date', 'FinalizationRegistry', 'Map', 'Number', 'Promise', 'Proxy', 'RangeError', 'Set', 'String', 'TypeError', 'Uint8Array', 'Uint32Array', 'WeakRef', 'WeakSet'].map((name) => ({
   name,
   message: `Destructure ${name} from primordials — builtins must not read intrinsics off globals user code can replace.`,
 }));
