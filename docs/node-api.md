@@ -199,6 +199,14 @@ Everything in `js_native_api.h` behaves exactly as upstream: it is upstream, com
 | `napi_fatal_exception` | Reports through the runtime's error pipeline (`error` event, uncaught-error hooks, `uncaughtErrorPolicy`) and returns; does not abort by itself | `napi_fatal_error` still aborts the process, as upstream. |
 | `napi_async_init`, `napi_open_callback_scope` | Accepted; the resource and name arguments are inert | There is no `async_hooks`, so there is nothing to report the async context to. `napi_make_callback` itself works, and rejects a call from the wrong thread with `napi_generic_failure`. |
 
+## Going faster
+
+For hot leaf functions — scalar math, hashing, byte crunching — this runtime
+also exposes V8's fast API calls behind a Node-API-shaped extension, so
+optimized JS reaches the addon with unboxed arguments and no handle scope. It
+is an explicitly unstable vendor extension with its own opt-in gate; see
+[V8 fast calls through Node-API](node-api-fast-calls.md).
+
 ## Not supported
 
 `node_api.h` is the entire native surface. The Node **runtime** is not here: no `process`, no `fs`, no `require()` of Node core modules from native, no libuv handles, no worker_threads C API. An addon that only uses Node-API works; an addon that reaches into `node.h`, `v8.h` or `uv.h` does not.
