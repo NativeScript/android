@@ -76,7 +76,7 @@ task prepareInputFiles {
 task runSbg(type: JavaExec, dependsOn: 'prepareInputFiles') {
     classpath = files('build/libs/static-binding-generator.jar', '../')
     workingDir = "../"
-    main = "org.nativescript.staticbindinggenerator.Main"
+    mainClass = "org.nativescript.staticbindinggenerator.Main"
 }
 java {
     sourceCompatibility = JavaVersion.VERSION_17

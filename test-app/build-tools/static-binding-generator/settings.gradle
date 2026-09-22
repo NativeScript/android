@@ -1,1 +1,3 @@
-// empty file to avoid using settings.gradle file from test-app
+// Only read when this directory is built standalone (`gradlew -p`, as the jsparser tests do);
+// as a test-app subproject, test-app's settings and build.gradle apply instead.
+rootProject.buildFileName = 'runtests.gradle'

@@ -217,7 +217,7 @@ def computeNamespace = { ->
 }
 
 android {
-    namespace computeNamespace()
+    namespace = computeNamespace()
 
     applyBeforePluginGradleConfiguration()
 
@@ -271,7 +271,7 @@ android {
     }
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            signingConfig = signingConfigs.release
         }
     }
 
@@ -703,7 +703,7 @@ def resolveCompileSdkPlatformName(File sdkDirectory, String compileSdkVersion) {
 
 task 'collectAllJars' {
     dependsOn extractAllJars
-    description "gathers all paths to jar dependencies before building metadata with them"
+    description = "gathers all paths to jar dependencies before building metadata with them"
 
     def sdkPath = android.sdkDirectory.getAbsolutePath()
 
@@ -964,7 +964,7 @@ task buildMetadata(type: BuildToolTask) {
     //buildMetadata.finalizedBy(copyMetadata)
     finalizedBy copyMetadata
 
-    description "builds metadata with provided jar dependencies"
+    description = "builds metadata with provided jar dependencies"
 
     inputs.files("$MDG_JAVA_DEPENDENCIES")
 
