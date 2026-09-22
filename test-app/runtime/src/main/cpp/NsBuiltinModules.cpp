@@ -10,6 +10,7 @@
 #include "NativeScriptAssert.h"
 #include "Runtime.h"
 #include "RuntimeState.h"
+#include "StructuredSerialization.h"
 #include "TextEncoding.h"
 #include "TraceLog.h"
 #include "console/Console.h"
@@ -58,7 +59,8 @@ constexpr Registration kRegistry[] = {
         {"node:module", BuiltinId::kNodeModule, nullptr},
         {"node:url", BuiltinId::kNodeUrl, nullptr},
         {"node:util", BuiltinId::kNodeUtil, nullptr},
-        {"internal/dom-exception", BuiltinId::kDomException, nullptr, true},
+        {"internal/dom-exception", BuiltinId::kDomException, serialization::DomExceptionBinding,
+         true},
         {"internal/events", BuiltinId::kEvents, nullptr, true},
 };
 

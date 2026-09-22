@@ -62,6 +62,47 @@ describe("DOMException canary", function () {
   it("is not reachable as a module from app code", function () {
     expect(function () { require("internal/dom-exception"); }).toThrow();
   });
+
+  it("serializes through structuredClone on this runtime", function () {
+    var clone = structuredClone(new DOMException("x", "AbortError"));
+    expect(clone instanceof DOMException).toBe(true);
+    expect(clone.name).toBe("AbortError");
+  });
+
+  it("clones the isolate's first DOMException even when a getter creates it mid-clone", function (done) {
+    var worker = new Worker("./domExceptionFirstCloneWorker.js");
+    worker.onmessage = function (event) {
+      expect(event.data.isDomException).toBe(true);
+      expect(event.data.name).toBe("AbortError");
+      expect(event.data.message).toBe("first in this isolate");
+      worker.terminate();
+      done();
+    };
+    worker.onerror = function (event) {
+      fail("worker error: " + event.message);
+      worker.terminate();
+      done();
+      return true;
+    };
+  });
+
+  // Once an isolate holds a DOMException the serializer claims host objects
+  // itself, and V8 then stops detecting native wrappers on its own. These are
+  // the shapes that would silently clone as {} if the claim missed them.
+  it("still rejects native wrappers once a DOMException exists", function () {
+    new DOMException("x", "AbortError");
+    var wrappers = [new java.lang.Object(), new URL("https://example.com/")];
+    for (var i = 0; i < wrappers.length; i++) {
+      var error;
+      try {
+        structuredClone(wrappers[i]);
+      } catch (e) {
+        error = e;
+      }
+      expect(error instanceof DOMException).toBe(true);
+      expect(error.name).toBe("DataCloneError");
+    }
+  });
 });
 
 describe("CustomEvent canary", function () {
