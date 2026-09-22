@@ -3,11 +3,11 @@ const exec = require("child_process").exec,
     fs = require("fs"),
     prefix = path.resolve(__dirname, "../cases/"),
     sbgBindingOutoutFile = path.resolve(__dirname, "../../../sbg-bindings.txt"),
-    testsGradleFile = path.resolve(__dirname, "../../../static-binding-generator/runtests.gradle"),
+    sbgProjectDir = path.resolve(__dirname, "../../../static-binding-generator"),
     gradleExecutable = path.resolve(__dirname, "../../../../../gradlew");
 
 function execGradle(inputPath, generatedJavaClassesRoot, callback) {
-    const command = `${gradleExecutable} -b ${testsGradleFile} -PappRoot=${inputPath} -PgeneratedJavaClassesRoot=${generatedJavaClassesRoot}`;
+    const command = `${gradleExecutable} -p ${sbgProjectDir} -PappRoot=${inputPath} -PgeneratedJavaClassesRoot=${generatedJavaClassesRoot}`;
     const options = {
         cwd: path.dirname(gradleExecutable)
     };

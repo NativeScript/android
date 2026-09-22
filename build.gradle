@@ -427,7 +427,7 @@ createNpmPackage.dependsOn(copyReadme)
 task createPackage {
     println "CCache version: " + getCCacheVersion()
 
-    description "Builds the NativeScript Android cleanBuildArtefactsApp Package using an application project template."
+    description = "Builds the NativeScript Android cleanBuildArtefactsApp Package using an application project template."
     dependsOn createNpmPackage
     println "Creating NativeScript Android Package"
 }

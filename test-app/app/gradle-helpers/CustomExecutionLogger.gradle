@@ -1,52 +1,60 @@
+import org.gradle.api.services.BuildService
+import org.gradle.api.services.BuildServiceParameters
+import org.gradle.build.event.BuildEventsListenerRegistry
+import org.gradle.internal.logging.text.StyledTextOutput
 import org.gradle.internal.logging.text.StyledTextOutputFactory
+import org.gradle.tooling.events.FinishEvent
+import org.gradle.tooling.events.OperationCompletionListener
+import org.gradle.tooling.events.task.TaskFailureResult
+import org.gradle.tooling.events.task.TaskFinishEvent
 
 import static org.gradle.internal.logging.text.StyledTextOutput.Style
-def outLogger = services.get(StyledTextOutputFactory).create("colouredOutputLogger")
 
-class CustomExecutionLogger extends BuildAdapter implements TaskExecutionListener {
-    private logger
-    private failedTask
+abstract class CustomExecutionLogger implements BuildService<BuildServiceParameters.None>, OperationCompletionListener, AutoCloseable {
+    // BuildToolTask already logs its own errors; its failures are not repeated here.
+    final Set<String> selfReportingTaskPaths = Collections.synchronizedSet(new HashSet<String>())
+    private final List<org.gradle.tooling.Failure> failures = Collections.synchronizedList(new ArrayList<org.gradle.tooling.Failure>())
 
-    CustomExecutionLogger(passedLogger) {
-        logger = passedLogger
-    }
+    // StyledTextOutputFactory cannot be injected into a BuildService, so the output is handed over from the script.
+    StyledTextOutput output
 
-    void buildStarted(Gradle gradle) {
-        failedTask = null
-    }
-
-    void beforeExecute(Task task) {
-    }
-
-    void afterExecute(Task task, TaskState state) {
-        def failure = state.getFailure()
-        if(failure) {
-            failedTask = task
+    @Override
+    void onFinish(FinishEvent event) {
+        if (event instanceof TaskFinishEvent && event.result instanceof TaskFailureResult) {
+            if (!selfReportingTaskPaths.contains(event.descriptor.taskPath)) {
+                failures.addAll(event.result.failures)
+            }
         }
     }
 
-    void buildFinished(BuildResult result) {
-        def failure = result.getFailure()
-        if(failure) {
-            if(failedTask && (failedTask.getClass().getName().contains("BuildToolTask"))) {
-                // the error from this task is already logged
-                return
-            }
+    // Build services are closed once all tasks have finished, which makes close() the end-of-build hook.
+    @Override
+    void close() {
+        if (failures.isEmpty() || output == null) {
+            return
+        }
+        failures.each { failure ->
+            output.println()
+            output.withStyle(Style.FailureHeader).println failure.message
 
-            println ""
-            logger.withStyle(Style.FailureHeader).println failure.getMessage()
-
-            def causeException = failure.getCause()
-            while (causeException != null) {
-                failure = causeException
-                causeException = failure.getCause()
+            def rootCause = failure
+            while (!rootCause.causes.isEmpty()) {
+                rootCause = rootCause.causes[0]
             }
-            if(failure != causeException) {
-                logger.withStyle(Style.Failure).println failure.getMessage()
+            if (rootCause != failure) {
+                output.withStyle(Style.Failure).println rootCause.message
             }
-            println ""
+            output.println()
         }
     }
 }
 
-gradle.useLogger(new CustomExecutionLogger(outLogger))
+def customExecutionLogger = gradle.sharedServices.registerIfAbsent("nsCustomExecutionLogger", CustomExecutionLogger) {}
+services.get(BuildEventsListenerRegistry).onTaskCompletion(customExecutionLogger)
+
+def outLogger = services.get(StyledTextOutputFactory).create("colouredOutputLogger")
+gradle.taskGraph.whenReady { graph ->
+    customExecutionLogger.get().output = outLogger
+    def selfReporting = graph.allTasks.findAll { it.getClass().getName().contains("BuildToolTask") }*.path
+    customExecutionLogger.get().selfReportingTaskPaths.addAll(selfReporting)
+}

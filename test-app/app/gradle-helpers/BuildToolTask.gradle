@@ -6,8 +6,8 @@ class BuildToolTask extends JavaExec {
         if(logFile.exists()) {
             logFile.delete()
         }
-        standardOutput new FileOutputStream(logFile)
-        errorOutput new FailureOutputStream(logger, logFile)
+        standardOutput = new FileOutputStream(logFile)
+        errorOutput = new FailureOutputStream(logger, logFile)
     }
 }
 

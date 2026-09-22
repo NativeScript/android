@@ -80,7 +80,7 @@ base {
 }
 
 android {
-    namespace "com.tns.android_runtime"
+    namespace = "com.tns.android_runtime"
 
     compileSdk NS_DEFAULT_COMPILE_SDK_VERSION as int
     buildToolsVersion = NS_DEFAULT_BUILD_TOOLS_VERSION as String
@@ -96,9 +96,9 @@ android {
     }
 
     if (hasNdkVersion) {
-        ndkVersion project.ndkVersion
+        ndkVersion = project.ndkVersion
     } else {
-        ndkVersion defaultNdkVersion
+        ndkVersion = defaultNdkVersion
     }
 
     defaultConfig {
@@ -152,8 +152,8 @@ android {
     }
     externalNativeBuild {
         cmake {
-            version "3.31.6"
-            path "CMakeLists.txt"
+            version = "3.31.6"
+            path = "CMakeLists.txt"
         }
     }
 
@@ -320,7 +320,7 @@ def createPackageConfigFileTask(taskName) {
 
                 def removeCmdParams = new ArrayList<String>([aaptCommand, "remove", pathToAAR, "config.json"])
                 exec {
-                    ignoreExitValue true
+                    ignoreExitValue = true
                     workingDir "$projectDir/src/main"
                     commandLine removeCmdParams.toArray()
                 }
