@@ -134,8 +134,10 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
 
     def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "${ns_default_kotlin_version}" }
     def computeBuildToolsVersion = { -> project.hasProperty("androidBuildToolsVersion") ? androidBuildToolsVersion : "${NS_DEFAULT_ANDROID_BUILD_TOOLS_VERSION}" }
+    def computeR8Version = { -> project.hasProperty("r8Version") ? r8Version : "${NS_DEFAULT_R8_VERSION}" }
     def kotlinVersion = computeKotlinVersion()
     def androidBuildToolsVersion = computeBuildToolsVersion()
+    def r8Version = computeR8Version()
 
     repositories {
         google()
@@ -143,6 +145,7 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
     }
     dependencies {
         classpath "com.android.tools.build:gradle:$androidBuildToolsVersion"
+        classpath "com.android.tools:r8:$r8Version"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
         classpath "org.apache.groovy:groovy-all:4.0.21"
     }
