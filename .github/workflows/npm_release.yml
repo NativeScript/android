@@ -169,9 +169,6 @@ jobs:
           key: ccache-test-${{ github.sha }}
           restore-keys: ccache-test-
       - name: Configure build caches
-        # no org.gradle.caching here: the SBG AST tests spawn nested `gradlew -b`
-        # builds that fail with "Build cache controller already set" when the
-        # build cache is on
         run: |
           command -v ccache || sudo apt-get install -y ccache
           ccache --version
@@ -181,7 +178,7 @@ jobs:
           # identification (the default) would invalidate the whole cache
           echo "CCACHE_COMPILERCHECK=content" >> $GITHUB_ENV
           mkdir -p ~/.gradle
-          printf 'org.gradle.parallel=true\n' >> ~/.gradle/gradle.properties
+          printf 'org.gradle.parallel=true\norg.gradle.caching=true\n' >> ~/.gradle/gradle.properties
       - name: Install Dependencies
         run: |
           npm install
