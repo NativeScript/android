@@ -22,6 +22,7 @@
 
 import groovy.json.JsonSlurper
 import groovy.xml.XmlSlurper
+import com.android.build.api.artifact.SingleArtifact
 import org.apache.commons.io.FileUtils
 
 import javax.inject.Inject
@@ -38,7 +39,6 @@ apply plugin: "com.android.application"
 apply from: "gradle-helpers/BuildToolTask.gradle"
 apply from: "gradle-helpers/CustomExecutionLogger.gradle"
 apply from: "gradle-helpers/AnalyticsCollector.gradle"
-apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-parcelize'
 
 def onlyX86 = project.hasProperty("onlyX86")
@@ -221,10 +221,6 @@ android {
 
     applyBeforePluginGradleConfiguration()
 
-    kotlinOptions {
-        jvmTarget = '17'
-    }
-
     compileSdk computeCompileSdkVersion()
     buildToolsVersion = computeBuildToolsVersion()
 
@@ -278,29 +274,14 @@ android {
     setAppIdentifier()
     applyPluginGradleConfigurations()
     applyAppGradleConfiguration()
+}
 
-    def initializeMergedAssetsOutputPath = { ->
-      android.applicationVariants.configureEach { variant ->
-          if (variant.buildType.name == project.selectedBuildType) {
-              def task
-              if (variant.metaClass.respondsTo(variant, "getMergeAssetsProvider")) {
-                  def provider = variant.getMergeAssetsProvider()
-                  task = provider.get()
-              } else {
-                  // fallback for older android gradle plugin versions
-                  task = variant.getMergeAssets()
-              }
-              for (File file : task.getOutputs().getFiles()) {
-                  if (!file.getPath().contains("${File.separator}incremental${File.separator}")) {
-                      project.ext.mergedAssetsOutputPath = file.getPath()
-                      break
-                  }
-              }
-          }
-      }
+def selectedVariantCompileClasspaths = []
+androidComponents {
+    onVariants(selector().withBuildType(project.selectedBuildType)) { variant ->
+        selectedVariantCompileClasspaths.add(variant.compileClasspath)
+        project.ext.mergedAssetsOutputPath = variant.artifacts.get(SingleArtifact.ASSETS.INSTANCE)
     }
-
-    initializeMergedAssetsOutputPath()
 }
 
 def externalRuntimeExists = !findProject(':runtime').is(null)
@@ -567,25 +548,21 @@ class EmptyRunnable implements Runnable {
 
 def getMergedAssetsOutputPath() {
     if (!project.hasProperty("mergedAssetsOutputPath")) {
-        // mergedAssetsOutputPath not found fallback to the default value for android gradle plugin 3.5.1
-        project.ext.mergedAssetsOutputPath = "$projectDir/build/intermediates/merged_assets/" + project.selectedBuildType + "/out"
+        throw new GradleException("No ${project.selectedBuildType} variant was configured, so there are no merged assets to copy the metadata into.")
     }
-    return project.ext.mergedAssetsOutputPath
+    def mergedAssets = project.ext.mergedAssetsOutputPath
+    return mergedAssets instanceof Provider ? mergedAssets.get().asFile.path : mergedAssets.toString()
 }
 
 // Discover all jars and dynamically create tasks for the extraction of each of them
 project.ext.allJars = []
-allprojects {
-    afterEvaluate { project ->
-        def buildType = project.selectedBuildType
-        def jars = []
-        def artifactType = Attribute.of('artifactType', String)
-        android.applicationVariants.configureEach { variant ->
-            if (variant.buildType.name == buildType) {
-                variant.getCompileClasspath(null).each { fileDependency ->
-                    processJar(fileDependency, jars)
-                }
-            }
+afterEvaluate {
+    def jars = []
+    selectedVariantCompileClasspaths.each { compileClasspath ->
+        // Carries the producer tasks of generated jars (e.g. the compile-time R class).
+        cleanupAllJars.inputs.files(compileClasspath)
+        compileClasspath.each { fileDependency ->
+            processJar(fileDependency, jars)
         }
     }
 }
@@ -637,8 +614,9 @@ task 'cleanupAllJars' {
 
     outputs.files cleanupAllJarsTimestamp
 
+    def allJars = project.ext.allJars
     doLast {
-        def allDests = project.ext.allJars*.outputDir*.name
+        def allDests = allJars*.outputDir*.name
         def dir = new File(extractedDependenciesDir)
         if (dir.exists()) {
             dir.eachDir {
@@ -701,15 +679,26 @@ def resolveCompileSdkPlatformName(File sdkDirectory, String compileSdkVersion) {
             "Install the matching SDK Platform with the Android SDK Manager.")
 }
 
+def compileSdkPlatformName() {
+    if (android.compileSdk != null) {
+        return android.compileSdkMinor ? "android-${android.compileSdk}.${android.compileSdkMinor}" : "android-${android.compileSdk}"
+    }
+    if (android.compileSdkPreview != null) {
+        return "android-${android.compileSdkPreview}"
+    }
+    throw new GradleException("compileSdk is not set.")
+}
+
 task 'collectAllJars' {
     dependsOn extractAllJars
     description = "gathers all paths to jar dependencies before building metadata with them"
 
-    def sdkPath = android.sdkDirectory.getAbsolutePath()
+    def sdkDirectory = androidComponents.sdkComponents.sdkDirectory
 
     doFirst {
-        def platformName = resolveCompileSdkPlatformName(android.sdkDirectory, android.compileSdkVersion)
-        def androidJar = sdkPath + "/platforms/" + platformName + "/android.jar"
+        def sdkDir = sdkDirectory.get().asFile
+        def platformName = resolveCompileSdkPlatformName(sdkDir, compileSdkPlatformName())
+        def androidJar = new File(sdkDir, "platforms/" + platformName + "/android.jar").path
 
         def allJarPaths = new LinkedList<String>()
         allJarPaths.add(androidJar)
@@ -786,172 +775,33 @@ task buildMetadata(type: BuildToolTask) {
         inputs.files(tasks.getByPath(':android-metadata-generator:jar'))
     }
 
-
-
-    android.applicationVariants.all { variant ->
-        // The generator only reads the selected build type's classes (see doFirst),
-        // so depending on the other variant's tasks would just force a second full
-        // app build without affecting the produced metadata.
-        if (variant.buildType.name != project.ext.selectedBuildType) {
-            return
-        }
-
-        def buildTypeName = variant.buildType.name.capitalize()
-        def mergeShadersTaskName = "merge${buildTypeName}Shaders"
-        def mergeShadersTask = tasks.findByName(mergeShadersTaskName)
-
-        if (mergeShadersTask) {
-            dependsOn mergeShadersTask
-        }
-
-        def compileJavaWithJavacTaskName = "compile${buildTypeName}JavaWithJavac"
-        def compileJavaWithJavacTask = tasks.findByName(compileJavaWithJavacTaskName)
-
-
-        if (compileJavaWithJavacTask) {
-            dependsOn compileJavaWithJavacTask
-        }
-
-        def compileKotlinTaskName = "compile${buildTypeName}Kotlin"
-        def compileKotlinTask = tasks.findByName(compileKotlinTaskName)
-
-
-        if (compileKotlinTask) {
-            dependsOn compileKotlinTask
-        }
-
-
-        def mergeDexTaskName = "mergeDex${buildTypeName}"
-        def mergeDexTask = tasks.findByName(mergeDexTaskName)
-
-        if (mergeDexTask) {
-            dependsOn mergeDexTask
-        }
-
-        def checkDuplicateClassesTaskName = "check${buildTypeName}DuplicateClasses"
-        def checkDuplicateClassesTask = tasks.findByName(checkDuplicateClassesTaskName)
-
-        if (checkDuplicateClassesTask) {
-            dependsOn checkDuplicateClassesTask
-        }
-
-        def generateBuildConfigTaskName = "generate${buildTypeName}BuildConfig"
-        def generateBuildConfigTask = tasks.findByName(generateBuildConfigTaskName)
-
-        if (generateBuildConfigTask) {
-            dependsOn generateBuildConfigTask
-        }
-
-        def dexBuilderTaskName = "dexBuilder${buildTypeName}"
-        def dexBuilderTask = tasks.findByName(dexBuilderTaskName)
-
-        if (dexBuilderTask) {
-            dependsOn dexBuilderTask
-        }
-
-
-        def mergeExtDexTaskName = "mergeExtDex${buildTypeName}"
-        def mergeExtDexTask = tasks.findByName(mergeExtDexTaskName)
-
-        if (mergeExtDexTask) {
-            dependsOn mergeExtDexTask
-        }
-
-        def mergeLibDexTaskName = "mergeLibDex${buildTypeName}"
-        def mergeLibDexTask = tasks.findByName(mergeLibDexTaskName)
-
-        if (mergeLibDexTask) {
-            dependsOn mergeLibDexTask
-        }
-
-        def mergeProjectDexTaskName = "mergeProjectDex${buildTypeName}"
-        def mergeProjectDexTask = tasks.findByName(mergeProjectDexTaskName)
-
-        if (mergeProjectDexTask) {
-            dependsOn mergeProjectDexTask
-        }
-
-        def syncLibJarsTaskName = "sync${buildTypeName}LibJars"
-        def syncLibJarsTask = tasks.findByName(syncLibJarsTaskName)
-
-        if (syncLibJarsTask) {
-            dependsOn syncLibJarsTask
-        }
-
-        def mergeJavaResourceTaskName = "merge${buildTypeName}JavaResource"
-        def mergeJavaResourceTask = tasks.findByName(mergeJavaResourceTaskName)
-
-        if (mergeJavaResourceTask) {
-            dependsOn mergeJavaResourceTask
-        }
-
-        def mergeJniLibFoldersTaskName = "merge${buildTypeName}JniLibFolders"
-        def mergeJniLibFoldersTask = tasks.findByName(mergeJniLibFoldersTaskName)
-
-        if (mergeJniLibFoldersTask) {
-            dependsOn mergeJniLibFoldersTask
-        }
-
-        def mergeNativeLibsTaskName = "merge${buildTypeName}NativeLibs"
-        def mergeNativeLibsTask = tasks.findByName(mergeNativeLibsTaskName)
-
-        if (mergeNativeLibsTask) {
-            dependsOn mergeNativeLibsTask
-        }
-
-        def stripDebugSymbolsTaskName = "strip${buildTypeName}DebugSymbols"
-        def stripDebugSymbolsTask = tasks.findByName(stripDebugSymbolsTaskName)
-
-        if (stripDebugSymbolsTask) {
-            dependsOn stripDebugSymbolsTask
-        }
-
-        def validateSigningTaskName = "validateSigning${buildTypeName}"
-        def validateSigningTask = tasks.findByName(validateSigningTaskName)
-
-        if (validateSigningTask) {
-            dependsOn validateSigningTask
-        }
-
-
-        def extractProguardFilesTaskName = "extractProguardFiles"
-        def extractProguardFilesTask = tasks.findByName(extractProguardFilesTaskName)
-
-        if (extractProguardFilesTask) {
-            dependsOn extractProguardFilesTask
-        }
-
-
-        // def compileArtProfileTaskName = "compile${buildTypeName}ArtProfile"
-        // def compileArtProfileTask = tasks.findByName(compileArtProfileTaskName)
-
-        // if (compileArtProfileTask) {
-        //     dependsOn compileArtProfileTask
-        // }
-
-
-        def extractNativeSymbolTablesTaskName = "extract${buildTypeName}NativeSymbolTables"
-        def extractNativeSymbolTablesTask = tasks.findByName(extractNativeSymbolTablesTaskName)
-
-        if (extractNativeSymbolTablesTask) {
-            dependsOn extractNativeSymbolTablesTask
-        }
-
-
-        // def optimizeResourcesTaskName = "optimize${buildTypeName}Resources"
-        // def optimizeResourcesTask = tasks.findByName(optimizeResourcesTaskName)
-
-        // if (optimizeResourcesTask) {
-        //     dependsOn optimizeResourcesTask
-        // }
-
-        def bundleResourcesTaskName = "bundle${buildTypeName}Resources"
-        def bundleResourcesTask = tasks.findByName(bundleResourcesTaskName)
-
-        if (bundleResourcesTask) {
-            dependsOn bundleResourcesTask
-        }
-
+    // The generator only reads the selected build type's classes (see doFirst), so
+    // the other build types' tasks are left out. Names are matched when the task graph
+    // is built, since several of these tasks only exist for some configurations.
+    def buildTypeName = project.ext.selectedBuildType.capitalize()
+    def metadataInputTaskNames = [
+            "merge${buildTypeName}Shaders",
+            "compile${buildTypeName}JavaWithJavac",
+            "compile${buildTypeName}Kotlin",
+            "mergeDex${buildTypeName}",
+            "check${buildTypeName}DuplicateClasses",
+            "generate${buildTypeName}BuildConfig",
+            "dexBuilder${buildTypeName}",
+            "mergeExtDex${buildTypeName}",
+            "mergeLibDex${buildTypeName}",
+            "mergeProjectDex${buildTypeName}",
+            "sync${buildTypeName}LibJars",
+            "merge${buildTypeName}JavaResource",
+            "merge${buildTypeName}JniLibFolders",
+            "merge${buildTypeName}NativeLibs",
+            "strip${buildTypeName}DebugSymbols",
+            "validateSigning${buildTypeName}",
+            "extractProguardFiles",
+            "extract${buildTypeName}NativeSymbolTables",
+            "bundle${buildTypeName}Resources"
+    ]
+    dependsOn {
+        metadataInputTaskNames.findAll { tasks.names.contains(it) }
     }
 
     dependsOn copyMetadataFilters
@@ -988,6 +838,9 @@ task buildMetadata(type: BuildToolTask) {
     workingDir "$BUILD_TOOLS_PATH"
     mainClass = "-jar"
 
+    def selectedBuildType = project.ext.selectedBuildType
+    def subprojectBuildDirectories = rootProject.subprojects.collect { it.layout.buildDirectory }
+
     doFirst {
         // get compiled classes to pass to metadata generator
         // these need to be called after the classes have compiled
@@ -995,12 +848,11 @@ task buildMetadata(type: BuildToolTask) {
 
         def classesSubDirs = []
         def kotlinClassesSubDirs = []
-        def selectedBuildType = project.ext.selectedBuildType
 
-        rootProject.subprojects {
+        subprojectBuildDirectories.each { buildDirectory ->
 
-            def projectClassesDir = it.layout.buildDirectory.dir("intermediates/javac").get().asFile
-            def projectKotlinClassesDir = it.layout.buildDirectory.dir("tmp/kotlin-classes").get().asFile
+            def projectClassesDir = buildDirectory.dir("intermediates/javac").get().asFile
+            def projectKotlinClassesDir = buildDirectory.dir("tmp/kotlin-classes").get().asFile
 
             if (projectClassesDir.exists()) {
                 def projectClassesSubDirs = projectClassesDir.listFiles()
@@ -1081,12 +933,13 @@ task generateTypescriptDefinitions(type: BuildToolTask) {
     }
 
     def paramz = new ArrayList<String>()
+    def sdkDirectory = androidComponents.sdkComponents.sdkDirectory
 
     workingDir "$BUILD_TOOLS_PATH"
     mainClass = "-jar"
 
     doFirst {
-        def includeDirs = ["com.android.support", "/platforms/" + resolveCompileSdkPlatformName(android.sdkDirectory, android.compileSdkVersion)]
+        def includeDirs = ["com.android.support", "/platforms/" + resolveCompileSdkPlatformName(sdkDirectory.get().asFile, compileSdkPlatformName())]
 
         delete "$TYPINGS_PATH"
 
@@ -1161,16 +1014,20 @@ copyTypings.onlyIf {
 generateTypescriptDefinitions.finalizedBy(copyTypings)
 
 task 'validateAppIdMatch' {
+    def expectedAppIdentifier = project.hasProperty("nsApplicationIdentifier") && !project.hasProperty("release") ? project.nsApplicationIdentifier : null
+    def androidExtension = android
+
     doLast {
         def lineSeparator = System.getProperty("line.separator")
 
-        if (project.hasProperty("nsApplicationIdentifier") && !project.hasProperty("release")) {
-            if (project.nsApplicationIdentifier != android.defaultConfig.applicationId && android.namespace != appIdentifier) {
+        if (expectedAppIdentifier != null) {
+            def actualAppIdentifier = androidExtension.defaultConfig.applicationId
+            if (expectedAppIdentifier != actualAppIdentifier && androidExtension.namespace != expectedAppIdentifier) {
                 def errorMessage = "${lineSeparator}WARNING: The Application identifier is different from the one inside \"package.json\" file.$lineSeparator" +
                         "NativeScript CLI might not work properly.$lineSeparator" +
                         "Remove applicationId from app.gradle and update the \"nativescript.id\" in package.json.$lineSeparator" +
-                        "Actual: ${android.defaultConfig.applicationId}$lineSeparator" +
-                        "Expected(from \"package.json\"): ${project.nsApplicationIdentifier}$lineSeparator"
+                        "Actual: ${actualAppIdentifier}$lineSeparator" +
+                        "Expected(from \"package.json\"): ${expectedAppIdentifier}$lineSeparator"
 
                 logger.error(errorMessage)
             }
