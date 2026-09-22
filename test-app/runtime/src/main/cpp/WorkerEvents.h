@@ -49,6 +49,16 @@ public:
     static bool EmitError(v8::Isolate* isolate, v8::Local<v8::Object> receiver,
                           const std::string& message, const std::string& source,
                           const std::string& stackTrace, int lineNumber);
+
+    /*
+     * Dispatches `nsworkerended` on `receiver` (the Worker object, on the
+     * parent isolate) once the worker's thread has finished. Internal and
+     * non-standard: the web has no end-of-worker event, and the
+     * node:worker_threads shim is what turns this into an 'exit'. A listener
+     * that throws leaves the exception pending for the caller's TryCatch.
+     * No-op before Init has run.
+     */
+    static void EmitEnded(v8::Isolate* isolate, v8::Local<v8::Object> receiver);
 };
 
 }  // namespace tns

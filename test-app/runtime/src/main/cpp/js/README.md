@@ -122,10 +122,10 @@ The two extra rules a lazy builtin lives by:
   are whatever user code left behind, so it should not reach for them at all.
 - The per-instance wrappers `defineEventHandler` creates live on the target's
   **own listener bag**, under a private symbol — never in a WeakMap keyed by
-  the target. An ObjectManager-registered object (a `Worker`) can be
-  resurrected by its finalizer while its thread is alive, and a resurrected
-  object's weak-collection entries are already gone, so a WeakMap would hand
-  the revived object a fresh, empty handler map.
+  the target. Own-instance state is Node's own design for handler attributes,
+  and it keeps the builtins independent of how the collector treats the
+  weak-collection entries of objects native code keeps alive — a `Worker` is
+  rooted by the runtime for as long as its thread runs.
 - No `import`/`export` — these are classic function bodies, not modules.
 - ESLint (`eslint.config.mjs` at the repo root, `npm run lint`) declares
   `exports`, `require`, `module`, `binding`, `primordials` and the reachable
