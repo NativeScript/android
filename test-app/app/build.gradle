@@ -833,6 +833,11 @@ task buildMetadata(type: BuildToolTask) {
         inputs.dir(kotlinClassesDir)
     }
 
+    def builtInKotlinClassesDir = layout.buildDirectory.dir("intermediates/built_in_kotlinc").get().asFile
+    if (builtInKotlinClassesDir.exists()) {
+        inputs.dir(builtInKotlinClassesDir)
+    }
+
     outputs.files("$METADATA_OUT_PATH/treeNodeStream.dat", "$METADATA_OUT_PATH/treeStringsStream.dat", "$METADATA_OUT_PATH/treeValueStream.dat")
 
     workingDir "$BUILD_TOOLS_PATH"
@@ -848,6 +853,7 @@ task buildMetadata(type: BuildToolTask) {
 
         def classesSubDirs = []
         def kotlinClassesSubDirs = []
+        def builtInKotlinClassesDirs = []
 
         subprojectBuildDirectories.each { buildDirectory ->
 
@@ -871,6 +877,15 @@ task buildMetadata(type: BuildToolTask) {
                     }
                 }
             }
+
+            // Kotlin compiled by AGP itself lands in <buildType>/<compile task>/classes.
+            def builtInKotlinBuildTypeDir = buildDirectory.dir("intermediates/built_in_kotlinc/$selectedBuildType").get().asFile
+            builtInKotlinBuildTypeDir.listFiles()?.each { compileTaskDir ->
+                def compiledClassesDir = new File(compileTaskDir, "classes")
+                if (compiledClassesDir.isDirectory()) {
+                    builtInKotlinClassesDirs.add(compiledClassesDir)
+                }
+            }
         }
 
         def generatedClasses = new LinkedList<String>()
@@ -884,6 +899,10 @@ task buildMetadata(type: BuildToolTask) {
             if (subDir.getName() == selectedBuildType) {
                 generatedClasses.add(subDir.getAbsolutePath())
             }
+        }
+
+        for (File compiledKotlinDir : builtInKotlinClassesDirs) {
+            generatedClasses.add(compiledKotlinDir.getAbsolutePath())
         }
 
         def store = new ArrayList<File>()
