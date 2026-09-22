@@ -6,7 +6,7 @@ env:
   NPM_TAG: "pr"
   EMULATOR_NAME: "runtime-emu"
   NDK_VERSION: r29
-  CMAKE_VERSION: "3.31.6"
+  CMAKE_VERSION: "4.1.2"
   ANDROID_API: 33
   ANDROID_ABI: x86_64
   NDK_ARCH: linux
