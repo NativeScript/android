@@ -134,10 +134,8 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
 
     def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "${ns_default_kotlin_version}" }
     def computeBuildToolsVersion = { -> project.hasProperty("androidBuildToolsVersion") ? androidBuildToolsVersion : "${NS_DEFAULT_ANDROID_BUILD_TOOLS_VERSION}" }
-    def computeR8Version = { -> project.hasProperty("r8Version") ? r8Version : "${NS_DEFAULT_R8_VERSION}" }
     def kotlinVersion = computeKotlinVersion()
     def androidBuildToolsVersion = computeBuildToolsVersion()
-    def r8Version = computeR8Version()
 
     repositories {
         google()
@@ -145,9 +143,7 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
     }
     dependencies {
         classpath "com.android.tools.build:gradle:$androidBuildToolsVersion"
-        classpath "com.android.tools:r8:$r8Version"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
-        classpath "org.apache.groovy:groovy-all:4.0.21"
     }
 }
 
@@ -157,6 +153,17 @@ allprojects {
         mavenCentral()
     }
     beforeEvaluate { project ->
+        // Subprojects see the root's extra properties (outLogger, nativescriptDependencies,
+        // additional_gradle.properties values, ...) as their own, since Gradle no longer
+        // resolves undeclared properties from the parent project. -P values are left alone
+        // so they keep precedence in the subproject.
+        def startProjectProperties = gradle.startParameter.projectProperties
+        rootProject.ext.properties.each { name, value ->
+            if (!startProjectProperties.containsKey(name)) {
+                project.ext.set(name, value)
+            }
+        }
+
         if (rootProject.hasProperty("userDefinedGradleProperties")) {
             rootProject.ext.userDefinedGradleProperties.each { entry ->
                 def propertyName = entry.getKey()

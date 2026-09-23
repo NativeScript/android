@@ -71,19 +71,18 @@ task createDistDir {
 
 def getCCacheVersion = { ->
     try {
-        def ccacheVersionOutput = new ByteArrayOutputStream()
-        exec {
+        return providers.exec {
             commandLine "ccache", "--version"
-            standardOutput = ccacheVersionOutput
-        }
-
-        return ccacheVersionOutput.toString().trim()
+        }.standardOutput.asText.get().trim()
     } catch (all) {
         return 'CCache not found!'
     }
 }
 
 task getPackageVersion {
+    def packageVersion = findProperty("packageVersion")
+    def preReleaseVersion = findProperty("preReleaseVersion")
+
     doLast {
         String content = new File("$rootDir/package.json").getText("UTF-8")
         def jsonSlurper = new JsonSlurper()
@@ -93,14 +92,14 @@ task getPackageVersion {
 
         println "Using runtime version from package.json '${pVersion}'"
 
-        if (project.hasProperty("packageVersion") && packageVersion != "") {
+        if (packageVersion != null && packageVersion != "") {
             pVersion += "-" + packageVersion
 
             println "Using packageVersion property '${pVersion}'"
         }
 
 
-        if (project.hasProperty("preReleaseVersion")) {
+        if (preReleaseVersion != null) {
             pVersion += "-" + preReleaseVersion
 
             println "Adding preReleaseVersion property '${pVersion}' to package version"
@@ -115,8 +114,10 @@ task getPackageVersion {
 }
 
 task getCommitVersion {
+    def gitCommitVersion = findProperty("gitCommitVersion")
+
     doLast {
-        if (project.hasProperty("gitCommitVersion")) {
+        if (gitCommitVersion != null) {
             println "Using commit version property " + gitCommitVersion
             arVersion = gitCommitVersion
         } else if ("$System.env.GIT_COMMIT" != "null") {
@@ -461,7 +462,7 @@ def getRunTestsBuildArguments = { taskName ->
     } else {
         arguments.add("./gradlew")
     }
-    arguments += ["-b", "runtests.gradle", taskName]
+    arguments += ["-p", "runtests", taskName]
     if (onlyX86) {
         arguments.add("-PonlyX86")
     }
