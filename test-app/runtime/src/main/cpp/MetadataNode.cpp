@@ -2042,6 +2042,8 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
           throw NativeScriptException(ss.str());
         }
     }
+    // Only opened to tell a missing folder from a missing file.
+    closedir(dir);
 
     string nodesFile = baseDir + "/treeNodeStream.dat";
     string namesFile = baseDir + "/treeStringsStream.dat";
@@ -2068,9 +2070,11 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
            << "-byte records. The metadata is truncated or corrupt.";
         throw NativeScriptException(ss.str());
     }
-    char* nodes = new char[lenNodes];
+    // Owned until the reader takes them, so a file that fails to open further
+    // down does not strand the buffers already read.
+    std::unique_ptr<char[]> nodes(new char[lenNodes]);
     rewind(f);
-    fread(nodes, 1, lenNodes, f);
+    fread(nodes.get(), 1, lenNodes, f);
     fclose(f);
 
     const int _512KB = 524288;
@@ -2085,9 +2089,9 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
     }
     fseek(f, 0, SEEK_END);
     int lenNames = ftell(f);
-    char* names = new char[lenNames + _512KB];
+    std::unique_ptr<char[]> names(new char[lenNames + _512KB]);
     rewind(f);
-    fread(names, 1, lenNames, f);
+    fread(names.get(), 1, lenNames, f);
     fclose(f);
 
     f = fopen(valuesFile.c_str(), "rb");
@@ -2115,11 +2119,9 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
 
     DEBUG_WRITE("time=%ld", (millis2 - millis1));
 
-    BuildMetadata(lenNodes, reinterpret_cast<uint8_t*>(nodes), lenNames, reinterpret_cast<uint8_t*>(names), lenValues, reinterpret_cast<uint8_t*>(values));
-
-    delete[] nodes;
-    //delete[] names;
-    //delete[] values;
+    // The reader keeps the names and values buffers for the life of the
+    // process and only reads the nodes buffer while it builds the tree.
+    BuildMetadata(lenNodes, reinterpret_cast<uint8_t*>(nodes.get()), lenNames, reinterpret_cast<uint8_t*>(names.release()), lenValues, reinterpret_cast<uint8_t*>(values));
 }
 
 void MetadataNode::BuildMetadata(uint32_t nodesLength, uint8_t* nodeData, uint32_t nameLength, uint8_t* nameData, uint32_t valueLength, uint8_t* valueData) {
