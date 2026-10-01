@@ -41,7 +41,7 @@ namespace tns {
 
     private:
 
-        bool ConvertArg(const v8::Local<v8::Value> &arg, int index);
+        bool ConvertArg(const v8::Local<v8::Value> &jsArg, int index);
 
         v8::Isolate *m_isolate;
         std::string m_methodSignature;

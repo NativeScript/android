@@ -52,7 +52,7 @@ namespace tns {
 
     private:
 
-        bool ConvertArg(const v8::Local<v8::Value>& arg, int index);
+        bool ConvertArg(const v8::Local<v8::Value>& jsArg, int index);
 
         bool ConvertJavaScriptArray(const v8::Local<v8::Array>& jsArr, int index);
 

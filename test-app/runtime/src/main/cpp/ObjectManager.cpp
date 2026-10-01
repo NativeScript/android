@@ -131,11 +131,22 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(
 
 ObjectManager::JSInstanceInfo* ObjectManager::GetJSInstanceInfo(
     const Local<Object>& object) {
-  JSInstanceInfo* jsInstanceInfo = nullptr;
+  if (object->IsProxy()) {
+    auto target = UnwrapProxy(object);
+    return target->IsObject() ? GetJSInstanceInfo(target.As<Object>())
+                              : nullptr;
+  }
   if (IsJsRuntimeObject(object)) {
     return GetJSInstanceInfoFromRuntimeObject(object);
   }
   return nullptr;
+}
+
+Local<Value> ObjectManager::UnwrapProxy(Local<Value> value) {
+  while (value->IsProxy()) {
+    value = value.As<Proxy>()->GetTarget();
+  }
+  return value;
 }
 
 ObjectManager::JSInstanceInfo*
@@ -307,7 +318,7 @@ bool ObjectManager::CloneLink(const Local<Object>& src,
 
   if (success) {
     auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-    auto jsInfo = src->GetInternalField(jsInfoIdx);
+    auto jsInfo = UnwrapProxy(src).As<Object>()->GetInternalField(jsInfoIdx);
     dest->SetInternalField(jsInfoIdx, jsInfo);
   }
 

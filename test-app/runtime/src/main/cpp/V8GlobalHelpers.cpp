@@ -64,10 +64,18 @@ std::string tns::GetNativeWrapperHint(Isolate* isolate, const Local<Value>& valu
     return "JavaObject";
 }
 
+Local<Context> tns::GetCreationContextOrCurrent(Isolate* isolate, const Local<Object>& obj) {
+    Local<Context> context;
+    if (obj->GetCreationContext(isolate).ToLocal(&context)) {
+        return context;
+    }
+    return isolate->GetCurrentContext();
+}
+
 bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<String>& propName, Local<Value>& out) {
     auto privateKey = Private::ForApi(isolate, propName);
 
-    auto context = obj->GetCreationContext(isolate).ToLocalChecked();
+    auto context = GetCreationContextOrCurrent(isolate, obj);
     auto hasPrivate = obj->HasPrivate(context, privateKey);
 
     if (hasPrivate.IsNothing()) {
@@ -93,7 +101,7 @@ bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Lo
 
 bool tns::V8SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<String>& propName, const Local<Value>& value) {
     auto privateKey = Private::ForApi(isolate, propName);
-    auto context = obj->GetCreationContext(isolate).ToLocalChecked();
+    auto context = GetCreationContextOrCurrent(isolate, obj);
     auto res = obj->SetPrivate(context, privateKey, value);
 
     if (res.IsNothing()) {

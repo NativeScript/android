@@ -611,7 +611,7 @@ CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &imple
 
     vector<jstring> interfacesToImplement;
     auto isolate = v8::Isolate::GetCurrent();
-    auto context = implementationObject->GetCreationContext(isolate).ToLocalChecked();
+    auto context = GetCreationContextOrCurrent(isolate, implementationObject);
     Local<String> interfacesName = String::NewFromUtf8Literal(isolate, "interfaces");
     Local<Value> prop;
     if (implementationObject->Get(context, interfacesName).ToLocal(&prop) && !prop.IsEmpty() && prop->IsArray()) {
@@ -657,7 +657,7 @@ CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object> &implementat
 
     vector<jstring> methodNames;
     auto isolate = v8::Isolate::GetCurrent();
-    auto context = implementationObject->GetCreationContext(isolate).ToLocalChecked();
+    auto context = GetCreationContextOrCurrent(isolate, implementationObject);
     auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(context, i).ToLocalChecked().As<String>();

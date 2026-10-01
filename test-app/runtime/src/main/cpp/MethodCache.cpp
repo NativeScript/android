@@ -12,6 +12,7 @@
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
+#include "ObjectManager.h"
 #include <sstream>
 
 using namespace v8;
@@ -132,8 +133,10 @@ string MethodCache::EncodeSignature(const string& className, const string& metho
     return sig;
 }
 
-string MethodCache::GetType(Isolate* isolate, const v8::Local<v8::Value>& value) {
+string MethodCache::GetType(Isolate* isolate, const v8::Local<v8::Value>& jsValue) {
     string type;
+    // Overloads resolve against what a Proxy wraps.
+    auto value = ObjectManager::UnwrapProxy(jsValue);
 
     if (value->IsObject()) {
         auto context = isolate->GetCurrentContext();

@@ -333,6 +333,9 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
                 //TODO: validate valie is a string;
                 result = ArgConverter::ConvertToJavaString(value);
             } else {
+                if (value->IsProxy() && !ObjectManager::UnwrapProxy(value)->IsObject()) {
+                    throw NativeScriptException("Cannot assign a revoked Proxy to field '" + fieldMetadata.name + "'");
+                }
                 auto context = isolate->GetCurrentContext();
                 auto objectWithHiddenID = value->ToObject(context).ToLocalChecked();
                 result = objectManager->GetJavaObjectByJsObject(objectWithHiddenID);
