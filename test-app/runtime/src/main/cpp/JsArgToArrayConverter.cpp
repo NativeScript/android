@@ -58,7 +58,7 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Valu
     m_isValid = success;
 }
 
-bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value> &arg, int index) {
+bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value> &jsArg, int index) {
     bool success = false;
     stringstream s;
 
@@ -67,8 +67,14 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
     Type returnType = JType::getClassType(m_return_type);
     auto isolate = v8::Isolate::GetCurrent();
 
+    // A Proxy's target is what holds the Java link.
+    auto arg = jsArg.IsEmpty() ? jsArg : ObjectManager::UnwrapProxy(jsArg);
+
     if (arg.IsEmpty()) {
         s << "Cannot convert empty JavaScript object";
+        success = false;
+    } else if (jsArg->IsProxy() && !arg->IsObject()) {
+        s << "Cannot marshal a revoked Proxy at index " << index << " to Java type.";
         success = false;
     } else if (arg->IsInt32() && (returnType == Type::Int || returnType == Type::Null)) {
         jint value = arg->Int32Value(context).ToChecked();
