@@ -111,8 +111,13 @@ JSToJavaConverter::JSToJavaConverter(
     }
 }
 
-bool JSToJavaConverter::ConvertArg(const Local<Value> &arg, int index) {
-
+bool JSToJavaConverter::ConvertArg(const Local<Value> &jsArg, int index) {
+    // A Proxy's target is what holds the Java link or the array elements.
+    auto arg = ObjectManager::UnwrapProxy(jsArg);
+    if (jsArg->IsProxy() && !arg->IsObject()) {
+        m_jniArgRefsState.SetConvertedObject(index, nullptr);
+        return false;
+    }
 
     if (arg->IsNumber() || arg->IsNumberObject()) {
         return tns::ConvertJavaScriptNumber(

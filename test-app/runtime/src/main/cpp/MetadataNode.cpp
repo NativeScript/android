@@ -35,10 +35,9 @@ void MetadataNode::Init(Isolate* isolate) {
         isolate, ArgConverter::ConvertToV8String(isolate, "tns::PackageKey"));
 }
 
-// Deliberately not V8GetPrivateValue: that one resolves the creation context,
-// which hard-crashes on values that have none (a revoked proxy), and throws
-// when the lookup comes back Nothing. Callers here take arbitrary values, so a
-// failed read must also leave no exception pending for whoever calls next.
+// Deliberately not V8GetPrivateValue: that one throws when the lookup comes
+// back Nothing. Callers here take arbitrary values, so a failed read must also
+// leave no exception pending for whoever calls next.
 static void* TryReadPrivateExternal(Isolate* isolate, const Local<Object>& value, Persistent<String>* key) {
     if (key == nullptr) {
         return nullptr;
@@ -58,6 +57,43 @@ static void* TryReadPrivateExternal(Isolate* isolate, const Local<Object>& value
     }
 
     return hidden.As<External>()->Value(v8::kExternalPointerTypeTagDefault);
+}
+
+static NativeScriptException ProxyTypeError(Isolate* isolate, const string& message) {
+    return NativeScriptException(isolate, Exception::TypeError(ArgConverter::ConvertToV8String(isolate, message)), message);
+}
+
+// Reactive frameworks put Java wrappers behind a Proxy, which carries none of
+// the wrapper's internal fields or private symbols.
+static Local<Object> ResolveProxyReceiver(Isolate* isolate, const Local<Object>& receiver, const char* verb, const string& member, bool requireJavaObject) {
+    if (!receiver->IsProxy()) {
+        return receiver;
+    }
+
+    auto target = ObjectManager::UnwrapProxy(receiver);
+    if (!target->IsObject()) {
+        throw ProxyTypeError(isolate, string("Cannot ") + verb + " '" + member + "' on a revoked Proxy");
+    }
+
+    auto object = target.As<Object>();
+    if (requireJavaObject && !ObjectManager::IsJsRuntimeObject(object)) {
+        throw ProxyTypeError(isolate, string("Cannot ") + verb + " '" + member + "' on a Proxy whose target is not a Java object");
+    }
+
+    return object;
+}
+
+static Local<Object> ResolveImplementationObject(Isolate* isolate, const Local<Object>& implementationObject) {
+    if (!implementationObject->IsProxy()) {
+        return implementationObject;
+    }
+
+    auto target = ObjectManager::UnwrapProxy(implementationObject);
+    if (!target->IsObject()) {
+        throw ProxyTypeError(isolate, "Cannot use a revoked Proxy as an implementation object");
+    }
+
+    return target.As<Object>();
 }
 
 bool MetadataNode::TryGetInstanceTypeName(Isolate* isolate, const Local<Object>& value, std::string& out) {
@@ -211,7 +247,11 @@ bool MetadataNode::IsNodeTypeInterface() {
 }
 
 string MetadataNode::GetTypeMetadataName(Isolate* isolate, Local<Value>& value) {
-    auto data = GetTypeMetadata(isolate, value.As<Function>());
+    auto target = ObjectManager::UnwrapProxy(value);
+    auto data = target->IsFunction() ? GetTypeMetadata(isolate, target.As<Function>()) : nullptr;
+    if (data == nullptr) {
+        throw NativeScriptException(string("Expected a Java class or interface constructor"));
+    }
 
     return data->name;
 }
@@ -336,9 +376,12 @@ void MetadataNode::SetClassAccessor(Local<Function>& ctorFunction) {
 
 void MetadataNode::ClassAccessorGetterCallback(const FunctionCallbackInfo<Value>& info) {
     try {
-        auto thiz = info.This();
         auto isolate = info.GetIsolate();
-        auto data = GetTypeMetadata(isolate, thiz.As<Function>());
+        auto thiz = ResolveProxyReceiver(isolate, info.This(), "read", "class", false);
+        auto data = thiz->IsFunction() ? GetTypeMetadata(isolate, thiz.As<Function>()) : nullptr;
+        if (data == nullptr) {
+            throw NativeScriptException(string("'class' can only be read from a Java class constructor"));
+        }
 
         auto value = CallbackHandlers::FindClass(isolate, data->name);
         info.GetReturnValue().Set(value);
@@ -360,7 +403,7 @@ void MetadataNode::NullObjectAccessorGetterCallback(const FunctionCallbackInfo<V
         DEBUG_WRITE("NullObjectAccessorGetterCallback called");
         auto isolate = info.GetIsolate();
 
-        auto thiz = info.This();
+        auto thiz = ResolveProxyReceiver(isolate, info.This(), "read", "null", false);
         Local<Value> hiddenVal;
         V8GetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodeName(isolate), hiddenVal);
         if (hiddenVal.IsEmpty()) {
@@ -405,9 +448,11 @@ void MetadataNode::NullValueOfCallback(const FunctionCallbackInfo<Value>& args) 
 
 void MetadataNode::FieldAccessorGetterCallback(const FunctionCallbackInfo<Value>& info) {
     try {
-        auto thiz = info.This();
         auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
         auto &fieldCallbackMetadata = fieldCallbackData->metadata;
+        auto thiz = ResolveProxyReceiver(info.GetIsolate(), info.This(),
+                                         "read Java field", fieldCallbackMetadata.getName(),
+                                         !fieldCallbackMetadata.isStatic);
 
         auto objectManager =
             Runtime::GetRuntime(info.GetIsolate())->GetObjectManager();
@@ -437,9 +482,11 @@ void MetadataNode::FieldAccessorGetterCallback(const FunctionCallbackInfo<Value>
 void MetadataNode::FieldAccessorSetterCallback(const FunctionCallbackInfo<Value>& info) {
     auto value = info[0];
     try {
-        auto thiz = info.This();
         auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
         auto &fieldCallbackMetadata = fieldCallbackData->metadata;
+        auto thiz = ResolveProxyReceiver(info.GetIsolate(), info.This(),
+                                         "write Java field", fieldCallbackMetadata.getName(),
+                                         !fieldCallbackMetadata.isStatic);
 
         auto objectManager =
             Runtime::GetRuntime(info.GetIsolate())->GetObjectManager();
@@ -532,8 +579,8 @@ void MetadataNode::PropertyAccessorSetterCallback(const FunctionCallbackInfo<Val
 
 void MetadataNode::SuperAccessorGetterCallback(const FunctionCallbackInfo<Value>& info) {
     try {
-        auto thiz = info.This();
         auto isolate = info.GetIsolate();
+        auto thiz = ResolveProxyReceiver(isolate, info.This(), "read", "super", true);
         auto key = ArgConverter::ConvertToV8String(isolate, "supervalue");
         Local<Value> hidenVal;
         V8GetPrivateValue(isolate, thiz, key, hidenVal);
@@ -1148,6 +1195,9 @@ Persistent<Function>* MetadataNode::GetPersistentConstructorFunction(Isolate* is
 MetadataNode::TypeMetadata* MetadataNode::GetTypeMetadata(Isolate* isolate, const Local<Function>& value) {
     Local<Value> hiddenVal;
     V8GetPrivateValue(isolate, value, String::NewFromUtf8(isolate, "typemetadata").ToLocalChecked(), hiddenVal);
+    if (hiddenVal.IsEmpty() || !hiddenVal->IsExternal()) {
+        return nullptr;
+    }
 
     auto data = reinterpret_cast<TypeMetadata*>(hiddenVal.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
     return data;
@@ -1239,7 +1289,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
             if (!info[0]->IsObject()) {
                 throw NativeScriptException(string("First argument must be implementation object"));
             }
-            implementationObject = info[0]->ToObject(context).ToLocalChecked();
+            implementationObject = ResolveImplementationObject(isolate, info[0].As<Object>());
         } else if (info.Length() == 2) {
             if (!info[0]->IsString()) {
                 throw NativeScriptException(string("First argument must be string"));
@@ -1249,7 +1299,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
             }
 
             v8ExtendName = info[0]->ToString(context).ToLocalChecked();
-            implementationObject = info[1]->ToObject(context).ToLocalChecked();
+            implementationObject = ResolveImplementationObject(isolate, info[1].As<Object>());
         } else {
             throw NativeScriptException(string("Invalid number of arguments"));
         }
@@ -1360,16 +1410,17 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
             }
         }
 
-        auto thiz = info.This();
+        auto thiz = ResolveProxyReceiver(info.GetIsolate(), info.This(),
+                                         "call Java method", methodName, !first.isStatic);
 
         auto isSuper = false;
-        if (!first.isStatic) {
+        if (!first.isStatic && ObjectManager::IsJsRuntimeObject(thiz)) {
             auto superValue = thiz->GetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper)).As<Value>();
             isSuper = !superValue.IsEmpty() && superValue->IsTrue();
         }
 
         if ((argLength == 0) && (methodName == V8StringConstants::VALUE_OF)) {
-            info.GetReturnValue().Set(thiz);
+            info.GetReturnValue().Set(info.This());
         } else {
             bool isFromInterface = initialCallbackData->node->IsNodeTypeInterface();
             CallbackHandlers::CallJavaMethod(thiz, *className, methodName, entry, isFromInterface, first.isStatic, isSuper, info);
@@ -1452,7 +1503,7 @@ Local<Object> MetadataNode::GetImplementationObject(Isolate* isolate, const Loca
         return implementationObject;
     }
 
-    auto context = object->GetCreationContext(isolate).ToLocalChecked();
+    auto context = GetCreationContextOrCurrent(isolate, object);
     if (object->HasOwnProperty(context, V8StringConstants::GetIsPrototypeImplementationObject(isolate)).ToChecked()) {
         auto v8Prototype = V8StringConstants::GetPrototype(isolate);
         auto maybeHasOwnProperty = object->HasOwnProperty(context, v8Prototype);
@@ -1726,6 +1777,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
                 return;
             }
         }
+        implementationObject = ResolveImplementationObject(isolate, implementationObject);
 
         auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
@@ -1970,7 +2022,11 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
 }
 
 MetadataNode* MetadataNode::GetNodeFromHandle(const Local<Object>& value) {
-    auto node = GetInstanceMetadata(Isolate::GetCurrent(), value);
+    auto target = ObjectManager::UnwrapProxy(value);
+    if (!target->IsObject()) {
+        return nullptr;
+    }
+    auto node = GetInstanceMetadata(Isolate::GetCurrent(), target.As<Object>());
     return node;
 }
 
@@ -2337,37 +2393,48 @@ void MetadataNode::RegisterSymbolHasInstanceCallback(Isolate* isolate, MetadataE
 }
 
 void MetadataNode::SymbolHasInstanceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
-    auto length = info.Length();
-    if (length != 1) {
-        throw NativeScriptException(string("Symbol.hasInstance must take exactly 1 argument"));
+    try {
+        auto length = info.Length();
+        if (length != 1) {
+            throw NativeScriptException(string("Symbol.hasInstance must take exactly 1 argument"));
+        }
+
+        auto arg = info[0];
+        if (!arg->IsObject()) {
+            info.GetReturnValue().Set(false);
+            return;
+        }
+
+        auto clazz = reinterpret_cast<jclass>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+
+        auto isolate = info.GetIsolate();
+        auto runtime = Runtime::GetRuntime(isolate);
+
+        auto objectManager = runtime->GetObjectManager();
+        auto obj = objectManager->GetJavaObjectByJsObject(arg.As<Object>());
+
+        if (obj.IsNull()) {
+            // Couldn't find a corresponding java instance counterpart. This could happen
+            // if the "instanceof" operator is invoked on a pure javascript instance
+            info.GetReturnValue().Set(false);
+            return;
+        }
+
+        JEnv env;
+        auto isInstanceOf = env.IsInstanceOf(obj, clazz);
+
+        info.GetReturnValue().Set(isInstanceOf);
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToV8();
     }
-
-    auto arg = info[0];
-    if (arg->IsNullOrUndefined()) {
-        info.GetReturnValue().Set(false);
-        return;
-    }
-
-    auto clazz = reinterpret_cast<jclass>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
-
-    auto isolate = info.GetIsolate();
-    auto context = isolate->GetCurrentContext();
-    auto runtime = Runtime::GetRuntime(isolate);
-
-    auto objectManager = runtime->GetObjectManager();
-    auto obj = objectManager->GetJavaObjectByJsObject(arg->ToObject(context).ToLocalChecked());
-
-    if (obj.IsNull()) {
-        // Couldn't find a corresponding java instance counterpart. This could happen
-        // if the "instanceof" operator is invoked on a pure javascript instance
-        info.GetReturnValue().Set(false);
-        return;
-    }
-
-    JEnv env;
-    auto isInstanceOf = env.IsInstanceOf(obj, clazz);
-
-    info.GetReturnValue().Set(isInstanceOf);
 }
 
 std::string MetadataNode::GetJniClassName(MetadataEntry& entry) {

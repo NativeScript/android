@@ -112,16 +112,22 @@ tns::BufferCastType JsArgConverter::GetCastType(const v8::Local<v8::ArrayBufferV
     return tns::BufferCastType::Byte;
 }
 
-bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
+bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
     bool success = false;
 
     char buff[1024];
 
     const auto &typeSignature = m_tokens.at(index);
 
+    // A Proxy's target is what holds the Java link or the array elements.
+    auto arg = jsArg.IsEmpty() ? jsArg : ObjectManager::UnwrapProxy(jsArg);
+
     if (arg.IsEmpty()) {
         SetConvertedObject(index, nullptr);
         success = false;
+    } else if (jsArg->IsProxy() && !arg->IsObject()) {
+        SetConvertedObject(index, nullptr);
+        sprintf(buff, "Cannot convert a revoked Proxy to %s at index %d", typeSignature.c_str(), index);
     } else if (arg->IsArray()) {
         success = typeSignature[0] == '[';
 

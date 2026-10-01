@@ -64,6 +64,7 @@ require("./tests/testClassForNameDiscovery");
 require("./tests/testInterfaceImplementation");
 require("./tests/testRuntimeImplementedAPIs");
 require("./tests/testsInstanceOfOperator");
+require("./tests/testProxyReceivers");
 require("./tests/testReleaseNativeCounterpart");
 require("./tests/testJSONObjects");
 require("./tests/kotlin/companions/testCompanionObjectsSupport");

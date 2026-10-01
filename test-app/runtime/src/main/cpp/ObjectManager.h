@@ -62,7 +62,19 @@ class ObjectManager {
   bool CloneLink(const v8::Local<v8::Object>& src,
                  const v8::Local<v8::Object>& dest);
 
-  bool IsJsRuntimeObject(const v8::Local<v8::Object>& object);
+  /*
+   * Whether GetInternalField is safe to call on this exact object. False for
+   * a Proxy even when its target qualifies; unwrap first where a Proxy should
+   * be accepted.
+   */
+  static bool IsJsRuntimeObject(const v8::Local<v8::Object>& object);
+
+  /*
+   * The innermost target of a Proxy chain; any other value is returned as is.
+   * A revoked Proxy anywhere in the chain yields null. Internal fields and
+   * private symbols live on the target, never on the Proxy.
+   */
+  static v8::Local<v8::Value> UnwrapProxy(v8::Local<v8::Value> value);
 
   static std::string GetClassName(jobject javaObject);
 

@@ -10,6 +10,9 @@ using namespace ada;
 URLImpl::URLImpl(url_aggregator url) : url_(url) {}
 
 URLImpl *URLImpl::GetPointer(v8::Local<v8::Object> object) {
+    if (object->InternalFieldCount() < 1) {
+        return nullptr;
+    }
     auto ptr = object->GetAlignedPointerFromInternalField(0, v8::kEmbedderDataTypeTagDefault);
     if (ptr == nullptr) {
         return nullptr;
