@@ -448,6 +448,8 @@ public class Generator {
             String normalizedClassName = BcelNamingUtil.resolveClassName(clazz.getClassName());
             fieldsWriter.writeStaticThizField(normalizedClassName);
         }
+
+        fieldsWriter.writeRuntimeIdField();
     }
 
     private void writeConstructorsToWriter(Writer writer, JavaClass clazz, DataRow dataRow, String generatedClassName, GenericHierarchyView genericHierarchyView) {
@@ -523,6 +525,7 @@ public class Generator {
 
         methodsWriter.writeInternalRuntimeHashCodeMethod();
         methodsWriter.writeInternalRuntimeEqualsMethod();
+        methodsWriter.writeInternalRuntimeIdAccessorMethods();
     }
 
     /**

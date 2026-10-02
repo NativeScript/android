@@ -53,7 +53,50 @@ public class GeneratorTest {
         Class<?> helloClass = InMemoryJavaCompiler.compile(binding.getClassname(), sourceCode.toString(), options);
 
         Assert.assertNotNull(helloClass);
-        Assert.assertEquals(3, helloClass.getDeclaredMethods().length);
+        Assert.assertEquals(5, helloClass.getDeclaredMethods().length);
+    }
+
+    @Test
+    public void testCanCompileBindingWithSuppressedCallJsMethodExceptions() throws Exception {
+        List<String> lines = Utils.getDataRowsFromResource("datarow-named-extend.txt");
+        DataRow dataRow = new DataRow(lines.get(0));
+
+        File outputDir = null;
+        List<DataRow> libs = new ArrayList<>();
+        Generator generator = new Generator(outputDir, libs, true);
+        Binding binding = generator.generateBinding(dataRow);
+        Assert.assertNotNull(binding);
+
+        String sourceCode = binding.getContent();
+        Assert.assertTrue(sourceCode.contains("com.tns.Runtime.passSuppressedExceptionToJs(this,"));
+
+        Iterable<String> options = new ArrayList<String>(Arrays.asList("-cp", dependenciesDir));
+        Class<?> helloClass = InMemoryJavaCompiler.compile(binding.getClassname(), sourceCode, options);
+
+        Assert.assertNotNull(helloClass);
+    }
+
+    @Test
+    public void testBindingCarriesItsOwningRuntimeId() throws Exception {
+        List<String> lines = Utils.getDataRowsFromResource("datarow-named-extend.txt");
+        DataRow dataRow = new DataRow(lines.get(0));
+
+        File outputDir = null;
+        List<DataRow> libs = new ArrayList<>();
+        Generator generator = new Generator(outputDir, libs);
+        Binding binding = generator.generateBinding(dataRow);
+        Assert.assertNotNull(binding);
+
+        Iterable<String> options = new ArrayList<String>(Arrays.asList("-cp", dependenciesDir));
+        Class<?> boundClass = InMemoryJavaCompiler.compile(binding.getClassname(), binding.getContent(), options);
+
+        Assert.assertTrue(com.tns.NativeScriptRuntimeBound.class.isAssignableFrom(boundClass));
+
+        com.tns.NativeScriptRuntimeBound instance = (com.tns.NativeScriptRuntimeBound) boundClass.newInstance();
+        Assert.assertEquals(com.tns.NativeScriptRuntimeBound.INVALID_RUNTIME_ID, instance.getRuntimeId__ns());
+
+        instance.setRuntimeId__ns(7);
+        Assert.assertEquals(7, instance.getRuntimeId__ns());
     }
 
     @Test
@@ -79,7 +122,7 @@ public class GeneratorTest {
         Class<?> helloClass = InMemoryJavaCompiler.compile("com.tns.gen.com.example.MyInterface", sourceCode.toString(), options);
 
         Assert.assertNotNull(helloClass);
-        Assert.assertEquals(3, helloClass.getDeclaredMethods().length);  // 3 methods (includes 'hashCode__super' and 'equals__super')
+        Assert.assertEquals(5, helloClass.getDeclaredMethods().length);  // 5 methods (includes 'hashCode__super', 'equals__super', 'getRuntimeId__ns' and 'setRuntimeId__ns')
     }
 
     @Test
@@ -100,7 +143,7 @@ public class GeneratorTest {
         Class<?> ComplexClass = InMemoryJavaCompiler.compile(binding.getClassname(), sourceCode.toString(), options);
 
         Assert.assertNotNull(ComplexClass);
-        Assert.assertEquals(3, ComplexClass.getInterfaces().length); // 2 + 1 (hashcodeprovider)
+        Assert.assertEquals(4, ComplexClass.getInterfaces().length); // 2 + hashcodeprovider + runtimebound
     }
 
     @Test
@@ -127,7 +170,7 @@ public class GeneratorTest {
         Class<?> ComplexClass = InMemoryJavaCompiler.compile(binding.getClassname(), sourceCode.toString(), options);
 
         Assert.assertNotNull(ComplexClass);
-        Assert.assertEquals(4, ComplexClass.getDeclaredMethods().length); // 1 + constructor + (equals + hashcode)
+        Assert.assertEquals(6, ComplexClass.getDeclaredMethods().length); // 1 + constructor + (equals + hashcode) + (getRuntimeId__ns + setRuntimeId__ns)
     }
 
     @Test
