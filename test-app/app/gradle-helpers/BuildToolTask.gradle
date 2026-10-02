@@ -1,6 +1,6 @@
 import static org.gradle.internal.logging.text.StyledTextOutput.Style
 
-class BuildToolTask extends JavaExec {
+abstract class BuildToolTask extends JavaExec {
     void setOutputs(def logger) {
         def logFile = new File("$workingDir/${name}.log")
         if(logFile.exists()) {
