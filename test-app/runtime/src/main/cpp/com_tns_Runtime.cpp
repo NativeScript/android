@@ -285,20 +285,6 @@ extern "C" JNIEXPORT jboolean Java_com_tns_Runtime_notifyGcLegacy(JNIEnv* env, j
     return notifyGcFast_impl(env, obj, runtimeId);
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_lock(JNIEnv* env, jobject obj, jint runtimeId) {
-    auto runtime = TryGetRuntime(runtimeId);
-    if (runtime != nullptr) {
-        runtime->Lock();
-    }
-}
-
-extern "C" JNIEXPORT void Java_com_tns_Runtime_unlock(JNIEnv* env, jobject obj, jint runtimeId) {
-    auto runtime = TryGetRuntime(runtimeId);
-    if (runtime != nullptr) {
-        runtime->Unlock();
-    }
-}
-
 extern "C" JNIEXPORT jboolean Java_com_tns_Runtime_passExceptionToJsNative(JNIEnv* env, jobject obj, jint runtimeId, jthrowable exception, jstring message, jstring fullStackTrace, jstring jsStackTrace, jboolean isDiscarded) {
     auto runtime = TryGetRuntime(runtimeId);
     if (runtime == nullptr) {
