@@ -28,6 +28,7 @@ const {
   ObjectCreate,
   ObjectDefineProperty,
   ObjectFreeze,
+  Promise,
   PromisePrototypeThen,
   PromiseResolve,
   SymbolFor,
@@ -145,6 +146,8 @@ class WorkerEmitter {
 class Worker extends WorkerEmitter {
   #worker;
   #exited = false;
+  // Every terminate() promise settles when the thread's end is reported.
+  #exitWaiters = [];
 
   constructor(filename, options) {
     super();
@@ -182,24 +185,53 @@ class Worker extends WorkerEmitter {
     worker.onerror = function (error) {
       self.emit("error", error);
     };
+    // The runtime's end-of-worker event: the one place 'exit' comes from, for
+    // a worker's own close() and for terminate() alike, so nothing the worker
+    // sent before it ended can follow 'exit'.
+    FunctionPrototypeCall(
+      addEventListener,
+      worker,
+      "nsworkerended",
+      function () {
+        self.#reportExit();
+      }
+    );
     soon(function () {
       self.emit("online", undefined);
     });
+  }
+
+  // Node emits 'exit' once and settles terminate() after it. The code is
+  // always 0: this runtime has no thread exit status to report, and the
+  // cross-runtime suite pins that for every end a worker can take.
+  #reportExit() {
+    if (this.#exited) {
+      return;
+    }
+    this.#exited = true;
+    this.emit("exit", 0);
+    const waiters = this.#exitWaiters;
+    this.#exitWaiters = [];
+    for (let i = 0; i < waiters.length; i++) {
+      waiters[i](0);
+    }
   }
 
   postMessage(value, transfer) {
     this.#worker.postMessage(value, transfer);
   }
 
+  // Resolves with the exit code once the thread has actually ended. A parent
+  // that is itself tearing down never delivers that signal, so the promise
+  // stays pending there, as it does in Node when the parent dies.
   terminate() {
+    if (this.#exited) {
+      return PromiseResolve(0);
+    }
     this.#worker.terminate();
     const self = this;
-    return PromisePrototypeThen(PromiseResolve(), function () {
-      if (!self.#exited) {
-        self.#exited = true;
-        self.emit("exit", 0);
-      }
-      return 0;
+    return new Promise(function (resolve) {
+      ArrayPrototypePush(self.#exitWaiters, resolve);
     });
   }
 }

@@ -130,6 +130,16 @@ public:
     static void ClearWorkerOnParent(int workerId);
 
     /*
+     * Parent thread only, from the worker thread's last act: dispatches
+     * `nsworkerended` on the Worker object and only then releases it. The
+     * Worker object stays rooted from construction until this runs, so a
+     * terminate() that is still draining can never lose its wrapper. A parent
+     * that is itself tearing down clears its children directly and never gets
+     * here, so the notification is best effort.
+     */
+    static void NotifyThreadEndedOnParent(int workerId);
+
+    /*
      * Terminates and clears all workers whose parent is the given isolate.
      * Must run on the parent's thread, before the parent isolate is disposed
      * (the children's Worker object persistents live in that isolate).
