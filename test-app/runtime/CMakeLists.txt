@@ -71,14 +71,18 @@ set(RUNTIME_BUILTIN_JS
         ${RUNTIME_BUILTIN_JS_DIR}/abort-signal.js
         ${RUNTIME_BUILTIN_JS_DIR}/base64.js
         ${RUNTIME_BUILTIN_JS_DIR}/blob-url.js
+        ${RUNTIME_BUILTIN_JS_DIR}/broadcast-channel.js
         ${RUNTIME_BUILTIN_JS_DIR}/dom-exception.js
         ${RUNTIME_BUILTIN_JS_DIR}/error-events.js
         ${RUNTIME_BUILTIN_JS_DIR}/events.js
         ${RUNTIME_BUILTIN_JS_DIR}/inspect.js
         ${RUNTIME_BUILTIN_JS_DIR}/json-helper.js
+        ${RUNTIME_BUILTIN_JS_DIR}/message-channel.js
+        ${RUNTIME_BUILTIN_JS_DIR}/message-event.js
         ${RUNTIME_BUILTIN_JS_DIR}/node-module.js
         ${RUNTIME_BUILTIN_JS_DIR}/node-url.js
         ${RUNTIME_BUILTIN_JS_DIR}/node-util.js
+        ${RUNTIME_BUILTIN_JS_DIR}/node-worker-threads.js
         ${RUNTIME_BUILTIN_JS_DIR}/ns-module.js
         ${RUNTIME_BUILTIN_JS_DIR}/ns-runtime.js
         ${RUNTIME_BUILTIN_JS_DIR}/ns-util.js
@@ -88,6 +92,7 @@ set(RUNTIME_BUILTIN_JS
         ${RUNTIME_BUILTIN_JS_DIR}/structured-clone.js
         ${RUNTIME_BUILTIN_JS_DIR}/text-encoding.js
         ${RUNTIME_BUILTIN_JS_DIR}/weak-ref.js
+        ${RUNTIME_BUILTIN_JS_DIR}/worker-events.js
 )
 set(RUNTIME_BUILTINS_GENERATED_DIR ${PROJECT_SOURCE_DIR}/src/main/cpp/generated)
 get_filename_component(RUNTIME_BUILTINS_JS2C ${PROJECT_SOURCE_DIR}/../../tools/js2c.mjs ABSOLUTE)
@@ -201,6 +206,7 @@ add_library(
         src/main/cpp/MetadataReader.cpp
         src/main/cpp/MetadataTreeNode.cpp
         src/main/cpp/MetadataEntry.cpp
+        src/main/cpp/Messaging.cpp
         src/main/cpp/MethodCache.cpp
         src/main/cpp/ModuleBinding.cpp
         src/main/cpp/ModuleInternal.cpp
@@ -225,6 +231,7 @@ add_library(
         src/main/cpp/V8GlobalHelpers.cpp
         src/main/cpp/V8StringConstants.cpp
         src/main/cpp/WeakRef.cpp
+        src/main/cpp/WorkerEvents.cpp
         src/main/cpp/WorkerWrapper.cpp
         src/main/cpp/Timers.cpp
         src/main/cpp/com_tns_AssetExtractor.cpp

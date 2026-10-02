@@ -28,6 +28,7 @@
 #include "JsArgToArrayConverter.h"
 #include "LazyGlobals.h"
 #include "ManualInstrumentation.h"
+#include "Messaging.h"
 #include "MetadataNode.h"
 #include "ModuleBinding.h"
 #include "ModuleInternal.h"
@@ -49,6 +50,7 @@
 #include "V8StringConstants.h"
 #include "Version.h"
 #include "WeakRef.h"
+#include "WorkerEvents.h"
 #include "include/libplatform/libplatform.h"
 #include "sys/system_properties.h"
 
@@ -1009,6 +1011,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   // PromiseRejectionEvent, reportError and the native dispatch closures) -
   // installed for both the main and worker isolates.
   Events::Init(context);
+  // Worker and the worker global scope as EventTargets, on top of those
+  // primitives. Before ErrorEvents::Init, whose ErrorEvent constructor the
+  // parent-side error callout picks up lazily on first use.
+  WorkerEvents::Init(context);
   ErrorEvents::Init(context);
 
   StructuredClone::Init(context);
@@ -1200,6 +1206,12 @@ void Runtime::DestroyRuntime() {
   if (m_objectManager != nullptr) {
     m_objectManager->ReleaseAllRegistered();
   }
+
+  // After the loop stopped: a port force-closed here can no longer be woken,
+  // and the disentangle both delivers the close sentinels this isolate's
+  // siblings are owed and puts each port's queue beyond the reach of the
+  // threads that were filling it.
+  messaging::CloseAllPorts(m_isolate);
 
   // Everything below still needs the isolate alive -- the caller disposes it
   // only after this returns -- but runs after the hooks above so nothing they

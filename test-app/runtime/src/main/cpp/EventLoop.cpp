@@ -165,35 +165,43 @@ void EventLoop::Shutdown() {
     // must run on the home thread: removing an fd concurrently with an
     // in-flight ALooper callback dispatch is racy
     JEnv env;
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (stopped_) {
-        return;
-    }
-    stopped_ = true;
-    internal_.immediate.clear();
-    internal_.delayed.clear();
-    ordered_.immediate.clear();
-    ordered_.delayed.clear();
-    deferredJavaThrows_.clear();
-    pumpDrainHook_ = nullptr;
-    if (eventFd_ != -1) {
-        ALooper_removeFd(looper_, eventFd_);
-        close(eventFd_);
-        eventFd_ = -1;
-    }
-    if (timerFd_ != -1) {
-        ALooper_removeFd(looper_, timerFd_);
-        close(timerFd_);
-        timerFd_ = -1;
-    }
-    if (looper_ != nullptr) {
-        ALooper_release(looper_);
-        looper_ = nullptr;
-    }
-    if (handler_ != nullptr) {
-        // the global ref stays alive until the destructor, but the released
-        // handler ignores any token already in (or racing into) its queue
-        env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_RELEASE);
+    // The dropped entries are moved out here and destroyed only after the lock
+    // is released: an entry's destructor may post back into this very loop (a
+    // dropped message carrying a transferred port sentinels the port's
+    // sibling, and that sibling may live here), and mutex_ is not recursive.
+    Lane droppedInternal;
+    Lane droppedOrdered;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (stopped_) {
+            return;
+        }
+        stopped_ = true;
+        droppedInternal.immediate.swap(internal_.immediate);
+        droppedInternal.delayed.swap(internal_.delayed);
+        droppedOrdered.immediate.swap(ordered_.immediate);
+        droppedOrdered.delayed.swap(ordered_.delayed);
+        deferredJavaThrows_.clear();
+        pumpDrainHook_ = nullptr;
+        if (eventFd_ != -1) {
+            ALooper_removeFd(looper_, eventFd_);
+            close(eventFd_);
+            eventFd_ = -1;
+        }
+        if (timerFd_ != -1) {
+            ALooper_removeFd(looper_, timerFd_);
+            close(timerFd_);
+            timerFd_ = -1;
+        }
+        if (looper_ != nullptr) {
+            ALooper_release(looper_);
+            looper_ = nullptr;
+        }
+        if (handler_ != nullptr) {
+            // the global ref stays alive until the destructor, but the released
+            // handler ignores any token already in (or racing into) its queue
+            env.CallVoidMethod(handler_, EVENT_LOOP_HANDLER_RELEASE);
+        }
     }
 }
 
