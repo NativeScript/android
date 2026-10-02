@@ -35,6 +35,23 @@ enum class HostObjectPolicy {
 void ThrowDataCloneError(v8::Isolate* isolate, const std::string& message);
 
 /*
+ * The dom-exception builtin's native half: `markCloneable`, which stamps a
+ * per-isolate private brand on every instance the constructor makes. The brand
+ * is what the serialization delegates answer IsHostObject from, so DOMException
+ * travels through structuredClone and worker postMessage (Web IDL
+ * [Serializable]). Lives here, next to those delegates.
+ */
+v8::MaybeLocal<v8::Object> DomExceptionBinding(v8::Local<v8::Context> context);
+
+/*
+ * The dom-exception builtin's exports with its binding attached. GetExports
+ * consults the factory only on the run that populates the cache, so every call
+ * site for this builtin must go through here — a site passing a different
+ * factory would win or lose by init order.
+ */
+v8::MaybeLocal<v8::Object> GetDomExceptionExports(v8::Local<v8::Context> context);
+
+/*
  * A value serialized out of one isolate, plus the memory that travels with it.
  * Serializing and deserializing are separate halves because a worker message
  * is read back on a different isolate than it was written on, while
@@ -68,6 +85,20 @@ class SerializedValue {
     v8::MaybeLocal<v8::Value> Deserialize(v8::Isolate* isolate,
                                           v8::Local<v8::Context> context);
 
+    /*
+     * Web IDL's DOMException serialization steps (name, message) plus the
+     * stack, matching Node. Kept out-of-band because V8 forbids JS while a
+     * value is being read: Deserialize constructs every instance up front and
+     * ReadHostObject only hands them out by index (Node's host_objects_
+     * design).
+     */
+    struct DomExceptionPayload {
+        std::string name;
+        std::string message;
+        std::string stack;
+        bool hasStack = false;
+    };
+
    private:
     struct FreeDeleter {
         void operator()(void* pointer) const { std::free(pointer); }
@@ -82,6 +113,9 @@ class SerializedValue {
     std::vector<std::shared_ptr<v8::BackingStore>> transferredBuffers_;
     // Backing stores shared with — not moved from — the sending isolate.
     std::vector<std::shared_ptr<v8::BackingStore>> sharedBuffers_;
+    // One entry per distinct DOMException in the graph, in write order (a
+    // repeated reference is an object id in the stream, not a second entry).
+    std::vector<DomExceptionPayload> domExceptions_;
 };
 
 }  // namespace serialization
