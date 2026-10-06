@@ -204,6 +204,52 @@ describe("Messaging runtime edges", function () {
         });
     });
 
+    describe("environment data keys", function () {
+        it("keeps keys containing NUL distinct from their prefixes", function () {
+            var wt = require("node:worker_threads");
+            var prefix = "environment-key";
+            var key = prefix + "\0suffix";
+            try {
+                wt.setEnvironmentData(prefix, "prefix");
+                wt.setEnvironmentData(key, "full key");
+                expect(wt.getEnvironmentData(prefix)).toBe("prefix");
+                expect(wt.getEnvironmentData(key)).toBe("full key");
+                wt.setEnvironmentData(key);
+                expect(wt.getEnvironmentData(key)).toBeUndefined();
+                expect(wt.getEnvironmentData(prefix)).toBe("prefix");
+            } finally {
+                wt.setEnvironmentData(key);
+                wt.setEnvironmentData(prefix);
+            }
+        });
+
+        function thrownMessage(fn) {
+            try {
+                fn();
+            } catch (e) {
+                return e && e.message;
+            }
+            return "nothing thrown";
+        }
+
+        it("throws what a key's toString throws instead of using the empty-string key", function () {
+            var wt = require("node:worker_threads");
+            var key = { toString: function () { throw new Error("key toString failed"); } };
+            wt.setEnvironmentData("", "empty");
+            try {
+                expect(thrownMessage(function () { wt.setEnvironmentData(key, "other"); }))
+                    .toBe("key toString failed");
+                expect(thrownMessage(function () { wt.getEnvironmentData(key); }))
+                    .toBe("key toString failed");
+                expect(thrownMessage(function () { wt.setEnvironmentData(key); }))
+                    .toBe("key toString failed");
+                expect(wt.getEnvironmentData("")).toBe("empty");
+            } finally {
+                wt.setEnvironmentData("");
+            }
+        });
+    });
+
     describe("worker error reporting", function () {
         // A worker boots on its own thread, so the first error arrives whenever
         // the runner gets to it; specs wait for it and only then settle for
