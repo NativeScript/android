@@ -204,6 +204,22 @@ describe("Messaging runtime edges", function () {
         });
     });
 
+    describe("markAsUncloneable", function () {
+        it("rejects an object marked while the clone that reaches it is written", function (done) {
+            var worker = new Worker("./messaging/uncloneableInGetterWorker.js");
+            worker.onmessage = function (event) {
+                expect(event.data).toEqual({ threw: true, name: "DataCloneError" });
+                worker.terminate();
+                done();
+            };
+            worker.onerror = function (error) {
+                fail("worker error: " + error.message);
+                worker.terminate();
+                done();
+            };
+        });
+    });
+
     describe("worker error reporting", function () {
         // A worker boots on its own thread, so the first error arrives whenever
         // the runner gets to it; specs wait for it and only then settle for

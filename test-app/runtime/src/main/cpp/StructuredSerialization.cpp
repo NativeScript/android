@@ -172,6 +172,11 @@ public:
         if (object->InternalFieldCount() > 0) {
             return Just(true);
         }
+        if (uncloneableBrand_.IsEmpty()) {
+            // markAsUncloneable creates the brand on its first call in an
+            // isolate, which a getter in the graph being written can make.
+            uncloneableBrand_ = messaging::UncloneableBrandIfAny(isolate);
+        }
         if (!uncloneableBrand_.IsEmpty()) {
             bool uncloneable = false;
             if (!object->HasPrivate(isolate->GetCurrentContext(), uncloneableBrand_)
@@ -635,7 +640,8 @@ MaybeLocal<Value> SerializedValue::Deserialize(Isolate* isolate, Local<Context> 
                 "A message carrying transferred objects can only be read once.");
         return MaybeLocal<Value>();
     }
-    if (HasTransferables()) {
+    const bool singleReceiver = HasTransferables();
+    if (singleReceiver) {
         consumed_ = true;
     }
 
@@ -728,9 +734,12 @@ MaybeLocal<Value> SerializedValue::Deserialize(Isolate* isolate, Local<Context> 
                 ArrayBuffer::New(isolate, std::move(transferredBuffers_[i])));
     }
     // Handed over above; the vectors would otherwise keep reporting
-    // transferables that are no longer here.
-    transferredBuffers_.clear();
-    transferredPorts_.clear();
+    // transferables that are no longer here. Only the single receiver writes
+    // them: the other readers share this value with no lock.
+    if (singleReceiver) {
+        transferredBuffers_.clear();
+        transferredPorts_.clear();
+    }
 
     Local<Value> result;
     {
