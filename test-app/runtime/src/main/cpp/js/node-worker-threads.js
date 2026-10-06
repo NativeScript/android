@@ -101,7 +101,7 @@ class WorkerEmitter {
     }
     const key = `${type}`;
     const list = this.#listeners[key] || (this.#listeners[key] = []);
-    ArrayPrototypePush(list, { listener, once: true });
+    ArrayPrototypePush(list, { listener, once: true, fired: false });
     return this;
   }
 
@@ -134,6 +134,13 @@ class WorkerEmitter {
     for (let i = 0; i < snapshot.length; i++) {
       const entry = snapshot[i];
       if (entry.once) {
+        // Node's once wrapper: a registration fires at most once, even when
+        // an earlier listener emits the same event again and the nested emit
+        // fires it first.
+        if (entry.fired) {
+          continue;
+        }
+        entry.fired = true;
         const index = ArrayPrototypeIndexOf(list, entry);
         if (index !== -1) {
           ArrayPrototypeSplice(list, index, 1);

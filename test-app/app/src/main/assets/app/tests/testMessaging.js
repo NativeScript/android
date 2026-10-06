@@ -398,6 +398,23 @@ describe("Messaging runtime edges", function () {
             });
         });
 
+        it("calls a node:worker_threads once listener once when an earlier listener emits again", function () {
+            var wt = require("node:worker_threads");
+            var worker = new wt.Worker("~/tests/eventLoopEchoWorker.js");
+            var calls = 0;
+            var nested = false;
+            worker.on("probe", function () {
+                if (!nested) {
+                    nested = true;
+                    worker.emit("probe");
+                }
+            });
+            worker.once("probe", function () { calls++; });
+            worker.emit("probe");
+            worker.terminate();
+            expect(calls).toBe(1);
+        });
+
         it("routes a throw from a parentPort listener to the parent's 'error' listeners", function (done) {
             var wt = require("node:worker_threads");
             var worker = new wt.Worker("~/tests/messaging/parentPortThrowingWorker.js");
