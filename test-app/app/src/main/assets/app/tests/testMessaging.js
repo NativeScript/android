@@ -377,6 +377,48 @@ describe("Messaging runtime edges", function () {
                 }
             };
         });
+
+        it("lets a node:worker_threads 'error' listener consume the error", function (done) {
+            var wt = require("node:worker_threads");
+            var globalErrors = [];
+            var listener = function (event) {
+                globalErrors.push(event.message);
+                event.preventDefault();
+            };
+            addEventListener("error", listener);
+            var worker = new wt.Worker("~/tests/messaging/throwingWorker.js");
+            worker.on("error", function (error) {
+                setTimeout(function () {
+                    removeEventListener("error", listener);
+                    expect(error.message).toContain("boom from worker");
+                    expect(globalErrors).toEqual([]);
+                    worker.terminate();
+                    done();
+                }, SETTLE);
+            });
+        });
+
+        it("routes a throw from a parentPort listener to the parent's 'error' listeners", function (done) {
+            var wt = require("node:worker_threads");
+            var worker = new wt.Worker("~/tests/messaging/parentPortThrowingWorker.js");
+            var messages = [];
+            var finish = function () {
+                expect(messages.length).toBe(1);
+                expect(messages[0]).toContain("thrown by a parentPort listener");
+                worker.terminate();
+                done();
+            };
+            // Nothing else settles the spec when the error never arrives.
+            var guard = setTimeout(finish, 10000);
+            worker.on("error", function (error) {
+                messages.push(error.message);
+                if (messages.length === 1) {
+                    clearTimeout(guard);
+                    setTimeout(finish, SETTLE);
+                }
+            });
+            worker.postMessage("go");
+        });
     });
 
     describe("AbortSignal handler attribute accounting", function () {

@@ -45,6 +45,7 @@ const { BroadcastChannel } = require("internal/broadcast-channel");
 const {
   EventTarget,
   defineEventHandler,
+  dispatchEventRethrowing,
   globalEventTarget,
 } = require("internal/events");
 
@@ -64,7 +65,6 @@ const globalPostMessage = g.postMessage;
 
 const addEventListener = EventTarget.prototype.addEventListener;
 const removeEventListener = EventTarget.prototype.removeEventListener;
-const dispatchEvent = EventTarget.prototype.dispatchEvent;
 
 // Runs `fn` after the caller returns. Node reports 'online' and 'exit' from
 // the thread's own lifecycle; the runtime's Worker has no equivalent signal,
@@ -124,10 +124,11 @@ class WorkerEmitter {
     return this.removeListener(type, listener);
   }
 
+  // Whether a listener was registered, as Node's EventEmitter reports it.
   emit(type, arg) {
     const list = this.#listeners[type];
-    if (list === undefined) {
-      return;
+    if (list === undefined || list.length === 0) {
+      return false;
     }
     const snapshot = ArrayPrototypeSlice(list);
     for (let i = 0; i < snapshot.length; i++) {
@@ -140,6 +141,7 @@ class WorkerEmitter {
       }
       FunctionPrototypeCall(entry.listener, this, arg);
     }
+    return true;
   }
 }
 
@@ -182,8 +184,10 @@ class Worker extends WorkerEmitter {
     worker.onmessageerror = function (event) {
       self.emit("messageerror", event.data);
     };
+    // A truthy return cancels the error, so one an 'error' listener took is
+    // not reported to the parent's global scope as well.
     worker.onerror = function (error) {
-      self.emit("error", error);
+      return self.emit("error", error);
     };
     // The runtime's end-of-worker event: the one place 'exit' comes from, for
     // a worker's own close() and for terminate() alike, so nothing the worker
@@ -344,9 +348,11 @@ ObjectDefineProperty(ParentPort.prototype, SymbolToStringTag, {
 let parentPort = null;
 if (!isMainThread) {
   parentPort = new ParentPort();
+  // Rethrowing, so a listener that throws reaches the worker's error chain
+  // (the scope's onerror, then the parent's Worker) the way a throwing
+  // onmessage on the global scope does.
   const relay = function (event) {
-    FunctionPrototypeCall(
-      dispatchEvent,
+    dispatchEventRethrowing(
       parentPort,
       getCreateMessageEvent()(event.type, event.data, event.ports)
     );
