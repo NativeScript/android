@@ -682,7 +682,13 @@ void NativeMessagePort::Drain() {
                 if (tc.HasTerminated() || !tc.CanContinue()) {
                     return;
                 }
-                payload = tc.HasCaught() ? tc.Exception() : v8::Undefined(isolate).As<Value>();
+                // Null rather than undefined when there is nothing to carry, which
+                // includes a thrown undefined: delivery stores the payload as given,
+                // and an event's `data` defaults to null.
+                payload = tc.HasCaught() ? tc.Exception() : Local<Value>();
+                if (payload.IsEmpty() || payload->IsUndefined()) {
+                    payload = v8::Null(isolate);
+                }
                 tc.Reset();
             }
         }

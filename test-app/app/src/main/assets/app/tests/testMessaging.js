@@ -204,6 +204,98 @@ describe("Messaging runtime edges", function () {
         });
     });
 
+    // The MessageEvent constructor defaults an undefined `data` to null, as Web
+    // IDL requires of its init dictionary. A delivered message is not built
+    // from a dictionary: it carries whatever the payload deserialized to.
+    describe("undefined payloads", function () {
+        var payloads = [undefined, null, false, 0, ""];
+        // Closed after every spec, so one that failed or timed out leaves no
+        // worker or channel behind. terminate() and close() are idempotent.
+        var cleanups = [];
+        afterEach(function () {
+            cleanups.forEach(function (cleanup) { cleanup(); });
+            cleanups = [];
+        });
+
+        function failOnWorkerError(done) {
+            return function (error) {
+                fail("worker error: " + error.message);
+                done();
+            };
+        }
+
+        function expectPayloads(events) {
+            expect(events.map(function (event) { return event.data; })).toEqual(payloads);
+            expect(events[0].data).toBeUndefined();
+            expect("data" in events[0]).toBe(true);
+        }
+
+        it("arrive unchanged on a MessagePort", function (done) {
+            var channel = new MessageChannel();
+            // The receiver first: closing only the sender queues the close
+            // behind the messages, which would still be delivered.
+            cleanups.push(function () { channel.port2.close(); channel.port1.close(); });
+            var events = [];
+            channel.port2.onmessage = function (event) {
+                events.push(event);
+                if (events.length === payloads.length) {
+                    expectPayloads(events);
+                    done();
+                }
+            };
+            payloads.forEach(function (payload) { channel.port1.postMessage(payload); });
+        });
+
+        it("arrive unchanged on a BroadcastChannel", function (done) {
+            var sender = new BroadcastChannel("undefined-payloads");
+            var receiver = new BroadcastChannel("undefined-payloads");
+            cleanups.push(function () { sender.close(); receiver.close(); });
+            var events = [];
+            receiver.onmessage = function (event) {
+                events.push(event);
+                if (events.length === payloads.length) {
+                    expectPayloads(events);
+                    done();
+                }
+            };
+            payloads.forEach(function (payload) { sender.postMessage(payload); });
+        });
+
+        it("arrive unchanged in a worker and back on its Worker object", function (done) {
+            var worker = new Worker("./messaging/describeDataWorker.js");
+            cleanups.push(function () { worker.terminate(); });
+            var events = [];
+            worker.onmessage = function (event) {
+                events.push(event);
+                if (events.length === 2) {
+                    expect(events[0].data).toEqual({ received: "undefined" });
+                    expect(events[1].data).toBeUndefined();
+                    expect("data" in events[1]).toBe(true);
+                    done();
+                }
+            };
+            worker.onerror = failOnWorkerError(done);
+            worker.postMessage(undefined);
+        });
+
+        it("arrive unchanged on a node:worker_threads parentPort", function (done) {
+            var wt = require("node:worker_threads");
+            var worker = new wt.Worker("~/tests/messaging/parentPortDescribeWorker.js");
+            cleanups.push(function () { worker.terminate(); });
+            worker.on("message", function (value) {
+                expect(value).toEqual({ received: "undefined" });
+                done();
+            });
+            worker.on("error", failOnWorkerError(done));
+            worker.postMessage(undefined);
+        });
+
+        it("still default to null in a constructed MessageEvent", function () {
+            expect(new MessageEvent("message").data).toBeNull();
+            expect(new MessageEvent("message", { data: undefined }).data).toBeNull();
+        });
+    });
+
     describe("worker error reporting", function () {
         // A worker boots on its own thread, so the first error arrives whenever
         // the runner gets to it; specs wait for it and only then settle for

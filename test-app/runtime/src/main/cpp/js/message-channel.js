@@ -53,12 +53,12 @@ const {
 const addEventListener = EventTarget.prototype.addEventListener;
 const dispatchEvent = EventTarget.prototype.dispatchEvent;
 
-let MessageEvent;
-function getMessageEvent() {
-  if (MessageEvent === undefined) {
-    ({ MessageEvent } = require("internal/message-event"));
+let createMessageEvent;
+function getCreateMessageEvent() {
+  if (createMessageEvent === undefined) {
+    ({ createMessageEvent } = require("internal/message-event"));
   }
-  return MessageEvent;
+  return createMessageEvent;
 }
 
 // WebIDL sequence<object>. Entries are handed to the native transfer-list
@@ -253,11 +253,10 @@ function emitMessage(data, ports, type) {
       ArrayPrototypePush(list, adoptPort(ports[i]));
     }
   }
-  const MessageEventCtor = getMessageEvent();
   FunctionPrototypeCall(
     dispatchEvent,
     this,
-    new MessageEventCtor(type, { data, ports: list })
+    getCreateMessageEvent()(type, data, list)
   );
 }
 

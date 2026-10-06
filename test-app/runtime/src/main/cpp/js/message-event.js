@@ -53,6 +53,12 @@ function toPortSequence(value) {
   return list;
 }
 
+// Builds the event a delivered message dispatches. The constructor cannot
+// serve delivery: per Web IDL its init dictionary treats `data: undefined` as
+// absent and defaults it to null, whereas a message that deserialized to
+// undefined has to arrive as undefined.
+let createMessageEvent;
+
 class MessageEvent extends Event {
   #data;
   #origin;
@@ -134,6 +140,17 @@ class MessageEvent extends Event {
     this.#source = source;
     this.#ports = ports === null ? [] : toPortSequence(ports);
   }
+
+  static {
+    createMessageEvent = (type, data, ports) => {
+      // Null-prototype init: the constructor reads every dictionary member,
+      // and one this object lacks would otherwise be looked up on
+      // Object.prototype, which app code can change.
+      const event = new MessageEvent(type, { __proto__: null, ports });
+      event.#data = data;
+      return event;
+    };
+  }
 }
 
 // Class members are non-enumerable; the IDL attributes and operations are not.
@@ -150,4 +167,4 @@ ObjectDefineProperty(MessageEvent.prototype, SymbolToStringTag, {
   configurable: true,
 });
 
-module.exports = { MessageEvent };
+module.exports = { MessageEvent, createMessageEvent };

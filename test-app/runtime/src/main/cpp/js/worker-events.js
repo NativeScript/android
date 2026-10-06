@@ -20,12 +20,12 @@ const {
 
 const g = globalThis;
 
-let MessageEvent;
-function getMessageEvent() {
-  if (MessageEvent === undefined) {
-    ({ MessageEvent } = require("internal/message-event"));
+let createMessageEvent;
+function getCreateMessageEvent() {
+  if (createMessageEvent === undefined) {
+    ({ createMessageEvent } = require("internal/message-event"));
   }
-  return MessageEvent;
+  return createMessageEvent;
 }
 
 // ErrorEvent is installed by the error-events builtin, which
@@ -48,8 +48,7 @@ function getErrorEvent() {
 // is what feeds the worker's onerror chain — the worker scope's handler
 // first, then the parent's — which the cross-runtime worker suite asserts.
 function emitMessage(data, ports, type) {
-  const MessageEventCtor = getMessageEvent();
-  dispatchEventRethrowing(this, new MessageEventCtor(type, { data, ports }));
+  dispatchEventRethrowing(this, getCreateMessageEvent()(type, data, ports));
 }
 
 // The parent-side error delivery callout, invoked by native with the Worker

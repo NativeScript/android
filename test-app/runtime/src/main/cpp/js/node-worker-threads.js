@@ -47,12 +47,12 @@ const {
   globalEventTarget,
 } = require("internal/events");
 
-let MessageEvent;
-function getMessageEvent() {
-  if (MessageEvent === undefined) {
-    ({ MessageEvent } = require("internal/message-event"));
+let createMessageEvent;
+function getCreateMessageEvent() {
+  if (createMessageEvent === undefined) {
+    ({ createMessageEvent } = require("internal/message-event"));
   }
-  return MessageEvent;
+  return createMessageEvent;
 }
 
 const g = globalThis;
@@ -316,7 +316,7 @@ if (!isMainThread) {
     FunctionPrototypeCall(
       dispatchEvent,
       parentPort,
-      new (getMessageEvent())(event.type, { data: event.data, ports: event.ports })
+      getCreateMessageEvent()(event.type, event.data, event.ports)
     );
   };
   FunctionPrototypeCall(addEventListener, globalEventTarget, "message", relay);
