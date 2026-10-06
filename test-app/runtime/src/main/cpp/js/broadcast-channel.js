@@ -24,12 +24,12 @@ const { adoptPort } = require("internal/message-channel");
 const addEventListener = EventTarget.prototype.addEventListener;
 const dispatchEvent = EventTarget.prototype.dispatchEvent;
 
-let MessageEvent;
-function getMessageEvent() {
-  if (MessageEvent === undefined) {
-    ({ MessageEvent } = require("internal/message-event"));
+let createMessageEvent;
+function getCreateMessageEvent() {
+  if (createMessageEvent === undefined) {
+    ({ createMessageEvent } = require("internal/message-event"));
   }
-  return MessageEvent;
+  return createMessageEvent;
 }
 
 let DOMException;
@@ -64,7 +64,7 @@ class BroadcastChannel extends EventTarget {
       FunctionPrototypeCall(
         dispatchEvent,
         channel,
-        new (getMessageEvent())(event.type, { data: event.data })
+        getCreateMessageEvent()(event.type, event.data)
       );
     };
     FunctionPrototypeCall(addEventListener, port, "message", relay);
