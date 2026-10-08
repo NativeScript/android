@@ -414,6 +414,18 @@ describe("Messaging runtime edges", function () {
             });
         });
 
+        it("rebuilds the error a worker's onerror threw exactly, even when its stack getter throws", function (done) {
+            var wt = require("node:worker_threads");
+            var worker = new wt.Worker("~/tests/messaging/onerrorRethrowingWorker.js");
+            worker.on("error", function (error) {
+                expect(error instanceof TypeError).toBe(true);
+                expect(error.message).toBe("before\0after \uD800");
+                worker.terminate();
+                done();
+            });
+            worker.postMessage("go");
+        });
+
         it("calls a node:worker_threads once listener once when an earlier listener emits again", function () {
             var wt = require("node:worker_threads");
             var worker = new wt.Worker("~/tests/eventLoopEchoWorker.js");

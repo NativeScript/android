@@ -3,6 +3,7 @@
 #include <android/looper.h>
 #include <pthread.h>
 
+#include <optional>
 #include <thread>
 
 #include "ArgConverter.h"
@@ -33,36 +34,57 @@ namespace tns {
 namespace {
 
 /*
- * The `name` and `message` the parent rebuilds the worker's error from, read
- * off the value the worker threw. An object's `name` and `message` are taken
- * when they are strings, so an Error or a DOMException keeps both; anything
- * else becomes an Error whose message is the value's string form. Either
- * property may be a getter, and one that throws leaves the default in place.
+ * The `name` and `message` the parent rebuilds the worker's error from. They
+ * stay UTF-16 on the way, so both arrive exactly as thrown, embedded NULs and
+ * unpaired surrogates included.
  */
-void DescribeThrownValue(Isolate* isolate, Local<Context> context, Local<Value> thrown,
-                         std::string& name, std::string& message) {
+struct ThrownErrorText {
+    std::u16string name = u"Error";
+    std::u16string message;
+};
+
+std::u16string ToUtf16(Isolate* isolate, Local<String> value) {
+    std::u16string result(value->Length(), u'\0');
+    value->WriteV2(isolate, 0, value->Length(), reinterpret_cast<uint16_t*>(result.data()));
+    return result;
+}
+
+Local<String> FromUtf16(Isolate* isolate, const std::u16string& value) {
+    return String::NewFromTwoByte(isolate, reinterpret_cast<const uint16_t*>(value.data()),
+                                  NewStringType::kNormal, static_cast<int>(value.size()))
+            .ToLocalChecked();
+}
+
+/*
+ * Reads the text off the value the worker threw. An object's `name` and
+ * `message` are taken when they are strings, so an Error or a DOMException
+ * keeps both; anything else becomes an Error whose message is the value's
+ * string form. Either property may be a getter, and one that throws leaves the
+ * default in place.
+ */
+ThrownErrorText DescribeThrownValue(Isolate* isolate, Local<Context> context, Local<Value> thrown) {
     HandleScope handleScope(isolate);
     TryCatch tc(isolate);
-    name = "Error";
-    message.clear();
+    ThrownErrorText text;
     Local<String> detail;
     if (thrown->ToDetailString(context).ToLocal(&detail)) {
-        message = ArgConverter::ConvertToString(detail);
+        text.message = ToUtf16(isolate, detail);
     }
     if (!thrown->IsObject() || thrown->IsFunction()) {
-        return;
+        return text;
     }
     auto object = thrown.As<Object>();
     Local<Value> value;
     if (object->Get(context, ArgConverter::ConvertToV8String(isolate, "name")).ToLocal(&value) &&
         value->IsString()) {
-        name = ArgConverter::ConvertToString(value.As<String>());
+        text.name = ToUtf16(isolate, value.As<String>());
     }
     if (object->Get(context, ArgConverter::ConvertToV8String(isolate, "message"))
                 .ToLocal(&value) &&
         value->IsString()) {
-        message = ArgConverter::ConvertToString(value.As<String>());
+        text.message = ToUtf16(isolate, value.As<String>());
     }
+    return text;
 }
 
 /*
@@ -416,12 +438,10 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToParent(const std::string& m
 
     // Read here, on the worker's isolate. A report with no thrown value, such
     // as the heap-limit one made from inside a GC, touches no v8 handle.
-    std::string errorName = "Error";
-    std::string errorMessage = message;
+    std::optional<ThrownErrorText> thrownText;
     if (!thrown.IsEmpty()) {
         Isolate* workerIsolate = Isolate::GetCurrent();
-        DescribeThrownValue(workerIsolate, workerIsolate->GetCurrentContext(), thrown, errorName,
-                            errorMessage);
+        thrownText = DescribeThrownValue(workerIsolate, workerIsolate->GetCurrentContext(), thrown);
     }
 
     int workerId = workerId_;
@@ -429,13 +449,21 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToParent(const std::string& m
     Isolate* parentIsolate = parentIsolate_;
 
     parentTasks->PostInternal([workerId, message, filename, stackTrace, lineno, threadName,
-                       parentIsolate, errorName, errorMessage]() {
+                       parentIsolate, thrownText]() {
         v8::Locker locker(parentIsolate);
         Isolate::Scope isolate_scope(parentIsolate);
         HandleScope handle_scope(parentIsolate);
         auto context = Runtime::GetRuntime(parentIsolate)->GetContext();
         Context::Scope context_scope(context);
 
+        // Without a thrown value, the error is an Error carrying the report's
+        // message.
+        Local<String> errorName = thrownText
+                ? FromUtf16(parentIsolate, thrownText->name)
+                : ArgConverter::ConvertToV8String(parentIsolate, "Error");
+        Local<String> errorMessage = thrownText
+                ? FromUtf16(parentIsolate, thrownText->message)
+                : ArgConverter::ConvertToV8String(parentIsolate, message);
         WorkerWrapper::FireErrorOnParentWorkerObject(workerId, message, stackTrace, filename,
                                                      lineno, threadName, errorName,
                                                      errorMessage);
@@ -446,8 +474,8 @@ void WorkerWrapper::FireErrorOnParentWorkerObject(int workerId, const std::strin
                                                 const std::string& stackTrace,
                                                 const std::string& filename, int lineno,
                                                 const std::string& threadName,
-                                                const std::string& errorName,
-                                                const std::string& errorMessage) {
+                                                Local<String> errorName,
+                                                Local<String> errorMessage) {
     auto wrapper = WorkerWrapper::GetById(workerId);
     if (wrapper == nullptr) {
         DEBUG_WRITE("MAIN: no worker instance was found with workerId=%d.", workerId);

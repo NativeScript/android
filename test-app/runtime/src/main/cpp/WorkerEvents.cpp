@@ -111,8 +111,8 @@ void WorkerEvents::EmitMessage(Isolate* isolate, Local<Object> receiver,
 MaybeLocal<Value> WorkerEvents::EmitError(Isolate* isolate, Local<Object> receiver,
                                           const std::string& message, const std::string& source,
                                           const std::string& stackTrace, int lineNumber,
-                                          const std::string& errorName,
-                                          const std::string& errorMessage) {
+                                          Local<String> errorName,
+                                          Local<String> errorMessage) {
     auto* state = RuntimeState::For<WorkerEventsState>(isolate);
     if (state == nullptr || state->emitError.IsEmpty()) {
         return MaybeLocal<Value>();
@@ -127,8 +127,8 @@ MaybeLocal<Value> WorkerEvents::EmitError(Isolate* isolate, Local<Object> receiv
                          ArgConverter::ConvertToV8String(isolate, source),
                          Number::New(isolate, lineNumber),
                          ArgConverter::ConvertToV8String(isolate, stackTrace),
-                         ArgConverter::ConvertToV8String(isolate, errorName),
-                         ArgConverter::ConvertToV8String(isolate, errorMessage)};
+                         errorName,
+                         errorMessage};
     return state->emitError.Get(isolate)->Call(context, receiver, 6, args);
 }
 

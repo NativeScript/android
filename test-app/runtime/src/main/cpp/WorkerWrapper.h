@@ -186,8 +186,8 @@ private:
                                             const std::string& stackTrace,
                                             const std::string& filename, int lineno,
                                             const std::string& threadName,
-                                            const std::string& errorName,
-                                            const std::string& errorMessage);
+                                            v8::Local<v8::String> errorName,
+                                            v8::Local<v8::String> errorMessage);
 
     v8::Isolate* parentIsolate_;
     // The parent runtime's task queue; weak so a child outliving its parent

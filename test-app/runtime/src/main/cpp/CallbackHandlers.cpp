@@ -1837,6 +1837,9 @@ static void ExtractTryCatchInfo(Isolate *isolate, Local<Context> context, TryCat
         }
     }
 
+    // `stack` may be an accessor. One that throws only costs the stack: caught
+    // here, its exception cannot replace the one `tc` holds.
+    TryCatch stackTc(isolate);
     Local<Value> outStackTrace = tc.StackTrace(context).FromMaybe(Local<Value>());
     if (!outStackTrace.IsEmpty()) {
         Local<String> stackTraceStr =

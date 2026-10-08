@@ -53,8 +53,8 @@ public:
                                                const std::string& message,
                                                const std::string& source,
                                                const std::string& stackTrace, int lineNumber,
-                                               const std::string& errorName,
-                                               const std::string& errorMessage);
+                                               v8::Local<v8::String> errorName,
+                                               v8::Local<v8::String> errorMessage);
 
     /*
      * Dispatches `nsworkerended` on `receiver` (the Worker object, on the
