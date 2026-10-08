@@ -48,6 +48,7 @@ const {
   dispatchEventRethrowing,
   globalEventTarget,
 } = require("internal/events");
+const { kWorkerError } = require("internal/worker-events");
 
 let createMessageEvent;
 function getCreateMessageEvent() {
@@ -191,10 +192,13 @@ class Worker extends WorkerEmitter {
     worker.onmessageerror = function (event) {
       self.emit("messageerror", event.data);
     };
-    // A truthy return cancels the error, so one an 'error' listener took is
-    // not reported to the parent's global scope as well.
-    worker.onerror = function (error) {
-      return self.emit("error", error);
+    // An 'error' listener receives the worker's error, as in Node, not the
+    // event. Once one has, the event is cancelled, so the error is not also
+    // reported to the parent's global scope.
+    worker.onerror = function (event) {
+      if (self.emit("error", event[kWorkerError])) {
+        event.preventDefault();
+      }
     };
     // The runtime's end-of-worker event: the one place 'exit' comes from, for
     // a worker's own close() and for terminate() alike, so nothing the worker

@@ -918,7 +918,9 @@ void PromiseRejectionTracker::Drain() {
               !workerWrapper->IsTerminating() && !workerWrapper->IsDisposed()) {
             string forwarded = message;
             string forwardedStack = stackTrace;
+            Local<Value> forwardedValue = reason;
             if (!thrown.IsEmpty()) {
+              forwardedValue = thrown;
               forwarded = ToDetailString(isolate, thrown);
               // The handler's own stack replaces the reason's; an accessor
               // that throws costs the stack, never the forward.
@@ -930,7 +932,7 @@ void PromiseRejectionTracker::Drain() {
               }
             }
             workerWrapper->PassUncaughtExceptionFromWorkerToParent(
-                forwarded, "", forwardedStack, 0);
+                forwarded, "", forwardedStack, 0, forwardedValue);
           }
         }
       } else {

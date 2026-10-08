@@ -354,6 +354,7 @@ describe("Messaging runtime edges", function () {
                 expect(seen.length).toBe(1);
                 expect(seen[0].message).toContain("boom from worker");
                 expect(seen[0].error instanceof Error).toBe(true);
+                expect(seen[0].error.message).toBe("boom from worker");
                 worker.terminate();
                 done();
             };
@@ -390,11 +391,26 @@ describe("Messaging runtime edges", function () {
             worker.on("error", function (error) {
                 setTimeout(function () {
                     removeEventListener("error", listener);
-                    expect(error.message).toContain("boom from worker");
+                    expect(error instanceof Error).toBe(true);
+                    expect(error.name).toBe("Error");
+                    expect(error.message).toBe("boom from worker");
+                    expect(error.stack).toContain("boom from worker");
                     expect(globalErrors).toEqual([]);
                     worker.terminate();
                     done();
                 }, SETTLE);
+            });
+        });
+
+        it("hands a node:worker_threads 'error' listener a thrown DOMException's name and message", function (done) {
+            var wt = require("node:worker_threads");
+            var worker = new wt.Worker("~/tests/messaging/domExceptionThrowingWorker.js");
+            worker.on("error", function (error) {
+                expect(error instanceof Error).toBe(true);
+                expect(error.name).toBe("AbortError");
+                expect(error.message).toBe("aborted in a worker");
+                worker.terminate();
+                done();
             });
         });
 
@@ -418,18 +434,20 @@ describe("Messaging runtime edges", function () {
         it("routes a throw from a parentPort listener to the parent's 'error' listeners", function (done) {
             var wt = require("node:worker_threads");
             var worker = new wt.Worker("~/tests/messaging/parentPortThrowingWorker.js");
-            var messages = [];
+            var errors = [];
             var finish = function () {
-                expect(messages.length).toBe(1);
-                expect(messages[0]).toContain("thrown by a parentPort listener");
+                expect(errors.length).toBe(1);
+                expect(errors[0] instanceof TypeError).toBe(true);
+                expect(errors[0].name).toBe("TypeError");
+                expect(errors[0].message).toBe("thrown by a parentPort listener");
                 worker.terminate();
                 done();
             };
             // Nothing else settles the spec when the error never arrives.
             var guard = setTimeout(finish, 10000);
             worker.on("error", function (error) {
-                messages.push(error.message);
-                if (messages.length === 1) {
+                errors.push(error);
+                if (errors.length === 1) {
                     clearTimeout(guard);
                     setTimeout(finish, SETTLE);
                 }
