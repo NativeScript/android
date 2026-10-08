@@ -44,8 +44,10 @@ const { BroadcastChannel } = require("internal/broadcast-channel");
 const {
   EventTarget,
   defineEventHandler,
+  dispatchEventRethrowing,
   globalEventTarget,
 } = require("internal/events");
+const { kWorkerError } = require("internal/worker-events");
 
 let MessageEvent;
 function getMessageEvent() {
@@ -63,7 +65,6 @@ const globalPostMessage = g.postMessage;
 
 const addEventListener = EventTarget.prototype.addEventListener;
 const removeEventListener = EventTarget.prototype.removeEventListener;
-const dispatchEvent = EventTarget.prototype.dispatchEvent;
 
 // Runs `fn` after the caller returns. Node reports 'online' and 'exit' from
 // the thread's own lifecycle; the runtime's Worker has no equivalent signal,
@@ -100,7 +101,7 @@ class WorkerEmitter {
     }
     const key = `${type}`;
     const list = this.#listeners[key] || (this.#listeners[key] = []);
-    ArrayPrototypePush(list, { listener, once: true });
+    ArrayPrototypePush(list, { listener, once: true, fired: false });
     return this;
   }
 
@@ -123,15 +124,23 @@ class WorkerEmitter {
     return this.removeListener(type, listener);
   }
 
+  // Whether a listener was registered, as Node's EventEmitter reports it.
   emit(type, arg) {
     const list = this.#listeners[type];
-    if (list === undefined) {
-      return;
+    if (list === undefined || list.length === 0) {
+      return false;
     }
     const snapshot = ArrayPrototypeSlice(list);
     for (let i = 0; i < snapshot.length; i++) {
       const entry = snapshot[i];
       if (entry.once) {
+        // Node's once wrapper: a registration fires at most once, even when
+        // an earlier listener emits the same event again and the nested emit
+        // fires it first.
+        if (entry.fired) {
+          continue;
+        }
+        entry.fired = true;
         const index = ArrayPrototypeIndexOf(list, entry);
         if (index !== -1) {
           ArrayPrototypeSplice(list, index, 1);
@@ -139,6 +148,7 @@ class WorkerEmitter {
       }
       FunctionPrototypeCall(entry.listener, this, arg);
     }
+    return true;
   }
 }
 
@@ -179,8 +189,13 @@ class Worker extends WorkerEmitter {
     worker.onmessageerror = function (event) {
       self.emit("messageerror", event.data);
     };
-    worker.onerror = function (error) {
-      self.emit("error", error);
+    // An 'error' listener receives the worker's error, as in Node, not the
+    // event. Once one has, the event is cancelled, so the error is not also
+    // reported to the parent's global scope.
+    worker.onerror = function (event) {
+      if (self.emit("error", event[kWorkerError])) {
+        event.preventDefault();
+      }
     };
     soon(function () {
       self.emit("online", undefined);
@@ -312,9 +327,11 @@ ObjectDefineProperty(ParentPort.prototype, SymbolToStringTag, {
 let parentPort = null;
 if (!isMainThread) {
   parentPort = new ParentPort();
+  // Rethrowing, so a listener that throws reaches the worker's error chain
+  // (the scope's onerror, then the parent's Worker) the way a throwing
+  // onmessage on the global scope does.
   const relay = function (event) {
-    FunctionPrototypeCall(
-      dispatchEvent,
+    dispatchEventRethrowing(
       parentPort,
       new (getMessageEvent())(event.type, { data: event.data, ports: event.ports })
     );

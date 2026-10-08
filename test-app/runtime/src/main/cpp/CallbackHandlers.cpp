@@ -1842,6 +1842,9 @@ static void ExtractTryCatchInfo(Isolate *isolate, Local<Context> context, TryCat
         }
     }
 
+    // `stack` may be an accessor. One that throws only costs the stack: caught
+    // here, its exception cannot replace the one `tc` holds.
+    TryCatch stackTc(isolate);
     Local<Value> outStackTrace = tc.StackTrace(context).FromMaybe(Local<Value>());
     if (!outStackTrace.IsEmpty()) {
         Local<String> stackTraceStr =
@@ -1902,14 +1905,16 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate *isolate, TryCatch &
         // parent sees the handler's own error, and only that one.
         if (innerTc.HasCaught()) {
             ExtractTryCatchInfo(isolate, context, innerTc, message, source, stackTrace, lineno);
-            wrapper->PassUncaughtExceptionFromWorkerToParent(message, source, stackTrace, lineno);
+            wrapper->PassUncaughtExceptionFromWorkerToParent(message, source, stackTrace, lineno,
+                                                             innerTc.Exception());
             return;
         }
 
         // Unhandled at the worker scope - including when there is no scope
         // handler at all - so it becomes the parent's error event.
         ExtractTryCatchInfo(isolate, context, tc, message, source, stackTrace, lineno);
-        wrapper->PassUncaughtExceptionFromWorkerToParent(message, source, stackTrace, lineno);
+        wrapper->PassUncaughtExceptionFromWorkerToParent(message, source, stackTrace, lineno,
+                                                         tc.Exception());
     } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {

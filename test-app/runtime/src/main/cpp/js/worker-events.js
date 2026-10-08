@@ -9,7 +9,18 @@
 // Eager, because the handler attributes have to exist before app code assigns
 // one. MessageEvent itself is pulled in on the first delivery, so a worker
 // nobody talks to never runs that builtin.
-const { ObjectDefineProperty, ObjectSetPrototypeOf } = primordials;
+const {
+  Error,
+  ErrorCaptureStackTrace,
+  EvalError,
+  ObjectDefineProperty,
+  ObjectSetPrototypeOf,
+  RangeError,
+  ReferenceError,
+  SyntaxError,
+  TypeError,
+  URIError,
+} = primordials;
 
 const {
   EventTarget,
@@ -52,15 +63,58 @@ function emitMessage(data, ports, type) {
   dispatchEventRethrowing(this, new MessageEventCtor(type, { data, ports }));
 }
 
+// The key the worker's rebuilt error travels under on the `error` event, for
+// node:worker_threads, whose listeners receive the error rather than the
+// event. Reached only through require("internal/worker-events").
+const kWorkerError = Symbol("workerError");
+
+// A built-in error name rebuilds with its own constructor, as Node's does, so
+// `instanceof TypeError` holds on the parent.
+const errorConstructors = {
+  __proto__: null,
+  Error,
+  EvalError,
+  RangeError,
+  ReferenceError,
+  SyntaxError,
+  TypeError,
+  URIError,
+};
+
+// The worker's error, rebuilt from the name and message the worker read off
+// the thrown value. Any other name, a subclass's or a DOMException's, stays an
+// own `name` on an Error. Without the worker's stack, the stack holds the
+// header alone rather than the frames that rebuilt it.
+function rebuildError(name, message, stack) {
+  const ErrorConstructor = errorConstructors[name];
+  const error =
+    ErrorConstructor === undefined ? new Error(message) : new ErrorConstructor(message);
+  if (ErrorConstructor === undefined) {
+    ObjectDefineProperty(error, "name", {
+      __proto__: null,
+      value: name,
+      writable: true,
+      configurable: true,
+    });
+  }
+  if (stack) {
+    error.stack = stack;
+  } else {
+    ErrorCaptureStackTrace(error, emitError);
+  }
+  return error;
+}
+
 // The parent-side error delivery callout, invoked by native with the Worker
 // object as `this` once the worker scope has left the error unhandled. Only
 // primitives cross the isolate boundary, so the event carries no `error`
 // object; `stackTrace` is this runtime's addition to the ErrorEvent fields.
 //
-// Returns whether the error was handled: a truthy return from the `onerror`
-// attribute cancels the event (HTML §8.1.7.3), as does preventDefault() from
-// any listener.
-function emitError(message, filename, lineno, stackTrace) {
+// Returns the rebuilt error when the event was not handled, for native to
+// report on the parent's global scope, and undefined when it was: a truthy
+// return from the `onerror` attribute cancels the event (HTML §8.1.7.3), as
+// does preventDefault() from any listener.
+function emitError(message, filename, lineno, stackTrace, errorName, errorMessage) {
   const ErrorEventCtor = getErrorEvent();
   const event = new ErrorEventCtor("error", {
     message,
@@ -69,8 +123,10 @@ function emitError(message, filename, lineno, stackTrace) {
     cancelable: true,
   });
   event.stackTrace = stackTrace;
+  const error = rebuildError(errorName, errorMessage, stackTrace);
+  ObjectDefineProperty(event, kWorkerError, { __proto__: null, value: error });
   dispatchEventRethrowing(this, event);
-  return event.defaultPrevented;
+  return event.defaultPrevented ? undefined : error;
 }
 
 ObjectSetPrototypeOf(g.Worker.prototype, EventTarget.prototype);
@@ -99,4 +155,4 @@ for (const name of ["onmessage", "onmessageerror"]) {
   });
 }
 
-module.exports = { emitMessage, emitError };
+module.exports = { emitMessage, emitError, kWorkerError };

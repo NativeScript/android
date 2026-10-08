@@ -98,28 +98,28 @@ void WorkerEvents::EmitMessage(Isolate* isolate, Local<Object> receiver,
     (void)state->emitMessage.Get(isolate)->Call(context, receiver, 3, args).ToLocal(&result);
 }
 
-bool WorkerEvents::EmitError(Isolate* isolate, Local<Object> receiver,
-                             const std::string& message, const std::string& source,
-                             const std::string& stackTrace, int lineNumber) {
+MaybeLocal<Value> WorkerEvents::EmitError(Isolate* isolate, Local<Object> receiver,
+                                          const std::string& message, const std::string& source,
+                                          const std::string& stackTrace, int lineNumber,
+                                          Local<String> errorName,
+                                          Local<String> errorMessage) {
     auto* state = RuntimeState::For<WorkerEventsState>(isolate);
     if (state == nullptr || state->emitError.IsEmpty()) {
-        return false;
+        return MaybeLocal<Value>();
     }
     Runtime* runtime = Runtime::TryGetRuntime(isolate);
     if (runtime == nullptr) {
-        return false;
+        return MaybeLocal<Value>();
     }
     Local<Context> context = runtime->GetContext();
 
-    Local<Value> args[4]{ArgConverter::ConvertToV8String(isolate, message),
+    Local<Value> args[6]{ArgConverter::ConvertToV8String(isolate, message),
                          ArgConverter::ConvertToV8String(isolate, source),
                          Number::New(isolate, lineNumber),
-                         ArgConverter::ConvertToV8String(isolate, stackTrace)};
-    Local<Value> result;
-    if (!state->emitError.Get(isolate)->Call(context, receiver, 4, args).ToLocal(&result)) {
-        return false;
-    }
-    return result->BooleanValue(isolate);
+                         ArgConverter::ConvertToV8String(isolate, stackTrace),
+                         errorName,
+                         errorMessage};
+    return state->emitError.Get(isolate)->Call(context, receiver, 6, args);
 }
 
 }  // namespace tns

@@ -68,6 +68,7 @@ constexpr Registration kRegistry[] = {
         {"internal/events", BuiltinId::kEvents, nullptr, true},
         {"internal/message-channel", BuiltinId::kMessageChannel, messaging::CreateBinding, true},
         {"internal/message-event", BuiltinId::kMessageEvent, nullptr, true},
+        {"internal/worker-events", BuiltinId::kWorkerEvents, nullptr, true},
 };
 
 constexpr const char* kDebugKey = "debug";

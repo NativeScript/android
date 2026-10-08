@@ -232,6 +232,7 @@ describe("Messaging runtime edges", function () {
                 expect(seen.length).toBe(1);
                 expect(seen[0].message).toContain("boom from worker");
                 expect(seen[0].error instanceof Error).toBe(true);
+                expect(seen[0].error.message).toBe("boom from worker");
                 worker.terminate();
                 done();
             };
@@ -254,6 +255,94 @@ describe("Messaging runtime edges", function () {
                     }, SETTLE);
                 }
             };
+        });
+
+        it("lets a node:worker_threads 'error' listener consume the error", function (done) {
+            var wt = require("node:worker_threads");
+            var globalErrors = [];
+            var listener = function (event) {
+                globalErrors.push(event.message);
+                event.preventDefault();
+            };
+            addEventListener("error", listener);
+            var worker = new wt.Worker("~/tests/messaging/throwingWorker.js");
+            worker.on("error", function (error) {
+                setTimeout(function () {
+                    removeEventListener("error", listener);
+                    expect(error instanceof Error).toBe(true);
+                    expect(error.name).toBe("Error");
+                    expect(error.message).toBe("boom from worker");
+                    expect(error.stack).toContain("boom from worker");
+                    expect(globalErrors).toEqual([]);
+                    worker.terminate();
+                    done();
+                }, SETTLE);
+            });
+        });
+
+        it("hands a node:worker_threads 'error' listener a thrown DOMException's name and message", function (done) {
+            var wt = require("node:worker_threads");
+            var worker = new wt.Worker("~/tests/messaging/domExceptionThrowingWorker.js");
+            worker.on("error", function (error) {
+                expect(error instanceof Error).toBe(true);
+                expect(error.name).toBe("AbortError");
+                expect(error.message).toBe("aborted in a worker");
+                worker.terminate();
+                done();
+            });
+        });
+
+        it("rebuilds the error a worker's onerror threw exactly, even when its stack getter throws", function (done) {
+            var wt = require("node:worker_threads");
+            var worker = new wt.Worker("~/tests/messaging/onerrorRethrowingWorker.js");
+            worker.on("error", function (error) {
+                expect(error instanceof TypeError).toBe(true);
+                expect(error.message).toBe("before\0after \uD800");
+                worker.terminate();
+                done();
+            });
+            worker.postMessage("go");
+        });
+
+        it("calls a node:worker_threads once listener once when an earlier listener emits again", function () {
+            var wt = require("node:worker_threads");
+            var worker = new wt.Worker("~/tests/eventLoopEchoWorker.js");
+            var calls = 0;
+            var nested = false;
+            worker.on("probe", function () {
+                if (!nested) {
+                    nested = true;
+                    worker.emit("probe");
+                }
+            });
+            worker.once("probe", function () { calls++; });
+            worker.emit("probe");
+            worker.terminate();
+            expect(calls).toBe(1);
+        });
+
+        it("routes a throw from a parentPort listener to the parent's 'error' listeners", function (done) {
+            var wt = require("node:worker_threads");
+            var worker = new wt.Worker("~/tests/messaging/parentPortThrowingWorker.js");
+            var errors = [];
+            var finish = function () {
+                expect(errors.length).toBe(1);
+                expect(errors[0] instanceof TypeError).toBe(true);
+                expect(errors[0].name).toBe("TypeError");
+                expect(errors[0].message).toBe("thrown by a parentPort listener");
+                worker.terminate();
+                done();
+            };
+            // Nothing else settles the spec when the error never arrives.
+            var guard = setTimeout(finish, 10000);
+            worker.on("error", function (error) {
+                errors.push(error);
+                if (errors.length === 1) {
+                    clearTimeout(guard);
+                    setTimeout(finish, SETTLE);
+                }
+            });
+            worker.postMessage("go");
         });
     });
 

@@ -60,7 +60,7 @@ class ArgConverter {
                 } else {
                         auto isolate = v8::Isolate::GetCurrent();
                         v8::String::Utf8Value str(isolate, s);
-                        return {*str};
+                        return {*str, static_cast<size_t>(str.length())};
                 }
         }
 

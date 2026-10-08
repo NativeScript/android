@@ -54,7 +54,7 @@ means deliberately unsupported.
 | `threadName` | shim | Always `undefined`. |
 | `workerData` | shim | Always `null` — see below. |
 | `parentPort` | shim | `null` on the main isolate. Inside a worker, a `MessagePort`-shaped `EventTarget` over the worker's existing parent channel: `postMessage` forwards to the global `postMessage`, `message`/`messageerror` are re-dispatched from the worker global scope, `start()` and `close()` are no-ops. It is **not** a real port: not transferable, no queue of its own. |
-| `Worker` | shim | A class over the runtime's global `Worker` with a small Node-style emitter (`on`/`once`/`off`/`removeListener`) for `message`, `messageerror`, `error`, `online` and `exit`. `postMessage(value, transfer)` and `terminate()` forward. `online` is emitted off a microtask after construction, not from the thread. Unsupported options throw a `TypeError` naming the option: `workerData`, `env`, `eval`, `transferList`, and `stdin`/`stdout`/`stderr` when explicitly truthy. The runtime's own `Worker` options (`androidPriority`) ride along untouched — the native constructor ignores keys it does not know. |
+| `Worker` | shim | A class over the runtime's global `Worker` with a small Node-style emitter (`on`/`once`/`off`/`removeListener`) for `message`, `messageerror`, `error`, `online` and `exit`. An `error` listener receives the worker's error rebuilt as an `Error` (see below). `postMessage(value, transfer)` and `terminate()` forward. `online` is emitted off a microtask after construction, not from the thread. Unsupported options throw a `TypeError` naming the option: `workerData`, `env`, `eval`, `transferList`, and `stdin`/`stdout`/`stderr` when explicitly truthy. The runtime's own `Worker` options (`androidPriority`) ride along untouched — the native constructor ignores keys it does not know. |
 | `postMessageToThread` | throws | `Error: postMessageToThread is not supported in this runtime`. |
 | `moveMessagePortToContext` | throws | `Error: moveMessagePortToContext is not supported in this runtime`. |
 | `locks` | absent | Web Locks are not implemented; the property does not exist. |
@@ -78,6 +78,22 @@ The runtime has no thread-exit signal — nothing reports that a worker's isolat
 finished. `terminate()` therefore resolves with `0` and emits `exit` with code
 `0` on the way, and that is the only path that emits it. A worker that ends by
 its own `close()` produces no `exit`.
+
+### An `error` listener receives a rebuilt `Error`
+
+Node hands an `error` listener the worker's error deserialized on the parent.
+Only strings cross the isolate boundary here, so the parent rebuilds it from
+the thrown value's `name` and `message`, with the worker's stack as its
+`stack`. A built-in name (`TypeError`, `RangeError`, …) rebuilds with that
+constructor, so `instanceof` holds; any other name, a subclass's or a
+`DOMException`'s, is an own `name` on an `Error`. Other properties, such as a
+`code` or a `cause`, are not carried. A thrown value with no string `message`,
+such as a string or a number, arrives as an `Error` whose message is its string
+form, where Node hands over the value itself.
+
+Once an `error` listener has received it, the error counts as handled and is
+not reported on the parent's global scope. With no `error` listener, the
+parent's global `error` event carries the same rebuilt `Error`.
 
 ### A worker error carries no `error` object, and the worker scope's `onerror` is not an event
 

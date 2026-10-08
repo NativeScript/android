@@ -732,12 +732,13 @@ resolvers read the same table differently:
   Seven rows are public today: `ns:module`, `ns:runtime`, `ns:util`,
   `node:module`, `node:url`, `node:util`, `node:worker_threads`.
 - The **internal require** builtins receive (previous section) is the only
-  thing that can name an internal-only row. Five rows are marked that way:
+  thing that can name an internal-only row. Six rows are marked that way:
   `internal/broadcast-channel`, `internal/dom-exception`, `internal/events`,
-  `internal/message-channel`, `internal/message-event`. Their exports carry
-  capabilities app code must not hold — listener-accounting hook keys, the
-  error-reporter setter, base classes that must be the runtime's own rather
-  than whatever a global currently names.
+  `internal/message-channel`, `internal/message-event`,
+  `internal/worker-events`. Their exports carry capabilities app code must not
+  hold — listener-accounting hook keys, the error-reporter setter, the key a
+  worker's rebuilt error travels under, base classes that must be the
+  runtime's own rather than whatever a global currently names.
 - Builtins with **no row at all** (the intrinsics snapshot, the require
   factory, the console formatter) are invoked straight from their native call
   sites. There is no specifier that could reach them and nothing to mark.

@@ -3,6 +3,7 @@
 #include <android/looper.h>
 #include <pthread.h>
 
+#include <optional>
 #include <thread>
 
 #include "ArgConverter.h"
@@ -31,6 +32,60 @@ using namespace v8;
 namespace tns {
 
 namespace {
+
+/*
+ * The `name` and `message` the parent rebuilds the worker's error from. They
+ * stay UTF-16 on the way, so both arrive exactly as thrown, embedded NULs and
+ * unpaired surrogates included.
+ */
+struct ThrownErrorText {
+    std::u16string name = u"Error";
+    std::u16string message;
+};
+
+std::u16string ToUtf16(Isolate* isolate, Local<String> value) {
+    std::u16string result(value->Length(), u'\0');
+    value->WriteV2(isolate, 0, value->Length(), reinterpret_cast<uint16_t*>(result.data()));
+    return result;
+}
+
+Local<String> FromUtf16(Isolate* isolate, const std::u16string& value) {
+    return String::NewFromTwoByte(isolate, reinterpret_cast<const uint16_t*>(value.data()),
+                                  NewStringType::kNormal, static_cast<int>(value.size()))
+            .ToLocalChecked();
+}
+
+/*
+ * Reads the text off the value the worker threw. An object's `name` and
+ * `message` are taken when they are strings, so an Error or a DOMException
+ * keeps both; anything else becomes an Error whose message is the value's
+ * string form. Either property may be a getter, and one that throws leaves the
+ * default in place.
+ */
+ThrownErrorText DescribeThrownValue(Isolate* isolate, Local<Context> context, Local<Value> thrown) {
+    HandleScope handleScope(isolate);
+    TryCatch tc(isolate);
+    ThrownErrorText text;
+    Local<String> detail;
+    if (thrown->ToDetailString(context).ToLocal(&detail)) {
+        text.message = ToUtf16(isolate, detail);
+    }
+    if (!thrown->IsObject() || thrown->IsFunction()) {
+        return text;
+    }
+    auto object = thrown.As<Object>();
+    Local<Value> value;
+    if (object->Get(context, ArgConverter::ConvertToV8String(isolate, "name")).ToLocal(&value) &&
+        value->IsString()) {
+        text.name = ToUtf16(isolate, value.As<String>());
+    }
+    if (object->Get(context, ArgConverter::ConvertToV8String(isolate, "message"))
+                .ToLocal(&value) &&
+        value->IsString()) {
+        text.message = ToUtf16(isolate, value.As<String>());
+    }
+    return text;
+}
 
 /*
  * An uncaught exception from a JS callback the event loop's internal lane
@@ -102,12 +157,12 @@ void ReportEntryRejection(Isolate* isolate, Local<Value> reason,
                 thrownStack = NativeScriptException::GetErrorStackTrace(stack);
             }
             wrapper->PassUncaughtExceptionFromWorkerToParent(
-                    ArgConverter::ToString(isolate, thrown), "", thrownStack, 0);
+                    ArgConverter::ToString(isolate, thrown), "", thrownStack, 0, thrown);
             return;
         }
     }
 
-    wrapper->PassUncaughtExceptionFromWorkerToParent(message, "", stackTrace, 0);
+    wrapper->PassUncaughtExceptionFromWorkerToParent(message, "", stackTrace, 0, reason);
 }
 
 }  // namespace
@@ -374,11 +429,19 @@ void WorkerWrapper::FireMessageOnParentWorkerObject(int workerId,
 void WorkerWrapper::PassUncaughtExceptionFromWorkerToParent(const std::string& message,
                                                           const std::string& filename,
                                                           const std::string& stackTrace,
-                                                          int lineno) {
+                                                          int lineno, Local<Value> thrown) {
     auto parentTasks = parentTasks_.lock();
     if (parentTasks == nullptr) {
         // the parent runtime is gone (e.g. a parent worker that shut down)
         return;
+    }
+
+    // Read here, on the worker's isolate. A report with no thrown value, such
+    // as the heap-limit one made from inside a GC, touches no v8 handle.
+    std::optional<ThrownErrorText> thrownText;
+    if (!thrown.IsEmpty()) {
+        Isolate* workerIsolate = Isolate::GetCurrent();
+        thrownText = DescribeThrownValue(workerIsolate, workerIsolate->GetCurrentContext(), thrown);
     }
 
     int workerId = workerId_;
@@ -386,22 +449,33 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToParent(const std::string& m
     Isolate* parentIsolate = parentIsolate_;
 
     parentTasks->PostInternal([workerId, message, filename, stackTrace, lineno, threadName,
-                       parentIsolate]() {
+                       parentIsolate, thrownText]() {
         v8::Locker locker(parentIsolate);
         Isolate::Scope isolate_scope(parentIsolate);
         HandleScope handle_scope(parentIsolate);
         auto context = Runtime::GetRuntime(parentIsolate)->GetContext();
         Context::Scope context_scope(context);
 
+        // Without a thrown value, the error is an Error carrying the report's
+        // message.
+        Local<String> errorName = thrownText
+                ? FromUtf16(parentIsolate, thrownText->name)
+                : ArgConverter::ConvertToV8String(parentIsolate, "Error");
+        Local<String> errorMessage = thrownText
+                ? FromUtf16(parentIsolate, thrownText->message)
+                : ArgConverter::ConvertToV8String(parentIsolate, message);
         WorkerWrapper::FireErrorOnParentWorkerObject(workerId, message, stackTrace, filename,
-                                                     lineno, threadName);
+                                                     lineno, threadName, errorName,
+                                                     errorMessage);
     });
 }
 
 void WorkerWrapper::FireErrorOnParentWorkerObject(int workerId, const std::string& message,
                                                 const std::string& stackTrace,
                                                 const std::string& filename, int lineno,
-                                                const std::string& threadName) {
+                                                const std::string& threadName,
+                                                Local<String> errorName,
+                                                Local<String> errorMessage) {
     auto wrapper = WorkerWrapper::GetById(workerId);
     if (wrapper == nullptr) {
         DEBUG_WRITE("MAIN: no worker instance was found with workerId=%d.", workerId);
@@ -419,11 +493,12 @@ void WorkerWrapper::FireErrorOnParentWorkerObject(int workerId, const std::strin
         }
 
         auto worker = Local<Object>::New(isolate, *wrapper->poWorker_);
-        auto context = Runtime::GetRuntime(isolate)->GetContext();
 
         TryCatch tc(isolate);
-        bool handled = WorkerEvents::EmitError(isolate, worker, message, filename, stackTrace,
-                                               lineno);
+        Local<Value> error;
+        (void)WorkerEvents::EmitError(isolate, worker, message, filename, stackTrace, lineno,
+                                      errorName, errorMessage)
+                .ToLocal(&error);
         if (tc.HasCaught()) {
             // A listener that threw replaces the error it was handed; nothing
             // further is reported for the original.
@@ -432,22 +507,14 @@ void WorkerWrapper::FireErrorOnParentWorkerObject(int workerId, const std::strin
             }
             return;
         }
-        if (handled) {
+        if (!error.IsEmpty() && error->IsUndefined()) {
+            // A handler took ownership of it.
             return;
         }
 
         // HTML: an error the Worker object leaves unhandled is reported to the
-        // parent's global scope. Only primitives crossed the isolate boundary,
-        // so the error object is rebuilt from them here.
-        Local<Value> error =
-                Exception::Error(ArgConverter::ConvertToV8String(isolate, message));
-        if (error->IsObject() && !stackTrace.empty()) {
-            (void)error.As<Object>()
-                    ->Set(context, ArgConverter::ConvertToV8String(isolate, "stack"),
-                          ArgConverter::ConvertToV8String(isolate, stackTrace))
-                    .FromMaybe(false);
-        }
-        if (!ErrorEvents::DispatchError(isolate, error, message, stackTrace)) {
+        // parent's global scope.
+        if (error.IsEmpty() || !ErrorEvents::DispatchError(isolate, error, message, stackTrace)) {
             DEBUG_WRITE_FORCE(
                     "Unhandled exception in '%s' thread. file: %s, line %d, message: %s\nStackTrace: %s",
                     threadName.c_str(), filename.c_str(), lineno, message.c_str(),
