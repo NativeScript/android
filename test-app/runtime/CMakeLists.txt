@@ -49,9 +49,6 @@ endif()
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/include_directories.html
 include_directories(
-        # V8 uses a custom STL compiled with the LIBCPP_ABI_UNSTABLE flag. To maintain the ABI
-        # compatibility we use this same STL headers for building the runtime
-        src/main/cpp/include/libc++
         src/main/cpp
         src/main/cpp/include
         src/main/cpp/v8_inspector
@@ -286,8 +283,11 @@ MESSAGE(STATUS "# CMAKE_C_FLAGS: " ${CMAKE_C_FLAGS})
 MESSAGE(STATUS "# CMAKE_CXX_FLAGS: " ${CMAKE_CXX_FLAGS})
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/target_link_libraries.html
-# linking v8 and custom STL libraries to the runtime (NativeScript library)
 target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libzip.a)
+# libv8_monolith.a carries the NDK libc++ it was compiled against, and libc++ is
+# only ABI-compatible with itself, so v8-buildscripts has to build V8 with the
+# same NDK the runtime uses (its android_ndk_root gn arg) -- see
+# docs/knowledge/v8-14-migration.md.
 target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_monolith.a)
 
 
