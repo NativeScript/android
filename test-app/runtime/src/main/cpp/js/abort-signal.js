@@ -49,12 +49,12 @@ const Event = g.Event;
 const setTimeout = g.setTimeout;
 const clearTimeout = g.clearTimeout;
 const dispatchEvent = EventTarget.prototype.dispatchEvent;
-const addEventListener = EventTarget.prototype.addEventListener;
-const removeEventListener = EventTarget.prototype.removeEventListener;
 // Published by events.js: the symbol under which EventTargetImpl looks up
-// the listener-mutation hook. events.js already ran (Events::Init), so this
-// require is a cache hit; a miss would run it on demand rather than fail.
-const { kListenerChanged } = require("internal/events");
+// the listener-mutation hook, and the shared event-handler-attribute helper
+// (whose wrapper registration routes through the same hook). events.js
+// already ran (Events::Init), so this require is a cache hit; a miss would
+// run it on demand rather than fail.
+const { defineEventHandler, kListenerChanged } = require("internal/events");
 
 // Construction token: AbortSignal instances come only from the factories in
 // this module (the controller, and the abort/timeout/any statics).
@@ -102,11 +102,6 @@ let sourcePruneRegistry;
 class AbortSignal extends EventTarget {
   #aborted = false;
   #reason = undefined;
-  // Event handler attribute state (HTML semantics: registered as a plain
-  // listener on the first non-null assignment, so its slot in the listener
-  // order is where it was first set; cleared assignments free the slot).
-  #onabort = null;
-  #onabortWrapper = null;
   #isTimeout = false;
   // any() linkage, all WeakRefs. #sources: the plain sources a live
   // composite follows (null on plain signals and once aborted — composites
@@ -145,45 +140,6 @@ class AbortSignal extends EventTarget {
     if (this.#aborted) {
       throw this.#reason;
     }
-  }
-
-  get onabort() {
-    return this.#onabort;
-  }
-
-  set onabort(handler) {
-    // TreatNonObjectAsNull: objects and functions are stored, any other value
-    // clears the handler; only a function is invoked at dispatch time.
-    const value =
-      typeof handler === "function" ||
-      (handler !== null && typeof handler === "object")
-        ? handler
-        : null;
-    if (value !== null && this.#onabort === null) {
-      if (this.#onabortWrapper === null) {
-        const self = this;
-        this.#onabortWrapper = function (event) {
-          const cb = self.#onabort;
-          if (typeof cb === "function") {
-            FunctionPrototypeCall(cb, self, event);
-          }
-        };
-      }
-      FunctionPrototypeCall(
-        addEventListener,
-        this,
-        "abort",
-        this.#onabortWrapper
-      );
-    } else if (value === null && this.#onabort !== null) {
-      FunctionPrototypeCall(
-        removeEventListener,
-        this,
-        "abort",
-        this.#onabortWrapper
-      );
-    }
-    this.#onabort = value;
   }
 
   static abort(reason) {
@@ -444,6 +400,8 @@ ObjectDefineProperty(AbortSignal.prototype, kListenerChanged, {
   enumerable: false,
   configurable: false,
 });
+
+defineEventHandler(AbortSignal.prototype, "abort");
 
 class AbortController {
   #signal = createAbortSignal(false, undefined);
