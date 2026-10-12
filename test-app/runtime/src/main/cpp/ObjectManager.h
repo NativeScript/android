@@ -76,6 +76,14 @@ class ObjectManager {
    */
   static v8::Local<v8::Value> UnwrapProxy(v8::Local<v8::Value> value);
 
+  /*
+   * Copies an array-like Proxy into a fresh Array by reading `length` and each
+   * index through the Proxy, so its traps decide what Java receives. Empty when
+   * a trap throws; the exception is left for the caller's TryCatch.
+   */
+  static v8::MaybeLocal<v8::Array> ReadArrayThroughProxy(
+      v8::Local<v8::Context> context, v8::Local<v8::Object> proxy);
+
   static std::string GetClassName(jobject javaObject);
 
   static std::string GetClassName(jclass clazz);

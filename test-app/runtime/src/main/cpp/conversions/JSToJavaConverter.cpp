@@ -112,7 +112,8 @@ JSToJavaConverter::JSToJavaConverter(
 }
 
 bool JSToJavaConverter::ConvertArg(const Local<Value> &jsArg, int index) {
-    // A Proxy's target is what holds the Java link or the array elements.
+    // Classify by the target, which holds the Java link and internal slots;
+    // array elements are read through the Proxy itself.
     auto arg = ObjectManager::UnwrapProxy(jsArg);
     if (jsArg->IsProxy() && !arg->IsObject()) {
         // The constructors do not inspect the result, so the failure must
@@ -144,9 +145,18 @@ bool JSToJavaConverter::ConvertArg(const Local<Value> &jsArg, int index) {
                 m_jniArgRefsState
         );
     } else if (arg->IsArray() && m_tokens->at(index)[0] == '[') {
+        Local<Value> elements = arg;
+        if (jsArg->IsProxy()) {
+            TryCatch tc(m_isolate);
+            Local<Array> snapshot;
+            if (!ObjectManager::ReadArrayThroughProxy(m_isolate->GetCurrentContext(), jsArg.As<Object>()).ToLocal(&snapshot)) {
+                throw NativeScriptException(tc);
+            }
+            elements = snapshot;
+        }
         return tns::ConvertJavaScriptArray(
                 m_isolate,
-                arg,
+                elements,
                 index,
                 m_tokens,
                 m_jniArgRefsState

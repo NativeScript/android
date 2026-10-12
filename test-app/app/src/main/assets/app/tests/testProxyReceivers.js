@@ -116,6 +116,86 @@ describe("Proxy receivers and arguments", function () {
         expect(list.get(0).equals(a)).toBe(true);
     });
 
+    function echoIntArray(arr) {
+        var echoed = new com.tns.tests.JniReferenceLeakTest(null).echoIntArray(arr);
+        var result = [];
+        for (var i = 0; i < echoed.length; i++) {
+            result.push(echoed[i]);
+        }
+        return result;
+    }
+
+    it("reads a proxied JS array through its get trap when converting to a Java array", function () {
+        var proxy = new Proxy([], {
+            get: function (target, key, receiver) {
+                if (key === "length") {
+                    return 3;
+                }
+                if (key === "0" || key === "1" || key === "2") {
+                    return Number(key) * 10;
+                }
+                return Reflect.get(target, key, receiver);
+            }
+        });
+
+        expect(echoIntArray(proxy)).toEqual([0, 10, 20]);
+    });
+
+    it("passes the values a reactive-style get trap unwraps from refs", function () {
+        function ref(value) {
+            return { __v_isRef: true, value: value };
+        }
+        var proxy = new Proxy([ref(1), 2, ref(3)], {
+            get: function (target, key, receiver) {
+                var v = Reflect.get(target, key, receiver);
+                return v !== null && typeof v === "object" && v.__v_isRef ? v.value : v;
+            }
+        });
+
+        expect(echoIntArray(proxy)).toEqual([1, 2, 3]);
+    });
+
+    it("throws the get trap's error when converting a proxied JS array", function () {
+        var proxy = new Proxy([1, 2], {
+            get: function (target, key, receiver) {
+                if (key === "1") {
+                    throw new Error("boom");
+                }
+                return Reflect.get(target, key, receiver);
+            }
+        });
+
+        expect(function () { echoIntArray(proxy); }).toThrowError(/boom/);
+    });
+
+    it("converts a proxied Java object or typed array from its target, bypassing traps", function () {
+        var lying = {
+            get: function (target, key, receiver) {
+                if (key === "length") {
+                    return 0;
+                }
+                if (key === "0") {
+                    return 99;
+                }
+                var v = Reflect.get(target, key, target);
+                return typeof v === "function" ? v.bind(target) : v;
+            }
+        };
+        var source = new java.util.ArrayList();
+        source.add("a");
+        source.add("b");
+        var bytes = new Uint8Array([7, 8, 9]);
+
+        var copy = new java.util.ArrayList(new Proxy(source, lying));
+        var holder = new java.util.ArrayList();
+        holder.add(new Proxy(bytes, lying));
+        var buffer = holder.toString();
+
+        expect(copy.size()).toBe(2);
+        expect(copy.get(1)).toBe("b");
+        expect(buffer).toMatch(/ByteBuffer.*cap=3/);
+    });
+
     it("throws when the receiver is a revoked Proxy", function () {
         var sb = new java.lang.StringBuilder();
         var revocable = Proxy.revocable(sb, {});

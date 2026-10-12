@@ -149,6 +149,42 @@ Local<Value> ObjectManager::UnwrapProxy(Local<Value> value) {
   return value;
 }
 
+MaybeLocal<Array> ObjectManager::ReadArrayThroughProxy(Local<Context> context,
+                                                       Local<Object> proxy) {
+  auto isolate = Isolate::GetCurrent();
+  EscapableHandleScope scope(isolate);
+
+  Local<Value> lengthValue;
+  if (!proxy->Get(context, ArgConverter::ConvertToV8String(isolate, "length"))
+           .ToLocal(&lengthValue)) {
+    return {};
+  }
+  double length;
+  if (!lengthValue->NumberValue(context).To(&length)) {
+    return {};
+  }
+  if (!(length > 0)) {
+    length = 0;
+  }
+  // Java arrays are indexed by jint.
+  if (length > INT32_MAX) {
+    isolate->ThrowException(Exception::RangeError(ArgConverter::ConvertToV8String(
+        isolate, "Array length exceeds the maximum Java array size")));
+    return {};
+  }
+
+  auto count = static_cast<uint32_t>(length);
+  auto snapshot = Array::New(isolate, static_cast<int>(count));
+  for (uint32_t i = 0; i < count; i++) {
+    Local<Value> element;
+    if (!proxy->Get(context, i).ToLocal(&element) ||
+        snapshot->Set(context, i, element).IsNothing()) {
+      return {};
+    }
+  }
+  return scope.Escape(snapshot);
+}
+
 ObjectManager::JSInstanceInfo*
 ObjectManager::GetJSInstanceInfoFromRuntimeObject(const Local<Object>& object) {
   HandleScope handleScope(m_isolate);
