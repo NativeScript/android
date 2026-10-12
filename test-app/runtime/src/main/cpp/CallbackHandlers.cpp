@@ -5,7 +5,6 @@
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include "Constants.h"
-//#include "./conversions/JSToJavaConverter.h"
 #include "JsArgConverter.h"
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
@@ -140,7 +139,6 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
             instance = env.NewObject(generatedJavaClass, mi.mid);
         } else {
             // resolve arguments before passing them on to the constructor
-//            JSToJavaConverter argConverter(isolate, argWrapper.args, mi.signature);
             JsArgConverter argConverter(argWrapper.args, mi.signature);
             auto ctorArgs = argConverter.ToArgs();
 
@@ -365,10 +363,6 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
         DEBUG_WRITE("CallJavaMethod called %s.%s. static method", className.c_str(),
                     methodName.c_str());
     }
-
-//    JSToJavaConverter argConverter = (entry != nullptr && entry->isExtensionFunction)
-//                                     ? JSToJavaConverter(isolate, args, *sig, entry, caller)
-//                                     : JSToJavaConverter(isolate, args, *sig, entry);
 
     JsArgConverter argConverter = (entry != nullptr && entry->isExtensionFunction)
                                         ? JsArgConverter(caller, args, *sig, entry)
