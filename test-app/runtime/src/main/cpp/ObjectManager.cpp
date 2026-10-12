@@ -185,36 +185,38 @@ MaybeLocal<Array> ObjectManager::ReadArrayThroughProxy(Local<Context> context,
   return scope.Escape(snapshot);
 }
 
-Local<Value> ObjectManager::GetJSInstanceInfoField(const Local<Object>& object) {
+Local<Object> ObjectManager::GetJSInstanceInfoOwner(const Local<Object>& object) {
   const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-  auto jsInfo = object->GetInternalField(jsInfoIdx).As<Value>();
-  if (jsInfo->IsUndefined()) {
-    // Typescript object layout has an object instance as child of the actual
-    // registered instance. checking for that
-    auto prototypeObject = object->GetPrototype().As<Object>();
+  if (object->GetInternalField(jsInfoIdx).As<Value>()->IsExternal()) {
+    return object;
+  }
 
-    if (!prototypeObject.IsEmpty() && prototypeObject->IsObject()) {
-      DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d",
-                  prototypeObject->GetIdentityHash());
-      if (IsJsRuntimeObject(prototypeObject)) {
-        jsInfo = prototypeObject->GetInternalField(jsInfoIdx).As<Value>();
-      }
+  // Typescript object layout has an object instance as child of the actual
+  // registered instance. checking for that
+  auto prototypeObject = object->GetPrototype().As<Object>();
+  if (!prototypeObject.IsEmpty() && prototypeObject->IsObject()) {
+    DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d",
+                prototypeObject->GetIdentityHash());
+    if (IsJsRuntimeObject(prototypeObject) &&
+        prototypeObject->GetInternalField(jsInfoIdx).As<Value>()->IsExternal()) {
+      return prototypeObject;
     }
   }
-  return jsInfo;
+
+  return Local<Object>();
 }
 
 ObjectManager::JSInstanceInfo*
 ObjectManager::GetJSInstanceInfoFromRuntimeObject(const Local<Object>& object) {
   HandleScope handleScope(m_isolate);
 
-  auto jsInfo = GetJSInstanceInfoField(object);
-  if (!jsInfo.IsEmpty() && jsInfo->IsExternal()) {
-    auto external = jsInfo.As<External>();
-    return static_cast<JSInstanceInfo*>(external->Value(v8::kExternalPointerTypeTagDefault));
+  auto owner = GetJSInstanceInfoOwner(object);
+  if (owner.IsEmpty()) {
+    return nullptr;
   }
 
-  return nullptr;
+  auto external = owner->GetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo)).As<External>();
+  return static_cast<JSInstanceInfo*>(external->Value(v8::kExternalPointerTypeTagDefault));
 }
 
 bool ObjectManager::IsJsRuntimeObject(const v8::Local<v8::Object>& object) {
@@ -357,12 +359,13 @@ bool ObjectManager::CloneLink(const Local<Object>& src,
     return false;
   }
 
-  auto jsInfo = GetJSInstanceInfoField(source.As<Object>());
-  if (jsInfo.IsEmpty() || !jsInfo->IsExternal()) {
+  auto owner = GetJSInstanceInfoOwner(source.As<Object>());
+  if (owner.IsEmpty()) {
     return false;
   }
 
-  dest->SetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo), jsInfo);
+  auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+  dest->SetInternalField(jsInfoIdx, owner->GetInternalField(jsInfoIdx));
   return true;
 }
 
@@ -695,11 +698,18 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
     throw NativeScriptException("Argument is not an object!");
   }
 
-  JSInstanceInfo* jsInstanceInfo = GetJSInstanceInfo(object);
-
-  if (jsInstanceInfo == nullptr) {
+  auto source = UnwrapProxy(object);
+  Local<Object> owner;
+  if (source->IsObject() && IsJsRuntimeObject(source.As<Object>())) {
+    owner = GetJSInstanceInfoOwner(source.As<Object>());
+  }
+  if (owner.IsEmpty()) {
     throw NativeScriptException("Trying to release a non native object!");
   }
+
+  auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+  auto jsInstanceInfo = static_cast<JSInstanceInfo*>(
+      owner->GetInternalField(jsInfoIdx).As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
   JEnv env;
   env.CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,
@@ -714,8 +724,7 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
   }
 
   delete jsInstanceInfo;
-  auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-  object->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+  owner->SetInternalField(jsInfoIdx, Undefined(m_isolate));
 }
 
 ObjectManager::JavaScriptMarkingMode ObjectManager::GetMarkingMode() {

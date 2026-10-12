@@ -267,4 +267,18 @@ describe("Proxy receivers and arguments", function () {
         expect(proxy.super.hashCode()).toBe(instance.hashCode());
         expect(proxy.equals(instance)).toBe(true);
     });
+
+    it("releases the native counterpart of the Proxy target", function () {
+        var target = new java.lang.Object();
+        var proxy = new Proxy(target, passThrough());
+        var revocable = Proxy.revocable(new java.lang.Object(), {});
+        revocable.revoke();
+
+        global.__releaseNativeCounterpart(proxy);
+
+        expect(function () { global.__releaseNativeCounterpart(target); }).toThrowError(/non native object/);
+        expect(function () { global.__releaseNativeCounterpart(proxy); }).toThrowError(/non native object/);
+        expect(function () { target.toString(); }).toThrowError(/no longer has available Java instance counterpart/);
+        expect(function () { global.__releaseNativeCounterpart(revocable.proxy); }).toThrowError(/non native object/);
+    });
 });

@@ -187,11 +187,12 @@ class ObjectManager {
       const v8::Local<v8::Object>& object);
 
   /*
-   * The stored JsInfo field for a runtime object: its own field, or its
-   * prototype's when the TypeScript layout keeps the registered instance one
-   * level up. Undefined when neither holds one.
+   * The runtime object holding the JsInfo External for `object`: the object
+   * itself, or its prototype when the TypeScript layout keeps the registered
+   * instance one level up. Empty when neither holds one. Reads and clears of
+   * the link must go through this object, never through a Proxy or a child.
    */
-  static v8::Local<v8::Value> GetJSInstanceInfoField(const v8::Local<v8::Object>& object);
+  static v8::Local<v8::Object> GetJSInstanceInfoOwner(const v8::Local<v8::Object>& object);
 
   void ReleaseJSInstance(v8::Persistent<v8::Object>* po,
                          JSInstanceInfo* jsInstanceInfo);
