@@ -103,7 +103,6 @@ android {
 
     defaultConfig {
         minSdkVersion NS_DEFAULT_MIN_SDK_VERSION as int
-        targetSdkVersion NS_DEFAULT_COMPILE_SDK_VERSION as int
 
         externalNativeBuild {
             cmake {
@@ -144,10 +143,18 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    testOptions {
+        targetSdk = NS_DEFAULT_COMPILE_SDK_VERSION as int
+    }
+
+    lint {
+        targetSdk = NS_DEFAULT_COMPILE_SDK_VERSION as int
+    }
+
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
     externalNativeBuild {
@@ -241,9 +248,6 @@ tasks.configureEach { task ->
     if (taskName.contains("Strip")) {
         task.finalizedBy(revertVersionFile)
     }
-    if ((taskName == "bundleDebug") || (taskName == "bundleRelease")) {
-        task.finalizedBy createPackageConfigFileTask(taskName)
-    }
 
     // Do not wire :app:buildMetadata onto runtime tasks: the app declares its own
     // dependency on it (merge*Assets), and forcing it here drags a full :app build
@@ -300,36 +304,4 @@ task revertVersionFile(type: Exec) {
 }
 repositories {
     mavenCentral()
-}
-
-def createPackageConfigFileTask(taskName) {
-    def mode = (taskName == "bundleDebug") ? "debug" : "release"
-
-    return tasks.create(name: "packageConfigFileTaskFor${mode}",) {
-        def sdkDir = android.getSdkDirectory().getAbsolutePath()
-        doFirst {
-            def pathToAAR = "${buildDir}/outputs/aar/${project.archivesBaseName}-${mode}.aar"
-
-            if (new File(pathToAAR).exists()) {
-                def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
-
-                def aaptCommand = new File(sdkDir, "/build-tools/$project.ext._buildToolsVersion/aapt").getAbsolutePath()
-                if (isWinOs) {
-                    aaptCommand += ".exe"
-                }
-
-                def removeCmdParams = new ArrayList<String>([aaptCommand, "remove", pathToAAR, "config.json"])
-                exec {
-                    ignoreExitValue = true
-                    workingDir "$projectDir/src/main"
-                    commandLine removeCmdParams.toArray()
-                }
-                def addCmdParams = new ArrayList<String>([aaptCommand, "add", pathToAAR, "config.json"])
-                exec {
-                    workingDir "$projectDir/src/main"
-                    commandLine addCmdParams.toArray()
-                }
-            }
-        }
-    }
 }
