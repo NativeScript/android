@@ -18,7 +18,7 @@ buffer.byteLength; // 0 — the memory now belongs to `moved`
 - `options` may be `undefined` or `null` (both mean "no transfer"); anything else must be an object, or a `TypeError` is thrown.
 - `options.transfer` is a WebIDL sequence: any object with a callable `Symbol.iterator` works (an array, a `Set`, a generator). A non-iterable value — including a string primitive — throws a `TypeError`.
 
-Cloneable: every primitive value except symbols — numbers (including `-0`, `NaN` and the infinities), strings, booleans, `BigInt`, `null` and `undefined`; plain objects and arrays; `Date`, `RegExp`, `Map`, `Set`, `Error`; `Boolean`/`String`/`Number` wrapper objects; `ArrayBuffer`, every typed array and `DataView`.
+Cloneable: every primitive value except symbols — numbers (including `-0`, `NaN` and the infinities), strings, booleans, `BigInt`, `null` and `undefined`; plain objects and arrays; `Date`, `RegExp`, `Map`, `Set`, `Error`; `Boolean`/`String`/`Number` wrapper objects; `ArrayBuffer`, every typed array and `DataView`; and `DOMException`, per its Web IDL `[Serializable]` slot — `name`, `message` and `stack` round-trip through `structuredClone` and worker `postMessage`, and object identity within a graph is preserved.
 
 The clone preserves the shape of the graph, not just the values: an object referenced twice in the input is a single object referenced twice in the output, and cycles round-trip. Prototypes do not survive — a class instance clones to a plain object with the same own properties. Getters are invoked during cloning and their result is stored as a plain data property. Property insertion order is preserved.
 

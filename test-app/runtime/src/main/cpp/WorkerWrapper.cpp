@@ -343,13 +343,26 @@ void WorkerWrapper::FireMessageOnParentWorkerObject(int workerId,
         }
 
         Local<Value> data;
-        if (message->Deserialize(isolate, context).ToLocal(&data)) {
-            auto event = Object::New(isolate);
-            event->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "data"),
-                                     data, PropertyAttribute::ReadOnly);
-            Local<Value> args[] = {event};
-            callback.As<Function>()->Call(context, Undefined(isolate), 1, args);
+        {
+            // Reading runs JS (a DOMException is rebuilt through its
+            // constructor), so a failure here must not stay pending on the
+            // isolate past this callout.
+            TryCatch tc(isolate);
+            if (!message->Deserialize(isolate, context).ToLocal(&data)) {
+                if (!tc.HasTerminated() && tc.HasCaught()) {
+                    DEBUG_WRITE_FORCE("MAIN: worker(id=%d) message could not be read: %s",
+                                      workerId,
+                                      ArgConverter::ToString(isolate, tc.Exception()).c_str());
+                }
+                return;
+            }
         }
+
+        auto event = Object::New(isolate);
+        event->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "data"), data,
+                                 PropertyAttribute::ReadOnly);
+        Local<Value> args[] = {event};
+        callback.As<Function>()->Call(context, Undefined(isolate), 1, args);
     } catch (NativeScriptException& ex) {
         ex.ReThrowToV8();
     }
