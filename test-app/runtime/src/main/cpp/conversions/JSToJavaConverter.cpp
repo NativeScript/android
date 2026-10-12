@@ -115,8 +115,10 @@ bool JSToJavaConverter::ConvertArg(const Local<Value> &jsArg, int index) {
     // A Proxy's target is what holds the Java link or the array elements.
     auto arg = ObjectManager::UnwrapProxy(jsArg);
     if (jsArg->IsProxy() && !arg->IsObject()) {
-        m_jniArgRefsState.SetConvertedObject(index, nullptr);
-        return false;
+        // The constructors do not inspect the result, so the failure must
+        // surface here rather than as a null argument.
+        string message = "Cannot pass a revoked Proxy to Java at index " + to_string(index);
+        throw NativeScriptException(m_isolate, Exception::TypeError(ArgConverter::ConvertToV8String(m_isolate, message)), message);
     }
 
     if (arg->IsNumber() || arg->IsNumberObject()) {

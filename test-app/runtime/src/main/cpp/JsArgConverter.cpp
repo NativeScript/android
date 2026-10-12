@@ -127,7 +127,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
         success = false;
     } else if (jsArg->IsProxy() && !arg->IsObject()) {
         SetConvertedObject(index, nullptr);
-        sprintf(buff, "Cannot convert a revoked Proxy to %s at index %d", typeSignature.c_str(), index);
+        snprintf(buff, sizeof(buff), "Cannot convert a revoked Proxy to %s at index %d", typeSignature.c_str(), index);
     } else if (arg->IsArray()) {
         success = typeSignature[0] == '[';
 
@@ -137,25 +137,25 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
         }
 
         if (!success) {
-            sprintf(buff, "Cannot convert array to %s at index %d", typeSignature.c_str(), index);
+            snprintf(buff, sizeof(buff), "Cannot convert array to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsNumber() || arg->IsNumberObject()) {
         success = ConvertJavaScriptNumber(arg, index);
 
         if (!success) {
-            sprintf(buff, "Cannot convert number to %s at index %d", typeSignature.c_str(), index);
+            snprintf(buff, sizeof(buff), "Cannot convert number to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsBoolean() || arg->IsBooleanObject()) {
         success = ConvertJavaScriptBoolean(arg, index);
 
         if (!success) {
-            sprintf(buff, "Cannot convert boolean to %s at index %d", typeSignature.c_str(), index);
+            snprintf(buff, sizeof(buff), "Cannot convert boolean to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsString() || arg->IsStringObject()) {
         success = ConvertJavaScriptString(arg, index);
 
         if (!success) {
-            sprintf(buff, "Cannot convert string to %s at index %d", typeSignature.c_str(), index);
+            snprintf(buff, sizeof(buff), "Cannot convert string to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsObject()) {
         auto context = m_isolate->GetCurrentContext();
@@ -362,7 +362,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
                 if (success) {
                     SetConvertedObject(index, obj.Move(), obj.IsGlobal());
                 } else {
-                    sprintf(buff, "Cannot convert object to %s at index %d", typeSignature.c_str(),
+                    snprintf(buff, sizeof(buff), "Cannot convert object to %s at index %d", typeSignature.c_str(),
                             index);
                 }
                 break;
