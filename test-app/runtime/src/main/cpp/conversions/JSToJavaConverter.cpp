@@ -111,8 +111,16 @@ JSToJavaConverter::JSToJavaConverter(
     }
 }
 
-bool JSToJavaConverter::ConvertArg(const Local<Value> &arg, int index) {
-
+bool JSToJavaConverter::ConvertArg(const Local<Value> &jsArg, int index) {
+    // Classify by the target, which holds the Java link and internal slots;
+    // array elements are read through the Proxy itself.
+    auto arg = ObjectManager::UnwrapProxy(jsArg);
+    if (jsArg->IsProxy() && !arg->IsObject()) {
+        // The constructors do not inspect the result, so the failure must
+        // surface here rather than as a null argument.
+        string message = "Cannot pass a revoked Proxy to Java at index " + to_string(index);
+        throw NativeScriptException(m_isolate, Exception::TypeError(ArgConverter::ConvertToV8String(m_isolate, message)), message);
+    }
 
     if (arg->IsNumber() || arg->IsNumberObject()) {
         return tns::ConvertJavaScriptNumber(
@@ -137,9 +145,18 @@ bool JSToJavaConverter::ConvertArg(const Local<Value> &arg, int index) {
                 m_jniArgRefsState
         );
     } else if (arg->IsArray() && m_tokens->at(index)[0] == '[') {
+        Local<Value> elements = arg;
+        if (jsArg->IsProxy()) {
+            TryCatch tc(m_isolate);
+            Local<Array> snapshot;
+            if (!ObjectManager::ReadArrayThroughProxy(m_isolate->GetCurrentContext(), jsArg.As<Object>()).ToLocal(&snapshot)) {
+                throw NativeScriptException(tc);
+            }
+            elements = snapshot;
+        }
         return tns::ConvertJavaScriptArray(
                 m_isolate,
-                arg,
+                elements,
                 index,
                 m_tokens,
                 m_jniArgRefsState

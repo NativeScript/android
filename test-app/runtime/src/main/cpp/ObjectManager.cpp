@@ -131,39 +131,92 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(
 
 ObjectManager::JSInstanceInfo* ObjectManager::GetJSInstanceInfo(
     const Local<Object>& object) {
-  JSInstanceInfo* jsInstanceInfo = nullptr;
+  if (object->IsProxy()) {
+    auto target = UnwrapProxy(object);
+    return target->IsObject() ? GetJSInstanceInfo(target.As<Object>())
+                              : nullptr;
+  }
   if (IsJsRuntimeObject(object)) {
     return GetJSInstanceInfoFromRuntimeObject(object);
   }
   return nullptr;
 }
 
+Local<Value> ObjectManager::UnwrapProxy(Local<Value> value) {
+  while (value->IsProxy()) {
+    value = value.As<Proxy>()->GetTarget();
+  }
+  return value;
+}
+
+MaybeLocal<Array> ObjectManager::ReadArrayThroughProxy(Local<Context> context,
+                                                       Local<Object> proxy) {
+  auto isolate = Isolate::GetCurrent();
+  EscapableHandleScope scope(isolate);
+
+  Local<Value> lengthValue;
+  if (!proxy->Get(context, ArgConverter::ConvertToV8String(isolate, "length"))
+           .ToLocal(&lengthValue)) {
+    return {};
+  }
+  double length;
+  if (!lengthValue->NumberValue(context).To(&length)) {
+    return {};
+  }
+  if (!(length > 0)) {
+    length = 0;
+  }
+  // Java arrays are indexed by jint.
+  if (length > INT32_MAX) {
+    isolate->ThrowException(Exception::RangeError(ArgConverter::ConvertToV8String(
+        isolate, "Array length exceeds the maximum Java array size")));
+    return {};
+  }
+
+  auto count = static_cast<uint32_t>(length);
+  auto snapshot = Array::New(isolate, static_cast<int>(count));
+  for (uint32_t i = 0; i < count; i++) {
+    Local<Value> element;
+    if (!proxy->Get(context, i).ToLocal(&element) ||
+        snapshot->CreateDataProperty(context, i, element).IsNothing()) {
+      return {};
+    }
+  }
+  return scope.Escape(snapshot);
+}
+
+Local<Object> ObjectManager::GetJSInstanceInfoOwner(const Local<Object>& object) {
+  const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+  if (object->GetInternalField(jsInfoIdx).As<Value>()->IsExternal()) {
+    return object;
+  }
+
+  // Typescript object layout has an object instance as child of the actual
+  // registered instance. checking for that
+  auto prototypeObject = object->GetPrototype().As<Object>();
+  if (!prototypeObject.IsEmpty() && prototypeObject->IsObject()) {
+    DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d",
+                prototypeObject->GetIdentityHash());
+    if (IsJsRuntimeObject(prototypeObject) &&
+        prototypeObject->GetInternalField(jsInfoIdx).As<Value>()->IsExternal()) {
+      return prototypeObject;
+    }
+  }
+
+  return Local<Object>();
+}
+
 ObjectManager::JSInstanceInfo*
 ObjectManager::GetJSInstanceInfoFromRuntimeObject(const Local<Object>& object) {
   HandleScope handleScope(m_isolate);
 
-  const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-  auto jsInfo = object->GetInternalField(jsInfoIdx).As<Value>();
-  if (jsInfo->IsUndefined()) {
-    // Typescript object layout has an object instance as child of the actual
-    // registered instance. checking for that
-    auto prototypeObject = object->GetPrototype().As<Object>();
-
-    if (!prototypeObject.IsEmpty() && prototypeObject->IsObject()) {
-      DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d",
-                  prototypeObject->GetIdentityHash());
-      if (IsJsRuntimeObject(prototypeObject)) {
-        jsInfo = prototypeObject->GetInternalField(jsInfoIdx).As<Value>();
-      }
-    }
+  auto owner = GetJSInstanceInfoOwner(object);
+  if (owner.IsEmpty()) {
+    return nullptr;
   }
 
-  if (!jsInfo.IsEmpty() && jsInfo->IsExternal()) {
-    auto external = jsInfo.As<External>();
-    return static_cast<JSInstanceInfo*>(external->Value(v8::kExternalPointerTypeTagDefault));
-  }
-
-  return nullptr;
+  auto external = owner->GetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo)).As<External>();
+  return static_cast<JSInstanceInfo*>(external->Value(v8::kExternalPointerTypeTagDefault));
 }
 
 bool ObjectManager::IsJsRuntimeObject(const v8::Local<v8::Object>& object) {
@@ -301,17 +354,19 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
 
 bool ObjectManager::CloneLink(const Local<Object>& src,
                               const Local<Object>& dest) {
-  auto jsInfo = GetJSInstanceInfo(src);
-
-  auto success = jsInfo != nullptr;
-
-  if (success) {
-    auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-    auto jsInfo = src->GetInternalField(jsInfoIdx);
-    dest->SetInternalField(jsInfoIdx, jsInfo);
+  auto source = UnwrapProxy(src);
+  if (!source->IsObject() || !IsJsRuntimeObject(source.As<Object>())) {
+    return false;
   }
 
-  return success;
+  auto owner = GetJSInstanceInfoOwner(source.As<Object>());
+  if (owner.IsEmpty()) {
+    return false;
+  }
+
+  auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+  dest->SetInternalField(jsInfoIdx, owner->GetInternalField(jsInfoIdx));
+  return true;
 }
 
 string ObjectManager::GetClassName(jobject javaObject) {
@@ -643,11 +698,31 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
     throw NativeScriptException("Argument is not an object!");
   }
 
-  JSInstanceInfo* jsInstanceInfo = GetJSInstanceInfo(object);
-
-  if (jsInstanceInfo == nullptr) {
+  auto source = UnwrapProxy(object);
+  if (!source->IsObject()) {
     throw NativeScriptException("Trying to release a non native object!");
   }
+  auto instance = source.As<Object>();
+
+  // A `super` object shares its owner's JsInfo External; the owner is the one
+  // registered, so the release is resolved and recorded there.
+  Local<Value> superOwner;
+  V8GetPrivateValue(m_isolate, instance, ArgConverter::ConvertToV8String(m_isolate, "superowner"), superOwner);
+  if (!superOwner.IsEmpty() && superOwner->IsObject()) {
+    instance = superOwner.As<Object>();
+  }
+
+  Local<Object> owner;
+  if (IsJsRuntimeObject(instance)) {
+    owner = GetJSInstanceInfoOwner(instance);
+  }
+  if (owner.IsEmpty()) {
+    throw NativeScriptException("Trying to release a non native object!");
+  }
+
+  auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+  auto jsInstanceInfo = static_cast<JSInstanceInfo*>(
+      owner->GetInternalField(jsInfoIdx).As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
   JEnv env;
   env.CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,
@@ -662,8 +737,22 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
   }
 
   delete jsInstanceInfo;
-  auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-  object->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+  owner->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+
+  // Every alias of the freed External must be cleared with it.
+  Local<Value> aliasesValue;
+  V8GetPrivateValue(m_isolate, owner, ArgConverter::ConvertToV8String(m_isolate, "superaliases"), aliasesValue);
+  if (!aliasesValue.IsEmpty() && aliasesValue->IsArray()) {
+    auto aliases = aliasesValue.As<Array>();
+    auto context = m_isolate->GetCurrentContext();
+    for (uint32_t i = 0; i < aliases->Length(); i++) {
+      Local<Value> alias;
+      if (aliases->Get(context, i).ToLocal(&alias) && alias->IsObject() &&
+          IsJsRuntimeObject(alias.As<Object>())) {
+        alias.As<Object>()->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+      }
+    }
+  }
 }
 
 ObjectManager::JavaScriptMarkingMode ObjectManager::GetMarkingMode() {

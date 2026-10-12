@@ -62,7 +62,35 @@ class ObjectManager {
   bool CloneLink(const v8::Local<v8::Object>& src,
                  const v8::Local<v8::Object>& dest);
 
-  bool IsJsRuntimeObject(const v8::Local<v8::Object>& object);
+  /*
+   * Whether GetInternalField is safe to call on this exact object. False for
+   * a Proxy even when its target qualifies; unwrap first where a Proxy should
+   * be accepted.
+   */
+  static bool IsJsRuntimeObject(const v8::Local<v8::Object>& object);
+
+  /*
+   * The runtime object holding the JsInfo External for `object`: the object
+   * itself, or its prototype when the TypeScript layout keeps the registered
+   * instance one level up. Empty when neither holds one. Reads and clears of
+   * the link must go through this object, never through a Proxy or a child.
+   */
+  static v8::Local<v8::Object> GetJSInstanceInfoOwner(const v8::Local<v8::Object>& object);
+
+  /*
+   * The innermost target of a Proxy chain; any other value is returned as is.
+   * A revoked Proxy anywhere in the chain yields null. Internal fields and
+   * private symbols live on the target, never on the Proxy.
+   */
+  static v8::Local<v8::Value> UnwrapProxy(v8::Local<v8::Value> value);
+
+  /*
+   * Copies an array-like Proxy into a fresh Array by reading `length` and each
+   * index through the Proxy, so its traps decide what Java receives. Empty when
+   * a trap throws; the exception is left for the caller's TryCatch.
+   */
+  static v8::MaybeLocal<v8::Array> ReadArrayThroughProxy(
+      v8::Local<v8::Context> context, v8::Local<v8::Object> proxy);
 
   static std::string GetClassName(jobject javaObject);
 
@@ -165,6 +193,7 @@ class ObjectManager {
 
   JSInstanceInfo* GetJSInstanceInfoFromRuntimeObject(
       const v8::Local<v8::Object>& object);
+
 
   void ReleaseJSInstance(v8::Persistent<v8::Object>* po,
                          JSInstanceInfo* jsInstanceInfo);

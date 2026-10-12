@@ -112,44 +112,69 @@ tns::BufferCastType JsArgConverter::GetCastType(const v8::Local<v8::ArrayBufferV
     return tns::BufferCastType::Byte;
 }
 
-bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
+bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
     bool success = false;
 
     char buff[1024];
 
     const auto &typeSignature = m_tokens.at(index);
 
+    // Classify by the target, which holds the Java link and internal slots;
+    // array elements are read through the Proxy itself.
+    auto arg = jsArg.IsEmpty() ? jsArg : ObjectManager::UnwrapProxy(jsArg);
+
     if (arg.IsEmpty()) {
         SetConvertedObject(index, nullptr);
         success = false;
+    } else if (jsArg->IsProxy() && !arg->IsObject()) {
+        SetConvertedObject(index, nullptr);
+        snprintf(buff, sizeof(buff), "Cannot convert a revoked Proxy to %s at index %d", typeSignature.c_str(), index);
     } else if (arg->IsArray()) {
         success = typeSignature[0] == '[';
 
+        bool trapThrew = false;
         if (success) {
-            auto jsArr = Local<Array>::Cast(arg);
-            success = ConvertJavaScriptArray(jsArr, index);
+            Local<Array> jsArr;
+            if (jsArg->IsProxy()) {
+                TryCatch tc(m_isolate);
+                auto context = m_isolate->GetCurrentContext();
+                if (!ObjectManager::ReadArrayThroughProxy(context, jsArg.As<Object>()).ToLocal(&jsArr)) {
+                    trapThrew = true;
+                    success = false;
+                    string reason = tc.HasCaught()
+                            ? ArgConverter::ConvertToString(tc.Exception()->ToString(context).FromMaybe(Local<String>()))
+                            : string("unknown error");
+                    snprintf(buff, sizeof(buff), "%s", reason.c_str());
+                }
+            } else {
+                jsArr = arg.As<Array>();
+            }
+
+            if (success) {
+                success = ConvertJavaScriptArray(jsArr, index);
+            }
         }
 
-        if (!success) {
-            sprintf(buff, "Cannot convert array to %s at index %d", typeSignature.c_str(), index);
+        if (!success && !trapThrew) {
+            snprintf(buff, sizeof(buff), "Cannot convert array to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsNumber() || arg->IsNumberObject()) {
         success = ConvertJavaScriptNumber(arg, index);
 
         if (!success) {
-            sprintf(buff, "Cannot convert number to %s at index %d", typeSignature.c_str(), index);
+            snprintf(buff, sizeof(buff), "Cannot convert number to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsBoolean() || arg->IsBooleanObject()) {
         success = ConvertJavaScriptBoolean(arg, index);
 
         if (!success) {
-            sprintf(buff, "Cannot convert boolean to %s at index %d", typeSignature.c_str(), index);
+            snprintf(buff, sizeof(buff), "Cannot convert boolean to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsString() || arg->IsStringObject()) {
         success = ConvertJavaScriptString(arg, index);
 
         if (!success) {
-            sprintf(buff, "Cannot convert string to %s at index %d", typeSignature.c_str(), index);
+            snprintf(buff, sizeof(buff), "Cannot convert string to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsObject()) {
         auto context = m_isolate->GetCurrentContext();
@@ -356,7 +381,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
                 if (success) {
                     SetConvertedObject(index, obj.Move(), obj.IsGlobal());
                 } else {
-                    sprintf(buff, "Cannot convert object to %s at index %d", typeSignature.c_str(),
+                    snprintf(buff, sizeof(buff), "Cannot convert object to %s at index %d", typeSignature.c_str(),
                             index);
                 }
                 break;
