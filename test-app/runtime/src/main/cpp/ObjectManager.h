@@ -186,6 +186,13 @@ class ObjectManager {
   JSInstanceInfo* GetJSInstanceInfoFromRuntimeObject(
       const v8::Local<v8::Object>& object);
 
+  /*
+   * The stored JsInfo field for a runtime object: its own field, or its
+   * prototype's when the TypeScript layout keeps the registered instance one
+   * level up. Undefined when neither holds one.
+   */
+  static v8::Local<v8::Value> GetJSInstanceInfoField(const v8::Local<v8::Object>& object);
+
   void ReleaseJSInstance(v8::Persistent<v8::Object>* po,
                          JSInstanceInfo* jsInstanceInfo);
 

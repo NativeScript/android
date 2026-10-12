@@ -185,10 +185,7 @@ MaybeLocal<Array> ObjectManager::ReadArrayThroughProxy(Local<Context> context,
   return scope.Escape(snapshot);
 }
 
-ObjectManager::JSInstanceInfo*
-ObjectManager::GetJSInstanceInfoFromRuntimeObject(const Local<Object>& object) {
-  HandleScope handleScope(m_isolate);
-
+Local<Value> ObjectManager::GetJSInstanceInfoField(const Local<Object>& object) {
   const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
   auto jsInfo = object->GetInternalField(jsInfoIdx).As<Value>();
   if (jsInfo->IsUndefined()) {
@@ -204,7 +201,14 @@ ObjectManager::GetJSInstanceInfoFromRuntimeObject(const Local<Object>& object) {
       }
     }
   }
+  return jsInfo;
+}
 
+ObjectManager::JSInstanceInfo*
+ObjectManager::GetJSInstanceInfoFromRuntimeObject(const Local<Object>& object) {
+  HandleScope handleScope(m_isolate);
+
+  auto jsInfo = GetJSInstanceInfoField(object);
   if (!jsInfo.IsEmpty() && jsInfo->IsExternal()) {
     auto external = jsInfo.As<External>();
     return static_cast<JSInstanceInfo*>(external->Value(v8::kExternalPointerTypeTagDefault));
@@ -348,17 +352,18 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
 
 bool ObjectManager::CloneLink(const Local<Object>& src,
                               const Local<Object>& dest) {
-  auto jsInfo = GetJSInstanceInfo(src);
-
-  auto success = jsInfo != nullptr;
-
-  if (success) {
-    auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-    auto jsInfo = UnwrapProxy(src).As<Object>()->GetInternalField(jsInfoIdx);
-    dest->SetInternalField(jsInfoIdx, jsInfo);
+  auto source = UnwrapProxy(src);
+  if (!source->IsObject() || !IsJsRuntimeObject(source.As<Object>())) {
+    return false;
   }
 
-  return success;
+  auto jsInfo = GetJSInstanceInfoField(source.As<Object>());
+  if (jsInfo.IsEmpty() || !jsInfo->IsExternal()) {
+    return false;
+  }
+
+  dest->SetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo), jsInfo);
+  return true;
 }
 
 string ObjectManager::GetClassName(jobject javaObject) {
