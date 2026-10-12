@@ -707,13 +707,13 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
 
     isDisposed_ = true;
 
-    // Notify the parent thread so the Worker object's persistent handle and
-    // the registry entry are released (no-op if terminate() or the parent's
+    // Notify the parent thread so the end reaches the Worker object and its
+    // persistent handle and registry entry are released (no-op if the parent's
     // own shutdown already cleared them).
     if (auto parentTasks = parentTasks_.lock()) {
         int workerId = workerId_;
         parentTasks->PostInternal([workerId]() {
-            WorkerWrapper::ClearWorkerOnParent(workerId);
+            WorkerWrapper::NotifyThreadEndedOnParent(workerId);
         });
     }
 
@@ -755,6 +755,42 @@ void WorkerWrapper::ClearWorkerOnParent(int workerId) {
         delete wrapper->poWorker_;
         wrapper->poWorker_ = nullptr;
     }
+}
+
+void WorkerWrapper::NotifyThreadEndedOnParent(int workerId) {
+    auto wrapper = WorkerWrapper::GetById(workerId);
+    if (wrapper == nullptr) {
+        return;
+    }
+
+    Isolate* isolate = wrapper->parentIsolate_;
+    {
+        v8::Locker locker(isolate);
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+
+        if (wrapper->poWorker_ != nullptr && !wrapper->poWorker_->IsEmpty()) {
+            auto worker = Local<Object>::New(isolate, *wrapper->poWorker_);
+            auto context = Runtime::GetRuntime(isolate)->GetContext();
+            Context::Scope context_scope(context);
+
+            try {
+                // A listener that throws has no JS frame below it to unwind
+                // into, so it is reported here the way a timer callback's
+                // exception is.
+                TryCatch tc(isolate);
+                WorkerEvents::EmitEnded(isolate, worker);
+                if (tc.HasCaught() &&
+                    !NativeScriptException::ContainUncaughtCallbackException(isolate, tc)) {
+                    ReportFromEventLoopEntry(isolate, tc);
+                }
+            } catch (NativeScriptException& ex) {
+                ex.ReThrowToV8();
+            }
+        }
+    }
+
+    ClearWorkerOnParent(workerId);
 }
 
 void WorkerWrapper::TerminateChildren(Isolate* parentIsolate) {

@@ -1732,11 +1732,12 @@ CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackInfo<v
 
         auto wrapper = WorkerWrapper::GetById(id);
         if (wrapper != nullptr) {
+            // Only starts the wind-down. The Worker object stays rooted and
+            // the registry entry stays until the worker thread's own last act
+            // notifies the parent, so no GC can condemn a wrapper whose thread
+            // is still draining.
             wrapper->Terminate();
         }
-
-        // Reset the persistent Worker object handle and drop the registry entry
-        WorkerWrapper::ClearWorkerOnParent(id);
     } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {

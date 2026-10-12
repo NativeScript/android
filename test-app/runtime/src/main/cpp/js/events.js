@@ -44,12 +44,12 @@ function setListenerErrorReporter(fn) {
 
 // Event name -> handler-attribute wrapper (see defineEventHandler), stored on
 // the target's own listener bag under a symbol so it cannot collide with an
-// event type. Deliberately NOT a WeakMap keyed by the target: a Worker is an
-// ObjectManager-registered object whose finalizer resurrects it while its
-// thread is alive, and a resurrected object's weak-collection entries are
-// already gone. Each wrapper carries a `delta` that the listener count is
-// corrected by: the wrapper occupies one slot in the listener list from its
-// first assignment onwards, but a cleared handler is not a listener.
+// event type. Deliberately NOT a WeakMap keyed by the target: the wrappers
+// live with the target, as Node keeps them, and stay independent of how the
+// collector treats weak-collection entries of objects that native code keeps
+// alive. Each wrapper carries a `delta` that the listener count is corrected
+// by: the wrapper occupies one slot in the listener list from its first
+// assignment onwards, but a cleared handler is not a listener.
 var kHandlers = Symbol("handlers");
 
 function handlersOf(target) {
