@@ -195,6 +195,9 @@ tasks.register("stageNapiPrefab", Sync) {
     from("src/main/cpp/napi/NapiRuntime.h") {
         into "prefab/modules/NativeScript/include"
     }
+    from("src/main/cpp/napi/node_api_ns_fast.h") {
+        into "prefab/modules/NativeScript/include"
+    }
     includeEmptyDirs = false
 }
 afterEvaluate {
