@@ -598,8 +598,26 @@ void MetadataNode::SuperAccessorGetterCallback(const FunctionCallbackInfo<Value>
 
             superValue->SetPrototype(context, thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype());
             V8SetPrivateValue(isolate, thiz, key, superValue);
-            V8SetPrivateValue(isolate, superValue, ArgConverter::ConvertToV8String(isolate, "superowner"), thiz);
             objectManager->CloneLink(thiz, superValue);
+
+            // The alias is tracked on the object that owns the link, which for
+            // the TypeScript layout is the prototype rather than `thiz`.
+            auto owner = ObjectManager::IsJsRuntimeObject(thiz) ? ObjectManager::GetJSInstanceInfoOwner(thiz) : Local<Object>();
+            if (owner.IsEmpty()) {
+                owner = thiz;
+            }
+            V8SetPrivateValue(isolate, superValue, ArgConverter::ConvertToV8String(isolate, "superowner"), owner);
+            auto aliasesKey = ArgConverter::ConvertToV8String(isolate, "superaliases");
+            Local<Value> aliasesValue;
+            V8GetPrivateValue(isolate, owner, aliasesKey, aliasesValue);
+            Local<Array> aliases;
+            if (!aliasesValue.IsEmpty() && aliasesValue->IsArray()) {
+                aliases = aliasesValue.As<Array>();
+            } else {
+                aliases = Array::New(isolate);
+                V8SetPrivateValue(isolate, owner, aliasesKey, aliases);
+            }
+            aliases->CreateDataProperty(context, aliases->Length(), superValue).Check();
 
             DEBUG_WRITE("superValue.GetPrototype=%d", superValue->GetPrototype().As<Object>()->GetIdentityHash());
 

@@ -70,6 +70,14 @@ class ObjectManager {
   static bool IsJsRuntimeObject(const v8::Local<v8::Object>& object);
 
   /*
+   * The runtime object holding the JsInfo External for `object`: the object
+   * itself, or its prototype when the TypeScript layout keeps the registered
+   * instance one level up. Empty when neither holds one. Reads and clears of
+   * the link must go through this object, never through a Proxy or a child.
+   */
+  static v8::Local<v8::Object> GetJSInstanceInfoOwner(const v8::Local<v8::Object>& object);
+
+  /*
    * The innermost target of a Proxy chain; any other value is returned as is.
    * A revoked Proxy anywhere in the chain yields null. Internal fields and
    * private symbols live on the target, never on the Proxy.
@@ -186,13 +194,6 @@ class ObjectManager {
   JSInstanceInfo* GetJSInstanceInfoFromRuntimeObject(
       const v8::Local<v8::Object>& object);
 
-  /*
-   * The runtime object holding the JsInfo External for `object`: the object
-   * itself, or its prototype when the TypeScript layout keeps the registered
-   * instance one level up. Empty when neither holds one. Reads and clears of
-   * the link must go through this object, never through a Proxy or a child.
-   */
-  static v8::Local<v8::Object> GetJSInstanceInfoOwner(const v8::Local<v8::Object>& object);
 
   void ReleaseJSInstance(v8::Persistent<v8::Object>* po,
                          JSInstanceInfo* jsInstanceInfo);

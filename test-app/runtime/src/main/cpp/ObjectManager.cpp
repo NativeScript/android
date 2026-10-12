@@ -740,10 +740,18 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
   owner->SetInternalField(jsInfoIdx, Undefined(m_isolate));
 
   // Every alias of the freed External must be cleared with it.
-  Local<Value> superValue;
-  V8GetPrivateValue(m_isolate, instance, ArgConverter::ConvertToV8String(m_isolate, "supervalue"), superValue);
-  if (!superValue.IsEmpty() && superValue->IsObject() && IsJsRuntimeObject(superValue.As<Object>())) {
-    superValue.As<Object>()->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+  Local<Value> aliasesValue;
+  V8GetPrivateValue(m_isolate, owner, ArgConverter::ConvertToV8String(m_isolate, "superaliases"), aliasesValue);
+  if (!aliasesValue.IsEmpty() && aliasesValue->IsArray()) {
+    auto aliases = aliasesValue.As<Array>();
+    auto context = m_isolate->GetCurrentContext();
+    for (uint32_t i = 0; i < aliases->Length(); i++) {
+      Local<Value> alias;
+      if (aliases->Get(context, i).ToLocal(&alias) && alias->IsObject() &&
+          IsJsRuntimeObject(alias.As<Object>())) {
+        alias.As<Object>()->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+      }
+    }
   }
 }
 
