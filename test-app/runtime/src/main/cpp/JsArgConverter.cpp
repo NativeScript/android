@@ -28,10 +28,10 @@ JsArgConverter::JsArgConverter(const Local<Object> &caller,
                 JniSignatureParser parser(m_methodSignature);
                 entry->parsedSig = parser.Parse();
             }
-            m_tokens = entry->parsedSig;
+            m_tokens = &entry->parsedSig;
         } else {
             JniSignatureParser parser(m_methodSignature);
-            m_tokens = parser.Parse();
+            m_ownedTokens = parser.Parse();
         }
 
         m_isValid = ConvertArg(caller, 0);
@@ -63,10 +63,10 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
                 JniSignatureParser parser(m_methodSignature);
                 entry->parsedSig = parser.Parse();
             }
-            m_tokens = entry->parsedSig;
+            m_tokens = &entry->parsedSig;
         } else {
             JniSignatureParser parser(m_methodSignature);
-            m_tokens = parser.Parse();
+            m_ownedTokens = parser.Parse();
         }
 
         for (int i = 0; i < m_argsLen; i++) {
@@ -86,7 +86,7 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
     m_argsLen = args.Length();
 
     JniSignatureParser parser(m_methodSignature);
-    m_tokens = parser.Parse();
+    m_ownedTokens = parser.Parse();
 
     for (int i = 0; i < m_argsLen; i++) {
         m_isValid = ConvertArg(args[i], i);
@@ -117,7 +117,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
 
     char buff[1024];
 
-    const auto &typeSignature = m_tokens.at(index);
+    const auto &typeSignature = m_tokens->at(index);
 
     if (arg.IsEmpty()) {
         SetConvertedObject(index, nullptr);
@@ -394,7 +394,7 @@ bool JsArgConverter::ConvertJavaScriptNumber(const Local<Value> &jsValue, int in
             0
     };
 
-    const auto &typeSignature = m_tokens.at(index);
+    const auto &typeSignature = m_tokens->at(index);
     auto context = m_isolate->GetCurrentContext();
 
     const char typePrefix = typeSignature[0];
@@ -445,7 +445,7 @@ bool JsArgConverter::ConvertJavaScriptNumber(const Local<Value> &jsValue, int in
 bool JsArgConverter::ConvertJavaScriptBoolean(const Local<Value> &jsValue, int index) {
     bool success;
 
-    const auto &typeSignature = m_tokens.at(index);
+    const auto &typeSignature = m_tokens->at(index);
     auto context = m_isolate->GetCurrentContext();
 
     if (typeSignature == "Z") {
@@ -489,7 +489,7 @@ bool JsArgConverter::ConvertJavaScriptArray(const Local<Array> &jsArr, int index
 
     jsize arrLength = jsArr->Length();
 
-    const auto &arraySignature = m_tokens.at(index);
+    const auto &arraySignature = m_tokens->at(index);
     auto context = m_isolate->GetCurrentContext();
 
     string elementType = arraySignature.substr(1);
@@ -632,7 +632,7 @@ template<typename T>
 bool JsArgConverter::ConvertFromCastFunctionObject(T value, int index) {
     bool success = false;
 
-    const auto &typeSignature = m_tokens.at(index);
+    const auto &typeSignature = m_tokens->at(index);
 
     const char typeSignaturePrefix = typeSignature[0];
 
