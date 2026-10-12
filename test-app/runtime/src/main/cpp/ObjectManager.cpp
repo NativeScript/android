@@ -178,7 +178,7 @@ MaybeLocal<Array> ObjectManager::ReadArrayThroughProxy(Local<Context> context,
   for (uint32_t i = 0; i < count; i++) {
     Local<Value> element;
     if (!proxy->Get(context, i).ToLocal(&element) ||
-        snapshot->Set(context, i, element).IsNothing()) {
+        snapshot->CreateDataProperty(context, i, element).IsNothing()) {
       return {};
     }
   }
@@ -699,9 +699,22 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
   }
 
   auto source = UnwrapProxy(object);
+  if (!source->IsObject()) {
+    throw NativeScriptException("Trying to release a non native object!");
+  }
+  auto instance = source.As<Object>();
+
+  // A `super` object shares its owner's JsInfo External; the owner is the one
+  // registered, so the release is resolved and recorded there.
+  Local<Value> superOwner;
+  V8GetPrivateValue(m_isolate, instance, ArgConverter::ConvertToV8String(m_isolate, "superowner"), superOwner);
+  if (!superOwner.IsEmpty() && superOwner->IsObject()) {
+    instance = superOwner.As<Object>();
+  }
+
   Local<Object> owner;
-  if (source->IsObject() && IsJsRuntimeObject(source.As<Object>())) {
-    owner = GetJSInstanceInfoOwner(source.As<Object>());
+  if (IsJsRuntimeObject(instance)) {
+    owner = GetJSInstanceInfoOwner(instance);
   }
   if (owner.IsEmpty()) {
     throw NativeScriptException("Trying to release a non native object!");
@@ -725,6 +738,13 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
 
   delete jsInstanceInfo;
   owner->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+
+  // Every alias of the freed External must be cleared with it.
+  Local<Value> superValue;
+  V8GetPrivateValue(m_isolate, instance, ArgConverter::ConvertToV8String(m_isolate, "supervalue"), superValue);
+  if (!superValue.IsEmpty() && superValue->IsObject() && IsJsRuntimeObject(superValue.As<Object>())) {
+    superValue.As<Object>()->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+  }
 }
 
 ObjectManager::JavaScriptMarkingMode ObjectManager::GetMarkingMode() {

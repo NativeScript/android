@@ -598,6 +598,7 @@ void MetadataNode::SuperAccessorGetterCallback(const FunctionCallbackInfo<Value>
 
             superValue->SetPrototype(context, thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype());
             V8SetPrivateValue(isolate, thiz, key, superValue);
+            V8SetPrivateValue(isolate, superValue, ArgConverter::ConvertToV8String(isolate, "superowner"), thiz);
             objectManager->CloneLink(thiz, superValue);
 
             DEBUG_WRITE("superValue.GetPrototype=%d", superValue->GetPrototype().As<Object>()->GetIdentityHash());

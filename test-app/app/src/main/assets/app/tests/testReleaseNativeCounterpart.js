@@ -68,6 +68,34 @@ describe("Test native counterpart release", function () {
         expect(errorMessage).toBe("Argument is not an object!");
     });
 
+    it("Releasing an extended instance also releases its super object", function () {
+        var MyObject = java.lang.Object.extend({
+            toString: function () { return "custom"; }
+        });
+        var instance = new MyObject();
+        var sup = instance.super;
+
+        global.__releaseNativeCounterpart(instance);
+
+        expect(function () { sup.hashCode(); }).toThrowError(/no longer has available Java instance counterpart/);
+        expect(function () { instance.hashCode(); }).toThrowError(/no longer has available Java instance counterpart/);
+        expect(function () { global.__releaseNativeCounterpart(sup); }).toThrowError("Trying to release a non native object!");
+    });
+
+    it("Releasing through the super object releases the instance", function () {
+        var MyObject = java.lang.Object.extend({
+            toString: function () { return "custom"; }
+        });
+        var instance = new MyObject();
+        var sup = instance.super;
+
+        global.__releaseNativeCounterpart(sup);
+
+        expect(function () { instance.hashCode(); }).toThrowError(/no longer has available Java instance counterpart/);
+        expect(function () { sup.hashCode(); }).toThrowError(/no longer has available Java instance counterpart/);
+        expect(function () { global.__releaseNativeCounterpart(instance); }).toThrowError("Trying to release a non native object!");
+    });
+
     it("Calling the __releaseNativeCounterpart function with 0 arguments should throw exception", function(){
         var errorMessage = "";
 
