@@ -170,7 +170,7 @@ void WorkerWrapper::Terminate() {
         // A worker paused at a breakpoint sits in the inspector's nested pause
         // loop, not in Looper.loop() - kick it loose so TerminateExecution and
         // the looper quit below can take effect.
-        std::lock_guard<std::mutex> lock(inspectorMutex_);
+        std::lock_guard<std::recursive_mutex> lock(inspectorMutex_);
         if (inspector_ != nullptr) {
             inspector_->NotifyTerminating();
         }
@@ -810,7 +810,7 @@ void WorkerWrapper::CreateInspector(Isolate* isolate) {
 
     auto* client = new WorkerInspectorClient(workerId_, isolate, ALooper_forThread(), url);
     {
-        std::lock_guard<std::mutex> lock(inspectorMutex_);
+        std::lock_guard<std::recursive_mutex> lock(inspectorMutex_);
         inspector_ = client;
     }
 
@@ -822,7 +822,7 @@ void WorkerWrapper::CreateInspector(Isolate* isolate) {
 void WorkerWrapper::DestroyInspector() {
     WorkerInspectorClient* client = nullptr;
     {
-        std::lock_guard<std::mutex> lock(inspectorMutex_);
+        std::lock_guard<std::recursive_mutex> lock(inspectorMutex_);
         client = inspector_;
         inspector_ = nullptr;
     }
@@ -843,7 +843,7 @@ void WorkerWrapper::DestroyInspector() {
 
 void WorkerWrapper::ConsoleLog(v8_inspector::ConsoleAPIType method,
                                const std::vector<Local<Value>>& args) {
-    std::lock_guard<std::mutex> lock(inspectorMutex_);
+    std::lock_guard<std::recursive_mutex> lock(inspectorMutex_);
     if (inspector_ != nullptr) {
         inspector_->consoleLog(method, args);
     }

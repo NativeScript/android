@@ -238,7 +238,10 @@ private:
     void DestroyInspector();
 
     WorkerInspectorClient* inspector_ = nullptr;
-    std::mutex inspectorMutex_;
+    // Recursive: ConsoleLog holds it across consoleLog, whose stack capture
+    // allocates, and a near-heap-limit callback raised by that allocation
+    // calls Terminate(), which takes it again on the same thread.
+    std::recursive_mutex inspectorMutex_;
 #endif
 
     static std::mutex registryMutex_;
