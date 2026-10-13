@@ -15,11 +15,21 @@
     napi_*;
     node_api_*;
     NativeScriptNapiEnv;
+    NativeScriptJSIRuntime;
+    _ZTIN8facebook3jsi*;
+    _ZTSN8facebook3jsi*;
+    _ZTVN8facebook3jsi*;
+    _ZTIN4rnv8*;
+    _ZTSN4rnv8*;
+    _ZTVN4rnv8*;
     extern "C++" {
       v8::[A-Z]*;
       v8::api_internal::*;
       v8::platform::*;
       cppgc::[A-Z]*;
+      facebook::jsi::*;
+      rnv8::*;
+      tns::GetJSIRuntime*;
     };
   local:
     *;

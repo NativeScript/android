@@ -60,6 +60,8 @@ include_directories(
         # the shim's Node-internal stand-ins (env-inl.h, util-inl.h) bare.
         src/main/cpp/napi/vendor
         src/main/cpp/napi/shim
+        src/main/cpp/jsi
+        src/main/cpp/v8runtime
 )
 
 # The runtime's builtin JavaScript (src/main/cpp/js) embedded into a generated
@@ -249,6 +251,16 @@ add_library(
         src/main/cpp/napi/NapiThreadSafeFunction.cpp
         src/main/cpp/napi/NodeApiEmbed.cpp
 
+        # JSI (facebook::jsi + rnv8::V8Runtime)
+        src/main/cpp/jsi/jsi.cpp
+        src/main/cpp/jsi/jsilib-posix.cpp
+        src/main/cpp/v8runtime/HostProxy.cpp
+        src/main/cpp/v8runtime/JSIRuntime.cpp
+        src/main/cpp/v8runtime/JSIV8ValueConverter.cpp
+        src/main/cpp/v8runtime/V8PointerValue.cpp
+        src/main/cpp/v8runtime/V8Runtime.cpp
+        src/main/cpp/v8runtime/V8RuntimeFactory.cpp
+
         ${RUNTIME_BUILTINS_GENERATED_DIR}/RuntimeBuiltins.cpp
 
         # V8 inspector source files will be included only in Release mode
@@ -256,6 +268,22 @@ add_library(
 
         # Node-API test addons, local Debug builds only
         ${NAPI_TEST_SOURCES}
+)
+
+# JSI consumers (e.g. NitroModules) rely on RTTI (std::dynamic_pointer_cast on
+# HostObject, NativeState, MutableBuffer, Runtime). Neither jsi nor v8runtime
+# subclasses any V8 class, so enabling RTTI on these translation units exports
+# their typeinfo without conflicting with V8's -fno-rtti build.
+set_source_files_properties(
+        src/main/cpp/jsi/jsi.cpp
+        src/main/cpp/jsi/jsilib-posix.cpp
+        src/main/cpp/v8runtime/HostProxy.cpp
+        src/main/cpp/v8runtime/JSIRuntime.cpp
+        src/main/cpp/v8runtime/JSIV8ValueConverter.cpp
+        src/main/cpp/v8runtime/V8PointerValue.cpp
+        src/main/cpp/v8runtime/V8Runtime.cpp
+        src/main/cpp/v8runtime/V8RuntimeFactory.cpp
+        PROPERTIES COMPILE_FLAGS "-frtti"
 )
 
 set(NATIVES_BLOB_INCLUDE_DIRECTORIES ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/include)

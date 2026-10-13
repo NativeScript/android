@@ -195,6 +195,14 @@ tasks.register("stageNapiPrefab", Sync) {
     from("src/main/cpp/napi/NapiRuntime.h") {
         into "prefab/modules/NativeScript/include"
     }
+    from("src/main/cpp/jsi") {
+        include "*.h"
+        into "prefab/modules/NativeScript/include/jsi"
+    }
+    from("src/main/cpp/v8runtime") {
+        include "JSIRuntime.h", "V8Runtime.h", "V8RuntimeConfig.h", "V8RuntimeFactory.h"
+        into "prefab/modules/NativeScript/include"
+    }
     includeEmptyDirs = false
 }
 afterEvaluate {
