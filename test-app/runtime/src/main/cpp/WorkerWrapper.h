@@ -178,7 +178,11 @@ private:
     // The parent runtime's task queue; weak so a child outliving its parent
     // just drops its posts instead of touching a dead runtime.
     std::weak_ptr<EventLoop> parentTasks_;
+    // Written by the worker thread only: published once the runtime is up,
+    // withdrawn before the isolate is disposed. Any other thread reads and uses
+    // it under workerIsolateMutex_.
     std::atomic<v8::Isolate*> workerIsolate_;
+    std::mutex workerIsolateMutex_;
     Runtime* runtime_;
 
     const int workerId_;

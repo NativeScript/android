@@ -27,6 +27,7 @@ require("./tests/testWebAssembly");
 require("./tests/testEventLoop");
 require("./tests/testMultithreadedJavascript");
 require("./tests/testWorkerTerminateDuringLoad");
+require("./tests/testWorkerTerminateAfterClose");
 require("./tests/testWorkerOptions");
 require("./tests/testWorkerResourceLimits");
 require("./tests/testInterfaceDefaultMethods");

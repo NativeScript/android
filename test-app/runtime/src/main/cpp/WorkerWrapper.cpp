@@ -142,8 +142,7 @@ void WorkerWrapper::PostMessageToParent(std::shared_ptr<worker::Message> message
 }
 
 void WorkerWrapper::Terminate() {
-    if (isClosing_ || isDisposed_) {
-        // The worker is already shutting down on its own; nothing to do.
+    if (isDisposed_) {
         return;
     }
 
@@ -152,16 +151,23 @@ void WorkerWrapper::Terminate() {
         return;
     }
 
-    Isolate* isolate = workerIsolate_.load();
-    if (isolate != nullptr) {
-        // The only v8 call that is legal from another thread - interrupts any
-        // JS currently running on the worker (e.g. a busy loop).
-        isolate->TerminateExecution();
-        // A pump parked with nothing queued runs no JS, so the interrupt
-        // above never materializes for it - the loop's own flag ends it.
-        auto loop = NativeScriptPlatform::Instance()->LookupEventLoop(isolate);
-        if (loop != nullptr) {
-            loop->NoteTerminationRequested();
+    {
+        // Held across the use, not just the read: the worker thread withdraws
+        // the isolate under the same mutex before disposing it, so a terminate
+        // that already read it finishes with it first, and a later one finds
+        // null.
+        std::lock_guard<std::mutex> lock(workerIsolateMutex_);
+        Isolate* isolate = workerIsolate_.load();
+        if (isolate != nullptr) {
+            // Legal from any thread: interrupts any JS currently running on the
+            // worker (e.g. a busy loop, including one that follows close()).
+            isolate->TerminateExecution();
+            // A pump parked with nothing queued runs no JS, so the interrupt
+            // above never materializes for it - the loop's own flag ends it.
+            auto loop = NativeScriptPlatform::Instance()->LookupEventLoop(isolate);
+            if (loop != nullptr) {
+                loop->NoteTerminationRequested();
+            }
         }
     }
 
@@ -656,7 +662,11 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
         // bootstrap failed between initWorkerRuntime and the workerIsolate_
         // publish (e.g. a JNI error while resolving the looper), the atomic is
         // still null while the isolate very much needs disposing.
-        workerIsolate_.store(nullptr);
+        {
+            // Waits out a Terminate() on another thread that is still using it.
+            std::lock_guard<std::mutex> lock(workerIsolateMutex_);
+            workerIsolate_.store(nullptr);
+        }
         Isolate* isolate = runtime_->GetIsolate();
         {
             v8::Locker locker(isolate);
