@@ -667,6 +667,7 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
             isolate->RemoveNearHeapLimitCallback(WorkerWrapper::OnNearHeapLimit, 0);
             runtime_->DestroyRuntime();
         }
+        CallbackHandlers::WaitForMainThreadCallbacks(isolate);
         isolate->Dispose();
         // Dispose freed the isolate's memory, so its address can be reused by
         // a concurrent Isolate::New - drop the platform's loop entry now, not

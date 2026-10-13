@@ -730,7 +730,24 @@ void CallbackHandlers::RunMainThreadEntry(uint64_t key) {
             return;
         }
         isolate = it->second.isolate_;
+        // Taken with the entry, under the same lock RemoveIsolateEntries
+        // takes, so a worker either removes the entry first or waits for this
+        // hold before disposing the isolate.
+        ++heldIsolates_[isolate];
     }
+    // Declared before the Locker so that it lets go only after the Locker is
+    // released.
+    struct IsolateHold {
+        Isolate *isolate;
+        ~IsolateHold() {
+            std::lock_guard<std::mutex> lock(cacheMutex_);
+            auto held = heldIsolates_.find(isolate);
+            if (--held->second == 0) {
+                heldIsolates_.erase(held);
+                isolateReleased_.notify_all();
+            }
+        }
+    } hold{isolate};
 
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
@@ -755,8 +772,15 @@ void CallbackHandlers::RunMainThreadEntry(uint64_t key) {
 
     if (tc.HasCaught() &&
         !NativeScriptException::ContainUncaughtCallbackException(isolate, tc)) {
+        NativeScriptException ex(tc);
+        if (!runtime->IsMainThread()) {
+            // Reported only after this function lets go of the isolate, which
+            // its worker may dispose by then, and from the main thread, which
+            // never enters it: only the message and stack can travel.
+            ex.ReleaseJsHandle();
+        }
         // surfaces via the event loop's guard as a pending Java exception
-        throw NativeScriptException(tc);
+        throw ex;
     }
 }
 
@@ -1932,8 +1956,17 @@ void CallbackHandlers::RemoveIsolateEntries(v8::Isolate *isolate) {
         }
     }
 }
+
+void CallbackHandlers::WaitForMainThreadCallbacks(v8::Isolate *isolate) {
+    std::unique_lock<std::mutex> lock(cacheMutex_);
+    isolateReleased_.wait(lock, [isolate]() {
+        return heldIsolates_.find(isolate) == heldIsolates_.end();
+    });
+}
 robin_hood::unordered_map<uint64_t, CallbackHandlers::CacheEntry> CallbackHandlers::cache_;
 std::mutex CallbackHandlers::cacheMutex_;
+robin_hood::unordered_map<v8::Isolate *, int> CallbackHandlers::heldIsolates_;
+std::condition_variable CallbackHandlers::isolateReleased_;
 
 
 std::atomic_int64_t CallbackHandlers::count_ = {0};

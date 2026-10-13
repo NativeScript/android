@@ -1175,9 +1175,10 @@ void Runtime::DestroyRuntime() {
   m_dispatchNativeUncaughtErrorFunc.Reset();
   // Both hold v8::Global handles to JS callbacks, so their entries must be
   // dropped here rather than in ~Runtime, which runs after Isolate::Dispose --
-  // resetting a Global then writes into a freed handle table. Doing it here
-  // also closes a window in which the main thread could take a Locker on this
-  // isolate (RunMainThreadEntry) after it had already been disposed.
+  // resetting a Global then writes into a freed handle table. A
+  // RunMainThreadEntry that has not taken its entry yet finds it gone; one that
+  // already has is waited for before the isolate is disposed
+  // (CallbackHandlers::WaitForMainThreadCallbacks).
   CallbackHandlers::RemoveIsolateEntries(m_isolate);
   FrameCallbacks::RemoveIsolateEntries(m_isolate);
 
