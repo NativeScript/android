@@ -2,6 +2,8 @@
 #include "Runtime.h"
 #include "NativeScriptException.h"
 #include "CallbackHandlers.h"
+#include "NativeScriptPlatform.h"
+#include "WorkerWrapper.h"
 #include <sstream>
 #include <android/log.h>
 
@@ -351,6 +353,38 @@ static jint getCurrentRuntimeIdCritical_impl() {
 
 extern "C" JNIEXPORT jint Java_com_tns_Runtime_getCurrentRuntimeIdLegacy(JNIEnv* env, jclass clazz) {
     return getCurrentRuntimeIdCritical_impl();
+}
+
+extern "C" JNIEXPORT void Java_com_tns_Runtime_TerminateRuntimeCallback(JNIEnv* env, jobject obj, jint runtimeId) {
+    auto runtime = TryGetRuntime(runtimeId);
+    if (runtime == nullptr) {
+        // TODO: Pete: Log message informing the developer of the failure
+        return;
+    }
+
+    auto isolate = runtime->GetIsolate();
+    auto eventLoop = runtime->GetEventLoop();
+
+    // Terminate this runtime's child workers before disposing the isolate. Their
+    // Worker object persistents live in this isolate, so they must be released
+    // first - mirrors WorkerWrapper::BackgroundLooper's nested-worker teardown.
+    WorkerWrapper::TerminateChildren(isolate);
+
+    {
+        v8::Locker locker(isolate);
+        v8::Isolate::Scope isolate_scope(isolate);
+        v8::HandleScope handleScope(isolate);
+
+        runtime->DestroyRuntime();
+    }
+
+    isolate->Dispose();
+    // Dispose freed the isolate's memory, so its address can be reused by
+    // a concurrent Isolate::New - drop the platform's loop entry now, not
+    // in ~Runtime (which still runs JNI calls first).
+    NativeScriptPlatform::Instance()->IsolateDisposed(isolate, eventLoop);
+
+    delete runtime;
 }
 
 extern "C" JNIEXPORT void Java_com_tns_Runtime_ResetDateTimeConfigurationCache(JNIEnv* _env, jobject obj, jint runtimeId) {
