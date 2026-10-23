@@ -3,6 +3,7 @@
 #include "ArgConverter.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
+#include <mutex>
 #include <sstream>
 
 using namespace v8;
@@ -12,7 +13,7 @@ using namespace tns;
 ArrayHelper::ArrayHelper() {
 }
 
-void ArrayHelper::Init(const Local<Context>& context) {
+void ArrayHelper::ResolveRuntimeMethods() {
     JEnv env;
 
     RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
@@ -20,19 +21,15 @@ void ArrayHelper::Init(const Local<Context>& context) {
 
     CREATE_ARRAY_HELPER = env.GetStaticMethodID(RUNTIME_CLASS, "createArrayHelper", "(Ljava/lang/String;I)Ljava/lang/Object;");
     NS_CHECK(CREATE_ARRAY_HELPER != nullptr);
+}
+
+MaybeLocal<Function> ArrayHelper::CreateNewArray(Local<Context> context) {
+    // Every isolate's binding gets here, workers on their own threads.
+    static std::once_flag resolved;
+    std::call_once(resolved, ResolveRuntimeMethods);
 
     auto isolate = v8::Isolate::GetCurrent();
-    auto global = context->Global();
-    auto arr = global->Get(context, ArgConverter::ConvertToV8String(isolate, "Array"));
-
-    if (!arr.IsEmpty()) {
-        Local<Value> arrVal;
-        auto success = arr.ToLocal(&arrVal);
-        if (success) {
-            auto arrayObj = arrVal.As<Object>();
-            arrayObj->Set(context, ArgConverter::ConvertToV8String(isolate, "create"), FunctionTemplate::New(isolate, CreateJavaArrayCallback)->GetFunction(context).ToLocalChecked());
-        }
-    }
+    return FunctionTemplate::New(isolate, CreateJavaArrayCallback)->GetFunction(context);
 }
 
 void ArrayHelper::CreateJavaArrayCallback(const FunctionCallbackInfo<Value>& info) {
