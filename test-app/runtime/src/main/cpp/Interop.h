@@ -7,10 +7,8 @@
 namespace tns {
 
 /*
- * The `interop` global, mirroring the iOS runtime's interop namespace. On
- * Android it currently exposes a single member:
- *
- *   interop.escapeException(x)
+ * escapeException(x), exported by `ns:runtime` (and by the legacy `interop`
+ * global, which js/interop-globals.js assembles from that module).
  *
  * Brands an error so the JS->Java boundary (NativeScriptException::
  * ReThrowToJava) forwards the ORIGINAL Java throwable carried by `x` (its
@@ -25,7 +23,7 @@ namespace tns {
 class Interop {
 public:
     /*
-     * The brand payload of an interop.escapeException(...) error, decoded at
+     * The brand payload of an escapeException(...) error, decoded at
      * the JS->Java boundary. `original` (a new local reference the caller may
      * env.Throw() directly) is nullptr for a branded error that carries no
      * Java throwable - the synthesized-escape case.
@@ -37,15 +35,14 @@ public:
         std::string message;
         /* The JS stack of the escaped error itself (may be empty). */
         std::string stack;
-        /* The JS stack of the interop.escapeException(...) call site. */
+        /* The JS stack of the escapeException(...) call site. */
         std::string escapeSiteStack;
     };
 
     /*
-     * Installs the `interop` object on the global. Evaluated once per isolate
-     * during PrepareV8Runtime, for both the main and worker isolates.
+     * A new escapeException function for the `ns:runtime` binding.
      */
-    static void Init(v8::Local<v8::Context> context);
+    static v8::MaybeLocal<v8::Function> CreateEscapeException(v8::Local<v8::Context> context);
 
     /*
      * Decodes the brand payload of `errObj` into `out`. Returns true when the

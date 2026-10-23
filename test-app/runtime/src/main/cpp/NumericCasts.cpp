@@ -11,15 +11,30 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-void NumericCasts::CreateGlobalCastFunctions(Isolate* isolate, const Local<ObjectTemplate>& globalTemplate) {
+bool NumericCasts::AddCastFunctions(Local<Context> context, Local<Object> target) {
+    auto isolate = v8::Isolate::GetCurrent();
     auto ext = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
 
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "long"), FunctionTemplate::New(isolate, NumericCasts::MarkAsLongCallbackStatic, ext));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "byte"), FunctionTemplate::New(isolate, NumericCasts::MarkAsByteCallbackStatic, ext));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "short"), FunctionTemplate::New(isolate, NumericCasts::MarkAsShortCallbackStatic, ext));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "double"), FunctionTemplate::New(isolate, NumericCasts::MarkAsDoubleCallbackStatic, ext));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "float"), FunctionTemplate::New(isolate, NumericCasts::MarkAsFloatCallbackStatic, ext));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "char"), FunctionTemplate::New(isolate, NumericCasts::MarkAsCharCallbackStatic, ext));
+    const struct {
+        const char* name;
+        FunctionCallback callback;
+    } casts[] = {
+            {"long", NumericCasts::MarkAsLongCallbackStatic},
+            {"byte", NumericCasts::MarkAsByteCallbackStatic},
+            {"short", NumericCasts::MarkAsShortCallbackStatic},
+            {"double", NumericCasts::MarkAsDoubleCallbackStatic},
+            {"float", NumericCasts::MarkAsFloatCallbackStatic},
+            {"char", NumericCasts::MarkAsCharCallbackStatic},
+    };
+
+    for (const auto& cast : casts) {
+        Local<Function> func;
+        if (!FunctionTemplate::New(isolate, cast.callback, ext)->GetFunction(context).ToLocal(&func) ||
+            !target->Set(context, ArgConverter::ConvertToV8String(isolate, cast.name), func).FromMaybe(false)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 CastType NumericCasts::GetCastType(Isolate* isolate, const Local<Object>& object) {

@@ -5,7 +5,10 @@
 #include <vector>
 
 #include "ArgConverter.h"
+#include "ArrayHelper.h"
 #include "BuiltinLoader.h"
+#include "CallbackHandlers.h"
+#include "Interop.h"
 #include "ModuleInternalCallbacks.h"
 #include "NativeScriptAssert.h"
 #include "Runtime.h"
@@ -25,6 +28,7 @@ constexpr const char* kNsPrefix = "ns:";
 constexpr const char* kNodePrefix = "node:";
 
 /* Defined below, each next to the natives it gathers. */
+MaybeLocal<Object> NsInteropAndroidBinding(Local<Context> context);
 MaybeLocal<Object> NsModuleBinding(Local<Context> context);
 MaybeLocal<Object> NsRuntimeBinding(Local<Context> context);
 MaybeLocal<Object> NsUtilBinding(Local<Context> context);
@@ -52,6 +56,8 @@ struct Registration {
  * standard module never carries compatibility code.
  */
 constexpr Registration kRegistry[] = {
+        {"ns:interop", BuiltinId::kNsInterop, nullptr},
+        {"ns:interop/android", BuiltinId::kNsInteropAndroid, NsInteropAndroidBinding},
         {"ns:module", BuiltinId::kNsModule, NsModuleBinding},
         {"ns:runtime", BuiltinId::kNsRuntime, NsRuntimeBinding},
         {"ns:util", BuiltinId::kNsUtil, NsUtilBinding},
@@ -60,6 +66,7 @@ constexpr Registration kRegistry[] = {
         {"node:util", BuiltinId::kNodeUtil, nullptr},
         {"internal/dom-exception", BuiltinId::kDomException, nullptr, true},
         {"internal/events", BuiltinId::kEvents, nullptr, true},
+        {"internal/interop-globals", BuiltinId::kInteropGlobals, nullptr, true},
 };
 
 constexpr const char* kDebugKey = "debug";
@@ -173,6 +180,19 @@ RealmState* GetRealm(Isolate* isolate) {
     return RuntimeState::For<RealmState>(isolate);
 }
 
+MaybeLocal<Object> NsInteropAndroidBinding(Local<Context> context) {
+    Isolate* isolate = v8::Isolate::GetCurrent();
+    Local<Object> binding = Object::New(isolate);
+    Local<v8::Function> newArray;
+    if (!CallbackHandlers::AddCastFunctions(context, binding) ||
+        !ArrayHelper::CreateNewArray(context).ToLocal(&newArray) ||
+        !binding->Set(context, ArgConverter::ConvertToV8String(isolate, "newArray"), newArray)
+                 .FromMaybe(false)) {
+        return MaybeLocal<Object>();
+    }
+    return binding;
+}
+
 MaybeLocal<Object> NsModuleBinding(Local<Context> context) {
     Isolate* isolate = v8::Isolate::GetCurrent();
     Local<Object> binding = Object::New(isolate);
@@ -188,12 +208,16 @@ MaybeLocal<Object> NsModuleBinding(Local<Context> context) {
 MaybeLocal<Object> NsRuntimeBinding(Local<Context> context) {
     Isolate* isolate = v8::Isolate::GetCurrent();
     Local<Object> binding = Object::New(isolate);
-    Local<v8::Function> setConfig, getConfig;
+    Local<v8::Function> setConfig, getConfig, escapeException;
     if (!v8::Function::New(context, SetConfigCallback).ToLocal(&setConfig) ||
         !v8::Function::New(context, GetConfigCallback).ToLocal(&getConfig) ||
+        !Interop::CreateEscapeException(context).ToLocal(&escapeException) ||
         !binding->Set(context, ArgConverter::ConvertToV8String(isolate, "setConfig"), setConfig)
                  .FromMaybe(false) ||
         !binding->Set(context, ArgConverter::ConvertToV8String(isolate, "getConfig"), getConfig)
+                 .FromMaybe(false) ||
+        !binding->Set(context, ArgConverter::ConvertToV8String(isolate, "escapeException"),
+                      escapeException)
                  .FromMaybe(false)) {
         return MaybeLocal<Object>();
     }

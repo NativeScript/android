@@ -93,8 +93,7 @@ namespace tns {
 
         static void ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
-        static void CreateGlobalCastFunctions(v8::Isolate *isolate,
-                                              const v8::Local<v8::ObjectTemplate> &globalTemplate);
+        static bool AddCastFunctions(v8::Local<v8::Context> context, v8::Local<v8::Object> target);
 
         static std::vector<std::string> GetTypeMetadata(const std::string &name, int index);
 

@@ -973,9 +973,8 @@ void CallbackHandlers::ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Val
     exit(-1);
 }
 
-void CallbackHandlers::CreateGlobalCastFunctions(Isolate *isolate,
-                                                 const Local<ObjectTemplate> &globalTemplate) {
-    castFunctions.CreateGlobalCastFunctions(isolate, globalTemplate);
+bool CallbackHandlers::AddCastFunctions(Local<Context> context, Local<Object> target) {
+    return castFunctions.AddCastFunctions(context, target);
 }
 
 vector<string> CallbackHandlers::GetTypeMetadata(const string &name, int index) {
