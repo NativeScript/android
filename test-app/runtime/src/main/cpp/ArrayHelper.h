@@ -8,7 +8,11 @@
 namespace tns {
 class ArrayHelper {
     public:
-        static void Init(const v8::Local<v8::Context>& context);
+        /*
+         * A new Java array factory, `newArray(type, length)`, for the
+         * `ns:interop/android` binding.
+         */
+        static v8::MaybeLocal<v8::Function> CreateNewArray(v8::Local<v8::Context> context);
 
     private:
         ArrayHelper();
@@ -20,6 +24,8 @@ class ArrayHelper {
         static void Throw(v8::Isolate* isolate, const std::string& errorMessage);
 
         static jobject CreateArrayByClassName(const std::string& typeName, int length);
+
+        static void ResolveRuntimeMethods();
 
         static jclass RUNTIME_CLASS;
 
