@@ -290,24 +290,44 @@ Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID,
   JEnv env;
   JniLocalRef clazz(env.GetObjectClass(instance));
 
-  return CreateJSWrapperHelper(javaObjectID, typeName, clazz);
+  auto& seen = m_wrapperClasses[typeName];
+  for (const auto& entry : seen) {
+    if (env.isSameObject(entry.clazz, clazz)) {
+      return CreateJSWrapperHelper(javaObjectID, entry.className, entry.clazz);
+    }
+  }
+
+  auto className = GetClassName((jclass)clazz);
+  jclass linked = nullptr;
+  auto jsWrapper = CreateJSWrapperHelper(javaObjectID, className, nullptr, &linked);
+  if (linked != nullptr) {
+    if (seen.size() >= 4) {
+      seen.erase(seen.begin());
+    }
+    seen.push_back({linked, className});
+  }
+  return jsWrapper;
 }
 
 Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
-                                                   const string& typeName,
-                                                   jclass clazz) {
+                                                   const string& className,
+                                                   jclass globalClazz,
+                                                   jclass* linkedClazz) {
   auto isolate = m_isolate;
-
-  auto className = (clazz != nullptr) ? GetClassName(clazz) : typeName;
 
   auto node = MetadataNode::GetOrCreate(className);
 
   auto jsWrapper = node->CreateJSWrapper(isolate, this);
 
   if (!jsWrapper.IsEmpty()) {
-    JEnv env;
-    auto claz = env.FindClass(className);
-    Link(jsWrapper, javaObjectID, claz);
+    if (globalClazz == nullptr) {
+      JEnv env;
+      globalClazz = env.FindClass(className);
+    }
+    Link(jsWrapper, javaObjectID, globalClazz);
+    if (linkedClazz != nullptr) {
+      *linkedClazz = globalClazz;
+    }
   }
   return jsWrapper;
 }
