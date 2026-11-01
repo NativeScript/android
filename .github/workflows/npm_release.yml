@@ -212,7 +212,7 @@ jobs:
           path: test-app/dist/android_unit_test_results.xml
       - name: Test report summary
         if: ${{ !cancelled() }}
-        uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6.5.0
+        uses: mikepenz/action-junit-report@6ef3fdcfcd5f0b5d14df3e659ef19b8c6820f93d # v6.6.1
         with:
           report_paths: test-app/dist/android_unit_test_results.xml
           annotate_only: true
