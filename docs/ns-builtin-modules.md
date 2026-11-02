@@ -95,13 +95,22 @@ Node's single-quoted style.
 
 ### `ns:runtime`
 
-Runtime-level configuration. Keys, value domains, and scope are defined and
-validated natively; the module surface is a thin frozen wrapper.
+Runtime-level configuration and runtime plumbing. Keys, value domains, and
+scope are defined and validated natively; the module surface is a thin frozen
+wrapper.
 
 | export | description |
 |---|---|
 | `setConfig(key, value)` | Sets a runtime config key. Throws `TypeError` on an unknown key, an invalid value, or (for process-wide keys) when called from a worker isolate. |
 | `getConfig(key)` | Returns the current value of a config key. Throws `TypeError` on an unknown key. Readable from any isolate. |
+| `escapeException(x)` | Returns an `Error` branded so that, when it is thrown back across a native callback boundary, the native caller receives the original native exception `x` carries rather than the runtime's wrapper exception. Idempotent: a branded error is returned unchanged. Throws `TypeError` when called with no argument. The global `interop.escapeException` is this same function (see [Legacy globals](#legacy-globals)). |
+
+*Platform note (Android):* the original exception is the Java throwable `x`
+wraps, or its `nativeException`; a Java `catch` of the concrete type then
+matches instead of receiving a `com.tns.NativeScriptException`. A branded error
+with no underlying throwable escapes as a `com.tns.NativeScriptException`
+carrying the JS message and stack, as an unbranded one does, but bypasses
+`discardUncaughtJsExceptions`.
 
 Config keys:
 
@@ -169,6 +178,53 @@ a release build that cannot be diagnosed.
 *Platform note (Android):* each category writes under its own logcat tag —
 `TNS.esm`, `TNS.fetch`, `TNS.registry` — so `adb logcat -s TNS.esm` can filter
 them without matching message text.
+
+### `ns:interop`
+
+The cross-platform interop surface: working with native values, as opposed to
+finding native symbols. It exists on every platform with whatever members that
+platform supports, so a feature check (`"Pointer" in interop`) is how portable
+code asks; a member a platform lacks is absent, never present-but-throwing.
+
+On Android the namespace is **empty**: Android has none of the native-memory
+members iOS exports here (`Pointer`, `Reference`, `sizeof`, …). It is still a
+frozen module, so `import * as interop from "ns:interop"` resolves everywhere.
+
+### `ns:interop/android`
+
+Java-specific interop helpers. Android only: on other platforms the specifier
+is not registered and fails like any unknown builtin.
+
+| export | description |
+|---|---|
+| `long(x)`, `byte(x)`, `short(x)`, `char(x)`, `float(x)`, `double(x)` | Mark a JS value as the named Java primitive, for overload resolution and argument conversion: `method(long("123456789012"))` picks the `long` overload and passes the full 64-bit value. Each takes exactly one argument. |
+| `newArray(type, length)` | Creates a Java array of `length` elements. `type` is a primitive type name (`"int"`, `"char"`, `"boolean"`, …), a fully qualified Java class name (`"java.lang.String"`), or a Java class constructor (`java.lang.String`). Throws on any other arity, a non-integer or negative length, or a class name that does not resolve. |
+
+```js
+import { long, newArray } from "ns:interop/android";
+
+const bytes = newArray("byte", 1024); // byte[1024]
+const names = newArray(java.lang.String, 3); // String[3]
+someJavaObject.setTimestamp(long(Date.now()));
+```
+
+### Legacy globals
+
+Before these modules existed the same functions were reachable only as
+globals, and app code and `@nativescript/core` read them at module top level.
+They remain, installed before any app code runs, as **aliases of the module
+exports** — the very same function objects, per realm:
+
+| global | module export |
+|---|---|
+| `interop.escapeException` | `ns:runtime`'s `escapeException` |
+| `long`, `byte`, `short`, `char`, `float`, `double` (Android) | `ns:interop/android`'s members of those names |
+| `Array.create` (Android) | `ns:interop/android`'s `newArray` |
+
+The global `interop` object, the cast globals and `Array.create` are ordinary
+writable, enumerable, configurable data properties. On Android the global
+`interop` has exactly one member, `escapeException`; it is a plain object, not
+the `ns:interop` namespace. New code should import from the modules.
 
 ### `ns:module`
 
@@ -724,8 +780,9 @@ separate loading paths**, not one registry with a per-entry flag:
 
 - The **public registry** is a table mapping specifier → builtin, and it is the
   only thing the `ns:`/`node:` resolver consults. A specifier absent from it
-  does not resolve, full stop. Today it holds six entries: `ns:module`,
-  `ns:runtime`, `ns:util`, `node:module`, `node:url`, `node:util`.
+  does not resolve, full stop. Today it holds eight entries: `ns:interop`,
+  `ns:interop/android`, `ns:module`, `ns:runtime`, `ns:util`, `node:module`,
+  `node:url`, `node:util`.
 - **Internal builtins** (the intrinsics snapshot, the require factory, the
   console formatter, and so on) are invoked directly from their own native call
   sites. They are never named in the public registry, so there is no specifier
@@ -765,8 +822,14 @@ internal require is a fixed parameter of the builtin function wrapper
 The files under `js/` that are *not* in the public registry — `primordials.js`,
 `require-factory.js`, `inspect.js`, `json-helper.js`, `events.js`,
 `error-events.js`, `structured-clone.js`, `blob-url.js`, `performance.js`,
-`weak-ref.js` — are the internal builtins: each is run from its own native call
-site and none is named in the registry table.
+`weak-ref.js`, `interop-globals.js` — are the internal builtins: each is run
+from its own native call site and none is named in the public registry.
+
+`interop-globals.js` is the [legacy globals](#legacy-globals) layer. It runs
+eagerly from `Runtime::PrepareV8Runtime` in every isolate, requires
+`ns:runtime` and `ns:interop/android` through the internal require and assigns
+their functions to the globals, so the compat knowledge lives only in that
+consumer and neither module refers to it.
 
 Per-realm builtin state — the exports objects, the synthetic modules, the
 in-progress set that produces the circular-require error, the cached `format`,

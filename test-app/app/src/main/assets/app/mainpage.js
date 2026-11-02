@@ -96,6 +96,7 @@ require('./tests/testInspect');
 // The ns:/node: builtin modules
 require('./tests/testNsUtil');
 require('./tests/testNsRuntime');
+require('./tests/testNsInterop');
 require('./tests/testNsModule');
 // Remote-module security gate (debug builds allow remote modules outright)
 require('./tests/testRemoteModuleSecurity');

@@ -64,6 +64,13 @@ module.exports = somethingTheCallSiteNeeds;
 - `node-module.js` re-exports `ns:module`'s `createRequire` as the `node:module`
   shim, and `node-url.js` is the `node:url` shim (`fileURLToPath` /
   `pathToFileURL`), the one shim with no `ns:` counterpart to adapt.
+- `ns-interop.js` is `ns:interop` (empty on Android) and `ns-interop-android.js`
+  is `ns:interop/android` (the numeric casts and `newArray`). The legacy
+  globals they back — `interop`, `long`…`double`, `Array.create` — are
+  installed by `interop-globals.js`, an eager internal-tier builtin that
+  requires both modules (and `ns:runtime` for `escapeException`): the same
+  one-file-per-surface split as a `node:` shim, with the compat file as the
+  only consumer that knows the globals exist.
 - Destructure `binding` and `primordials` once, at the top of the file, so the
   file's dependencies are visible and greppable.
 

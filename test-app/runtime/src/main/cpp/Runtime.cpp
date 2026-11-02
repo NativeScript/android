@@ -11,7 +11,6 @@
 #include <thread>
 
 #include "ArgConverter.h"
-#include "ArrayHelper.h"
 #include "BuiltinLoader.h"
 #include "CallbackHandlers.h"
 #include "Constants.h"
@@ -22,7 +21,6 @@
 #include "File.h"
 #include "FrameCallbacks.h"
 #include "HttpLoader.h"
-#include "Interop.h"
 #include "IsolateTracked.h"
 #include "JType.h"
 #include "JsArgToArrayConverter.h"
@@ -989,8 +987,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   SimpleProfiler::Init(isolate, globalTemplate);
 
-  CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
-
   // Lazy web globals (TextEncoder/TextDecoder, atob/btoa): registered on the
   // template so the builtins behind them run only on first use, in every
   // isolate — workers included.
@@ -1017,8 +1013,14 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   // mark/measure `detail` is cloned through the structuredClone global.
   Performance::Init(context);
 
-  // The `interop` global (interop.escapeException), mirroring iOS.
-  Interop::Init(context);
+  // The legacy interop globals (`interop`, the numeric casts, Array.create),
+  // assembled from ns:runtime and ns:interop/android. Builtins run above this
+  // point cannot use them.
+  if (BuiltinLoader::GetExports(context, BuiltinId::kInteropGlobals, nullptr)
+          .IsEmpty()) {
+    throw NativeScriptException(
+        "PrepareV8Runtime: the interop globals bootstrap failed");
+  }
 
   m_objectManager->Init(isolate);
 
@@ -1078,8 +1080,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   MetadataNode::EnableProfiler(enableProfiler);
 
   MetadataNode::CreateTopLevelNamespaces(isolate, global);
-
-  ArrayHelper::Init(context);
 
   m_arrayBufferHelper.CreateConvertFunctions(context, global, m_objectManager);
 
