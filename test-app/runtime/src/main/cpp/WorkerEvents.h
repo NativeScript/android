@@ -30,7 +30,7 @@ public:
      * Builds a MessageEvent out of `message` and dispatches it on `receiver` -
      * the Worker object for worker-to-parent traffic, the global scope's
      * EventTarget for parent-to-worker. A message that cannot be read arrives
-     * as a `messageerror` event carrying nothing. A handler that throws leaves
+     * as a `messageerror` event instead. A handler that throws leaves
      * the exception pending for the caller's TryCatch, which owns the worker's
      * error chain. No-op before Init has run.
      */
