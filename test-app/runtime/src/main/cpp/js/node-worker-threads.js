@@ -217,8 +217,8 @@ class Worker extends WorkerEmitter {
   }
 
   // Node emits 'exit' once and settles terminate() after it. The code is
-  // always 0: this runtime has no thread exit status to report, and the
-  // cross-runtime suite pins that for every end a worker can take.
+  // always 0, however the worker ended: this runtime has no thread exit
+  // status to report.
   #reportExit() {
     if (this.#exited) {
       return;
