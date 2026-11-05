@@ -14,12 +14,13 @@ namespace {
 
 /*
  * The worker-events builtin's delivery callouts for this isolate. Both message
- * directions share emitMessage; only the receiver differs. emitError is
- * parent-side only.
+ * directions share emitMessage; only the receiver differs. emitError and
+ * emitEnded are parent-side only.
  */
 struct WorkerEventsState {
     Global<v8::Function> emitMessage;
     Global<v8::Function> emitError;
+    Global<v8::Function> emitEnded;
 };
 
 Local<v8::Function> CalloutOf(Local<Object> exports, Isolate* isolate, const char* name) {
@@ -48,6 +49,7 @@ void WorkerEvents::Init(Local<Context> context) {
 
     Local<v8::Function> emitMessage = CalloutOf(exports, isolate, "emitMessage");
     Local<v8::Function> emitError = CalloutOf(exports, isolate, "emitError");
+    Local<v8::Function> emitEnded = CalloutOf(exports, isolate, "emitEnded");
 
     auto* state = RuntimeState::For<WorkerEventsState>(isolate);
     if (state == nullptr) {
@@ -55,6 +57,7 @@ void WorkerEvents::Init(Local<Context> context) {
     }
     state->emitMessage.Reset(isolate, emitMessage);
     state->emitError.Reset(isolate, emitError);
+    state->emitEnded.Reset(isolate, emitEnded);
 }
 
 void WorkerEvents::EmitMessage(Isolate* isolate, Local<Object> receiver,
@@ -120,6 +123,21 @@ bool WorkerEvents::EmitError(Isolate* isolate, Local<Object> receiver,
         return false;
     }
     return result->BooleanValue(isolate);
+}
+
+void WorkerEvents::EmitEnded(Isolate* isolate, Local<Object> receiver) {
+    auto* state = RuntimeState::For<WorkerEventsState>(isolate);
+    if (state == nullptr || state->emitEnded.IsEmpty()) {
+        return;
+    }
+    Runtime* runtime = Runtime::TryGetRuntime(isolate);
+    if (runtime == nullptr) {
+        return;
+    }
+    Local<Context> context = runtime->GetContext();
+
+    Local<Value> result;
+    (void)state->emitEnded.Get(isolate)->Call(context, receiver, 0, nullptr).ToLocal(&result);
 }
 
 }  // namespace tns
