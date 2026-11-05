@@ -62,6 +62,9 @@ void WorkerEvents::Init(Local<Context> context) {
 
 void WorkerEvents::EmitMessage(Isolate* isolate, Local<Object> receiver,
                                const std::shared_ptr<worker::Message>& message) {
+    // Callers drain a whole batch under one scope; without this the handles of
+    // every message in the batch stay alive until the batch ends.
+    HandleScope handleScope(isolate);
     auto* state = RuntimeState::For<WorkerEventsState>(isolate);
     if (state == nullptr || state->emitMessage.IsEmpty()) {
         return;

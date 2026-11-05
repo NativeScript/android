@@ -64,9 +64,12 @@ describe("DOMException canary", function () {
   });
 
   it("serializes through structuredClone on this runtime", function () {
-    var clone = structuredClone(new DOMException("x", "AbortError"));
+    var original = new DOMException("x", "AbortError");
+    original.stack = "DOMException stack sentinel";
+    var clone = structuredClone(original);
     expect(clone instanceof DOMException).toBe(true);
     expect(clone.name).toBe("AbortError");
+    expect(clone.stack).toBe("DOMException stack sentinel");
   });
 
   it("clones the isolate's first DOMException even when a getter creates it mid-clone", function (done) {
