@@ -155,10 +155,11 @@ describe("Messaging runtime edges", function () {
             var got = [];
             worker.on("message", function (value) {
                 got.push(value);
-                if (got.length === 3) {
+                if (got.length === 4) {
                     setTimeout(function () {
-                        // Three messages: the once() registration fires only
-                        // for the first, the on() one for all three.
+                        // Three messages: the on() registration fires for all
+                        // three, the once() one only for the first. The settle
+                        // window catches a fifth reply.
                         expect(got).toEqual([1, 2, 3, 4]);
                         worker.terminate();
                         done();
