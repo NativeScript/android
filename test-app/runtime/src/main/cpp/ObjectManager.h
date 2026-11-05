@@ -212,8 +212,14 @@ class ObjectManager {
       DirectBuffer& inputBuff, DirectBuffer& outputBuff);
 
   v8::Local<v8::Object> CreateJSWrapperHelper(jint javaObjectID,
-                                              const std::string& typeName,
-                                              jclass clazz);
+                                              const std::string& className,
+                                              jclass globalClazz,
+                                              jclass* linkedClazz = nullptr);
+
+  struct WrapperClassEntry {
+    jclass clazz;
+    std::string className;
+  };
 
   static void JSObjectWeakCallbackStatic(
       const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
@@ -252,6 +258,9 @@ class ObjectManager {
   std::stack<GarbageCollectionInfo> m_markedForGC;
 
   std::unordered_map<int, ObjectWeakCallbackState*> m_idToObject;
+
+  // Recent runtime classes per declared type.
+  std::unordered_map<std::string, std::vector<WrapperClassEntry>> m_wrapperClasses;
 
   PersistentObjectIdSet m_released;
 
