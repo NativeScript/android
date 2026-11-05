@@ -27,6 +27,10 @@ namespace tns {
 
         JsArgConverter(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& methodSignature);
 
+        JsArgConverter(const JsArgConverter&) = delete;
+
+        JsArgConverter& operator=(const JsArgConverter&) = delete;
+
         ~JsArgConverter();
 
         jvalue* ToArgs();
@@ -79,7 +83,10 @@ namespace tns {
 
         std::string m_methodSignature;
 
-        std::vector<std::string> m_tokens;
+        std::vector<std::string> m_ownedTokens;
+
+        // May point at m_ownedTokens, which is why the converter is not copyable.
+        const std::vector<std::string>* m_tokens = &m_ownedTokens;
 
         Error m_error;
     };
