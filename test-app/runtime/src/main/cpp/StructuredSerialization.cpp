@@ -172,14 +172,16 @@ public:
         if (object->InternalFieldCount() > 0) {
             return Just(true);
         }
-        if (uncloneableBrand_.IsEmpty()) {
-            // markAsUncloneable creates the brand on its first call in an
-            // isolate, which a getter in the graph being written can make.
-            uncloneableBrand_ = messaging::UncloneableBrandIfAny(isolate);
-        }
-        if (!uncloneableBrand_.IsEmpty()) {
+        // markAsUncloneable creates the brand on its first call in an isolate,
+        // which a getter in the graph being written can make. A brand looked up
+        // here stays local: V8 calls IsHostObject inside a HandleScope of its
+        // own, so a handle made now is gone once this returns.
+        Local<Private> uncloneableBrand = uncloneableBrand_.IsEmpty()
+                                                  ? messaging::UncloneableBrandIfAny(isolate)
+                                                  : uncloneableBrand_;
+        if (!uncloneableBrand.IsEmpty()) {
             bool uncloneable = false;
-            if (!object->HasPrivate(isolate->GetCurrentContext(), uncloneableBrand_)
+            if (!object->HasPrivate(isolate->GetCurrentContext(), uncloneableBrand)
                          .To(&uncloneable)) {
                 return Nothing<bool>();
             }

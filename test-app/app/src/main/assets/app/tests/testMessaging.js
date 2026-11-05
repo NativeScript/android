@@ -310,6 +310,20 @@ describe("Messaging runtime edges", function () {
                 done();
             };
         });
+
+        it("rejects a marked object reached after the getter that created the brand", function (done) {
+            var worker = new Worker("./messaging/uncloneableAfterGetterWorker.js");
+            worker.onmessage = function (event) {
+                expect(event.data).toEqual({ threw: true, name: "DataCloneError" });
+                worker.terminate();
+                done();
+            };
+            worker.onerror = function (error) {
+                fail("worker error: " + error.message);
+                worker.terminate();
+                done();
+            };
+        });
     });
 
     describe("worker error reporting", function () {
