@@ -111,3 +111,27 @@ describe("CustomEvent canary", function () {
     expect(new CustomEvent("x") instanceof Event).toBe(true);
   });
 });
+
+// Same contract again for the shared messaging suites (MessageChannel,
+// BroadcastChannel, MessageEvent, WorkerEvents, NodeWorkerThreads): they
+// self-gate, these unguarded specs turn absence into a failure.
+describe("messaging canary", function () {
+  it("implements the messaging interfaces as globals", function () {
+    expect(typeof MessagePort).toBe("function");
+    expect(typeof MessageChannel).toBe("function");
+    expect(typeof BroadcastChannel).toBe("function");
+    expect(typeof MessageEvent).toBe("function");
+  });
+
+  it("is not reachable as a module from app code", function () {
+    expect(function () { require("internal/message-channel"); }).toThrow();
+    expect(function () { require("internal/message-event"); }).toThrow();
+    expect(function () { require("internal/broadcast-channel"); }).toThrow();
+  });
+
+  it("resolves node:worker_threads on the main thread", function () {
+    var workerThreads = require("node:worker_threads");
+    expect(workerThreads.isMainThread).toBe(true);
+    expect(workerThreads.MessageChannel).toBe(MessageChannel);
+  });
+});
