@@ -81,3 +81,30 @@ describe("Tests mapped ByteBuffer conversion", function () {
 		expect(exceptionCaught).toBe(true);
 	});
 });
+
+describe("Tests JNI references of ArrayBuffers passed to Java", function () {
+	// ART aborts the process once its JNI global reference table holds 51200
+	// entries. Each ArrayBuffer or typed array crossing to Java for the first
+	// time used to take a global reference that was never deleted, so these
+	// loops cross more distinct buffers than the table can hold.
+	var MORE_THAN_THE_GLOBAL_REF_TABLE = 60000;
+
+	it("should not keep a global reference per buffer passed as a method argument", function () {
+		var holder = new com.tns.tests.ByteBufferHolder();
+		for (var i = 0; i < MORE_THAN_THE_GLOBAL_REF_TABLE; i++) {
+			var buffer = i % 2 ? new ArrayBuffer(1) : new Uint8Array(1);
+			new Uint8Array(buffer.buffer || buffer)[0] = i & 0x7f;
+			holder.hold(buffer);
+		}
+		expect(holder.get(0)).toBe((MORE_THAN_THE_GLOBAL_REF_TABLE - 1) & 0x7f);
+	});
+
+	it("should not keep a global reference per buffer stored in a Java array", function () {
+		var array = Array.create(java.nio.ByteBuffer, 1);
+		for (var i = 0; i < MORE_THAN_THE_GLOBAL_REF_TABLE; i++) {
+			array[0] = new ArrayBuffer(1);
+		}
+		// reaching here without the runtime aborting is the real assertion
+		expect(array[0]).toBeTruthy();
+	});
+});

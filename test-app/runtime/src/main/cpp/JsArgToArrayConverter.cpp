@@ -340,8 +340,11 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                         buffer = directBuffer;
                     }
 
-                    buffer = env.NewGlobalRef(buffer);
-
+                    // The buffer needs no global ref of its own: GetOrCreateObjectId keeps
+                    // it strongly reachable from Java until the JS object is collected.
+                    // One taken here would never be deleted, pinning the buffer (and, via
+                    // JSObjectFinalizer, its ArrayBuffer) and filling the JNI global
+                    // reference table.
                     int id = objectManager->GetOrCreateObjectId(buffer);
                     auto clazz = env.GetObjectClass(buffer);
                     objectManager->Link(jsObj, id, clazz);
