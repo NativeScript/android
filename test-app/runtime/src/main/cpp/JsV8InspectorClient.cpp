@@ -949,8 +949,13 @@ std::string JsV8InspectorClient::HandleIORead(long long msgId, const std::string
         }
         stream.lastReadPos = position + count;
 
+        // A read that starts inside a character, or one of 6 bytes or fewer,
+        // can cut a character at an end. Chromium's JSON encoder would drop
+        // those bytes; sending that one chunk as base64 keeps them.
+        bool wholeCharacters =
+                (bytes[0] & 0xC0) != 0x80 && TruncateUTF8ToByteSize(bytes, count) == count;
         const char* chunk = reinterpret_cast<const char*>(bytes);
-        if (stream.binary) {
+        if (stream.binary || !wholeCharacters) {
             result = {{"data", Base64Encode(chunk, count)}, {"eof", false}, {"base64Encoded", true}};
         } else {
             result = {{"data", std::string(chunk, count)}, {"eof", false}, {"base64Encoded", false}};
