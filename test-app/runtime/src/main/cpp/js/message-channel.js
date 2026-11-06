@@ -241,7 +241,8 @@ function receiveMessageOnPort(port) {
 }
 
 // The per-isolate delivery callout. Native invokes it with the receiving port
-// wrapper as the receiver; `type` is "message", "messageerror" or "close".
+// wrapper as the receiver — or, for a BroadcastChannel's port, the channel
+// itself; `type` is "message", "messageerror" or "close".
 function emitMessage(data, ports, type) {
   if (type === "close") {
     FunctionPrototypeCall(dispatchEvent, this, new Event("close"));
