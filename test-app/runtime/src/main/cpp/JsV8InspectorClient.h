@@ -4,6 +4,7 @@
 #include <atomic>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 #include <src/inspector/v8-console-message.h>
@@ -92,10 +93,14 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
 
         // Streams backing Network.loadNetworkResource responses, read by the
         // frontend through IO.read/IO.close (how Chrome DevTools fetches source
-        // maps from the target). Accessed from the websocket read thread.
+        // maps from the target). Accessed from the websocket read thread. Like
+        // Chromium's DevToolsIOContext, a stream lives until IO.close or until
+        // its frontend disconnects.
         struct ResourceStream {
             std::string data;
-            size_t offset = 0;
+            // Chromium sends valid UTF-8 as text and everything else as base64.
+            bool binary = false;
+            size_t lastReadPos = 0;
         };
 
         // Live worker inspectors, keyed by their flat-protocol sessionId
@@ -122,7 +127,9 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         // Source map delivery to Chrome DevTools (Network.loadNetworkResource +
         // IO domain). V8's inspector doesn't implement these embedder domains.
         std::string HandleLoadNetworkResource(long long msgId, const std::string& url, const std::string& sessionId);
-        std::string HandleIORead(long long msgId, const std::string& handle, int size, const std::string& sessionId);
+        std::string HandleIORead(long long msgId, const std::string& handle,
+                                 std::optional<long long> offset, std::optional<long long> size,
+                                 const std::string& sessionId);
         std::string HandleIOClose(long long msgId, const std::string& handle, const std::string& sessionId);
 
         std::map<std::string, ResourceStream> resourceStreams_;
