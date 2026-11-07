@@ -144,9 +144,9 @@ MetadataNode::MetadataNode(MetadataTreeNode* treeNode) :
 
     m_isArray = s_metadataReader.IsNodeTypeArray(parentNodeType);
 
-    bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
+    m_isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
 
-    if (!m_isArray && isInterface) {
+    if (!m_isArray && m_isInterface) {
         bool isPrefix;
         auto impTypeName = s_metadataReader.ReadInterfaceImplementationTypeName(m_treeNode, isPrefix);
         m_implType = isPrefix
@@ -242,8 +242,7 @@ string MetadataNode::GetName() {
 }
 
 bool MetadataNode::IsNodeTypeInterface() {
-    uint8_t nodeType = s_metadataReader.GetNodeType(m_treeNode);
-    return s_metadataReader.IsNodeTypeInterface(nodeType);
+    return m_isInterface;
 }
 
 string MetadataNode::GetTypeMetadataName(Isolate* isolate, Local<Value>& value) {
