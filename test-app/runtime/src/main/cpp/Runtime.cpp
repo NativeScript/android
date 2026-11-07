@@ -505,7 +505,7 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
 jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
                                     jint javaObjectID, jstring methodName,
                                     jint retType, jboolean isConstructor,
-                                    jobjectArray packagedArgs) {
+                                    const JavaCallArgs& args) {
   SET_PROFILER_FRAME();
 
   auto isolate = m_isolate;
@@ -537,7 +537,7 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
 
   string method_name = ArgConverter::jstringToString(methodName);
   auto jsResult = CallbackHandlers::CallJSMethod(m_isolate, env, jsObject,
-                                                 method_name, packagedArgs);
+                                                 method_name, args);
 
   int classReturnType = retType;
   jobject javaObject =

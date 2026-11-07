@@ -15,11 +15,21 @@
 
 namespace tns {
 
+// The argument arrays com.tns.Runtime.packageArgs builds for a Java -> JS call.
+struct JavaCallArgs {
+    jintArray types;
+    jlongArray values;
+    jobjectArray refs;
+};
+
 class ArgConverter {
     public:
         static void Init(v8::Local<v8::Context> context);
 
-        static v8::Local<v8::Array> ConvertJavaArgsToJsArgs(v8::Local<v8::Context> context, jobjectArray args);
+        static int GetJavaArgsLength(JNIEnv* env, const JavaCallArgs& args);
+
+        // out must have room for GetJavaArgsLength(args) values.
+        static void ConvertJavaArgsToJsArgs(v8::Isolate* isolate, JNIEnv* env, const JavaCallArgs& args, int argc, v8::Local<v8::Value>* out);
 
         static v8::Local<v8::Value> ConvertFromJavaLong(v8::Isolate* isolate, jlong value);
 

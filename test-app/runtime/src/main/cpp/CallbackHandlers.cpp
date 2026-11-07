@@ -1001,7 +1001,7 @@ vector<string> CallbackHandlers::GetTypeMetadata(const string &name, int index) 
 
 Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
                                             const Local<Object> &jsObject, const string &methodName,
-                                            jobjectArray args) {
+                                            const JavaCallArgs &args) {
     SET_PROFILER_FRAME();
 
     JEnv env(_env);
@@ -1023,19 +1023,23 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
         EscapableHandleScope handleScope(isolate);
 
         auto jsMethod = method.As<Function>();
-        auto jsArgs = ArgConverter::ConvertJavaArgsToJsArgs(context, args);
-        int argc = jsArgs->Length();
+        int argc = ArgConverter::GetJavaArgsLength(env, args);
 
-        std::vector<Local<Value>> arguments(argc);
-        for (int i = 0; i < argc; i++) {
-            arguments[i] = jsArgs->Get(context, i).ToLocalChecked();
+        constexpr int kInlineArgs = 16;
+        Local<Value> inlineArguments[kInlineArgs];
+        std::vector<Local<Value>> heapArguments;
+        Local<Value>* arguments = inlineArguments;
+        if (argc > kInlineArgs) {
+            heapArguments.resize(argc);
+            arguments = heapArguments.data();
         }
+        ArgConverter::ConvertJavaArgsToJsArgs(isolate, env, args, argc, arguments);
 
         TryCatch tc(isolate);
         Local<Value> jsResult;
         {
             SET_PROFILER_FRAME();
-            jsMethod->Call(context, jsObject, argc, argc == 0 ? nullptr : arguments.data()).ToLocal(
+            jsMethod->Call(context, jsObject, argc, argc == 0 ? nullptr : arguments).ToLocal(
                     &jsResult);
         }
 
