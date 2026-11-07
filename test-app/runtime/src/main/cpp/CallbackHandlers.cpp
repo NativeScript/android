@@ -1008,7 +1008,7 @@ vector<string> CallbackHandlers::GetTypeMetadata(const string &name, int index) 
 }
 
 Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
-                                            const Local<Object> &jsObject, const string &methodName,
+                                            const Local<Object> &jsObject, const Local<String> &methodName,
                                             const JavaCallArgs &args) {
     SET_PROFILER_FRAME();
 
@@ -1016,16 +1016,15 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
     Local<Value> result;
 
     auto context = Runtime::GetRuntime(isolate)->GetContext();
-    auto method = jsObject->Get(context, ArgConverter::ConvertToV8String(isolate,
-                                                                         methodName)).ToLocalChecked();
+    auto method = jsObject->Get(context, methodName).ToLocalChecked();
 
     if (method.IsEmpty() || method->IsUndefined()) {
         stringstream ss;
-        ss << "Cannot find method '" << methodName << "' implementation";
+        ss << "Cannot find method '" << ArgConverter::ConvertToString(methodName) << "' implementation";
         throw NativeScriptException(ss.str());
     } else if (!method->IsFunction()) {
         stringstream ss;
-        ss << "Property '" << methodName << "' is not a function";
+        ss << "Property '" << ArgConverter::ConvertToString(methodName) << "' is not a function";
         throw NativeScriptException(ss.str());
     } else {
         EscapableHandleScope handleScope(isolate);
@@ -1060,7 +1059,7 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
                 jsResult = v8::Undefined(isolate);
             } else {
                 stringstream ss;
-                ss << "Calling js method " << methodName << " failed";
+                ss << "Calling js method " << ArgConverter::ConvertToString(methodName) << " failed";
                 throw NativeScriptException(tc, ss.str());
             }
         }

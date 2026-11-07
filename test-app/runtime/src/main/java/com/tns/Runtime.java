@@ -1173,21 +1173,24 @@ public class Runtime {
 
     public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException {
         Runtime runtime = Runtime.getCurrentRuntime();
+        Integer javaObjectID = (runtime != null) ? runtime.getJavaObjectID(javaObject) : null;
 
         // if we're not in a runtime or the runtime we're in does not have the object, try to find the right one (this might happen if a worker fires a JS method on an object created in the main thread or another worker)
-        if (runtime == null || runtime.getJavaObjectID(javaObject) == null) {
+        if (javaObjectID == null) {
             runtime = getObjectRuntime(javaObject);
+            if (runtime != null) {
+                javaObjectID = runtime.getJavaObjectID(javaObject);
+            }
         }
 
         if (runtime == null) {
             throw new NativeScriptException("Cannot find runtime for instance=" + ((javaObject == null) ? "null" : javaObject));
         }
 
-        return runtime.callJSMethodImpl(javaObject, methodName, retType, isConstructor, delay, args);
+        return runtime.callJSMethodImpl(javaObject, javaObjectID, methodName, retType, isConstructor, delay, args);
     }
 
-    private Object callJSMethodImpl(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException {
-        Integer javaObjectID = getJavaObjectID(javaObject);
+    private Object callJSMethodImpl(Object javaObject, Integer javaObjectID, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException {
         if (javaObjectID == null) {
             throw new NativeScriptException("Cannot find object id for instance=" + ((javaObject == null) ? "null" : javaObject));
         }

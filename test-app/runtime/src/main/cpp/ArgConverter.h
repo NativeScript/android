@@ -12,6 +12,7 @@
 #include "JEnv.h"
 #include <string>
 #include <map>
+#include <vector>
 
 namespace tns {
 
@@ -52,6 +53,26 @@ class ArgConverter {
         inline static v8::Local<v8::String> jcharToV8String(v8::Isolate* isolate, jchar value) {
                 auto v8String = ConvertToV8String(isolate, &value, 1);
                 return v8String;
+        }
+
+        // For property keys: an internalized key skips the string-table insert a
+        // fresh key costs on every property lookup.
+        static v8::Local<v8::String> jstringToInternalizedV8String(v8::Isolate* isolate, JNIEnv* env, jstring value) {
+                if (value == nullptr) {
+                        return v8::String::Empty(isolate);
+                }
+
+                constexpr jsize kInlineUnits = 64;
+                jsize length = env->GetStringLength(value);
+                jchar inlineUnits[kInlineUnits];
+                std::vector<jchar> heapUnits;
+                jchar* units = inlineUnits;
+                if (length > kInlineUnits) {
+                        heapUnits.resize(length);
+                        units = heapUnits.data();
+                }
+                env->GetStringRegion(value, 0, length, units);
+                return v8::String::NewFromTwoByte(isolate, reinterpret_cast<const uint16_t*>(units), v8::NewStringType::kInternalized, length).ToLocalChecked();
         }
 
         static std::string jstringToString(jstring value) {
