@@ -350,7 +350,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                 }
 
 
-                V8GetPrivateValue(isolate, jsObj, V8StringConstants::GetNullNodeName(isolate),
+                V8GetPrivateValue(isolate, jsObj, V8StringConstants::GetNullNodePrivate(isolate),
                                   castValue);
 
                 if (!castValue.IsEmpty()) {

@@ -112,3 +112,35 @@ bool tns::V8SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Lo
 
     return res.FromMaybe(false);
 }
+
+bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<Private>& privateKey, Local<Value>& out) {
+    auto context = GetCreationContextOrCurrent(isolate, obj);
+    auto hasPrivate = obj->HasPrivate(context, privateKey);
+
+    if (hasPrivate.IsNothing()) {
+        throw tns::NativeScriptException("Failed to Get Private Value");
+    }
+
+    if (!hasPrivate.FromMaybe(false)) {
+        return false;
+    }
+
+    auto res = obj->GetPrivate(context, privateKey);
+
+    if (res.IsEmpty()) {
+        throw tns::NativeScriptException("Failed to Get Private Value");
+    }
+
+    return res.ToLocal(&out);
+}
+
+bool tns::V8SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<Private>& privateKey, const Local<Value>& value) {
+    auto context = GetCreationContextOrCurrent(isolate, obj);
+    auto res = obj->SetPrivate(context, privateKey, value);
+
+    if (res.IsNothing()) {
+        throw tns::NativeScriptException("Failed to Set Private Value");
+    }
+
+    return res.FromMaybe(false);
+}
