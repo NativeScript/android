@@ -7,6 +7,8 @@
 
 var JniBench = com.tns.tests.JniBench;
 var ROUNDS = 7;
+var FILTER = String(JniBench.getFilter());
+var SCALE = JniBench.getScale();
 
 function median(values) {
     var sorted = values.slice().sort(function (a, b) { return a - b; });
@@ -25,6 +27,8 @@ function report(name, nsPerOp) {
 
 // body(n) runs the operation n times; returning a value keeps V8 from dropping the loop.
 function measureJs(name, iterations, body) {
+    if (FILTER && name.indexOf(FILTER) < 0) return null;
+    iterations *= SCALE;
     var sink = body(Math.max(1000, iterations >> 2));
     var samples = [];
     for (var r = 0; r < ROUNDS; r++) {
@@ -38,6 +42,8 @@ function measureJs(name, iterations, body) {
 }
 
 function measureCallback(name, cb, kind, iterations) {
+    if (FILTER && name.indexOf(FILTER) < 0) return null;
+    iterations *= SCALE;
     JniBench.runCallbacks(cb, kind, Math.max(1000, iterations >> 2));
     var samples = [];
     for (var r = 0; r < ROUNDS; r++) {
@@ -51,6 +57,10 @@ function buildBenchmarks() {
     var bench = new JniBench();
     var other = bench.getOther();
     var jsString = "hello world";
+    var longString = new Array(129).join("abcdefgh");
+    var Extended = java.lang.Object.extend({
+        toString: function () { return "extended"; }
+    });
     var buffer = new ArrayBuffer(64);
     var intArray = [1, 2, 3, 4, 5, 6, 7, 8];
     var callback = new JniBench.Callback({
@@ -98,6 +108,12 @@ function buildBenchmarks() {
             });
         },
         function () {
+            return measureJs("instance.noop()", 50000, function (n) {
+                for (var i = 0; i < n; i++) bench.instanceNoop();
+                return n;
+            });
+        },
+        function () {
             return measureJs("instance.getInt()", 50000, function (n) {
                 var s = 0;
                 for (var i = 0; i < n; i++) s = bench.getInt();
@@ -122,6 +138,13 @@ function buildBenchmarks() {
             return measureJs("instance.echo(String)", 50000, function (n) {
                 var s;
                 for (var i = 0; i < n; i++) s = bench.echo(jsString);
+                return s;
+            });
+        },
+        function () {
+            return measureJs("instance.echo(String 1KB)", 20000, function (n) {
+                var s;
+                for (var i = 0; i < n; i++) s = bench.echo(longString);
                 return s;
             });
         },
@@ -188,6 +211,13 @@ function buildBenchmarks() {
             });
         },
         function () {
+            return measureJs("new Object.extend({})()", 20000, function (n) {
+                var s;
+                for (var i = 0; i < n; i++) s = new Extended();
+                return s;
+            });
+        },
+        function () {
             return measureJs("field.get int", 50000, function (n) {
                 var s = 0;
                 for (var i = 0; i < n; i++) s = bench.intField;
@@ -243,7 +273,8 @@ exports.run = function () {
             return;
         }
         gc();
-        results.push(benchmarks[index++]());
+        var result = benchmarks[index++]();
+        if (result) results.push(result);
         setTimeout(next, 50);
     }
     setTimeout(next, 500);
