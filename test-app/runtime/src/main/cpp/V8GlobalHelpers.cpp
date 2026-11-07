@@ -113,25 +113,21 @@ bool tns::V8SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Lo
     return res.FromMaybe(false);
 }
 
+// An absent private reads as undefined, so one GetPrivate replaces the
+// HasPrivate + GetPrivate pair; callers never store undefined under these keys.
 bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<Private>& privateKey, Local<Value>& out) {
     auto context = GetCreationContextOrCurrent(isolate, obj);
-    auto hasPrivate = obj->HasPrivate(context, privateKey);
-
-    if (hasPrivate.IsNothing()) {
+    Local<Value> value;
+    if (!obj->GetPrivate(context, privateKey).ToLocal(&value)) {
         throw tns::NativeScriptException("Failed to Get Private Value");
     }
 
-    if (!hasPrivate.FromMaybe(false)) {
+    if (value->IsUndefined()) {
         return false;
     }
 
-    auto res = obj->GetPrivate(context, privateKey);
-
-    if (res.IsEmpty()) {
-        throw tns::NativeScriptException("Failed to Get Private Value");
-    }
-
-    return res.ToLocal(&out);
+    out = value;
+    return true;
 }
 
 bool tns::V8SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<Private>& privateKey, const Local<Value>& value) {
