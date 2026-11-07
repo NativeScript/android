@@ -49,6 +49,11 @@ class ArgConverter {
                 return v8String;
         }
 
+        inline static v8::Local<v8::String> jcharToV8String(v8::Isolate* isolate, jchar value) {
+                auto v8String = ConvertToV8String(isolate, &value, 1);
+                return v8String;
+        }
+
         static std::string jstringToString(jstring value) {
                 if (value == nullptr) {
                         return {};
@@ -150,11 +155,6 @@ class ArgConverter {
 
         inline static jstring ObjectToString(jobject object) {
                 return (jstring) object;
-        }
-
-        inline static v8::Local<v8::String> jcharToV8String(v8::Isolate* isolate, jchar value) {
-                auto v8String = ConvertToV8String(isolate, &value, 1);
-                return v8String;
         }
 
         static void NativeScriptLongFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
