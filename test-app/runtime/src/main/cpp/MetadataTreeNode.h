@@ -1,6 +1,8 @@
 #ifndef TREENODE_H_
 #define TREENODE_H_
 
+#include <atomic>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -16,7 +18,10 @@ struct MetadataTreeNode {
     std::vector<MetadataTreeNode*>* children;
     //
     std::string* metadata;
-    uint8_t type;
+    // Write-once memo: INVALID_TYPE until GetNodeType derives it from the
+    // immutable value data, so a reader that sees any other value can use it
+    // without the reader's state lock.
+    std::atomic<uint8_t> type;
 
     static const uint8_t PACKAGE = 0;
     static const uint8_t CLASS = 1 << 0;
