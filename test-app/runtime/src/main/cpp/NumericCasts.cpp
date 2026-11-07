@@ -24,7 +24,7 @@ void NumericCasts::CreateGlobalCastFunctions(Isolate* isolate, const Local<Objec
 
 CastType NumericCasts::GetCastType(Isolate* isolate, const Local<Object>& object) {
     auto ret = CastType::None;
-    auto key = ArgConverter::ConvertToV8String(isolate, s_castMarker);
+    auto key = V8StringConstants::GetCastMarkerPrivate(isolate);
     Local<Value> hidden;
     V8GetPrivateValue(isolate, object, key, hidden);
     if (!hidden.IsEmpty()) {
@@ -361,7 +361,7 @@ void NumericCasts::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& a
 }
 
 void NumericCasts::MarkJsObject(Isolate* isolate, const Local<Object>& object, CastType castType, const Local<Value>& value) {
-    auto key = ArgConverter::ConvertToV8String(isolate, s_castMarker);
+    auto key = V8StringConstants::GetCastMarkerPrivate(isolate);
     auto type = Integer::New(isolate, static_cast<int>(castType));
     V8SetPrivateValue(isolate, object, key, type);
     auto context = GetCreationContextOrCurrent(isolate, object);
@@ -370,4 +370,3 @@ void NumericCasts::MarkJsObject(Isolate* isolate, const Local<Object>& object, C
     DEBUG_WRITE("MarkJsObject: Marking js object: %d with cast type: %d", object->GetIdentityHash(), castType);
 }
 
-std::string NumericCasts::s_castMarker = "t::cast";

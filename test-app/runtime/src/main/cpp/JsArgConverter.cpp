@@ -17,7 +17,7 @@ using namespace tns;
 JsArgConverter::JsArgConverter(const Local<Object> &caller,
                                const v8::FunctionCallbackInfo<Value> &args,
                                const string &methodSignature, MetadataEntry *entry)
-        : m_isolate(args.GetIsolate()), m_methodSignature(methodSignature), m_isValid(true),
+        : m_isolate(args.GetIsolate()), m_isValid(true),
           m_error(Error()) {
     int v8ProvidedArgumentsLength = args.Length();
     m_argsLen = 1 + v8ProvidedArgumentsLength;
@@ -25,12 +25,12 @@ JsArgConverter::JsArgConverter(const Local<Object> &caller,
     if (m_argsLen > 0) {
         if ((entry != nullptr) && (entry->getIsResolved())) {
             if (entry->parsedSig.empty()) {
-                JniSignatureParser parser(m_methodSignature);
+                JniSignatureParser parser(methodSignature);
                 entry->parsedSig = parser.Parse();
             }
             m_tokens = &entry->parsedSig;
         } else {
-            JniSignatureParser parser(m_methodSignature);
+            JniSignatureParser parser(methodSignature);
             m_ownedTokens = parser.Parse();
         }
 
@@ -53,19 +53,19 @@ JsArgConverter::JsArgConverter(const Local<Object> &caller,
 JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
                                bool hasImplementationObject, const string &methodSignature,
                                MetadataEntry *entry)
-        : m_isolate(args.GetIsolate()), m_methodSignature(methodSignature), m_isValid(true),
+        : m_isolate(args.GetIsolate()), m_isValid(true),
           m_error(Error()) {
     m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 1;
 
     if (m_argsLen > 0) {
         if ((entry != nullptr) && (entry->getIsResolved())) {
             if (entry->parsedSig.empty()) {
-                JniSignatureParser parser(m_methodSignature);
+                JniSignatureParser parser(methodSignature);
                 entry->parsedSig = parser.Parse();
             }
             m_tokens = &entry->parsedSig;
         } else {
-            JniSignatureParser parser(m_methodSignature);
+            JniSignatureParser parser(methodSignature);
             m_ownedTokens = parser.Parse();
         }
 
@@ -81,11 +81,11 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
 
 JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
                                const string &methodSignature)
-        : m_isolate(args.GetIsolate()), m_methodSignature(methodSignature), m_isValid(true),
+        : m_isolate(args.GetIsolate()), m_isValid(true),
           m_error(Error()) {
     m_argsLen = args.Length();
 
-    JniSignatureParser parser(m_methodSignature);
+    JniSignatureParser parser(methodSignature);
     m_ownedTokens = parser.Parse();
 
     for (int i = 0; i < m_argsLen; i++) {
@@ -366,8 +366,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
                     obj = objectManager->GetJavaObjectByJsObject(jsObject);
                 }
 
-                V8GetPrivateValue(m_isolate, jsObject, ArgConverter::ConvertToV8String(m_isolate,
-                                                                                       V8StringConstants::NULL_NODE_NAME),
+                V8GetPrivateValue(m_isolate, jsObject, V8StringConstants::GetNullNodePrivate(m_isolate),
                                   castValue);
 
                 if (!castValue.IsEmpty()) {

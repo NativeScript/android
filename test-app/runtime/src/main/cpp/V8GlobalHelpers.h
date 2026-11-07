@@ -19,7 +19,11 @@ v8::Local<v8::Context> GetCreationContextOrCurrent(v8::Isolate* isolate, const v
 
 bool V8GetPrivateValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, const v8::Local<v8::String>& propName, v8::Local<v8::Value>& out);
 
+bool V8GetPrivateValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, const v8::Local<v8::Private>& privateKey, v8::Local<v8::Value>& out);
+
 bool V8SetPrivateValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, const v8::Local<v8::String>& propName, const v8::Local<v8::Value>& value);
+
+bool V8SetPrivateValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, const v8::Local<v8::Private>& privateKey, const v8::Local<v8::Value>& value);
 }
 
 #endif /* V8GLOBALHELPERS_H_ */

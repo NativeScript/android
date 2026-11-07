@@ -54,7 +54,6 @@ class NumericCasts {
 
         static NumericCasts* GetThis(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-        static std::string s_castMarker;
 };
 }
 

@@ -404,10 +404,10 @@ void MetadataNode::NullObjectAccessorGetterCallback(const FunctionCallbackInfo<V
 
         auto thiz = ResolveProxyReceiver(isolate, info.This(), "read", "null", false);
         Local<Value> hiddenVal;
-        V8GetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodeName(isolate), hiddenVal);
+        V8GetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodePrivate(isolate), hiddenVal);
         if (hiddenVal.IsEmpty()) {
             auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
-            V8SetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodeName(isolate), External::New(isolate, node, v8::kExternalPointerTypeTagDefault));
+            V8SetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodePrivate(isolate), External::New(isolate, node, v8::kExternalPointerTypeTagDefault));
             auto funcTemplate = FunctionTemplate::New(isolate, MetadataNode::NullValueOfCallback);
             auto context = isolate->GetCurrentContext();
             thiz->Delete(context, V8StringConstants::GetValueOf(isolate));
