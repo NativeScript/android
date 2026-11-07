@@ -35,8 +35,10 @@ class WorkerInspectorClient final : public v8_inspector::V8InspectorClient,
                                     public v8_inspector::V8Inspector::Channel {
     public:
         // Worker thread, with the worker isolate locked and its context created.
+        // `workerTerminating` is the worker's own termination flag; the
+        // worker outlives this client.
         WorkerInspectorClient(int workerId, v8::Isolate* isolate, ALooper* workerLooper,
-                              const std::string& url);
+                              const std::string& url, const std::atomic_bool& workerTerminating);
         ~WorkerInspectorClient() override;
 
         int WorkerId() const {
@@ -126,6 +128,10 @@ class WorkerInspectorClient final : public v8_inspector::V8InspectorClient,
 
         std::atomic<bool> dying_{false};
         std::atomic<bool> pauseTerminated_{false};
+        // Read by the pause loop, which leaves on it without NotifyTerminating:
+        // a pause entered while the worker holds its inspector mutex, inside
+        // console.log, would otherwise keep Terminate() waiting for that mutex.
+        const std::atomic_bool& workerTerminating_;
         std::atomic<bool> runningPauseLoop_{false};  // written on the worker thread only
         bool pendingReset_ = false;                  // worker thread only
 };
