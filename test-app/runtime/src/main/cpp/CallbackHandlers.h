@@ -3,6 +3,7 @@
 
 #include <string>
 #include <map>
+#include <condition_variable>
 #include <mutex>
 #include <vector>
 #include "JEnv.h"
@@ -163,6 +164,14 @@ namespace tns {
 
         static void RemoveIsolateEntries(v8::Isolate *isolate);
 
+        /*
+         * Blocks until no __runOnMainThread callback still holds `isolate`.
+         * A worker calls it after releasing its Locker and before disposing
+         * the isolate: a callback that took the isolate before
+         * RemoveIsolateEntries ran may be waiting on that Locker.
+         */
+        static void WaitForMainThreadCallbacks(v8::Isolate *isolate);
+
 
     private:
         CallbackHandlers() {
@@ -248,6 +257,10 @@ namespace tns {
         // thread (multithreaded JS, workers), each under a different
         // isolate's Locker, so the Lockers provide no mutual exclusion
         static std::mutex cacheMutex_;
+        // How many RunMainThreadEntry calls hold each isolate, from reading
+        // its entry until they release its Locker; guarded by cacheMutex_
+        static robin_hood::unordered_map<v8::Isolate *, int> heldIsolates_;
+        static std::condition_variable isolateReleased_;
 
 
     };
