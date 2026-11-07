@@ -191,6 +191,8 @@ class MetadataNode {
         std::string m_name;
         std::string m_implType;
         bool m_isArray;
+        // Read on every Java method call; GetNodeType takes the reader's state lock.
+        bool m_isInterface;
 
         static std::string TNS_PREFIX;
         static MetadataReader s_metadataReader;

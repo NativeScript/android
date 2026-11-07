@@ -81,8 +81,6 @@ namespace tns {
         int m_args_refs[255];
         int m_args_refs_size = 0;
 
-        std::string m_methodSignature;
-
         std::vector<std::string> m_ownedTokens;
 
         // May point at m_ownedTokens, which is why the converter is not copyable.

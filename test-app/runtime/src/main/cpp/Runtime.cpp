@@ -505,7 +505,7 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
 jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
                                     jint javaObjectID, jstring methodName,
                                     jint retType, jboolean isConstructor,
-                                    jobjectArray packagedArgs) {
+                                    const JavaCallArgs& args) {
   SET_PROFILER_FRAME();
 
   auto isolate = m_isolate;
@@ -535,9 +535,15 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
   DEBUG_WRITE("CallJSMethodNative called jsObject=%d",
               jsObject->GetIdentityHash());
 
-  string method_name = ArgConverter::jstringToString(methodName);
+  auto jsMethodName =
+      ArgConverter::jstringToInternalizedV8String(m_isolate, env, methodName);
   auto jsResult = CallbackHandlers::CallJSMethod(m_isolate, env, jsObject,
-                                                 method_name, packagedArgs);
+                                                 jsMethodName, args);
+
+  // Type::Null is the id of void.class: the Java caller discards the result.
+  if (retType == static_cast<jint>(Type::Null)) {
+    return nullptr;
+  }
 
   int classReturnType = retType;
   jobject javaObject =
@@ -1093,6 +1099,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   this->m_napiEnv = NapiEnv::Create(context, m_eventLoop);
   s_currentRuntime = this;
+  // The runtime's thread stays attached until DestroyRuntime: the main thread
+  // for the process, a worker thread until after it tears its runtime down.
+  JEnv::PinThreadEnv(JEnv());
 
   if (m_isMainThread) {
     // Releases any runtime waiting in ElectMainRuntime: the metadata tree and
@@ -1169,6 +1178,7 @@ void Runtime::DestroyRuntime() {
   }
   if (s_currentRuntime == this) {
     s_currentRuntime = nullptr;
+    JEnv::UnpinThreadEnv();
   }
   // The events state holds v8::Global handles (backing event target, dispatch
   // closures and tracked promise rejections) - reset them while the isolate

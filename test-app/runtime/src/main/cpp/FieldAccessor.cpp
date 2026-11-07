@@ -89,11 +89,7 @@ Local<Value> FieldAccessor::GetJavaField(Isolate* isolate, const Local<Object>& 
                 result = env.GetCharField(targetJavaObject, fieldId);
             }
 
-            JniLocalRef str(env.NewString(&result, 1));
-            jboolean bol = true;
-            const char* resP = env.GetStringUTFChars(str, &bol);
-            fieldResult = handleScope.Escape(ArgConverter::ConvertToV8String(isolate, resP, 1));
-            env.ReleaseStringUTFChars(str, resP);
+            fieldResult = handleScope.Escape(ArgConverter::jcharToV8String(isolate, result));
             break;
         }
         case 'S': { //short

@@ -142,7 +142,7 @@ string MethodCache::GetType(Isolate* isolate, const v8::Local<v8::Value>& jsValu
         auto context = isolate->GetCurrentContext();
         auto objVal = value->ToObject(context).ToLocalChecked();
         Local<Value> nullNode; //out
-        V8GetPrivateValue(isolate, objVal, V8StringConstants::GetNullNodeName(isolate), nullNode);
+        V8GetPrivateValue(isolate, objVal, V8StringConstants::GetNullNodePrivate(isolate), nullNode);
 
         if (!nullNode.IsEmpty()) {
             auto treeNode = reinterpret_cast<MetadataNode*>(nullNode.As<External>()->Value(v8::kExternalPointerTypeTagDefault));

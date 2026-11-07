@@ -230,6 +230,17 @@ void CallbackHandlers::SetJavaField(Isolate *isolate, const Local<Object> &targe
     fieldAccessor.SetJavaField(isolate, target, value, fieldData);
 }
 
+// java.lang.String is final, so an object returned through any other declared
+// type can only be a String if that type is one of String's supertypes.
+static bool CanBeJavaString(const std::string &jniReturnType) {
+    return jniReturnType == "Ljava/lang/Object;" ||
+           jniReturnType == "Ljava/lang/CharSequence;" ||
+           jniReturnType == "Ljava/lang/Comparable;" ||
+           jniReturnType == "Ljava/io/Serializable;" ||
+           jniReturnType == "Ljava/lang/constant/Constable;" ||
+           jniReturnType == "Ljava/lang/constant/ConstantDesc;";
+}
+
 void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string &className,
                                       const string &methodName, MetadataEntry *entry,
                                       bool isFromInterface, bool isStatic,
@@ -441,11 +452,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                 result = env.CallCharMethodA(callerJavaObject, mid, javaArgs);
             }
 
-            JniLocalRef str(env.NewString(&result, 1));
-            jboolean bol = true;
-            const char *resP = env.GetStringUTFChars(str, &bol);
-            args.GetReturnValue().Set(ArgConverter::ConvertToV8String(isolate, resP, 1));
-            env.ReleaseStringUTFChars(str, resP);
+            args.GetReturnValue().Set(ArgConverter::jcharToV8String(isolate, result));
             break;
         }
         case MethodReturnType::Short: {
@@ -546,7 +553,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             }
 
             if (result != nullptr) {
-                auto isString = env.IsInstanceOf(result, JAVA_LANG_STRING);
+                auto isString = (returnType == nullptr || CanBeJavaString(*returnType))
+                                && env.IsInstanceOf(result, JAVA_LANG_STRING);
 
                 Local<Value> objectResult;
                 if (isString) {
@@ -1000,42 +1008,45 @@ vector<string> CallbackHandlers::GetTypeMetadata(const string &name, int index) 
 }
 
 Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
-                                            const Local<Object> &jsObject, const string &methodName,
-                                            jobjectArray args) {
+                                            const Local<Object> &jsObject, const Local<String> &methodName,
+                                            const JavaCallArgs &args) {
     SET_PROFILER_FRAME();
 
     JEnv env(_env);
     Local<Value> result;
 
     auto context = Runtime::GetRuntime(isolate)->GetContext();
-    auto method = jsObject->Get(context, ArgConverter::ConvertToV8String(isolate,
-                                                                         methodName)).ToLocalChecked();
+    auto method = jsObject->Get(context, methodName).ToLocalChecked();
 
     if (method.IsEmpty() || method->IsUndefined()) {
         stringstream ss;
-        ss << "Cannot find method '" << methodName << "' implementation";
+        ss << "Cannot find method '" << ArgConverter::ConvertToString(methodName) << "' implementation";
         throw NativeScriptException(ss.str());
     } else if (!method->IsFunction()) {
         stringstream ss;
-        ss << "Property '" << methodName << "' is not a function";
+        ss << "Property '" << ArgConverter::ConvertToString(methodName) << "' is not a function";
         throw NativeScriptException(ss.str());
     } else {
         EscapableHandleScope handleScope(isolate);
 
         auto jsMethod = method.As<Function>();
-        auto jsArgs = ArgConverter::ConvertJavaArgsToJsArgs(context, args);
-        int argc = jsArgs->Length();
+        int argc = ArgConverter::GetJavaArgsLength(env, args);
 
-        std::vector<Local<Value>> arguments(argc);
-        for (int i = 0; i < argc; i++) {
-            arguments[i] = jsArgs->Get(context, i).ToLocalChecked();
+        constexpr int kInlineArgs = 16;
+        Local<Value> inlineArguments[kInlineArgs];
+        std::vector<Local<Value>> heapArguments;
+        Local<Value>* arguments = inlineArguments;
+        if (argc > kInlineArgs) {
+            heapArguments.resize(argc);
+            arguments = heapArguments.data();
         }
+        ArgConverter::ConvertJavaArgsToJsArgs(isolate, env, args, argc, arguments);
 
         TryCatch tc(isolate);
         Local<Value> jsResult;
         {
             SET_PROFILER_FRAME();
-            jsMethod->Call(context, jsObject, argc, argc == 0 ? nullptr : arguments.data()).ToLocal(
+            jsMethod->Call(context, jsObject, argc, argc == 0 ? nullptr : arguments).ToLocal(
                     &jsResult);
         }
 
@@ -1048,7 +1059,7 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
                 jsResult = v8::Undefined(isolate);
             } else {
                 stringstream ss;
-                ss << "Calling js method " << methodName << " failed";
+                ss << "Calling js method " << ArgConverter::ConvertToString(methodName) << " failed";
                 throw NativeScriptException(tc, ss.str());
             }
         }
