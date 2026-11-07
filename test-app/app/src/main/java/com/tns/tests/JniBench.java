@@ -28,14 +28,32 @@ public class JniBench {
     private final Object other = new Object();
 
     public static boolean isEnabled() {
+        return getProp("debug.ns.jnibench").equals("1");
+    }
+
+    /** Substring a benchmark name must contain to run; empty runs all. */
+    public static String getFilter() {
+        return getProp("debug.ns.jnibench.filter");
+    }
+
+    /** Iteration multiplier, e.g. to keep one benchmark running long enough to profile. */
+    public static int getScale() {
         try {
-            Process p = new ProcessBuilder("getprop", "debug.ns.jnibench").start();
+            return Math.max(1, Integer.parseInt(getProp("debug.ns.jnibench.scale")));
+        } catch (NumberFormatException e) {
+            return 1;
+        }
+    }
+
+    private static String getProp(String name) {
+        try {
+            Process p = new ProcessBuilder("getprop", name).start();
             try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
                 String line = r.readLine();
-                return line != null && line.trim().equals("1");
+                return line == null ? "" : line.trim();
             }
         } catch (Exception e) {
-            return false;
+            return "";
         }
     }
 
@@ -52,6 +70,9 @@ public class JniBench {
 
     public static double addDouble(double a, double b) {
         return a + b;
+    }
+
+    public void instanceNoop() {
     }
 
     public int getInt() {
