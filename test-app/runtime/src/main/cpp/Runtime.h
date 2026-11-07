@@ -25,6 +25,7 @@
 typedef struct napi_env__* napi_env;
 
 namespace tns {
+struct JavaCallArgs;
 class PromiseRejectionTracker;
 class RuntimeState;
 
@@ -162,7 +163,7 @@ class Runtime {
         void RunModule(const char *moduleName);
         void RunWorker(const std::string& filePath);
         jobject RunScript(JNIEnv* _env, jobject obj, jstring scriptFile);
-        jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs);
+        jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, const JavaCallArgs& args);
         void CreateJSInstanceNative(JNIEnv* _env, jobject obj, jobject javaObject, jint javaObjectID, jstring className);
         jint GenerateNewObjectId(JNIEnv* env, jobject obj);
         void AdjustAmountOfExternalAllocatedMemory();

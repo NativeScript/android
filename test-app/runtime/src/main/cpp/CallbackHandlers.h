@@ -62,7 +62,7 @@ namespace tns {
 
         static v8::Local<v8::Value>
         CallJSMethod(v8::Isolate *isolate, JNIEnv *_env, const v8::Local<v8::Object> &jsObject,
-                     const std::string &methodName, jobjectArray args);
+                     const std::string &methodName, const JavaCallArgs &args);
 
         static v8::Local<v8::Value>
         GetJavaField(v8::Isolate *isolate, const v8::Local<v8::Object> &caller,
