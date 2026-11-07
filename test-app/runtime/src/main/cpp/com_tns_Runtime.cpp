@@ -107,6 +107,22 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_initNativeScript(JNIEnv* _env, jo
     }
 }
 
+extern "C" JNIEXPORT void Java_com_tns_Runtime_unwindFailedBootstrap(JNIEnv* _env, jclass clazz, jint runtimeId) {
+    try {
+        Runtime::UnwindFailedBootstrap(runtimeId);
+    } catch (NativeScriptException& e) {
+        e.ReThrowToJava();
+    } catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToJava();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToJava();
+    }
+}
+
 Runtime* TryGetRuntime(int runtimeId) {
     Runtime* runtime = nullptr;
     try {

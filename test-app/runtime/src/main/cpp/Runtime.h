@@ -82,6 +82,14 @@ class Runtime {
          */
         static void SetPendingIsolateSetup(PendingIsolateSetup setup);
 
+        /*
+         * Tears down the native runtime of a bootstrap that failed on the
+         * Java side after initNativeScript returned, such as a throwing
+         * ts_helpers.js. No-op when no native runtime is registered under the
+         * id, which is the case for a bootstrap that failed inside Init.
+         */
+        static void UnwindFailedBootstrap(int runtimeId);
+
         static Runtime* GetRuntime(int runtimeId);
 
         static Runtime* GetRuntime(v8::Isolate* isolate);
@@ -201,6 +209,16 @@ class Runtime {
          */
         static std::shared_ptr<EventLoop> GetMainEventLoop() {
             return s_mainEventLoop;
+        }
+
+        /*
+         * The main runtime, or null while there is none: before it finishes
+         * initializing and after it is destroyed. Its id is whatever its
+         * bootstrap attempt was handed, which is 0 only when the first attempt
+         * succeeded.
+         */
+        static Runtime* GetMainRuntime() {
+            return s_mainRuntime.load(std::memory_order_acquire);
         }
         static JavaVM* GetJVM() {
             return s_jvm;
@@ -351,7 +369,7 @@ class Runtime {
         v8::Persistent<v8::Function>* m_gcFunc;
         volatile bool m_runGC;
 
-        v8::Persistent<v8::Context>* m_context;
+        v8::Persistent<v8::Context>* m_context = nullptr;
 
         // Decided by ElectMainRuntime, before anything can read it.
         bool m_isMainThread = false;
@@ -383,10 +401,11 @@ class Runtime {
         static void SignalMainRuntimeReady(bool failed);
 
         /*
-         * Unwinds an initialization that threw after the isolate existed. The
-         * Java-side rollback only unwinds Java state, which would otherwise
-         * leave the isolate in the runtime caches and the half-built Runtime
-         * holding everything it had allocated.
+         * Unwinds an initialization that threw after the isolate existed, or
+         * one that finished and then failed on the Java side. The Java-side
+         * rollback only unwinds Java state, which would otherwise leave the
+         * isolate in the runtime caches and the Runtime holding everything it
+         * had allocated.
          */
         void UnwindFailedInit();
         jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
@@ -422,6 +441,7 @@ class Runtime {
         static bool s_mainRuntimeFailed;
 
         static std::shared_ptr<EventLoop> s_mainEventLoop;
+        static std::atomic<Runtime*> s_mainRuntime;
 
         static thread_local Runtime* s_currentRuntime;
         static thread_local PendingIsolateSetup s_pendingIsolateSetup;
