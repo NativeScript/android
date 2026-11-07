@@ -535,9 +535,15 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
   DEBUG_WRITE("CallJSMethodNative called jsObject=%d",
               jsObject->GetIdentityHash());
 
-  string method_name = ArgConverter::jstringToString(methodName);
+  auto jsMethodName =
+      ArgConverter::jstringToInternalizedV8String(m_isolate, env, methodName);
   auto jsResult = CallbackHandlers::CallJSMethod(m_isolate, env, jsObject,
-                                                 method_name, args);
+                                                 jsMethodName, args);
+
+  // Type::Null is the id of void.class: the Java caller discards the result.
+  if (retType == static_cast<jint>(Type::Null)) {
+    return nullptr;
+  }
 
   int classReturnType = retType;
   jobject javaObject =
