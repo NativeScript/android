@@ -230,6 +230,17 @@ void CallbackHandlers::SetJavaField(Isolate *isolate, const Local<Object> &targe
     fieldAccessor.SetJavaField(isolate, target, value, fieldData);
 }
 
+// java.lang.String is final, so an object returned through any other declared
+// type can only be a String if that type is one of String's supertypes.
+static bool CanBeJavaString(const std::string &jniReturnType) {
+    return jniReturnType == "Ljava/lang/Object;" ||
+           jniReturnType == "Ljava/lang/CharSequence;" ||
+           jniReturnType == "Ljava/lang/Comparable;" ||
+           jniReturnType == "Ljava/io/Serializable;" ||
+           jniReturnType == "Ljava/lang/constant/Constable;" ||
+           jniReturnType == "Ljava/lang/constant/ConstantDesc;";
+}
+
 void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string &className,
                                       const string &methodName, MetadataEntry *entry,
                                       bool isFromInterface, bool isStatic,
@@ -441,11 +452,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                 result = env.CallCharMethodA(callerJavaObject, mid, javaArgs);
             }
 
-            JniLocalRef str(env.NewString(&result, 1));
-            jboolean bol = true;
-            const char *resP = env.GetStringUTFChars(str, &bol);
-            args.GetReturnValue().Set(ArgConverter::ConvertToV8String(isolate, resP, 1));
-            env.ReleaseStringUTFChars(str, resP);
+            args.GetReturnValue().Set(ArgConverter::jcharToV8String(isolate, result));
             break;
         }
         case MethodReturnType::Short: {
@@ -546,7 +553,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             }
 
             if (result != nullptr) {
-                auto isString = env.IsInstanceOf(result, JAVA_LANG_STRING);
+                auto isString = (returnType == nullptr || CanBeJavaString(*returnType))
+                                && env.IsInstanceOf(result, JAVA_LANG_STRING);
 
                 Local<Value> objectResult;
                 if (isString) {
