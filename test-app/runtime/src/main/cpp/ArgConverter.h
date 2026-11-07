@@ -131,8 +131,27 @@ class ArgConverter {
         inline static jstring ConvertToJavaString(const v8::Local<v8::Value>& jsValue) {
                 JEnv env;
                 auto isolate = v8::Isolate::GetCurrent();
-                v8::String::Value stringValue(isolate, jsValue);
-                return env.NewString((const jchar*) *stringValue, stringValue.length());
+                v8::Local<v8::String> str;
+                if (jsValue->IsString()) {
+                        str = jsValue.As<v8::String>();
+                } else if (!jsValue->ToString(isolate->GetCurrentContext()).ToLocal(&str)) {
+                        // ToString threw and left a V8 exception pending; running it
+                        // again would re-enter user code.
+                        static const jchar kNoUnits[1] = {0};
+                        return env.NewString(kNoUnits, 0);
+                }
+
+                constexpr uint32_t kInlineUnits = 256;
+                uint32_t length = str->Length();
+                uint16_t inlineUnits[kInlineUnits];
+                std::vector<uint16_t> heapUnits;
+                uint16_t* units = inlineUnits;
+                if (length > kInlineUnits) {
+                        heapUnits.resize(length);
+                        units = heapUnits.data();
+                }
+                str->WriteV2(isolate, 0, length, units);
+                return env.NewString(reinterpret_cast<const jchar*>(units), static_cast<jsize>(length));
         }
 
         inline static v8::Local<v8::String> ConvertToV8String(v8::Isolate* isolate, const jchar* data, int length) {
