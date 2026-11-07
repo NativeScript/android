@@ -1093,6 +1093,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   this->m_napiEnv = NapiEnv::Create(context, m_eventLoop);
   s_currentRuntime = this;
+  // The runtime's thread stays attached until DestroyRuntime: the main thread
+  // for the process, a worker thread until after it tears its runtime down.
+  JEnv::PinThreadEnv(JEnv());
 
   if (m_isMainThread) {
     // Releases any runtime waiting in ElectMainRuntime: the metadata tree and
@@ -1169,6 +1172,7 @@ void Runtime::DestroyRuntime() {
   }
   if (s_currentRuntime == this) {
     s_currentRuntime = nullptr;
+    JEnv::UnpinThreadEnv();
   }
   // The events state holds v8::Global handles (backing event target, dispatch
   // closures and tracked promise rejections) - reset them while the isolate
