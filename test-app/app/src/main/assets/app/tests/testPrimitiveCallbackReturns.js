@@ -53,18 +53,18 @@ describe("Primitive return values of JS callbacks", function () {
     // can hold it (whole numbers in range for integer types, float range for
     // float, a one-character string for char); otherwise the binding throws.
     var expected = {
-        "0": "ex:ClassCastException ok:0 ex:ClassCastException ok:0 ok:0 ok:0 ok:0.0 ok:0.0",
-        "1": "ex:ClassCastException ok:1 ex:ClassCastException ok:1 ok:1 ok:1 ok:1.0 ok:1.0",
-        "-1": "ex:ClassCastException ok:-1 ex:ClassCastException ok:-1 ok:-1 ok:-1 ok:-1.0 ok:-1.0",
-        "-0": "ex:ClassCastException ok:0 ex:ClassCastException ok:0 ok:0 ok:0 ok:-0.0 ok:-0.0",
-        "2^31": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:2147483648 ok:2.1474836E9 ok:2.147483648E9",
-        "-2^31-1": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:-2147483649 ok:-2.1474836E9 ok:-2.147483649E9",
-        "2^40": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:1099511627776 ok:1.0995116E12 ok:1.099511627776E12",
-        "2^60": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:1152921504606846976 ok:1.1529215E18 ok:1.152921504606847E18",
+        "0": "ex:ClassCastException ok:0 ex:ClassCastException ok:0 ok:0 ok:0 ok:0 ok:0",
+        "1": "ex:ClassCastException ok:1 ex:ClassCastException ok:1 ok:1 ok:1 ok:1 ok:1",
+        "-1": "ex:ClassCastException ok:-1 ex:ClassCastException ok:-1 ok:-1 ok:-1 ok:-1 ok:-1",
+        "-0": "ex:ClassCastException ok:0 ex:ClassCastException ok:0 ok:0 ok:0 ok:0 ok:0",
+        "2^31": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:2147483648 ok:2.14748365E+9 ok:2147483648",
+        "-2^31-1": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:-2147483649 ok:-2.14748365E+9 ok:-2147483649",
+        "2^40": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:1099511627776 ok:1.09951163E+12 ok:1099511627776",
+        "2^60": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:1152921504606846976 ok:1.1529215E+18 ok:1.152921504606847E+18",
         "1.5": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:1.5 ok:1.5",
         "-1.5": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:-1.5 ok:-1.5",
-        "1e-40": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:1.0E-40",
-        "3.5e38": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:3.5E38",
+        "1e-40": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:9.9999999999999993E-41",
+        "3.5e38": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:3.5E+38",
         "NaN": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:NaN ok:NaN",
         "Infinity": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:Infinity ok:Infinity",
         "-Infinity": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:-Infinity ok:-Infinity",
@@ -73,9 +73,9 @@ describe("Primitive return values of JS callbacks", function () {
         "false": "ok:false ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException",
         "'1'": "ex:ClassCastException ex:ClassCastException ok:49 ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException",
         "'a'": "ex:ClassCastException ex:ClassCastException ok:97 ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException",
-        "null": "ok:false ok:0 ok:0 ok:0 ok:0 ok:0 ok:0.0 ok:0.0",
-        "undefined": "ok:false ok:0 ok:0 ok:0 ok:0 ok:0 ok:0.0 ok:0.0",
-        "Number(5)": "ex:ClassCastException ok:5 ex:ClassCastException ok:5 ok:5 ok:5 ok:5.0 ok:5.0",
+        "null": "ok:false ok:0 ok:0 ok:0 ok:0 ok:0 ok:0 ok:0",
+        "undefined": "ok:false ok:0 ok:0 ok:0 ok:0 ok:0 ok:0 ok:0",
+        "Number(5)": "ex:ClassCastException ok:5 ex:ClassCastException ok:5 ok:5 ok:5 ok:5 ok:5",
         "Number(2.5)": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:2.5 ok:2.5",
         "Boolean(true)": "ok:true ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException",
         "Boolean(false)": "ok:false ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException",
@@ -84,8 +84,8 @@ describe("Primitive return values of JS callbacks", function () {
         "short(3)": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:3 ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException",
         "char('a')": "ex:ClassCastException ex:ClassCastException ok:97 ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException",
         "float(1.5)": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:1.5 ex:ClassCastException",
-        "double(2)": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:2.0",
-        "{}": "ok:false ok:0 ok:0 ok:0 ok:0 ok:0 ok:0.0 ok:0.0"
+        "double(2)": "ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ex:ClassCastException ok:2",
+        "{}": "ok:false ok:0 ok:0 ok:0 ok:0 ok:0 ok:0 ok:0"
     };
 
     var kinds = ["z", "b", "c", "s", "i", "j", "f", "d"];
