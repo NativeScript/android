@@ -124,12 +124,49 @@ public class Runtime {
         passExceptionToJsNative(getRuntimeId(), ex, ex.getMessage(), Runtime.getStackTraceErrorMessage(ex), Runtime.getJSStackTrace(ex), true);
     }
 
+    /**
+     * For callers with no binding instance at hand; the calling thread's runtime
+     * is only a guess at where the exception belongs.
+     */
     public static void passSuppressedExceptionToJs(Throwable ex, String methodName) {
-        com.tns.Runtime runtime = com.tns.Runtime.getCurrentRuntime();
+        passSuppressedExceptionToJs(null, ex, methodName);
+    }
+
+    public static void passSuppressedExceptionToJs(Object instance, Throwable ex, String methodName) {
+        int owningRuntimeId = getOwningRuntimeId(instance);
+
+        // A known owner that has terminated gets nothing: any other runtime
+        // receiving the report would surface an error that is not its own.
+        com.tns.Runtime runtime = (owningRuntimeId != NO_OWNING_RUNTIME)
+                ? runtimeCache.get(owningRuntimeId)
+                : com.tns.Runtime.getCurrentRuntime();
+
         if (runtime != null) {
-            String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for " + methodName + "\n";
-            runtime.passDiscardedExceptionToJs(ex, "");
+            runtime.postDiscardedExceptionToJs(ex);
+        } else {
+            android.util.Log.w("Warning", "NativeScript discarding suppressed exception from \"" + methodName
+                    + "\": no runtime is left to report it to", ex);
         }
+    }
+
+    /*
+     * Reports on the owning runtime's thread without waiting: the caller has
+     * already swallowed the exception and has no result to collect. A runtime
+     * whose looper is gone simply drops the report - throwing out of an
+     * error-reporting path would replace a suppressed exception with a live one.
+     */
+    private void postDiscardedExceptionToJs(final Throwable ex) {
+        if (config.appConfig.getEnableMultithreadedJavascript() || threadScheduler.getThread().equals(Thread.currentThread())) {
+            passDiscardedExceptionToJs(ex, "");
+            return;
+        }
+
+        threadScheduler.post(new Runnable() {
+            @Override
+            public void run() {
+                passDiscardedExceptionToJs(ex, "");
+            }
+        });
     }
 
     private boolean initialized;
@@ -394,17 +431,39 @@ public class Runtime {
         return new String[0];
     }
 
-    private static Runtime getObjectRuntime(Object object) {
-        Runtime runtime = null;
+    private static final int NO_OWNING_RUNTIME = -1;
 
-        for (Runtime r : runtimeCache.values()) {
-            if (r.getJavaObjectID(object) != null) {
-                runtime = r;
-                break;
+    /*
+     * Records which runtime a binding instance belongs to. Called once, from
+     * initInstance, by the runtime that registers the instance; later
+     * registrations in other runtimes (getOrCreateJavaObjectID when the instance
+     * crosses into another isolate) must not overwrite it, because only the
+     * creating runtime holds the JS implementation behind the generated overrides.
+     *
+     * The tag is the runtime id plus one, so that the field's zero default means
+     * "no owner yet": runtime id 0 is the main runtime's.
+     */
+    private static void recordOwningRuntime(Object instance, int runtimeId) {
+        if (instance instanceof NativeScriptRuntimeBound) {
+            NativeScriptRuntimeBound bound = (NativeScriptRuntimeBound) instance;
+            if (bound.getRuntimeTag__ns() == 0) {
+                bound.setRuntimeTag__ns(runtimeId + 1);
             }
         }
+    }
 
-        return runtime;
+    /*
+     * The id of the runtime that created the instance, or NO_OWNING_RUNTIME when
+     * nothing has recorded one yet. A returned id may name a runtime that has
+     * since been torn down; callers decide how to report that.
+     */
+    private static int getOwningRuntimeId(Object javaObject) {
+        if (!(javaObject instanceof NativeScriptRuntimeBound)) {
+            return NO_OWNING_RUNTIME;
+        }
+
+        int tag = ((NativeScriptRuntimeBound) javaObject).getRuntimeTag__ns();
+        return (tag == 0) ? NO_OWNING_RUNTIME : tag - 1;
     }
 
     /*
@@ -810,6 +869,12 @@ public class Runtime {
         try {
             Runtime runtime = Runtime.getCurrentRuntime();
 
+            if (runtime == null) {
+                throw new NativeScriptException("Cannot initialize an instance of " + instance.getClass().getName()
+                        + ": no NativeScript runtime is bound to thread \"" + Thread.currentThread().getName()
+                        + "\". Construct it on the runtime's own thread, or from JS.");
+            }
+
             int objectId = runtime.currentObjectId;
 
             if (objectId != -1) {
@@ -817,6 +882,8 @@ public class Runtime {
             } else {
                 runtime.createJSInstance(instance);
             }
+
+            recordOwningRuntime(instance, runtime.getRuntimeId());
         } finally {
             frame.close();
         }
@@ -1172,33 +1239,38 @@ public class Runtime {
     }
 
     public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException {
-        Runtime runtime = Runtime.getCurrentRuntime();
+        int owningRuntimeId = getOwningRuntimeId(javaObject);
+        Runtime runtime;
 
-        // if we're not in a runtime or the runtime we're in does not have the object, try to find the right one (this might happen if a worker fires a JS method on an object created in the main thread or another worker)
-        if (runtime == null || runtime.getJavaObjectID(javaObject) == null) {
-            runtime = getObjectRuntime(javaObject);
+        if (owningRuntimeId != NO_OWNING_RUNTIME) {
+            runtime = runtimeCache.get(owningRuntimeId);
+
+            if (runtime == null) {
+                return discardCall(methodName, retType, describeInstance(javaObject)
+                        + " outlived the runtime that created it (id=" + owningRuntimeId + ")");
+            }
+        } else {
+            // No owner recorded yet: the instance is still being constructed and
+            // registered (a generated method invoked from the superclass
+            // constructor, or re-entered while initInstance runs), so only the
+            // constructing thread's runtime can hold it.
+            runtime = Runtime.getCurrentRuntime();
+
+            if (runtime == null) {
+                throw new NativeScriptException("Cannot find runtime for " + describeInstance(javaObject));
+            }
         }
 
-        if (runtime == null) {
-            throw new NativeScriptException("Cannot find runtime for instance=" + ((javaObject == null) ? "null" : javaObject));
-        }
-
-        return runtime.callJSMethodImpl(javaObject, methodName, retType, isConstructor, delay, args);
+        return runtime.dispatchCallJSMethodNative(javaObject, methodName, isConstructor, delay, retType, args);
     }
 
-    private Object callJSMethodImpl(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException {
-        Integer javaObjectID = getJavaObjectID(javaObject);
-        if (javaObjectID == null) {
-            throw new NativeScriptException("Cannot find object id for instance=" + ((javaObject == null) ? "null" : javaObject));
-        }
-
-        if (logger.isEnabled()) {
-            logger.write("Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
-        }
-
-        Object result = dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, delay, retType, args);
-
-        return result;
+    /*
+     * Names the class rather than calling toString(): that may be one of the JS
+     * overrides, and these messages are built exactly when calling into JS is
+     * not possible.
+     */
+    private static String describeInstance(Object javaObject) {
+        return (javaObject == null) ? "null" : "an instance of " + javaObject.getClass().getName();
     }
 
     // Packages args in format (typeID, value, null) except for objects where it is
@@ -1293,11 +1365,36 @@ public class Runtime {
         return arr;
     }
 
-    private Object dispatchCallJSMethodNative(final int javaObjectID, final String methodName, boolean isConstructor, Class<?> retType, final Object[] args) throws NativeScriptException {
-        return dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, 0, retType, args);
+    /*
+     * While a cross-thread call waits, the owner may terminate. Looper.quit()
+     * discards queued messages, so a call posted just before that never runs and
+     * nothing would wake the caller; it re-checks the owner at this interval.
+     */
+    private static final long QUEUED_CALL_LIVENESS_CHECK_MS = 100;
+
+    private boolean isAcceptingWork() {
+        return runtimeCache.get(runtimeId) == this && threadScheduler.getThread().isAlive();
     }
 
-    private Object dispatchCallJSMethodNative(final int javaObjectID, final String methodName, boolean isConstructor, long delay, Class<?> retType, final Object[] args) throws NativeScriptException {
+    /*
+     * Must run on this runtime's thread unless multithreaded JS is enabled: the
+     * object maps are otherwise unsynchronized, and a weak-map lookup is not even
+     * read-only (it expunges stale entries).
+     */
+    private int resolveJavaObjectID(Object javaObject, String methodName) throws NativeScriptException {
+        Integer javaObjectID = getJavaObjectID(javaObject);
+        if (javaObjectID == null) {
+            throw new NativeScriptException("Cannot find object id for " + describeInstance(javaObject));
+        }
+
+        if (logger.isEnabled()) {
+            logger.write("Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
+        }
+
+        return javaObjectID;
+    }
+
+    private Object dispatchCallJSMethodNative(final Object javaObject, final String methodName, boolean isConstructor, long delay, Class<?> retType, final Object[] args) throws NativeScriptException {
         final int returnType = TypeIDs.GetObjectTypeId(retType);
         Object ret = null;
 
@@ -1308,10 +1405,20 @@ public class Runtime {
         boolean enableMultithreadedJavascript = this.config.appConfig.getEnableMultithreadedJavascript();
 
         if (enableMultithreadedJavascript || isWorkThread) {
+            int javaObjectID = resolveJavaObjectID(javaObject, methodName);
             Object[] packagedArgs = packageArgs(tmpArgs);
             try {
                 ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
             } catch (NativeScriptException e) {
+                // With multithreaded JS the owner can be torn down between the
+                // routing check and the native call, which then throws
+                // "Cannot find runtime"; that is the same lifecycle race the
+                // other dead-owner paths drop.
+                if (!isAcceptingWork()) {
+                    return discardCall(methodName, retType, "runtime id=" + getRuntimeId() + " (workerId=" + workerId
+                            + ") terminated during the call");
+                }
+
                 if (discardUncaughtJsExceptions && !e.isEscapedFromJs()) {
                     String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
                     android.util.Log.w("Warning", "NativeScript discarding uncaught JS exception!");
@@ -1321,7 +1428,9 @@ public class Runtime {
                 }
             }
         } else {
-            final Object[] arr = new Object[2];
+            // [0] result, [1] completion flag, [2] a lookup failure to rethrow on
+            // the calling thread rather than on the runtime's looper
+            final Object[] arr = new Object[3];
 
             final boolean isCtor = isConstructor;
 
@@ -1330,6 +1439,13 @@ public class Runtime {
                 public void run() {
                     synchronized (this) {
                         try {
+                            final int javaObjectID;
+                            try {
+                                javaObjectID = resolveJavaObjectID(javaObject, methodName);
+                            } catch (NativeScriptException e) {
+                                arr[2] = e;
+                                return;
+                            }
                             final Object[] packagedArgs = packageArgs(tmpArgs);
                             arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs);
                         } catch (NativeScriptException e) {
@@ -1360,13 +1476,27 @@ public class Runtime {
             if (success) {
                 synchronized (r) {
                     try {
-                        if (arr[1] == null) {
-                            r.wait();
+                        while (arr[1] == null) {
+                            r.wait(QUEUED_CALL_LIVENESS_CHECK_MS);
+
+                            if (arr[1] == null && !isAcceptingWork()) {
+                                logDiscardedCall(methodName, "runtime id=" + getRuntimeId() + " (workerId=" + workerId
+                                        + ") terminated before the call ran");
+                                break;
+                            }
                         }
                     } catch (InterruptedException e) {
                         ret = e;
                     }
                 }
+            } else {
+                // arr[0] stays null and primitive returns are defaulted below
+                logDiscardedCall(methodName, "runtime id=" + getRuntimeId() + " (workerId=" + workerId
+                        + ") is no longer accepting work");
+            }
+
+            if (arr[2] != null) {
+                throw (NativeScriptException) arr[2];
             }
 
             ret = arr[0];
@@ -1380,6 +1510,25 @@ public class Runtime {
         }
 
         return ret;
+    }
+
+    private static void logDiscardedCall(String methodName, String reason) {
+        android.util.Log.w("Warning", "NativeScript discarding call to \"" + methodName + "\": " + reason);
+    }
+
+    /*
+     * A call with nowhere left to run is dropped rather than thrown. These arrive
+     * on Android callbacks - lifecycle, listeners, draw - where an exception would
+     * take down the process because a worker ended, so the loss is contained to
+     * the one call and reported through the log instead. Primitive returns still
+     * need a value the generated cast can unbox.
+     */
+    private static Object discardCall(String methodName, Class<?> retType, String reason) {
+        logDiscardedCall(methodName, reason);
+
+        return (retType != null && retType.isPrimitive() && retType != void.class)
+                ? defaultPrimitiveValue(retType)
+                : null;
     }
 
     private static Object defaultPrimitiveValue(Class<?> type) {
