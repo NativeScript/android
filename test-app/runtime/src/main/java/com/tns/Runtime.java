@@ -1410,6 +1410,15 @@ public class Runtime {
             try {
                 ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
             } catch (NativeScriptException e) {
+                // With multithreaded JS the owner can be torn down between the
+                // routing check and the native call, which then throws
+                // "Cannot find runtime"; that is the same lifecycle race the
+                // other dead-owner paths drop.
+                if (!isAcceptingWork()) {
+                    return discardCall(methodName, retType, "runtime id=" + getRuntimeId() + " (workerId=" + workerId
+                            + ") terminated during the call");
+                }
+
                 if (discardUncaughtJsExceptions && !e.isEscapedFromJs()) {
                     String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
                     android.util.Log.w("Warning", "NativeScript discarding uncaught JS exception!");
