@@ -1026,12 +1026,26 @@ public class Runtime {
         }
     }
 
+    /*
+     * One call per finalizer batch: the JS wrappers of these ids were collected. weaken holds
+     * first collections (held strongly until now), check later ones. Each entry whose Java
+     * object is already gone is overwritten with -1 so its wrapper can be released too.
+     */
     @RuntimeCallable
-    private boolean makeInstanceWeakAndCheckIfAlive(int javaObjectID) {
-        if (logger.isEnabled()) {
-            logger.write("makeInstanceWeakAndCheckIfAlive instance " + javaObjectID);
+    private void processFinalizedBatch(int[] weaken, int weakenCount, int[] check, int checkCount) {
+        for (int i = 0; i < weakenCount; i++) {
+            if (!objectTable.weakenAndCheckAlive(weaken[i])) {
+                weaken[i] = -1;
+            }
         }
-        return objectTable.weakenAndCheckAlive(javaObjectID);
+        for (int i = 0; i < checkCount; i++) {
+            if (!objectTable.weakenAndCheckAlive(check[i])) {
+                check[i] = -1;
+            }
+        }
+        if (logger.isEnabled()) {
+            logger.write("processFinalizedBatch weakened=" + weakenCount + " checked=" + checkCount);
+        }
     }
 
     @RuntimeCallable

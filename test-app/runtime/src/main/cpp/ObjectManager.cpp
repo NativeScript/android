@@ -61,9 +61,9 @@ void ObjectManager::InitializeJNI() {
       runtimeClass, "makeInstanceStrong", "(Ljava/lang/Object;I)V");
   NS_CHECK(MAKE_INSTANCE_STRONG_METHOD_ID != nullptr);
 
-  MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID =
-      env.GetMethodID(runtimeClass, "makeInstanceWeakAndCheckIfAlive", "(I)Z");
-  NS_CHECK(MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID != nullptr);
+  PROCESS_FINALIZED_BATCH_METHOD_ID =
+      env.GetMethodID(runtimeClass, "processFinalizedBatch", "([II[II)V");
+  NS_CHECK(PROCESS_FINALIZED_BATCH_METHOD_ID != nullptr);
 
   RELEASE_NATIVE_INSTANCE_METHOD_ID =
       env.GetMethodID(runtimeClass, "releaseNativeCounterpart", "(I)V");
@@ -225,6 +225,7 @@ jweak ObjectManager::GetJavaObjectByID(uint32_t javaObjectID) {
 
 jobject ObjectManager::GetJavaObjectByIDImpl(uint32_t javaObjectID) {
   JEnv env;
+  AssertIsolateLocked();
   jobject object = env.CallObjectMethod(
       m_javaRuntimeObject, GET_JAVAOBJECT_BY_ID_METHOD_ID, javaObjectID);
   return object;
@@ -250,6 +251,7 @@ void ObjectManager::SetJavaClass(const Local<Object>& instance, jclass clazz) {
 
 int ObjectManager::GetOrCreateObjectId(jobject object) {
   JEnv env;
+  AssertIsolateLocked();
   jint javaObjectID = env.CallIntMethod(
       m_javaRuntimeObject, GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID, object);
 
@@ -258,12 +260,14 @@ int ObjectManager::GetOrCreateObjectId(jobject object) {
 
 int ObjectManager::FindObjectId(jobject object) {
   JEnv env;
+  AssertIsolateLocked();
   return env.CallIntMethod(m_javaRuntimeObject, FIND_JAVA_OBJECT_ID_METHOD_ID,
                            object);
 }
 
 void ObjectManager::RegisterStrong(jobject object, int javaObjectID) {
   JEnv env;
+  AssertIsolateLocked();
   env.CallVoidMethod(m_javaRuntimeObject, MAKE_INSTANCE_STRONG_METHOD_ID,
                      object, javaObjectID);
 }
@@ -424,25 +428,125 @@ void ObjectManager::JSObjectFinalizer(Isolate* isolate,
     return;
   }
 
-  auto javaObjectID = jsInstanceInfo->JavaObjectID;
-  JEnv env;
-  jboolean isJavaInstanceAlive = env.CallBooleanMethod(
-      m_javaRuntimeObject, MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID,
-      javaObjectID);
-  if (isJavaInstanceAlive) {
-    // If the Java instance is alive, keep the JavaScript instance alive.
-    po->SetWeak(callbackState, JSObjectFinalizerStatic,
-                WeakCallbackType::kFinalizer);
+  // Kept alive until the batch has asked the Java side whether it may die.
+  po->SetWeak(callbackState, JSObjectFinalizerStatic,
+              WeakCallbackType::kFinalizer);
+
+  if (callbackState->queued) {
+    return;
+  }
+  callbackState->queued = true;
+  auto javaObjectID = static_cast<jint>(jsInstanceInfo->JavaObjectID);
+  (callbackState->javaWeakened ? m_pendingCheck : m_pendingWeaken)
+      .push_back(javaObjectID);
+
+  // Flushed here once large, so a long synchronous JS loop can hold at most
+  // this many Java objects strongly past their wrappers' collection; the
+  // epilogue runs before finalizers, so the rest waits for the event loop.
+  constexpr size_t kFlushThreshold = 1024;
+  if (m_pendingWeaken.size() + m_pendingCheck.size() >= kFlushThreshold) {
+    FlushFinalizedBatch();
   } else {
-    // If the Java instance is dead, this JavaScript instance can be let die.
+    ScheduleFinalizedBatchFlush();
+  }
+}
+
+void ObjectManager::ScheduleFinalizedBatchFlush() {
+  if (m_flushScheduled) {
+    return;
+  }
+  auto runtime = Runtime::GetRuntime(m_isolate);
+  auto eventLoop = runtime->GetEventLoop();
+  if (eventLoop == nullptr) {
+    return;
+  }
+  m_flushScheduled = true;
+  int runtimeId = runtime->GetId();
+  eventLoop->PostInternal([runtimeId]() {
+    // Runs on the runtime's own thread; skip if the runtime is gone.
+    auto current = Runtime::GetCurrentRuntime();
+    if (current == nullptr || current->GetId() != runtimeId) {
+      return;
+    }
+    auto isolate = current->GetIsolate();
+    v8::Locker locker(isolate);
+    Isolate::Scope isolateScope(isolate);
+    HandleScope handleScope(isolate);
+    current->GetObjectManager()->FlushFinalizedBatch();
+  });
+}
+
+void ObjectManager::FlushFinalizedBatch() {
+  m_flushScheduled = false;
+  if (m_pendingWeaken.empty() && m_pendingCheck.empty()) {
+    return;
+  }
+
+  auto weaken = std::move(m_pendingWeaken);
+  auto check = std::move(m_pendingCheck);
+  m_pendingWeaken.clear();
+  m_pendingCheck.clear();
+
+  JEnv env;
+  auto weakenCount = static_cast<jsize>(weaken.size());
+  auto checkCount = static_cast<jsize>(check.size());
+  JniLocalRef weakenArray(env.NewIntArray(weakenCount));
+  JniLocalRef checkArray(env.NewIntArray(checkCount));
+  JNIEnv* raw = env;
+  raw->SetIntArrayRegion(weakenArray, 0, weakenCount, weaken.data());
+  raw->SetIntArrayRegion(checkArray, 0, checkCount, check.data());
+
+  // Java overwrites the id of every object that is already dead with -1.
+  AssertIsolateLocked();
+  env.CallVoidMethod(m_javaRuntimeObject, PROCESS_FINALIZED_BATCH_METHOD_ID,
+                     (jintArray) weakenArray, weakenCount,
+                     (jintArray) checkArray, checkCount);
+
+  std::vector<jint> weakenResult(weaken.size());
+  std::vector<jint> checkResult(check.size());
+  raw->GetIntArrayRegion(weakenArray, 0, weakenCount, weakenResult.data());
+  raw->GetIntArrayRegion(checkArray, 0, checkCount, checkResult.data());
+
+  auto settle = [this](jint id, jint result, bool weakened) {
+    auto it = m_idToObject.find(id);
+    if (it == m_idToObject.end()) {
+      return;
+    }
+    if (result < 0) {
+      ReleaseCollectedWrapper(id);
+      return;
+    }
+    it->second->queued = false;
+    if (weakened) {
+      it->second->javaWeakened = true;
+    }
+  };
+  for (size_t i = 0; i < weaken.size(); i++) {
+    settle(weaken[i], weakenResult[i], true);
+  }
+  for (size_t i = 0; i < check.size(); i++) {
+    settle(check[i], checkResult[i], false);
+  }
+}
+
+void ObjectManager::ReleaseCollectedWrapper(int javaObjectID) {
+  auto it = m_idToObject.find(javaObjectID);
+  if (it == m_idToObject.end()) {
+    return;
+  }
+  ObjectWeakCallbackState* state = it->second;
+  Persistent<Object>* po = state->target;
+  auto object = po->Get(m_isolate);
+  auto jsInstanceInfo = GetJSInstanceInfoFromRuntimeObject(object);
+  if (jsInstanceInfo != nullptr) {
     delete jsInstanceInfo;
     auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-    po->Get(m_isolate)->SetInternalField(jsInfoIdx, Undefined(m_isolate));
-    po->Reset();
-    m_idToObject.erase(javaObjectID);
-    delete po;
-    delete callbackState;
+    object->SetInternalField(jsInfoIdx, Undefined(m_isolate));
   }
+  m_idToObject.erase(it);
+  po->Reset();
+  delete po;
+  delete state;
 }
 
 int ObjectManager::GenerateNewObjectID() {
@@ -454,6 +558,9 @@ int ObjectManager::GenerateNewObjectID() {
 
 void ObjectManager::ReleaseAllRegistered() {
   HandleScope handleScope(m_isolate);
+
+  m_pendingWeaken.clear();
+  m_pendingCheck.clear();
 
   auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
 
@@ -571,6 +678,7 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
       owner->GetInternalField(jsInfoIdx).As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
   JEnv env;
+  AssertIsolateLocked();
   env.CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,
                      jsInstanceInfo->JavaObjectID);
 
@@ -607,6 +715,5 @@ jmethodID ObjectManager::GET_JAVAOBJECT_BY_ID_METHOD_ID = nullptr;
 jmethodID ObjectManager::GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID = nullptr;
 jmethodID ObjectManager::FIND_JAVA_OBJECT_ID_METHOD_ID = nullptr;
 jmethodID ObjectManager::MAKE_INSTANCE_STRONG_METHOD_ID = nullptr;
-jmethodID ObjectManager::MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID =
-    nullptr;
+jmethodID ObjectManager::PROCESS_FINALIZED_BATCH_METHOD_ID = nullptr;
 jmethodID ObjectManager::RELEASE_NATIVE_INSTANCE_METHOD_ID = nullptr;

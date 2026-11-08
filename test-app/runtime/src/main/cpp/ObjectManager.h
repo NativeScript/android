@@ -11,6 +11,7 @@
 #include "JEnv.h"
 #include "JniLocalRef.h"
 #include "LRUCache.h"
+#include "NativeScriptAssert.h"
 #include "v8.h"
 
 namespace tns {
@@ -137,6 +138,11 @@ class ObjectManager {
     // Duplicated from jsInfo: the finalizer has to unregister itself even when
     // the JsInfo field was already cleared and jsInfo freed.
     uint32_t javaObjectID;
+    // The Java side holds the object weakly; a finalization now only asks
+    // whether it is still alive.
+    bool javaWeakened = false;
+    // Queued in a finalizer batch that has not been flushed yet.
+    bool queued = false;
   };
 
   JSInstanceInfo* GetJSInstanceInfo(const v8::Local<v8::Object>& object);
@@ -153,6 +159,24 @@ class ObjectManager {
 
   void JSObjectFinalizer(v8::Isolate* isolate,
                          ObjectWeakCallbackState* callbackState);
+
+  // The Java object table may only be touched by the thread holding the
+  // isolate lock; every upcall into it checks that in debug builds.
+  void AssertIsolateLocked() const {
+    NS_DCHECK(m_isolate == nullptr || v8::Locker::IsLocked(m_isolate));
+  }
+
+  void FlushFinalizedBatch();
+
+  void ScheduleFinalizedBatchFlush();
+
+  void ReleaseCollectedWrapper(int javaObjectID);
+
+  // Ids whose JS wrapper was collected, waiting for one JNI call that weakens
+  // (first collection) or liveness-checks (later ones) their Java objects.
+  std::vector<jint> m_pendingWeaken;
+  std::vector<jint> m_pendingCheck;
+  bool m_flushScheduled = false;
 
   jweak GetJavaObjectByID(uint32_t javaObjectID);
 
@@ -192,7 +216,7 @@ class ObjectManager {
 
   static jmethodID MAKE_INSTANCE_STRONG_METHOD_ID;
 
-  static jmethodID MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID;
+  static jmethodID PROCESS_FINALIZED_BATCH_METHOD_ID;
 
   static jmethodID RELEASE_NATIVE_INSTANCE_METHOD_ID;
 
