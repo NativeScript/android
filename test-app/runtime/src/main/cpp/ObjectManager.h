@@ -52,6 +52,16 @@ class ObjectManager {
 
   v8::Local<v8::Object> GetJsObjectByJavaObject(int javaObjectID);
 
+  // Settles the wrappers collected since the last flush. Called on every JS<->Java
+  // crossing: JS cannot create or receive a Java object without one, so the Java objects
+  // still held strongly for collected wrappers cannot grow between a GC and the flush.
+  void FlushFinalizedBatchIfPending() {
+    if (!m_flushBackingOff &&
+        (!m_pendingWeaken.empty() || !m_pendingCheck.empty())) {
+      FlushFinalizedBatch();
+    }
+  }
+
   // As GetJsObjectByJavaObject, but empty once the wrapper's link to the Java object was
   // released.
   v8::Local<v8::Object> GetLinkedJsObjectByJavaObject(int javaObjectID);
@@ -143,6 +153,9 @@ class ObjectManager {
     bool javaWeakened = false;
     // Queued in a finalizer batch that has not been flushed yet.
     bool queued = false;
+    // Handed back to JS while queued: the wrapper is reachable again, so the flush must
+    // leave the Java side alone and let a later collection queue it anew.
+    bool reacquired = false;
   };
 
   JSInstanceInfo* GetJSInstanceInfo(const v8::Local<v8::Object>& object);
@@ -168,7 +181,8 @@ class ObjectManager {
 
   void FlushFinalizedBatch();
 
-  void ScheduleFinalizedBatchFlush();
+  // Whether a flush task is pending afterwards; false on a thread with no event loop.
+  bool ScheduleFinalizedBatchFlush(double delayMs = 0);
 
   void ReleaseCollectedWrapper(int javaObjectID);
 
@@ -177,6 +191,8 @@ class ObjectManager {
   std::vector<jint> m_pendingWeaken;
   std::vector<jint> m_pendingCheck;
   bool m_flushScheduled = false;
+  // A flush failed; crossings leave the retry to the delayed task.
+  bool m_flushBackingOff = false;
 
   jweak GetJavaObjectByID(uint32_t javaObjectID);
 

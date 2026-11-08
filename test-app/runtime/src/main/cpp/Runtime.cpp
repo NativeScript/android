@@ -619,6 +619,8 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
 
   DEBUG_WRITE("CallJSMethodNative called javaObjectID=%d", javaObjectID);
 
+  m_objectManager->FlushFinalizedBatchIfPending();
+
   // javaObjectID may be a hint read without the isolate lock; resolve it exactly when it
   // does not name a linked wrapper.
   Local<Object> jsObject;
@@ -689,6 +691,7 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
 
   JEnv env(_env);
 
+  m_objectManager->FlushFinalizedBatchIfPending();
   m_objectManager->RegisterStrong(javaObject, javaObjectID);
 
   string existingClassName = ArgConverter::jstringToString(className);

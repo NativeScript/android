@@ -544,7 +544,9 @@ public class Runtime {
         }
     }
 
-    public void releaseNativeCounterpart(int nativeObjectId) {
+    // Only native code may call this, from the thread holding the isolate lock.
+    @RuntimeCallable
+    void releaseNativeCounterpart(int nativeObjectId) {
         objectTable.remove(nativeObjectId);
     }
 

@@ -314,4 +314,59 @@ describe("Tests garbage collection", function () {
 
 		test.postCallback();
 	});
+	describe("collected wrappers waiting for a flush", function () {
+		var Holder = com.tns.tests.WrapperHolder;
+
+		function collectJava() {
+			for (var i = 0; i < 3; i++) {
+				java.lang.Runtime.getRuntime().gc();
+				java.lang.System.runFinalization();
+			}
+		}
+
+		afterEach(function () {
+			Holder.held = null;
+		});
+
+		it("keep the Java object of a wrapper handed back to JS before the flush", function () {
+			(function () {
+				Holder.held = new java.lang.StringBuilder("reacquired");
+			})();
+			gc();
+			var again = Holder.held;
+			Holder.held = null;
+			collectJava();
+
+			expect(again.toString()).toBe("reacquired");
+		});
+
+		it("keep a wrapper handed back to JS while its liveness check is queued", function () {
+			(function () {
+				Holder.held = new java.lang.StringBuilder("checked");
+			})();
+			gc();
+			collectJava();
+			gc();
+			var again = Holder.held;
+			collectJava();
+
+			expect(again.toString()).toBe("checked");
+			again = null;
+			gc();
+			collectJava();
+		});
+
+		it("let Java reclaim objects during a synchronous loop that never yields", function () {
+			// Far more than the Java heap: every buffer must become collectable while the loop runs.
+			var total = 0;
+			for (var i = 0; i < 160; i++) {
+				var stream = new java.io.ByteArrayOutputStream(4 * 1024 * 1024);
+				total += stream.size() + 1;
+				if (i % 8 === 7) {
+					gc();
+				}
+			}
+			expect(total).toBe(160);
+		});
+	});
 });

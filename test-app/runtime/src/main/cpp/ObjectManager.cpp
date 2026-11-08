@@ -281,9 +281,12 @@ Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID) {
     return handleScope.Escape(Local<Object>());
   }
 
-  Persistent<Object>* jsObject = it->second->target;
+  ObjectWeakCallbackState* state = it->second;
+  if (state->queued) {
+    state->reacquired = true;
+  }
 
-  auto localObject = Local<Object>::New(isolate, *jsObject);
+  auto localObject = Local<Object>::New(isolate, *state->target);
   return handleScope.Escape(localObject);
 }
 
@@ -433,6 +436,8 @@ void ObjectManager::JSObjectFinalizer(Isolate* isolate,
               WeakCallbackType::kFinalizer);
 
   if (callbackState->queued) {
+    // Collected again before the flush, so whatever handed it back has let go.
+    callbackState->reacquired = false;
     return;
   }
   callbackState->queued = true;
@@ -440,29 +445,24 @@ void ObjectManager::JSObjectFinalizer(Isolate* isolate,
   (callbackState->javaWeakened ? m_pendingCheck : m_pendingWeaken)
       .push_back(javaObjectID);
 
-  // Flushed here once large, so a long synchronous JS loop can hold at most
-  // this many Java objects strongly past their wrappers' collection; the
-  // epilogue runs before finalizers, so the rest waits for the event loop.
-  constexpr size_t kFlushThreshold = 1024;
-  if (m_pendingWeaken.size() + m_pendingCheck.size() >= kFlushThreshold) {
-    FlushFinalizedBatch();
-  } else {
-    ScheduleFinalizedBatchFlush();
-  }
+  // Never flushed from here: that would call into Java and free other
+  // wrappers' handles in the middle of V8's finalizer pass. The next JS<->Java
+  // crossing flushes; this task covers a thread that goes idle first.
+  ScheduleFinalizedBatchFlush();
 }
 
-void ObjectManager::ScheduleFinalizedBatchFlush() {
+bool ObjectManager::ScheduleFinalizedBatchFlush(double delayMs) {
   if (m_flushScheduled) {
-    return;
+    return true;
   }
   auto runtime = Runtime::GetRuntime(m_isolate);
   auto eventLoop = runtime->GetEventLoop();
   if (eventLoop == nullptr) {
-    return;
+    return false;
   }
   m_flushScheduled = true;
   int runtimeId = runtime->GetId();
-  eventLoop->PostInternal([runtimeId]() {
+  auto flush = [runtimeId]() {
     // Runs on the runtime's own thread; skip if the runtime is gone.
     auto current = Runtime::GetCurrentRuntime();
     if (current == nullptr || current->GetId() != runtimeId) {
@@ -473,60 +473,122 @@ void ObjectManager::ScheduleFinalizedBatchFlush() {
     Isolate::Scope isolateScope(isolate);
     HandleScope handleScope(isolate);
     current->GetObjectManager()->FlushFinalizedBatch();
-  });
+  };
+  if (delayMs > 0) {
+    eventLoop->PostInternalDelayed(std::move(flush), delayMs);
+  } else {
+    eventLoop->PostInternal(std::move(flush));
+  }
+  return true;
 }
 
 void ObjectManager::FlushFinalizedBatch() {
   m_flushScheduled = false;
+  m_flushBackingOff = false;
   if (m_pendingWeaken.empty() && m_pendingCheck.empty()) {
     return;
   }
+  HandleScope handleScope(m_isolate);
 
   auto weaken = std::move(m_pendingWeaken);
   auto check = std::move(m_pendingCheck);
   m_pendingWeaken.clear();
   m_pendingCheck.clear();
 
+  // A wrapper handed back to JS since it was queued is reachable again: its
+  // Java side keeps its current strength until a later collection.
+  auto keepCollected = [this](std::vector<jint>& ids) {
+    size_t kept = 0;
+    for (jint id : ids) {
+      auto it = m_idToObject.find(id);
+      if (it == m_idToObject.end()) {
+        continue;
+      }
+      ObjectWeakCallbackState* state = it->second;
+      if (state->reacquired) {
+        state->reacquired = false;
+        state->queued = false;
+        continue;
+      }
+      ids[kept++] = id;
+    }
+    ids.resize(kept);
+  };
+  keepCollected(weaken);
+  keepCollected(check);
+  if (weaken.empty() && check.empty()) {
+    return;
+  }
+
   JEnv env;
-  auto weakenCount = static_cast<jsize>(weaken.size());
-  auto checkCount = static_cast<jsize>(check.size());
-  JniLocalRef weakenArray(env.NewIntArray(weakenCount));
-  JniLocalRef checkArray(env.NewIntArray(checkCount));
   JNIEnv* raw = env;
-  raw->SetIntArrayRegion(weakenArray, 0, weakenCount, weaken.data());
-  raw->SetIntArrayRegion(checkArray, 0, checkCount, check.data());
+  auto toJava = [raw](const std::vector<jint>& ids) -> jintArray {
+    if (ids.empty()) {
+      return nullptr;
+    }
+    auto count = static_cast<jsize>(ids.size());
+    jintArray array = raw->NewIntArray(count);
+    if (array != nullptr) {
+      raw->SetIntArrayRegion(array, 0, count, ids.data());
+    }
+    return array;
+  };
+  JniLocalRef weakenArray(toJava(weaken));
+  JniLocalRef checkArray(toJava(check));
+  bool failed = (!weaken.empty() && weakenArray.IsNull()) ||
+                (!check.empty() && checkArray.IsNull());
+  if (!failed) {
+    // Java overwrites the id of every object that is already dead with -1.
+    // Called without JEnv's check, which would throw into whichever JS call
+    // happens to be crossing.
+    AssertIsolateLocked();
+    raw->CallVoidMethod(m_javaRuntimeObject, PROCESS_FINALIZED_BATCH_METHOD_ID,
+                        (jintArray) weakenArray,
+                        static_cast<jint>(weaken.size()),
+                        (jintArray) checkArray,
+                        static_cast<jint>(check.size()));
+    failed = raw->ExceptionCheck();
+  }
+  if (failed) {
+    // Most likely an OutOfMemoryError. Every Java-side step is idempotent, so
+    // the whole batch is retried, after a pause so a persistent failure
+    // cannot spin the event loop.
+    if (raw->ExceptionCheck()) {
+      raw->ExceptionDescribe();
+      raw->ExceptionClear();
+    }
+    m_pendingWeaken.insert(m_pendingWeaken.end(), weaken.begin(), weaken.end());
+    m_pendingCheck.insert(m_pendingCheck.end(), check.begin(), check.end());
+    constexpr double kRetryDelayMs = 100;
+    m_flushBackingOff = ScheduleFinalizedBatchFlush(kRetryDelayMs);
+    return;
+  }
 
-  // Java overwrites the id of every object that is already dead with -1.
-  AssertIsolateLocked();
-  env.CallVoidMethod(m_javaRuntimeObject, PROCESS_FINALIZED_BATCH_METHOD_ID,
-                     (jintArray) weakenArray, weakenCount,
-                     (jintArray) checkArray, checkCount);
-
-  std::vector<jint> weakenResult(weaken.size());
-  std::vector<jint> checkResult(check.size());
-  raw->GetIntArrayRegion(weakenArray, 0, weakenCount, weakenResult.data());
-  raw->GetIntArrayRegion(checkArray, 0, checkCount, checkResult.data());
-
-  auto settle = [this](jint id, jint result, bool weakened) {
-    auto it = m_idToObject.find(id);
-    if (it == m_idToObject.end()) {
+  auto settle = [this, raw](const std::vector<jint>& ids, jintArray array,
+                            bool weakened) {
+    if (ids.empty()) {
       return;
     }
-    if (result < 0) {
-      ReleaseCollectedWrapper(id);
-      return;
-    }
-    it->second->queued = false;
-    if (weakened) {
-      it->second->javaWeakened = true;
+    std::vector<jint> results(ids.size());
+    raw->GetIntArrayRegion(array, 0, static_cast<jsize>(ids.size()),
+                           results.data());
+    for (size_t i = 0; i < ids.size(); i++) {
+      auto it = m_idToObject.find(ids[i]);
+      if (it == m_idToObject.end()) {
+        continue;
+      }
+      if (results[i] < 0) {
+        ReleaseCollectedWrapper(ids[i]);
+        continue;
+      }
+      it->second->queued = false;
+      if (weakened) {
+        it->second->javaWeakened = true;
+      }
     }
   };
-  for (size_t i = 0; i < weaken.size(); i++) {
-    settle(weaken[i], weakenResult[i], true);
-  }
-  for (size_t i = 0; i < check.size(); i++) {
-    settle(check[i], checkResult[i], false);
-  }
+  settle(weaken, (jintArray) weakenArray, true);
+  settle(check, (jintArray) checkArray, false);
 }
 
 void ObjectManager::ReleaseCollectedWrapper(int javaObjectID) {

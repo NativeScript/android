@@ -88,6 +88,7 @@ void CallbackHandlers::Init(Isolate *isolate) {
 namespace {
 struct JavaCallScope {
     explicit JavaCallScope(Runtime* runtime) : runtime_(runtime) {
+        runtime_->GetObjectManager()->FlushFinalizedBatchIfPending();
         runtime_->EnterJavaCall();
     }
     ~JavaCallScope() {
