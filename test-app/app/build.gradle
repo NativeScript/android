@@ -973,14 +973,23 @@ task buildMetadata(type: BuildToolTask) {
     // use explicit inputs as the above makes the whole build-tools directory an input!
     inputs.files("$BUILD_TOOLS_PATH/whitelist.mdg", "$BUILD_TOOLS_PATH/blacklist.mdg")
 
-    def classesDir = layout.buildDirectory.dir("intermediates/javac").get().asFile
-    if (classesDir.exists()) {
-        inputs.dir(classesDir)
-    }
+    // Must mirror the directories doFirst scans. Declared lazily because they don't exist
+    // yet at configuration time on a clean build, and limited to the selected build type
+    // so the other variant's compile outputs never overlap this task's inputs.
+    def compiledClassesBuildType = project.ext.selectedBuildType
+    inputs.files(rootProject.subprojects.collectMany { sub ->
+        [sub.layout.buildDirectory.dir("intermediates/javac/$compiledClassesBuildType"),
+         sub.layout.buildDirectory.dir("tmp/kotlin-classes/$compiledClassesBuildType")]
+    }).withPropertyName("compiledClasses")
 
-    def kotlinClassesDir = layout.buildDirectory.dir("tmp/kotlin-classes").get().asFile
-    if (kotlinClassesDir.exists()) {
-        inputs.dir(kotlinClassesDir)
+    // This project's compile tasks are dependencies (see applicationVariants above). For
+    // other subprojects only order after them: ones the app depends on are already reached
+    // transitively, and a hard dependency would drag unrelated modules into the build.
+    def compiledClassesTaskNames = ["JavaWithJavac", "Kotlin"].collect { "compile${compiledClassesBuildType.capitalize()}$it" }
+    rootProject.subprojects.each { sub ->
+        if (sub != project) {
+            mustRunAfter { compiledClassesTaskNames.collect { sub.tasks.findByName(it) }.findAll { it != null } }
+        }
     }
 
     outputs.files("$METADATA_OUT_PATH/treeNodeStream.dat", "$METADATA_OUT_PATH/treeStringsStream.dat", "$METADATA_OUT_PATH/treeValueStream.dat")
