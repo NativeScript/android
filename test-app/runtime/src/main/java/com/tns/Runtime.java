@@ -533,15 +533,6 @@ public class Runtime {
         }
     }
 
-    @RuntimeCallable
-    public int getMarkingModeOrdinal() {
-        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
-            return staticConfiguration.appConfig.getMarkingMode().ordinal();
-        } else {
-            return ((MarkingMode) AppConfig.KnownKeys.MarkingMode.getDefaultValue()).ordinal();
-        }
-    }
-
     public static boolean isInitialized() {
         Runtime runtime = Runtime.getCurrentRuntime();
         return (runtime != null) ? runtime.isInitializedImpl() : false;
@@ -1054,30 +1045,6 @@ public class Runtime {
         }
     }
 
-    private void makeInstanceWeak(int javaObjectID, boolean keepAsWeak) {
-        if (logger.isEnabled()) {
-            logger.write("makeInstanceWeak instance " + javaObjectID + " keepAsWeak=" + keepAsWeak);
-        }
-        Object instance = strongInstances.get(javaObjectID);
-
-        if (keepAsWeak) {
-            weakJavaObjectToID.put(instance, Integer.valueOf(javaObjectID));
-            weakInstances.put(javaObjectID, new WeakReference<Object>(instance));
-        }
-
-        strongInstances.remove(javaObjectID);
-        strongJavaObjectToID.remove(instance);
-    }
-
-    @RuntimeCallable
-    private void makeInstanceWeak(ByteBuffer buff, int length, boolean keepAsWeak) {
-        buff.position(0);
-        for (int i = 0; i < length; i++) {
-            int javaObjectId = buff.getInt();
-            makeInstanceWeak(javaObjectId, keepAsWeak);
-        }
-    }
-
     @RuntimeCallable
     private boolean makeInstanceWeakAndCheckIfAlive(int javaObjectID) {
         if (logger.isEnabled()) {
@@ -1107,34 +1074,6 @@ public class Runtime {
             weakInstances.put(javaObjectID, new WeakReference<Object>(instance));
 
             return true;
-        }
-    }
-
-    @RuntimeCallable
-    private void checkWeakObjectAreAlive(ByteBuffer input, ByteBuffer output, int length) {
-        input.position(0);
-        output.position(0);
-        for (int i = 0; i < length; i++) {
-            int javaObjectId = input.getInt();
-
-            WeakReference<Object> weakRef = weakInstances.get(javaObjectId);
-
-            int isReleased;
-
-            if (weakRef != null) {
-                Object instance = weakRef.get();
-
-                if (instance == null) {
-                    isReleased = 1;
-                    weakInstances.remove(javaObjectId);
-                } else {
-                    isReleased = 0;
-                }
-            } else {
-                isReleased = (strongInstances.get(javaObjectId) == null) ? 1 : 0;
-            }
-
-            output.putInt(isReleased);
         }
     }
 

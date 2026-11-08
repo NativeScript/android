@@ -270,14 +270,14 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
   {
     JEnv jEnv(env);
     JniLocalRef discardUncaught(env->GetObjectArrayElement(
-        args, (jsize)11 /* KnownKeys.DiscardUncaughtJsExceptions */));
+        args, (jsize)10 /* KnownKeys.DiscardUncaughtJsExceptions */));
     if (!discardUncaught.IsNull()) {
       m_discardUncaughtJsExceptions =
           JType::BooleanValue(jEnv, discardUncaught) == JNI_TRUE;
     }
 
     JniLocalRef uncaughtErrorPolicy(env->GetObjectArrayElement(
-        args, (jsize)14 /* KnownKeys.UncaughtErrorPolicy */));
+        args, (jsize)13 /* KnownKeys.UncaughtErrorPolicy */));
     if (!uncaughtErrorPolicy.IsNull()) {
       auto policy = ArgConverter::jstringToString(uncaughtErrorPolicy);
       if (policy == "throw") {
@@ -942,9 +942,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
       ArgConverter::ConvertToV8String(isolate, "__releaseNativeCounterpart"),
       FunctionTemplate::New(
           isolate, CallbackHandlers::ReleaseNativeCounterpartCallback));
-  globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__markingMode"),
-                      Number::New(isolate, m_objectManager->GetMarkingMode()),
-                      readOnlyFlags);
   globalTemplate->Set(
       ArgConverter::ConvertToV8String(isolate, "__runOnMainThread"),
       FunctionTemplate::New(isolate,
