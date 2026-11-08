@@ -7,11 +7,111 @@ import java.lang.ref.WeakReference;
  * holds its object strongly while the JS wrapper is reachable and through a WeakReference
  * after the wrapper was collected (until the object is collected too).
  *
- * Not synchronized: every access must come from the thread that holds the runtime's isolate
- * lock. Neither table allocates per entry.
+ * Every mutation and every exact read must come from the thread that holds the runtime's
+ * isolate lock; findIdOptimistic is the one read any thread may make. Neither table
+ * allocates per entry.
  */
 final class ObjectTable {
     static final int NO_ID = -1;
+
+    // Null where StampedLock is unavailable (API < 24): findIdOptimistic then always misses.
+    private final Stamps stamps;
+
+    ObjectTable() {
+        this(false);
+    }
+
+    ObjectTable(boolean optimisticReads) {
+        stamps = optimisticReads ? new Stamps() : null;
+    }
+
+    /**
+     * Writers are already serialized by the isolate lock; the write stamp only lets an
+     * optimistic reader detect that a write overlapped it. Kept in its own class so that
+     * runtimes where StampedLock is missing never load it.
+     */
+    private static final class Stamps {
+        private final java.util.concurrent.locks.StampedLock lock = new java.util.concurrent.locks.StampedLock();
+
+        long beginWrite() {
+            return lock.writeLock();
+        }
+
+        void endWrite(long stamp) {
+            lock.unlockWrite(stamp);
+        }
+
+        long beginRead() {
+            return lock.tryOptimisticRead();
+        }
+
+        boolean validate(long stamp) {
+            return lock.validate(stamp);
+        }
+    }
+
+    /**
+     * The id obj is registered under, from any thread, without the isolate lock. A miss
+     * (NO_ID) is not authoritative: it is also returned when a write overlapped the read.
+     * A hit was correct at the time of the read; the object may have been released since,
+     * which the caller must check under the isolate lock.
+     */
+    int findIdOptimistic(Object obj) {
+        if (stamps == null) {
+            return NO_ID;
+        }
+        long stamp = stamps.beginRead();
+        if (stamp == 0) {
+            return NO_ID;
+        }
+        int id;
+        try {
+            id = findIdUnlocked(obj);
+        } catch (RuntimeException e) {
+            // A torn view of a resize can index past an array; the stamp check below fails then.
+            id = NO_ID;
+        }
+        return stamps.validate(stamp) ? id : NO_ID;
+    }
+
+    private int findIdUnlocked(Object obj) {
+        int[] index = identityIndex;
+        int mask = index.length - 1;
+        int i = mix(System.identityHashCode(obj)) & mask;
+        for (int probes = 0; probes <= mask; probes++) {
+            int entry = index[i];
+            if (entry == 0) {
+                return NO_ID;
+            }
+            if (getUnlocked(entry - 1) == obj) {
+                return entry - 1;
+            }
+            i = (i + 1) & mask;
+        }
+        return NO_ID;
+    }
+
+    // get() with every probe bounded: a torn view need not contain the empty slot that
+    // ends a probe.
+    private Object getUnlocked(int id) {
+        int[] keys = idKeys;
+        Object[] vals = values;
+        int mask = keys.length - 1;
+        int i = mix(id) & mask;
+        int key = id + 1;
+        for (int probes = 0; probes <= mask; probes++) {
+            int k = keys[i];
+            if (k == key) {
+                Object value = vals[i];
+                return value instanceof WeakRef ? ((WeakRef) value).get() : value;
+            }
+            if (k == 0) {
+                return null;
+            }
+            i = (i + 1) & mask;
+        }
+        return null;
+    }
 
     // id -> entry, open addressing on the id. Keys are id + 1 so 0 marks an empty slot.
     private int[] idKeys = new int[1024];
@@ -25,6 +125,19 @@ final class ObjectTable {
 
     /** Registers obj under id, held strongly, replacing whatever id held before. */
     void putStrong(int id, Object obj) {
+        if (stamps == null) {
+            putStrongLocked(id, obj);
+            return;
+        }
+        long stamp = stamps.beginWrite();
+        try {
+            putStrongLocked(id, obj);
+        } finally {
+            stamps.endWrite(stamp);
+        }
+    }
+
+    private void putStrongLocked(int id, Object obj) {
         int existing = findIdSlot(id);
         if (existing >= 0) {
             Object value = values[existing];
@@ -32,7 +145,7 @@ final class ObjectTable {
                 values[existing] = obj;
                 return;
             }
-            remove(id);
+            removeLocked(id);
         }
 
         int hash = System.identityHashCode(obj);
@@ -85,6 +198,18 @@ final class ObjectTable {
      * the object is still alive; an entry whose object was already collected is removed.
      */
     boolean weakenAndCheckAlive(int id) {
+        if (stamps == null) {
+            return weakenAndCheckAliveLocked(id);
+        }
+        long stamp = stamps.beginWrite();
+        try {
+            return weakenAndCheckAliveLocked(id);
+        } finally {
+            stamps.endWrite(stamp);
+        }
+    }
+
+    private boolean weakenAndCheckAliveLocked(int id) {
         int slot = findIdSlot(id);
         if (slot < 0) {
             return false;
@@ -94,7 +219,7 @@ final class ObjectTable {
             if (((WeakRef) value).get() != null) {
                 return true;
             }
-            remove(id);
+            removeLocked(id);
             return false;
         }
         values[slot] = new WeakRef(value);
@@ -102,6 +227,19 @@ final class ObjectTable {
     }
 
     void remove(int id) {
+        if (stamps == null) {
+            removeLocked(id);
+            return;
+        }
+        long stamp = stamps.beginWrite();
+        try {
+            removeLocked(id);
+        } finally {
+            stamps.endWrite(stamp);
+        }
+    }
+
+    private void removeLocked(int id) {
         int slot = findIdSlot(id);
         if (slot < 0) {
             return;

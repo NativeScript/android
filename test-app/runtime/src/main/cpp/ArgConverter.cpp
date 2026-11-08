@@ -155,12 +155,18 @@ void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const 
             break;
         }
         case Type::JsObject: {
-            JniLocalRef arg(env->GetObjectArrayElement(args.refs, i));
-            auto javaObjectID = objectManager->GetOrCreateObjectId(arg);
-            jsArg = objectManager->GetJsObjectByJavaObject(javaObjectID);
-
+            // values[i] is an id Java read without the isolate lock, or -1.
+            auto hintedObjectID = static_cast<jint>(bits);
+            if (hintedObjectID >= 0) {
+                jsArg = objectManager->GetLinkedJsObjectByJavaObject(hintedObjectID);
+            }
             if (jsArg.IsEmpty()) {
-                jsArg = objectManager->CreateJSWrapper(javaObjectID, "", arg);
+                JniLocalRef arg(env->GetObjectArrayElement(args.refs, i));
+                auto javaObjectID = objectManager->GetOrCreateObjectId(arg);
+                jsArg = objectManager->GetJsObjectByJavaObject(javaObjectID);
+                if (jsArg.IsEmpty()) {
+                    jsArg = objectManager->CreateJSWrapper(javaObjectID, "", arg);
+                }
             }
             break;
         }

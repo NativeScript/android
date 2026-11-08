@@ -619,15 +619,20 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
 
   DEBUG_WRITE("CallJSMethodNative called javaObjectID=%d", javaObjectID);
 
-  if (javaObjectID < 0) {
+  // javaObjectID may be a hint read without the isolate lock; resolve it exactly when it
+  // does not name a linked wrapper.
+  Local<Object> jsObject;
+  if (javaObjectID >= 0) {
+    jsObject = m_objectManager->GetLinkedJsObjectByJavaObject(javaObjectID);
+  }
+  if (jsObject.IsEmpty() && javaObject != nullptr) {
     javaObjectID = m_objectManager->FindObjectId(javaObject);
     if (javaObjectID < 0) {
       throw NativeScriptException("Cannot find object id for an instance of " +
                                   m_objectManager->GetClassName(javaObject));
     }
+    jsObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID);
   }
-
-  auto jsObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID);
   if (jsObject.IsEmpty()) {
     stringstream ss;
     ss << "JavaScript object for Java ID " << javaObjectID << " not found."

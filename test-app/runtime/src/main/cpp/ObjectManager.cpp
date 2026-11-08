@@ -283,6 +283,14 @@ Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID) {
   return handleScope.Escape(localObject);
 }
 
+Local<Object> ObjectManager::GetLinkedJsObjectByJavaObject(int javaObjectID) {
+  auto it = m_idToObject.find(javaObjectID);
+  if (it == m_idToObject.end() || it->second->jsInfo == nullptr) {
+    return Local<Object>();
+  }
+  return GetJsObjectByJavaObject(javaObjectID);
+}
+
 Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID,
                                              const string& typeName) {
   return CreateJSWrapperHelper(javaObjectID, typeName, nullptr);

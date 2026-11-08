@@ -175,8 +175,9 @@ public class Runtime {
             "Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
             "If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
 
-    // Unsynchronized: only touched by the thread holding this runtime's isolate lock (the
-    // native side resolves and registers objects after taking it).
+    // Mutated and read exactly only by the thread holding this runtime's isolate lock (the
+    // native side resolves and registers objects after taking it); other threads may only
+    // findIdOptimistic, whose result the native side re-checks.
     private final ObjectTable objectTable;
 
     private Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
@@ -257,7 +258,7 @@ public class Runtime {
     }
 
     public Runtime(StaticConfiguration config, DynamicConfiguration dynamicConfiguration) {
-        this.objectTable = new ObjectTable();
+        this.objectTable = new ObjectTable(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N);
         synchronized (Runtime.currentRuntime) {
             ManualInstrumentation.Frame frame = ManualInstrumentation.start("new Runtime");
             try {
@@ -1237,8 +1238,9 @@ public class Runtime {
                 if (refs == null) {
                     refs = new Object[len];
                 }
-                // Resolved and registered natively, under the isolate lock.
+                // A hint; resolved or registered natively, under the isolate lock, on a miss.
                 refs[i] = value;
+                values[i] = objectTable.findIdOptimistic(value);
             }
 
             types[i] = typeId;
@@ -1350,8 +1352,9 @@ public class Runtime {
             PackagedArgs packagedArgs = packageArgs(tmpArgs);
             long[] primitiveResult = newPrimitiveResult(returnType);
             try {
-                // NO_ID: resolved natively, under the isolate lock other threads may also hold.
-                ret = callJSMethodNative(getRuntimeId(), javaObject, ObjectTable.NO_ID, methodName, returnType, isConstructor, packagedArgs.types, packagedArgs.values, packagedArgs.refs, primitiveResult);
+                // A hint: other threads may be writing the table, so native re-checks it under the
+                // isolate lock and resolves the id itself on a miss.
+                ret = callJSMethodNative(getRuntimeId(), javaObject, objectTable.findIdOptimistic(javaObject), methodName, returnType, isConstructor, packagedArgs.types, packagedArgs.values, packagedArgs.refs, primitiveResult);
                 ret = takePrimitiveResult(ret, returnType, primitiveResult);
             } catch (NativeScriptException e) {
                 // With multithreaded JS the owner can be torn down between the

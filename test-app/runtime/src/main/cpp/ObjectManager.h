@@ -51,6 +51,10 @@ class ObjectManager {
 
   v8::Local<v8::Object> GetJsObjectByJavaObject(int javaObjectID);
 
+  // As GetJsObjectByJavaObject, but empty once the wrapper's link to the Java object was
+  // released.
+  v8::Local<v8::Object> GetLinkedJsObjectByJavaObject(int javaObjectID);
+
   v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID,
                                         const std::string& typeName);
 
