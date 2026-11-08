@@ -53,6 +53,41 @@ function measureCallback(name, cb, kind, iterations) {
     return report(name, samples);
 }
 
+
+// Splits an object's lifecycle into allocation (objects kept alive), release through a
+// V8 GC (wrapper finalization and the Java-side strong -> weak bookkeeping), and the
+// Java GC that follows. Each phase is reported per object.
+function measureLifecycle(name, count, create) {
+    if (FILTER && name.indexOf(FILTER) < 0) return null;
+    count *= SCALE;
+    var javaRuntime = java.lang.Runtime.getRuntime();
+    var alloc = [], release = [], javaGc = [];
+    var warm = [];
+    for (var w = 0; w < Math.max(1000, count >> 2); w++) warm.push(create());
+    warm = null;
+    gc();
+    javaRuntime.gc();
+    for (var r = 0; r < ROUNDS; r++) {
+        var kept = new Array(count);
+        var start = performance.now();
+        for (var i = 0; i < count; i++) kept[i] = create();
+        alloc.push((performance.now() - start) * 1e6 / count);
+
+        kept = null;
+        start = performance.now();
+        gc();
+        release.push((performance.now() - start) * 1e6 / count);
+
+        start = performance.now();
+        javaRuntime.gc();
+        javaGc.push((performance.now() - start) * 1e6 / count);
+    }
+    report(name + " [alloc, kept alive]", alloc);
+    report(name + " [release: V8 gc]", release);
+    return report(name + " [release: Java gc]", javaGc);
+}
+
+
 function buildBenchmarks() {
     var bench = new JniBench();
     var other = bench.getOther();
@@ -243,6 +278,34 @@ function buildBenchmarks() {
                 for (var i = 0; i < n; i++) s = bench.strField;
                 return s;
             });
+        },
+        function () {
+            return measureLifecycle("lifecycle new java.lang.Object()", 20000, function () {
+                return new java.lang.Object();
+            });
+        },
+        function () {
+            return measureLifecycle("lifecycle new Object.extend({})()", 20000, function () {
+                return new Extended();
+            });
+        },
+        function () {
+            return measureLifecycle("lifecycle JniBench.newObjectInJava()", 20000, function () {
+                return JniBench.newObjectInJava();
+            });
+        },
+        function () {
+            if (FILTER && "instance.self() [50k live wrappers]".indexOf(FILTER) < 0) return null;
+            var live = new Array(50000);
+            for (var i = 0; i < live.length; i++) live[i] = new java.lang.Object();
+            var result = measureJs("instance.self() [50k live wrappers]", 50000, function (n) {
+                var s;
+                for (var i = 0; i < n; i++) s = bench.self();
+                return s;
+            });
+            globalThis.__jniBenchLive = live;
+            globalThis.__jniBenchLive = null;
+            return result;
         },
         function () {
             return measureCallback("callback.noArgs()", callback, 0, 20000);
