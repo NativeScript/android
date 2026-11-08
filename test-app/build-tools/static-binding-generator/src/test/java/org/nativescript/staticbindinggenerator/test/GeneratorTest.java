@@ -77,7 +77,7 @@ public class GeneratorTest {
     }
 
     @Test
-    public void testBindingCarriesItsOwningRuntimeId() throws Exception {
+    public void testBindingCarriesARuntimeTag() throws Exception {
         List<String> lines = Utils.getDataRowsFromResource("datarow-named-extend.txt");
         DataRow dataRow = new DataRow(lines.get(0));
 
@@ -93,10 +93,14 @@ public class GeneratorTest {
         Assert.assertTrue(com.tns.NativeScriptRuntimeBound.class.isAssignableFrom(boundClass));
 
         com.tns.NativeScriptRuntimeBound instance = (com.tns.NativeScriptRuntimeBound) boundClass.newInstance();
-        Assert.assertEquals(com.tns.NativeScriptRuntimeBound.INVALID_RUNTIME_ID, instance.getRuntimeId__ns());
+        // zero is the "no runtime yet" tag; com.tns.Runtime never stores it for a real owner
+        Assert.assertEquals(0, instance.getRuntimeTag__ns());
 
-        instance.setRuntimeId__ns(7);
-        Assert.assertEquals(7, instance.getRuntimeId__ns());
+        instance.setRuntimeTag__ns(7);
+        Assert.assertEquals(7, instance.getRuntimeTag__ns());
+
+        // read on whichever thread a Java->JS call arrives on
+        Assert.assertTrue(java.lang.reflect.Modifier.isVolatile(boundClass.getDeclaredField("runtimeTag__ns").getModifiers()));
     }
 
     @Test
@@ -122,7 +126,7 @@ public class GeneratorTest {
         Class<?> helloClass = InMemoryJavaCompiler.compile("com.tns.gen.com.example.MyInterface", sourceCode.toString(), options);
 
         Assert.assertNotNull(helloClass);
-        Assert.assertEquals(5, helloClass.getDeclaredMethods().length);  // 5 methods (includes 'hashCode__super', 'equals__super', 'getRuntimeId__ns' and 'setRuntimeId__ns')
+        Assert.assertEquals(5, helloClass.getDeclaredMethods().length);  // 5 methods (includes 'hashCode__super', 'equals__super', 'getRuntimeTag__ns' and 'setRuntimeTag__ns')
     }
 
     @Test
@@ -170,7 +174,7 @@ public class GeneratorTest {
         Class<?> ComplexClass = InMemoryJavaCompiler.compile(binding.getClassname(), sourceCode.toString(), options);
 
         Assert.assertNotNull(ComplexClass);
-        Assert.assertEquals(6, ComplexClass.getDeclaredMethods().length); // 1 + constructor + (equals + hashcode) + (getRuntimeId__ns + setRuntimeId__ns)
+        Assert.assertEquals(6, ComplexClass.getDeclaredMethods().length); // 1 + constructor + (equals + hashcode) + (getRuntimeTag__ns + setRuntimeTag__ns)
     }
 
     @Test

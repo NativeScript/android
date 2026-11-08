@@ -449,7 +449,7 @@ public class Generator {
             fieldsWriter.writeStaticThizField(normalizedClassName);
         }
 
-        fieldsWriter.writeRuntimeIdField();
+        fieldsWriter.writeRuntimeTagField();
     }
 
     private void writeConstructorsToWriter(Writer writer, JavaClass clazz, DataRow dataRow, String generatedClassName, GenericHierarchyView genericHierarchyView) {
@@ -525,7 +525,7 @@ public class Generator {
 
         methodsWriter.writeInternalRuntimeHashCodeMethod();
         methodsWriter.writeInternalRuntimeEqualsMethod();
-        methodsWriter.writeInternalRuntimeIdAccessorMethods();
+        methodsWriter.writeInternalRuntimeTagAccessorMethods();
     }
 
     /**

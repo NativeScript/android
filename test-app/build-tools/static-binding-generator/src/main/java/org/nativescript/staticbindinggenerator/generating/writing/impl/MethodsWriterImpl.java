@@ -47,10 +47,10 @@ public class MethodsWriterImpl implements MethodsWriter {
 
     private static final String INTERNAL_RUNTIME_EQUALS_METHOD_SIGNATURE = "public boolean equals__super(java.lang.Object other)";
     private static final String INTERNAL_RUNTIME_HASHCODE_METHOD_SIGNATURE = "public int hashCode__super()";
-    private static final String INTERNAL_RUNTIME_GET_RUNTIME_ID_METHOD_SIGNATURE = "public int getRuntimeId__ns()";
-    private static final String INTERNAL_RUNTIME_GET_RUNTIME_ID_RETURN_STATEMENT = "return runtimeId__ns;";
-    private static final String INTERNAL_RUNTIME_SET_RUNTIME_ID_METHOD_SIGNATURE = "public void setRuntimeId__ns(int runtimeId)";
-    private static final String INTERNAL_RUNTIME_SET_RUNTIME_ID_ASSIGNMENT = "runtimeId__ns = runtimeId;";
+    private static final String INTERNAL_RUNTIME_GET_RUNTIME_TAG_METHOD_SIGNATURE = "public int getRuntimeTag__ns()";
+    private static final String INTERNAL_RUNTIME_GET_RUNTIME_TAG_RETURN_STATEMENT = "return runtimeTag__ns;";
+    private static final String INTERNAL_RUNTIME_SET_RUNTIME_TAG_METHOD_SIGNATURE = "public void setRuntimeTag__ns(int tag)";
+    private static final String INTERNAL_RUNTIME_SET_RUNTIME_TAG_ASSIGNMENT = "runtimeTag__ns = tag;";
     private static final String INTERNAL_SERVICES_ONCREATE_METHOD_SIGNATURE = "public void " + ON_CREATE_METHOD_NAME + "()";
 
     private static final String RETURN_KEYWORD = "return";
@@ -403,9 +403,9 @@ public class MethodsWriterImpl implements MethodsWriter {
     }
 
     @Override
-    public void writeInternalRuntimeIdAccessorMethods() {
-        writeInternalRuntimeMethod(INTERNAL_RUNTIME_GET_RUNTIME_ID_METHOD_SIGNATURE, INTERNAL_RUNTIME_GET_RUNTIME_ID_RETURN_STATEMENT);
-        writeInternalRuntimeMethod(INTERNAL_RUNTIME_SET_RUNTIME_ID_METHOD_SIGNATURE, INTERNAL_RUNTIME_SET_RUNTIME_ID_ASSIGNMENT);
+    public void writeInternalRuntimeTagAccessorMethods() {
+        writeInternalRuntimeMethod(INTERNAL_RUNTIME_GET_RUNTIME_TAG_METHOD_SIGNATURE, INTERNAL_RUNTIME_GET_RUNTIME_TAG_RETURN_STATEMENT);
+        writeInternalRuntimeMethod(INTERNAL_RUNTIME_SET_RUNTIME_TAG_METHOD_SIGNATURE, INTERNAL_RUNTIME_SET_RUNTIME_TAG_ASSIGNMENT);
     }
 
     private void writeInternalRuntimeMethod(String signature, String returnStatement) {

@@ -7,7 +7,7 @@ public class FieldsWriterImpl implements FieldsWriter {
 
 
     private static final String THIZ_KEYWORD = "thiz";
-    private static final String RUNTIME_ID_FIELD_DECLARATION = "private int runtimeId__ns = com.tns.NativeScriptRuntimeBound.INVALID_RUNTIME_ID;";
+    private static final String RUNTIME_TAG_FIELD_DECLARATION = "private volatile int runtimeTag__ns;";
 
     private final Writer writer;
 
@@ -16,9 +16,9 @@ public class FieldsWriterImpl implements FieldsWriter {
     }
 
     @Override
-    public void writeRuntimeIdField() {
+    public void writeRuntimeTagField() {
         writer.write(TABULATION_LITERAL);
-        writer.writeln(RUNTIME_ID_FIELD_DECLARATION);
+        writer.writeln(RUNTIME_TAG_FIELD_DECLARATION);
         writer.writeln();
     }
 

@@ -1,9 +1,7 @@
 package com.tns;
 
 public interface NativeScriptRuntimeBound {
-    int INVALID_RUNTIME_ID = -1;
+    int getRuntimeTag__ns();
 
-    int getRuntimeId__ns();
-
-    void setRuntimeId__ns(int runtimeId);
+    void setRuntimeTag__ns(int tag);
 }
