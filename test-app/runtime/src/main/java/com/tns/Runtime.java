@@ -1029,6 +1029,8 @@ public class Runtime {
         return ret;
     }
 
+    private Class<?> lastStoredClass;
+
     @RuntimeCallable
     private void makeInstanceStrong(Object instance, int objectId) {
         if (instance == null) {
@@ -1040,7 +1042,12 @@ public class Runtime {
         strongJavaObjectToID.put(instance, key);
 
         Class<?> clazz = instance.getClass();
-        classStorageService.storeClass(clazz.getName(), clazz);
+        // Instances of one class are usually registered back to back, and storeClass takes
+        // two locks. A racing read only costs a redundant store.
+        if (clazz != lastStoredClass) {
+            classStorageService.storeClass(clazz.getName(), clazz);
+            lastStoredClass = clazz;
+        }
 
         if (logger != null && logger.isEnabled()) {
             logger.write("MakeInstanceStrong (" + key + ", " + instance.getClass().toString() + ")");
