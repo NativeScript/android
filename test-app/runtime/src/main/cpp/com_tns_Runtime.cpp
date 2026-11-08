@@ -92,10 +92,16 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_setManualInstrumentationModeLegac
     setManualInstrumentationModeFast_impl(_env, clazz, mode);
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_initNativeScript(JNIEnv* _env, jobject obj, jint runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, jint maxLogcatObjectSize, jboolean forceLog) {
+extern "C" JNIEXPORT void Java_com_tns_Runtime_initNativeScript(JNIEnv* _env, jobject obj, jint runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jstring v8Flags, jboolean codeCache, jstring profilerOutputDir, jboolean discardUncaughtJsExceptions, jstring uncaughtErrorPolicy, jstring callingDir, jint maxLogcatObjectSize, jboolean forceLog) {
     JEnv::EntryScope envScope(_env);
     try {
-        Runtime::Init(_env, obj, runtimeId, filesPath, nativeLibDir, verboseLoggingEnabled, isDebuggable, packageName, args, callingDir, maxLogcatObjectSize, forceLog);
+        Runtime::StartupOptions options{
+            ArgConverter::jstringToString(v8Flags),
+            codeCache == JNI_TRUE,
+            ArgConverter::jstringToString(profilerOutputDir),
+            discardUncaughtJsExceptions == JNI_TRUE,
+            ArgConverter::jstringToString(uncaughtErrorPolicy)};
+        Runtime::Init(_env, obj, runtimeId, filesPath, nativeLibDir, verboseLoggingEnabled, isDebuggable, packageName, options, callingDir, maxLogcatObjectSize, forceLog);
     } catch (NativeScriptException& e) {
         e.ReThrowToJava();
     } catch (std::exception e) {

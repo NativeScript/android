@@ -23,7 +23,6 @@ class AppConfig {
         DiscardUncaughtJsExceptions("discardUncaughtJsExceptions", false),
         EnableLineBreakpoins("enableLineBreakpoints", false),
         EnableMultithreadedJavascript("enableMultithreadedJavascript", false),
-        // Appended last: native code reads this array by ordinal.
         UncaughtErrorPolicy("uncaughtErrorPolicy", "report");
 
         private final String name;
@@ -152,8 +151,16 @@ class AppConfig {
         }
     }
 
-    public Object[] getAsArray() {
-        return values;
+    public String getV8Flags() {
+        return (String)values[KnownKeys.V8FlagsKey.ordinal()];
+    }
+
+    public boolean getCodeCache() {
+        return (boolean)values[KnownKeys.CodeCacheKey.ordinal()];
+    }
+
+    public String getProfilerOutputDir() {
+        return (String)values[KnownKeys.ProfilerOutputDirKey.ordinal()];
     }
 
     private static Object[] makeDefaultOptions() {
