@@ -123,6 +123,206 @@ describe("Messaging runtime edges", function () {
                 }, SETTLE);
             }, SETTLE);
         });
+
+        var channelId = 0;
+        function channelName() {
+            return "messaging-edges-" + (channelId++);
+        }
+
+        function pollGC(predicate, cb) {
+            var turns = 0;
+            (function poll() {
+                __collect();
+                if (predicate() || turns >= 100) {
+                    cb();
+                    return;
+                }
+                turns++;
+                setTimeout(poll, 20);
+            })();
+        }
+
+        it("delivers a message posted before the listener was attached in the same turn", function (done) {
+            var name = channelName();
+            var sender = new BroadcastChannel(name);
+            var receiver = new BroadcastChannel(name);
+            sender.postMessage("early");
+            receiver.onmessage = function (event) {
+                expect(event.data).toBe("early");
+                sender.close();
+                receiver.close();
+                done();
+            };
+        });
+
+        it("discards a message that arrived while the channel had no listener", function (done) {
+            var name = channelName();
+            var sender = new BroadcastChannel(name);
+            var receiver = new BroadcastChannel(name);
+            var got = [];
+            sender.postMessage("unheard");
+            setTimeout(function () {
+                receiver.onmessage = function (event) { got.push(event.data); };
+                sender.postMessage("heard");
+                setTimeout(function () {
+                    expect(got).toEqual(["heard"]);
+                    sender.close();
+                    receiver.close();
+                    done();
+                }, SETTLE);
+            }, SETTLE);
+        });
+
+        it("stops delivering when the last listener goes and resumes when one returns", function (done) {
+            var name = channelName();
+            var sender = new BroadcastChannel(name);
+            var receiver = new BroadcastChannel(name);
+            var got = [];
+            var listener = function (event) { got.push(event.data); };
+            receiver.addEventListener("message", listener);
+            receiver.removeEventListener("message", listener);
+            sender.postMessage("gone");
+            setTimeout(function () {
+                receiver.addEventListener("message", listener);
+                sender.postMessage("back");
+                setTimeout(function () {
+                    expect(got).toEqual(["back"]);
+                    sender.close();
+                    receiver.close();
+                    done();
+                }, SETTLE);
+            }, SETTLE);
+        });
+
+        it("dispatches a single MessageEvent at the channel itself", function (done) {
+            var name = channelName();
+            var sender = new BroadcastChannel(name);
+            var receiver = new BroadcastChannel(name);
+            var events = [];
+            receiver.addEventListener("message", function (event) {
+                expect(this).toBe(receiver);
+                expect(event.currentTarget).toBe(receiver);
+                events.push(event);
+            });
+            receiver.onmessage = function (event) { events.push(event); };
+            sender.postMessage("once");
+            setTimeout(function () {
+                expect(events.length).toBe(2);
+                expect(events[0]).toBe(events[1]);
+                expect(events[0] instanceof MessageEvent).toBe(true);
+                expect(events[0].target).toBe(receiver);
+                sender.close();
+                receiver.close();
+                done();
+            }, SETTLE);
+        });
+
+        it("delivers to the channels of a group in creation order", function (done) {
+            var name = channelName();
+            var sender = new BroadcastChannel(name);
+            var receivers = [];
+            var order = [];
+            for (var i = 0; i < 16; i++) {
+                (function (index) {
+                    var channel = new BroadcastChannel(name);
+                    channel.onmessage = function () { order.push(index); };
+                    receivers.push(channel);
+                })(i);
+            }
+            sender.postMessage("fan");
+            setTimeout(function () {
+                var expected = [];
+                for (var j = 0; j < receivers.length; j++) { expected.push(j); }
+                expect(order).toEqual(expected);
+                sender.close();
+                receivers.forEach(function (channel) { channel.close(); });
+                done();
+            }, SETTLE);
+        });
+
+        it("lets an unreferenced channel without a listener be collected", function (done) {
+            var wr = (function () {
+                return new WeakRef(new BroadcastChannel(channelName()));
+            })();
+            pollGC(function () { return wr.deref() === undefined; }, function () {
+                expect(wr.deref()).toBeUndefined();
+                done();
+            });
+        });
+
+        it("lets a channel be collected once its last listener is removed", function (done) {
+            var wr = (function () {
+                var channel = new BroadcastChannel(channelName());
+                channel.onmessage = function () {};
+                channel.onmessage = null;
+                return new WeakRef(channel);
+            })();
+            pollGC(function () { return wr.deref() === undefined; }, function () {
+                expect(wr.deref()).toBeUndefined();
+                done();
+            });
+        });
+
+        it("lets a closed channel be collected even with a listener", function (done) {
+            var wr = (function () {
+                var channel = new BroadcastChannel(channelName());
+                channel.onmessage = function () {};
+                channel.close();
+                return new WeakRef(channel);
+            })();
+            pollGC(function () { return wr.deref() === undefined; }, function () {
+                expect(wr.deref()).toBeUndefined();
+                done();
+            });
+        });
+
+        it("keeps an unreferenced channel with a messageerror listener alive", function (done) {
+            var wr = (function () {
+                var channel = new BroadcastChannel(channelName());
+                channel.onmessageerror = function () {};
+                return new WeakRef(channel);
+            })();
+            var turns = 0;
+            (function poll() {
+                __collect();
+                if (++turns < 10) {
+                    setTimeout(poll, 20);
+                    return;
+                }
+                var channel = wr.deref();
+                expect(channel instanceof BroadcastChannel).toBe(true);
+                if (channel) { channel.close(); }
+                done();
+            })();
+        });
+
+        it("keeps delivering to an unreferenced channel that has a listener", function (done) {
+            var name = channelName();
+            var sender = new BroadcastChannel(name);
+            var got = null;
+            var receiver = null;
+            (function () {
+                new BroadcastChannel(name).onmessage = function (event) {
+                    got = event.data;
+                    receiver = event.target;
+                };
+            })();
+            var turns = 0;
+            (function poll() {
+                __collect();
+                if (++turns < 10) {
+                    setTimeout(poll, 20);
+                    return;
+                }
+                sender.postMessage("still here");
+                setTimeout(function () {
+                    expect(got).toBe("still here");
+                    sender.close();
+                    if (receiver) { receiver.close(); }
+                    done();
+                }, SETTLE);
+            })();
+        });
     });
 
     describe("node:worker_threads", function () {

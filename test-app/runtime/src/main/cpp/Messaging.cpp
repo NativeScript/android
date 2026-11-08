@@ -2,11 +2,11 @@
 
 #include <algorithm>
 #include <initializer_list>
-#include <set>
 #include <shared_mutex>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
@@ -194,7 +194,10 @@ private:
     // group is one channel's two ends.
     const bool named_ = false;
     std::shared_mutex mutex_;
-    std::set<PortData*> ports_;
+    // In join order: HTML delivers a broadcast to its destinations in the order
+    // the channels were created, and a burst that finds none of them already
+    // scheduled posts their drains in that order.
+    std::vector<PortData*> ports_;
 };
 
 namespace {
@@ -233,7 +236,7 @@ DispatchResult SiblingGroup::Dispatch(PortData* source, std::shared_ptr<Message>
                                       std::string* error) {
     std::shared_lock<std::shared_mutex> lock(this->mutex_);
 
-    if (this->ports_.find(source) == this->ports_.end()) {
+    if (std::find(this->ports_.begin(), this->ports_.end(), source) == this->ports_.end()) {
         if (error != nullptr) {
             *error = "Source MessagePort is not entangled with this group.";
         }
@@ -278,7 +281,7 @@ void SiblingGroup::Entangle(PortData* port) {
 void SiblingGroup::Entangle(std::initializer_list<PortData*> ports) {
     std::unique_lock<std::shared_mutex> lock(this->mutex_);
     for (PortData* data : ports) {
-        this->ports_.insert(data);
+        this->ports_.push_back(data);
         // group_ is written under the port's own mutex, which is what lets
         // PortData::Dispatch read it without racing a disentangle. Taken here in
         // the only legal order: this group's lock is already held.
@@ -292,7 +295,8 @@ void SiblingGroup::Disentangle(PortData* data) {
     // Keeps the group alive past the last member dropping its reference.
     std::shared_ptr<SiblingGroup> self = this->shared_from_this();
     std::unique_lock<std::shared_mutex> lock(this->mutex_);
-    this->ports_.erase(data);
+    this->ports_.erase(std::remove(this->ports_.begin(), this->ports_.end(), data),
+                       this->ports_.end());
     {
         std::lock_guard<std::mutex> dataLock(data->mutex_);
         data->group_.reset();
@@ -317,10 +321,11 @@ PortData::~PortData() {
 
 void PortData::AddToIncomingQueue(std::shared_ptr<Message> message) {
     std::lock_guard<std::mutex> lock(this->mutex_);
+    // Still holding the mutex: an owner read outside it could be detached by
+    // the time the wake reaches it, and Start() checks the backlog under it.
+    bool wake = this->owner_ != nullptr && this->owner_->WantsDrainFor(*message);
     this->incoming_.push_back(std::move(message));
-    if (this->owner_ != nullptr) {
-        // Still holding the mutex: an owner read outside it could be detached by
-        // the time the wake reaches it.
+    if (wake) {
         this->owner_->TriggerAsync();
     }
 }
@@ -397,6 +402,7 @@ std::shared_ptr<NativeMessagePort> NativeMessagePort::New(Local<Context> context
     } else {
         port->data_ = std::make_unique<PortData>(port.get());
         if (group != nullptr) {
+            port->broadcast_ = true;
             group->Entangle(port->data_.get());
         }
     }
@@ -449,6 +455,19 @@ void NativeMessagePort::Stop() {
     this->receiving_ = false;
 }
 
+bool NativeMessagePort::WantsDrainFor(const Message& message) const {
+    // A port that was never started still learns that its sibling died.
+    return this->receiving_ || message.IsCloseMessage();
+}
+
+void NativeMessagePort::SetBroadcastTarget(Local<Object> target) {
+    if (target.IsEmpty()) {
+        this->broadcastTarget_.Reset();
+    } else {
+        this->broadcastTarget_.Reset(this->isolate_, target);
+    }
+}
+
 std::unique_ptr<PortData> NativeMessagePort::Detach() {
     // owner_ drops under the data mutex, so a producer either wakes this port
     // before the detach or never sees an owner at all. Node carries a separate
@@ -470,6 +489,7 @@ void NativeMessagePort::CloseHandle() {
                 0, nullptr, v8::kEmbedderDataTypeTagDefault);
         this->wrapper_.Reset();
     }
+    this->broadcastTarget_.Reset();
     MessagingState* state = State(isolate);
     if (state != nullptr) {
         state->livePorts.erase(this->shared_from_this());
@@ -499,8 +519,9 @@ void NativeMessagePort::Close() {
     }
     // Last, on the wrapper the port has just let go of, so a listener finds an
     // already-detached port and a close() from inside one is a no-op rather than
-    // a recursion.
-    if (!wrapper.IsEmpty()) {
+    // a recursion. A broadcast port's wrapper never reaches app code, so there
+    // is no one to tell.
+    if (!wrapper.IsEmpty() && !this->broadcast_) {
         this->EmitClose(wrapper);
     }
 }
@@ -669,6 +690,17 @@ void NativeMessagePort::Drain() {
             return;
         }
 
+        Local<Object> receiver = wrapper;
+        if (this->broadcast_) {
+            // Per message: a listener can add or remove the channel's last listener.
+            // With none, the event would reach no one and reading the value has no
+            // other observable effect, so it is never read.
+            if (this->broadcastTarget_.IsEmpty()) {
+                continue;
+            }
+            receiver = this->broadcastTarget_.Get(isolate);
+        }
+
         Local<Value> payload;
         Local<Value> ports = v8::Undefined(isolate);
         bool read;
@@ -693,12 +725,12 @@ void NativeMessagePort::Drain() {
             }
         }
         if (!read) {
-            this->Emit(context, wrapper, emitMessage, payload, v8::Undefined(isolate),
+            this->Emit(context, receiver, emitMessage, payload, v8::Undefined(isolate),
                        "messageerror");
             reschedule = true;
             break;
         }
-        if (!this->Emit(context, wrapper, emitMessage, payload, ports, "message")) {
+        if (!this->Emit(context, receiver, emitMessage, payload, ports, "message")) {
             reschedule = true;
             break;
         }
@@ -882,6 +914,19 @@ void StopCallback(const FunctionCallbackInfo<Value>& info) {
     }
 }
 
+void SetBroadcastTargetCallback(const FunctionCallbackInfo<Value>& info) {
+    Local<Object> wrapper;
+    if (!PortArg(info, 0, &wrapper)) {
+        return;
+    }
+    NativeMessagePort* port = PortFromWrapper(info.GetIsolate(), wrapper);
+    if (port == nullptr) {
+        return;
+    }
+    port->SetBroadcastTarget(info.Length() > 1 && info[1]->IsObject() ? info[1].As<Object>()
+                                                                      : Local<Object>());
+}
+
 void CloseCallback(const FunctionCallbackInfo<Value>& info) {
     Local<Object> wrapper;
     if (!PortArg(info, 0, &wrapper)) {
@@ -1038,6 +1083,7 @@ MaybeLocal<Object> CreateBinding(Local<Context> context) {
     tns::SetMethod(context, binding, "postMessage", PostMessageCallback);
     tns::SetMethod(context, binding, "start", StartCallback);
     tns::SetMethod(context, binding, "stop", StopCallback);
+    tns::SetMethod(context, binding, "setBroadcastTarget", SetBroadcastTargetCallback);
     tns::SetMethod(context, binding, "close", CloseCallback);
     tns::SetMethod(context, binding, "drainOne", DrainOneCallback);
     tns::SetMethodNoSideEffect(context, binding, "isDetached", IsDetachedCallback);
