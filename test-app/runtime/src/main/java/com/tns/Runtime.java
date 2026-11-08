@@ -43,7 +43,7 @@ public class Runtime {
 
     private native Object runScript(int runtimeId, String filePath) throws NativeScriptException;
 
-    private native Object callJSMethodNative(int runtimeId, int javaObjectID, String methodName, int retType, boolean isConstructor, int[] argTypes, long[] argValues, Object[] argRefs) throws NativeScriptException;
+    private native Object callJSMethodNative(int runtimeId, int javaObjectID, String methodName, int retType, boolean isConstructor, int[] argTypes, long[] argValues, Object[] argRefs, long[] primitiveResult) throws NativeScriptException;
 
     private native void createJSInstanceNative(int runtimeId, Object javaObject, int javaObjectID, String canonicalName);
 
@@ -1409,8 +1409,10 @@ public class Runtime {
         if (enableMultithreadedJavascript || isWorkThread) {
             int javaObjectID = resolveJavaObjectID(javaObject, methodName);
             PackagedArgs packagedArgs = packageArgs(tmpArgs);
+            long[] primitiveResult = newPrimitiveResult(returnType);
             try {
-                ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs.types, packagedArgs.values, packagedArgs.refs);
+                ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs.types, packagedArgs.values, packagedArgs.refs, primitiveResult);
+                ret = takePrimitiveResult(ret, returnType, primitiveResult);
             } catch (NativeScriptException e) {
                 // With multithreaded JS the owner can be torn down between the
                 // routing check and the native call, which then throws
@@ -1449,7 +1451,8 @@ public class Runtime {
                                 return;
                             }
                             final PackagedArgs packagedArgs = packageArgs(tmpArgs);
-                            arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs.types, packagedArgs.values, packagedArgs.refs);
+                            final long[] primitiveResult = newPrimitiveResult(returnType);
+                            arr[0] = takePrimitiveResult(callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs.types, packagedArgs.values, packagedArgs.refs, primitiveResult), returnType, primitiveResult);
                         } catch (NativeScriptException e) {
                             if (discardUncaughtJsExceptions && !e.isEscapedFromJs()) {
                                 String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
@@ -1531,6 +1534,36 @@ public class Runtime {
         return (retType != null && retType.isPrimitive() && retType != void.class)
                 ? defaultPrimitiveValue(retType)
                 : null;
+    }
+
+    /*
+     * For return types the native side can hand back as raw bits instead of a
+     * boxed object: it writes {bits, 1} here and returns null, or leaves the
+     * array untouched and returns the boxed value as before.
+     */
+    private static long[] newPrimitiveResult(int returnType) {
+        boolean raw = returnType == TypeIDs.Boolean || returnType == TypeIDs.Int || returnType == TypeIDs.Long
+                || returnType == TypeIDs.Float || returnType == TypeIDs.Double;
+        return raw ? new long[2] : null;
+    }
+
+    private static Object takePrimitiveResult(Object nativeResult, int returnType, long[] primitiveResult) {
+        if (primitiveResult == null || primitiveResult[1] == 0) {
+            return nativeResult;
+        }
+
+        long bits = primitiveResult[0];
+        if (returnType == TypeIDs.Boolean) {
+            return bits != 0;
+        } else if (returnType == TypeIDs.Int) {
+            return (int) bits;
+        } else if (returnType == TypeIDs.Long) {
+            return bits;
+        } else if (returnType == TypeIDs.Float) {
+            return Float.intBitsToFloat((int) bits);
+        } else {
+            return Double.longBitsToDouble(bits);
+        }
     }
 
     private static Object defaultPrimitiveValue(Class<?> type) {
