@@ -298,12 +298,13 @@ function buildBenchmarks() {
             if (FILTER && "instance.self() [50k live wrappers]".indexOf(FILTER) < 0) return null;
             var live = new Array(50000);
             for (var i = 0; i < live.length; i++) live[i] = new java.lang.Object();
+            // Pinned from a global: an optimized frame may drop a local after its last use.
+            globalThis.__jniBenchLive = live;
             var result = measureJs("instance.self() [50k live wrappers]", 50000, function (n) {
                 var s;
                 for (var i = 0; i < n; i++) s = bench.self();
                 return s;
             });
-            globalThis.__jniBenchLive = live;
             globalThis.__jniBenchLive = null;
             return result;
         },
