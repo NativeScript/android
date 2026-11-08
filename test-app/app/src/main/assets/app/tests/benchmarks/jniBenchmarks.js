@@ -88,6 +88,43 @@ function measureLifecycle(name, count, create) {
 }
 
 
+
+// Aggregate ns per call while `threads` Java threads call into JS at once. Runs
+// asynchronously: the JS thread must go idle and release the isolate for the
+// callers to get in, so it polls for the result.
+function measureContention(name, sink, threads, calls, mode, done) {
+    if (FILTER && name.indexOf(FILTER) < 0) {
+        done(null);
+        return;
+    }
+    var Bench = com.tns.tests.ContentionBench;
+    calls *= SCALE;
+    var samples = [];
+    var round = -1;
+    function startRound() {
+        Bench.start(sink, threads, calls, mode);
+        setTimeout(poll, 5);
+    }
+    function poll() {
+        var nanos = Number(Bench.result());
+        if (nanos < 0) {
+            setTimeout(poll, 5);
+            return;
+        }
+        if (round >= 0) {
+            samples.push(nanos / (threads * calls));
+        }
+        round++;
+        if (round < ROUNDS) {
+            gc();
+            setTimeout(startRound, 20);
+        } else {
+            done(report(name, samples));
+        }
+    }
+    startRound();
+}
+
 function buildBenchmarks() {
     var bench = new JniBench();
     var other = bench.getOther();
@@ -326,6 +363,23 @@ function buildBenchmarks() {
     ];
 }
 
+function buildContentionBenchmarks() {
+    var Bench = com.tns.tests.ContentionBench;
+    var sink = new Bench.Sink({
+        call0: function () { },
+        call3: function (a, b, c) { }
+    });
+    var list = [];
+    [1, 2, 4].forEach(function (threads) {
+        [["no args", Bench.NO_ARGS], ["3 existing objects", Bench.EXISTING_OBJECTS], ["3 new objects", Bench.NEW_OBJECTS]].forEach(function (mode) {
+            list.push(function (done) {
+                measureContention("contention " + threads + " thread(s), " + mode[0], sink, threads, 20000, mode[1], done);
+            });
+        });
+    });
+    return list;
+}
+
 exports.run = function () {
     var benchmarks = buildBenchmarks();
     var results = [];
@@ -333,13 +387,25 @@ exports.run = function () {
     // Yield to the looper between benchmarks so GC and queued work run outside timed rounds.
     function next() {
         if (index >= benchmarks.length) {
-            console.log("JNIBENCH_DONE " + JSON.stringify(results));
+            runContention();
             return;
         }
         gc();
         var result = benchmarks[index++]();
         if (result) results.push(result);
         setTimeout(next, 50);
+    }
+    var contention = buildContentionBenchmarks();
+    var contentionIndex = 0;
+    function runContention() {
+        if (contentionIndex >= contention.length) {
+            console.log("JNIBENCH_DONE " + JSON.stringify(results));
+            return;
+        }
+        contention[contentionIndex++](function (result) {
+            if (result) results.push(result);
+            setTimeout(runContention, 50);
+        });
     }
     setTimeout(next, 500);
 };
