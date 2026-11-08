@@ -44,6 +44,11 @@ class ObjectManager {
   void SetJavaClass(const v8::Local<v8::Object>& instance, jclass clazz);
   int GetOrCreateObjectId(jobject object);
 
+  // The id object is registered under, or -1.
+  int FindObjectId(jobject object);
+
+  void RegisterStrong(jobject object, int javaObjectID);
+
   v8::Local<v8::Object> GetJsObjectByJavaObject(int javaObjectID);
 
   v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID,
@@ -178,6 +183,10 @@ class ObjectManager {
   static jmethodID GET_JAVAOBJECT_BY_ID_METHOD_ID;
 
   static jmethodID GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID;
+
+  static jmethodID FIND_JAVA_OBJECT_ID_METHOD_ID;
+
+  static jmethodID MAKE_INSTANCE_STRONG_METHOD_ID;
 
   static jmethodID MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID;
 

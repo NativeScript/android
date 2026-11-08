@@ -53,6 +53,14 @@ void ObjectManager::InitializeJNI() {
       runtimeClass, "getOrCreateJavaObjectID", "(Ljava/lang/Object;)I");
   NS_CHECK(GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID != nullptr);
 
+  FIND_JAVA_OBJECT_ID_METHOD_ID = env.GetMethodID(
+      runtimeClass, "findJavaObjectID", "(Ljava/lang/Object;)I");
+  NS_CHECK(FIND_JAVA_OBJECT_ID_METHOD_ID != nullptr);
+
+  MAKE_INSTANCE_STRONG_METHOD_ID = env.GetMethodID(
+      runtimeClass, "makeInstanceStrong", "(Ljava/lang/Object;I)V");
+  NS_CHECK(MAKE_INSTANCE_STRONG_METHOD_ID != nullptr);
+
   MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID =
       env.GetMethodID(runtimeClass, "makeInstanceWeakAndCheckIfAlive", "(I)Z");
   NS_CHECK(MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID != nullptr);
@@ -246,6 +254,18 @@ int ObjectManager::GetOrCreateObjectId(jobject object) {
       m_javaRuntimeObject, GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID, object);
 
   return javaObjectID;
+}
+
+int ObjectManager::FindObjectId(jobject object) {
+  JEnv env;
+  return env.CallIntMethod(m_javaRuntimeObject, FIND_JAVA_OBJECT_ID_METHOD_ID,
+                           object);
+}
+
+void ObjectManager::RegisterStrong(jobject object, int javaObjectID) {
+  JEnv env;
+  env.CallVoidMethod(m_javaRuntimeObject, MAKE_INSTANCE_STRONG_METHOD_ID,
+                     object, javaObjectID);
 }
 
 Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID) {
@@ -577,6 +597,8 @@ jclass ObjectManager::JAVA_LANG_CLASS = nullptr;
 jmethodID ObjectManager::GET_NAME_METHOD_ID = nullptr;
 jmethodID ObjectManager::GET_JAVAOBJECT_BY_ID_METHOD_ID = nullptr;
 jmethodID ObjectManager::GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID = nullptr;
+jmethodID ObjectManager::FIND_JAVA_OBJECT_ID_METHOD_ID = nullptr;
+jmethodID ObjectManager::MAKE_INSTANCE_STRONG_METHOD_ID = nullptr;
 jmethodID ObjectManager::MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID =
     nullptr;
 jmethodID ObjectManager::RELEASE_NATIVE_INSTANCE_METHOD_ID = nullptr;

@@ -155,14 +155,12 @@ void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const 
             break;
         }
         case Type::JsObject: {
-            auto javaObjectID = static_cast<jint>(bits);
+            JniLocalRef arg(env->GetObjectArrayElement(args.refs, i));
+            auto javaObjectID = objectManager->GetOrCreateObjectId(arg);
             jsArg = objectManager->GetJsObjectByJavaObject(javaObjectID);
 
             if (jsArg.IsEmpty()) {
-                JniLocalRef argJavaClassPath(env->GetObjectArrayElement(args.refs, i));
-                string argClassName = jstringToString(ObjectToString(argJavaClassPath));
-                argClassName = Util::ConvertFromCanonicalToJniName(argClassName);
-                jsArg = objectManager->CreateJSWrapper(javaObjectID, argClassName);
+                jsArg = objectManager->CreateJSWrapper(javaObjectID, "", arg);
             }
             break;
         }

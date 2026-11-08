@@ -606,7 +606,8 @@ static bool TryGetPrimitiveReturnBits(Isolate* isolate,
 }
 
 jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
-                                    jint javaObjectID, jstring methodName,
+                                    jobject javaObject, jint javaObjectID,
+                                    jstring methodName,
                                     jint retType, jboolean isConstructor,
                                     const JavaCallArgs& args,
                                     jlongArray primitiveResult) {
@@ -617,6 +618,14 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
   JEnv env(_env);
 
   DEBUG_WRITE("CallJSMethodNative called javaObjectID=%d", javaObjectID);
+
+  if (javaObjectID < 0) {
+    javaObjectID = m_objectManager->FindObjectId(javaObject);
+    if (javaObjectID < 0) {
+      throw NativeScriptException("Cannot find object id for an instance of " +
+                                  m_objectManager->GetClassName(javaObject));
+    }
+  }
 
   auto jsObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID);
   if (jsObject.IsEmpty()) {
@@ -659,9 +668,9 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
   }
 
   int classReturnType = retType;
-  jobject javaObject =
+  jobject javaResult =
       ConvertJsValueToJavaObject(env, jsResult, classReturnType);
-  return javaObject;
+  return javaResult;
 }
 
 void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
@@ -674,6 +683,8 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
   auto isolate = m_isolate;
 
   JEnv env(_env);
+
+  m_objectManager->RegisterStrong(javaObject, javaObjectID);
 
   string existingClassName = ArgConverter::jstringToString(className);
   string jniName = Util::ConvertFromCanonicalToJniName(existingClassName);
