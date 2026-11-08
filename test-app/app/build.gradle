@@ -966,7 +966,13 @@ task buildMetadata(type: BuildToolTask) {
 
     description = "builds metadata with provided jar dependencies"
 
-    inputs.files("$MDG_JAVA_DEPENDENCIES")
+    // collectAllJars rewrites this list on every build and doFirst then appends the class
+    // directories to it, so fingerprint the jars it names rather than the file itself. Must
+    // stay a provider: the list is only current once collectAllJars has run.
+    def mdgJavaDependenciesFile = file("$BUILD_TOOLS_PATH/$MDG_JAVA_DEPENDENCIES")
+    inputs.files(provider {
+        mdgJavaDependenciesFile.exists() ? mdgJavaDependenciesFile.readLines().findAll { it.endsWith(".jar") } : []
+    }).withPropertyName("dependencyJars")
 
     // make MDG aware of whitelist.mdg and blacklist.mdg files
     // inputs.files(project.fileTree(dir: "$rootDir", include: "**/*.mdg"))
