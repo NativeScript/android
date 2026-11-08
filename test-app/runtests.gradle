@@ -57,28 +57,15 @@ task installApk(type: Exec) {
     }
 }
 
-task runAdbAsRoot(type: Exec) {
-    doFirst {
-        println "Running adb as root"
-
-        if (isWinOs) {
-            commandLine "cmd", "/c", "adb", "-e", "root"
-        } else {
-            commandLine "adb", "-e", "root"
-        }
-        sleep(10 * 1000) // wait 10s to make sure adb properly restarts, otherwise error: closed might happen on next command
-    }
-}
-
 task deletePreviousResultXml(type: Exec) {
     ignoreExitValue = true
     doFirst {
         println "Removing previous android_unit_test_results.xml"
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "-e", "shell", "run-as", "com.tns.testapplication", "rm", "-f", "android_unit_test_results.xml"
+            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "shell", "run-as", "com.tns.testapplication", "rm", "-f", "android_unit_test_results.xml"
         } else {
-            commandLine "adb", runOnDeviceOrEmulator, "-e", "shell", "run-as", "com.tns.testapplication", "rm", "-f", "android_unit_test_results.xml"
+            commandLine "adb", runOnDeviceOrEmulator, "shell", "run-as", "com.tns.testapplication", "rm", "-f", "android_unit_test_results.xml"
         }
     }
 }
@@ -88,9 +75,9 @@ task startInstalledApk(type: Exec) {
         println "Starting test application"
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "-e", "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
         } else {
-            commandLine "adb", runOnDeviceOrEmulator, "-e", "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+            commandLine "adb", runOnDeviceOrEmulator, "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
         }
     }
 }
@@ -138,10 +125,10 @@ task runtests {
 }
 
 // waitForEmulatorToStart.dependsOn(deleteDist)
-runAdbAsRoot.dependsOn(waitForEmulatorToStart)
-deletePreviousResultXml.dependsOn(runAdbAsRoot)
-installApk.dependsOn(deletePreviousResultXml)
-startInstalledApk.dependsOn(installApk)
+installApk.dependsOn(waitForEmulatorToStart)
+// Runs after the install: run-as only works once the debuggable build is on the device.
+deletePreviousResultXml.dependsOn(installApk)
+startInstalledApk.dependsOn(deletePreviousResultXml)
 createDistFolder.dependsOn(startInstalledApk)
 waitForUnitTestResultFile.dependsOn(createDistFolder)
 copyResultToDist.dependsOn(waitForUnitTestResultFile)

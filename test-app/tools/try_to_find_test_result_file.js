@@ -1,9 +1,9 @@
 const { exec } = require("child_process");
 
 const appId = "com.tns.testapplication";
-const runOnDeviceOrEmulator = process.argv[2] || "";
-const adbPrefix = `adb ${runOnDeviceOrEmulator} -e`;
-const resultsPath = `/data/data/${appId}/android_unit_test_results.xml`;
+const runOnDeviceOrEmulator = process.argv[2] || "-e";
+const adbPrefix = `adb ${runOnDeviceOrEmulator}`;
+const resultsFileName = "android_unit_test_results.xml";
 
 const processTimeoutMs = 20 * 60 * 1000; // 20 minutes timeout (empirical constant)
 const pollIntervalMs = 10 * 1000;
@@ -139,32 +139,15 @@ function isCompleteJunitXml(text) {
   return /<testsuites[\s>]/.test(trimmed) && trimmed.includes("</testsuites>");
 }
 
+// The app writes into its private data dir. `run-as` reads it without root, as
+// long as the installed build is debuggable.
 async function tryPullResultsFile() {
-  const { error } = await execAndStream(`${adbPrefix} pull ${resultsPath}`);
-
-  if (!error) {
-    const fs = require("fs");
-    try {
-      const text = fs.readFileSync("android_unit_test_results.xml", "utf8");
-      if (isCompleteJunitXml(text)) {
-        console.log("Tests results file found!");
-        process.exit(0);
-      }
-    } catch (e) {
-      // Missing or unreadable; keep polling.
-    }
-  }
-
-  // Play Store / userdebug-less images reject `adb root` and cannot pull
-  // /data/data directly. Debug apps can still read their own files via run-as.
-  const localPath = "android_unit_test_results.xml";
-  const { error: runAsError, stdout } = await execAndStream(
-    `${adbPrefix} exec-out run-as ${appId} cat android_unit_test_results.xml`
+  const { error, stdout } = await execAndStream(
+    `${adbPrefix} exec-out run-as ${appId} cat ${resultsFileName}`
   );
-  if (!runAsError && isCompleteJunitXml(stdout)) {
-    const fs = require("fs");
-    fs.writeFileSync(localPath, stdout);
-    console.log("Tests results file found via run-as!");
+  if (!error && isCompleteJunitXml(stdout)) {
+    require("fs").writeFileSync(resultsFileName, stdout);
+    console.log("Tests results file found!");
     process.exit(0);
   }
 }
