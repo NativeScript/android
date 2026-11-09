@@ -536,8 +536,10 @@ void ObjectManager::JSObjectFinalizer(Isolate* isolate,
 
   // Never flushed from here: that would call into Java and free other
   // wrappers' handles in the middle of V8's finalizer pass. The next JS<->Java
-  // crossing flushes; this task covers a thread that goes idle first.
-  ScheduleFinalizedBatchFlush();
+  // crossing flushes; this task covers a thread that goes idle first, and is
+  // delayed so that a busy runtime does not wake its event loop per GC.
+  constexpr double kIdleFlushDelayMs = 4;
+  ScheduleFinalizedBatchFlush(kIdleFlushDelayMs);
 }
 
 bool ObjectManager::ScheduleFinalizedBatchFlush(double delayMs) {

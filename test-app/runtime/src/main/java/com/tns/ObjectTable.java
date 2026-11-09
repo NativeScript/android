@@ -304,6 +304,28 @@ final class ObjectTable {
         }
     }
 
+    /**
+     * weakenAndCheckAlive for ids[0..count), under one write lock; overwrites the id of
+     * every object no longer alive with NO_ID.
+     */
+    void weakenAndCheckAlive(int[] ids, int count) {
+        if (count == 0) {
+            return;
+        }
+        long stamp = stamps == null ? 0 : stamps.beginWrite();
+        try {
+            for (int i = 0; i < count; i++) {
+                if (!weakenAndCheckAliveLocked(ids[i])) {
+                    ids[i] = NO_ID;
+                }
+            }
+        } finally {
+            if (stamps != null) {
+                stamps.endWrite(stamp);
+            }
+        }
+    }
+
     private boolean weakenAndCheckAliveLocked(int id) {
         int slot = findIdSlot(id);
         if (slot < 0) {

@@ -224,8 +224,11 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _en
         NativeScriptException nsEx(std::string("Error: c++ exception!"));
         nsEx.ReThrowToJava();
     }
+    auto objectManager = runtime->GetObjectManager();
     // Objects Java registered for a call that never reached them would stay strong.
-    runtime->GetObjectManager()->ReleaseUnwrappedArgs(args);
+    objectManager->ReleaseUnwrappedArgs(args);
+    // Wrappers collected during the call, settled while the isolate is still held.
+    objectManager->FlushFinalizedBatchIfPending();
     return result;
 }
 

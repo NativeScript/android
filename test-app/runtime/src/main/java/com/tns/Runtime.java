@@ -1067,16 +1067,8 @@ public class Runtime {
      */
     @RuntimeCallable
     private void processFinalizedBatch(int[] weaken, int weakenCount, int[] check, int checkCount) {
-        for (int i = 0; i < weakenCount; i++) {
-            if (!objectTable.weakenAndCheckAlive(weaken[i])) {
-                weaken[i] = -1;
-            }
-        }
-        for (int i = 0; i < checkCount; i++) {
-            if (!objectTable.weakenAndCheckAlive(check[i])) {
-                check[i] = -1;
-            }
-        }
+        objectTable.weakenAndCheckAlive(weaken, weakenCount);
+        objectTable.weakenAndCheckAlive(check, checkCount);
         if (logger.isEnabled()) {
             logger.write("processFinalizedBatch weakened=" + weakenCount + " checked=" + checkCount);
         }
