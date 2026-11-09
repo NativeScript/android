@@ -13,7 +13,6 @@
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include "ObjectManager.h"
-#include <sstream>
 
 using namespace v8;
 
@@ -111,19 +110,14 @@ MethodCache::CacheMethodInfo MethodCache::ResolveConstructorSignature(const Args
 
 // Encoded signature <className>.S/I.<methodName>.<argsCount>.<arg1class>.<...>
 string MethodCache::EncodeSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic) {
-    string sig(className);
-    sig.append(".");
-    if (isStatic) {
-        sig.append("S.");
-    } else {
-        sig.append("I.");
-    }
+    int len = args.Length();
+    string sig;
+    sig.reserve(className.size() + methodName.size() + 8 + len * 12);
+    sig.append(className);
+    sig.append(isStatic ? ".S." : ".I.");
     sig.append(methodName);
     sig.append(".");
-    int len = args.Length();
-    stringstream s;
-    s << len;
-    sig.append(s.str());
+    sig.append(std::to_string(len));
 
     for (int i = 0; i < len; i++) {
         sig.append(".");

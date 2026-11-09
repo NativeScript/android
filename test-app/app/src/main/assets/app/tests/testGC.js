@@ -1,7 +1,4 @@
-// Run GC tests only in Full marking mode
-let describeFunc = __markingMode == 0 ? describe : xdescribe;
-
-describeFunc("Tests garbage collection", function () {
+describe("Tests garbage collection", function () {
 	var myCustomEquality = function(first, second) {
 		return first == second;
 	};

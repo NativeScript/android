@@ -36,7 +36,8 @@ import dalvik.annotation.optimization.FastNative;
 
 public class Runtime {
     private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName,
-                                         Object[] v8Options, String callingDir, int maxLogcatObjectSize, boolean forceLog);
+                                         String v8Flags, boolean codeCache, String profilerOutputDir, boolean discardUncaughtJsExceptions, String uncaughtErrorPolicy,
+                                         String callingDir, int maxLogcatObjectSize, boolean forceLog);
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
 
@@ -533,15 +534,6 @@ public class Runtime {
         }
     }
 
-    @RuntimeCallable
-    public int getMarkingModeOrdinal() {
-        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
-            return staticConfiguration.appConfig.getMarkingMode().ordinal();
-        } else {
-            return ((MarkingMode) AppConfig.KnownKeys.MarkingMode.getDefaultValue()).ordinal();
-        }
-    }
-
     public static boolean isInitialized() {
         Runtime runtime = Runtime.getCurrentRuntime();
         return (runtime != null) ? runtime.isInitializedImpl() : false;
@@ -711,7 +703,9 @@ public class Runtime {
 
             boolean forceConsoleLog = appConfig.getForceLog() || "timeline".equalsIgnoreCase(appConfig.getProfilingMode());
 
-            initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName, appConfig.getAsArray(),
+            initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName,
+                    appConfig.getV8Flags(), appConfig.getCodeCache(), appConfig.getProfilerOutputDir(),
+                    appConfig.getDiscardUncaughtJsExceptions(), appConfig.getUncaughtErrorPolicy(),
                     callingJsDir, appConfig.getMaxLogcatObjectSize(), forceConsoleLog);
 
             if (logger.isEnabled()) {
@@ -1029,6 +1023,8 @@ public class Runtime {
         return ret;
     }
 
+    private Class<?> lastStoredClass;
+
     @RuntimeCallable
     private void makeInstanceStrong(Object instance, int objectId) {
         if (instance == null) {
@@ -1040,34 +1036,15 @@ public class Runtime {
         strongJavaObjectToID.put(instance, key);
 
         Class<?> clazz = instance.getClass();
-        classStorageService.storeClass(clazz.getName(), clazz);
+        // Instances of one class are usually registered back to back, and storeClass takes
+        // two locks. A racing read only costs a redundant store.
+        if (clazz != lastStoredClass) {
+            classStorageService.storeClass(clazz.getName(), clazz);
+            lastStoredClass = clazz;
+        }
 
         if (logger != null && logger.isEnabled()) {
             logger.write("MakeInstanceStrong (" + key + ", " + instance.getClass().toString() + ")");
-        }
-    }
-
-    private void makeInstanceWeak(int javaObjectID, boolean keepAsWeak) {
-        if (logger.isEnabled()) {
-            logger.write("makeInstanceWeak instance " + javaObjectID + " keepAsWeak=" + keepAsWeak);
-        }
-        Object instance = strongInstances.get(javaObjectID);
-
-        if (keepAsWeak) {
-            weakJavaObjectToID.put(instance, Integer.valueOf(javaObjectID));
-            weakInstances.put(javaObjectID, new WeakReference<Object>(instance));
-        }
-
-        strongInstances.remove(javaObjectID);
-        strongJavaObjectToID.remove(instance);
-    }
-
-    @RuntimeCallable
-    private void makeInstanceWeak(ByteBuffer buff, int length, boolean keepAsWeak) {
-        buff.position(0);
-        for (int i = 0; i < length; i++) {
-            int javaObjectId = buff.getInt();
-            makeInstanceWeak(javaObjectId, keepAsWeak);
         }
     }
 
@@ -1100,34 +1077,6 @@ public class Runtime {
             weakInstances.put(javaObjectID, new WeakReference<Object>(instance));
 
             return true;
-        }
-    }
-
-    @RuntimeCallable
-    private void checkWeakObjectAreAlive(ByteBuffer input, ByteBuffer output, int length) {
-        input.position(0);
-        output.position(0);
-        for (int i = 0; i < length; i++) {
-            int javaObjectId = input.getInt();
-
-            WeakReference<Object> weakRef = weakInstances.get(javaObjectId);
-
-            int isReleased;
-
-            if (weakRef != null) {
-                Object instance = weakRef.get();
-
-                if (instance == null) {
-                    isReleased = 1;
-                    weakInstances.remove(javaObjectId);
-                } else {
-                    isReleased = 0;
-                }
-            } else {
-                isReleased = (strongInstances.get(javaObjectId) == null) ? 1 : 0;
-            }
-
-            output.putInt(isReleased);
         }
     }
 

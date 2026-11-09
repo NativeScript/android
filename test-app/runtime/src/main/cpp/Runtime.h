@@ -133,12 +133,21 @@ class Runtime {
 
         static void Init(JavaVM* vm, void* reserved);
 
-        static void Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibsDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize,
+        // The com.tns.AppConfig values initNativeScript passes by name.
+        struct StartupOptions {
+            std::string v8Flags;
+            bool codeCache;
+            std::string profilerOutputDir;
+            bool discardUncaughtJsExceptions;
+            std::string uncaughtErrorPolicy;
+        };
+
+        static void Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibsDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, const StartupOptions& options, jstring callingDir, int maxLogcatObjectSize,
                          bool forceLog);
 
         static void SetManualInstrumentationMode(jstring mode);
 
-        void Init(JNIEnv* env, jstring filesPath, jstring nativeLibsDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog);
+        void Init(JNIEnv* env, jstring filesPath, jstring nativeLibsDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, const StartupOptions& options, jstring callingDir, int maxLogcatObjectSize, bool forceLog);
 
         v8::Isolate* GetIsolate() const;
 

@@ -223,7 +223,7 @@ ObjectManager* Runtime::GetObjectManager() const { return m_objectManager; }
 void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath,
                    jstring nativeLibDir, jboolean verboseLoggingEnabled,
                    jboolean isDebuggable, jstring packageName,
-                   jobjectArray args, jstring callingDir,
+                   const StartupOptions& options, jstring callingDir,
                    int maxLogcatObjectSize, bool forceLog) {
   JEnv env(_env);
 
@@ -233,7 +233,7 @@ void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath,
 
   try {
     runtime->Init(env, filesPath, nativeLibDir, enableLog, isDebuggable,
-                  packageName, args, callingDir, maxLogcatObjectSize, forceLog);
+                  packageName, options, callingDir, maxLogcatObjectSize, forceLog);
   } catch (...) {
     // The Java side rolls back its own state and rethrows; without this the
     // native half of a failed bootstrap would stay allocated and registered.
@@ -244,8 +244,8 @@ void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath,
 
 void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
                    bool verboseLoggingEnabled, bool isDebuggable,
-                   jstring packageName, jobjectArray args, jstring callingDir,
-                   int maxLogcatObjectSize, bool forceLog) {
+                   jstring packageName, const StartupOptions& options,
+                   jstring callingDir, int maxLogcatObjectSize, bool forceLog) {
   LogEnabled = verboseLoggingEnabled;
 
   auto filesRoot = ArgConverter::jstringToString(filesPath);
@@ -259,40 +259,18 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
   CrashBreadcrumbs::RegisterRuntime(m_id);
 
   Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
-  // read config options passed from Java
-  // Indices correspond to positions in the com.tns.AppConfig.KnownKeys enum
-  JniLocalRef v8Flags(env->GetObjectArrayElement(args, 0));
-  Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
-  JniLocalRef cacheCode(env->GetObjectArrayElement(args, 1));
-  Constants::V8_CACHE_COMPILED_CODE = (bool)cacheCode;
-  JniLocalRef profilerOutputDir(env->GetObjectArrayElement(args, 2));
-
-  {
-    JEnv jEnv(env);
-    JniLocalRef discardUncaught(env->GetObjectArrayElement(
-        args, (jsize)11 /* KnownKeys.DiscardUncaughtJsExceptions */));
-    if (!discardUncaught.IsNull()) {
-      m_discardUncaughtJsExceptions =
-          JType::BooleanValue(jEnv, discardUncaught) == JNI_TRUE;
-    }
-
-    JniLocalRef uncaughtErrorPolicy(env->GetObjectArrayElement(
-        args, (jsize)14 /* KnownKeys.UncaughtErrorPolicy */));
-    if (!uncaughtErrorPolicy.IsNull()) {
-      auto policy = ArgConverter::jstringToString(uncaughtErrorPolicy);
-      if (policy == "throw") {
-        m_uncaughtErrorPolicy = UncaughtErrorPolicy::Throw;
-      } else {
-        // AppConfig validates and warns about unknown values; anything that
-        // is not "throw" behaves as the default.
-        m_uncaughtErrorPolicy = UncaughtErrorPolicy::Report;
-      }
-    }
-  }
+  Constants::V8_STARTUP_FLAGS = options.v8Flags;
+  Constants::V8_CACHE_COMPILED_CODE = options.codeCache;
+  m_discardUncaughtJsExceptions = options.discardUncaughtJsExceptions;
+  // AppConfig validates and warns about unknown values; anything that is not
+  // "throw" behaves as the default.
+  m_uncaughtErrorPolicy = options.uncaughtErrorPolicy == "throw"
+                              ? UncaughtErrorPolicy::Throw
+                              : UncaughtErrorPolicy::Report;
 
   DEBUG_WRITE("Initializing Telerik NativeScript");
 
-  auto profilerOutputDirStr = ArgConverter::jstringToString(profilerOutputDir);
+  const auto& profilerOutputDirStr = options.profilerOutputDir;
 
   NativeScriptException::Init();
   try {
@@ -942,9 +920,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
       ArgConverter::ConvertToV8String(isolate, "__releaseNativeCounterpart"),
       FunctionTemplate::New(
           isolate, CallbackHandlers::ReleaseNativeCounterpartCallback));
-  globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__markingMode"),
-                      Number::New(isolate, m_objectManager->GetMarkingMode()),
-                      readOnlyFlags);
   globalTemplate->Set(
       ArgConverter::ConvertToV8String(isolate, "__runOnMainThread"),
       FunctionTemplate::New(isolate,

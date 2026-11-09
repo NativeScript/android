@@ -154,8 +154,8 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     success = !localInstance.IsNull();
 
     if (success) {
-        jclass instanceClass = env.FindClass(fullClassName);
-        objectManager->SetJavaClass(jsObject, instanceClass);
+        // ResolveClass returned the class cache's global ref for fullClassName.
+        objectManager->SetJavaClass(jsObject, generatedJavaClass);
     } else {
         DEBUG_WRITE_FORCE("RegisterInstance failed with null new instance class: %s",
                           fullClassName.c_str());

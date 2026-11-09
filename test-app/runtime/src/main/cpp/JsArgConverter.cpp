@@ -85,8 +85,10 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
           m_error(Error()) {
     m_argsLen = args.Length();
 
-    JniSignatureParser parser(methodSignature);
-    m_ownedTokens = parser.Parse();
+    if (m_argsLen > 0) {
+        JniSignatureParser parser(methodSignature);
+        m_ownedTokens = parser.Parse();
+    }
 
     for (int i = 0; i < m_argsLen; i++) {
         m_isValid = ConvertArg(args[i], i);
