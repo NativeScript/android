@@ -1242,7 +1242,7 @@ public class Runtime {
         }
     }
 
-    private static final PackagedArgs NO_ARGS = new PackagedArgs(new int[0], new long[0], null);
+    private static final PackagedArgs NO_ARGS = new PackagedArgs(null, null, null);
 
     // If a javaObject has no javaObjectID, meaning no JavaScript object exists
     // for it yet, it is assigned one.

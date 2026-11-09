@@ -98,6 +98,7 @@ int ArgConverter::GetJavaArgsLength(JNIEnv* env, const JavaCallArgs& args) {
 
 void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const JavaCallArgs& args, int argc, Local<Value>* out) {
     if (argc == 0) {
+        args.converted = true;
         return;
     }
 
