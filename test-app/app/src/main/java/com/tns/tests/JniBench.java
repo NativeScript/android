@@ -126,6 +126,101 @@ public class JniBench {
         return new Object();
     }
 
+    // Sixteen distinct classes, for call sites that see many runtime classes, as the
+    // generic ones in an app do (View, Object, Drawable...).
+    public static final class K0 {
+    }
+
+    public static final class K1 {
+    }
+
+    public static final class K2 {
+    }
+
+    public static final class K3 {
+    }
+
+    public static final class K4 {
+    }
+
+    public static final class K5 {
+    }
+
+    public static final class K6 {
+    }
+
+    public static final class K7 {
+    }
+
+    public static final class K8 {
+    }
+
+    public static final class K9 {
+    }
+
+    public static final class K10 {
+    }
+
+    public static final class K11 {
+    }
+
+    public static final class K12 {
+    }
+
+    public static final class K13 {
+    }
+
+    public static final class K14 {
+    }
+
+    public static final class K15 {
+    }
+
+    public static Object newOfClass(int i) {
+        switch (i & 15) {
+            case 0:
+                return new K0();
+            case 1:
+                return new K1();
+            case 2:
+                return new K2();
+            case 3:
+                return new K3();
+            case 4:
+                return new K4();
+            case 5:
+                return new K5();
+            case 6:
+                return new K6();
+            case 7:
+                return new K7();
+            case 8:
+                return new K8();
+            case 9:
+                return new K9();
+            case 10:
+                return new K10();
+            case 11:
+                return new K11();
+            case 12:
+                return new K12();
+            case 13:
+                return new K13();
+            case 14:
+                return new K14();
+            case 15:
+                return new K15();
+            default:
+                throw new AssertionError();
+        }
+    }
+
+    private static int nextClass;
+
+    public static Object newObjectOfManyClasses() {
+        return newOfClass(nextClass++);
+    }
+
     /** Returns total elapsed nanoseconds for {@code n} Java -> JS calls of the given kind. */
     public static long runCallbacks(Callback cb, int kind, int n) {
         Object arg = new Object();
@@ -145,6 +240,12 @@ public class JniBench {
                 break;
             case 4:
                 for (int i = 0; i < n; i++) cb.oneObject(arg);
+                break;
+            case 5:
+                for (int i = 0; i < n; i++) cb.oneObject(new Object());
+                break;
+            case 6:
+                for (int i = 0; i < n; i++) cb.oneObject(newOfClass(i));
                 break;
             default:
                 throw new IllegalArgumentException("kind " + kind);

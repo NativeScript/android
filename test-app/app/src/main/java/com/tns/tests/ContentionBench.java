@@ -17,6 +17,7 @@ public class ContentionBench {
     public static final int NO_ARGS = 0;
     public static final int EXISTING_OBJECTS = 1;
     public static final int NEW_OBJECTS = 2;
+    public static final int NEW_OBJECTS_MANY_CLASSES = 3;
 
     private static volatile long resultNanos = -1;
 
@@ -48,8 +49,10 @@ public class ContentionBench {
                                     sink.call0();
                                 } else if (mode == EXISTING_OBJECTS) {
                                     sink.call3(shared[0], shared[1], shared[2]);
-                                } else {
+                                } else if (mode == NEW_OBJECTS) {
                                     sink.call3(new Object(), new Object(), new Object());
+                                } else {
+                                    sink.call3(JniBench.newOfClass(i), JniBench.newOfClass(i + 5), JniBench.newOfClass(i + 11));
                                 }
                             }
                         }

@@ -269,6 +269,13 @@ function buildBenchmarks() {
             });
         },
         function () {
+            return measureJs("static.newObjectOfManyClasses() [16 classes]", 20000, function (n) {
+                var s;
+                for (var i = 0; i < n; i++) s = JniBench.newObjectOfManyClasses();
+                return s;
+            });
+        },
+        function () {
             return measureJs("static.newObjectInJava() [new wrapper]", 20000, function (n) {
                 var s;
                 for (var i = 0; i < n; i++) s = JniBench.newObjectInJava();
@@ -359,6 +366,12 @@ function buildBenchmarks() {
         },
         function () {
             return measureCallback("callback.oneObject(Object)", callback, 4, 20000);
+        },
+        function () {
+            return measureCallback("callback.oneObject(new Object)", callback, 5, 20000);
+        },
+        function () {
+            return measureCallback("callback.oneObject(new, 16 classes)", callback, 6, 20000);
         }
     ];
 }
@@ -371,7 +384,7 @@ function buildContentionBenchmarks() {
     });
     var list = [];
     [1, 2, 4].forEach(function (threads) {
-        [["no args", Bench.NO_ARGS], ["3 existing objects", Bench.EXISTING_OBJECTS], ["3 new objects", Bench.NEW_OBJECTS]].forEach(function (mode) {
+        [["no args", Bench.NO_ARGS], ["3 existing objects", Bench.EXISTING_OBJECTS], ["3 new objects", Bench.NEW_OBJECTS], ["3 new objects of 16 classes", Bench.NEW_OBJECTS_MANY_CLASSES]].forEach(function (mode) {
             list.push(function (done) {
                 measureContention("contention " + threads + " thread(s), " + mode[0], sink, threads, 20000, mode[1], done);
             });
