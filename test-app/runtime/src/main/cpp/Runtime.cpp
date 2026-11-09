@@ -134,7 +134,7 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
       m_runGC(false) {
   // GetRuntime(int) and the thread's pinned JNIEnv assume one runtime per
   // thread; com.tns.Runtime's constructor enforces the same on the Java side.
-  NS_CHECK(s_currentRuntime == nullptr);
+  NS_CHECK(s_current.runtime == nullptr);
 
   m_runtime = env->NewGlobalRef(runtime);
   m_objectManager = new ObjectManager(m_runtime);
@@ -148,8 +148,9 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
 Runtime* Runtime::GetRuntime(int runtimeId) {
   // A runtime is only destroyed on its own thread, which is busy in this call,
   // so the calling thread's own runtime needs neither the lock nor the map.
-  if (runtimeId == s_currentRuntimeId) {
-    return s_currentRuntime;
+  auto& current = s_current;
+  if (runtimeId == current.id) {
+    return current.runtime;
   }
 
   Runtime* runtime = nullptr;
@@ -289,9 +290,9 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
 
 Runtime::~Runtime() {
   NS_CHECK(std::this_thread::get_id() == m_ownerThread);
-  if (s_currentRuntime == this) {
-    s_currentRuntime = nullptr;
-    s_currentRuntimeId = -1;
+  if (s_current.runtime == this) {
+    s_current.runtime = nullptr;
+    s_current.id = -1;
   }
 
   /*
@@ -1216,8 +1217,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   this->m_context = new Persistent<Context>(isolate, context);
 
   this->m_napiEnv = NapiEnv::Create(context, m_eventLoop);
-  s_currentRuntime = this;
-  s_currentRuntimeId = m_id;
+  s_current.runtime = this;
+  s_current.id = m_id;
   // The runtime's thread stays attached until DestroyRuntime: the main thread
   // for the process, a worker thread until after it tears its runtime down.
   JEnv::PinThreadEnv(JEnv());
@@ -1296,9 +1297,9 @@ void Runtime::DestroyRuntime() {
     NapiEnv::Destroy(static_cast<NapiEnv*>(m_napiEnv));
     m_napiEnv = nullptr;
   }
-  if (s_currentRuntime == this) {
-    s_currentRuntime = nullptr;
-    s_currentRuntimeId = -1;
+  if (s_current.runtime == this) {
+    s_current.runtime = nullptr;
+    s_current.id = -1;
     JEnv::UnpinThreadEnv();
   }
   // The events state holds v8::Global handles (backing event target, dispatch
@@ -1394,8 +1395,7 @@ v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 std::shared_ptr<EventLoop> Runtime::s_mainEventLoop;
 
-thread_local Runtime* Runtime::s_currentRuntime = nullptr;
-thread_local int Runtime::s_currentRuntimeId = -1;
+thread_local Runtime::CurrentRuntime Runtime::s_current;
 thread_local PendingIsolateSetup Runtime::s_pendingIsolateSetup;
 
 void Runtime::SetPendingIsolateSetup(PendingIsolateSetup setup) {

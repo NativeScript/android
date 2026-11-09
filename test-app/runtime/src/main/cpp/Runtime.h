@@ -109,7 +109,7 @@ class Runtime {
          * thread hosts at most one runtime and only that thread may destroy it.
          */
         static Runtime* GetCurrentRuntime() {
-            return s_currentRuntime;
+            return s_current.runtime;
         }
 
         /*
@@ -441,8 +441,12 @@ class Runtime {
 
         static std::shared_ptr<EventLoop> s_mainEventLoop;
 
-        static thread_local Runtime* s_currentRuntime;
-        static thread_local int s_currentRuntimeId;
+        // One struct because without ELF TLS (minSdk < 29) every thread_local costs a lookup.
+        struct CurrentRuntime {
+            Runtime* runtime = nullptr;
+            int id = -1;
+        };
+        static thread_local CurrentRuntime s_current;
         static thread_local PendingIsolateSetup s_pendingIsolateSetup;
 
 #ifdef APPLICATION_IN_DEBUG
