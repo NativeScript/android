@@ -68,6 +68,7 @@ require("./tests/shared-array-buffer-test");
 require("./tests/dex-interface-implementation");
 require("./tests/testClassForNameDiscovery");
 require("./tests/testInterfaceImplementation");
+require("./tests/testPrimitiveCallbackReturns");
 require("./tests/testRuntimeImplementedAPIs");
 require("./tests/testsInstanceOfOperator");
 require("./tests/testProxyReceivers");

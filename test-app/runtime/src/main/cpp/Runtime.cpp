@@ -54,6 +54,11 @@
 #include "include/libplatform/libplatform.h"
 #include "sys/system_properties.h"
 
+#include <cfloat>
+#include <climits>
+#include <cmath>
+#include <cstring>
+
 #ifdef APPLICATION_IN_DEBUG
 // #include "NetworkDomainCallbackHandlers.h"
 #include "JsV8InspectorClient.h"
@@ -497,10 +502,86 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
   return res;
 }
 
+/*
+ * The primitive-returning cases of JsArgToArrayConverter::ConvertArg that box
+ * into exactly the declared wrapper type, which is all the generated binding's
+ * cast accepts. Everything else keeps the boxed conversion, including the
+ * values it turns into a ClassCastException or a defaulted null.
+ */
+static bool TryGetPrimitiveReturnBits(Isolate* isolate,
+                                      const Local<Value>& value, Type type,
+                                      jlong& bits) {
+  if (value.IsEmpty()) {
+    return false;
+  }
+
+  if (type == Type::Boolean) {
+    if (!value->IsBoolean() && !value->IsBooleanObject()) {
+      return false;
+    }
+    // ToBoolean, as the boxed path does: a Boolean object is always true.
+    bits = value->BooleanValue(isolate) ? 1 : 0;
+    return true;
+  }
+
+  // Number objects are left to the boxed path: reading one calls valueOf,
+  // which must not run twice if this path then declines.
+  if (!value->IsNumber()) {
+    return false;
+  }
+
+  if (type == Type::Int && value->IsInt32()) {
+    bits = value.As<Int32>()->Value();
+    return true;
+  }
+
+  double d = value.As<Number>()->Value();
+  // Beyond int64 the boxed path's double -> int64 cast is undefined.
+  constexpr double kTwoPow63 = 9223372036854775808.0;
+  if (std::isfinite(d) && std::fabs(d) >= kTwoPow63) {
+    return false;
+  }
+  bool isWholeNumber =
+      std::isfinite(d) && d == static_cast<double>(static_cast<int64_t>(d));
+
+  switch (type) {
+    case Type::Int:
+      if (isWholeNumber && INT_MIN <= d && d <= INT_MAX) {
+        bits = static_cast<jint>(d);
+        return true;
+      }
+      return false;
+    case Type::Long:
+      if (isWholeNumber) {
+        bits = static_cast<jlong>(d);
+        return true;
+      }
+      return false;
+    case Type::Float:
+      if (!isWholeNumber && FLT_MIN <= d && d <= FLT_MAX) {
+        float f = static_cast<jfloat>(d);
+        int32_t raw;
+        memcpy(&raw, &f, sizeof(raw));
+        bits = raw;
+        return true;
+      }
+      return false;
+    case Type::Double:
+      if (!isWholeNumber) {
+        memcpy(&bits, &d, sizeof(bits));
+        return true;
+      }
+      return false;
+    default:
+      return false;
+  }
+}
+
 jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
                                     jint javaObjectID, jstring methodName,
                                     jint retType, jboolean isConstructor,
-                                    const JavaCallArgs& args) {
+                                    const JavaCallArgs& args,
+                                    jlongArray primitiveResult) {
   SET_PROFILER_FRAME();
 
   auto isolate = m_isolate;
@@ -537,6 +618,15 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
 
   // Type::Null is the id of void.class: the Java caller discards the result.
   if (retType == static_cast<jint>(Type::Null)) {
+    return nullptr;
+  }
+
+  jlong bits;
+  if (primitiveResult != nullptr &&
+      TryGetPrimitiveReturnBits(m_isolate, jsResult, static_cast<Type>(retType),
+                                bits)) {
+    jlong out[2] = {bits, 1};
+    _env->SetLongArrayRegion(primitiveResult, 0, 2, out);
     return nullptr;
   }
 
