@@ -95,6 +95,7 @@ void ObjectManager::Init(Isolate* isolate) {
   auto jsWrapperFunc =
       jsWrapperFuncTemplate->GetFunction(context).ToLocalChecked();
   m_poJsWrapperFunc = new Persistent<Function>(isolate, jsWrapperFunc);
+  m_jsWrapperTemplate.Reset(isolate, jsWrapperFuncTemplate->InstanceTemplate());
 }
 
 JniLocalRef ObjectManager::GetJavaObjectByJsObject(
@@ -743,6 +744,7 @@ void ObjectManager::ReleaseAllRegistered() {
     delete m_poJsWrapperFunc;
     m_poJsWrapperFunc = nullptr;
   }
+  m_jsWrapperTemplate.Reset();
 }
 
 ObjectManager::~ObjectManager() {
@@ -788,9 +790,9 @@ bool ObjectManager::ValidateWeakGlobalRefCallback(const int& javaObjectID,
 }
 
 Local<Object> ObjectManager::GetEmptyObject(Isolate* isolate) {
-  auto emptyObjCtorFunc = Local<Function>::New(isolate, *m_poJsWrapperFunc);
+  // The same object `new` on m_poJsWrapperFunc makes, without entering its callback.
   auto context = Runtime::GetRuntime(isolate)->GetContext();
-  auto val = emptyObjCtorFunc->CallAsConstructor(context, 0, nullptr);
+  auto val = m_jsWrapperTemplate.Get(isolate)->NewInstance(context);
   if (val.IsEmpty()) {
     return Local<Object>();
   }

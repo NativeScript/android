@@ -288,7 +288,7 @@ Local<Object> MetadataNode::CreateJSWrapper(Isolate* isolate, ObjectManager* obj
         if (!obj.IsEmpty()) {
             auto ctorFunc = GetConstructorFunction(isolate);
             auto context = isolate->GetCurrentContext();
-            obj->Set(context, ArgConverter::ConvertToV8String(isolate, "constructor"), ctorFunc);
+            obj->Set(context, V8StringConstants::GetConstructor(isolate), ctorFunc);
             obj->SetPrototype(context, ctorFunc->Get(context, V8StringConstants::GetPrototype(isolate)).ToLocalChecked());
             SetInstanceMetadata(isolate, obj, this);
         }
@@ -1191,6 +1191,11 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
 }
 
 Local<Function> MetadataNode::GetConstructorFunction(Isolate* isolate) {
+    auto cache = GetMetadataNodeCache(isolate);
+    auto itFound = cache->CtorFunctions.find(this);
+    if (itFound != cache->CtorFunctions.end()) {
+        return Local<Function>::New(isolate, *itFound->second);
+    }
     GetConstructorFunctionTemplate(isolate, m_treeNode);
     auto ctorFunc = Local<Function>::New(isolate, *GetPersistentConstructorFunction(isolate));
 
