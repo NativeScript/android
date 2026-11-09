@@ -5,7 +5,7 @@ var checkBootAnimationPropertyExec = require('child_process').exec,
 	processTimeout = 10 * 60 * 1000, // 10 minutes
 	searchInterval = 2 * 1000;
 
-var runOnDeviceOrEmulator = process.argv[2];
+var runOnDeviceOrEmulator = process.argv.slice(2).join(" ");
 
 checkBootAnimationPropertyExec("empty", check)
 
