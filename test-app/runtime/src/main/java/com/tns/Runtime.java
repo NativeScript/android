@@ -1537,14 +1537,13 @@ public class Runtime {
     }
 
     /*
-     * For return types the native side can hand back as raw bits instead of a
-     * boxed object: it writes {bits, 1} here and returns null, or leaves the
-     * array untouched and returns the boxed value as before.
+     * For primitive return types the native side hands the converted value back
+     * as raw bits: it writes {bits, 1} here and returns null, or leaves the
+     * array untouched and returns a boxed value from the generic conversion.
      */
     private static long[] newPrimitiveResult(int returnType) {
-        boolean raw = returnType == TypeIDs.Boolean || returnType == TypeIDs.Int || returnType == TypeIDs.Long
-                || returnType == TypeIDs.Float || returnType == TypeIDs.Double;
-        return raw ? new long[2] : null;
+        boolean primitive = returnType >= TypeIDs.Boolean && returnType <= TypeIDs.Double;
+        return primitive ? new long[2] : null;
     }
 
     private static Object takePrimitiveResult(Object nativeResult, int returnType, long[] primitiveResult) {
@@ -1555,6 +1554,12 @@ public class Runtime {
         long bits = primitiveResult[0];
         if (returnType == TypeIDs.Boolean) {
             return bits != 0;
+        } else if (returnType == TypeIDs.Char) {
+            return (char) bits;
+        } else if (returnType == TypeIDs.Byte) {
+            return (byte) bits;
+        } else if (returnType == TypeIDs.Short) {
+            return (short) bits;
         } else if (returnType == TypeIDs.Int) {
             return (int) bits;
         } else if (returnType == TypeIDs.Long) {

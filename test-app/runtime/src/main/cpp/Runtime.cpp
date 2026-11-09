@@ -56,6 +56,7 @@
 
 #include <cfloat>
 #include <climits>
+#include <cstdint>
 #include <cmath>
 #include <cstring>
 
@@ -503,10 +504,12 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
 }
 
 /*
- * The primitive-returning cases of JsArgToArrayConverter::ConvertArg that box
- * into exactly the declared wrapper type, which is all the generated binding's
- * cast accepts. Everything else keeps the boxed conversion, including the
- * values it turns into a ClassCastException or a defaulted null.
+ * A JS callback result for a primitive Java return type, converted only when
+ * the declared type can hold it: whole numbers in range for the integer types,
+ * a value within float range (or 0, NaN, +-Infinity) for float, any number for
+ * double, a one-character string for char. Anything else keeps the boxed
+ * conversion, whose result the generated binding rejects with a
+ * ClassCastException.
  */
 static bool TryGetPrimitiveReturnBits(Isolate* isolate,
                                       const Local<Value>& value, Type type,
@@ -516,49 +519,76 @@ static bool TryGetPrimitiveReturnBits(Isolate* isolate,
   }
 
   if (type == Type::Boolean) {
-    if (!value->IsBoolean() && !value->IsBooleanObject()) {
+    if (value->IsBoolean()) {
+      bits = value->IsTrue() ? 1 : 0;
+      return true;
+    }
+    if (value->IsBooleanObject()) {
+      bits = value.As<BooleanObject>()->ValueOf() ? 1 : 0;
+      return true;
+    }
+    return false;
+  }
+
+  if (type == Type::Char) {
+    Local<String> str;
+    if (value->IsString()) {
+      str = value.As<String>();
+    } else if (value->IsStringObject()) {
+      str = value.As<StringObject>()->ValueOf();
+    } else {
       return false;
     }
-    // ToBoolean, as the boxed path does: a Boolean object is always true.
-    bits = value->BooleanValue(isolate) ? 1 : 0;
+    if (str->Length() != 1) {
+      return false;
+    }
+    uint16_t unit;
+    str->WriteV2(isolate, 0, 1, &unit);
+    bits = unit;
     return true;
   }
 
-  // Number objects are left to the boxed path: reading one calls valueOf,
-  // which must not run twice if this path then declines.
-  if (!value->IsNumber()) {
+  double d;
+  if (value->IsNumber()) {
+    d = value.As<Number>()->Value();
+  } else if (value->IsNumberObject()) {
+    d = value.As<NumberObject>()->ValueOf();
+  } else {
     return false;
   }
 
-  if (type == Type::Int && value->IsInt32()) {
-    bits = value.As<Int32>()->Value();
-    return true;
-  }
-
-  double d = value.As<Number>()->Value();
-  // Beyond int64 the boxed path's double -> int64 cast is undefined.
-  constexpr double kTwoPow63 = 9223372036854775808.0;
-  if (std::isfinite(d) && std::fabs(d) >= kTwoPow63) {
-    return false;
-  }
-  bool isWholeNumber =
-      std::isfinite(d) && d == static_cast<double>(static_cast<int64_t>(d));
-
+  bool isWhole = std::isfinite(d) && std::trunc(d) == d;
   switch (type) {
+    case Type::Byte:
+      if (isWhole && d >= INT8_MIN && d <= INT8_MAX) {
+        bits = static_cast<jbyte>(d);
+        return true;
+      }
+      return false;
+    case Type::Short:
+      if (isWhole && d >= INT16_MIN && d <= INT16_MAX) {
+        bits = static_cast<jshort>(d);
+        return true;
+      }
+      return false;
     case Type::Int:
-      if (isWholeNumber && INT_MIN <= d && d <= INT_MAX) {
+      if (isWhole && d >= INT32_MIN && d <= INT32_MAX) {
         bits = static_cast<jint>(d);
         return true;
       }
       return false;
     case Type::Long:
-      if (isWholeNumber) {
+      // 2^63 itself is not representable; the boxed path's handling of it is
+      // undefined, so it is left there.
+      if (isWhole && std::fabs(d) < 9223372036854775808.0) {
         bits = static_cast<jlong>(d);
         return true;
       }
       return false;
-    case Type::Float:
-      if (!isWholeNumber && FLT_MIN <= d && d <= FLT_MAX) {
+    case Type::Float: {
+      double magnitude = std::fabs(d);
+      if (!std::isfinite(d) || d == 0 ||
+          (magnitude >= FLT_MIN && magnitude <= FLT_MAX)) {
         float f = static_cast<jfloat>(d);
         int32_t raw;
         memcpy(&raw, &f, sizeof(raw));
@@ -566,12 +596,10 @@ static bool TryGetPrimitiveReturnBits(Isolate* isolate,
         return true;
       }
       return false;
+    }
     case Type::Double:
-      if (!isWholeNumber) {
-        memcpy(&bits, &d, sizeof(bits));
-        return true;
-      }
-      return false;
+      memcpy(&bits, &d, sizeof(bits));
+      return true;
     default:
       return false;
   }

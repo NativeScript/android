@@ -1,5 +1,8 @@
 package com.tns.tests;
 
+import java.math.BigDecimal;
+import java.math.MathContext;
+
 /**
  * Calls each primitive-returning method of a JS implementation and reports either the
  * returned value or the class of what was thrown, so a spec can pin how JS return values
@@ -24,6 +27,15 @@ public class PrimitiveReturnTest {
         double d();
     }
 
+    // Float.toString/Double.toString changed their shortest-digits algorithm
+    // across Android versions; BigDecimal rounding prints the same everywhere.
+    private static String format(double value, int digits) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            return Double.toString(value);
+        }
+        return new BigDecimal(value).round(new MathContext(digits)).stripTrailingZeros().toString();
+    }
+
     public static String call(Returns r, String kind) {
         try {
             switch (kind) {
@@ -40,9 +52,9 @@ public class PrimitiveReturnTest {
                 case "j":
                     return "ok:" + r.j();
                 case "f":
-                    return "ok:" + r.f();
+                    return "ok:" + format(r.f(), 9);
                 case "d":
-                    return "ok:" + r.d();
+                    return "ok:" + format(r.d(), 17);
                 default:
                     throw new IllegalArgumentException(kind);
             }
