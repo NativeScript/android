@@ -158,6 +158,10 @@ class MetadataNode {
 
         static void FieldAccessorGetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void FieldAccessorSetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+
+        static void StaticFieldGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+
+        static void StaticFieldSetterCallback(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Boolean>& info);
         static void PropertyAccessorGetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void PropertyAccessorSetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 

@@ -477,6 +477,51 @@ void MetadataNode::FieldAccessorGetterCallback(const FunctionCallbackInfo<Value>
         nsEx.ReThrowToV8();
     }
 }
+void MetadataNode::StaticFieldGetterCallback(Local<Name> property, const PropertyCallbackInfo<Value>& info) {
+    try {
+        auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+        if (fieldCallbackData->metadata.getDeclaringType() == "") {
+            info.GetReturnValue().SetUndefined();
+            return;
+        }
+        auto isolate = info.GetIsolate();
+        info.GetReturnValue().Set(CallbackHandlers::GetJavaField(isolate, info.Holder(), fieldCallbackData));
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToV8();
+    }
+}
+
+void MetadataNode::StaticFieldSetterCallback(Local<Name> property, Local<Value> value, const PropertyCallbackInfo<Boolean>& info) {
+    try {
+        auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+        auto &fieldCallbackMetadata = fieldCallbackData->metadata;
+        if (fieldCallbackMetadata.getIsFinal()) {
+            stringstream ss;
+            ss << "You are trying to set \"" << fieldCallbackMetadata.getName() << "\" which is a final field! Final fields can only be read.";
+            throw NativeScriptException(ss.str());
+        }
+        CallbackHandlers::SetJavaField(info.GetIsolate(), info.Holder(), value, fieldCallbackData);
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToV8();
+    }
+}
+
 void MetadataNode::FieldAccessorSetterCallback(const FunctionCallbackInfo<Value>& info) {
     auto value = info[0];
     try {
@@ -958,6 +1003,18 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembersFromRu
 }
 
 
+static constexpr int kManyStaticFields = 64;
+
+// V8 has no API for this; deleting a property other than the last one added does it.
+static void MoveToDictionaryMode(Isolate* isolate, Local<Context> context, Local<Object> object) {
+    auto first = String::NewFromUtf8Literal(isolate, "__ns_dictionary_a");
+    auto second = String::NewFromUtf8Literal(isolate, "__ns_dictionary_b");
+    object->Set(context, first, v8::True(isolate)).Check();
+    object->Set(context, second, v8::True(isolate)).Check();
+    object->Delete(context, first).Check();
+    object->Delete(context, second).Check();
+}
+
 void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunction, MetadataTreeNode* treeNode, uint8_t* &curPtr) {
     auto hasCustomMetadata = treeNode->metadata != nullptr;
     auto context = isolate->GetCurrentContext();
@@ -995,11 +1052,32 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
         //get candidates from static fields metadata
         auto staticFieldCout = *reinterpret_cast<uint16_t*>(curPtr);
         curPtr += sizeof(uint16_t);
+        // A class with many static fields (every android.R inner class) installs all of them
+        // on first touch. Native accessors skip creating a getter and a setter function per
+        // field, but adding them one by one to a fast-mode object copies its descriptors each
+        // time, so such a class is moved to dictionary mode first. Its final fields become
+        // their value on first read (read-only), since a native accessor on a dictionary-mode
+        // object is slower to call than reading a plain property.
+        bool manyFields = staticFieldCout > kManyStaticFields;
+        if (manyFields) {
+            MoveToDictionaryMode(isolate, context, ctorFunction);
+        }
         for (auto i = 0; i < staticFieldCout; i++) {
             auto entry = MetadataReader::ReadStaticFieldEntry(&curPtr);
 
             auto fieldName = ArgConverter::ConvertToV8String(isolate, entry.getName());
             auto fieldData = External::New(isolate, cache->Own<FieldCallbackData>(entry), v8::kExternalPointerTypeTagDefault);
+            if (manyFields) {
+                if (entry.getIsFinal()) {
+                    ctorFunction->SetLazyDataProperty(context, fieldName, StaticFieldGetterCallback, fieldData,
+                                                      static_cast<PropertyAttribute>(PropertyAttribute::ReadOnly | PropertyAttribute::DontDelete)).ToChecked();
+                } else {
+                    ctorFunction->SetNativeDataProperty(context, fieldName, StaticFieldGetterCallback,
+                                                        StaticFieldSetterCallback, fieldData,
+                                                        PropertyAttribute::DontDelete).ToChecked();
+                }
+                continue;
+            }
             auto fieldGetter = FunctionTemplate::New(isolate, FieldAccessorGetterCallback, fieldData)
                                    ->GetFunction(context).ToLocalChecked();
             auto fieldSetter = FunctionTemplate::New(isolate, FieldAccessorSetterCallback, fieldData)
