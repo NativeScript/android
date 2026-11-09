@@ -41,7 +41,7 @@ class MetadataNode {
 
         static void EnableProfiler(bool enableProfiler);
 
-        std::string GetName();
+        const std::string& GetName();
 
         bool IsNodeTypeInterface();
 

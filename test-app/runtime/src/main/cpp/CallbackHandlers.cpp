@@ -126,7 +126,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     objectManager->Link(jsObject, javaObjectID, nullptr);
 
     // resolve constructor
-    auto mi = MethodCache::ResolveConstructorSignature(argWrapper, fullClassName,
+    const auto &mi = MethodCache::ResolveConstructorSignature(argWrapper, fullClassName,
                                                        generatedJavaClass, isInterface);
 
     // while the "instance" is being created, if an exception is thrown during the construction
@@ -254,10 +254,10 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 
     jclass clazz;
     jmethodID mid;
-    string *sig = nullptr;
-    string *returnType = nullptr;
+    const string *sig = nullptr;
+    const string *returnType = nullptr;
     auto retType = MethodReturnType::Unknown;
-    MethodCache::CacheMethodInfo mi;
+    const MethodCache::CacheMethodInfo *mi = nullptr;
 
     auto isolate = args.GetIsolate();
 
@@ -340,8 +340,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 
         clazz = env.FindClass(className);
         if (clazz != nullptr) {
-            mi = MethodCache::ResolveMethodSignature(className, methodName, args, isStatic);
-            if (mi.mid == nullptr) {
+            mi = &MethodCache::ResolveMethodSignature(className, methodName, args, isStatic);
+            if (mi->mid == nullptr) {
                 DEBUG_WRITE("Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d",
                             className.c_str(), methodName.c_str(), isStatic, isSuper);
                 return;
@@ -351,8 +351,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             const string callerClassName = callerNode->GetName();
             DEBUG_WRITE("Resolving method on caller class: %s.%s on className %s",
                         callerClassName.c_str(), methodName.c_str(), className.c_str());
-            mi = MethodCache::ResolveMethodSignature(callerClassName, methodName, args, isStatic);
-            if (mi.mid == nullptr) {
+            mi = &MethodCache::ResolveMethodSignature(callerClassName, methodName, args, isStatic);
+            if (mi->mid == nullptr) {
                 DEBUG_WRITE(
                         "Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d, callerClass=%s",
                         className.c_str(), methodName.c_str(), isStatic, isSuper,
@@ -361,11 +361,11 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             }
         }
 
-        clazz = mi.clazz;
-        mid = mi.mid;
-        sig = &mi.signature;
-        returnType = &mi.returnType;
-        retType = mi.retType;
+        clazz = mi->clazz;
+        mid = mi->mid;
+        sig = &mi->signature;
+        returnType = &mi->returnType;
+        retType = mi->retType;
     }
 
     if (!isStatic) {

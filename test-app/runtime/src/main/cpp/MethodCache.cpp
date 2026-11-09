@@ -41,17 +41,23 @@ void MethodCache::Init() {
     NS_CHECK(RESOLVE_CONSTRUCTOR_SIGNATURE_ID != nullptr);
 }
 
-MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic) {
+// Reused for every lookup so a cache hit allocates nothing.
+static thread_local std::string s_signatureKey;
+static const MethodCache::CacheMethodInfo s_unresolved;
+
+const MethodCache::CacheMethodInfo& MethodCache::ResolveMethodSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic) {
     CacheMethodInfo method_info;
 
-    auto encoded_method_signature = EncodeSignature(className, methodName, args, isStatic);
+    EncodeSignature(s_signatureKey, className, methodName, args, isStatic);
     {
         std::shared_lock<std::shared_mutex> lock(signatureCacheMutex);
-        auto it = s_mthod_ctor_signature_cache.find(encoded_method_signature);
+        auto it = s_mthod_ctor_signature_cache.find(s_signatureKey);
         if (it != s_mthod_ctor_signature_cache.end()) {
             return it->second;
         }
     }
+    // Resolving calls into Java, which may call back into JS and reuse s_signatureKey.
+    string encoded_method_signature = s_signatureKey;
 
     auto signature = ResolveJavaMethod(args, className, methodName);
 
@@ -72,24 +78,26 @@ MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& c
                           env.GetMethodID(clazz, methodName, signature);
 
         std::unique_lock<std::shared_mutex> lock(signatureCacheMutex);
-        s_mthod_ctor_signature_cache.emplace(encoded_method_signature, method_info);
+        return s_mthod_ctor_signature_cache.emplace(encoded_method_signature, method_info).first->second;
     }
 
-    return method_info;
+    return s_unresolved;
 }
 
-MethodCache::CacheMethodInfo MethodCache::ResolveConstructorSignature(const ArgsWrapper& argWrapper, const string& fullClassName, jclass javaClass, bool isInterface) {
+const MethodCache::CacheMethodInfo& MethodCache::ResolveConstructorSignature(const ArgsWrapper& argWrapper, const string& fullClassName, jclass javaClass, bool isInterface) {
     CacheMethodInfo constructor_info;
 
     auto& args = argWrapper.args;
-    auto encoded_ctor_signature = EncodeSignature(fullClassName, "<init>", args, false);
+    static const string kConstructorName = "<init>";
+    EncodeSignature(s_signatureKey, fullClassName, kConstructorName, args, false);
     {
         std::shared_lock<std::shared_mutex> lock(signatureCacheMutex);
-        auto it = s_mthod_ctor_signature_cache.find(encoded_ctor_signature);
+        auto it = s_mthod_ctor_signature_cache.find(s_signatureKey);
         if (it != s_mthod_ctor_signature_cache.end()) {
             return it->second;
         }
     }
+    string encoded_ctor_signature = s_signatureKey;
 
     auto signature = ResolveConstructor(args, javaClass, isInterface);
 
@@ -102,17 +110,16 @@ MethodCache::CacheMethodInfo MethodCache::ResolveConstructorSignature(const Args
         constructor_info.mid = env.GetMethodID(javaClass, "<init>", signature);
 
         std::unique_lock<std::shared_mutex> lock(signatureCacheMutex);
-        s_mthod_ctor_signature_cache.emplace(encoded_ctor_signature, constructor_info);
+        return s_mthod_ctor_signature_cache.emplace(encoded_ctor_signature, constructor_info).first->second;
     }
 
-    return constructor_info;
+    return s_unresolved;
 }
 
 // Encoded signature <className>.S/I.<methodName>.<argsCount>.<arg1class>.<...>
-string MethodCache::EncodeSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic) {
+void MethodCache::EncodeSignature(string& sig, const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic) {
     int len = args.Length();
-    string sig;
-    sig.reserve(className.size() + methodName.size() + 8 + len * 12);
+    sig.clear();
     sig.append(className);
     sig.append(isStatic ? ".S." : ".I.");
     sig.append(methodName);
@@ -121,14 +128,11 @@ string MethodCache::EncodeSignature(const string& className, const string& metho
 
     for (int i = 0; i < len; i++) {
         sig.append(".");
-        sig.append(GetType(args.GetIsolate(), args[i]));
+        AppendType(sig, args.GetIsolate(), args[i]);
     }
-
-    return sig;
 }
 
-string MethodCache::GetType(Isolate* isolate, const v8::Local<v8::Value>& jsValue) {
-    string type;
+void MethodCache::AppendType(string& type, Isolate* isolate, const v8::Local<v8::Value>& jsValue) {
     // Overloads resolve against what a Proxy wraps.
     auto value = ObjectManager::UnwrapProxy(jsValue);
 
@@ -141,48 +145,52 @@ string MethodCache::GetType(Isolate* isolate, const v8::Local<v8::Value>& jsValu
         if (!nullNode.IsEmpty()) {
             auto treeNode = reinterpret_cast<MetadataNode*>(nullNode.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
-            type = (treeNode != nullptr) ? treeNode->GetName() : "<unknown>";
+            if (treeNode != nullptr) {
+                type += treeNode->GetName();
+            } else {
+                type += "<unknown>";
+            }
 
             DEBUG_WRITE("Parameter of type %s with NULL value is passed to the method.", type.c_str());
-            return type;
+            return;
         }
     }
 
     if (value->IsArray()) {
-        type = "array";
+        type += "array";
     } else if (value->IsArrayBuffer() || value->IsSharedArrayBuffer() || value->IsInt8Array() || value->IsUint8Array() || value->IsUint8ClampedArray()) {
-        type = "bytebuffer";
+        type += "bytebuffer";
     } else if (value->IsInt16Array() || value->IsUint16Array()) {
-        type = "shortbuffer";
+        type += "shortbuffer";
     } else if (value->IsInt32Array() || value->IsUint32Array()) {
-        type = "intbuffer";
+        type += "intbuffer";
     } else if (value->IsBigUint64Array() || value->IsBigInt64Array()) {
-        type = "longbuffer";
+        type += "longbuffer";
     } else if (value->IsFloat32Array()) {
-        type = "floatbuffer";
+        type += "floatbuffer";
     } else if (value->IsFloat64Array()) {
-        type = "doublebuffer";
+        type += "doublebuffer";
     } else if (value->IsBoolean() || value->IsBooleanObject() || value->IsFalse() || value->IsTrue()) {
-        type = "bool";
+        type += "bool";
     } else if (value->IsDataView()) {
-        type = "view";
+        type += "view";
     } else if (value->IsDate()) {
-        type = "date";
+        type += "date";
     } else if (value->IsFunction()) {
-        type = "function";
+        type += "function";
     } else if (value->IsInt32() || value->IsUint32()) {
-        type = "int";
+        type += "int";
     } else if (value->IsNull() || value->IsUndefined()) {
-        type = "null";
+        type += "null";
     } else if (value->IsString() || value->IsStringObject()) {
-        type = "string";
+        type += "string";
     } else if (value->IsNumber() || value->IsNumberObject()) {
         auto context = isolate->GetCurrentContext();
         double d = value->NumberValue(context).ToChecked();
         int64_t i = (int64_t) d;
         bool isInteger = d == i;
 
-        type = isInteger ? "intnumber" : "doublenumber";
+        type += isInteger ? "intnumber" : "doublenumber";
     } else if (value->IsObject()) {
         auto context = isolate->GetCurrentContext();
         auto object = value->ToObject(context).ToLocalChecked();
@@ -191,39 +199,42 @@ string MethodCache::GetType(Isolate* isolate, const v8::Local<v8::Value>& jsValu
 
         switch (castType) {
         case CastType::Char:
-            type = "char";
+            type += "char";
             break;
 
         case CastType::Byte:
-            type = "byte";
+            type += "byte";
             break;
 
         case CastType::Short:
-            type = "short";
+            type += "short";
             break;
 
         case CastType::Long:
-            type = "long";
+            type += "long";
             break;
 
         case CastType::Float:
-            type = "float";
+            type += "float";
             break;
 
         case CastType::Double:
-            type = "double";
+            type += "double";
             break;
 
         case CastType::None:
             node = MetadataNode::GetNodeFromHandle(object);
-            type = (node != nullptr) ? node->GetName() : "<unknown>";
+            if (node != nullptr) {
+                type += node->GetName();
+            } else {
+                type += "<unknown>";
+            }
             break;
 
         default:
             throw NativeScriptException("Unsupported cast type");
         }
     }
-    return type;
 }
 
 string MethodCache::ResolveJavaMethod(const FunctionCallbackInfo<Value>& args, const string& className, const string& methodName) {
@@ -276,7 +287,7 @@ string MethodCache::ResolveConstructor(const FunctionCallbackInfo<Value>& args, 
     return resolvedSignature;
 }
 
-robin_hood::unordered_map<string, MethodCache::CacheMethodInfo> MethodCache::s_mthod_ctor_signature_cache;
+robin_hood::unordered_node_map<string, MethodCache::CacheMethodInfo> MethodCache::s_mthod_ctor_signature_cache;
 jclass MethodCache::RUNTIME_CLASS = nullptr;
 jmethodID MethodCache::RESOLVE_METHOD_OVERLOAD_METHOD_ID = nullptr;
 jmethodID MethodCache::RESOLVE_CONSTRUCTOR_SIGNATURE_ID = nullptr;

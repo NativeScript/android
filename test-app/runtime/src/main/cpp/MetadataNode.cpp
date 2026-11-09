@@ -237,7 +237,7 @@ MetadataTreeNode* MetadataNode::GetOrCreateTreeNodeByName(const string& classNam
     return s_name2TreeNodeCache.emplace(className, result).first->second;
 }
 
-string MetadataNode::GetName() {
+const string& MetadataNode::GetName() {
     return m_name;
 }
 
