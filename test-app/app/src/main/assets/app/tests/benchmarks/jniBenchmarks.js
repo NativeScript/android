@@ -205,6 +205,22 @@ function buildBenchmarks() {
             });
         },
         function () {
+            if (skipped("instance.getAlpha() [android.view.View]")) return null;
+            var view = new android.view.View(com.tns.NativeScriptApplication.getInstance());
+            return measureJs("instance.getAlpha() [android.view.View]", 50000, function (n) {
+                var s = 0;
+                for (var i = 0; i < n; i++) s = view.getAlpha();
+                return s;
+            });
+        },
+        function () {
+            return measureJs("package member read android.view.View", 200000, function (n) {
+                var s = null;
+                for (var i = 0; i < n; i++) s = android.view.View;
+                return s;
+            });
+        },
+        function () {
             return measureJs("instance.getInt()", 50000, function (n) {
                 var s = 0;
                 for (var i = 0; i < n; i++) s = bench.getInt();
@@ -412,9 +428,52 @@ function buildContentionBenchmarks() {
     return list;
 }
 
-exports.run = function () {
-    var benchmarks = buildBenchmarks();
+// The first touch of a class builds its JS constructor and installs every static member, once
+// per runtime, so each row is a single sample and must run before anything else touches the class.
+function measureFirstAccess() {
+    var rows = [
+        ["first access android.R", function () { return android.R; }],
+        ["first access android.R.attr", function () { return android.R.attr; }],
+        ["first access android.R.id", function () { return android.R.id; }],
+        ["first access android.R.style", function () { return android.R.style; }],
+        ["first access android.R.drawable", function () { return android.R.drawable; }],
+        ["first access android.R.string", function () { return android.R.string; }],
+        ["first read android.R.id.content", function () { return android.R.id.content; }],
+        ["first read android.R.id.text1", function () { return android.R.id.text1; }],
+        ["first read android.R.attr.textColor", function () { return android.R.attr.textColor; }],
+        ["first read android.R.style.Theme", function () { return android.R.style.Theme; }],
+        ["first access android.view [package]", function () { return android.view; }],
+        ["first access android.view.View", function () { return android.view.View; }],
+        ["first access android.widget [package]", function () { return android.widget; }],
+        ["first access android.widget.TextView", function () { return android.widget.TextView; }],
+        ["first access android.content.Context", function () { return android.content.Context; }],
+        ["first access android.app.Activity", function () { return android.app.Activity; }]
+    ];
     var results = [];
+    rows.forEach(function (row) {
+        if (skipped(row[0])) return;
+        gc();
+        var start = performance.now();
+        globalThis.__jniBenchSink = row[1]();
+        results.push(report(row[0], [(performance.now() - start) * 1e6]));
+    });
+    var name = "first calls of 20 android.view.View methods";
+    if (!skipped(name)) {
+        var view = new android.view.View(com.tns.NativeScriptApplication.getInstance());
+        gc();
+        var start = performance.now();
+        globalThis.__jniBenchSink = [view.getAlpha(), view.getRotation(), view.getX(), view.getY(), view.getId(),
+            view.getWidth(), view.getHeight(), view.getLeft(), view.getTop(), view.getRight(),
+            view.getBottom(), view.getPaddingLeft(), view.getPaddingTop(), view.getScaleX(), view.getScaleY(),
+            view.getTranslationX(), view.getTranslationY(), view.getVisibility(), view.isEnabled(), view.isFocused()];
+        results.push(report(name, [(performance.now() - start) * 1e6]));
+    }
+    return results;
+}
+
+exports.run = function () {
+    var results = measureFirstAccess();
+    var benchmarks = buildBenchmarks();
     var index = 0;
     // Yield to the looper between benchmarks so GC and queued work run outside timed rounds.
     function next() {
