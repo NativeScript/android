@@ -339,10 +339,10 @@ Local<Object> MetadataNode::CreatePackageObject(Isolate* isolate) {
     auto ctx = isolate->GetCurrentContext();
     auto extData = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
 
-    // Every child is a native data property, so anything that reads a property
-    // descriptor off a package object - console formatting, most notably -
-    // would materialize the whole subtree. The marker lets such callers
-    // recognize a package and stop.
+    // Every child is a lazy data property (replaced by its value on first read),
+    // so anything that reads a property descriptor off a package object -
+    // console formatting, most notably - would materialize the whole subtree.
+    // The marker lets such callers recognize a package and stop.
     auto cache = GetMetadataNodeCache(isolate);
     packageObj->SetPrivate(ctx,
                            Private::ForApi(isolate, Local<String>::New(isolate, *cache->PackageKey)),
@@ -352,11 +352,10 @@ Local<Object> MetadataNode::CreatePackageObject(Isolate* isolate) {
     if (ptrChildren != nullptr) {
         const auto& children = *ptrChildren;
         for (auto childNode: children) {
-            packageObj->SetNativeDataProperty(ctx,
-                                              ArgConverter::ConvertToV8String(isolate, childNode->name),
-                                              PackageGetterCallback,
-                                              nullptr,
-                                              extData).ToChecked();
+            packageObj->SetLazyDataProperty(ctx,
+                                            ArgConverter::ConvertToV8String(isolate, childNode->name),
+                                            PackageGetterCallback,
+                                            extData).ToChecked();
         }
     }
 
