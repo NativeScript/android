@@ -8,6 +8,11 @@
 var JniBench = com.tns.tests.JniBench;
 var ROUNDS = 7;
 var FILTER = String(JniBench.getFilter());
+// Several names may be given, separated by "|"; a benchmark runs when its name contains any.
+var FILTERS = FILTER ? FILTER.split("|") : [];
+function skipped(name) {
+    return FILTERS.length > 0 && !FILTERS.some(function (f) { return name.indexOf(f) >= 0; });
+}
 var SCALE = JniBench.getScale();
 
 function median(values) {
@@ -27,7 +32,7 @@ function report(name, nsPerOp) {
 
 // body(n) runs the operation n times; returning a value keeps V8 from dropping the loop.
 function measureJs(name, iterations, body) {
-    if (FILTER && name.indexOf(FILTER) < 0) return null;
+    if (skipped(name)) return null;
     iterations *= SCALE;
     var sink = body(Math.max(1000, iterations >> 2));
     var samples = [];
@@ -42,7 +47,7 @@ function measureJs(name, iterations, body) {
 }
 
 function measureCallback(name, cb, kind, iterations) {
-    if (FILTER && name.indexOf(FILTER) < 0) return null;
+    if (skipped(name)) return null;
     iterations *= SCALE;
     JniBench.runCallbacks(cb, kind, Math.max(1000, iterations >> 2));
     var samples = [];
@@ -58,7 +63,7 @@ function measureCallback(name, cb, kind, iterations) {
 // V8 GC (wrapper finalization and the Java-side strong -> weak bookkeeping), and the
 // Java GC that follows. Each phase is reported per object.
 function measureLifecycle(name, count, create) {
-    if (FILTER && name.indexOf(FILTER) < 0) return null;
+    if (skipped(name)) return null;
     count *= SCALE;
     var javaRuntime = java.lang.Runtime.getRuntime();
     var alloc = [], release = [], javaGc = [];
@@ -93,7 +98,7 @@ function measureLifecycle(name, count, create) {
 // asynchronously: the JS thread must go idle and release the isolate for the
 // callers to get in, so it polls for the result.
 function measureContention(name, sink, threads, calls, mode, done) {
-    if (FILTER && name.indexOf(FILTER) < 0) {
+    if (skipped(name)) {
         done(null);
         return;
     }
@@ -339,7 +344,7 @@ function buildBenchmarks() {
             });
         },
         function () {
-            if (FILTER && "instance.self() [50k live wrappers]".indexOf(FILTER) < 0) return null;
+            if (skipped("instance.self() [50k live wrappers]")) return null;
             var live = new Array(50000);
             for (var i = 0; i < live.length; i++) live[i] = new java.lang.Object();
             // Pinned from a global: an optimized frame may drop a local after its last use.
