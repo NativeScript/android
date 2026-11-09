@@ -10,6 +10,9 @@ const pollIntervalMs = 10 * 1000;
 // adb can hang outright on a wedged or overloaded device; a hung call would also stall the
 // overall timeout check, which only runs between calls.
 const adbCallTimeoutMs = 30 * 1000;
+// exec kills the child past maxBuffer (1 MiB by default); the results XML and a full logcat
+// dump can both exceed that.
+const adbExecOptions = { timeout: adbCallTimeoutMs, maxBuffer: 64 * 1024 * 1024 };
 const scriptStartTime = new Date();
 const logcatCutoffTime = new Date(scriptStartTime.getTime() - 60 * 1000); // 1 minute before start
 
@@ -19,7 +22,7 @@ console.error = console.log; // Redirect stderr to stdout for easier logcat capt
 
 function execAndStream(command, streamOutput = false) {
   return new Promise((resolve) => {
-    const child = exec(command, { timeout: adbCallTimeoutMs }, (error, stdout, stderr) => {
+    const child = exec(command, adbExecOptions, (error, stdout, stderr) => {
       resolve({ error, stdout, stderr });
     });
 
@@ -76,7 +79,7 @@ async function readAndFilterLogcat() {
 	// if we have a PID, filter by it
   if (appPID !== -1) {
     return new Promise((resolve) => {
-      exec(`${adbPrefix} logcat -d --pid=${appPID}`, { timeout: adbCallTimeoutMs }, (error, stdout) => {
+      exec(`${adbPrefix} logcat -d --pid=${appPID}`, adbExecOptions, (error, stdout) => {
         resolve(filterLogcatFromCutoff(stdout || ""));
       });
     });
@@ -84,7 +87,7 @@ async function readAndFilterLogcat() {
 	// otherwise, do a general logcat read
   return new Promise((resolve) => {
 		console.log('Reading full logcat since app PID is unknown');
-    exec(`${adbPrefix} logcat -d`, { timeout: adbCallTimeoutMs }, (error, stdout) => {
+    exec(`${adbPrefix} logcat -d`, adbExecOptions, (error, stdout) => {
       resolve(filterLogcatFromCutoff(stdout || ""));
     });
   });
