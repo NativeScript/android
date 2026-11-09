@@ -2,6 +2,32 @@ def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def runOnDevice = project.hasProperty("runOnDevice")
 def runOnDeviceOrEmulator = runOnDevice ? "-d" : "-e"
 
+// One device for the whole run. Without ANDROID_SERIAL, :app:installDebug installs on every
+// connected device, overwriting whatever build of the test app the others are running.
+def targetSerial = null
+def resolveTargetSerial = { ->
+    if (targetSerial != null) {
+        return targetSerial
+    }
+    def fromEnv = System.getenv("ANDROID_SERIAL")
+    if (fromEnv) {
+        targetSerial = fromEnv
+        return targetSerial
+    }
+    def proc = ["adb", runOnDeviceOrEmulator, "get-serialno"].execute()
+    def stdout = new StringBuilder()
+    def stderr = new StringBuilder()
+    proc.waitForProcessOutput(stdout, stderr)
+    def serial = stdout.toString().trim()
+    if (proc.exitValue() != 0 || !serial) {
+        throw new GradleException("Could not pick a single ${runOnDevice ? 'device' : 'emulator'} " +
+                "(adb ${runOnDeviceOrEmulator}: ${stderr.toString().trim()}). Set ANDROID_SERIAL to choose one.")
+    }
+    targetSerial = serial
+    return targetSerial
+}
+def adbTarget = { -> ["-s", resolveTargetSerial()] }
+
 def onlyX86 = project.hasProperty("onlyX86")
 def useCCache = project.hasProperty("useCCache")
 def selectedAbis = project.hasProperty("abis") ? project.property("abis") : null
@@ -16,10 +42,12 @@ task waitForEmulatorToStart(type: Exec) {
     doFirst {
         println "Waiting for emulator to start..."
 
+        def envSerial = System.getenv("ANDROID_SERIAL")
+        def selector = envSerial ? ["-s", envSerial] : [runOnDeviceOrEmulator]
         if (isWinOs) {
-            commandLine "cmd", "/c", "node", "$rootDir\\tools\\make_sure_emulator_is_ready.js", runOnDeviceOrEmulator
+            commandLine(["cmd", "/c", "node", "$rootDir\\tools\\make_sure_emulator_is_ready.js"] + selector)
         } else {
-            commandLine "node", "$rootDir/tools/make_sure_emulator_is_ready.js", runOnDeviceOrEmulator
+            commandLine(["node", "$rootDir/tools/make_sure_emulator_is_ready.js"] + selector)
         }
     }
 }
@@ -53,6 +81,7 @@ def getBuildArguments = { ->
 task installApk(type: Exec) {
     doFirst {
         println "Attempting to install buit apk"
+        environment "ANDROID_SERIAL", resolveTargetSerial()
         commandLine getBuildArguments()
     }
 }
@@ -63,9 +92,9 @@ task deletePreviousResultXml(type: Exec) {
         println "Removing previous android_unit_test_results.xml"
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "shell", "run-as", "com.tns.testapplication", "rm", "-f", "android_unit_test_results.xml"
+            commandLine(["cmd", "/c", "adb"] + adbTarget() + ["shell", "run-as", "com.tns.testapplication", "rm", "-f", "android_unit_test_results.xml"])
         } else {
-            commandLine "adb", runOnDeviceOrEmulator, "shell", "run-as", "com.tns.testapplication", "rm", "-f", "android_unit_test_results.xml"
+            commandLine(["adb"] + adbTarget() + ["shell", "run-as", "com.tns.testapplication", "rm", "-f", "android_unit_test_results.xml"])
         }
     }
 }
@@ -75,9 +104,9 @@ task startInstalledApk(type: Exec) {
         println "Starting test application"
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+            commandLine(["cmd", "/c", "adb"] + adbTarget() + ["shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"])
         } else {
-            commandLine "adb", runOnDeviceOrEmulator, "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+            commandLine(["adb"] + adbTarget() + ["shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"])
         }
     }
 }
@@ -94,9 +123,9 @@ task waitForUnitTestResultFile(type: Exec) {
         println "Waiting for tests to finish..."
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "node", "$rootDir\\tools\\try_to_find_test_result_file.js", runOnDeviceOrEmulator
+            commandLine(["cmd", "/c", "node", "$rootDir\\tools\\try_to_find_test_result_file.js"] + adbTarget())
         } else {
-            commandLine "node", "$rootDir/tools/try_to_find_test_result_file.js", runOnDeviceOrEmulator
+            commandLine(["node", "$rootDir/tools/try_to_find_test_result_file.js"] + adbTarget())
         }
     }
 }

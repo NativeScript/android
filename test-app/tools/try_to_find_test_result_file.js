@@ -1,12 +1,15 @@
 const { exec } = require("child_process");
 
 const appId = "com.tns.testapplication";
-const runOnDeviceOrEmulator = process.argv[2] || "-e";
+const runOnDeviceOrEmulator = process.argv.slice(2).join(" ") || "-e";
 const adbPrefix = `adb ${runOnDeviceOrEmulator}`;
 const resultsFileName = "android_unit_test_results.xml";
 
 const processTimeoutMs = 20 * 60 * 1000; // 20 minutes timeout (empirical constant)
 const pollIntervalMs = 10 * 1000;
+// adb can hang outright on a wedged or overloaded device; a hung call would also stall the
+// overall timeout check, which only runs between calls.
+const adbCallTimeoutMs = 30 * 1000;
 const scriptStartTime = new Date();
 const logcatCutoffTime = new Date(scriptStartTime.getTime() - 60 * 1000); // 1 minute before start
 
@@ -16,7 +19,7 @@ console.error = console.log; // Redirect stderr to stdout for easier logcat capt
 
 function execAndStream(command, streamOutput = false) {
   return new Promise((resolve) => {
-    const child = exec(command, (error, stdout, stderr) => {
+    const child = exec(command, { timeout: adbCallTimeoutMs }, (error, stdout, stderr) => {
       resolve({ error, stdout, stderr });
     });
 
@@ -73,7 +76,7 @@ async function readAndFilterLogcat() {
 	// if we have a PID, filter by it
   if (appPID !== -1) {
     return new Promise((resolve) => {
-      exec(`${adbPrefix} logcat -d --pid=${appPID}`, (error, stdout) => {
+      exec(`${adbPrefix} logcat -d --pid=${appPID}`, { timeout: adbCallTimeoutMs }, (error, stdout) => {
         resolve(filterLogcatFromCutoff(stdout || ""));
       });
     });
@@ -81,7 +84,7 @@ async function readAndFilterLogcat() {
 	// otherwise, do a general logcat read
   return new Promise((resolve) => {
 		console.log('Reading full logcat since app PID is unknown');
-    exec(`${adbPrefix} logcat -d`, (error, stdout) => {
+    exec(`${adbPrefix} logcat -d`, { timeout: adbCallTimeoutMs }, (error, stdout) => {
       resolve(filterLogcatFromCutoff(stdout || ""));
     });
   });
@@ -97,27 +100,33 @@ async function exitWithLogcatDump() {
   }
 }
 
-async function ensureProcessAlive() {
-  const { stdout } = await execAndStream(
-    `${adbPrefix} shell "ps | grep ${appId}"`
-  );
+// A single slow or failed adb call on a loaded host is not a crash; only give up after
+// several consecutive misses.
+const maxConsecutiveLivenessMisses = 3;
+let consecutiveLivenessMisses = 0;
+let appPID = -1;
 
-  if (!stdout) {
+async function ensureProcessAlive() {
+  const { stdout } = await execAndStream(`${adbPrefix} shell pidof ${appId}`);
+  const pid = parseInt((stdout || "").trim(), 10);
+
+  if (!Number.isFinite(pid)) {
+    consecutiveLivenessMisses++;
+    if (consecutiveLivenessMisses < maxConsecutiveLivenessMisses) {
+      console.log(
+        `${appId} process not found (${consecutiveLivenessMisses}/${maxConsecutiveLivenessMisses}), checking again`
+      );
+      return;
+    }
     console.error(`${appId} process died or never started!`);
     await exitWithLogcatDump();
   }
-	await updateAppPID();
 
-  console.log(`${appId} process is running`);
-}
-let appPID = -1;
-async function updateAppPID() {
-  if (appPID !== -1) {
-    return appPID;
+  consecutiveLivenessMisses = 0;
+  if (appPID === -1) {
+    appPID = pid;
   }
-  const { stdout } = await execAndStream(`${adbPrefix} shell "pidof ${appId}"`);
-  appPID = parseInt(stdout.trim(), 10);
-  return appPID;
+  console.log(`${appId} process is running`);
 }
 
 async function checkForErrorActivity() {
