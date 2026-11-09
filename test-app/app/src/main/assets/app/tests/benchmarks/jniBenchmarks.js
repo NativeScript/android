@@ -6,8 +6,9 @@
 // the median and minimum ns/op. Java -> JS benchmarks are timed in Java with System.nanoTime.
 
 var JniBench = com.tns.tests.JniBench;
-var ROUNDS = 7;
+var ROUNDS = com.tns.tests.JniBenchConfig.getRounds() || 7;
 var FILTER = String(JniBench.getFilter());
+var VARIANTS = String(com.tns.tests.JniBenchConfig.getVariants()).split(",").filter(function (v) { return v !== ""; }).map(Number);
 // Several names may be given, separated by "|"; a benchmark runs when its name contains any.
 var FILTERS = FILTER ? FILTER.split("|") : [];
 function skipped(name) {
@@ -104,9 +105,20 @@ function measureContention(name, sink, threads, calls, mode, done) {
     }
     var Bench = com.tns.tests.ContentionBench;
     calls *= SCALE;
-    var samples = [];
-    var round = -1;
+    // Variants alternate round by round inside one launch, so a change in the device's
+    // performance state between launches cannot favour one of them.
+    var variants = VARIANTS.length > 0 ? VARIANTS : [null];
+    var samples = variants.map(function () { return []; });
+    var round = -variants.length;
+    var total = ROUNDS * variants.length;
+    function variantOf(r) {
+        return ((r % variants.length) + variants.length) % variants.length;
+    }
     function startRound() {
+        var spin = variants[variantOf(round)];
+        if (spin !== null) {
+            com.tns.Runtime.setAdmissionSpinMicros(spin);
+        }
         Bench.start(sink, threads, calls, mode);
         setTimeout(poll, 5);
     }
@@ -117,14 +129,16 @@ function measureContention(name, sink, threads, calls, mode, done) {
             return;
         }
         if (round >= 0) {
-            samples.push(nanos / (threads * calls));
+            samples[variantOf(round)].push(nanos / (threads * calls));
         }
         round++;
-        if (round < ROUNDS) {
+        if (round < total) {
             gc();
             setTimeout(startRound, 20);
         } else {
-            done(report(name, samples));
+            done(variants.map(function (spin, i) {
+                return report(spin === null ? name : name + " [spin=" + spin + "]", samples[i]);
+            }));
         }
     }
     startRound();
@@ -421,7 +435,7 @@ exports.run = function () {
             return;
         }
         contention[contentionIndex++](function (result) {
-            if (result) results.push(result);
+            if (result) results.push.apply(results, [].concat(result));
             setTimeout(runContention, 50);
         });
     }

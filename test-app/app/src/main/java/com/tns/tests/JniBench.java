@@ -45,7 +45,7 @@ public class JniBench {
         }
     }
 
-    private static String getProp(String name) {
+    static String getProp(String name) {
         try {
             Process p = new ProcessBuilder("getprop", name).start();
             try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
