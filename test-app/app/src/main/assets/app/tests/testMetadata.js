@@ -36,3 +36,25 @@ describe("Tests metadata", function () {
 		expect(keywordClass.getValue5()).toBe(expected);
 	});
 });
+describe("Java members", function () {
+	it("are not constructors", function () {
+		var list = new java.util.ArrayList();
+
+		expect(function () { return new list.size(); }).toThrowError(TypeError);
+		expect(list.size.prototype).toBeUndefined();
+	});
+
+	it("keep static methods constructible, so new on a static factory returns its object", function () {
+		var id = new java.util.UUID.randomUUID();
+
+		expect(id instanceof java.util.UUID).toBe(true);
+	});
+
+	it("leave class constructors constructible", function () {
+		var MyObject = java.lang.Object.extend({ toString: function () { return "mine"; } });
+
+		expect(new java.util.ArrayList().size()).toBe(0);
+		expect(new MyObject().toString()).toBe("mine");
+		expect(java.util.UUID.randomUUID() instanceof java.util.UUID).toBe(true);
+	});
+});

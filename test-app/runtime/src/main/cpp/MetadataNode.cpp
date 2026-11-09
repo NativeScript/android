@@ -41,6 +41,14 @@ static void MoveToDictionaryMode(Isolate* isolate, Local<Context> context, Local
     object->Delete(context, second).Check();
 }
 
+// For everything but class constructors and static methods: V8 builds a prototype object and
+// an instance map for each constructible API function it instantiates, which a method never uses.
+static Local<FunctionTemplate> NewNonConstructor(Isolate* isolate, FunctionCallback callback,
+                                                 Local<Value> data = Local<Value>()) {
+    return FunctionTemplate::New(isolate, callback, data, Local<Signature>(), 0,
+                                 ConstructorBehavior::kThrow);
+}
+
 // Property names are internalized by V8 anyway; creating them internalized skips a copy.
 static Local<String> NewMemberName(Isolate* isolate, std::string_view name) {
     return String::NewFromUtf8(isolate, name.data(), NewStringType::kInternalized,
@@ -389,7 +397,7 @@ void MetadataNode::SetClassAccessor(Local<Function>& ctorFunction) {
     auto isolate = v8::Isolate::GetCurrent();
     auto classFieldName = ArgConverter::ConvertToV8String(isolate, "class");
     auto context = isolate->GetCurrentContext();
-    auto classGetter = FunctionTemplate::New(isolate, ClassAccessorGetterCallback)
+    auto classGetter = NewNonConstructor(isolate, ClassAccessorGetterCallback)
                            ->GetFunction(context).ToLocalChecked();
     ctorFunction->SetAccessorProperty(classFieldName, classGetter, Local<Function>(),
                                       PropertyAttribute::DontDelete);
@@ -430,7 +438,7 @@ void MetadataNode::NullObjectAccessorGetterCallback(const FunctionCallbackInfo<V
         if (hiddenVal.IsEmpty()) {
             auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
             V8SetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodePrivate(isolate), External::New(isolate, node, v8::kExternalPointerTypeTagDefault));
-            auto funcTemplate = FunctionTemplate::New(isolate, MetadataNode::NullValueOfCallback);
+            auto funcTemplate = NewNonConstructor(isolate, MetadataNode::NullValueOfCallback);
             auto context = isolate->GetCurrentContext();
             thiz->Delete(context, V8StringConstants::GetValueOf(isolate));
             thiz->Set(context, V8StringConstants::GetValueOf(isolate), funcTemplate->GetFunction(context).ToLocalChecked());
@@ -718,7 +726,7 @@ public:
         }
 
         Local<External> funcData = External::New(isolate, methodInfo, v8::kExternalPointerTypeTagDefault);
-        Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, MetadataNode::MethodCallback, funcData);
+        Local<FunctionTemplate> funcTemplate = NewNonConstructor(isolate, MetadataNode::MethodCallback, funcData);
         m_protoTemplate->Set(NewMemberName(isolate, name), funcTemplate);
         m_addedNames.insert(name);
     }
@@ -734,8 +742,8 @@ public:
         Local<Name> nameString = NewMemberName(isolate, name);
         m_protoTemplate->SetAccessorProperty(
                 nameString,
-                FunctionTemplate::New(isolate, MetadataNode::FieldAccessorGetterCallback, fieldData),
-                FunctionTemplate::New(isolate, MetadataNode::FieldAccessorSetterCallback, fieldData),
+                NewNonConstructor(isolate, MetadataNode::FieldAccessorGetterCallback, fieldData),
+                NewNonConstructor(isolate, MetadataNode::FieldAccessorSetterCallback, fieldData),
                 PropertyAttribute::DontDelete);
         m_addedNames.insert(name);
     }
@@ -751,8 +759,8 @@ public:
         Local<Name> nameString = NewMemberName(isolate, name);
         m_protoTemplate->SetAccessorProperty(
                 nameString,
-                FunctionTemplate::New(isolate, MetadataNode::PropertyAccessorGetterCallback, propertyData),
-                FunctionTemplate::New(isolate, MetadataNode::PropertyAccessorSetterCallback, propertyData),
+                NewNonConstructor(isolate, MetadataNode::PropertyAccessorGetterCallback, propertyData),
+                NewNonConstructor(isolate, MetadataNode::PropertyAccessorSetterCallback, propertyData),
                 PropertyAttribute::DontDelete);
         m_addedNames.insert(name);
     }
@@ -873,7 +881,7 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
 
             if (s_profilerEnabled.load(std::memory_order_relaxed)) {
                 Local<External> funcData = External::New(isolate, callbackData, v8::kExternalPointerTypeTagDefault);
-                Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
+                Local<FunctionTemplate> funcTemplate = NewNonConstructor(isolate, MethodCallback, funcData);
                 auto func = funcTemplate->GetFunction(context).ToLocalChecked();
                 std::string origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
                 Local<Function> wrapperFunc = Wrap(isolate, func, methodName, origin,
@@ -1049,6 +1057,7 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
             if (methodName != lastMethodName) {
                 callbackData = cache->Own<MethodCallbackData>(this);
                 auto funcData = External::New(isolate, callbackData, v8::kExternalPointerTypeTagDefault);
+                // Constructible on purpose: `new X.staticFactory()` returns the factory's object.
                 auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
                 auto func = funcTemplate->GetFunction(context).ToLocalChecked();
                 auto funcName = NewMemberName(isolate, methodName);
@@ -1060,7 +1069,7 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
 
         //attach .extend function
         auto extendFuncName = V8StringConstants::GetExtend(isolate);
-        auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendMethodCallback, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
+        auto extendFuncTemplate = NewNonConstructor(isolate, ExtendMethodCallback, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
         ctorFunction->Set(context, extendFuncName, extendFuncTemplate->GetFunction(context).ToLocalChecked());
 
         //get candidates from static fields metadata
@@ -1092,9 +1101,9 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
                 }
                 continue;
             }
-            auto fieldGetter = FunctionTemplate::New(isolate, FieldAccessorGetterCallback, fieldData)
+            auto fieldGetter = NewNonConstructor(isolate, FieldAccessorGetterCallback, fieldData)
                                    ->GetFunction(context).ToLocalChecked();
-            auto fieldSetter = FunctionTemplate::New(isolate, FieldAccessorSetterCallback, fieldData)
+            auto fieldSetter = NewNonConstructor(isolate, FieldAccessorSetterCallback, fieldData)
                                    ->GetFunction(context).ToLocalChecked();
             ctorFunction->SetAccessorProperty(fieldName, fieldGetter, fieldSetter,
                                               PropertyAttribute::DontDelete);
@@ -1104,7 +1113,7 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
 
         Local<Value> nullObjectData = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
         auto nullObjectGetter =
-            FunctionTemplate::New(isolate, NullObjectAccessorGetterCallback, nullObjectData)
+            NewNonConstructor(isolate, NullObjectAccessorGetterCallback, nullObjectData)
                 ->GetFunction(context).ToLocalChecked();
         ctorFunction->SetAccessorProperty(nullObjectName, nullObjectGetter);
 
@@ -1947,7 +1956,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         auto prototypeName = V8StringConstants::GetPrototype(isolate);
         implementationObject->SetPrototype(context, baseClassCtorFunc->Get(context, prototypeName).ToLocalChecked());
         auto superGetter =
-            FunctionTemplate::New(isolate, SuperAccessorGetterCallback, implementationObject)
+            NewNonConstructor(isolate, SuperAccessorGetterCallback, implementationObject)
                 ->GetFunction(context).ToLocalChecked();
         implementationObject->SetAccessorProperty(V8StringConstants::GetSuper(isolate), superGetter);
 
@@ -2499,7 +2508,7 @@ void MetadataNode::RegisterSymbolHasInstanceCallback(Isolate* isolate, MetadataE
     }
 
     auto extData = External::New(isolate, clazz, v8::kExternalPointerTypeTagDefault);
-    auto hasInstanceTemplate = FunctionTemplate::New(isolate, MetadataNode::SymbolHasInstanceCallback, extData);
+    auto hasInstanceTemplate = NewNonConstructor(isolate, MetadataNode::SymbolHasInstanceCallback, extData);
     auto context = isolate->GetCurrentContext();
     auto hasInstanceFunc = hasInstanceTemplate->GetFunction(context).ToLocalChecked();
     PropertyDescriptor descriptor(hasInstanceFunc, false);
