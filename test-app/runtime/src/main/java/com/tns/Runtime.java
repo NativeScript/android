@@ -57,6 +57,12 @@ public class Runtime {
     private static native int generateNewObjectIdCritical(int runtimeId);
     private static native int generateNewObjectIdLegacy(int runtimeId);
 
+    /**
+     * How long a Java thread calling into JS spins for the isolate before sleeping, in
+     * microseconds; negative lets callers go straight to V8's lock.
+     */
+    public static native void setAdmissionSpinMicros(int micros);
+
     private static int generateNewObjectId(int runtimeId) {
         return SUPPORTS_OPTIMIZED_NATIVE
                 ? generateNewObjectIdCritical(runtimeId)

@@ -13,6 +13,7 @@
 #include "File.h"
 #include "Timers.h"
 #include "EventLoop.h"
+#include "AdmissionGate.h"
 #include <atomic>
 #include <condition_variable>
 #include <optional>
@@ -167,6 +168,10 @@ class Runtime {
         jobject GetJavaRuntime() const;
 
         ObjectManager* GetObjectManager() const;
+
+        AdmissionGate& GetAdmissionGate() {
+            return m_admissionGate;
+        }
 
         void RunModule(JNIEnv* _env, jobject obj, jstring scriptFile);
         void RunModule(const char *moduleName);
@@ -332,6 +337,8 @@ class Runtime {
         v8::Isolate* m_isolate;
 
         ObjectManager* m_objectManager;
+
+        AdmissionGate m_admissionGate;
 
         ModuleInternal m_module;
 

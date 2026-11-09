@@ -204,6 +204,7 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _en
     }
 
     auto isolate = runtime->GetIsolate();
+    AdmissionScope admission(runtime->GetAdmissionGate(), isolate);
     v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
@@ -240,6 +241,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv* _e
     }
 
     auto isolate = runtime->GetIsolate();
+    AdmissionScope admission(runtime->GetAdmissionGate(), isolate);
     v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
@@ -379,4 +381,8 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_ResetDateTimeConfigurationCache(J
 
     auto isolate = runtime->GetIsolate();
     isolate->DateTimeConfigurationChangeNotification(Isolate::TimeZoneDetection::kRedetect);
+}
+
+extern "C" JNIEXPORT void Java_com_tns_Runtime_setAdmissionSpinMicros(JNIEnv* _env, jclass clazz, jint micros) {
+    AdmissionGate::s_spinMicros.store(micros, std::memory_order_relaxed);
 }
