@@ -561,13 +561,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                 if (isString) {
                     objectResult = ArgConverter::jstringToV8String(isolate, (jstring) result);
                 } else {
-                    jint javaObjectID = objectManager->GetOrCreateObjectId(result);
-                    objectResult = objectManager->GetJsObjectByJavaObject(javaObjectID);
-
-                    if (objectResult.IsEmpty()) {
-                        objectResult = objectManager->CreateJSWrapper(javaObjectID, *returnType,
-                                                                      result);
-                    }
+                    objectResult = objectManager->GetOrCreateJSWrapper(result);
                 }
 
                 args.GetReturnValue().Set(objectResult);
@@ -1080,12 +1074,7 @@ Local<Object> CallbackHandlers::FindClass(Isolate *isolate, const string &classN
         auto runtime = Runtime::GetRuntime(isolate);
         auto objectManager = runtime->GetObjectManager();
 
-        jint javaObjectID = objectManager->GetOrCreateObjectId(c);
-        clazz = objectManager->GetJsObjectByJavaObject(javaObjectID);
-
-        if (clazz.IsEmpty()) {
-            clazz = objectManager->CreateJSWrapper(javaObjectID, "Ljava/lang/Class;", c);
-        }
+        clazz = objectManager->GetOrCreateJSWrapper(c);
     }
     return clazz;
 }

@@ -2,6 +2,7 @@
 #define OBJECTMANAGER_H_
 
 #include <map>
+#include <memory>
 #include <set>
 #include <stack>
 #include <string>
@@ -69,8 +70,11 @@ class ObjectManager {
   v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID,
                                         const std::string& typeName);
 
-  v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID,
-                                        const std::string& typeName,
+  // The wrapper of object, registering it and creating the wrapper if needed.
+  v8::Local<v8::Object> GetOrCreateJSWrapper(jobject object);
+
+  // classIndex is Runtime.classIndexOf(instance's class), or 0 when unknown.
+  v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, int classIndex,
                                         jobject instance);
 
   void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
@@ -163,9 +167,23 @@ class ObjectManager {
   JSInstanceInfo* GetJSInstanceInfoFromRuntimeObject(
       const v8::Local<v8::Object>& object);
 
+  // clazz must be a global ref, or null to look className up.
   v8::Local<v8::Object> CreateJSWrapperHelper(jint javaObjectID,
-                                              const std::string& typeName,
+                                              const std::string& className,
                                               jclass clazz);
+
+  struct WrapperClass {
+    std::string name;
+    jclass clazz;  // global ref
+  };
+
+  // The JNI name and a global ref of instance's class, cached by class index.
+  const std::string& WrapperClassFor(int classIndex, jobject instance,
+                                     jclass& clazz, std::string& scratch);
+
+  // Indexed by class index. Entries are never replaced, so references to them
+  // survive a nested wrap growing the vector.
+  std::vector<std::unique_ptr<WrapperClass>> m_wrapperClasses;
 
   static void JSObjectFinalizerStatic(
       const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
@@ -227,6 +245,8 @@ class ObjectManager {
   static jmethodID GET_JAVAOBJECT_BY_ID_METHOD_ID;
 
   static jmethodID GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID;
+
+  static jmethodID GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID;
 
   static jmethodID FIND_JAVA_OBJECT_ID_METHOD_ID;
 

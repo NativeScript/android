@@ -165,12 +165,7 @@ Local<Value> FieldAccessor::GetJavaField(Isolate* isolate, const Local<Object>& 
                 auto resultV8Value = ArgConverter::jstringToV8String(isolate, (jstring) result);
                 fieldResult = handleScope.Escape(resultV8Value);
             } else {
-                int javaObjectID = objectManager->GetOrCreateObjectId(result);
-                auto objectResult = objectManager->GetJsObjectByJavaObject(javaObjectID);
-
-                if (objectResult.IsEmpty()) {
-                    objectResult = objectManager->CreateJSWrapper(javaObjectID, fieldTypeName, result);
-                }
+                auto objectResult = objectManager->GetOrCreateJSWrapper(result);
 
                 fieldResult = handleScope.Escape(objectResult);
             }

@@ -247,6 +247,34 @@ public class Runtime {
 
     private static final ClassStorageService classStorageService = new ClassStorageServiceImpl(ClassCacheImpl.INSTANCE, ClassLoadersCollectionImpl.INSTANCE);
 
+    // A dense index per runtime class, shared by every runtime, so native code can cache a
+    // class's name and global ref by index instead of asking Java for them per object. 0 is
+    // never assigned; native reads it as "no index".
+    private static final ConcurrentHashMap<Class<?>, Integer> classIndices = new ConcurrentHashMap<>();
+    private static int nextClassIndex = 1;
+
+    static int classIndexOf(Class<?> clazz) {
+        Integer index = classIndices.get(clazz);
+        return index != null ? index : registerClass(clazz);
+    }
+
+    private static int registerClass(Class<?> clazz) {
+        synchronized (classIndices) {
+            Integer index = classIndices.get(clazz);
+            if (index == null) {
+                classStorageService.storeClass(clazz.getName(), clazz);
+                index = nextClassIndex++;
+                classIndices.put(clazz, index);
+            }
+            return index;
+        }
+    }
+
+    // An object id in the low half, the object's class index in the high half.
+    static long packIdAndClass(int objectId, Object obj) {
+        return ((long) classIndexOf(obj.getClass()) << 32) | (objectId & 0xFFFFFFFFL);
+    }
+
     public Runtime(ClassResolver classResolver, GcListener gcListener, StaticConfiguration config, DynamicConfiguration dynamicConfig, int runtimeId, int workerId, ObjectTable objectTable) {
         this.classResolver = classResolver;
         this.gcListener = gcListener;
@@ -1004,8 +1032,6 @@ public class Runtime {
         return ret;
     }
 
-    private Class<?> lastStoredClass;
-
     @RuntimeCallable
     private void makeInstanceStrong(Object instance, int objectId) {
         if (instance == null) {
@@ -1015,13 +1041,8 @@ public class Runtime {
         int key = objectId;
         objectTable.putStrong(key, instance);
 
-        Class<?> clazz = instance.getClass();
-        // Instances of one class are usually registered back to back, and storeClass takes
-        // two locks. A racing read only costs a redundant store.
-        if (clazz != lastStoredClass) {
-            classStorageService.storeClass(clazz.getName(), clazz);
-            lastStoredClass = clazz;
-        }
+        // Stores the class by name on its first registration.
+        classIndexOf(instance.getClass());
 
         if (logger != null && logger.isEnabled()) {
             logger.write("MakeInstanceStrong (" + key + ", " + instance.getClass().toString() + ")");
@@ -1074,6 +1095,19 @@ public class Runtime {
     @RuntimeCallable
     private int findJavaObjectID(Object obj) {
         return objectTable.findId(obj);
+    }
+
+    // The class index is only needed to create a wrapper, and an object that already has
+    // an id almost always has one; native asks for the class itself when it does not.
+    @RuntimeCallable
+    private long getOrCreateJavaObjectIDAndClass(Object obj) {
+        int id = objectTable.findId(obj);
+        if (id != ObjectTable.NO_ID) {
+            return id & 0xFFFFFFFFL;
+        }
+        id = generateNewObjectId(getRuntimeId());
+        makeInstanceStrong(obj, id);
+        return packIdAndClass(id, obj);
     }
 
     @RuntimeCallable
@@ -1254,9 +1288,10 @@ public class Runtime {
                 if (refs == null) {
                     refs = new Object[len];
                 }
-                // A hint; resolved or registered natively, under the isolate lock, on a miss.
+                // The id is a hint; resolved or registered natively, under the isolate lock,
+                // on a miss.
                 refs[i] = value;
-                values[i] = objectTable.findIdOptimistic(value);
+                values[i] = packIdAndClass(objectTable.findIdOptimistic(value), value);
             }
 
             types[i] = typeId;

@@ -53,6 +53,10 @@ void ObjectManager::InitializeJNI() {
       runtimeClass, "getOrCreateJavaObjectID", "(Ljava/lang/Object;)I");
   NS_CHECK(GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID != nullptr);
 
+  GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID = env.GetMethodID(
+      runtimeClass, "getOrCreateJavaObjectIDAndClass", "(Ljava/lang/Object;)J");
+  NS_CHECK(GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID != nullptr);
+
   FIND_JAVA_OBJECT_ID_METHOD_ID = env.GetMethodID(
       runtimeClass, "findJavaObjectID", "(Ljava/lang/Object;)I");
   NS_CHECK(FIND_JAVA_OBJECT_ID_METHOD_ID != nullptr);
@@ -303,30 +307,76 @@ Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID,
   return CreateJSWrapperHelper(javaObjectID, typeName, nullptr);
 }
 
-Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID,
-                                             const string& typeName,
-                                             jobject instance) {
+Local<Object> ObjectManager::GetOrCreateJSWrapper(jobject object) {
   JEnv env;
-  JniLocalRef clazz(env.GetObjectClass(instance));
+  AssertIsolateLocked();
+  jlong packed = env.CallLongMethod(
+      m_javaRuntimeObject, GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID,
+      object);
+  auto javaObjectID = static_cast<jint>(packed);
+  auto wrapper = GetJsObjectByJavaObject(javaObjectID);
+  if (!wrapper.IsEmpty()) {
+    return wrapper;
+  }
+  return CreateJSWrapper(javaObjectID, static_cast<int>(packed >> 32), object);
+}
 
-  return CreateJSWrapperHelper(javaObjectID, typeName, clazz);
+Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, int classIndex,
+                                             jobject instance) {
+  jclass clazz;
+  std::string scratch;
+  const auto& className = WrapperClassFor(classIndex, instance, clazz, scratch);
+  return CreateJSWrapperHelper(javaObjectID, className, clazz);
+}
+
+const std::string& ObjectManager::WrapperClassFor(int classIndex,
+                                                  jobject instance,
+                                                  jclass& clazz,
+                                                  std::string& scratch) {
+  if (classIndex > 0 &&
+      static_cast<size_t>(classIndex) < m_wrapperClasses.size() &&
+      m_wrapperClasses[classIndex] != nullptr) {
+    clazz = m_wrapperClasses[classIndex]->clazz;
+    return m_wrapperClasses[classIndex]->name;
+  }
+
+  JEnv env;
+  JniLocalRef localClass(env.GetObjectClass(instance));
+  auto name = GetClassName(static_cast<jclass>(localClass));
+  if (classIndex <= 0) {
+    scratch = std::move(name);
+    clazz = nullptr;
+    return scratch;
+  }
+
+  // The object's own class, not whatever its name resolves to: they differ
+  // when two class loaders define the same name.
+  auto entry = std::make_unique<WrapperClass>();
+  entry->name = std::move(name);
+  entry->clazz = static_cast<jclass>(env.NewGlobalRef(localClass));
+  if (static_cast<size_t>(classIndex) >= m_wrapperClasses.size()) {
+    m_wrapperClasses.resize(classIndex + 1);
+  }
+  m_wrapperClasses[classIndex] = std::move(entry);
+  clazz = m_wrapperClasses[classIndex]->clazz;
+  return m_wrapperClasses[classIndex]->name;
 }
 
 Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
-                                                   const string& typeName,
+                                                   const string& className,
                                                    jclass clazz) {
   auto isolate = m_isolate;
-
-  auto className = (clazz != nullptr) ? GetClassName(clazz) : typeName;
 
   auto node = MetadataNode::GetOrCreate(className);
 
   auto jsWrapper = node->CreateJSWrapper(isolate, this);
 
   if (!jsWrapper.IsEmpty()) {
-    JEnv env;
-    auto claz = env.FindClass(className);
-    Link(jsWrapper, javaObjectID, claz);
+    if (clazz == nullptr) {
+      JEnv env;
+      clazz = env.FindClass(className);
+    }
+    Link(jsWrapper, javaObjectID, clazz);
   }
   return jsWrapper;
 }
@@ -663,6 +713,14 @@ ObjectManager::~ObjectManager() {
   // objects abandoned the whole cache when it died. ART's weak-global table is
   // bounded, so enough worker cycles turned that leak into an abort.
   m_cache.clear();
+
+  JEnv env;
+  for (const auto& entry : m_wrapperClasses) {
+    if (entry != nullptr) {
+      env.DeleteGlobalRef(entry->clazz);
+    }
+  }
+  m_wrapperClasses.clear();
 }
 
 jweak ObjectManager::NewWeakGlobalRefCallback(const int& javaObjectID,
@@ -775,6 +833,8 @@ jclass ObjectManager::JAVA_LANG_CLASS = nullptr;
 jmethodID ObjectManager::GET_NAME_METHOD_ID = nullptr;
 jmethodID ObjectManager::GET_JAVAOBJECT_BY_ID_METHOD_ID = nullptr;
 jmethodID ObjectManager::GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID = nullptr;
+jmethodID ObjectManager::GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID =
+    nullptr;
 jmethodID ObjectManager::FIND_JAVA_OBJECT_ID_METHOD_ID = nullptr;
 jmethodID ObjectManager::MAKE_INSTANCE_STRONG_METHOD_ID = nullptr;
 jmethodID ObjectManager::PROCESS_FINALIZED_BATCH_METHOD_ID = nullptr;
