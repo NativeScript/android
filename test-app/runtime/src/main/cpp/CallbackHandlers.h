@@ -168,7 +168,7 @@ namespace tns {
         CallbackHandlers() {
         }
 
-        static void AdjustAmountOfExternalAllocatedMemory(JEnv &env, v8::Isolate *isolate);
+        static void AdjustAmountOfExternalAllocatedMemory(v8::Isolate *isolate, int64_t usedJavaMemory);
 
         /*
          * Helper method that creates a java string array for sending strings over JNI
@@ -187,7 +187,7 @@ namespace tns {
 
         static jfieldID CURRENT_OBJECTID_FIELD_ID;
 
-        static jmethodID MAKE_INSTANCE_STRONG_ID;
+        static jmethodID REGISTER_CONSTRUCTED_INSTANCE_ID;
 
         static jmethodID GET_TYPE_METADATA;
 

@@ -180,7 +180,7 @@ class Runtime {
         jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jobject javaObject, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, const JavaCallArgs& args, jlongArray primitiveResult);
         void CreateJSInstanceNative(JNIEnv* _env, jobject obj, jobject javaObject, jint javaObjectID, jstring className);
         jint GenerateNewObjectId(JNIEnv* env, jobject obj);
-        void AdjustAmountOfExternalAllocatedMemory();
+        void AdjustAmountOfExternalAllocatedMemory(int64_t usedJavaMemory);
         bool NotifyGC(JNIEnv* env, jobject obj);
         bool TryCallGC();
         /*
@@ -424,7 +424,6 @@ class Runtime {
 
         static JavaVM* s_jvm;
 
-        static jmethodID GET_USED_MEMORY_METHOD_ID;
 
         /*
          * The main runtime has finished initializing. Distinct from the

@@ -143,15 +143,6 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_id2RuntimeCache.emplace(id, this);
   }
-
-  if (GET_USED_MEMORY_METHOD_ID == nullptr) {
-    auto RUNTIME_CLASS = env->FindClass("com/tns/Runtime");
-    NS_CHECK(RUNTIME_CLASS != nullptr);
-
-    GET_USED_MEMORY_METHOD_ID =
-        env->GetMethodID(RUNTIME_CLASS, "getUsedMemory", "()J");
-    NS_CHECK(GET_USED_MEMORY_METHOD_ID != nullptr);
-  }
 }
 
 Runtime* Runtime::GetRuntime(int runtimeId) {
@@ -729,9 +720,7 @@ jint Runtime::GenerateNewObjectId(JNIEnv* env, jobject obj) {
   return objectId;
 }
 
-void Runtime::AdjustAmountOfExternalAllocatedMemory() {
-  JEnv env;
-  int64_t usedMemory = env.CallLongMethod(m_runtime, GET_USED_MEMORY_METHOD_ID);
+void Runtime::AdjustAmountOfExternalAllocatedMemory(int64_t usedMemory) {
   int64_t changeInBytes = usedMemory - m_lastUsedMemory;
   int64_t externalMemory = 0;
 
@@ -753,7 +742,7 @@ bool Runtime::NotifyGC(JNIEnv* env, jobject obj) {
 }
 
 bool Runtime::TryCallGC() {
-  auto success = m_gcFunc != nullptr;
+  auto success = m_gcFunc != nullptr && m_runGC;
   if (success) {
     success = __sync_bool_compare_and_swap(&m_runGC, true, false);
     if (success) {
@@ -1393,7 +1382,6 @@ int Runtime::GetId() { return this->m_id; }
 
 
 JavaVM* Runtime::s_jvm = nullptr;
-jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 robin_hood::unordered_map<int, Runtime*> Runtime::s_id2RuntimeCache;
 robin_hood::unordered_map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 std::mutex Runtime::s_runtimeCacheMutex;

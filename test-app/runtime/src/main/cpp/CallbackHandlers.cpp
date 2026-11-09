@@ -56,9 +56,9 @@ void CallbackHandlers::Init(Isolate *isolate) {
         CURRENT_OBJECTID_FIELD_ID = env.GetFieldID(RUNTIME_CLASS, "currentObjectId", "I");
         NS_CHECK(CURRENT_OBJECTID_FIELD_ID != nullptr);
 
-        MAKE_INSTANCE_STRONG_ID = env.GetMethodID(RUNTIME_CLASS, "makeInstanceStrong",
-                                                  "(Ljava/lang/Object;I)V");
-        NS_CHECK(MAKE_INSTANCE_STRONG_ID != nullptr);
+        REGISTER_CONSTRUCTED_INSTANCE_ID = env.GetMethodID(RUNTIME_CLASS, "registerConstructedInstance",
+                                                           "(Ljava/lang/Object;I)J");
+        NS_CHECK(REGISTER_CONSTRUCTED_INSTANCE_ID != nullptr);
 
         GET_TYPE_METADATA = env.GetStaticMethodID(RUNTIME_CLASS, "getTypeMetadata",
                                                   "(Ljava/lang/String;I)[Ljava/lang/String;");
@@ -147,9 +147,10 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
         }
     }
 
-    env.CallVoidMethod(runtime->GetJavaRuntime(), MAKE_INSTANCE_STRONG_ID, instance, javaObjectID);
+    jlong usedJavaMemory = env.CallLongMethod(runtime->GetJavaRuntime(), REGISTER_CONSTRUCTED_INSTANCE_ID,
+                                              instance, javaObjectID);
 
-    AdjustAmountOfExternalAllocatedMemory(env, isolate);
+    AdjustAmountOfExternalAllocatedMemory(isolate, usedJavaMemory);
 
     JniLocalRef localInstance(instance);
     success = !localInstance.IsNull();
@@ -585,9 +586,9 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 //    }
 }
 
-void CallbackHandlers::AdjustAmountOfExternalAllocatedMemory(JEnv &env, Isolate *isolate) {
+void CallbackHandlers::AdjustAmountOfExternalAllocatedMemory(Isolate *isolate, int64_t usedJavaMemory) {
     auto runtime = Runtime::GetRuntime(isolate);
-    runtime->AdjustAmountOfExternalAllocatedMemory();
+    runtime->AdjustAmountOfExternalAllocatedMemory(usedJavaMemory);
     runtime->TryCallGC();
 }
 
@@ -1948,7 +1949,7 @@ jclass CallbackHandlers::RUNTIME_CLASS = nullptr;
 jclass CallbackHandlers::JAVA_LANG_STRING = nullptr;
 jfieldID CallbackHandlers::CURRENT_OBJECTID_FIELD_ID = nullptr;
 jmethodID CallbackHandlers::RESOLVE_CLASS_METHOD_ID = nullptr;
-jmethodID CallbackHandlers::MAKE_INSTANCE_STRONG_ID = nullptr;
+jmethodID CallbackHandlers::REGISTER_CONSTRUCTED_INSTANCE_ID = nullptr;
 jmethodID CallbackHandlers::GET_TYPE_METADATA = nullptr;
 jmethodID CallbackHandlers::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::DISABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;

@@ -836,7 +836,6 @@ public class Runtime {
         return javaClass;
     }
 
-    @RuntimeCallable
     private long getUsedMemory() {
         long usedMemory = dalvikRuntime.totalMemory() - dalvikRuntime.freeMemory();
         return usedMemory;
@@ -1047,6 +1046,13 @@ public class Runtime {
         String ret = sb.toString();
 
         return ret;
+    }
+
+    // One upcall for what native needs after constructing an object from JS.
+    @RuntimeCallable
+    private long registerConstructedInstance(Object instance, int objectId) {
+        makeInstanceStrong(instance, objectId);
+        return getUsedMemory();
     }
 
     @RuntimeCallable
