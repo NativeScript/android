@@ -332,6 +332,37 @@ function buildBenchmarks() {
             });
         },
         function () {
+            return measureJs("static field get int [small class]", 50000, function (n) {
+                var Fields = com.tns.tests.StaticFieldBench;
+                var s = 0;
+                for (var i = 0; i < n; i++) s = Fields.counter;
+                return s;
+            });
+        },
+        function () {
+            return measureJs("static field get final int [small class]", 50000, function (n) {
+                var Fields = com.tns.tests.StaticFieldBench;
+                var s = 0;
+                for (var i = 0; i < n; i++) s = Fields.CONSTANT;
+                return s;
+            });
+        },
+        function () {
+            return measureJs("static field set int [small class]", 50000, function (n) {
+                var Fields = com.tns.tests.StaticFieldBench;
+                for (var i = 0; i < n; i++) Fields.counter = i;
+                return n;
+            });
+        },
+        function () {
+            return measureJs("static field get final int [android.R.id]", 50000, function (n) {
+                var ids = android.R.id;
+                var s = 0;
+                for (var i = 0; i < n; i++) s = ids.content;
+                return s;
+            });
+        },
+        function () {
             return measureJs("field.get int", 50000, function (n) {
                 var s = 0;
                 for (var i = 0; i < n; i++) s = bench.intField;
