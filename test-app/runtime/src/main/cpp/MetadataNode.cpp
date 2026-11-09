@@ -811,6 +811,17 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
 
     robin_hood::unordered_map<std::string, MethodCallbackData *> collectedExtensionMethodDatas;
 
+    // The base class is fully built, so its method names stay put while this class is.
+    robin_hood::unordered_flat_map<std::string_view, MethodCallbackData *> baseMethodsByName;
+    baseMethodsByName.reserve(baseInstanceMethodsCallbackData.size());
+    for (auto baseMethod: baseInstanceMethodsCallbackData) {
+        baseMethodsByName.emplace(baseMethod->candidates.front().name, baseMethod);
+    }
+    auto findBaseMethod = [&baseMethodsByName](const std::string &name) -> MethodCallbackData * {
+        auto itFound = baseMethodsByName.find(std::string_view(name));
+        return itFound != baseMethodsByName.end() ? itFound->second : nullptr;
+    };
+
     auto extensionFunctionsCount = *reinterpret_cast<uint16_t *>(curPtr);
     curPtr += sizeof(uint16_t);
     for (auto i = 0; i < extensionFunctionsCount; i++) {
@@ -858,14 +869,7 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
             instanceMethodData.push_back(callbackData);
 
             instanceMethodsCallbackData.push_back(callbackData);
-            auto itBegin = baseInstanceMethodsCallbackData.begin();
-            auto itEnd = baseInstanceMethodsCallbackData.end();
-            auto itFound = find_if(itBegin, itEnd, [&methodName](MethodCallbackData *x) {
-                return x->candidates.front().name == methodName;
-            });
-            if (itFound != itEnd) {
-                callbackData->parent = *itFound;
-            }
+            callbackData->parent = findBaseMethod(methodName);
 
             if (s_profilerEnabled.load(std::memory_order_relaxed)) {
                 Local<External> funcData = External::New(isolate, callbackData, v8::kExternalPointerTypeTagDefault);
