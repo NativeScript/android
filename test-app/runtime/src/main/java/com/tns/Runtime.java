@@ -180,6 +180,17 @@ public class Runtime {
     // findIdOptimistic, whose result the native side re-checks.
     private final ObjectTable objectTable;
 
+    private final ObjectTable.IdSource objectIds = new ObjectTable.IdSource() {
+        @Override
+        public int newId() {
+            return generateNewObjectId(getRuntimeId());
+        }
+    };
+
+    // Set in a packed argument when packageArgs registered the object itself, before the
+    // isolate lock; native then wraps it without asking Java again.
+    private static final long FRESH_ARG = 1L << 63;
+
     private Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
 
     private final java.lang.Runtime dalvikRuntime = java.lang.Runtime.getRuntime();
@@ -1288,10 +1299,21 @@ public class Runtime {
                 if (refs == null) {
                     refs = new Object[len];
                 }
-                // The id is a hint; resolved or registered natively, under the isolate lock,
-                // on a miss.
                 refs[i] = value;
-                values[i] = packIdAndClass(objectTable.findIdOptimistic(value), value);
+                int id = objectTable.findIdOptimistic(value);
+                long fresh = 0;
+                if (id == ObjectTable.NO_ID && objectTable.allowsConcurrentRegistration()) {
+                    // Registered here rather than under the isolate lock, so threads calling
+                    // in with new objects only serialize on creating their wrappers.
+                    long found = objectTable.findOrRegister(value, objectIds);
+                    id = (int) found;
+                    if ((found & ObjectTable.FRESH) != 0) {
+                        fresh = FRESH_ARG;
+                    }
+                }
+                // Otherwise the id is a hint, resolved or registered natively under the
+                // isolate lock.
+                values[i] = packIdAndClass(id, value) | fresh;
             }
 
             types[i] = typeId;

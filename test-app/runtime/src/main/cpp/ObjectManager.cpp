@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include "ArgConverter.h"
+#include "JType.h"
 #include "ManualInstrumentation.h"
 #include "MetadataNode.h"
 #include "NativeScriptAssert.h"
@@ -292,6 +293,44 @@ Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID) {
 
   auto localObject = Local<Object>::New(isolate, *state->target);
   return handleScope.Escape(localObject);
+}
+
+void ObjectManager::ReleaseUnwrappedArgs(const JavaCallArgs& args) {
+  if (args.converted || args.types == nullptr || args.values == nullptr) {
+    return;
+  }
+  JEnv env;
+  JNIEnv* raw = env;
+  // Runs after the failure was rethrown to Java; keep that exception for the caller.
+  jthrowable pending = raw->ExceptionOccurred();
+  raw->ExceptionClear();
+
+  jsize argc = raw->GetArrayLength(args.types);
+  std::vector<jint> types(argc);
+  std::vector<jlong> values(argc);
+  raw->GetIntArrayRegion(args.types, 0, argc, types.data());
+  raw->GetLongArrayRegion(args.values, 0, argc, values.data());
+  AssertIsolateLocked();
+  for (jsize i = 0; i < argc; i++) {
+    if (static_cast<Type>(types[i]) != Type::JsObject ||
+        (values[i] & JavaCallArgs::FreshArg) == 0) {
+      continue;
+    }
+    auto javaObjectID = static_cast<jint>(values[i]);
+    if (HasJsObject(javaObjectID)) {
+      continue;
+    }
+    raw->CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,
+                        javaObjectID);
+    if (raw->ExceptionCheck()) {
+      raw->ExceptionClear();
+    }
+  }
+
+  if (pending != nullptr) {
+    raw->Throw(pending);
+    raw->DeleteLocalRef(pending);
+  }
 }
 
 Local<Object> ObjectManager::GetLinkedJsObjectByJavaObject(int javaObjectID) {

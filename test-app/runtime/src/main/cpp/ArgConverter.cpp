@@ -155,11 +155,15 @@ void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const 
             break;
         }
         case Type::JsObject: {
-            // values[i] packs an id Java read without the isolate lock (or -1) in
-            // its low half and the class index in its high half.
+            // values[i] packs an id in its low half (exact when FreshArg is set, else a
+            // hint Java read without the isolate lock, or -1) and the class index above.
             auto hintedObjectID = static_cast<jint>(bits);
-            auto classIndex = static_cast<int>(bits >> 32);
-            if (hintedObjectID >= 0) {
+            auto classIndex = static_cast<int>((bits >> 32) & 0x7fffffff);
+            if ((bits & JavaCallArgs::FreshArg) != 0 &&
+                !objectManager->HasJsObject(hintedObjectID)) {
+                JniLocalRef arg(env->GetObjectArrayElement(args.refs, i));
+                jsArg = objectManager->CreateJSWrapper(hintedObjectID, classIndex, arg);
+            } else if (hintedObjectID >= 0) {
                 jsArg = objectManager->GetLinkedJsObjectByJavaObject(hintedObjectID);
             }
             if (jsArg.IsEmpty()) {
@@ -179,6 +183,7 @@ void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const 
 
         out[i] = jsArg;
     }
+    args.converted = true;
 }
 
 Local<Value> ArgConverter::ConvertFromJavaLong(Isolate* isolate, jlong value) {

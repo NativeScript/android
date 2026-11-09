@@ -210,8 +210,9 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _en
     auto context = runtime->GetContext();
     v8::Context::Scope context_scope(context);
 
+    JavaCallArgs args{argTypes, argValues, argRefs};
     try {
-        result = runtime->CallJSMethodNative(_env, obj, javaObject, javaObjectID, methodName, retType, isConstructor, JavaCallArgs{argTypes, argValues, argRefs}, primitiveResult);
+        result = runtime->CallJSMethodNative(_env, obj, javaObject, javaObjectID, methodName, retType, isConstructor, args, primitiveResult);
     } catch (NativeScriptException& e) {
         e.ReThrowToJava();
     } catch (std::exception e) {
@@ -223,6 +224,8 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _en
         NativeScriptException nsEx(std::string("Error: c++ exception!"));
         nsEx.ReThrowToJava();
     }
+    // Objects Java registered for a call that never reached them would stay strong.
+    runtime->GetObjectManager()->ReleaseUnwrappedArgs(args);
     return result;
 }
 

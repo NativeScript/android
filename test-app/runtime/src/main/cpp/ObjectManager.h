@@ -16,6 +16,8 @@
 #include "v8.h"
 
 namespace tns {
+struct JavaCallArgs;
+
 class ObjectManager {
  public:
   ObjectManager(jobject javaRuntimeObject);
@@ -62,6 +64,15 @@ class ObjectManager {
       FlushFinalizedBatch();
     }
   }
+
+  // Whether a wrapper was ever created for this id and not yet collected.
+  bool HasJsObject(int javaObjectID) const {
+    return m_idToObject.find(javaObjectID) != m_idToObject.end();
+  }
+
+  // After a failed Java->JS call: drops the Java registration of every object Java
+  // registered for the call (JavaCallArgs::FreshArg) that never got a wrapper.
+  void ReleaseUnwrappedArgs(const JavaCallArgs& args);
 
   // As GetJsObjectByJavaObject, but empty once the wrapper's link to the Java object was
   // released.

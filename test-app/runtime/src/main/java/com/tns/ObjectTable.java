@@ -7,12 +7,20 @@ import java.lang.ref.WeakReference;
  * holds its object strongly while the JS wrapper is reachable and through a WeakReference
  * after the wrapper was collected (until the object is collected too).
  *
- * Every mutation and every exact read must come from the thread that holds the runtime's
- * isolate lock; findIdOptimistic is the one read any thread may make. Neither table
- * allocates per entry.
+ * Where StampedLock exists (API 24+) any thread may read and findOrRegister: writers are
+ * serialized by its write lock and exact reads validate against it. Without it, every
+ * mutation and every exact read must come from the thread that holds the runtime's
+ * isolate lock. Neither table allocates per entry.
  */
 final class ObjectTable {
     static final int NO_ID = -1;
+
+    // Set in findOrRegister's result when that call registered the object.
+    static final long FRESH = 1L << 32;
+
+    interface IdSource {
+        int newId();
+    }
 
     // Null where StampedLock is unavailable (API < 24): findIdOptimistic then always misses.
     private final Stamps stamps;
@@ -43,6 +51,14 @@ final class ObjectTable {
 
         long beginRead() {
             return lock.tryOptimisticRead();
+        }
+
+        long readLock() {
+            return lock.readLock();
+        }
+
+        void unlockRead(long stamp) {
+            lock.unlockRead(stamp);
         }
 
         boolean validate(long stamp) {
@@ -162,8 +178,56 @@ final class ObjectTable {
         identityCount++;
     }
 
+    boolean allowsConcurrentRegistration() {
+        return stamps != null;
+    }
+
+    /**
+     * The id obj is registered under, registering it strongly under a new id from ids when
+     * it has none; FRESH is set in the result when this call registered it. The lookup and
+     * the insert happen under one write lock, so concurrent calls agree on one id. Only
+     * when allowsConcurrentRegistration().
+     */
+    long findOrRegister(Object obj, IdSource ids) {
+        long stamp = stamps.beginWrite();
+        try {
+            int id = findIdLocked(obj);
+            if (id != NO_ID) {
+                return id;
+            }
+            id = ids.newId();
+            putStrongLocked(id, obj);
+            return id | FRESH;
+        } finally {
+            stamps.endWrite(stamp);
+        }
+    }
+
     /** The id obj is registered under, or NO_ID. */
     int findId(Object obj) {
+        if (stamps == null) {
+            return findIdLocked(obj);
+        }
+        long stamp = stamps.beginRead();
+        if (stamp != 0) {
+            try {
+                int id = findIdUnlocked(obj);
+                if (stamps.validate(stamp)) {
+                    return id;
+                }
+            } catch (RuntimeException e) {
+                // A torn view of a resize; retried under the read lock.
+            }
+        }
+        stamp = stamps.readLock();
+        try {
+            return findIdLocked(obj);
+        } finally {
+            stamps.unlockRead(stamp);
+        }
+    }
+
+    private int findIdLocked(Object obj) {
         int mask = identityIndex.length - 1;
         int i = mix(System.identityHashCode(obj)) & mask;
         while (true) {
@@ -172,7 +236,7 @@ final class ObjectTable {
                 return NO_ID;
             }
             int id = entry - 1;
-            if (get(id) == obj) {
+            if (getLocked(id) == obj) {
                 return id;
             }
             i = (i + 1) & mask;
@@ -181,6 +245,29 @@ final class ObjectTable {
 
     /** The object registered under id; null if there is none or it was collected. */
     Object get(int id) {
+        if (stamps == null) {
+            return getLocked(id);
+        }
+        long stamp = stamps.beginRead();
+        if (stamp != 0) {
+            try {
+                Object value = getUnlocked(id);
+                if (stamps.validate(stamp)) {
+                    return value;
+                }
+            } catch (RuntimeException e) {
+                // A torn view of a resize; retried under the read lock.
+            }
+        }
+        stamp = stamps.readLock();
+        try {
+            return getLocked(id);
+        } finally {
+            stamps.unlockRead(stamp);
+        }
+    }
+
+    private Object getLocked(int id) {
         int slot = findIdSlot(id);
         if (slot < 0) {
             return null;
@@ -190,7 +277,15 @@ final class ObjectTable {
     }
 
     boolean contains(int id) {
-        return findIdSlot(id) >= 0;
+        if (stamps == null) {
+            return findIdSlot(id) >= 0;
+        }
+        long stamp = stamps.readLock();
+        try {
+            return findIdSlot(id) >= 0;
+        } finally {
+            stamps.unlockRead(stamp);
+        }
     }
 
     /**

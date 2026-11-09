@@ -356,6 +356,37 @@ describe("Tests garbage collection", function () {
 			collectJava();
 		});
 
+		it("release an object Java registered for a call that failed before reaching it", function () {
+			// Not a function: the call fails before its argument is converted.
+			var target = new com.tns.tests.FreshArgs.Target({ take: 42 });
+			var ref = com.tns.tests.FreshArgs.callWithNewObject(target);
+			collectJava();
+
+			expect(ref.get()).toBe(null);
+		});
+
+		it("give threads passing the same new object at once one wrapper", function (done) {
+			var FreshArgs = com.tns.tests.FreshArgs;
+			var received = [];
+			var target = new FreshArgs.Target({
+				take: function (o) {
+					received.push(o);
+				}
+			});
+			FreshArgs.startFromThreadsAtOnce(target, 4);
+			(function poll() {
+				if (FreshArgs.finishedCalls() < 4) {
+					setTimeout(poll, 10);
+					return;
+				}
+				expect(received.length).toBe(4);
+				for (var i = 1; i < received.length; i++) {
+					expect(received[i] === received[0]).toBe(true);
+				}
+				done();
+			})();
+		});
+
 		it("let Java reclaim objects during a synchronous loop that never yields", function () {
 			// Far more than the Java heap: every buffer must become collectable while the loop runs.
 			var total = 0;
