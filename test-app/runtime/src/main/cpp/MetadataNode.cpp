@@ -27,6 +27,20 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
+// Objects that get more members than this are moved to dictionary mode before the members are
+// added: adding properties one by one to a fast-mode object copies its descriptors each time.
+static constexpr size_t kManyMembers = 64;
+
+// V8 has no API for this; deleting a property other than the last one added does it.
+static void MoveToDictionaryMode(Isolate* isolate, Local<Context> context, Local<Object> object) {
+    auto first = String::NewFromUtf8Literal(isolate, "__ns_dictionary_a");
+    auto second = String::NewFromUtf8Literal(isolate, "__ns_dictionary_b");
+    object->Set(context, first, v8::True(isolate)).Check();
+    object->Set(context, second, v8::True(isolate)).Check();
+    object->Delete(context, first).Check();
+    object->Delete(context, second).Check();
+}
+
 void MetadataNode::Init(Isolate* isolate) {
     auto key = ArgConverter::ConvertToV8String(isolate, "tns::MetadataKey");
     auto cache = GetMetadataNodeCache(isolate);
@@ -351,6 +365,9 @@ Local<Object> MetadataNode::CreatePackageObject(Isolate* isolate) {
     auto ptrChildren = this->m_treeNode->children;
     if (ptrChildren != nullptr) {
         const auto& children = *ptrChildren;
+        if (children.size() > kManyMembers) {
+            MoveToDictionaryMode(isolate, ctx, packageObj);
+        }
         for (auto childNode: children) {
             packageObj->SetLazyDataProperty(ctx,
                                             ArgConverter::ConvertToV8String(isolate, childNode->name),
@@ -1003,18 +1020,6 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembersFromRu
 }
 
 
-static constexpr int kManyStaticFields = 64;
-
-// V8 has no API for this; deleting a property other than the last one added does it.
-static void MoveToDictionaryMode(Isolate* isolate, Local<Context> context, Local<Object> object) {
-    auto first = String::NewFromUtf8Literal(isolate, "__ns_dictionary_a");
-    auto second = String::NewFromUtf8Literal(isolate, "__ns_dictionary_b");
-    object->Set(context, first, v8::True(isolate)).Check();
-    object->Set(context, second, v8::True(isolate)).Check();
-    object->Delete(context, first).Check();
-    object->Delete(context, second).Check();
-}
-
 void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunction, MetadataTreeNode* treeNode, uint8_t* &curPtr) {
     auto hasCustomMetadata = treeNode->metadata != nullptr;
     auto context = isolate->GetCurrentContext();
@@ -1058,7 +1063,7 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
         // time, so such a class is moved to dictionary mode first. Its final fields become
         // their value on first read (read-only), since a native accessor on a dictionary-mode
         // object is slower to call than reading a plain property.
-        bool manyFields = staticFieldCout > kManyStaticFields;
+        bool manyFields = staticFieldCout > kManyMembers;
         if (manyFields) {
             MoveToDictionaryMode(isolate, context, ctorFunction);
         }
