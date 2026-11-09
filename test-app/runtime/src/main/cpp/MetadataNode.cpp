@@ -41,6 +41,12 @@ static void MoveToDictionaryMode(Isolate* isolate, Local<Context> context, Local
     object->Delete(context, second).Check();
 }
 
+// Property names are internalized by V8 anyway; creating them internalized skips a copy.
+static Local<String> NewMemberName(Isolate* isolate, std::string_view name) {
+    return String::NewFromUtf8(isolate, name.data(), NewStringType::kInternalized,
+                               static_cast<int>(name.size())).ToLocalChecked();
+}
+
 void MetadataNode::Init(Isolate* isolate) {
     auto key = ArgConverter::ConvertToV8String(isolate, "tns::MetadataKey");
     auto cache = GetMetadataNodeCache(isolate);
@@ -370,7 +376,7 @@ Local<Object> MetadataNode::CreatePackageObject(Isolate* isolate) {
         }
         for (auto childNode: children) {
             packageObj->SetLazyDataProperty(ctx,
-                                            ArgConverter::ConvertToV8String(isolate, childNode->name),
+                                            NewMemberName(isolate, childNode->name),
                                             PackageGetterCallback,
                                             extData).ToChecked();
         }
@@ -713,8 +719,7 @@ public:
 
         Local<External> funcData = External::New(isolate, methodInfo, v8::kExternalPointerTypeTagDefault);
         Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, MetadataNode::MethodCallback, funcData);
-        Local<String> nameString = ArgConverter::ConvertToV8String(isolate, name);
-        m_protoTemplate->Set(nameString, funcTemplate);
+        m_protoTemplate->Set(NewMemberName(isolate, name), funcTemplate);
         m_addedNames.insert(name);
     }
 
@@ -726,7 +731,7 @@ public:
         }
 
         Local<External> fieldData = External::New(isolate, fieldInfo, v8::kExternalPointerTypeTagDefault);
-        Local<Name> nameString = ArgConverter::ConvertToV8String(isolate, name);
+        Local<Name> nameString = NewMemberName(isolate, name);
         m_protoTemplate->SetAccessorProperty(
                 nameString,
                 FunctionTemplate::New(isolate, MetadataNode::FieldAccessorGetterCallback, fieldData),
@@ -743,7 +748,7 @@ public:
         }
 
         Local<External> propertyData = External::New(isolate, propertyInfo, v8::kExternalPointerTypeTagDefault);
-        Local<Name> nameString = ArgConverter::ConvertToV8String(isolate, name);
+        Local<Name> nameString = NewMemberName(isolate, name);
         m_protoTemplate->SetAccessorProperty(
                 nameString,
                 FunctionTemplate::New(isolate, MetadataNode::PropertyAccessorGetterCallback, propertyData),
@@ -1042,7 +1047,7 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
                 auto funcData = External::New(isolate, callbackData, v8::kExternalPointerTypeTagDefault);
                 auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
                 auto func = funcTemplate->GetFunction(context).ToLocalChecked();
-                auto funcName = ArgConverter::ConvertToV8String(isolate, methodName);
+                auto funcName = NewMemberName(isolate, methodName);
                 ctorFunction->Set(context, funcName, Wrap(isolate, func, methodName, origin, false /* isCtorFunc */));
                 lastMethodName = methodName;
             }
@@ -1070,7 +1075,7 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
         for (auto i = 0; i < staticFieldCout; i++) {
             auto entry = MetadataReader::ReadStaticFieldEntry(&curPtr);
 
-            auto fieldName = ArgConverter::ConvertToV8String(isolate, entry.getName());
+            auto fieldName = NewMemberName(isolate, s_metadataReader.ReadNameView(entry.sfi->nameOffset));
             auto fieldData = External::New(isolate, cache->Own<FieldCallbackData>(entry), v8::kExternalPointerTypeTagDefault);
             if (manyFields) {
                 if (entry.getIsFinal()) {
@@ -1108,12 +1113,13 @@ void MetadataNode::SetInnerTypes(v8::Isolate* isolate, Local<Function>& ctorFunc
         auto context = isolate->GetCurrentContext();
         const auto &children = *treeNode->children;
         for (auto curChild: children) {
-            bool hasOwnProperty = ctorFunction->HasOwnProperty(context, ArgConverter::ConvertToV8String(isolate, curChild->name)).ToChecked();
+            auto childName = NewMemberName(isolate, curChild->name);
+            bool hasOwnProperty = ctorFunction->HasOwnProperty(context, childName).ToChecked();
                 // Child is defined as a function already when the inner type is a companion object
                 if (!hasOwnProperty) {
                     ctorFunction->SetNativeDataProperty(
                         context,
-                        v8::String::NewFromUtf8(isolate, curChild->name.c_str()).ToLocalChecked(),
+                        childName,
                         InnerTypeAccessorGetterCallback, nullptr,
                         v8::External::New(isolate, curChild, v8::kExternalPointerTypeTagDefault)
                 ).ToChecked();

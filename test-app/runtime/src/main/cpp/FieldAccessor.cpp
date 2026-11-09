@@ -39,10 +39,10 @@ Local<Value> FieldAccessor::GetJavaField(Isolate* isolate, const Local<Object>& 
 
         if (isStatic) {
             fieldData->clazz = env.FindClass(fieldMetadata.getDeclaringType());
-            fieldData->fid = env.GetStaticFieldID(fieldData->clazz, fieldMetadata.name, fieldJniSig);
+            fieldData->fid = env.GetStaticFieldID(fieldData->clazz, fieldMetadata.getName(), fieldJniSig);
         } else {
             fieldData->clazz = env.FindClass(fieldMetadata.getDeclaringType());
-            fieldData->fid = env.GetFieldID(fieldData->clazz, fieldMetadata.name, fieldJniSig);
+            fieldData->fid = env.GetFieldID(fieldData->clazz, fieldMetadata.getName(), fieldJniSig);
         }
     }
 
@@ -51,7 +51,7 @@ Local<Value> FieldAccessor::GetJavaField(Isolate* isolate, const Local<Object>& 
 
         if (targetJavaObject.IsNull()) {
             stringstream ss;
-            ss << "Cannot access property '" << fieldMetadata.name.c_str() << "' because there is no corresponding Java object";
+            ss << "Cannot access property '" << fieldMetadata.getName().c_str() << "' because there is no corresponding Java object";
             throw NativeScriptException(ss.str());
         }
     }
@@ -207,12 +207,12 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
         if (isStatic) {
             fieldData->clazz = env.FindClass(fieldMetadata.getDeclaringType());
             NS_DCHECK(fieldData->clazz != nullptr);
-            fieldData->fid = env.GetStaticFieldID(fieldData->clazz, fieldMetadata.name, fieldJniSig);
+            fieldData->fid = env.GetStaticFieldID(fieldData->clazz, fieldMetadata.getName(), fieldJniSig);
             NS_DCHECK(fieldData->fid != nullptr);
         } else {
             fieldData->clazz = env.FindClass(fieldMetadata.getDeclaringType());
             NS_DCHECK(fieldData->clazz != nullptr);
-            fieldData->fid = env.GetFieldID(fieldData->clazz, fieldMetadata.name, fieldJniSig);
+            fieldData->fid = env.GetFieldID(fieldData->clazz, fieldMetadata.getName(), fieldJniSig);
             NS_DCHECK(fieldData->fid != nullptr);
         }
     }
@@ -222,7 +222,7 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
 
         if (targetJavaObject.IsNull()) {
             stringstream ss;
-            ss << "Cannot access property '" << fieldMetadata.name.c_str() << "' because there is no corresponding Java object";
+            ss << "Cannot access property '" << fieldMetadata.getName().c_str() << "' because there is no corresponding Java object";
             throw NativeScriptException(ss.str());
         }
     }
@@ -325,7 +325,7 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
                 result = ArgConverter::ConvertToJavaString(value);
             } else {
                 if (value->IsProxy() && !ObjectManager::UnwrapProxy(value)->IsObject()) {
-                    throw NativeScriptException("Cannot assign a revoked Proxy to field '" + fieldMetadata.name + "'");
+                    throw NativeScriptException("Cannot assign a revoked Proxy to field '" + fieldMetadata.getName() + "'");
                 }
                 auto context = isolate->GetCurrentContext();
                 auto objectWithHiddenID = value->ToObject(context).ToLocalChecked();
