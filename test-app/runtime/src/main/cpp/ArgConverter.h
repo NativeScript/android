@@ -10,6 +10,7 @@
 
 #include "v8.h"
 #include "JEnv.h"
+#include "JType.h"
 #include <string>
 #include <map>
 #include <vector>
@@ -18,7 +19,8 @@ namespace tns {
 
 // The argument arrays com.tns.Runtime.packageArgs builds for a Java -> JS call.
 struct JavaCallArgs {
-    jintArray types;
+    jint count;
+    // count values, then one type id per byte, eight to a slot: one JNI read gets both.
     jlongArray values;
     jobjectArray refs;
     // Set once every argument has a JS value, so each object Java registered for this
@@ -28,15 +30,21 @@ struct JavaCallArgs {
     // Set in an object argument's packed value when Java registered the object for this
     // call; the low half is then its exact id and the next 31 bits its class index.
     static constexpr jlong FreshArg = static_cast<jlong>(1ULL << 63);
+
+    static constexpr int PackedLength(int count) {
+        return count + (count + 7) / 8;
+    }
+
+    static Type TypeAt(const jlong* packed, int count, int i) {
+        return static_cast<Type>((packed[count + i / 8] >> ((i % 8) * 8)) & 0xff);
+    }
 };
 
 class ArgConverter {
     public:
         static void Init(v8::Local<v8::Context> context);
 
-        static int GetJavaArgsLength(JNIEnv* env, const JavaCallArgs& args);
-
-        // out must have room for GetJavaArgsLength(args) values.
+        // out must have room for args.count values.
         static void ConvertJavaArgsToJsArgs(v8::Isolate* isolate, JNIEnv* env, const JavaCallArgs& args, int argc, v8::Local<v8::Value>* out);
 
         static v8::Local<v8::Value> ConvertFromJavaLong(v8::Isolate* isolate, jlong value);

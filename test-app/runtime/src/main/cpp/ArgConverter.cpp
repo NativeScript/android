@@ -92,10 +92,6 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
     }
 }
 
-int ArgConverter::GetJavaArgsLength(JNIEnv* env, const JavaCallArgs& args) {
-    return args.types == nullptr ? 0 : env->GetArrayLength(args.types);
-}
-
 void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const JavaCallArgs& args, int argc, Local<Value>* out) {
     if (argc == 0) {
         args.converted = true;
@@ -103,28 +99,22 @@ void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const 
     }
 
     constexpr int kInlineArgs = 16;
-    jint inlineTypes[kInlineArgs];
-    jlong inlineValues[kInlineArgs];
-    std::vector<jint> heapTypes;
+    jlong inlineValues[JavaCallArgs::PackedLength(kInlineArgs)];
     std::vector<jlong> heapValues;
-    jint* types = inlineTypes;
     jlong* values = inlineValues;
     if (argc > kInlineArgs) {
-        heapTypes.resize(argc);
-        heapValues.resize(argc);
-        types = heapTypes.data();
+        heapValues.resize(JavaCallArgs::PackedLength(argc));
         values = heapValues.data();
     }
 
-    env->GetIntArrayRegion(args.types, 0, argc, types);
-    env->GetLongArrayRegion(args.values, 0, argc, values);
+    env->GetLongArrayRegion(args.values, 0, JavaCallArgs::PackedLength(argc), values);
 
     auto objectManager = Runtime::GetRuntime(isolate)->GetObjectManager();
 
     for (int i = 0; i < argc; i++) {
         jlong bits = values[i];
         Local<Value> jsArg;
-        switch (static_cast<Type>(types[i])) {
+        switch (JavaCallArgs::TypeAt(values, argc, i)) {
         case Type::Boolean:
             jsArg = Boolean::New(isolate, bits != 0);
             break;

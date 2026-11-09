@@ -296,7 +296,7 @@ Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID) {
 }
 
 void ObjectManager::ReleaseUnwrappedArgs(const JavaCallArgs& args) {
-  if (args.converted || args.types == nullptr || args.values == nullptr) {
+  if (args.converted || args.count == 0) {
     return;
   }
   JEnv env;
@@ -305,14 +305,12 @@ void ObjectManager::ReleaseUnwrappedArgs(const JavaCallArgs& args) {
   jthrowable pending = raw->ExceptionOccurred();
   raw->ExceptionClear();
 
-  jsize argc = raw->GetArrayLength(args.types);
-  std::vector<jint> types(argc);
-  std::vector<jlong> values(argc);
-  raw->GetIntArrayRegion(args.types, 0, argc, types.data());
-  raw->GetLongArrayRegion(args.values, 0, argc, values.data());
+  jsize argc = args.count;
+  std::vector<jlong> values(JavaCallArgs::PackedLength(argc));
+  raw->GetLongArrayRegion(args.values, 0, values.size(), values.data());
   AssertIsolateLocked();
   for (jsize i = 0; i < argc; i++) {
-    if (static_cast<Type>(types[i]) != Type::JsObject ||
+    if (JavaCallArgs::TypeAt(values.data(), argc, i) != Type::JsObject ||
         (values[i] & JavaCallArgs::FreshArg) == 0) {
       continue;
     }

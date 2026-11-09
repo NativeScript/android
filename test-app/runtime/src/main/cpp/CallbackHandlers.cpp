@@ -1025,7 +1025,7 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
         EscapableHandleScope handleScope(isolate);
 
         auto jsMethod = method.As<Function>();
-        int argc = ArgConverter::GetJavaArgsLength(env, args);
+        int argc = args.count;
 
         constexpr int kInlineArgs = 16;
         Local<Value> inlineArguments[kInlineArgs];

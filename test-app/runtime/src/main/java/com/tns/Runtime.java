@@ -42,7 +42,7 @@ public class Runtime {
 
     private native Object runScript(int runtimeId, String filePath) throws NativeScriptException;
 
-    private native Object callJSMethodNative(int runtimeId, Object javaObject, int javaObjectID, String methodName, int retType, boolean isConstructor, int[] argTypes, long[] argValues, Object[] argRefs, long[] primitiveResult) throws NativeScriptException;
+    private native Object callJSMethodNative(int runtimeId, Object javaObject, int javaObjectID, String methodName, int retType, boolean isConstructor, int argCount, long[] argValues, Object[] argRefs, long[] primitiveResult) throws NativeScriptException;
 
     private native void createJSInstanceNative(int runtimeId, Object javaObject, int javaObjectID, String canonicalName);
 
@@ -1223,26 +1223,26 @@ public class Runtime {
     }
 
     /*
-     * Arguments cross to native as three parallel arrays so the native side
-     * reads every primitive with one bulk region copy instead of unboxing each
-     * through JNI. argValues holds primitives as raw bits (float/double via
-     * floatToRawIntBits/doubleToRawLongBits) and object IDs; argRefs holds
-     * strings and, for objects, the class name a missing JS wrapper needs.
-     * Type IDs are those of TypeIDs.GetObjectTypeId(Object).
+     * Arguments cross to native in one long[] so the native side reads them with
+     * a single region copy instead of unboxing each through JNI: count values
+     * (primitives as raw bits, float/double via floatToRawIntBits/
+     * doubleToRawLongBits; objects as a packed id and class index), then the
+     * TypeIDs.GetObjectTypeId(Object) of each, one per byte. refs holds strings
+     * and objects. Must match JavaCallArgs in ArgConverter.h.
      */
     private static final class PackagedArgs {
-        final int[] types;
+        final int count;
         final long[] values;
         final Object[] refs;
 
-        PackagedArgs(int[] types, long[] values, Object[] refs) {
-            this.types = types;
+        PackagedArgs(int count, long[] values, Object[] refs) {
+            this.count = count;
             this.values = values;
             this.refs = refs;
         }
     }
 
-    private static final PackagedArgs NO_ARGS = new PackagedArgs(null, null, null);
+    private static final PackagedArgs NO_ARGS = new PackagedArgs(0, null, null);
 
     // If a javaObject has no javaObjectID, meaning no JavaScript object exists
     // for it yet, it is assigned one.
@@ -1252,8 +1252,7 @@ public class Runtime {
             return NO_ARGS;
         }
 
-        int[] types = new int[len];
-        long[] values = new long[len];
+        long[] values = new long[len + (len + 7) / 8];
         Object[] refs = null;
 
         for (int i = 0; i < len; i++) {
@@ -1314,10 +1313,10 @@ public class Runtime {
                 values[i] = packIdAndClass(id, value) | fresh;
             }
 
-            types[i] = typeId;
+            values[len + (i >> 3)] |= (long) typeId << ((i & 7) * 8);
         }
 
-        return new PackagedArgs(types, values, refs);
+        return new PackagedArgs(len, values, refs);
     }
 
     static Class<?> getClassForName(String className) {
@@ -1425,7 +1424,7 @@ public class Runtime {
             try {
                 // A hint: other threads may be writing the table, so native re-checks it under the
                 // isolate lock and resolves the id itself on a miss.
-                ret = callJSMethodNative(getRuntimeId(), javaObject, objectTable.findIdOptimistic(javaObject), methodName, returnType, isConstructor, packagedArgs.types, packagedArgs.values, packagedArgs.refs, primitiveResult);
+                ret = callJSMethodNative(getRuntimeId(), javaObject, objectTable.findIdOptimistic(javaObject), methodName, returnType, isConstructor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult);
                 ret = takePrimitiveResult(ret, returnType, primitiveResult);
             } catch (NativeScriptException e) {
                 // With multithreaded JS the owner can be torn down between the
@@ -1466,7 +1465,7 @@ public class Runtime {
                             }
                             final PackagedArgs packagedArgs = packageArgs(tmpArgs);
                             final long[] primitiveResult = newPrimitiveResult(returnType);
-                            arr[0] = takePrimitiveResult(callJSMethodNative(getRuntimeId(), javaObject, javaObjectID, methodName, returnType, isCtor, packagedArgs.types, packagedArgs.values, packagedArgs.refs, primitiveResult), returnType, primitiveResult);
+                            arr[0] = takePrimitiveResult(callJSMethodNative(getRuntimeId(), javaObject, javaObjectID, methodName, returnType, isCtor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult), returnType, primitiveResult);
                         } catch (NativeScriptException e) {
                             if (discardUncaughtJsExceptions && !e.isEscapedFromJs()) {
                                 String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
