@@ -5,12 +5,13 @@ describe("ns:runtime", function () {
         expect(Object.isFrozen(runtime)).toBe(true);
         expect(typeof runtime.setConfig).toBe("function");
         expect(typeof runtime.getConfig).toBe("function");
+        expect(typeof runtime.escapeException).toBe("function");
     });
 
     // The export set is public API, declared alongside docs/ns-builtin-modules.md
     // — all of them change together.
     it("exposes exactly the declared surface", function () {
-        expect(Object.keys(runtime).sort()).toEqual(["getConfig", "setConfig"]);
+        expect(Object.keys(runtime).sort()).toEqual(["escapeException", "getConfig", "setConfig"]);
     });
 
     it("rejects unknown keys", function () {
