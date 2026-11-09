@@ -109,9 +109,19 @@ const maxConsecutiveLivenessMisses = 3;
 let consecutiveLivenessMisses = 0;
 let appPID = -1;
 
+// pidof prints "<pid>". API 21-23 images have no pidof, so fall back to their ps, whose rows
+// are "<user> <pid> ...".
+function parseAppPid(output) {
+  const text = (output || "").trim();
+  const match = /^(\d+)/.exec(text) || /^\S+\s+(\d+)/.exec(text);
+  return match ? parseInt(match[1], 10) : NaN;
+}
+
 async function ensureProcessAlive() {
-  const { stdout } = await execAndStream(`${adbPrefix} shell pidof ${appId}`);
-  const pid = parseInt((stdout || "").trim(), 10);
+  const { stdout } = await execAndStream(
+    `${adbPrefix} shell "pidof ${appId} 2>/dev/null || ps | grep ${appId}"`
+  );
+  const pid = parseAppPid(stdout);
 
   if (!Number.isFinite(pid)) {
     consecutiveLivenessMisses++;
