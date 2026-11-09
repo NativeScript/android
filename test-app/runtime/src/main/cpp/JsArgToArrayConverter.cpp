@@ -60,7 +60,7 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Valu
 
 bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value> &jsArg, int index) {
     bool success = false;
-    stringstream s;
+    std::string error;
 
     JEnv env;
 
@@ -71,10 +71,10 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
     auto arg = jsArg.IsEmpty() ? jsArg : ObjectManager::UnwrapProxy(jsArg);
 
     if (arg.IsEmpty()) {
-        s << "Cannot convert empty JavaScript object";
+        error = "Cannot convert empty JavaScript object";
         success = false;
     } else if (jsArg->IsProxy() && !arg->IsObject()) {
-        s << "Cannot marshal a revoked Proxy at index " << index << " to Java type.";
+        error = "Cannot marshal a revoked Proxy at index " + std::to_string(index) + " to Java type.";
         success = false;
     } else if (arg->IsInt32() && (returnType == Type::Int || returnType == Type::Null)) {
         jint value = arg->Int32Value(context).ToChecked();
@@ -350,14 +350,14 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                 }
 
 
-                V8GetPrivateValue(isolate, jsObj, V8StringConstants::GetNullNodeName(isolate),
+                V8GetPrivateValue(isolate, jsObj, V8StringConstants::GetNullNodePrivate(isolate),
                                   castValue);
 
                 if (!castValue.IsEmpty()) {
                     auto node = reinterpret_cast<MetadataNode *>(castValue.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
                     if (node == nullptr) {
-                        s << "Cannot get type of the null argument at index " << index;
+                        error = "Cannot get type of the null argument at index " + std::to_string(index);
                         success = false;
                         break;
                     }
@@ -386,9 +386,9 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                     SetConvertedObject(env, index, obj.Move(), obj.IsGlobal());
                 } else {
                     String::Utf8Value jsObjStr(isolate, jsObj);
-                    s << "Cannot marshal JavaScript argument "
-                      << (*jsObjStr ? *jsObjStr : "<failed-to-string>") << " at index " << index
-                      << " to Java type.";
+                    error = std::string("Cannot marshal JavaScript argument ") +
+                            (*jsObjStr ? *jsObjStr : "<failed-to-string>") + " at index " +
+                            std::to_string(index) + " to Java type.";
                 }
                 break;
 
@@ -399,13 +399,13 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
         SetConvertedObject(env, index, nullptr);
         success = true;
     } else {
-        s << "Cannot marshal JavaScript argument at index " << index << " to Java type.";
+        error = "Cannot marshal JavaScript argument at index " + std::to_string(index) + " to Java type.";
         success = false;
     }
 
     if (!success) {
         m_error.index = index;
-        m_error.msg = s.str();
+        m_error.msg = std::move(error);
     }
 
     return success;

@@ -121,10 +121,15 @@ int Runtime::GetAndroidVersion() {
 
 Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
     : m_id(id),
+      m_ownerThread(std::this_thread::get_id()),
       m_isolate(nullptr),
       m_lastUsedMemory(0),
       m_gcFunc(nullptr),
       m_runGC(false) {
+  // GetRuntime(int) and the thread's pinned JNIEnv assume one runtime per
+  // thread; com.tns.Runtime's constructor enforces the same on the Java side.
+  NS_CHECK(s_currentRuntime == nullptr);
+
   m_runtime = env->NewGlobalRef(runtime);
   m_objectManager = new ObjectManager(m_runtime);
   m_state = std::make_unique<RuntimeState>();
@@ -144,6 +149,12 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
 }
 
 Runtime* Runtime::GetRuntime(int runtimeId) {
+  // A runtime is only destroyed on its own thread, which is busy in this call,
+  // so the calling thread's own runtime needs neither the lock nor the map.
+  if (runtimeId == s_currentRuntimeId) {
+    return s_currentRuntime;
+  }
+
   Runtime* runtime = nullptr;
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
@@ -302,6 +313,12 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
 }
 
 Runtime::~Runtime() {
+  NS_CHECK(std::this_thread::get_id() == m_ownerThread);
+  if (s_currentRuntime == this) {
+    s_currentRuntime = nullptr;
+    s_currentRuntimeId = -1;
+  }
+
   /*
    * Idempotent backstop for the erase DestroyRuntime does: a bootstrap that
    * failed before PrepareV8Runtime ran never reached it. The isolate entry is
@@ -505,7 +522,7 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
 jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
                                     jint javaObjectID, jstring methodName,
                                     jint retType, jboolean isConstructor,
-                                    jobjectArray packagedArgs) {
+                                    const JavaCallArgs& args) {
   SET_PROFILER_FRAME();
 
   auto isolate = m_isolate;
@@ -535,9 +552,15 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
   DEBUG_WRITE("CallJSMethodNative called jsObject=%d",
               jsObject->GetIdentityHash());
 
-  string method_name = ArgConverter::jstringToString(methodName);
+  auto jsMethodName =
+      ArgConverter::jstringToInternalizedV8String(m_isolate, env, methodName);
   auto jsResult = CallbackHandlers::CallJSMethod(m_isolate, env, jsObject,
-                                                 method_name, packagedArgs);
+                                                 jsMethodName, args);
+
+  // Type::Null is the id of void.class: the Java caller discards the result.
+  if (retType == static_cast<jint>(Type::Null)) {
+    return nullptr;
+  }
 
   int classReturnType = retType;
   jobject javaObject =
@@ -1093,6 +1116,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   this->m_napiEnv = NapiEnv::Create(context, m_eventLoop);
   s_currentRuntime = this;
+  s_currentRuntimeId = m_id;
+  // The runtime's thread stays attached until DestroyRuntime: the main thread
+  // for the process, a worker thread until after it tears its runtime down.
+  JEnv::PinThreadEnv(JEnv());
 
   if (m_isMainThread) {
     // Releases any runtime waiting in ElectMainRuntime: the metadata tree and
@@ -1131,6 +1158,7 @@ double Runtime::PerformanceNowMillis() {
 }
 
 void Runtime::DestroyRuntime() {
+  NS_CHECK(std::this_thread::get_id() == m_ownerThread);
   CrashBreadcrumbs::UnregisterRuntime(m_id);
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
@@ -1169,6 +1197,8 @@ void Runtime::DestroyRuntime() {
   }
   if (s_currentRuntime == this) {
     s_currentRuntime = nullptr;
+    s_currentRuntimeId = -1;
+    JEnv::UnpinThreadEnv();
   }
   // The events state holds v8::Global handles (backing event target, dispatch
   // closures and tracked promise rejections) - reset them while the isolate
@@ -1265,6 +1295,7 @@ int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 std::shared_ptr<EventLoop> Runtime::s_mainEventLoop;
 
 thread_local Runtime* Runtime::s_currentRuntime = nullptr;
+thread_local int Runtime::s_currentRuntimeId = -1;
 thread_local PendingIsolateSetup Runtime::s_pendingIsolateSetup;
 
 void Runtime::SetPendingIsolateSetup(PendingIsolateSetup setup) {

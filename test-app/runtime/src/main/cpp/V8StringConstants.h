@@ -47,6 +47,10 @@ class V8StringConstants {
 
         static v8::Local<v8::String> GetImplementationObject(v8::Isolate* isolate);
 
+        static v8::Local<v8::Private> GetNullNodePrivate(v8::Isolate* isolate);
+
+        static v8::Local<v8::Private> GetCastMarkerPrivate(v8::Isolate* isolate);
+
         static const std::string CLASS_IMPLEMENTATION_OBJECT;
         static const std::string DEBUG_NAME;
         static const std::string EXTEND;
@@ -67,6 +71,7 @@ class V8StringConstants {
         static const std::string UNCAUGHT_ERROR;
         static const std::string DISCARDED_ERROR;
         static const std::string IMPLEMENTATION_OBJECT;
+        static const std::string CAST_MARKER;
 
         /*
          * The structure contains Persistent handles to the most commonly used v8 String values;
@@ -146,6 +151,12 @@ class V8StringConstants {
 
                 str = String::NewFromUtf8(isolate, IMPLEMENTATION_OBJECT.c_str()).ToLocalChecked();
                 IMPLEMENTATION_OBJECT_PERSISTENT = new Persistent<String>(isolate, str);
+
+                // Private::ForApi resolves its name through the isolate's registry
+                // on every call, so the keys read per bridge call are resolved once.
+                NULL_NODE_PRIVATE.Reset(isolate, Private::ForApi(isolate, Local<String>::New(isolate, *NULL_NODE_NAME_PERSISTENT)));
+                str = String::NewFromUtf8(isolate, CAST_MARKER.c_str()).ToLocalChecked();
+                CAST_MARKER_PRIVATE.Reset(isolate, Private::ForApi(isolate, str));
             };
 
             ~PerIsolateV8Constants() {
@@ -205,6 +216,8 @@ class V8StringConstants {
             v8::Persistent<v8::String>* UNCAUGHT_ERROR_PERSISTENT = nullptr;
             v8::Persistent<v8::String>* DISCARDED_ERROR_PERSISTENT = nullptr;
             v8::Persistent<v8::String>* IMPLEMENTATION_OBJECT_PERSISTENT = nullptr;
+            v8::Global<v8::Private> NULL_NODE_PRIVATE;
+            v8::Global<v8::Private> CAST_MARKER_PRIVATE;
         };
 
     private:

@@ -12,14 +12,25 @@
 #include "JEnv.h"
 #include <string>
 #include <map>
+#include <vector>
 
 namespace tns {
+
+// The argument arrays com.tns.Runtime.packageArgs builds for a Java -> JS call.
+struct JavaCallArgs {
+    jintArray types;
+    jlongArray values;
+    jobjectArray refs;
+};
 
 class ArgConverter {
     public:
         static void Init(v8::Local<v8::Context> context);
 
-        static v8::Local<v8::Array> ConvertJavaArgsToJsArgs(v8::Local<v8::Context> context, jobjectArray args);
+        static int GetJavaArgsLength(JNIEnv* env, const JavaCallArgs& args);
+
+        // out must have room for GetJavaArgsLength(args) values.
+        static void ConvertJavaArgsToJsArgs(v8::Isolate* isolate, JNIEnv* env, const JavaCallArgs& args, int argc, v8::Local<v8::Value>* out);
 
         static v8::Local<v8::Value> ConvertFromJavaLong(v8::Isolate* isolate, jlong value);
 
@@ -37,6 +48,31 @@ class ArgConverter {
                 env.ReleaseStringChars(value, chars);
 
                 return v8String;
+        }
+
+        inline static v8::Local<v8::String> jcharToV8String(v8::Isolate* isolate, jchar value) {
+                auto v8String = ConvertToV8String(isolate, &value, 1);
+                return v8String;
+        }
+
+        // For property keys: an internalized key skips the string-table insert a
+        // fresh key costs on every property lookup.
+        static v8::Local<v8::String> jstringToInternalizedV8String(v8::Isolate* isolate, JNIEnv* env, jstring value) {
+                if (value == nullptr) {
+                        return v8::String::Empty(isolate);
+                }
+
+                constexpr jsize kInlineUnits = 64;
+                jsize length = env->GetStringLength(value);
+                jchar inlineUnits[kInlineUnits];
+                std::vector<jchar> heapUnits;
+                jchar* units = inlineUnits;
+                if (length > kInlineUnits) {
+                        heapUnits.resize(length);
+                        units = heapUnits.data();
+                }
+                env->GetStringRegion(value, 0, length, units);
+                return v8::String::NewFromTwoByte(isolate, reinterpret_cast<const uint16_t*>(units), v8::NewStringType::kInternalized, length).ToLocalChecked();
         }
 
         static std::string jstringToString(jstring value) {
@@ -95,8 +131,27 @@ class ArgConverter {
         inline static jstring ConvertToJavaString(const v8::Local<v8::Value>& jsValue) {
                 JEnv env;
                 auto isolate = v8::Isolate::GetCurrent();
-                v8::String::Value stringValue(isolate, jsValue);
-                return env.NewString((const jchar*) *stringValue, stringValue.length());
+                v8::Local<v8::String> str;
+                if (jsValue->IsString()) {
+                        str = jsValue.As<v8::String>();
+                } else if (!jsValue->ToString(isolate->GetCurrentContext()).ToLocal(&str)) {
+                        // ToString threw and left a V8 exception pending; running it
+                        // again would re-enter user code.
+                        static const jchar kNoUnits[1] = {0};
+                        return env.NewString(kNoUnits, 0);
+                }
+
+                constexpr uint32_t kInlineUnits = 256;
+                uint32_t length = str->Length();
+                uint16_t inlineUnits[kInlineUnits];
+                std::vector<uint16_t> heapUnits;
+                uint16_t* units = inlineUnits;
+                if (length > kInlineUnits) {
+                        heapUnits.resize(length);
+                        units = heapUnits.data();
+                }
+                str->WriteV2(isolate, 0, length, units);
+                return env.NewString(reinterpret_cast<const jchar*>(units), static_cast<jsize>(length));
         }
 
         inline static v8::Local<v8::String> ConvertToV8String(v8::Isolate* isolate, const jchar* data, int length) {
@@ -140,11 +195,6 @@ class ArgConverter {
 
         inline static jstring ObjectToString(jobject object) {
                 return (jstring) object;
-        }
-
-        inline static v8::Local<v8::String> jcharToV8String(v8::Isolate* isolate, jchar value) {
-                auto v8String = ConvertToV8String(isolate, &value, 1);
-                return v8String;
         }
 
         static void NativeScriptLongFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& args);

@@ -2,6 +2,7 @@
 #define RUNTIME_H_
 
 #include "v8.h"
+#include <thread>
 #include "JniLocalRef.h"
 #include "ObjectManager.h"
 #include "SimpleAllocator.h"
@@ -25,6 +26,7 @@
 typedef struct napi_env__* napi_env;
 
 namespace tns {
+struct JavaCallArgs;
 class PromiseRejectionTracker;
 class RuntimeState;
 
@@ -102,9 +104,8 @@ class Runtime {
 
         /*
          * The runtime whose home thread is the calling thread, or null. Set at
-         * the end of PrepareV8Runtime; may be stale after a Runtime destroyed
-         * on another thread, so consumers must validate through
-         * GetNapiEnvIfAlive rather than dereference it.
+         * the end of PrepareV8Runtime and cleared when it is torn down; a
+         * thread hosts at most one runtime and only that thread may destroy it.
          */
         static Runtime* GetCurrentRuntime() {
             return s_currentRuntime;
@@ -162,7 +163,7 @@ class Runtime {
         void RunModule(const char *moduleName);
         void RunWorker(const std::string& filePath);
         jobject RunScript(JNIEnv* _env, jobject obj, jstring scriptFile);
-        jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs);
+        jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, const JavaCallArgs& args);
         void CreateJSInstanceNative(JNIEnv* _env, jobject obj, jobject javaObject, jint javaObjectID, jstring className);
         jint GenerateNewObjectId(JNIEnv* env, jobject obj);
         void AdjustAmountOfExternalAllocatedMemory();
@@ -316,6 +317,8 @@ class Runtime {
         Runtime(JNIEnv* env, jobject runtime, int id);
 
         int m_id;
+
+        std::thread::id m_ownerThread;
         jobject m_runtime;
         v8::Isolate* m_isolate;
 
@@ -424,6 +427,7 @@ class Runtime {
         static std::shared_ptr<EventLoop> s_mainEventLoop;
 
         static thread_local Runtime* s_currentRuntime;
+        static thread_local int s_currentRuntimeId;
         static thread_local PendingIsolateSetup s_pendingIsolateSetup;
 
 #ifdef APPLICATION_IN_DEBUG

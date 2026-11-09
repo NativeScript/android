@@ -19,8 +19,7 @@ using namespace tns;
 static std::shared_mutex classCacheMutex;
 using namespace std;
 
-JEnv::JEnv()
-        : m_env(nullptr) {
+JNIEnv* JEnv::GetEnvSlow() {
     JNIEnv *env = nullptr;
     jint ret = s_jvm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
 
@@ -30,22 +29,17 @@ JEnv::JEnv()
         NS_CHECK(env != nullptr);
     }
 
-    m_env = env;
+    return env;
 }
 
-JEnv::JEnv(JNIEnv *jniEnv) {
-    jint ret = s_jvm->GetEnv(reinterpret_cast<void **>(&jniEnv), JNI_VERSION_1_6);
-
-    if ((ret != JNI_OK) || (jniEnv == nullptr)) {
-        ret = s_jvm->AttachCurrentThread(&jniEnv, nullptr);
-        NS_CHECK(ret == JNI_OK);
-        NS_CHECK(jniEnv != nullptr);
-    }
-
-    m_env = jniEnv;
+void JEnv::PinThreadEnv(JNIEnv* env) {
+    s_threadEnv = env;
+    s_threadEnvPinned = true;
 }
 
-JEnv::~JEnv() {
+void JEnv::UnpinThreadEnv() {
+    s_threadEnv = nullptr;
+    s_threadEnvPinned = false;
 }
 
 JEnv::operator JNIEnv* () const {
@@ -898,6 +892,8 @@ void JEnv::CheckForJavaException() {
 }
 
 JavaVM *JEnv::s_jvm = nullptr;
+thread_local JNIEnv *JEnv::s_threadEnv = nullptr;
+thread_local bool JEnv::s_threadEnvPinned = false;
 robin_hood::unordered_map<string, jclass> JEnv::s_classCache;
 robin_hood::unordered_map<string, jthrowable> JEnv::s_missingClasses;
 jclass JEnv::RUNTIME_CLASS = nullptr;

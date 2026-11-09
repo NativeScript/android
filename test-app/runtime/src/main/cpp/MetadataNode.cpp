@@ -144,9 +144,9 @@ MetadataNode::MetadataNode(MetadataTreeNode* treeNode) :
 
     m_isArray = s_metadataReader.IsNodeTypeArray(parentNodeType);
 
-    bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
+    m_isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
 
-    if (!m_isArray && isInterface) {
+    if (!m_isArray && m_isInterface) {
         bool isPrefix;
         auto impTypeName = s_metadataReader.ReadInterfaceImplementationTypeName(m_treeNode, isPrefix);
         m_implType = isPrefix
@@ -242,8 +242,7 @@ string MetadataNode::GetName() {
 }
 
 bool MetadataNode::IsNodeTypeInterface() {
-    uint8_t nodeType = s_metadataReader.GetNodeType(m_treeNode);
-    return s_metadataReader.IsNodeTypeInterface(nodeType);
+    return m_isInterface;
 }
 
 string MetadataNode::GetTypeMetadataName(Isolate* isolate, Local<Value>& value) {
@@ -405,10 +404,10 @@ void MetadataNode::NullObjectAccessorGetterCallback(const FunctionCallbackInfo<V
 
         auto thiz = ResolveProxyReceiver(isolate, info.This(), "read", "null", false);
         Local<Value> hiddenVal;
-        V8GetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodeName(isolate), hiddenVal);
+        V8GetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodePrivate(isolate), hiddenVal);
         if (hiddenVal.IsEmpty()) {
             auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
-            V8SetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodeName(isolate), External::New(isolate, node, v8::kExternalPointerTypeTagDefault));
+            V8SetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodePrivate(isolate), External::New(isolate, node, v8::kExternalPointerTypeTagDefault));
             auto funcTemplate = FunctionTemplate::New(isolate, MetadataNode::NullValueOfCallback);
             auto context = isolate->GetCurrentContext();
             thiz->Delete(context, V8StringConstants::GetValueOf(isolate));

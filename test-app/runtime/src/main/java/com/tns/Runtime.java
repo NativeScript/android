@@ -42,7 +42,7 @@ public class Runtime {
 
     private native Object runScript(int runtimeId, String filePath) throws NativeScriptException;
 
-    private native Object callJSMethodNative(int runtimeId, int javaObjectID, String methodName, int retType, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
+    private native Object callJSMethodNative(int runtimeId, int javaObjectID, String methodName, int retType, boolean isConstructor, int[] argTypes, long[] argValues, Object[] argRefs) throws NativeScriptException;
 
     private native void createJSInstanceNative(int runtimeId, Object javaObject, int javaObjectID, String canonicalName);
 
@@ -1273,36 +1273,89 @@ public class Runtime {
         return (javaObject == null) ? "null" : "an instance of " + javaObject.getClass().getName();
     }
 
-    // Packages args in format (typeID, value, null) except for objects where it is
-    // (typeid, javaObjectID, canonicalName)
-    // if javaObject has no javaObjecID meaning javascript object does not
-    // exists for this object we assign one.
-    private Object[] packageArgs(Object... args) {
-        int len = (args != null) ? (args.length * 3) : 0;
-        Object[] packagedArgs = new Object[len];
+    /*
+     * Arguments cross to native as three parallel arrays so the native side
+     * reads every primitive with one bulk region copy instead of unboxing each
+     * through JNI. argValues holds primitives as raw bits (float/double via
+     * floatToRawIntBits/doubleToRawLongBits) and object IDs; argRefs holds
+     * strings and, for objects, the class name a missing JS wrapper needs.
+     * Type IDs are those of TypeIDs.GetObjectTypeId(Object).
+     */
+    private static final class PackagedArgs {
+        final int[] types;
+        final long[] values;
+        final Object[] refs;
 
-        if (len > 0) {
-            int jsArgsIndex = 0;
+        PackagedArgs(int[] types, long[] values, Object[] refs) {
+            this.types = types;
+            this.values = values;
+            this.refs = refs;
+        }
+    }
 
-            for (int i = 0; i < args.length; i++) {
-                Object value = args[i];
-                int typeId = TypeIDs.GetObjectTypeId(value);
-                String javaClassPath = null;
+    private static final PackagedArgs NO_ARGS = new PackagedArgs(new int[0], new long[0], null);
 
-                if (typeId == TypeIDs.JsObject) {
-                    javaClassPath = value.getClass().getName();
-                    value = getOrCreateJavaObjectID(value);
-                }
-
-                packagedArgs[jsArgsIndex++] = typeId;
-
-                packagedArgs[jsArgsIndex++] = value;
-
-                packagedArgs[jsArgsIndex++] = javaClassPath;
-            }
+    // If a javaObject has no javaObjectID, meaning no JavaScript object exists
+    // for it yet, it is assigned one.
+    private PackagedArgs packageArgs(Object... args) {
+        int len = (args != null) ? args.length : 0;
+        if (len == 0) {
+            return NO_ARGS;
         }
 
-        return packagedArgs;
+        int[] types = new int[len];
+        long[] values = new long[len];
+        Object[] refs = null;
+
+        for (int i = 0; i < len; i++) {
+            Object value = args[i];
+            int typeId;
+
+            if (value == null) {
+                typeId = TypeIDs.Null;
+            } else if (value instanceof Integer) {
+                typeId = TypeIDs.Int;
+                values[i] = (Integer) value;
+            } else if (value instanceof Boolean) {
+                typeId = TypeIDs.Boolean;
+                values[i] = ((Boolean) value) ? 1 : 0;
+            } else if (value instanceof Character) {
+                typeId = TypeIDs.Char;
+                values[i] = (Character) value;
+            } else if (value instanceof Byte) {
+                typeId = TypeIDs.Byte;
+                values[i] = (Byte) value;
+            } else if (value instanceof Short) {
+                typeId = TypeIDs.Short;
+                values[i] = (Short) value;
+            } else if (value instanceof Long) {
+                typeId = TypeIDs.Long;
+                values[i] = (Long) value;
+            } else if (value instanceof Float) {
+                typeId = TypeIDs.Float;
+                values[i] = Float.floatToRawIntBits((Float) value);
+            } else if (value instanceof Double) {
+                typeId = TypeIDs.Double;
+                values[i] = Double.doubleToRawLongBits((Double) value);
+            } else if (value instanceof String) {
+                typeId = TypeIDs.string;
+                if (refs == null) {
+                    refs = new Object[len];
+                }
+                refs[i] = value;
+            } else {
+                typeId = TypeIDs.JsObject;
+                if (refs == null) {
+                    refs = new Object[len];
+                }
+                refs[i] = value.getClass().getName();
+                values[i] = getOrCreateJavaObjectID(value);
+            }
+
+            types[i] = typeId;
+        }
+
+        return new PackagedArgs(types, values, refs);
     }
 
     static Class<?> getClassForName(String className) {
@@ -1406,9 +1459,9 @@ public class Runtime {
 
         if (enableMultithreadedJavascript || isWorkThread) {
             int javaObjectID = resolveJavaObjectID(javaObject, methodName);
-            Object[] packagedArgs = packageArgs(tmpArgs);
+            PackagedArgs packagedArgs = packageArgs(tmpArgs);
             try {
-                ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
+                ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs.types, packagedArgs.values, packagedArgs.refs);
             } catch (NativeScriptException e) {
                 // With multithreaded JS the owner can be torn down between the
                 // routing check and the native call, which then throws
@@ -1446,8 +1499,8 @@ public class Runtime {
                                 arr[2] = e;
                                 return;
                             }
-                            final Object[] packagedArgs = packageArgs(tmpArgs);
-                            arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs);
+                            final PackagedArgs packagedArgs = packageArgs(tmpArgs);
+                            arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs.types, packagedArgs.values, packagedArgs.refs);
                         } catch (NativeScriptException e) {
                             if (discardUncaughtJsExceptions && !e.isEscapedFromJs()) {
                                 String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
