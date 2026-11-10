@@ -21,12 +21,16 @@ function median(values) {
     return sorted[Math.floor(sorted.length / 2)];
 }
 
-function report(name, nsPerOp) {
+function report(name, nsPerOp, refNsPerOp) {
     var result = {
         name: name,
         median: Math.round(median(nsPerOp) * 10) / 10,
         min: Math.round(Math.min.apply(null, nsPerOp) * 10) / 10
     };
+    if (refNsPerOp) {
+        result.ref = Math.round(median(refNsPerOp) * 10) / 10;
+        result.refMin = Math.round(Math.min.apply(null, refNsPerOp) * 10) / 10;
+    }
     console.log("JNIBENCH " + JSON.stringify(result));
     return result;
 }
@@ -47,16 +51,30 @@ function measureJs(name, iterations, body) {
     return report(name, samples);
 }
 
+// Callback rows drift with the device's performance state independently of the other rows,
+// so each round also times a fixed reference callback (twoInts on its own object). Compare
+// launches by median / ref rather than by median alone.
+var REF_CALLBACK_KIND = 1;
+var REF_CALLBACK_ITERATIONS = 20000;
+var refCallback = null;
+
 function measureCallback(name, cb, kind, iterations) {
     if (skipped(name)) return null;
     iterations *= SCALE;
+    var refIterations = REF_CALLBACK_ITERATIONS * SCALE;
+    if (refCallback === null) {
+        refCallback = new JniBench.Callback({ twoInts: function (a, b) { } });
+    }
+    JniBench.runCallbacks(refCallback, REF_CALLBACK_KIND, refIterations >> 2);
     JniBench.runCallbacks(cb, kind, Math.max(1000, iterations >> 2));
     var samples = [];
+    var ref = [];
     for (var r = 0; r < ROUNDS; r++) {
+        ref.push(Number(JniBench.runCallbacks(refCallback, REF_CALLBACK_KIND, refIterations)) / refIterations);
         var nanos = JniBench.runCallbacks(cb, kind, iterations);
         samples.push(Number(nanos) / iterations);
     }
-    return report(name, samples);
+    return report(name, samples, ref);
 }
 
 
