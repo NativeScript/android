@@ -597,9 +597,34 @@ static bool TryGetPrimitiveReturnBits(Isolate* isolate,
   }
 }
 
+namespace {
+// Indexed by the id Java's MethodNameIds gives each method name.
+struct CallbackMethodNames {
+  std::vector<v8::Global<v8::String>> byId;
+};
+
+Local<String> GetCallbackMethodName(Isolate* isolate, JNIEnv* env,
+                                    jstring methodName, jint methodNameId) {
+  auto* names = RuntimeState::For<CallbackMethodNames>(isolate);
+  if (names == nullptr || methodNameId < 0) {
+    return ArgConverter::jstringToInternalizedV8String(isolate, env, methodName);
+  }
+  auto index = static_cast<size_t>(methodNameId);
+  if (index < names->byId.size() && !names->byId[index].IsEmpty()) {
+    return names->byId[index].Get(isolate);
+  }
+  auto name = ArgConverter::jstringToInternalizedV8String(isolate, env, methodName);
+  if (index >= names->byId.size()) {
+    names->byId.resize(index + 1);
+  }
+  names->byId[index].Reset(isolate, name);
+  return name;
+}
+}  // namespace
+
 jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
                                     jobject javaObject, jint javaObjectID,
-                                    jstring methodName,
+                                    jstring methodName, jint methodNameId,
                                     jint retType, jboolean isConstructor,
                                     const JavaCallArgs& args,
                                     jlongArray primitiveResult) {
@@ -648,7 +673,7 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
               jsObject->GetIdentityHash());
 
   auto jsMethodName =
-      ArgConverter::jstringToInternalizedV8String(m_isolate, env, methodName);
+      GetCallbackMethodName(m_isolate, _env, methodName, methodNameId);
   auto jsResult = CallbackHandlers::CallJSMethod(m_isolate, env, jsObject,
                                                  jsMethodName, args);
 

@@ -42,7 +42,7 @@ public class Runtime {
 
     private native Object runScript(int runtimeId, String filePath) throws NativeScriptException;
 
-    private native Object callJSMethodNative(int runtimeId, Object javaObject, int javaObjectID, String methodName, int retType, boolean isConstructor, int argCount, long[] argValues, Object[] argRefs, long[] primitiveResult) throws NativeScriptException;
+    private native Object callJSMethodNative(int runtimeId, Object javaObject, int javaObjectID, String methodName, int methodNameId, int retType, boolean isConstructor, int argCount, long[] argValues, Object[] argRefs, long[] primitiveResult) throws NativeScriptException;
 
     private native void createJSInstanceNative(int runtimeId, Object javaObject, int javaObjectID, String canonicalName);
 
@@ -1430,7 +1430,7 @@ public class Runtime {
             try {
                 // A hint: other threads may be writing the table, so native re-checks it under the
                 // isolate lock and resolves the id itself on a miss.
-                ret = callJSMethodNative(getRuntimeId(), javaObject, objectTable.findIdOptimistic(javaObject), methodName, returnType, isConstructor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult);
+                ret = callJSMethodNative(getRuntimeId(), javaObject, objectTable.findIdOptimistic(javaObject), methodName, MethodNameIds.idOf(methodName), returnType, isConstructor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult);
                 ret = takePrimitiveResult(ret, returnType, primitiveResult);
             } catch (NativeScriptException e) {
                 // With multithreaded JS the owner can be torn down between the
@@ -1471,7 +1471,7 @@ public class Runtime {
                             }
                             final PackagedArgs packagedArgs = packageArgs(tmpArgs);
                             final long[] primitiveResult = newPrimitiveResult(returnType);
-                            arr[0] = takePrimitiveResult(callJSMethodNative(getRuntimeId(), javaObject, javaObjectID, methodName, returnType, isCtor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult), returnType, primitiveResult);
+                            arr[0] = takePrimitiveResult(callJSMethodNative(getRuntimeId(), javaObject, javaObjectID, methodName, MethodNameIds.idOf(methodName), returnType, isCtor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult), returnType, primitiveResult);
                         } catch (NativeScriptException e) {
                             if (discardUncaughtJsExceptions && !e.isEscapedFromJs()) {
                                 String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
