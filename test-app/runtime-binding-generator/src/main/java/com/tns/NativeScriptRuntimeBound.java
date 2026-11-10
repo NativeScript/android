@@ -16,4 +16,16 @@ public interface NativeScriptRuntimeBound {
     int getRuntimeTag__ns();
 
     void setRuntimeTag__ns(int tag);
+
+    /**
+     * The id the owning runtime registered the instance under, written before the tag and
+     * read only once the tag is set. Lets a Java-&gt;JS call skip looking the id up; native
+     * still checks it. The defaults keep a class compiled without the field working.
+     */
+    default int getObjectId__ns() {
+        return -1;
+    }
+
+    default void setObjectId__ns(int id) {
+    }
 }

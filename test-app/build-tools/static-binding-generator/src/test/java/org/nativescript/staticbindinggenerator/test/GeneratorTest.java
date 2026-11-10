@@ -53,7 +53,7 @@ public class GeneratorTest {
         Class<?> helloClass = InMemoryJavaCompiler.compile(binding.getClassname(), sourceCode.toString(), options);
 
         Assert.assertNotNull(helloClass);
-        Assert.assertEquals(5, helloClass.getDeclaredMethods().length);
+        Assert.assertEquals(7, helloClass.getDeclaredMethods().length);
     }
 
     @Test
@@ -101,6 +101,9 @@ public class GeneratorTest {
 
         // read on whichever thread a Java->JS call arrives on
         Assert.assertTrue(java.lang.reflect.Modifier.isVolatile(boundClass.getDeclaredField("runtimeTag__ns").getModifiers()));
+
+        instance.setObjectId__ns(42);
+        Assert.assertEquals(42, instance.getObjectId__ns());
     }
 
     @Test
@@ -126,7 +129,7 @@ public class GeneratorTest {
         Class<?> helloClass = InMemoryJavaCompiler.compile("com.tns.gen.com.example.MyInterface", sourceCode.toString(), options);
 
         Assert.assertNotNull(helloClass);
-        Assert.assertEquals(5, helloClass.getDeclaredMethods().length);  // 5 methods (includes 'hashCode__super', 'equals__super', 'getRuntimeTag__ns' and 'setRuntimeTag__ns')
+        Assert.assertEquals(7, helloClass.getDeclaredMethods().length);  // 7 methods (includes 'hashCode__super', 'equals__super' and the runtime tag and object id accessors)
     }
 
     @Test
@@ -174,7 +177,7 @@ public class GeneratorTest {
         Class<?> ComplexClass = InMemoryJavaCompiler.compile(binding.getClassname(), sourceCode.toString(), options);
 
         Assert.assertNotNull(ComplexClass);
-        Assert.assertEquals(6, ComplexClass.getDeclaredMethods().length); // 1 + constructor + (equals + hashcode) + (getRuntimeTag__ns + setRuntimeTag__ns)
+        Assert.assertEquals(8, ComplexClass.getDeclaredMethods().length); // 1 + constructor + (equals + hashcode) + (runtime tag and object id accessors)
     }
 
     @Test

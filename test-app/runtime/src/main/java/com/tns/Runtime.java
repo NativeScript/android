@@ -239,6 +239,8 @@ public class Runtime {
     };
 
     private final StaticConfiguration config;
+    private final boolean discardUncaughtJsExceptions;
+    private final boolean multithreadedJavascript;
     private static StaticConfiguration staticConfiguration;
 
     private final DynamicConfiguration dynamicConfig;
@@ -260,6 +262,28 @@ public class Runtime {
      */
     private static volatile Runtime mainRuntime;
     private final static Map<Integer, Runtime> runtimeCache = new ConcurrentHashMap<>();
+    // runtimeCache by id for the Java->JS call path, which would otherwise box the id and
+    // probe the map on every call; ids past its length fall back to the map.
+    private static volatile Runtime[] runtimesById = new Runtime[8];
+    private static final int MAX_INDEXED_RUNTIME_ID = 1024;
+
+    private static synchronized void indexRuntime(int runtimeId, Runtime runtime) {
+        if (runtimeId < 0 || runtimeId >= MAX_INDEXED_RUNTIME_ID) {
+            return;
+        }
+        Runtime[] index = runtimesById;
+        index = Arrays.copyOf(index, Math.max(index.length, Integer.highestOneBit(runtimeId) * 2));
+        index[runtimeId] = runtime;
+        runtimesById = index;
+    }
+
+    private static Runtime runtimeForId(int runtimeId) {
+        Runtime[] index = runtimesById;
+        if (runtimeId >= 0 && runtimeId < index.length) {
+            return index[runtimeId];
+        }
+        return runtimeCache.get(runtimeId);
+    }
     public static boolean nativeLibraryLoaded;
 
     private static final ClassStorageService classStorageService = new ClassStorageServiceImpl(ClassCacheImpl.INSTANCE, ClassLoadersCollectionImpl.INSTANCE);
@@ -296,6 +320,8 @@ public class Runtime {
         this.classResolver = classResolver;
         this.gcListener = gcListener;
         this.config = config;
+        this.discardUncaughtJsExceptions = config != null && config.appConfig != null && config.appConfig.getDiscardUncaughtJsExceptions();
+        this.multithreadedJavascript = config != null && config.appConfig != null && config.appConfig.getEnableMultithreadedJavascript();
         this.dynamicConfig = dynamicConfig;
         this.runtimeId = runtimeId;
         this.workerId = workerId;
@@ -314,6 +340,8 @@ public class Runtime {
 
                 this.runtimeId = nextRuntimeId.getAndIncrement();
                 this.config = config;
+                this.discardUncaughtJsExceptions = config.appConfig.getDiscardUncaughtJsExceptions();
+                this.multithreadedJavascript = config.appConfig.getEnableMultithreadedJavascript();
                 this.dynamicConfig = dynamicConfiguration;
                 this.threadScheduler = dynamicConfiguration.myThreadScheduler;
                 this.workerId = dynamicConfiguration.workerId;
@@ -334,6 +362,7 @@ public class Runtime {
                 // the thread-local or the cache
                 currentRuntime.set(this);
                 runtimeCache.put(this.runtimeId, this);
+                indexRuntime(this.runtimeId, this);
             } finally {
                 frame.close();
             }
@@ -479,10 +508,12 @@ public class Runtime {
      * The tag is the runtime id plus one, so that the field's zero default means
      * "no owner yet": runtime id 0 is the main runtime's.
      */
-    private static void recordOwningRuntime(Object instance, int runtimeId) {
+    private static void recordOwningRuntime(Object instance, int runtimeId, int objectId) {
         if (instance instanceof NativeScriptRuntimeBound) {
             NativeScriptRuntimeBound bound = (NativeScriptRuntimeBound) instance;
             if (bound.getRuntimeTag__ns() == 0) {
+                // Before the tag: readers take the id only once they see a tag.
+                bound.setObjectId__ns(objectId);
                 bound.setRuntimeTag__ns(runtimeId + 1);
             }
         }
@@ -654,6 +685,7 @@ public class Runtime {
     @RuntimeCallable
     public static void detachWorkerRuntime(int runtimeId) {
         Runtime runtime = runtimeCache.remove(runtimeId);
+        indexRuntime(runtimeId, null);
         if (runtime != null) {
             GcListener.unsubscribe(runtime);
 
@@ -678,6 +710,7 @@ public class Runtime {
             // failed bootstrap doesn't leave a stale, half-initialized runtime
             // reachable through the caches
             runtimeCache.remove(runtime.getRuntimeId());
+            indexRuntime(runtime.getRuntimeId(), null);
             currentRuntime.remove();
             GcListener.unsubscribe(runtime);
             throw t;
@@ -900,16 +933,16 @@ public class Runtime {
             if (objectId != -1) {
                 runtime.makeInstanceStrong(instance, objectId);
             } else {
-                runtime.createJSInstance(instance);
+                objectId = runtime.createJSInstance(instance);
             }
 
-            recordOwningRuntime(instance, runtime.getRuntimeId());
+            recordOwningRuntime(instance, runtime.getRuntimeId(), objectId);
         } finally {
             frame.close();
         }
     }
 
-    private void createJSInstance(Object instance) {
+    private int createJSInstance(Object instance) {
         // Registered by createJSInstanceNative, which holds the isolate lock.
         int javaObjectID = generateNewObjectId(getRuntimeId());
 
@@ -933,6 +966,8 @@ public class Runtime {
         if (logger.isEnabled()) {
             logger.write("JSInstance for " + instance.getClass().toString() + " created with overrides");
         }
+
+        return javaObjectID;
     }
 
     @RuntimeCallable
@@ -1194,11 +1229,20 @@ public class Runtime {
     }
 
     public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException {
-        int owningRuntimeId = getOwningRuntimeId(javaObject);
+        int owningRuntimeId = NO_OWNING_RUNTIME;
+        int objectIdHint = -1;
+        if (javaObject instanceof NativeScriptRuntimeBound) {
+            NativeScriptRuntimeBound bound = (NativeScriptRuntimeBound) javaObject;
+            int tag = bound.getRuntimeTag__ns();
+            if (tag != 0) {
+                owningRuntimeId = tag - 1;
+                objectIdHint = bound.getObjectId__ns();
+            }
+        }
         Runtime runtime;
 
         if (owningRuntimeId != NO_OWNING_RUNTIME) {
-            runtime = runtimeCache.get(owningRuntimeId);
+            runtime = runtimeForId(owningRuntimeId);
 
             if (runtime == null) {
                 return discardCall(methodName, retType, describeInstance(javaObject)
@@ -1216,7 +1260,7 @@ public class Runtime {
             }
         }
 
-        return runtime.dispatchCallJSMethodNative(javaObject, methodName, isConstructor, delay, retType, args);
+        return runtime.dispatchCallJSMethodNative(javaObject, objectIdHint, methodName, isConstructor, delay, retType, args);
     }
 
     /*
@@ -1414,15 +1458,15 @@ public class Runtime {
         return javaObjectID;
     }
 
-    private Object dispatchCallJSMethodNative(final Object javaObject, final String methodName, boolean isConstructor, long delay, Class<?> retType, final Object[] args) throws NativeScriptException {
+    private Object dispatchCallJSMethodNative(final Object javaObject, int objectIdHint, final String methodName, boolean isConstructor, long delay, Class<?> retType, final Object[] args) throws NativeScriptException {
         final int returnType = TypeIDs.GetObjectTypeId(retType);
         Object ret = null;
 
         boolean isWorkThread = threadScheduler.getThread().equals(Thread.currentThread());
 
         final Object[] tmpArgs = extendConstructorArgs(methodName, isConstructor, args);
-        final boolean discardUncaughtJsExceptions = this.config.appConfig.getDiscardUncaughtJsExceptions();
-        boolean enableMultithreadedJavascript = this.config.appConfig.getEnableMultithreadedJavascript();
+        final boolean discardUncaughtJsExceptions = this.discardUncaughtJsExceptions;
+        boolean enableMultithreadedJavascript = this.multithreadedJavascript;
 
         if (enableMultithreadedJavascript || isWorkThread) {
             PackagedArgs packagedArgs = packageArgs(tmpArgs);
@@ -1430,7 +1474,8 @@ public class Runtime {
             try {
                 // A hint: other threads may be writing the table, so native re-checks it under the
                 // isolate lock and resolves the id itself on a miss.
-                ret = callJSMethodNative(getRuntimeId(), javaObject, objectTable.findIdOptimistic(javaObject), methodName, MethodNameIds.idOf(methodName), returnType, isConstructor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult);
+                ret = callJSMethodNative(getRuntimeId(), javaObject,
+                        objectIdHint >= 0 ? objectIdHint : objectTable.findIdOptimistic(javaObject), methodName, MethodNameIds.idOf(methodName), returnType, isConstructor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult);
                 ret = takePrimitiveResult(ret, returnType, primitiveResult);
             } catch (NativeScriptException e) {
                 // With multithreaded JS the owner can be torn down between the

@@ -24,6 +24,7 @@ public class Dump {
     static final String callJSMethodName = "callJSMethod";
     static final String initInstanceMethodName = "initInstance";
     static final String RUNTIME_TAG_FIELD_NAME = "runtimeTag__ns";
+    static final String OBJECT_ID_FIELD_NAME = "objectId__ns";
 
     static final StringBuffer methodDescriptorBuilder = new StringBuffer();
 
@@ -494,26 +495,28 @@ public class Dump {
 
         generateEqualsSuper(cv);
         generateHashCodeSuper(cv);
-        generateGetRuntimeTag(cv, tnsClassSignature);
-        generateSetRuntimeTag(cv, tnsClassSignature);
+        generateIntGetter(cv, tnsClassSignature, "getRuntimeTag__ns", RUNTIME_TAG_FIELD_NAME);
+        generateIntSetter(cv, tnsClassSignature, "setRuntimeTag__ns", RUNTIME_TAG_FIELD_NAME);
+        generateIntGetter(cv, tnsClassSignature, "getObjectId__ns", OBJECT_ID_FIELD_NAME);
+        generateIntSetter(cv, tnsClassSignature, "setObjectId__ns", OBJECT_ID_FIELD_NAME);
     }
 
     // 2 registers, 1 parameter: 'this' takes the last one, v0 is left as scratch
-    private void generateGetRuntimeTag(ClassVisitor cv, String tnsClassSignature) {
-        MethodVisitor mv = cv.visitMethod(org.ow2.asmdex.Opcodes.ACC_PUBLIC, "getRuntimeTag__ns", "I", null, null);
+    private void generateIntGetter(ClassVisitor cv, String tnsClassSignature, String methodName, String fieldName) {
+        MethodVisitor mv = cv.visitMethod(org.ow2.asmdex.Opcodes.ACC_PUBLIC, methodName, "I", null, null);
         mv.visitCode();
         mv.visitMaxs(2, 0);
-        mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET, tnsClassSignature, RUNTIME_TAG_FIELD_NAME, "I", 0, 1);
+        mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET, tnsClassSignature, fieldName, "I", 0, 1);
         mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_RETURN, 0);
         mv.visitEnd();
     }
 
-    // 2 registers, 2 parameters: v0 is 'this' and v1 the id, leaving no scratch
-    private void generateSetRuntimeTag(ClassVisitor cv, String tnsClassSignature) {
-        MethodVisitor mv = cv.visitMethod(org.ow2.asmdex.Opcodes.ACC_PUBLIC, "setRuntimeTag__ns", "VI", null, null);
+    // 2 registers, 2 parameters: v0 is 'this' and v1 the value, leaving no scratch
+    private void generateIntSetter(ClassVisitor cv, String tnsClassSignature, String methodName, String fieldName) {
+        MethodVisitor mv = cv.visitMethod(org.ow2.asmdex.Opcodes.ACC_PUBLIC, methodName, "VI", null, null);
         mv.visitCode();
         mv.visitMaxs(2, 0);
-        mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT, tnsClassSignature, RUNTIME_TAG_FIELD_NAME, "I", 1, 0);
+        mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT, tnsClassSignature, fieldName, "I", 1, 0);
         mv.visitInsn(org.ow2.asmdex.Opcodes.INSN_RETURN_VOID);
         mv.visitEnd();
     }
@@ -830,6 +833,10 @@ public class Dump {
 
         // left at its zero default, which NativeScriptRuntimeBound defines as "no runtime yet"
         fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE | org.ow2.asmdex.Opcodes.ACC_VOLATILE, RUNTIME_TAG_FIELD_NAME, "I", null, null);
+        fv.visitEnd();
+
+        // only read once the tag is set, which is written after it
+        fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE, OBJECT_ID_FIELD_NAME, "I", null, null);
         fv.visitEnd();
     }
 
