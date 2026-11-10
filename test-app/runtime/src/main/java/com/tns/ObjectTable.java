@@ -92,14 +92,16 @@ final class ObjectTable {
 
     private int findIdUnlocked(Object obj) {
         int[] index = identityIndex;
+        int[] hashes = identityIndexHashes;
         int mask = index.length - 1;
-        int i = mix(System.identityHashCode(obj)) & mask;
+        int hash = System.identityHashCode(obj);
+        int i = mix(hash) & mask;
         for (int probes = 0; probes <= mask; probes++) {
             int entry = index[i];
             if (entry == 0) {
                 return NO_ID;
             }
-            if (getUnlocked(entry - 1) == obj) {
+            if (hashes[i] == hash && getUnlocked(entry - 1) == obj) {
                 return entry - 1;
             }
             i = (i + 1) & mask;
@@ -136,7 +138,10 @@ final class ObjectTable {
     private int idCount = 0;
 
     // identity hash -> id + 1, open addressing; values[] decides which object an id holds.
+    // identityIndexHashes[i] is the hash of identityIndex[i]'s object, so a probe only looks
+    // the id up when the hashes match.
     private int[] identityIndex = new int[1024];
+    private int[] identityIndexHashes = new int[1024];
     private int identityCount = 0;
 
     /** Registers obj under id, held strongly, replacing whatever id held before. */
@@ -154,6 +159,10 @@ final class ObjectTable {
     }
 
     private void putStrongLocked(int id, Object obj) {
+        putStrongLocked(id, obj, System.identityHashCode(obj));
+    }
+
+    private void putStrongLocked(int id, Object obj, int hash) {
         int existing = findIdSlot(id);
         if (existing >= 0) {
             Object value = values[existing];
@@ -164,7 +173,6 @@ final class ObjectTable {
             removeLocked(id);
         }
 
-        int hash = System.identityHashCode(obj);
         if ((idCount + 1) * 2 > idKeys.length) {
             growIds();
         }
@@ -191,12 +199,13 @@ final class ObjectTable {
     long findOrRegister(Object obj, IdSource ids) {
         long stamp = stamps.beginWrite();
         try {
-            int id = findIdLocked(obj);
+            int hash = System.identityHashCode(obj);
+            int id = findIdLocked(obj, hash);
             if (id != NO_ID) {
                 return id;
             }
             id = ids.newId();
-            putStrongLocked(id, obj);
+            putStrongLocked(id, obj, hash);
             return id | FRESH;
         } finally {
             stamps.endWrite(stamp);
@@ -228,15 +237,19 @@ final class ObjectTable {
     }
 
     private int findIdLocked(Object obj) {
+        return findIdLocked(obj, System.identityHashCode(obj));
+    }
+
+    private int findIdLocked(Object obj, int hash) {
         int mask = identityIndex.length - 1;
-        int i = mix(System.identityHashCode(obj)) & mask;
+        int i = mix(hash) & mask;
         while (true) {
             int entry = identityIndex[i];
             if (entry == 0) {
                 return NO_ID;
             }
             int id = entry - 1;
-            if (getLocked(id) == obj) {
+            if (identityIndexHashes[i] == hash && getLocked(id) == obj) {
                 return id;
             }
             i = (i + 1) & mask;
@@ -432,12 +445,17 @@ final class ObjectTable {
     }
 
     private void insertIdentity(int hash, int id) {
-        int mask = identityIndex.length - 1;
+        insertIdentity(identityIndex, identityIndexHashes, hash, id);
+    }
+
+    private static void insertIdentity(int[] index, int[] hashes, int hash, int id) {
+        int mask = index.length - 1;
         int i = mix(hash) & mask;
-        while (identityIndex[i] != 0) {
+        while (index[i] != 0) {
             i = (i + 1) & mask;
         }
-        identityIndex[i] = id + 1;
+        hashes[i] = hash;
+        index[i] = id + 1;
     }
 
     private void removeIdentity(int hash, int id) {
@@ -454,13 +472,15 @@ final class ObjectTable {
             if (entry == 0) {
                 break;
             }
-            int home = mix(identityHashes[findIdSlot(entry - 1)]) & mask;
+            int home = mix(identityIndexHashes[j]) & mask;
             if (!isBetween(hole, home, j)) {
                 identityIndex[hole] = entry;
+                identityIndexHashes[hole] = identityIndexHashes[j];
                 hole = j;
             }
         }
         identityIndex[hole] = 0;
+        identityIndexHashes[hole] = 0;
     }
 
     // Whether home lies cyclically in (hole, j], i.e. the entry at j must stay put.
@@ -484,13 +504,17 @@ final class ObjectTable {
     }
 
     private void growIdentity() {
-        int[] old = identityIndex;
-        identityIndex = new int[old.length * 2];
-        for (int entry : old) {
-            if (entry != 0) {
-                insertIdentity(identityHashes[findIdSlot(entry - 1)], entry - 1);
+        int[] oldIndex = identityIndex;
+        int[] oldHashes = identityIndexHashes;
+        int[] index = new int[oldIndex.length * 2];
+        int[] hashes = new int[index.length];
+        for (int i = 0; i < oldIndex.length; i++) {
+            if (oldIndex[i] != 0) {
+                insertIdentity(index, hashes, oldHashes[i], oldIndex[i] - 1);
             }
         }
+        identityIndexHashes = hashes;
+        identityIndex = index;
     }
 
     private static int mix(int h) {
