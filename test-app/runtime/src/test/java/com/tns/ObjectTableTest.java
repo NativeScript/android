@@ -308,6 +308,34 @@ public class ObjectTableTest {
     }
 
     @Test
+    public void idsPastIntMaxAreUnsigned() {
+        ObjectTable table = new ObjectTable(true);
+        Object a = new Object();
+        Object b = new Object();
+        table.putStrong(Integer.MIN_VALUE + 3, a);
+
+        assertSame(a, table.get(Integer.MIN_VALUE + 3));
+        assertEquals(Integer.MIN_VALUE + 3, table.findId(a));
+        assertTrue(table.weakenAndCheckAlive(Integer.MIN_VALUE + 3));
+
+        long found = table.findOrRegister(b, new ObjectTable.IdSource() {
+            @Override
+            public int newId() {
+                return -7;
+            }
+        });
+        assertTrue((found & ObjectTable.FRESH) != 0);
+        assertEquals(-7, (int) found);
+        assertEquals(-7, table.findId(b));
+        assertEquals(-7L & 0xFFFFFFFFL, table.findOrRegister(b, null));
+
+        table.remove(-7);
+        assertNull(table.get(-7));
+        assertEquals(ObjectTable.NO_ID, table.findId(b));
+        assertEquals(1, table.size());
+    }
+
+    @Test
     public void optimisticReadsMissWhenDisabled() {
         ObjectTable table = new ObjectTable(false);
         Object a = new Object();

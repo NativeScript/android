@@ -641,12 +641,12 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
   // javaObjectID may be a hint read without the isolate lock; resolve it exactly when it
   // does not name a linked wrapper.
   Local<Object> jsObject;
-  if (javaObjectID >= 0) {
+  if (javaObjectID != -1) {
     jsObject = m_objectManager->GetLinkedJsObjectByJavaObject(javaObjectID);
   }
   if (jsObject.IsEmpty() && javaObject != nullptr) {
     javaObjectID = m_objectManager->FindObjectId(javaObject);
-    if (javaObjectID < 0) {
+    if (javaObjectID == -1) {
       throw NativeScriptException("Cannot find object id for an instance of " +
                                   m_objectManager->GetClassName(javaObject));
     }

@@ -57,9 +57,9 @@ class ObjectManager {
 
   v8::Local<v8::Object> GetJsObjectByJavaObject(int javaObjectID);
 
-  // Settles the wrappers collected since the last flush. Called on every JS<->Java
-  // crossing: JS cannot create or receive a Java object without one, so the Java objects
-  // still held strongly for collected wrappers cannot grow between a GC and the flush.
+  // Settles the wrappers collected since the last flush. Called on JS<->Java calls and
+  // constructions; field and array-element reads that hand JS a Java object skip it and
+  // rely on the delayed flush task.
   void FlushFinalizedBatchIfPending() {
     if (!m_flushBackingOff &&
         (!m_pendingWeaken.empty() || !m_pendingCheck.empty())) {
@@ -101,7 +101,9 @@ class ObjectManager {
   /*
    * Whether GetInternalField is safe to call on this exact object. False for
    * a Proxy even when its target qualifies; unwrap first where a Proxy should
-   * be accepted.
+   * be accepted. Any object with this many internal fields is read as a runtime
+   * object, so embedder code must never store an aligned pointer in field 0 of
+   * an object with 2 or 3 internal fields.
    */
   static bool IsJsRuntimeObject(const v8::Local<v8::Object>& object);
 
@@ -121,7 +123,7 @@ class ObjectManager {
   // Whether a runtime object's JsInfo field holds a link. The field holds id + 1, so
   // the zero V8 stores in a typed array's embedder fields never reads as a link.
   static bool HasJsInfo(const v8::Local<v8::Object>& object) {
-    return LinkedIdOf(object) >= 0;
+    return LinkedIdOf(object) != -1;
   }
 
   /*
@@ -194,7 +196,8 @@ class ObjectManager {
   JSInstanceInfo* GetJSInstanceInfoFromRuntimeObject(
       const v8::Local<v8::Object>& object);
 
-  // The id in a runtime object's JsInfo field, or -1.
+  // The id in a runtime object's JsInfo field (an unsigned 32-bit id carried in an int),
+  // or -1.
   static int LinkedIdOf(const v8::Local<v8::Object>& object);
 
   void SetJsInfo(const v8::Local<v8::Object>& object, uint32_t javaObjectID);

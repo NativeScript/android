@@ -10,8 +10,9 @@
 namespace tns {
 
 /*
- * Object id -> entry, as a radix tree indexed by id: chunks of leaves of slots. Ids come
- * from a per-runtime monotonic counter and are never reused, so a leaf or chunk that
+ * Object id -> entry, as a radix tree indexed by id: chunks of leaves of slots. Ids are
+ * unsigned 32-bit values carried in an int, -1 meaning none; they come from a per-runtime
+ * monotonic counter and are never reused, so a leaf or chunk that
  * empties is freed unless it is the newest; an id linked after its leaf was freed just
  * re-creates it. Leaves and chunks are small, so a long-lived entry keeps at most one of
  * each alive. Not thread-safe: used under the isolate lock.
@@ -20,10 +21,10 @@ template <typename T>
 class ObjectIdIndex {
  public:
   T* Find(int id) const {
-    if (id < 0) {
+    if (id == kNoId) {
       return nullptr;
     }
-    size_t chunkIndex = static_cast<size_t>(id) >> kChunkShift;
+    size_t chunkIndex = Key(id) >> kChunkShift;
     if (chunkIndex >= m_chunks.size()) {
       return nullptr;
     }
@@ -32,15 +33,16 @@ class ObjectIdIndex {
       return nullptr;
     }
     const Leaf* leaf = chunk->leaves[LeafIndex(id)].get();
-    return leaf == nullptr ? nullptr : leaf->slots[id & kLeafMask];
+    return leaf == nullptr ? nullptr : leaf->slots[Key(id) & kLeafMask];
   }
 
-  // Keeps an existing entry for id, like std::unordered_map::emplace.
-  void Insert(int id, T* value) {
-    if (id < 0) {
-      return;
+  // Keeps an existing entry for id, like std::unordered_map::emplace; returns whether value
+  // was inserted.
+  bool Insert(int id, T* value) {
+    if (id == kNoId) {
+      return false;
     }
-    size_t chunkIndex = static_cast<size_t>(id) >> kChunkShift;
+    size_t chunkIndex = Key(id) >> kChunkShift;
     if (chunkIndex >= m_chunks.size()) {
       m_chunks.resize(chunkIndex + 1);
     }
@@ -53,25 +55,27 @@ class ObjectIdIndex {
       leaf = std::make_unique<Leaf>();
       chunk->liveLeaves++;
     }
-    T*& slot = leaf->slots[id & kLeafMask];
-    size_t leafNumber = static_cast<size_t>(id) >> kLeafBits;
+    T*& slot = leaf->slots[Key(id) & kLeafMask];
+    size_t leafNumber = Key(id) >> kLeafBits;
     if (leafNumber > m_newestLeaf) {
       size_t previous = m_newestLeaf;
       m_newestLeaf = leafNumber;
       // Kept while it was the newest; nothing else frees it once it is empty.
       ReleaseIfEmpty(previous);
     }
-    if (slot == nullptr) {
-      slot = value;
-      leaf->live++;
+    if (slot != nullptr) {
+      return false;
     }
+    slot = value;
+    leaf->live++;
+    return true;
   }
 
   void Erase(int id) {
-    if (id < 0) {
+    if (id == kNoId) {
       return;
     }
-    size_t chunkIndex = static_cast<size_t>(id) >> kChunkShift;
+    size_t chunkIndex = Key(id) >> kChunkShift;
     if (chunkIndex >= m_chunks.size() || m_chunks[chunkIndex] == nullptr) {
       return;
     }
@@ -80,13 +84,13 @@ class ObjectIdIndex {
     if (leaf == nullptr) {
       return;
     }
-    T*& slot = leaf->slots[id & kLeafMask];
+    T*& slot = leaf->slots[Key(id) & kLeafMask];
     if (slot == nullptr) {
       return;
     }
     slot = nullptr;
     leaf->live--;
-    size_t leafNumber = static_cast<size_t>(id) >> kLeafBits;
+    size_t leafNumber = Key(id) >> kLeafBits;
     if (leafNumber != m_newestLeaf) {
       ReleaseIfEmpty(leafNumber);
     }
@@ -149,8 +153,14 @@ class ObjectIdIndex {
     }
   }
 
+  static constexpr int kNoId = -1;
+
+  static size_t Key(int id) {
+    return static_cast<uint32_t>(id);
+  }
+
   static size_t LeafIndex(int id) {
-    return (static_cast<size_t>(id) >> kLeafBits) & ((1 << kChunkLeafBits) - 1);
+    return (Key(id) >> kLeafBits) & ((1 << kChunkLeafBits) - 1);
   }
 
   std::vector<std::unique_ptr<Chunk>> m_chunks;

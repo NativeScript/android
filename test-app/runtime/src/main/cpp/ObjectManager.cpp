@@ -21,6 +21,7 @@ using namespace tns;
 
 ObjectManager::ObjectManager(jobject javaRuntimeObject)
     : m_javaRuntimeObject(javaRuntimeObject),
+      m_isolate(nullptr),
       m_currentObjectId(0),
       m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback,
               ValidateWeakGlobalRefCallback, 1000, this) {
@@ -188,7 +189,7 @@ int ObjectManager::LinkedIdOf(const Local<Object>& object) {
   if (!field->IsUint32()) {
     return -1;
   }
-  return static_cast<int>(field.As<Uint32>()->Value()) - 1;
+  return static_cast<int>(field.As<Uint32>()->Value() - 1u);
 }
 
 void ObjectManager::SetJsInfo(const Local<Object>& object, uint32_t javaObjectID) {
@@ -218,7 +219,7 @@ Local<Object> ObjectManager::GetJSInstanceInfoOwner(const Local<Object>& object)
 ObjectManager::JSInstanceInfo*
 ObjectManager::GetJSInstanceInfoFromRuntimeObject(const Local<Object>& object) {
   int id = LinkedIdOf(object);
-  if (id < 0) {
+  if (id == -1) {
     HandleScope handleScope(m_isolate);
     auto owner = GetJSInstanceInfoOwner(object);
     if (owner.IsEmpty()) {
@@ -474,7 +475,11 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
 
   SetJsInfo(object, javaObjectID);
 
-  m_idToObject.Insert(javaObjectID, state);
+  bool inserted = m_idToObject.Insert(javaObjectID, state);
+  // A second link for one id would leave this state's finalizer weakening the first
+  // wrapper's Java object.
+  NS_DCHECK(inserted);
+  (void) inserted;
 }
 
 bool ObjectManager::CloneLink(const Local<Object>& src,
@@ -597,6 +602,12 @@ void ObjectManager::FlushFinalizedBatch() {
   m_flushScheduled = false;
   m_flushBackingOff = false;
   if (m_pendingWeaken.empty() && m_pendingCheck.empty()) {
+    return;
+  }
+  // A failed Java->JS call returns with its exception pending: JNI may not be used until it
+  // is thrown, and the flush must not mistake it for its own failure and clear it.
+  if (JEnv().ExceptionCheck()) {
+    ScheduleFinalizedBatchFlush();
     return;
   }
   HandleScope handleScope(m_isolate);

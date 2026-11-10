@@ -185,8 +185,9 @@ void MethodCache::AppendType(string& type, Isolate* isolate, const v8::Local<v8:
     } else if (value->IsString() || value->IsStringObject()) {
         type += "string";
     } else if (value->IsNumber() || value->IsNumberObject()) {
-        auto context = isolate->GetCurrentContext();
-        double d = value->NumberValue(context).ToChecked();
+        // Not NumberValue: a user valueOf could call into Java and reuse the thread's key.
+        double d = value->IsNumberObject() ? value.As<NumberObject>()->ValueOf()
+                                           : value.As<Number>()->Value();
         int64_t i = (int64_t) d;
         bool isInteger = d == i;
 

@@ -78,6 +78,13 @@ describe("Java object wrappers", function () {
 		expect(String(returned.toString())).toBe("ba");
 	});
 
+	it("read super through an implementation object that is not a Java instance", function () {
+		var impl = { toString: function () { return "impl"; } };
+		java.lang.Object.extend(impl);
+
+		expect(function () { return impl.super; }).not.toThrow();
+	});
+
 	it("hand back the same wrapper for the same Java object", function () {
 		var builder = new java.lang.StringBuilder();
 

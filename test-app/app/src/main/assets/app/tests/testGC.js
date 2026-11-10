@@ -317,6 +317,23 @@ describe("Tests garbage collection", function () {
 	describe("collected wrappers waiting for a flush", function () {
 		var Holder = com.tns.tests.WrapperHolder;
 
+		it("keep a callback's error when wrappers were collected after its last Java call", function () {
+			var callable = new java.util.concurrent.Callable({
+				call: function () {
+					for (var i = 0; i < 2000; i++) {
+						new java.lang.Object();
+					}
+					gc();
+					throw new Error("thrown with a batch pending");
+				}
+			});
+			var task = new java.util.concurrent.FutureTask(callable);
+			task.run();
+
+			expect(task.isDone()).toBe(true);
+			expect(function () { task.get(); }).toThrow();
+		});
+
 		function collectJava() {
 			for (var i = 0; i < 3; i++) {
 				java.lang.Runtime.getRuntime().gc();

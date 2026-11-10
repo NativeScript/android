@@ -112,7 +112,7 @@ final class ObjectTable {
     // get() without the lock. Safe on a torn view: every array it reads is indexed within
     // its own bounds, and a stale one only makes the caller's stamp check fail.
     private Object getUnlocked(int id) {
-        if (id < 0) {
+        if (id == NO_ID) {
             return null;
         }
         Chunk[] cs = chunks;
@@ -137,7 +137,8 @@ final class ObjectTable {
     }
 
     /*
-     * id -> entry, as a radix tree indexed by id: chunks of leaves of slots. Ids come from a
+     * id -> entry, as a radix tree indexed by id: chunks of leaves of slots. Ids are unsigned
+     * 32-bit values carried in an int (NO_ID is the one excluded value); they come from a
      * monotonic counter and are never reused, so a leaf or chunk that empties is dropped
      * unless it is the newest; an id registered after its leaf was dropped re-creates it.
      * Leaves and chunks are small, so a long-lived object keeps at most one of each alive.
@@ -231,11 +232,11 @@ final class ObjectTable {
             int hash = System.identityHashCode(obj);
             int id = findIdLocked(obj, hash);
             if (id != NO_ID) {
-                return id;
+                return id & 0xFFFFFFFFL;
             }
             id = ids.newId();
             putStrongLocked(id, obj, hash);
-            return id | FRESH;
+            return (id & 0xFFFFFFFFL) | FRESH;
         } finally {
             stamps.endWrite(stamp);
         }
@@ -426,7 +427,7 @@ final class ObjectTable {
     }
 
     private Leaf leafFor(int id) {
-        if (id < 0) {
+        if (id == NO_ID) {
             return null;
         }
         int c = id >>> CHUNK_SHIFT;

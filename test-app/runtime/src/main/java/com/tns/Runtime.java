@@ -181,9 +181,9 @@ public class Runtime {
             "Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
             "If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
 
-    // Mutated and read exactly only by the thread holding this runtime's isolate lock (the
-    // native side resolves and registers objects after taking it); other threads may only
-    // findIdOptimistic, whose result the native side re-checks.
+    // Any thread may read it optimistically and register new objects through findOrRegister
+    // (see ObjectTable); every other mutation and every exact read comes from the thread
+    // holding this runtime's isolate lock.
     private final ObjectTable objectTable;
 
     private final ObjectTable.IdSource objectIds = new ObjectTable.IdSource() {
@@ -622,7 +622,7 @@ public class Runtime {
 
     // Only native code may call this, from the thread holding the isolate lock.
     @RuntimeCallable
-    void releaseNativeCounterpart(int nativeObjectId) {
+    public void releaseNativeCounterpart(int nativeObjectId) {
         objectTable.remove(nativeObjectId);
     }
 
@@ -1151,27 +1151,38 @@ public class Runtime {
     // an id almost always has one; native asks for the class itself when it does not.
     @RuntimeCallable
     private long getOrCreateJavaObjectIDAndClass(Object obj) {
-        int id = objectTable.findId(obj);
-        if (id != ObjectTable.NO_ID) {
-            return id & 0xFFFFFFFFL;
+        long found = getOrCreateObjectId(obj);
+        if ((found & ObjectTable.FRESH) == 0) {
+            return found;
         }
-        id = generateNewObjectId(getRuntimeId());
-        makeInstanceStrong(obj, id);
-        return packIdAndClass(id, obj);
+        return packIdAndClass((int) found, obj);
     }
 
     @RuntimeCallable
     private int getOrCreateJavaObjectID(Object obj) {
-        Integer result = getJavaObjectID(obj);
-
-        if (result == null) {
-            int objectId = generateNewObjectId(getRuntimeId());
-            makeInstanceStrong(obj, objectId);
-
-            result = objectId;
+        long found = getOrCreateObjectId(obj);
+        if ((found & ObjectTable.FRESH) != 0) {
+            // Stores the class by name on its first registration.
+            classIndexOf(obj.getClass());
         }
+        return (int) found;
+    }
 
-        return result;
+    // obj's id (low 32 bits), registering it strongly under a new id if it has none, with
+    // ObjectTable.FRESH set then. Threads registering call arguments (packageArgs) do not
+    // hold the isolate lock, so where they may, the lookup and insert are one atomic step.
+    private long getOrCreateObjectId(Object obj) {
+        // Exact: only the isolate-lock holder (this thread) removes entries.
+        int id = objectTable.findId(obj);
+        if (id != ObjectTable.NO_ID) {
+            return id & 0xFFFFFFFFL;
+        }
+        if (objectTable.allowsConcurrentRegistration()) {
+            return objectTable.findOrRegister(obj, objectIds);
+        }
+        id = generateNewObjectId(getRuntimeId());
+        makeInstanceStrong(obj, id);
+        return (id & 0xFFFFFFFFL) | ObjectTable.FRESH;
     }
 
     public static Object callJSMethodFromPossibleNonMainThread(Object javaObject, String methodName, Class<?> retType, Object... args) throws NativeScriptException {
@@ -1475,7 +1486,7 @@ public class Runtime {
                 // A hint: other threads may be writing the table, so native re-checks it under the
                 // isolate lock and resolves the id itself on a miss.
                 ret = callJSMethodNative(getRuntimeId(), javaObject,
-                        objectIdHint >= 0 ? objectIdHint : objectTable.findIdOptimistic(javaObject), methodName, MethodNameIds.idOf(methodName), returnType, isConstructor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult);
+                        objectIdHint != ObjectTable.NO_ID ? objectIdHint : objectTable.findIdOptimistic(javaObject), methodName, MethodNameIds.idOf(methodName), returnType, isConstructor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult);
                 ret = takePrimitiveResult(ret, returnType, primitiveResult);
             } catch (NativeScriptException e) {
                 // With multithreaded JS the owner can be torn down between the

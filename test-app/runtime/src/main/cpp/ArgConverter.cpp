@@ -154,7 +154,7 @@ void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const 
                 !objectManager->HasJsObject(hintedObjectID)) {
                 JniLocalRef arg(env->GetObjectArrayElement(args.refs, i));
                 jsArg = objectManager->CreateJSWrapper(hintedObjectID, classIndex, arg);
-            } else if (hintedObjectID >= 0) {
+            } else if (hintedObjectID != -1) {
                 jsArg = objectManager->GetLinkedJsObjectByJavaObject(hintedObjectID);
             }
             if (jsArg.IsEmpty()) {

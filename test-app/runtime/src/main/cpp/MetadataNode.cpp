@@ -398,7 +398,8 @@ Local<Object> MetadataNode::CreatePackageObject(Isolate* isolate) {
             packageObj->SetLazyDataProperty(ctx,
                                             NewMemberName(isolate, childNode->name),
                                             PackageGetterCallback,
-                                            extData).ToChecked();
+                                            extData,
+                                            PropertyAttribute::ReadOnly).ToChecked();
         }
     }
 
@@ -1376,8 +1377,10 @@ MetadataNode* MetadataNode::GetInstanceMetadata(Isolate* isolate, const Local<Ob
 
 void MetadataNode::SetInstanceMetadata(Isolate* isolate, Local<Object> object, MetadataNode* node) {
     if (ObjectManager::HasMetadataField(object)) {
-        object->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::Metadata),
-                                 node->GetInstanceData(isolate).metadata->Get(isolate));
+        // node is null for `super` read through an object that is not a Java instance.
+        Local<Data> metadata = node == nullptr ? Local<Data>(Undefined(isolate))
+                                               : node->GetInstanceData(isolate).metadata->Get(isolate);
+        object->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::Metadata), metadata);
         return;
     }
 
