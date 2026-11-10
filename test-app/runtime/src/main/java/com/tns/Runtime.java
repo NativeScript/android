@@ -202,7 +202,12 @@ public class Runtime {
     private final java.lang.Runtime dalvikRuntime = java.lang.Runtime.getRuntime();
 
     private final Object keyNotFoundObject = new Object();
+    // The id and class of the instance JS is constructing, set by the native side around
+    // the Java constructor call. Only an instance of exactly that class may take the id: any
+    // other binding instance created while that constructor runs was created by Java. The
+    // class is only meaningful while the id is set, and only native code writes it.
     private int currentObjectId = -1;
+    private Class<?> currentObjectClass;
 
     private ExtractPolicy extractPolicy;
 
@@ -930,7 +935,8 @@ public class Runtime {
 
             int objectId = runtime.currentObjectId;
 
-            if (objectId != -1) {
+            if (objectId != -1 && instance.getClass() == runtime.currentObjectClass) {
+                runtime.currentObjectId = -1;
                 runtime.makeInstanceStrong(instance, objectId);
             } else {
                 objectId = runtime.createJSInstance(instance);

@@ -173,6 +173,22 @@ class Runtime {
             return m_admissionGate;
         }
 
+        // The instance JS is constructing, as last published to the Java runtime's
+        // currentObjectId and currentObjectClass.
+        struct Construction {
+            int id = -1;
+            jclass clazz = nullptr;
+        };
+
+        Construction& CurrentConstruction() {
+            return m_construction;
+        }
+
+        // What the Java runtime's currentObjectClass holds; only native code writes it.
+        jclass& PublishedConstructionClass() {
+            return m_publishedConstructionClass;
+        }
+
         void RunModule(JNIEnv* _env, jobject obj, jstring scriptFile);
         void RunModule(const char *moduleName);
         void RunWorker(const std::string& filePath);
@@ -339,6 +355,10 @@ class Runtime {
         ObjectManager* m_objectManager;
 
         AdmissionGate m_admissionGate;
+
+        Construction m_construction;
+
+        jclass m_publishedConstructionClass = nullptr;
 
         ModuleInternal m_module;
 

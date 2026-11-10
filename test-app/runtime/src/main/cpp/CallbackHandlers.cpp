@@ -56,6 +56,9 @@ void CallbackHandlers::Init(Isolate *isolate) {
         CURRENT_OBJECTID_FIELD_ID = env.GetFieldID(RUNTIME_CLASS, "currentObjectId", "I");
         NS_CHECK(CURRENT_OBJECTID_FIELD_ID != nullptr);
 
+        CURRENT_OBJECTCLASS_FIELD_ID = env.GetFieldID(RUNTIME_CLASS, "currentObjectClass", "Ljava/lang/Class;");
+        NS_CHECK(CURRENT_OBJECTCLASS_FIELD_ID != nullptr);
+
         REGISTER_CONSTRUCTED_INSTANCE_ID = env.GetMethodID(RUNTIME_CLASS, "registerConstructedInstance",
                                                            "(Ljava/lang/Object;I)J");
         NS_CHECK(REGISTER_CONSTRUCTED_INSTANCE_ID != nullptr);
@@ -98,6 +101,41 @@ struct JavaCallScope {
 };
 }  // namespace
 
+// Publishes the instance JS is constructing to Runtime.initInstance for the duration of the
+// Java constructor, and restores the enclosing construction afterwards: JS run by a
+// callback the constructor makes may construct another instance. Raw JNI, so that the
+// destructor never throws.
+class CallbackHandlers::ConstructionScope {
+public:
+    ConstructionScope(Runtime* runtime, int javaObjectId, jclass clazz)
+            : _runtime(runtime), _previous(runtime->CurrentConstruction()) {
+        Publish({javaObjectId, clazz});
+    }
+
+    ~ConstructionScope() {
+        Publish(_previous);
+    }
+
+private:
+    // The class is written only when it changes: initInstance reads it only while an id is
+    // published, so a stale one is harmless, and repeated constructions of one class then
+    // cost a single field write each way.
+    void Publish(const Runtime::Construction& construction) {
+        _runtime->CurrentConstruction() = construction;
+        JNIEnv* env = JEnv();
+        jobject javaRuntime = _runtime->GetJavaRuntime();
+        jclass& published = _runtime->PublishedConstructionClass();
+        if (construction.id != -1 && construction.clazz != published) {
+            env->SetObjectField(javaRuntime, CURRENT_OBJECTCLASS_FIELD_ID, construction.clazz);
+            published = construction.clazz;
+        }
+        env->SetIntField(javaRuntime, CURRENT_OBJECTID_FIELD_ID, construction.id);
+    }
+
+    Runtime* _runtime;
+    Runtime::Construction _previous;
+};
+
 bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &jsObject,
                                         const std::string &fullClassName,
                                         const ArgsWrapper &argWrapper,
@@ -129,12 +167,9 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     const auto &mi = MethodCache::ResolveConstructorSignature(argWrapper, fullClassName,
                                                        generatedJavaClass, isInterface);
 
-    // while the "instance" is being created, if an exception is thrown during the construction
-    // this scope will guarantee the "javaObjectID" will be set to -1 and won't have an invalid value
     jobject instance;
     {
-        JavaObjectIdScope objIdScope(env, CURRENT_OBJECTID_FIELD_ID, runtime->GetJavaRuntime(),
-                                     javaObjectID);
+        ConstructionScope construction(runtime, javaObjectID, generatedJavaClass);
 
         if (argWrapper.type == ArgType::Interface) {
             instance = env.NewObject(generatedJavaClass, mi.mid);
@@ -1948,6 +1983,7 @@ short CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH = 100;
 jclass CallbackHandlers::RUNTIME_CLASS = nullptr;
 jclass CallbackHandlers::JAVA_LANG_STRING = nullptr;
 jfieldID CallbackHandlers::CURRENT_OBJECTID_FIELD_ID = nullptr;
+jfieldID CallbackHandlers::CURRENT_OBJECTCLASS_FIELD_ID = nullptr;
 jmethodID CallbackHandlers::RESOLVE_CLASS_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::REGISTER_CONSTRUCTED_INSTANCE_ID = nullptr;
 jmethodID CallbackHandlers::GET_TYPE_METADATA = nullptr;

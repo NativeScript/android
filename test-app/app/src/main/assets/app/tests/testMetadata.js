@@ -85,6 +85,30 @@ describe("Java object wrappers", function () {
 		expect(function () { return impl.super; }).not.toThrow();
 	});
 
+	it("leave an extended instance Java creates during a JS construction its own JS object", function () {
+		var Inner = java.lang.Object.extend({ toString: function () { return "inner"; } });
+		var Outer = com.tns.tests.NestedConstruction.extend({ toString: function () { return "outer"; } });
+		var outer = new Outer(new Inner().getClass(), null);
+
+		expect(String(outer.toString())).toBe("outer");
+		expect(String(outer.getCreated().toString())).toBe("inner");
+	});
+
+	it("keep a JS construction's instance when a callback constructs another during it", function () {
+		var Inner = java.lang.Object.extend({ toString: function () { return "inner"; } });
+		var Outer = com.tns.tests.NestedConstruction.extend({ toString: function () { return "outer:" + this.tag; } });
+		var made = null;
+		var outer = new Outer(null, new java.lang.Runnable({
+			run: function () {
+				made = new Inner();
+			}
+		}));
+		outer.tag = "mine";
+
+		expect(String(outer.toString())).toBe("outer:mine");
+		expect(String(made.toString())).toBe("inner");
+	});
+
 	it("hand back the same wrapper for the same Java object", function () {
 		var builder = new java.lang.StringBuilder();
 
