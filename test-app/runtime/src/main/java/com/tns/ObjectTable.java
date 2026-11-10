@@ -109,35 +109,65 @@ final class ObjectTable {
         return NO_ID;
     }
 
-    // get() with every probe bounded: a torn view need not contain the empty slot that
-    // ends a probe.
+    // get() without the lock. Safe on a torn view: every array it reads is indexed within
+    // its own bounds, and a stale one only makes the caller's stamp check fail.
     private Object getUnlocked(int id) {
-        int[] keys = idKeys;
-        Object[] vals = values;
-        int mask = keys.length - 1;
-        int i = mix(id) & mask;
-        int key = id + 1;
-        for (int probes = 0; probes <= mask; probes++) {
-            int k = keys[i];
-            if (k == key) {
-                Object value = vals[i];
-                return value instanceof WeakRef ? ((WeakRef) value).get() : value;
-            }
-            if (k == 0) {
-                return null;
-            }
-            i = (i + 1) & mask;
+        if (id < 0) {
+            return null;
         }
-        return null;
+        Chunk[] cs = chunks;
+        int c = id >>> CHUNK_SHIFT;
+        if (c >= cs.length) {
+            return null;
+        }
+        Chunk chunk = cs[c];
+        if (chunk == null) {
+            return null;
+        }
+        Leaf leaf = chunk.leaves[(id >>> LEAF_BITS) & CHUNK_MASK];
+        if (leaf == null) {
+            return null;
+        }
+        Object value = leaf.values[id & LEAF_MASK];
+        return value == null ? null : deref(value);
     }
 
-    // id -> entry, open addressing on the id. Keys are id + 1 so 0 marks an empty slot.
-    private int[] idKeys = new int[1024];
-    private Object[] values = new Object[1024];
-    private int[] identityHashes = new int[1024];
+    private static Object deref(Object value) {
+        return value instanceof WeakRef ? ((WeakRef) value).get() : value;
+    }
+
+    /*
+     * id -> entry, as a radix tree indexed by id: chunks of leaves of slots. Ids come from a
+     * monotonic counter and are never reused, so a leaf or chunk that empties is dropped
+     * unless it is the newest; an id registered after its leaf was dropped re-creates it.
+     * Leaves and chunks are small, so a long-lived object keeps at most one of each alive.
+     */
+    private static final int LEAF_BITS = 6;
+    private static final int LEAF_SIZE = 1 << LEAF_BITS;
+    private static final int LEAF_MASK = LEAF_SIZE - 1;
+    private static final int CHUNK_BITS = 6;
+    private static final int CHUNK_MASK = (1 << CHUNK_BITS) - 1;
+    private static final int CHUNK_SHIFT = LEAF_BITS + CHUNK_BITS;
+
+    private static final class Leaf {
+        // The object, or a WeakRef to it; null for no entry.
+        final Object[] values = new Object[LEAF_SIZE];
+        // The object's identity hash, to find its identity index entry on removal.
+        final int[] hashes = new int[LEAF_SIZE];
+        int live;
+    }
+
+    private static final class Chunk {
+        final Leaf[] leaves = new Leaf[1 << CHUNK_BITS];
+        int liveLeaves;
+    }
+
+    private Chunk[] chunks = new Chunk[16];
+    // id >>> LEAF_BITS of the highest id registered.
+    private int newestLeaf = 0;
     private int idCount = 0;
 
-    // identity hash -> id + 1, open addressing; values[] decides which object an id holds.
+    // identity hash -> id + 1, open addressing; the id's entry decides which object it holds.
     // identityIndexHashes[i] is the hash of identityIndex[i]'s object, so a probe only looks
     // the id up when the hashes match.
     private int[] identityIndex = new int[1024];
@@ -163,20 +193,19 @@ final class ObjectTable {
     }
 
     private void putStrongLocked(int id, Object obj, int hash) {
-        int existing = findIdSlot(id);
-        if (existing >= 0) {
-            Object value = values[existing];
-            if ((value instanceof WeakRef ? ((WeakRef) value).get() : value) == obj) {
-                values[existing] = obj;
-                return;
+        Leaf existingLeaf = leafFor(id);
+        if (existingLeaf != null) {
+            Object value = existingLeaf.values[id & LEAF_MASK];
+            if (value != null) {
+                if (deref(value) == obj) {
+                    existingLeaf.values[id & LEAF_MASK] = obj;
+                    return;
+                }
+                removeLocked(id);
             }
-            removeLocked(id);
         }
 
-        if ((idCount + 1) * 2 > idKeys.length) {
-            growIds();
-        }
-        insertId(id, obj, hash);
+        insertEntry(id, obj, hash);
         idCount++;
 
         if ((identityCount + 1) * 2 > identityIndex.length) {
@@ -281,21 +310,17 @@ final class ObjectTable {
     }
 
     private Object getLocked(int id) {
-        int slot = findIdSlot(id);
-        if (slot < 0) {
-            return null;
-        }
-        Object value = values[slot];
-        return value instanceof WeakRef ? ((WeakRef) value).get() : value;
+        Object value = rawLocked(id);
+        return value == null ? null : deref(value);
     }
 
     boolean contains(int id) {
         if (stamps == null) {
-            return findIdSlot(id) >= 0;
+            return rawLocked(id) != null;
         }
         long stamp = stamps.readLock();
         try {
-            return findIdSlot(id) >= 0;
+            return rawLocked(id) != null;
         } finally {
             stamps.unlockRead(stamp);
         }
@@ -340,11 +365,11 @@ final class ObjectTable {
     }
 
     private boolean weakenAndCheckAliveLocked(int id) {
-        int slot = findIdSlot(id);
-        if (slot < 0) {
+        Leaf leaf = leafFor(id);
+        Object value = leaf == null ? null : leaf.values[id & LEAF_MASK];
+        if (value == null) {
             return false;
         }
-        Object value = values[slot];
         if (value instanceof WeakRef) {
             if (((WeakRef) value).get() != null) {
                 return true;
@@ -352,7 +377,7 @@ final class ObjectTable {
             removeLocked(id);
             return false;
         }
-        values[slot] = new WeakRef(value);
+        leaf.values[id & LEAF_MASK] = new WeakRef(value);
         return true;
     }
 
@@ -370,12 +395,19 @@ final class ObjectTable {
     }
 
     private void removeLocked(int id) {
-        int slot = findIdSlot(id);
-        if (slot < 0) {
+        Leaf leaf = leafFor(id);
+        int i = id & LEAF_MASK;
+        if (leaf == null || leaf.values[i] == null) {
             return;
         }
-        int hash = identityHashes[slot];
-        removeIdSlot(slot);
+        int hash = leaf.hashes[i];
+        leaf.values[i] = null;
+        leaf.hashes[i] = 0;
+        leaf.live--;
+        int leafNumber = id >>> LEAF_BITS;
+        if (leafNumber != newestLeaf) {
+            releaseIfEmpty(leafNumber);
+        }
         idCount--;
         removeIdentity(hash, id);
         identityCount--;
@@ -393,55 +425,75 @@ final class ObjectTable {
         }
     }
 
-    private int findIdSlot(int id) {
-        int mask = idKeys.length - 1;
-        int i = mix(id) & mask;
-        int key = id + 1;
-        while (true) {
-            int k = idKeys[i];
-            if (k == key) {
-                return i;
+    private Leaf leafFor(int id) {
+        if (id < 0) {
+            return null;
+        }
+        int c = id >>> CHUNK_SHIFT;
+        Chunk chunk = c < chunks.length ? chunks[c] : null;
+        return chunk == null ? null : chunk.leaves[(id >>> LEAF_BITS) & CHUNK_MASK];
+    }
+
+    // The entry for id as stored (the object or a WeakRef to it), or null.
+    private Object rawLocked(int id) {
+        Leaf leaf = leafFor(id);
+        return leaf == null ? null : leaf.values[id & LEAF_MASK];
+    }
+
+    // Adds an entry for an id that has none.
+    private void insertEntry(int id, Object value, int hash) {
+        int c = id >>> CHUNK_SHIFT;
+        if (c >= chunks.length) {
+            int length = chunks.length;
+            while (length <= c) {
+                length *= 2;
             }
-            if (k == 0) {
-                return -1;
-            }
-            i = (i + 1) & mask;
+            Chunk[] grown = new Chunk[length];
+            System.arraycopy(chunks, 0, grown, 0, chunks.length);
+            chunks = grown;
+        }
+        Chunk chunk = chunks[c];
+        if (chunk == null) {
+            chunk = new Chunk();
+            chunks[c] = chunk;
+        }
+        int l = (id >>> LEAF_BITS) & CHUNK_MASK;
+        Leaf leaf = chunk.leaves[l];
+        if (leaf == null) {
+            leaf = new Leaf();
+            chunk.leaves[l] = leaf;
+            chunk.liveLeaves++;
+        }
+        int i = id & LEAF_MASK;
+        leaf.values[i] = value;
+        leaf.hashes[i] = hash;
+        leaf.live++;
+        int leafNumber = id >>> LEAF_BITS;
+        if (leafNumber > newestLeaf) {
+            int previous = newestLeaf;
+            newestLeaf = leafNumber;
+            // Kept while it was the newest; nothing else drops it once it is empty.
+            releaseIfEmpty(previous);
         }
     }
 
-    private void insertId(int id, Object value, int hash) {
-        int mask = idKeys.length - 1;
-        int i = mix(id) & mask;
-        while (idKeys[i] != 0) {
-            i = (i + 1) & mask;
+    // Drops leaf leafNumber if it is empty, then its chunk if that empties and is not the
+    // newest.
+    private void releaseIfEmpty(int leafNumber) {
+        int c = leafNumber >>> CHUNK_BITS;
+        Chunk chunk = c < chunks.length ? chunks[c] : null;
+        if (chunk == null) {
+            return;
         }
-        idKeys[i] = id + 1;
-        values[i] = value;
-        identityHashes[i] = hash;
-    }
-
-    // Backward-shift deletion keeps linear probing tombstone-free.
-    private void removeIdSlot(int slot) {
-        int mask = idKeys.length - 1;
-        int hole = slot;
-        int j = slot;
-        while (true) {
-            j = (j + 1) & mask;
-            int key = idKeys[j];
-            if (key == 0) {
-                break;
-            }
-            int home = mix(key - 1) & mask;
-            if (!isBetween(hole, home, j)) {
-                idKeys[hole] = key;
-                values[hole] = values[j];
-                identityHashes[hole] = identityHashes[j];
-                hole = j;
-            }
+        int l = leafNumber & CHUNK_MASK;
+        Leaf leaf = chunk.leaves[l];
+        if (leaf == null || leaf.live != 0) {
+            return;
         }
-        idKeys[hole] = 0;
-        values[hole] = null;
-        identityHashes[hole] = 0;
+        chunk.leaves[l] = null;
+        if (--chunk.liveLeaves == 0 && c != (newestLeaf >>> CHUNK_BITS)) {
+            chunks[c] = null;
+        }
     }
 
     private void insertIdentity(int hash, int id) {
@@ -486,21 +538,6 @@ final class ObjectTable {
     // Whether home lies cyclically in (hole, j], i.e. the entry at j must stay put.
     private static boolean isBetween(int hole, int home, int j) {
         return hole <= j ? (hole < home && home <= j) : (hole < home || home <= j);
-    }
-
-    private void growIds() {
-        int[] oldKeys = idKeys;
-        Object[] oldValues = values;
-        int[] oldHashes = identityHashes;
-        int capacity = oldKeys.length * 2;
-        idKeys = new int[capacity];
-        values = new Object[capacity];
-        identityHashes = new int[capacity];
-        for (int i = 0; i < oldKeys.length; i++) {
-            if (oldKeys[i] != 0) {
-                insertId(oldKeys[i] - 1, oldValues[i], oldHashes[i]);
-            }
-        }
     }
 
     private void growIdentity() {

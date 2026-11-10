@@ -277,6 +277,37 @@ public class ObjectTableTest {
     }
 
     @Test
+    public void keepsSurvivorsOfReleasedRangesAndOldIdsRegisteredLate() {
+        ObjectTable table = new ObjectTable();
+        Object[] objects = new Object[3000];
+        for (int id = 0; id < objects.length; id++) {
+            objects[id] = new Object();
+            table.putStrong(id, objects[id]);
+        }
+        for (int id = 0; id < 2048; id++) {
+            if (id != 5 && id != 1500) {
+                table.remove(id);
+            }
+        }
+
+        assertTrue(table.weakenAndCheckAlive(5));
+        assertSame(objects[5], table.get(5));
+        assertEquals(5, table.findId(objects[5]));
+        assertEquals(1500, table.findId(objects[1500]));
+
+        Object late = new Object();
+        table.putStrong(700, late);
+        assertSame(late, table.get(700));
+        assertEquals(700, table.findId(late));
+
+        table.remove(5);
+        assertNull(table.get(5));
+        assertFalse(table.contains(5));
+        assertEquals(ObjectTable.NO_ID, table.findId(objects[5]));
+        assertEquals(954, table.size());
+    }
+
+    @Test
     public void optimisticReadsMissWhenDisabled() {
         ObjectTable table = new ObjectTable(false);
         Object a = new Object();
