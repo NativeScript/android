@@ -19,17 +19,12 @@ static std::string ToDottedName(std::string name) {
     return name;
 }
 
-// A JS object linked to a Java counterpart holds a JSInstanceInfo External in
-// its first internal field. The field count alone does not identify one: V8
-// hands typed arrays and array buffers the same number of embedder fields.
 static bool HasJavaCounterpart(Isolate* isolate, const Local<Object>& object) {
     auto objectManager = tns::Runtime::GetObjectManager(isolate);
     if (objectManager == nullptr || !objectManager->IsJsRuntimeObject(object)) {
         return false;
     }
-
-    const int jsInfoIdx = static_cast<int>(tns::ObjectManager::MetadataNodeKeys::JsInfo);
-    return object->GetInternalField(jsInfoIdx).As<Value>()->IsExternal();
+    return tns::ObjectManager::HasJsInfo(object);
 }
 
 std::string tns::GetNativeWrapperHint(Isolate* isolate, const Local<Value>& value) {

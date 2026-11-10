@@ -13,6 +13,7 @@
 #include "JniLocalRef.h"
 #include "LRUCache.h"
 #include "NativeScriptAssert.h"
+#include "ObjectIdIndex.h"
 #include "v8.h"
 
 namespace tns {
@@ -68,7 +69,7 @@ class ObjectManager {
 
   // Whether a wrapper was ever created for this id and not yet collected.
   bool HasJsObject(int javaObjectID) const {
-    return m_idToObject.find(javaObjectID) != m_idToObject.end();
+    return m_idToObject.Find(javaObjectID) != nullptr;
   }
 
   // After a failed Java->JS call: drops the Java registration of every object Java
@@ -112,6 +113,12 @@ class ObjectManager {
    */
   static v8::Local<v8::Object> GetJSInstanceInfoOwner(const v8::Local<v8::Object>& object);
 
+  // Whether a runtime object's JsInfo field holds a link. The field holds id + 1, so
+  // the zero V8 stores in a typed array's embedder fields never reads as a link.
+  static bool HasJsInfo(const v8::Local<v8::Object>& object) {
+    return LinkedIdOf(object) >= 0;
+  }
+
   /*
    * The innermost target of a Proxy chain; any other value is returned as is.
    * A revoked Proxy anywhere in the chain yields null. Internal fields and
@@ -141,33 +148,29 @@ class ObjectManager {
 
  private:
   static void InitializeJNI();
-  struct JSInstanceInfo {
-   public:
-    JSInstanceInfo(uint32_t javaObjectID, jclass claz)
-        : JavaObjectID(javaObjectID), ObjectClazz(claz) {}
 
-    uint32_t JavaObjectID;
-    jclass ObjectClazz;
-  };
-
+  // The registration of one linked Java object id, reached from the wrapper's JsInfo
+  // field through m_idToObject.
   struct ObjectWeakCallbackState {
-    ObjectWeakCallbackState(ObjectManager* _thisPtr, JSInstanceInfo* _jsInfo,
-                            v8::Isolate* isolate, v8::Local<v8::Object> object)
+    ObjectWeakCallbackState(ObjectManager* _thisPtr, uint32_t _javaObjectID,
+                            jclass clazz, v8::Isolate* isolate,
+                            v8::Local<v8::Object> object)
         : thisPtr(_thisPtr),
-          jsInfo(_jsInfo),
           handle(isolate, object),
           target(&handle),
-          javaObjectID(_jsInfo->JavaObjectID) {}
+          javaObjectID(_javaObjectID),
+          objectClazz(clazz) {}
 
     ObjectManager* thisPtr;
-    JSInstanceInfo* jsInfo;
     // Persistent, not Global: its destructor never calls into V8, so a state may be
     // freed after its isolate is gone.
     v8::Persistent<v8::Object> handle;
     v8::Persistent<v8::Object>* target;
-    // Duplicated from jsInfo: the finalizer has to unregister itself even when
-    // the JsInfo field was already cleared and jsInfo freed.
     uint32_t javaObjectID;
+    jclass objectClazz;
+    // Cleared by ReleaseNativeCounterpart; the registration itself lives until the
+    // wrapper is collected.
+    bool linked = true;
     // The Java side holds the object weakly; a finalization now only asks
     // whether it is still alive.
     bool javaWeakened = false;
@@ -178,10 +181,18 @@ class ObjectManager {
     bool reacquired = false;
   };
 
+  using JSInstanceInfo = ObjectWeakCallbackState;
+
+  // The linked state of object, or null.
   JSInstanceInfo* GetJSInstanceInfo(const v8::Local<v8::Object>& object);
 
   JSInstanceInfo* GetJSInstanceInfoFromRuntimeObject(
       const v8::Local<v8::Object>& object);
+
+  // The id in a runtime object's JsInfo field, or -1.
+  static int LinkedIdOf(const v8::Local<v8::Object>& object);
+
+  void SetJsInfo(const v8::Local<v8::Object>& object, uint32_t javaObjectID);
 
   // clazz must be a global ref, or null to look className up.
   v8::Local<v8::Object> CreateJSWrapperHelper(jint javaObjectID,
@@ -253,7 +264,7 @@ class ObjectManager {
 
   v8::Isolate* m_isolate;
 
-  std::unordered_map<int, ObjectWeakCallbackState*> m_idToObject;
+  ObjectIdIndex<ObjectWeakCallbackState> m_idToObject;
 
   LRUCache<int, jweak> m_cache;
 

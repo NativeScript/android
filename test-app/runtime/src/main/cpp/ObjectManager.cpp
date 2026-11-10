@@ -105,12 +105,12 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(
   if (jsInstanceInfo != nullptr) {
     jweak existingObject;
     try {
-      existingObject = GetJavaObjectByID(jsInstanceInfo->JavaObjectID);
+      existingObject = GetJavaObjectByID(jsInstanceInfo->javaObjectID);
     } catch (const NativeScriptException& e) {
       // this captures usually the error
-      auto className = GetClassName(jsInstanceInfo->ObjectClazz);
+      auto className = GetClassName(jsInstanceInfo->objectClazz);
       throw NativeScriptException("Failed to get Java object by ID. id=" +
-                                  std::to_string(jsInstanceInfo->JavaObjectID) +
+                                  std::to_string(jsInstanceInfo->javaObjectID) +
                                   ", class=" + className + ". " +
                                   e.GetErrorMessage());
     }
@@ -183,9 +183,21 @@ MaybeLocal<Array> ObjectManager::ReadArrayThroughProxy(Local<Context> context,
   return scope.Escape(snapshot);
 }
 
+int ObjectManager::LinkedIdOf(const Local<Object>& object) {
+  auto field = object->GetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo)).As<Value>();
+  if (!field->IsUint32()) {
+    return -1;
+  }
+  return static_cast<int>(field.As<Uint32>()->Value()) - 1;
+}
+
+void ObjectManager::SetJsInfo(const Local<Object>& object, uint32_t javaObjectID) {
+  object->SetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo),
+                           Integer::NewFromUnsigned(m_isolate, javaObjectID + 1));
+}
+
 Local<Object> ObjectManager::GetJSInstanceInfoOwner(const Local<Object>& object) {
-  const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-  if (object->GetInternalField(jsInfoIdx).As<Value>()->IsExternal()) {
+  if (HasJsInfo(object)) {
     return object;
   }
 
@@ -195,8 +207,7 @@ Local<Object> ObjectManager::GetJSInstanceInfoOwner(const Local<Object>& object)
   if (!prototypeObject.IsEmpty() && prototypeObject->IsObject()) {
     DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d",
                 prototypeObject->GetIdentityHash());
-    if (IsJsRuntimeObject(prototypeObject) &&
-        prototypeObject->GetInternalField(jsInfoIdx).As<Value>()->IsExternal()) {
+    if (IsJsRuntimeObject(prototypeObject) && HasJsInfo(prototypeObject)) {
       return prototypeObject;
     }
   }
@@ -206,15 +217,18 @@ Local<Object> ObjectManager::GetJSInstanceInfoOwner(const Local<Object>& object)
 
 ObjectManager::JSInstanceInfo*
 ObjectManager::GetJSInstanceInfoFromRuntimeObject(const Local<Object>& object) {
-  HandleScope handleScope(m_isolate);
-
-  auto owner = GetJSInstanceInfoOwner(object);
-  if (owner.IsEmpty()) {
-    return nullptr;
+  int id = LinkedIdOf(object);
+  if (id < 0) {
+    HandleScope handleScope(m_isolate);
+    auto owner = GetJSInstanceInfoOwner(object);
+    if (owner.IsEmpty()) {
+      return nullptr;
+    }
+    id = LinkedIdOf(owner);
   }
 
-  auto external = owner->GetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo)).As<External>();
-  return static_cast<JSInstanceInfo*>(external->Value(v8::kExternalPointerTypeTagDefault));
+  auto state = m_idToObject.Find(id);
+  return state != nullptr && state->linked ? state : nullptr;
 }
 
 bool ObjectManager::IsJsRuntimeObject(const v8::Local<v8::Object>& object) {
@@ -245,14 +259,14 @@ jclass ObjectManager::GetJavaClass(const Local<Object>& instance) {
   DEBUG_WRITE("GetClass called");
 
   JSInstanceInfo* jsInfo = GetJSInstanceInfo(instance);
-  jclass clazz = jsInfo->ObjectClazz;
+  jclass clazz = jsInfo->objectClazz;
 
   return clazz;
 }
 
 void ObjectManager::SetJavaClass(const Local<Object>& instance, jclass clazz) {
   JSInstanceInfo* jsInfo = GetJSInstanceInfo(instance);
-  jsInfo->ObjectClazz = clazz;
+  jsInfo->objectClazz = clazz;
 }
 
 int ObjectManager::GetOrCreateObjectId(jobject object) {
@@ -282,12 +296,12 @@ Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID) {
   auto isolate = m_isolate;
   EscapableHandleScope handleScope(isolate);
 
-  auto it = m_idToObject.find(javaObjectID);
-  if (it == m_idToObject.end()) {
+  auto state = m_idToObject.Find(javaObjectID);
+  if (state == nullptr) {
     return handleScope.Escape(Local<Object>());
   }
 
-  return handleScope.Escape(JsObjectFor(it->second));
+  return handleScope.Escape(JsObjectFor(state));
 }
 
 Local<Object> ObjectManager::JsObjectFor(ObjectWeakCallbackState* state) {
@@ -334,11 +348,11 @@ void ObjectManager::ReleaseUnwrappedArgs(const JavaCallArgs& args) {
 }
 
 Local<Object> ObjectManager::GetLinkedJsObjectByJavaObject(int javaObjectID) {
-  auto it = m_idToObject.find(javaObjectID);
-  if (it == m_idToObject.end() || it->second->jsInfo == nullptr) {
+  auto state = m_idToObject.Find(javaObjectID);
+  if (state == nullptr || !state->linked) {
     return Local<Object>();
   }
-  return JsObjectFor(it->second);
+  return JsObjectFor(state);
 }
 
 Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID,
@@ -445,23 +459,15 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
   DEBUG_WRITE("Linking js object: %d and java instance id: %d",
               object->GetIdentityHash(), javaObjectID);
 
-  auto jsInstanceInfo =
-      new JSInstanceInfo(javaObjectID, clazz);
-
-  auto state = new ObjectWeakCallbackState(this, jsInstanceInfo, isolate, object);
+  auto state = new ObjectWeakCallbackState(this, javaObjectID, clazz, isolate, object);
 
   // subscribe for JS GC event
   state->target->SetWeak(state, JSObjectFinalizerStatic,
                          WeakCallbackType::kFinalizer);
 
-  auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+  SetJsInfo(object, javaObjectID);
 
-  auto jsInfo = External::New(isolate, jsInstanceInfo, v8::kExternalPointerTypeTagDefault);
-
-  // link
-  object->SetInternalField(jsInfoIdx, jsInfo);
-
-  m_idToObject.emplace(javaObjectID, state);
+  m_idToObject.Insert(javaObjectID, state);
 }
 
 bool ObjectManager::CloneLink(const Local<Object>& src,
@@ -517,12 +523,11 @@ void ObjectManager::JSObjectFinalizer(Isolate* isolate,
                                       ObjectWeakCallbackState* callbackState) {
   HandleScope handleScope(m_isolate);
   Persistent<Object>* po = callbackState->target;
-  auto jsInstanceInfo = GetJSInstanceInfoFromRuntimeObject(po->Get(m_isolate));
 
-  if (jsInstanceInfo == nullptr) {
+  if (!callbackState->linked) {
     // The link was already torn down (ReleaseNativeCounterpart); nothing but
     // the registration is left to drop.
-    m_idToObject.erase(callbackState->javaObjectID);
+    m_idToObject.Erase(callbackState->javaObjectID);
     po->Reset();
     delete callbackState;
     return;
@@ -538,7 +543,7 @@ void ObjectManager::JSObjectFinalizer(Isolate* isolate,
     return;
   }
   callbackState->queued = true;
-  auto javaObjectID = static_cast<jint>(jsInstanceInfo->JavaObjectID);
+  auto javaObjectID = static_cast<jint>(callbackState->javaObjectID);
   (callbackState->javaWeakened ? m_pendingCheck : m_pendingWeaken)
       .push_back(javaObjectID);
 
@@ -599,11 +604,10 @@ void ObjectManager::FlushFinalizedBatch() {
   auto keepCollected = [this](std::vector<jint>& ids) {
     size_t kept = 0;
     for (jint id : ids) {
-      auto it = m_idToObject.find(id);
-      if (it == m_idToObject.end()) {
+      ObjectWeakCallbackState* state = m_idToObject.Find(id);
+      if (state == nullptr) {
         continue;
       }
-      ObjectWeakCallbackState* state = it->second;
       if (state->reacquired) {
         state->reacquired = false;
         state->queued = false;
@@ -672,17 +676,17 @@ void ObjectManager::FlushFinalizedBatch() {
     raw->GetIntArrayRegion(array, 0, static_cast<jsize>(ids.size()),
                            results.data());
     for (size_t i = 0; i < ids.size(); i++) {
-      auto it = m_idToObject.find(ids[i]);
-      if (it == m_idToObject.end()) {
+      ObjectWeakCallbackState* state = m_idToObject.Find(ids[i]);
+      if (state == nullptr) {
         continue;
       }
       if (results[i] < 0) {
         ReleaseCollectedWrapper(ids[i]);
         continue;
       }
-      it->second->queued = false;
+      state->queued = false;
       if (weakened) {
-        it->second->javaWeakened = true;
+        state->javaWeakened = true;
       }
     }
   };
@@ -691,20 +695,16 @@ void ObjectManager::FlushFinalizedBatch() {
 }
 
 void ObjectManager::ReleaseCollectedWrapper(int javaObjectID) {
-  auto it = m_idToObject.find(javaObjectID);
-  if (it == m_idToObject.end()) {
+  ObjectWeakCallbackState* state = m_idToObject.Find(javaObjectID);
+  if (state == nullptr) {
     return;
   }
-  ObjectWeakCallbackState* state = it->second;
   Persistent<Object>* po = state->target;
-  auto object = po->Get(m_isolate);
-  auto jsInstanceInfo = GetJSInstanceInfoFromRuntimeObject(object);
-  if (jsInstanceInfo != nullptr) {
-    delete jsInstanceInfo;
-    auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-    object->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+  if (state->linked) {
+    auto object = po->Get(m_isolate);
+    object->SetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo), Undefined(m_isolate));
   }
-  m_idToObject.erase(it);
+  m_idToObject.Erase(javaObjectID);
   po->Reset();
   delete state;
 }
@@ -726,25 +726,19 @@ void ObjectManager::ReleaseAllRegistered() {
 
   // Detached first: nothing below should observe a half-emptied map, and the
   // finalizers these handles were armed with will never run now anyway.
-  auto survivors = std::move(m_idToObject);
-  m_idToObject.clear();
-
-  for (auto& entry : survivors) {
-    ObjectWeakCallbackState* state = entry.second;
+  m_idToObject.DrainAll([this, jsInfoIdx](ObjectWeakCallbackState* state) {
     Persistent<Object>* po = state->target;
 
     if (!po->IsEmpty()) {
       auto local = po->Get(m_isolate);
       if (!local.IsEmpty()) {
-        // Drop the back-pointer before the JSInstanceInfo goes away.
         local->SetInternalField(jsInfoIdx, Undefined(m_isolate));
       }
       po->Reset();
     }
 
-    delete state->jsInfo;
     delete state;
-  }
+  });
 
   if (m_poJsWrapperFunc != nullptr) {
     m_poJsWrapperFunc->Reset();
@@ -825,7 +819,7 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
   }
   auto instance = source.As<Object>();
 
-  // A `super` object shares its owner's JsInfo External; the owner is the one
+  // A `super` object shares its owner's JsInfo link; the owner is the one
   // registered, so the release is resolved and recorded there.
   Local<Value> superOwner;
   V8GetPrivateValue(m_isolate, instance, ArgConverter::ConvertToV8String(m_isolate, "superowner"), superOwner);
@@ -842,26 +836,23 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
   }
 
   auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-  auto jsInstanceInfo = static_cast<JSInstanceInfo*>(
-      owner->GetInternalField(jsInfoIdx).As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+  auto javaObjectID = LinkedIdOf(owner);
 
   JEnv env;
   AssertIsolateLocked();
   env.CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,
-                     jsInstanceInfo->JavaObjectID);
+                     javaObjectID);
 
   // The registration outlives the link: it is dropped by the finalizer once
-  // the wrapper is collected. Until then the entry must not point at the
-  // JSInstanceInfo being freed here.
-  auto it = m_idToObject.find(jsInstanceInfo->JavaObjectID);
-  if (it != m_idToObject.end()) {
-    it->second->jsInfo = nullptr;
+  // the wrapper is collected.
+  auto state = m_idToObject.Find(javaObjectID);
+  if (state != nullptr) {
+    state->linked = false;
   }
 
-  delete jsInstanceInfo;
   owner->SetInternalField(jsInfoIdx, Undefined(m_isolate));
 
-  // Every alias of the freed External must be cleared with it.
+  // Every alias of the link is cleared with it.
   Local<Value> aliasesValue;
   V8GetPrivateValue(m_isolate, owner, ArgConverter::ConvertToV8String(m_isolate, "superaliases"), aliasesValue);
   if (!aliasesValue.IsEmpty() && aliasesValue->IsArray()) {
