@@ -293,14 +293,16 @@ class MetadataNode {
         struct ExtendedClassCacheData {
             ExtendedClassCacheData()
                 :
-                extendedCtorFunction(nullptr), node(nullptr) {
+                extendedCtorFunction(nullptr), instanceTemplate(nullptr), node(nullptr) {
             }
-            ExtendedClassCacheData(const v8::Local<v8::Function>& extCtorFunc, const std::string& _extendedName, MetadataNode* _node)
+            ExtendedClassCacheData(const v8::Local<v8::Function>& extCtorFunc, const v8::Local<v8::ObjectTemplate>& _instanceTemplate, const std::string& _extendedName, MetadataNode* _node)
                 :
                 extendedName(_extendedName), node(_node) {
                 extendedCtorFunction = new v8::Persistent<v8::Function>(v8::Isolate::GetCurrent(), extCtorFunc);
+                instanceTemplate = new v8::Persistent<v8::ObjectTemplate>(v8::Isolate::GetCurrent(), _instanceTemplate);
             }
             v8::Persistent<v8::Function>* extendedCtorFunction;
+            v8::Persistent<v8::ObjectTemplate>* instanceTemplate;
             std::string extendedName;
             MetadataNode* node;
         };
@@ -385,6 +387,7 @@ class MetadataNode {
                 }
                 for (auto& entry : ExtendedCtorFuncCache) {
                     delete entry.second.extendedCtorFunction;
+                    delete entry.second.instanceTemplate;
                 }
             }
         };

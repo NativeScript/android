@@ -194,14 +194,13 @@ Local<Object> MetadataNode::CreateExtendedJSWrapper(Isolate* isolate, ObjectMana
 
     auto cacheData = GetCachedExtendedClassData(isolate, proxyClassName);
     if (cacheData.node != nullptr) {
-        extInstance = objectManager->GetEmptyObject(isolate);
-        extInstance->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
-        auto extdCtorFunc = Local<Function>::New(isolate, *cacheData.extendedCtorFunction);
+        // Starts on the extended class's initial map, with its prototype, and without
+        // running its constructor callback.
         auto context = Runtime::GetRuntime(isolate)->GetContext();
-        extInstance->SetPrototype(context, extdCtorFunc->Get(context, V8StringConstants::GetPrototype(isolate)).ToLocalChecked());
-        extInstance->Set(context, ArgConverter::ConvertToV8String(isolate, "constructor"), extdCtorFunc);
-
-        SetInstanceMetadata(isolate, extInstance, cacheData.node);
+        if (cacheData.instanceTemplate->Get(isolate)->NewInstance(context).ToLocal(&extInstance)) {
+            extInstance->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
+            SetInstanceMetadata(isolate, extInstance, cacheData.node);
+        }
     }
 
     return extInstance;
@@ -2012,7 +2011,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
             s_name2NodeCache.emplace(fullExtendedName, node);
         }
 
-        ExtendedClassCacheData cacheData(extendFunc, fullExtendedName, node);
+        ExtendedClassCacheData cacheData(extendFunc, extendFuncTemplate->InstanceTemplate(), fullExtendedName, node);
         cache->ExtendedCtorFuncCache.emplace(fullExtendedName, cacheData);
 
         if (frame.check()) {

@@ -418,6 +418,17 @@ function buildBenchmarks() {
             });
         },
         function () {
+            if (skipped("static.newInstance(extended class) [Java-created]")) return null;
+            var Created = java.lang.Object.extend({ toString: function () { return "created"; } });
+            var createdClass = new Created().getClass();
+            var JavaCreated = com.tns.tests.JavaCreated;
+            return measureJs("static.newInstance(extended class) [Java-created]", 10000, function (n) {
+                var o;
+                for (var i = 0; i < n; i++) o = JavaCreated.newInstance(createdClass);
+                return o;
+            });
+        },
+        function () {
             return measureLifecycle("lifecycle JniBench.newObjectInJava()", 20000, function () {
                 return JniBench.newObjectInJava();
             });

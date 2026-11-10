@@ -92,6 +92,7 @@ describe("Java object wrappers", function () {
 
 		expect(String(outer.toString())).toBe("outer");
 		expect(String(outer.getCreated().toString())).toBe("inner");
+		expect(Object.prototype.hasOwnProperty.call(outer.getCreated(), "constructor")).toBe(false);
 	});
 
 	it("keep a JS construction's instance when a callback constructs another during it", function () {
