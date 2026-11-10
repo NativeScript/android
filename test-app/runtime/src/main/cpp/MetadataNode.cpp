@@ -125,8 +125,13 @@ static Local<Object> ResolveImplementationObject(Isolate* isolate, const Local<O
 }
 
 bool MetadataNode::TryGetInstanceTypeName(Isolate* isolate, const Local<Object>& value, std::string& out) {
-    auto cache = GetMetadataNodeCache(isolate);
-    auto node = static_cast<MetadataNode*>(TryReadPrivateExternal(isolate, value, cache->MetadataKey));
+    MetadataNode* node;
+    if (ObjectManager::HasMetadataField(value)) {
+        node = GetInstanceMetadata(isolate, value);
+    } else {
+        auto cache = GetMetadataNodeCache(isolate);
+        node = static_cast<MetadataNode*>(TryReadPrivateExternal(isolate, value, cache->MetadataKey));
+    }
     if (node == nullptr) {
         return false;
     }
@@ -312,13 +317,20 @@ Local<Object> MetadataNode::CreateJSWrapper(Isolate* isolate, ObjectManager* obj
     if (m_isArray) {
         obj = CreateArrayWrapper(isolate);
     } else {
-        obj = objectManager->GetEmptyObject(isolate);
-        if (!obj.IsEmpty()) {
-            auto ctorFunc = GetConstructorFunction(isolate);
-            auto context = isolate->GetCurrentContext();
-            obj->Set(context, V8StringConstants::GetConstructor(isolate), ctorFunc);
-            obj->SetPrototype(context, ctorFunc->Get(context, V8StringConstants::GetPrototype(isolate)).ToLocalChecked());
-            SetInstanceMetadata(isolate, obj, this);
+        auto& data = GetInstanceData(isolate);
+        if (data.instanceTemplate == nullptr) {
+            // Throws for a class missing at runtime, which has no template.
+            GetConstructorFunction(isolate);
+            auto cache = GetMetadataNodeCache(isolate);
+            auto ft = Local<FunctionTemplate>::New(isolate, *cache->CtorFuncCache.at(m_treeNode).ft);
+            data.instanceTemplate = new Persistent<ObjectTemplate>(isolate, ft->InstanceTemplate());
+        }
+        // Starts on the class's initial map, with the constructor's prototype, and
+        // without running the constructor callback.
+        auto context = isolate->GetCurrentContext();
+        if (data.instanceTemplate->Get(isolate)->NewInstance(context).ToLocal(&obj)) {
+            obj->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::Metadata),
+                                  data.metadata->Get(isolate));
         }
     }
 
@@ -1331,7 +1343,24 @@ void MetadataNode::SetTypeMetadata(Isolate* isolate, Local<Function> value, Type
     V8SetPrivateValue(isolate, value, String::NewFromUtf8(isolate, "typemetadata").ToLocalChecked(),  External::New(isolate, data, v8::kExternalPointerTypeTagDefault));
 }
 
+MetadataNode::InstanceData& MetadataNode::GetInstanceData(Isolate* isolate) {
+    auto cache = GetMetadataNodeCache(isolate);
+    auto& data = cache->Instances[this];
+    if (data.metadata == nullptr) {
+        data.metadata = new Persistent<External>(isolate, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
+    }
+    return data;
+}
+
 MetadataNode* MetadataNode::GetInstanceMetadata(Isolate* isolate, const Local<Object>& value) {
+    if (ObjectManager::HasMetadataField(value)) {
+        auto field = value->GetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::Metadata)).As<Value>();
+        if (!field->IsExternal()) {
+            return nullptr;
+        }
+        return static_cast<MetadataNode*>(field.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+    }
+
     MetadataNode* node = nullptr;
     auto cache = GetMetadataNodeCache(isolate);
     auto key = Local<String>::New(isolate, *cache->MetadataKey);
@@ -1346,6 +1375,12 @@ MetadataNode* MetadataNode::GetInstanceMetadata(Isolate* isolate, const Local<Ob
 }
 
 void MetadataNode::SetInstanceMetadata(Isolate* isolate, Local<Object> object, MetadataNode* node) {
+    if (ObjectManager::HasMetadataField(object)) {
+        object->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::Metadata),
+                                 node->GetInstanceData(isolate).metadata->Get(isolate));
+        return;
+    }
+
     auto cache = GetMetadataNodeCache(isolate);
     auto key = Local<String>::New(isolate, *cache->MetadataKey);
     V8SetPrivateValue(isolate, object, key, External::New(isolate, node, v8::kExternalPointerTypeTagDefault));

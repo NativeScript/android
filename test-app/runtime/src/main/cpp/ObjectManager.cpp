@@ -231,10 +231,17 @@ ObjectManager::GetJSInstanceInfoFromRuntimeObject(const Local<Object>& object) {
   return state != nullptr && state->linked ? state : nullptr;
 }
 
+// Array buffers and their views are linked to Java buffers through V8's own embedder
+// fields, which must cover JsInfo and CallSuper; they have no Metadata field.
+static_assert(V8_ARRAY_BUFFER_INTERNAL_FIELD_COUNT ==
+              static_cast<int>(ObjectManager::MetadataNodeKeys::Metadata));
+static_assert(V8_ARRAY_BUFFER_VIEW_INTERNAL_FIELD_COUNT ==
+              static_cast<int>(ObjectManager::MetadataNodeKeys::Metadata));
+
 bool ObjectManager::IsJsRuntimeObject(const v8::Local<v8::Object>& object) {
   int internalFieldCount = object->InternalFieldCount();
-  const int count = static_cast<int>(MetadataNodeKeys::END);
-  return internalFieldCount == count;
+  return internalFieldCount == static_cast<int>(MetadataNodeKeys::END) ||
+         internalFieldCount == V8_ARRAY_BUFFER_INTERNAL_FIELD_COUNT;
 }
 
 jweak ObjectManager::GetJavaObjectByID(uint32_t javaObjectID) {

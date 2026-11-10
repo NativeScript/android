@@ -58,3 +58,45 @@ describe("Java members", function () {
 		expect(java.util.UUID.randomUUID() instanceof java.util.UUID).toBe(true);
 	});
 });
+
+describe("Java object wrappers", function () {
+	it("resolve constructor through the class prototype, with no own properties", function () {
+		var id = java.util.UUID.randomUUID();
+
+		expect(Object.getPrototypeOf(id)).toBe(java.util.UUID.prototype);
+		expect(id.constructor).toBe(java.util.UUID);
+		expect(Object.prototype.hasOwnProperty.call(id, "constructor")).toBe(false);
+		expect(Object.keys(id)).toEqual([]);
+	});
+
+	it("share a prototype between Java-created and JS-created instances", function () {
+		var created = new java.lang.StringBuilder("a");
+		var returned = new java.lang.StringBuilder().append("b").append(created);
+
+		expect(Object.getPrototypeOf(returned)).toBe(Object.getPrototypeOf(created));
+		expect(returned instanceof java.lang.StringBuilder).toBe(true);
+		expect(String(returned.toString())).toBe("ba");
+	});
+
+	it("hand back the same wrapper for the same Java object", function () {
+		var builder = new java.lang.StringBuilder();
+
+		expect(builder.append("x")).toBe(builder);
+	});
+
+	it("stay linked while thousands of later wrappers are collected", function () {
+		var list = new java.util.ArrayList();
+		var first = java.util.UUID.randomUUID();
+		list.add(first);
+		for (var round = 0; round < 3; round++) {
+			for (var i = 0; i < 3000; i++) {
+				java.util.UUID.randomUUID();
+			}
+			gc();
+			java.lang.System.gc();
+		}
+
+		expect(list.get(0)).toBe(first);
+		expect(String(list.get(0).toString())).toBe(String(first.toString()));
+	});
+});

@@ -105,6 +105,11 @@ class ObjectManager {
    */
   static bool IsJsRuntimeObject(const v8::Local<v8::Object>& object);
 
+  // Whether object is a runtime object with a Metadata field: not an array buffer.
+  static bool HasMetadataField(const v8::Local<v8::Object>& object) {
+    return object->InternalFieldCount() == static_cast<int>(MetadataNodeKeys::END);
+  }
+
   /*
    * The runtime object holding the JsInfo External for `object`: the object
    * itself, or its prototype when the TypeScript layout keeps the registered
@@ -144,7 +149,7 @@ class ObjectManager {
 
   v8::Local<v8::Object> GetEmptyObject(v8::Isolate* isolate);
 
-  enum class MetadataNodeKeys { JsInfo, CallSuper, END };
+  enum class MetadataNodeKeys { JsInfo, CallSuper, Metadata, END };
 
  private:
   static void InitializeJNI();

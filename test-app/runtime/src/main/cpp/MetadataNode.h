@@ -139,6 +139,10 @@ class MetadataNode {
 
         static MetadataNode* GetInstanceMetadata(v8::Isolate* isolate, const v8::Local<v8::Object>& value);
 
+        struct InstanceData;
+        // This runtime's per-instance data for this node, created on first use.
+        InstanceData& GetInstanceData(v8::Isolate* isolate);
+
         static void SetInstanceMetadata(v8::Isolate* isolate, v8::Local<v8::Object> value, MetadataNode* node);
 
         static TypeMetadata* GetTypeMetadata(v8::Isolate* isolate, const v8::Local<v8::Function>& value);
@@ -269,6 +273,13 @@ class MetadataNode {
             std::string name;
         };
 
+        // A node's metadata External is shared by all its instances, so marking an
+        // instance allocates nothing. instanceTemplate is set once a wrapper was made.
+        struct InstanceData {
+            v8::Persistent<v8::External>* metadata = nullptr;
+            v8::Persistent<v8::ObjectTemplate>* instanceTemplate = nullptr;
+        };
+
         struct CtorCacheData {
             CtorCacheData(v8::Persistent<v8::FunctionTemplate>* _ft, std::vector<MethodCallbackData*> _instanceMethodCallbacks)
                 :
@@ -322,6 +333,8 @@ class MetadataNode {
              */
             robin_hood::unordered_map<MetadataNode*, v8::Persistent<v8::Function>*> CtorFunctions;
 
+            robin_hood::unordered_node_map<MetadataNode*, InstanceData> Instances;
+
             /*
              * Owns every callback payload this runtime hands to V8 as External
              * or FunctionTemplate data -- MethodCallbackData, FieldCallbackData,
@@ -355,6 +368,10 @@ class MetadataNode {
                 delete ArrayObjectTemplate;
                 for (auto& entry : CtorFunctions) {
                     delete entry.second;
+                }
+                for (auto& entry : Instances) {
+                    delete entry.second.metadata;
+                    delete entry.second.instanceTemplate;
                 }
                 /*
                  * Freed from the maps rather than from CtorCacheData and
