@@ -456,6 +456,9 @@ function buildBenchmarks() {
         },
         function () {
             return measureCallback("callback.oneObject(new, 16 classes)", callback, 6, 20000);
+        },
+        function () {
+            return measureCallback("callback.oneObject(binding)", callback, 7, 20000);
         }
     ];
 }

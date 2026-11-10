@@ -1364,7 +1364,18 @@ public class Runtime {
                     refs = new Object[len];
                 }
                 refs[i] = value;
-                int id = objectTable.findIdOptimistic(value);
+                int id = ObjectTable.NO_ID;
+                if (value instanceof NativeScriptRuntimeBound) {
+                    // A binding of this runtime carries its id (written before the tag, never
+                    // reused); native resolves it like an identity-index hint.
+                    NativeScriptRuntimeBound bound = (NativeScriptRuntimeBound) value;
+                    if (bound.getRuntimeTag__ns() == getRuntimeId() + 1) {
+                        id = bound.getObjectId__ns();
+                    }
+                }
+                if (id == ObjectTable.NO_ID) {
+                    id = objectTable.findIdOptimistic(value);
+                }
                 long fresh = 0;
                 if (id == ObjectTable.NO_ID && objectTable.allowsConcurrentRegistration()) {
                     // Registered here rather than under the isolate lock, so threads calling

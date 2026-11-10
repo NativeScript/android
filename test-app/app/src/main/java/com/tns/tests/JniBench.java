@@ -247,6 +247,10 @@ public class JniBench {
             case 6:
                 for (int i = 0; i < n; i++) cb.oneObject(newOfClass(i));
                 break;
+            case 7:
+                // The callback is itself a binding: the argument carries its object id.
+                for (int i = 0; i < n; i++) cb.oneObject(cb);
+                break;
             default:
                 throw new IllegalArgumentException("kind " + kind);
         }
