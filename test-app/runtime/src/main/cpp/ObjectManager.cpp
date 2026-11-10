@@ -287,13 +287,14 @@ Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID) {
     return handleScope.Escape(Local<Object>());
   }
 
-  ObjectWeakCallbackState* state = it->second;
+  return handleScope.Escape(JsObjectFor(it->second));
+}
+
+Local<Object> ObjectManager::JsObjectFor(ObjectWeakCallbackState* state) {
   if (state->queued) {
     state->reacquired = true;
   }
-
-  auto localObject = Local<Object>::New(isolate, *state->target);
-  return handleScope.Escape(localObject);
+  return Local<Object>::New(m_isolate, *state->target);
 }
 
 void ObjectManager::ReleaseUnwrappedArgs(const JavaCallArgs& args) {
@@ -337,7 +338,7 @@ Local<Object> ObjectManager::GetLinkedJsObjectByJavaObject(int javaObjectID) {
   if (it == m_idToObject.end() || it->second->jsInfo == nullptr) {
     return Local<Object>();
   }
-  return GetJsObjectByJavaObject(javaObjectID);
+  return JsObjectFor(it->second);
 }
 
 Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID,

@@ -205,6 +205,9 @@ class ObjectManager {
   // survive a nested wrap growing the vector.
   std::vector<std::unique_ptr<WrapperClass>> m_wrapperClasses;
 
+  // state's wrapper, marking a queued one as handed back to JS.
+  v8::Local<v8::Object> JsObjectFor(ObjectWeakCallbackState* state);
+
   static void JSObjectFinalizerStatic(
       const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
 
