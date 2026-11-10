@@ -363,19 +363,26 @@ Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, int classIndex,
                                              jobject instance) {
   jclass clazz;
   std::string scratch;
-  const auto& className = WrapperClassFor(classIndex, instance, clazz, scratch);
-  return CreateJSWrapperHelper(javaObjectID, className, clazz);
+  MetadataNode* node = nullptr;
+  const auto& className = WrapperClassFor(classIndex, instance, clazz, scratch, node);
+  return CreateJSWrapperHelper(javaObjectID, className, clazz, node);
 }
 
 const std::string& ObjectManager::WrapperClassFor(int classIndex,
                                                   jobject instance,
                                                   jclass& clazz,
-                                                  std::string& scratch) {
+                                                  std::string& scratch,
+                                                  MetadataNode*& node) {
   if (classIndex > 0 &&
       static_cast<size_t>(classIndex) < m_wrapperClasses.size() &&
       m_wrapperClasses[classIndex] != nullptr) {
-    clazz = m_wrapperClasses[classIndex]->clazz;
-    return m_wrapperClasses[classIndex]->name;
+    auto& entry = *m_wrapperClasses[classIndex];
+    if (entry.node == nullptr) {
+      entry.node = MetadataNode::GetOrCreate(entry.name);
+    }
+    clazz = entry.clazz;
+    node = entry.node;
+    return entry.name;
   }
 
   JEnv env;
@@ -402,10 +409,13 @@ const std::string& ObjectManager::WrapperClassFor(int classIndex,
 
 Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
                                                    const string& className,
-                                                   jclass clazz) {
+                                                   jclass clazz,
+                                                   MetadataNode* node) {
   auto isolate = m_isolate;
 
-  auto node = MetadataNode::GetOrCreate(className);
+  if (node == nullptr) {
+    node = MetadataNode::GetOrCreate(className);
+  }
 
   auto jsWrapper = node->CreateJSWrapper(isolate, this);
 
@@ -437,12 +447,11 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
   auto jsInstanceInfo =
       new JSInstanceInfo(javaObjectID, clazz);
 
-  auto objectHandle = new Persistent<Object>(isolate, object);
-  auto state = new ObjectWeakCallbackState(this, jsInstanceInfo, objectHandle);
+  auto state = new ObjectWeakCallbackState(this, jsInstanceInfo, isolate, object);
 
   // subscribe for JS GC event
-  objectHandle->SetWeak(state, JSObjectFinalizerStatic,
-                        WeakCallbackType::kFinalizer);
+  state->target->SetWeak(state, JSObjectFinalizerStatic,
+                         WeakCallbackType::kFinalizer);
 
   auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
 
@@ -514,7 +523,6 @@ void ObjectManager::JSObjectFinalizer(Isolate* isolate,
     // the registration is left to drop.
     m_idToObject.erase(callbackState->javaObjectID);
     po->Reset();
-    delete po;
     delete callbackState;
     return;
   }
@@ -697,7 +705,6 @@ void ObjectManager::ReleaseCollectedWrapper(int javaObjectID) {
   }
   m_idToObject.erase(it);
   po->Reset();
-  delete po;
   delete state;
 }
 
@@ -734,7 +741,6 @@ void ObjectManager::ReleaseAllRegistered() {
       po->Reset();
     }
 
-    delete po;
     delete state->jsInfo;
     delete state;
   }

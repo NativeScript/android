@@ -17,6 +17,7 @@
 
 namespace tns {
 struct JavaCallArgs;
+class MetadataNode;
 
 class ObjectManager {
  public:
@@ -151,14 +152,18 @@ class ObjectManager {
 
   struct ObjectWeakCallbackState {
     ObjectWeakCallbackState(ObjectManager* _thisPtr, JSInstanceInfo* _jsInfo,
-                            v8::Persistent<v8::Object>* _target)
+                            v8::Isolate* isolate, v8::Local<v8::Object> object)
         : thisPtr(_thisPtr),
           jsInfo(_jsInfo),
-          target(_target),
+          handle(isolate, object),
+          target(&handle),
           javaObjectID(_jsInfo->JavaObjectID) {}
 
     ObjectManager* thisPtr;
     JSInstanceInfo* jsInfo;
+    // Persistent, not Global: its destructor never calls into V8, so a state may be
+    // freed after its isolate is gone.
+    v8::Persistent<v8::Object> handle;
     v8::Persistent<v8::Object>* target;
     // Duplicated from jsInfo: the finalizer has to unregister itself even when
     // the JsInfo field was already cleared and jsInfo freed.
@@ -181,16 +186,20 @@ class ObjectManager {
   // clazz must be a global ref, or null to look className up.
   v8::Local<v8::Object> CreateJSWrapperHelper(jint javaObjectID,
                                               const std::string& className,
-                                              jclass clazz);
+                                              jclass clazz,
+                                              MetadataNode* node = nullptr);
 
   struct WrapperClass {
     std::string name;
     jclass clazz;  // global ref
+    MetadataNode* node = nullptr;  // process-wide, never freed
   };
 
   // The JNI name and a global ref of instance's class, cached by class index.
+  // node is set only for a cached class.
   const std::string& WrapperClassFor(int classIndex, jobject instance,
-                                     jclass& clazz, std::string& scratch);
+                                     jclass& clazz, std::string& scratch,
+                                     MetadataNode*& node);
 
   // Indexed by class index. Entries are never replaced, so references to them
   // survive a nested wrap growing the vector.
