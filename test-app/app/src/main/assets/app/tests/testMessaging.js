@@ -1,3 +1,5 @@
+const { raisesGlobalErrors } = require("../Infrastructure/Jasmine/globalErrorSpy");
+
 // Android-side regression specs for the messaging tier. The shared suites under
 // app/shared cover the specified behavior; these pin runtime edges that need
 // native wrappers, a worker that never settles, or a collection.
@@ -540,7 +542,7 @@ describe("Messaging runtime edges", function () {
             jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
         });
 
-        it("reports an error the Worker object left unhandled to the parent scope", function (done) {
+        it("reports an error the Worker object left unhandled to the parent scope", raisesGlobalErrors(function (done) {
             var seen = [];
             var worker = null;
             var listener = function (event) {
@@ -561,7 +563,7 @@ describe("Messaging runtime edges", function () {
             };
             addEventListener("error", listener);
             worker = new Worker("./messaging/throwingWorker.js");
-        });
+        }));
 
         it("forwards the error a throwing scope onerror raised for a rejection, once", function (done) {
             var worker = new Worker("./messaging/rejectingWorker.js");

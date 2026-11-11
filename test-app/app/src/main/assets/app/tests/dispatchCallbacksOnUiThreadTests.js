@@ -1,28 +1,22 @@
 describe("Tests dispatch callbacks on UI thread ", function () {
 	
-	it("TestProcessDataCallbackShouldBeExecutedOnUiThread", function () {
+	it("TestProcessDataCallbackShouldBeExecutedOnUiThread", function (done) {
 
-		__log("TEST: TestProcessDataCallbackShouldBeExecutedOnUiThread"); 
+		__log("TEST: TestProcessDataCallbackShouldBeExecutedOnUiThread");
 
+		var received = [];
 		var D = com.tns.tests.DispatchAsyncOpOnUIThreadTest.extend("DispatchAsyncOpOnUIThreadTest", {
 			processData: function(index, data) {
-				it("inner spec", function () {
-					if (index === 0) {
-						expect(data).toBe(123);
-					} else if (index === 1) {
-						expect(data).toBe(456);
-					} else if (index === 2) {
-						expect(data).toBe(789);
-					} else {
-						//one of the above has to be called ... else fail
-						expect(true).toBe(false);
-					}	
-				});
+				received.push([index, data]);
+				if (received.length === 3) {
+					expect(received).toEqual([[0, 123], [1, 456], [2, 789]]);
+					done();
+				}
 			}
 		});
-		
+
 		var d = new D();
-		
+
 		d.processDataAsync([123, 456, 789]);
 	});
 });

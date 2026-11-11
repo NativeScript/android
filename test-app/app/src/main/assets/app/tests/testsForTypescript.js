@@ -201,9 +201,9 @@ describe("Tests typescript", function () {
 		expect(isInstanceOf).toEqual(true);
 	});
 	
-	it("When_creating_a_typescript_instance_it_should_be_a_valid_nativescript_instance", function () {
+	it("When_creating_a_typescript_instance_with_constructor_arguments_it_should_be_a_valid_nativescript_instance", function () {
 		
-		__log("TEST: When_creating_a_typescript_instance_it_should_be_a_valid_nativescript_instance");
+		__log("TEST: When_creating_a_typescript_instance_with_constructor_arguments_it_should_be_a_valid_nativescript_instance");
 		
 		var MyButtonWithArgs = (function (_super) {
 		    __extends(MyButtonWithArgs, _super);
