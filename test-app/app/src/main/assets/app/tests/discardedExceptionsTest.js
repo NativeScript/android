@@ -1,3 +1,5 @@
+const { raisesGlobalErrors } = require("../Infrastructure/Jasmine/globalErrorSpy");
+
 describe("Tests discarded exception ", function () {
     var originalOnDiscardedError = null;
 
@@ -5,7 +7,7 @@ describe("Tests discarded exception ", function () {
       originalOnDiscardedError = global.__onDiscardedError;
     });
 
-    it("should report discarded exception", function () {
+    it("should report discarded exception", raisesGlobalErrors(function (done) {
         var reportedException = null;
 
         global.__onDiscardedError = (error) => {
@@ -20,7 +22,8 @@ describe("Tests discarded exception ", function () {
         expect(reportedException.nativeException.getMessage()).toBe('Exception to suppress');
         expect(reportedException.message).toBe('Exception to suppress');
         expect(reportedException.stackTrace).toContain('com.tns.tests.DiscardedExceptionTest.reportSupressedException');
-    });
+        done();
+    }));
 
     afterEach(function() {
       global.__onDiscardedError = originalOnDiscardedError;

@@ -1,4 +1,4 @@
-describe("Test JSONObject conversions", () => {
+describe("Test console.log arguments", () => {
     it("console.log with number param should not crash", () => {
         console.log(123);
     });

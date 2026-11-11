@@ -12,7 +12,9 @@
     function trim(str) { return str.replace(/^\s+/, "" ).replace(/\s+$/, "" ); }
     function elapsed(start, end) { return (end - start)/1000; }
     function isFailed(obj) { return obj.status === "failed"; }
-    function isSkipped(obj) { return obj.status === "pending"; }
+    function isSkipped(obj) {
+        return obj.status === "pending" || obj.status === "excluded" || obj.status === "notApplicable";
+    }
     function pad(n) { return n < 10 ? '0'+n : n; }
     function extend(dupe, obj) { // performs a shallow copy of all props of `obj` onto `dupe`
         for (var prop in obj) {
@@ -30,12 +32,23 @@
             pad(d.getMinutes()) + ':' +
             pad(d.getSeconds());
     }
+    // XML 1.0 has no way to represent these, escaped or not, and a single one
+    // makes the whole report unparseable; they are written out as \uXXXX text.
+    var XML_FORBIDDEN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+    function replaceXmlForbiddenChars(str) {
+        return str.replace(XML_FORBIDDEN, function (ch) {
+            return "\\u" + ("000" + ch.charCodeAt(0).toString(16).toUpperCase()).slice(-4);
+        });
+    }
     function escapeInvalidXmlChars(str) {
-        return str.replace(/</g, "&lt;")
+        return replaceXmlForbiddenChars(str).replace(/\&/g, "&amp;")
+            .replace(/</g, "&lt;")
             .replace(/\>/g, "&gt;")
             .replace(/\"/g, "&quot;")
-            .replace(/\'/g, "&apos;")
-            .replace(/\&/g, "&amp;");
+            .replace(/\'/g, "&apos;");
+    }
+    function cdata(str) {
+        return '<![CDATA[' + replaceXmlForbiddenChars(str).replace(/\]\]>/g, ']]]]><![CDATA[>') + ']]>';
     }
     function getQualifiedFilename(path, filename, separator) {
         if (path && path.substr(-1) !== separator && filename.substr(0) !== separator) {
@@ -143,6 +156,9 @@
         };
         self.suiteDone = function(suite) {
             suite = getSuite(suite);
+            // Errors that belong to the suite itself (an afterAll, or an error
+            // reported while no spec was running), not to any one spec.
+            suite._ownFailures = suite.failedExpectations || [];
             // disabled suite (xdescribe) -- suiteStarted was never called
             if (suite._parent === UNDEFINED) {
                 self.suiteStarted(suite);
@@ -151,11 +167,12 @@
             suite._endTime = new Date();
             currentSuite = suite._parent;
         };
-        self.jasmineDone = function() {
+        self.jasmineDone = function(result) {
             var output = '';
             for (var i = 0; i < suites.length; i++) {
                 output += self.getOrWriteNestedOutput(suites[i]);
             }
+            output += runFailuresAsXml(result || {});
             // if we have anything to write here, write out the consolidated file
             if (output) {
                 wrapOutputAndWriteFile(self.filePrefix, output);
@@ -265,24 +282,65 @@
         }
 
         function suiteAsXml(suite) {
-        	
-        	var fullyQualifiedSuiteName = getFullyQualifiedSuiteName(suite);
+            var ownFailures = suite._ownFailures || [];
+            var extraCase = ownFailures.length ? 1 : 0;
             var xml = '\n <testsuite name="' + getFullyQualifiedSuiteName(suite) + '"';
             xml += ' timestamp="' + ISODateString(suite._startTime) + '"';
             xml += ' hostname="localhost"'; // many CI systems like Jenkins don't care about this, but junit spec says it is required
             xml += ' time="' + elapsed(suite._startTime, suite._endTime) + '"';
             xml += ' errors="0"';
-            xml += ' tests="' + suite._specs.length + '"';
+            xml += ' tests="' + (suite._specs.length + extraCase) + '"';
             xml += ' skipped="' + suite._skipped + '"';
             // Because of JUnit's flat structure, only include directly failed tests (not failures for nested suites)
-            xml += ' failures="' + suite._failures + '"';
+            xml += ' failures="' + (suite._failures + extraCase) + '"';
             xml += '>';
 
             for (var i = 0; i < suite._specs.length; i++) {
                 xml += specAsXml(suite._specs[i]);
             }
-            
+            if (extraCase) {
+                xml += failedCaseAsXml(getFullyQualifiedSuiteName(suite), "(suite-level errors)",
+                    elapsed(suite._startTime, suite._endTime), ownFailures);
+            }
             xml += '\n </testsuite>';
+            return xml;
+        }
+        // Run-level failures (errors outside any suite, or a run that never
+        // completed) as their own suite, so JUnit consumers count them.
+        function runFailuresAsXml(result) {
+            var failures = (result.failedExpectations || []).slice();
+            if (result.overallStatus === "incomplete") {
+                failures.push({ message: "Run incomplete: " + result.incompleteReason });
+            }
+            if (!failures.length) {
+                return '';
+            }
+            var xml = '\n <testsuite name="Jasmine run"';
+            xml += ' timestamp="' + ISODateString(exportObject.startTime || new Date()) + '"';
+            xml += ' hostname="localhost" time="0" errors="0" tests="1" skipped="0" failures="1">';
+            xml += failedCaseAsXml("Jasmine run", "(run-level errors)", 0, failures);
+            xml += '\n </testsuite>';
+            return xml;
+        }
+        function failedCaseAsXml(classname, name, time, failures) {
+            var xml = '\n  <testcase classname="' + classname + '"';
+            xml += ' name="' + escapeInvalidXmlChars(name) + '"';
+            xml += ' time="' + time + '"';
+            xml += '>';
+            xml += failuresAsXml(failures);
+            xml += '\n  </testcase>';
+            return xml;
+        }
+        function failuresAsXml(failures) {
+            var xml = '';
+            for (var i = 0, failure; i < failures.length; i++) {
+                failure = failures[i];
+                xml += '\n   <failure type="' + (failure.matcherName || "exception") + '"';
+                xml += ' message="' + trim(escapeInvalidXmlChars(failure.message || ""))+ '"';
+                xml += '>';
+                xml += cdata(trim(failure.stack || failure.message || ""));
+                xml += '\n   </failure>';
+            }
             return xml;
         }
         function specAsXml(spec) {
@@ -294,14 +352,7 @@
             if (isSkipped(spec)) {
                 xml += '<skipped />';
             } else if (isFailed(spec)) {
-                for (var i = 0, failure; i < spec.failedExpectations.length; i++) {
-                    failure = spec.failedExpectations[i];
-                    xml += '\n   <failure type="' + (failure.matcherName || "exception") + '"';
-                    xml += ' message="' + trim(escapeInvalidXmlChars(failure.message))+ '"';
-                    xml += '>';
-                    xml += '<![CDATA[' + trim(failure.stack || failure.message) + ']]>';
-                    xml += '\n   </failure>';
-                }
+                xml += failuresAsXml(spec.failedExpectations);
             }
             xml += '\n  </testcase>';
             return xml;

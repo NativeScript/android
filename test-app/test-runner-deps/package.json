@@ -1,0 +1,5 @@
+{
+  "name": "test-runner-deps",
+  "private": true,
+  "description": "Test app only: stages the npm packages the Jasmine harness loads at runtime into the APK's assets."
+}

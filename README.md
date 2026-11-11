@@ -94,6 +94,7 @@ Note: You might need to run the Android Studio from the command line in order to
 
 ## How to Run Tests
 
+* Run `npm install` in the repository root. The test app's Jasmine (`jasmine-core`) comes from there and is copied into the APK at build time.
 * Go to subfolder test-app after you built the runtime.
 * Start an emulator or connect a device.
 

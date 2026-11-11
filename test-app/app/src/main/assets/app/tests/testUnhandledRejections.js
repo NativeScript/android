@@ -1,3 +1,5 @@
+const { raisesGlobalErrors } = require("../Infrastructure/Jasmine/globalErrorSpy");
+
 describe("unhandled promise rejections", function () {
     // Unhandled rejections are tracked per-isolate and reported once per
     // looper turn through the same uncaught-error machinery exposed via
@@ -57,14 +59,14 @@ describe("unhandled promise rejections", function () {
         }, 20);
     }
 
-    it("reports an unhandled Promise.reject through __onUncaughtError", function (done) {
+    it("reports an unhandled Promise.reject through __onUncaughtError", raisesGlobalErrors(function (done) {
         var reason = new Error("unhandled-promise-reject");
         Promise.reject(reason);
         pollUntil(function () { return reportedSeen(reason); }, function () {
             expect(reportedSeen(reason)).toBe(true);
             done();
         });
-    });
+    }));
 
     it("does not report when .catch is attached synchronously in the same turn", function (done) {
         var reason = new Error("handled-same-turn");
@@ -76,7 +78,7 @@ describe("unhandled promise rejections", function () {
         });
     });
 
-    it("reports an uncaught throw from an async function", function (done) {
+    it("reports an uncaught throw from an async function", raisesGlobalErrors(function (done) {
         var reason = new Error("async-function-throw");
         (async () => {
             throw reason;
@@ -85,9 +87,9 @@ describe("unhandled promise rejections", function () {
             expect(reportedSeen(reason)).toBe(true);
             done();
         });
-    });
+    }));
 
-    it("reports an unhandled rejection thrown from a .then callback", function (done) {
+    it("reports an unhandled rejection thrown from a .then callback", raisesGlobalErrors(function (done) {
         var reason = new Error("then-callback-throw");
         Promise.resolve().then(function () {
             throw reason;
@@ -96,9 +98,9 @@ describe("unhandled promise rejections", function () {
             expect(reportedSeen(reason)).toBe(true);
             done();
         });
-    });
+    }));
 
-    it("ignores a late .catch attached after the rejection was already reported", function (done) {
+    it("ignores a late .catch attached after the rejection was already reported", raisesGlobalErrors(function (done) {
         var reason = new Error("late-catch");
         var p = Promise.reject(reason);
         pollUntil(function () { return reportedSeen(reason); }, function () {
@@ -112,9 +114,9 @@ describe("unhandled promise rejections", function () {
                 done();
             });
         });
-    });
+    }));
 
-    it("unhandledrejection listener receives reason and promise; preventDefault suppresses the hook", function (done) {
+    it("unhandledrejection listener receives reason and promise; preventDefault suppresses the hook", raisesGlobalErrors(function (done) {
         var reason = new Error("rejected-with-listener");
         var received = null;
         onGlobal("unhandledrejection", function (e) {
@@ -141,9 +143,9 @@ describe("unhandled promise rejections", function () {
                 done();
             });
         });
-    });
+    }));
 
-    it("fires rejectionhandled when a handler is attached after the rejection was reported", function (done) {
+    it("fires rejectionhandled when a handler is attached after the rejection was reported", raisesGlobalErrors(function (done) {
         var reason = new Error("late-handler");
         var rejectionHandled = null;
         onGlobal("rejectionhandled", function (e) {
@@ -181,5 +183,5 @@ describe("unhandled promise rejections", function () {
                 });
             }, 20);
         });
-    });
+    }));
 });

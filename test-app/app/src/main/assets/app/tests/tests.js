@@ -927,9 +927,9 @@ describe("Tests ", function () {
 		expect(s).toBe("1, test, false");
 	});
 
-	it("TestCallMethodWithByteParameter", function () {
+	it("TestCallByteValueOfWithByteParameter", function () {
 
-		__log("TEST: TestCallMethodWithByteParameter");
+		__log("TEST: TestCallByteValueOfWithByteParameter");
 
 		var b = java.lang.Byte.valueOf(byte(123));
 
