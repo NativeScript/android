@@ -72,6 +72,14 @@ describe("Prebuilt classes of anonymous extends", function () {
         expect(generatedDexFiles(instance)).toEqual([]);
     });
 
+    it("loads the class of an extend in a file with $ in its name from the APK", function () {
+        var DollarFileObject = require("./prebuiltExtend$Dollar").DollarFileObject;
+        var instance = new DollarFileObject();
+
+        expect(instance.toString()).toBe("dollar file");
+        expect(generatedDexFiles(instance)).toEqual([]);
+    });
+
     it("loads the class of an extend on the first line of an ES module from the APK", function () {
         var LineOneObject = require("./prebuiltExtendLineOne.mjs").LineOneObject;
         var instance = new LineOneObject();
