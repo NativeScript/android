@@ -78,7 +78,7 @@ public class ObjectTableTest {
     }
 
     @Test
-    public void optimisticReadsNeverReturnAWrongIdWhileAnotherThreadWrites() throws Exception {
+    public void concurrentReadsFindStableEntriesWhileAnotherThreadWrites() throws Exception {
         final ObjectTable table = new ObjectTable(true);
         final int stableCount = 64;
         final Object[] stable = new Object[stableCount];
@@ -127,8 +127,8 @@ public class ObjectTableTest {
                         int id = table.findIdOptimistic(stable[expected]);
                         if (id == expected) {
                             hits.incrementAndGet();
-                        } else if (id != ObjectTable.NO_ID) {
-                            failure.compareAndSet(null, "expected " + expected + " or NO_ID, got " + id);
+                        } else {
+                            failure.compareAndSet(null, "expected " + expected + ", got " + id);
                         }
                     }
                 }
@@ -147,7 +147,7 @@ public class ObjectTableTest {
         }
 
         assertNull(failure.get(), failure.get());
-        assertTrue("optimistic reads should mostly hit", hits.get() > 1000);
+        assertTrue("readers should have run", hits.get() > 1000);
     }
 
     @Test

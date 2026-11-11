@@ -7,10 +7,13 @@ import java.lang.ref.WeakReference;
  * holds its object strongly while the JS wrapper is reachable and through a WeakReference
  * after the wrapper was collected (until the object is collected too).
  *
- * Where StampedLock exists (API 24+) any thread may read and findOrRegister: writers are
- * serialized by its write lock and exact reads validate against it. Without it, every
- * mutation and every exact read must come from the thread that holds the runtime's
- * isolate lock. Neither table allocates per entry.
+ * When concurrent, any thread may read and findOrRegister: every access synchronizes on the
+ * table. Otherwise every mutation and every read must come from the thread that holds the
+ * runtime's isolate lock. Neither table allocates per entry.
+ *
+ * A monitor rather than java.util.concurrent locks: those live in the boot classpath but
+ * outside the boot image, so on device they run interpreted, and an app's profile can't
+ * compile them. Uncontended monitor enter/exit is compiled into every caller.
  */
 final class ObjectTable {
     static final int NO_ID = -1;
@@ -22,114 +25,28 @@ final class ObjectTable {
         int newId();
     }
 
-    // Null where StampedLock is unavailable (API < 24): findIdOptimistic then always misses.
-    private final Stamps stamps;
+    private final boolean concurrent;
 
     ObjectTable() {
         this(false);
     }
 
-    ObjectTable(boolean optimisticReads) {
-        stamps = optimisticReads ? new Stamps() : null;
+    ObjectTable(boolean concurrent) {
+        this.concurrent = concurrent;
     }
 
     /**
-     * Writers are already serialized by the isolate lock; the write stamp only lets an
-     * optimistic reader detect that a write overlapped it. Kept in its own class so that
-     * runtimes where StampedLock is missing never load it.
-     */
-    private static final class Stamps {
-        private final java.util.concurrent.locks.StampedLock lock = new java.util.concurrent.locks.StampedLock();
-
-        long beginWrite() {
-            return lock.writeLock();
-        }
-
-        void endWrite(long stamp) {
-            lock.unlockWrite(stamp);
-        }
-
-        long beginRead() {
-            return lock.tryOptimisticRead();
-        }
-
-        long readLock() {
-            return lock.readLock();
-        }
-
-        void unlockRead(long stamp) {
-            lock.unlockRead(stamp);
-        }
-
-        boolean validate(long stamp) {
-            return lock.validate(stamp);
-        }
-    }
-
-    /**
-     * The id obj is registered under, from any thread, without the isolate lock. A miss
-     * (NO_ID) is not authoritative: it is also returned when a write overlapped the read.
-     * A hit was correct at the time of the read; the object may have been released since,
-     * which the caller must check under the isolate lock.
+     * The id obj is registered under, from any thread, without the isolate lock; NO_ID when
+     * the table isn't concurrent. A hit was correct at the time of the read; the object may
+     * have been released since, which the caller must check under the isolate lock.
      */
     int findIdOptimistic(Object obj) {
-        if (stamps == null) {
+        if (!concurrent) {
             return NO_ID;
         }
-        long stamp = stamps.beginRead();
-        if (stamp == 0) {
-            return NO_ID;
+        synchronized (this) {
+            return findIdLocked(obj);
         }
-        int id;
-        try {
-            id = findIdUnlocked(obj);
-        } catch (RuntimeException e) {
-            // A torn view of a resize can index past an array; the stamp check below fails then.
-            id = NO_ID;
-        }
-        return stamps.validate(stamp) ? id : NO_ID;
-    }
-
-    private int findIdUnlocked(Object obj) {
-        int[] index = identityIndex;
-        int[] hashes = identityIndexHashes;
-        int mask = index.length - 1;
-        int hash = System.identityHashCode(obj);
-        int i = mix(hash) & mask;
-        for (int probes = 0; probes <= mask; probes++) {
-            int entry = index[i];
-            if (entry == 0) {
-                return NO_ID;
-            }
-            if (hashes[i] == hash && getUnlocked(entry - 1) == obj) {
-                return entry - 1;
-            }
-            i = (i + 1) & mask;
-        }
-        return NO_ID;
-    }
-
-    // get() without the lock. Safe on a torn view: every array it reads is indexed within
-    // its own bounds, and a stale one only makes the caller's stamp check fail.
-    private Object getUnlocked(int id) {
-        if (id == NO_ID) {
-            return null;
-        }
-        Chunk[] cs = chunks;
-        int c = id >>> CHUNK_SHIFT;
-        if (c >= cs.length) {
-            return null;
-        }
-        Chunk chunk = cs[c];
-        if (chunk == null) {
-            return null;
-        }
-        Leaf leaf = chunk.leaves[(id >>> LEAF_BITS) & CHUNK_MASK];
-        if (leaf == null) {
-            return null;
-        }
-        Object value = leaf.values[id & LEAF_MASK];
-        return value == null ? null : deref(value);
     }
 
     private static Object deref(Object value) {
@@ -177,15 +94,12 @@ final class ObjectTable {
 
     /** Registers obj under id, held strongly, replacing whatever id held before. */
     void putStrong(int id, Object obj) {
-        if (stamps == null) {
+        if (!concurrent) {
             putStrongLocked(id, obj);
             return;
         }
-        long stamp = stamps.beginWrite();
-        try {
+        synchronized (this) {
             putStrongLocked(id, obj);
-        } finally {
-            stamps.endWrite(stamp);
         }
     }
 
@@ -217,18 +131,17 @@ final class ObjectTable {
     }
 
     boolean allowsConcurrentRegistration() {
-        return stamps != null;
+        return concurrent;
     }
 
     /**
      * The id obj is registered under, registering it strongly under a new id from ids when
      * it has none; FRESH is set in the result when this call registered it. The lookup and
-     * the insert happen under one write lock, so concurrent calls agree on one id. Only
-     * when allowsConcurrentRegistration().
+     * the insert happen under one lock, so concurrent calls agree on one id. Only when
+     * allowsConcurrentRegistration().
      */
     long findOrRegister(Object obj, IdSource ids) {
-        long stamp = stamps.beginWrite();
-        try {
+        synchronized (this) {
             int hash = System.identityHashCode(obj);
             int id = findIdLocked(obj, hash);
             if (id != NO_ID) {
@@ -237,32 +150,16 @@ final class ObjectTable {
             id = ids.newId();
             putStrongLocked(id, obj, hash);
             return (id & 0xFFFFFFFFL) | FRESH;
-        } finally {
-            stamps.endWrite(stamp);
         }
     }
 
     /** The id obj is registered under, or NO_ID. */
     int findId(Object obj) {
-        if (stamps == null) {
+        if (!concurrent) {
             return findIdLocked(obj);
         }
-        long stamp = stamps.beginRead();
-        if (stamp != 0) {
-            try {
-                int id = findIdUnlocked(obj);
-                if (stamps.validate(stamp)) {
-                    return id;
-                }
-            } catch (RuntimeException e) {
-                // A torn view of a resize; retried under the read lock.
-            }
-        }
-        stamp = stamps.readLock();
-        try {
+        synchronized (this) {
             return findIdLocked(obj);
-        } finally {
-            stamps.unlockRead(stamp);
         }
     }
 
@@ -288,25 +185,11 @@ final class ObjectTable {
 
     /** The object registered under id; null if there is none or it was collected. */
     Object get(int id) {
-        if (stamps == null) {
+        if (!concurrent) {
             return getLocked(id);
         }
-        long stamp = stamps.beginRead();
-        if (stamp != 0) {
-            try {
-                Object value = getUnlocked(id);
-                if (stamps.validate(stamp)) {
-                    return value;
-                }
-            } catch (RuntimeException e) {
-                // A torn view of a resize; retried under the read lock.
-            }
-        }
-        stamp = stamps.readLock();
-        try {
+        synchronized (this) {
             return getLocked(id);
-        } finally {
-            stamps.unlockRead(stamp);
         }
     }
 
@@ -316,14 +199,11 @@ final class ObjectTable {
     }
 
     boolean contains(int id) {
-        if (stamps == null) {
+        if (!concurrent) {
             return rawLocked(id) != null;
         }
-        long stamp = stamps.readLock();
-        try {
+        synchronized (this) {
             return rawLocked(id) != null;
-        } finally {
-            stamps.unlockRead(stamp);
         }
     }
 
@@ -332,35 +212,35 @@ final class ObjectTable {
      * the object is still alive; an entry whose object was already collected is removed.
      */
     boolean weakenAndCheckAlive(int id) {
-        if (stamps == null) {
+        if (!concurrent) {
             return weakenAndCheckAliveLocked(id);
         }
-        long stamp = stamps.beginWrite();
-        try {
+        synchronized (this) {
             return weakenAndCheckAliveLocked(id);
-        } finally {
-            stamps.endWrite(stamp);
         }
     }
 
     /**
-     * weakenAndCheckAlive for ids[0..count), under one write lock; overwrites the id of
-     * every object no longer alive with NO_ID.
+     * weakenAndCheckAlive for ids[0..count), under one lock; overwrites the id of every
+     * object no longer alive with NO_ID.
      */
     void weakenAndCheckAlive(int[] ids, int count) {
         if (count == 0) {
             return;
         }
-        long stamp = stamps == null ? 0 : stamps.beginWrite();
-        try {
-            for (int i = 0; i < count; i++) {
-                if (!weakenAndCheckAliveLocked(ids[i])) {
-                    ids[i] = NO_ID;
-                }
-            }
-        } finally {
-            if (stamps != null) {
-                stamps.endWrite(stamp);
+        if (!concurrent) {
+            weakenAndCheckAliveAllLocked(ids, count);
+            return;
+        }
+        synchronized (this) {
+            weakenAndCheckAliveAllLocked(ids, count);
+        }
+    }
+
+    private void weakenAndCheckAliveAllLocked(int[] ids, int count) {
+        for (int i = 0; i < count; i++) {
+            if (!weakenAndCheckAliveLocked(ids[i])) {
+                ids[i] = NO_ID;
             }
         }
     }
@@ -383,15 +263,12 @@ final class ObjectTable {
     }
 
     void remove(int id) {
-        if (stamps == null) {
+        if (!concurrent) {
             removeLocked(id);
             return;
         }
-        long stamp = stamps.beginWrite();
-        try {
+        synchronized (this) {
             removeLocked(id);
-        } finally {
-            stamps.endWrite(stamp);
         }
     }
 

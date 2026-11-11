@@ -181,9 +181,9 @@ public class Runtime {
             "Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
             "If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
 
-    // Any thread may read it optimistically and register new objects through findOrRegister
-    // (see ObjectTable); every other mutation and every exact read comes from the thread
-    // holding this runtime's isolate lock.
+    // On API 24+ any thread may read it and register new objects through findOrRegister
+    // (see ObjectTable); every other mutation comes from the thread holding this runtime's
+    // isolate lock.
     private final ObjectTable objectTable;
 
     private final ObjectTable.IdSource objectIds = new ObjectTable.IdSource() {
