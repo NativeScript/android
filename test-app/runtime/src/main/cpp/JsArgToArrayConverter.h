@@ -38,7 +38,7 @@ class JsArgToArrayConverter {
         };
 
     private:
-        bool ConvertArg(v8::Local<v8::Context> context, const v8::Local<v8::Value>& arg, int index);
+        bool ConvertArg(v8::Local<v8::Context> context, const v8::Local<v8::Value>& jsArg, int index);
 
         void SetConvertedObject(JEnv& env, int index, jobject obj, bool isGlobal = false);
 

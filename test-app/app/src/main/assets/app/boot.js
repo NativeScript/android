@@ -29,7 +29,10 @@ global.__JUnitSaveResults = function (unitTestResults) {
     }
 };
 
-require('./Infrastructure/Jasmine/jasmine-2.0.1/boot'); //runs jasmine, attaches the junitOutputter
+if (com.tns.tests.JniBench.isEnabled()) {
+	require("./tests/benchmarks/jniBenchmarks").run();
+} else {
+	require('./Infrastructure/Jasmine/boot');
 
-
-require("./mainpage");
+	require("./mainpage");
+}

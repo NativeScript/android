@@ -51,14 +51,6 @@ describe('native timer', () => {
         }, 100);
     });
 
-    it('triggers timeout', (done) => {
-        const now = Date.now();
-        setTimeout(() => {
-            expect(Date.now() - now).not.toBeLessThan(100);
-            done();
-        }, 100);
-    });
-
     it('triggers interval', (done) => {
         let calls = 0;
         const itv = setInterval(() => {

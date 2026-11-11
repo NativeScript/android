@@ -11,7 +11,6 @@
 #include <thread>
 
 #include "ArgConverter.h"
-#include "ArrayHelper.h"
 #include "BuiltinLoader.h"
 #include "CallbackHandlers.h"
 #include "Constants.h"
@@ -22,12 +21,12 @@
 #include "File.h"
 #include "FrameCallbacks.h"
 #include "HttpLoader.h"
-#include "Interop.h"
 #include "IsolateTracked.h"
 #include "JType.h"
 #include "JsArgToArrayConverter.h"
 #include "LazyGlobals.h"
 #include "ManualInstrumentation.h"
+#include "Messaging.h"
 #include "MetadataNode.h"
 #include "ModuleBinding.h"
 #include "ModuleInternal.h"
@@ -49,8 +48,15 @@
 #include "V8StringConstants.h"
 #include "Version.h"
 #include "WeakRef.h"
+#include "WorkerEvents.h"
 #include "include/libplatform/libplatform.h"
 #include "sys/system_properties.h"
+
+#include <cfloat>
+#include <climits>
+#include <cstdint>
+#include <cmath>
+#include <cstring>
 
 #ifdef APPLICATION_IN_DEBUG
 // #include "NetworkDomainCallbackHandlers.h"
@@ -119,10 +125,15 @@ int Runtime::GetAndroidVersion() {
 
 Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
     : m_id(id),
+      m_ownerThread(std::this_thread::get_id()),
       m_isolate(nullptr),
       m_lastUsedMemory(0),
       m_gcFunc(nullptr),
       m_runGC(false) {
+  // GetRuntime(int) and the thread's pinned JNIEnv assume one runtime per
+  // thread; com.tns.Runtime's constructor enforces the same on the Java side.
+  NS_CHECK(s_current.runtime == nullptr);
+
   m_runtime = env->NewGlobalRef(runtime);
   m_objectManager = new ObjectManager(m_runtime);
   m_state = std::make_unique<RuntimeState>();
@@ -130,18 +141,16 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_id2RuntimeCache.emplace(id, this);
   }
-
-  if (GET_USED_MEMORY_METHOD_ID == nullptr) {
-    auto RUNTIME_CLASS = env->FindClass("com/tns/Runtime");
-    NS_CHECK(RUNTIME_CLASS != nullptr);
-
-    GET_USED_MEMORY_METHOD_ID =
-        env->GetMethodID(RUNTIME_CLASS, "getUsedMemory", "()J");
-    NS_CHECK(GET_USED_MEMORY_METHOD_ID != nullptr);
-  }
 }
 
 Runtime* Runtime::GetRuntime(int runtimeId) {
+  // A runtime is only destroyed on its own thread, which is busy in this call,
+  // so the calling thread's own runtime needs neither the lock nor the map.
+  auto& current = s_current;
+  if (runtimeId == current.id) {
+    return current.runtime;
+  }
+
   Runtime* runtime = nullptr;
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
@@ -210,7 +219,7 @@ ObjectManager* Runtime::GetObjectManager() const { return m_objectManager; }
 void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath,
                    jstring nativeLibDir, jboolean verboseLoggingEnabled,
                    jboolean isDebuggable, jstring packageName,
-                   jobjectArray args, jstring callingDir,
+                   const StartupOptions& options, jstring callingDir,
                    int maxLogcatObjectSize, bool forceLog) {
   JEnv env(_env);
 
@@ -220,7 +229,7 @@ void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath,
 
   try {
     runtime->Init(env, filesPath, nativeLibDir, enableLog, isDebuggable,
-                  packageName, args, callingDir, maxLogcatObjectSize, forceLog);
+                  packageName, options, callingDir, maxLogcatObjectSize, forceLog);
   } catch (...) {
     // The Java side rolls back its own state and rethrows; without this the
     // native half of a failed bootstrap would stay allocated and registered.
@@ -231,8 +240,8 @@ void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath,
 
 void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
                    bool verboseLoggingEnabled, bool isDebuggable,
-                   jstring packageName, jobjectArray args, jstring callingDir,
-                   int maxLogcatObjectSize, bool forceLog) {
+                   jstring packageName, const StartupOptions& options,
+                   jstring callingDir, int maxLogcatObjectSize, bool forceLog) {
   LogEnabled = verboseLoggingEnabled;
 
   auto filesRoot = ArgConverter::jstringToString(filesPath);
@@ -246,40 +255,18 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
   CrashBreadcrumbs::RegisterRuntime(m_id);
 
   Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
-  // read config options passed from Java
-  // Indices correspond to positions in the com.tns.AppConfig.KnownKeys enum
-  JniLocalRef v8Flags(env->GetObjectArrayElement(args, 0));
-  Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
-  JniLocalRef cacheCode(env->GetObjectArrayElement(args, 1));
-  Constants::V8_CACHE_COMPILED_CODE = (bool)cacheCode;
-  JniLocalRef profilerOutputDir(env->GetObjectArrayElement(args, 2));
-
-  {
-    JEnv jEnv(env);
-    JniLocalRef discardUncaught(env->GetObjectArrayElement(
-        args, (jsize)11 /* KnownKeys.DiscardUncaughtJsExceptions */));
-    if (!discardUncaught.IsNull()) {
-      m_discardUncaughtJsExceptions =
-          JType::BooleanValue(jEnv, discardUncaught) == JNI_TRUE;
-    }
-
-    JniLocalRef uncaughtErrorPolicy(env->GetObjectArrayElement(
-        args, (jsize)14 /* KnownKeys.UncaughtErrorPolicy */));
-    if (!uncaughtErrorPolicy.IsNull()) {
-      auto policy = ArgConverter::jstringToString(uncaughtErrorPolicy);
-      if (policy == "throw") {
-        m_uncaughtErrorPolicy = UncaughtErrorPolicy::Throw;
-      } else {
-        // AppConfig validates and warns about unknown values; anything that
-        // is not "throw" behaves as the default.
-        m_uncaughtErrorPolicy = UncaughtErrorPolicy::Report;
-      }
-    }
-  }
+  Constants::V8_STARTUP_FLAGS = options.v8Flags;
+  Constants::V8_CACHE_COMPILED_CODE = options.codeCache;
+  m_discardUncaughtJsExceptions = options.discardUncaughtJsExceptions;
+  // AppConfig validates and warns about unknown values; anything that is not
+  // "throw" behaves as the default.
+  m_uncaughtErrorPolicy = options.uncaughtErrorPolicy == "throw"
+                              ? UncaughtErrorPolicy::Throw
+                              : UncaughtErrorPolicy::Report;
 
   DEBUG_WRITE("Initializing Telerik NativeScript");
 
-  auto profilerOutputDirStr = ArgConverter::jstringToString(profilerOutputDir);
+  const auto& profilerOutputDirStr = options.profilerOutputDir;
 
   NativeScriptException::Init();
   try {
@@ -300,6 +287,12 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
 }
 
 Runtime::~Runtime() {
+  NS_CHECK(std::this_thread::get_id() == m_ownerThread);
+  if (s_current.runtime == this) {
+    s_current.runtime = nullptr;
+    s_current.id = -1;
+  }
+
   /*
    * Idempotent backstop for the erase DestroyRuntime does: a bootstrap that
    * failed before PrepareV8Runtime ran never reached it. The isolate entry is
@@ -500,10 +493,139 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
   return res;
 }
 
+/*
+ * A JS callback result for a primitive Java return type, converted only when
+ * the declared type can hold it: whole numbers in range for the integer types,
+ * a value within float range (or 0, NaN, +-Infinity) for float, any number for
+ * double, a one-character string for char. Anything else keeps the boxed
+ * conversion, whose result the generated binding rejects with a
+ * ClassCastException.
+ */
+static bool TryGetPrimitiveReturnBits(Isolate* isolate,
+                                      const Local<Value>& value, Type type,
+                                      jlong& bits) {
+  if (value.IsEmpty()) {
+    return false;
+  }
+
+  if (type == Type::Boolean) {
+    if (value->IsBoolean()) {
+      bits = value->IsTrue() ? 1 : 0;
+      return true;
+    }
+    if (value->IsBooleanObject()) {
+      bits = value.As<BooleanObject>()->ValueOf() ? 1 : 0;
+      return true;
+    }
+    return false;
+  }
+
+  if (type == Type::Char) {
+    Local<String> str;
+    if (value->IsString()) {
+      str = value.As<String>();
+    } else if (value->IsStringObject()) {
+      str = value.As<StringObject>()->ValueOf();
+    } else {
+      return false;
+    }
+    if (str->Length() != 1) {
+      return false;
+    }
+    uint16_t unit;
+    str->WriteV2(isolate, 0, 1, &unit);
+    bits = unit;
+    return true;
+  }
+
+  double d;
+  if (value->IsNumber()) {
+    d = value.As<Number>()->Value();
+  } else if (value->IsNumberObject()) {
+    d = value.As<NumberObject>()->ValueOf();
+  } else {
+    return false;
+  }
+
+  bool isWhole = std::isfinite(d) && std::trunc(d) == d;
+  switch (type) {
+    case Type::Byte:
+      if (isWhole && d >= INT8_MIN && d <= INT8_MAX) {
+        bits = static_cast<jbyte>(d);
+        return true;
+      }
+      return false;
+    case Type::Short:
+      if (isWhole && d >= INT16_MIN && d <= INT16_MAX) {
+        bits = static_cast<jshort>(d);
+        return true;
+      }
+      return false;
+    case Type::Int:
+      if (isWhole && d >= INT32_MIN && d <= INT32_MAX) {
+        bits = static_cast<jint>(d);
+        return true;
+      }
+      return false;
+    case Type::Long:
+      // 2^63 itself is not representable; the boxed path's handling of it is
+      // undefined, so it is left there.
+      if (isWhole && std::fabs(d) < 9223372036854775808.0) {
+        bits = static_cast<jlong>(d);
+        return true;
+      }
+      return false;
+    case Type::Float: {
+      double magnitude = std::fabs(d);
+      if (!std::isfinite(d) || d == 0 ||
+          (magnitude >= FLT_MIN && magnitude <= FLT_MAX)) {
+        float f = static_cast<jfloat>(d);
+        int32_t raw;
+        memcpy(&raw, &f, sizeof(raw));
+        bits = raw;
+        return true;
+      }
+      return false;
+    }
+    case Type::Double:
+      memcpy(&bits, &d, sizeof(bits));
+      return true;
+    default:
+      return false;
+  }
+}
+
+namespace {
+// Indexed by the id Java's MethodNameIds gives each method name.
+struct CallbackMethodNames {
+  std::vector<v8::Global<v8::String>> byId;
+};
+
+Local<String> GetCallbackMethodName(Isolate* isolate, JNIEnv* env,
+                                    jstring methodName, jint methodNameId) {
+  auto* names = RuntimeState::For<CallbackMethodNames>(isolate);
+  if (names == nullptr || methodNameId < 0) {
+    return ArgConverter::jstringToInternalizedV8String(isolate, env, methodName);
+  }
+  auto index = static_cast<size_t>(methodNameId);
+  if (index < names->byId.size() && !names->byId[index].IsEmpty()) {
+    return names->byId[index].Get(isolate);
+  }
+  auto name = ArgConverter::jstringToInternalizedV8String(isolate, env, methodName);
+  if (index >= names->byId.size()) {
+    names->byId.resize(index + 1);
+  }
+  names->byId[index].Reset(isolate, name);
+  return name;
+}
+}  // namespace
+
 jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
-                                    jint javaObjectID, jstring methodName,
+                                    jobject javaObject, jint javaObjectID,
+                                    jstring methodName, jint methodNameId,
                                     jint retType, jboolean isConstructor,
-                                    jobjectArray packagedArgs) {
+                                    const JavaCallArgs& args,
+                                    jlongArray primitiveResult) {
   SET_PROFILER_FRAME();
 
   auto isolate = m_isolate;
@@ -512,7 +634,22 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
 
   DEBUG_WRITE("CallJSMethodNative called javaObjectID=%d", javaObjectID);
 
-  auto jsObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID);
+  m_objectManager->FlushFinalizedBatchIfPending();
+
+  // javaObjectID may be a hint read without the isolate lock; resolve it exactly when it
+  // does not name a linked wrapper.
+  Local<Object> jsObject;
+  if (javaObjectID != -1) {
+    jsObject = m_objectManager->GetLinkedJsObjectByJavaObject(javaObjectID);
+  }
+  if (jsObject.IsEmpty() && javaObject != nullptr) {
+    javaObjectID = m_objectManager->FindObjectId(javaObject);
+    if (javaObjectID == -1) {
+      throw NativeScriptException("Cannot find object id for an instance of " +
+                                  m_objectManager->GetClassName(javaObject));
+    }
+    jsObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID);
+  }
   if (jsObject.IsEmpty()) {
     stringstream ss;
     ss << "JavaScript object for Java ID " << javaObjectID << " not found."
@@ -533,14 +670,29 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
   DEBUG_WRITE("CallJSMethodNative called jsObject=%d",
               jsObject->GetIdentityHash());
 
-  string method_name = ArgConverter::jstringToString(methodName);
+  auto jsMethodName =
+      GetCallbackMethodName(m_isolate, _env, methodName, methodNameId);
   auto jsResult = CallbackHandlers::CallJSMethod(m_isolate, env, jsObject,
-                                                 method_name, packagedArgs);
+                                                 jsMethodName, args);
+
+  // Type::Null is the id of void.class: the Java caller discards the result.
+  if (retType == static_cast<jint>(Type::Null)) {
+    return nullptr;
+  }
+
+  jlong bits;
+  if (primitiveResult != nullptr &&
+      TryGetPrimitiveReturnBits(m_isolate, jsResult, static_cast<Type>(retType),
+                                bits)) {
+    jlong out[2] = {bits, 1};
+    _env->SetLongArrayRegion(primitiveResult, 0, 2, out);
+    return nullptr;
+  }
 
   int classReturnType = retType;
-  jobject javaObject =
+  jobject javaResult =
       ConvertJsValueToJavaObject(env, jsResult, classReturnType);
-  return javaObject;
+  return javaResult;
 }
 
 void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
@@ -553,6 +705,9 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
   auto isolate = m_isolate;
 
   JEnv env(_env);
+
+  m_objectManager->FlushFinalizedBatchIfPending();
+  m_objectManager->RegisterStrong(javaObject, javaObjectID);
 
   string existingClassName = ArgConverter::jstringToString(className);
   string jniName = Util::ConvertFromCanonicalToJniName(existingClassName);
@@ -589,9 +744,7 @@ jint Runtime::GenerateNewObjectId(JNIEnv* env, jobject obj) {
   return objectId;
 }
 
-void Runtime::AdjustAmountOfExternalAllocatedMemory() {
-  JEnv env;
-  int64_t usedMemory = env.CallLongMethod(m_runtime, GET_USED_MEMORY_METHOD_ID);
+void Runtime::AdjustAmountOfExternalAllocatedMemory(int64_t usedMemory) {
   int64_t changeInBytes = usedMemory - m_lastUsedMemory;
   int64_t externalMemory = 0;
 
@@ -613,7 +766,7 @@ bool Runtime::NotifyGC(JNIEnv* env, jobject obj) {
 }
 
 bool Runtime::TryCallGC() {
-  auto success = m_gcFunc != nullptr;
+  auto success = m_gcFunc != nullptr && m_runGC;
   if (success) {
     success = __sync_bool_compare_and_swap(&m_runGC, true, false);
     if (success) {
@@ -917,9 +1070,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
       ArgConverter::ConvertToV8String(isolate, "__releaseNativeCounterpart"),
       FunctionTemplate::New(
           isolate, CallbackHandlers::ReleaseNativeCounterpartCallback));
-  globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__markingMode"),
-                      Number::New(isolate, m_objectManager->GetMarkingMode()),
-                      readOnlyFlags);
   globalTemplate->Set(
       ArgConverter::ConvertToV8String(isolate, "__runOnMainThread"),
       FunctionTemplate::New(isolate,
@@ -989,8 +1139,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   SimpleProfiler::Init(isolate, globalTemplate);
 
-  CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
-
   // Lazy web globals (TextEncoder/TextDecoder, atob/btoa): registered on the
   // template so the builtins behind them run only on first use, in every
   // isolate — workers included.
@@ -1009,6 +1157,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   // PromiseRejectionEvent, reportError and the native dispatch closures) -
   // installed for both the main and worker isolates.
   Events::Init(context);
+  // Worker and the worker global scope as EventTargets, on top of those
+  // primitives. Before ErrorEvents::Init, whose ErrorEvent constructor the
+  // parent-side error callout picks up lazily on first use.
+  WorkerEvents::Init(context);
   ErrorEvents::Init(context);
 
   StructuredClone::Init(context);
@@ -1017,8 +1169,14 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   // mark/measure `detail` is cloned through the structuredClone global.
   Performance::Init(context);
 
-  // The `interop` global (interop.escapeException), mirroring iOS.
-  Interop::Init(context);
+  // The legacy interop globals (`interop`, the numeric casts, Array.create),
+  // assembled from ns:runtime and ns:interop/android. Builtins run above this
+  // point cannot use them.
+  if (BuiltinLoader::GetExports(context, BuiltinId::kInteropGlobals, nullptr)
+          .IsEmpty()) {
+    throw NativeScriptException(
+        "PrepareV8Runtime: the interop globals bootstrap failed");
+  }
 
   m_objectManager->Init(isolate);
 
@@ -1079,14 +1237,16 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
 
   MetadataNode::CreateTopLevelNamespaces(isolate, global);
 
-  ArrayHelper::Init(context);
-
   m_arrayBufferHelper.CreateConvertFunctions(context, global, m_objectManager);
 
   this->m_context = new Persistent<Context>(isolate, context);
 
   this->m_napiEnv = NapiEnv::Create(context, m_eventLoop);
-  s_currentRuntime = this;
+  s_current.runtime = this;
+  s_current.id = m_id;
+  // The runtime's thread stays attached until DestroyRuntime: the main thread
+  // for the process, a worker thread until after it tears its runtime down.
+  JEnv::PinThreadEnv(JEnv());
 
   if (m_isMainThread) {
     // Releases any runtime waiting in ElectMainRuntime: the metadata tree and
@@ -1125,6 +1285,7 @@ double Runtime::PerformanceNowMillis() {
 }
 
 void Runtime::DestroyRuntime() {
+  NS_CHECK(std::this_thread::get_id() == m_ownerThread);
   CrashBreadcrumbs::UnregisterRuntime(m_id);
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
@@ -1161,8 +1322,10 @@ void Runtime::DestroyRuntime() {
     NapiEnv::Destroy(static_cast<NapiEnv*>(m_napiEnv));
     m_napiEnv = nullptr;
   }
-  if (s_currentRuntime == this) {
-    s_currentRuntime = nullptr;
+  if (s_current.runtime == this) {
+    s_current.runtime = nullptr;
+    s_current.id = -1;
+    JEnv::UnpinThreadEnv();
   }
   // The events state holds v8::Global handles (backing event target, dispatch
   // closures and tracked promise rejections) - reset them while the isolate
@@ -1193,13 +1356,19 @@ void Runtime::DestroyRuntime() {
   // is alive and its destructors can still touch v8::Global handles.
   IsolateTracked::SweepAll(m_isolate);
 
-  // Same reason: every still-linked Java<->JS wrapper holds a Persistent, a
-  // JSInstanceInfo and its weak-callback state, and those finalizers will
+  // Same reason: every still-linked Java<->JS wrapper holds a Persistent in
+  // its weak-callback state, and those finalizers will
   // never run now. The JNI half of ObjectManager is released later, in its
   // destructor, once the isolate is gone.
   if (m_objectManager != nullptr) {
     m_objectManager->ReleaseAllRegistered();
   }
+
+  // After the loop stopped: a port force-closed here can no longer be woken,
+  // and the disentangle both delivers the close sentinels this isolate's
+  // siblings are owed and puts each port's queue beyond the reach of the
+  // threads that were filling it.
+  messaging::CloseAllPorts(m_isolate);
 
   // Everything below still needs the isolate alive -- the caller disposes it
   // only after this returns -- but runs after the hooks above so nothing they
@@ -1239,7 +1408,6 @@ int Runtime::GetId() { return this->m_id; }
 
 
 JavaVM* Runtime::s_jvm = nullptr;
-jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 robin_hood::unordered_map<int, Runtime*> Runtime::s_id2RuntimeCache;
 robin_hood::unordered_map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 std::mutex Runtime::s_runtimeCacheMutex;
@@ -1252,7 +1420,7 @@ v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 std::shared_ptr<EventLoop> Runtime::s_mainEventLoop;
 
-thread_local Runtime* Runtime::s_currentRuntime = nullptr;
+thread_local Runtime::CurrentRuntime Runtime::s_current;
 thread_local PendingIsolateSetup Runtime::s_pendingIsolateSetup;
 
 void Runtime::SetPendingIsolateSetup(PendingIsolateSetup setup) {

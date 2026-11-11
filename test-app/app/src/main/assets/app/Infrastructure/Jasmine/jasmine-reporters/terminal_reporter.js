@@ -10,7 +10,9 @@
 
     function elapsed(start, end) { return (end - start)/1000; }
     function isFailed(obj) { return obj.status === "failed"; }
-    function isSkipped(obj) { return obj.status === "pending"; }
+    function isSkipped(obj) {
+        return obj.status === "pending" || obj.status === "excluded" || obj.status === "notApplicable";
+    }
     function extend(dupe, obj) { // performs a shallow copy of all props of `obj` onto `dupe`
         for (var prop in obj) {
             if (obj.hasOwnProperty(prop)) {
@@ -66,7 +68,18 @@
             totalSpecsExecuted = 0,
             totalSpecsSkipped = 0,
             totalSpecsFailed = 0,
+            totalOtherFailures = 0,
             totalSpecsDefined;
+
+        function logFailures(depth, header, failures) {
+            log(indentWithLevel(depth, inColor(header, 'red')));
+            for (var i = 0; i < failures.length; i++) {
+                log(inColor(indentWithLevel(depth, indent_string + failures[i].message), 'red'));
+                if (failures[i].stack) {
+                    log(indentWithLevel(depth, indent_string + failures[i].stack));
+                }
+            }
+        }
 
         var __suites = {}, __specs = {};
         function getSuite(suite) {
@@ -189,6 +202,10 @@
         };
         self.suiteDone = function(suite) {
             suite = getSuite(suite);
+            if (suite.failedExpectations && suite.failedExpectations.length) {
+                totalOtherFailures++;
+                logFailures(1, 'Suite-level errors in "' + suite.fullName + '":', suite.failedExpectations);
+            }
             // disabled suite (xdescribe) -- suiteStarted was never called
             if (suite._parent === UNDEFINED) {
                 self.suiteStarted(suite);
@@ -212,7 +229,21 @@
                 str = passed + ' of ' + total + ' passed (' + skipped + ' skipped)';
             log(indentWithLevel(suite._depth, inColor(str+'.', color)));
         };
-        self.jasmineDone = function() {
+        self.jasmineDone = function(result) {
+            result = result || {};
+            if (result.failedExpectations && result.failedExpectations.length) {
+                totalOtherFailures++;
+                logFailures(1, 'Run-level errors:', result.failedExpectations);
+            }
+            if (result.overallStatus === "incomplete") {
+                totalOtherFailures++;
+                log(inColor('Run incomplete: ' + result.incompleteReason, 'red'));
+            }
+            var deprecations = result.deprecationWarnings || [];
+            for (var d = 0; d < deprecations.length; d++) {
+                log('DEPRECATION: ' + deprecations[d].message);
+            }
+            var failedOverall = totalSpecsFailed > 0 || totalOtherFailures > 0;
             var now = new Date(),
                 dur = elapsed(startTime, now),
                 total = totalSpecsDefined || totalSpecsExecuted,
@@ -222,9 +253,11 @@
                 fail_str = totalSpecsFailed + (totalSpecsFailed === 1 ? " failure, " : " failures, "),
                 skip_str = skipped + " skipped, ",
                 disabled_str = disabled + " disabled in ",
-                summary_str = spec_str + fail_str + skip_str + disabled_str + dur + "s.",
-                result_str = (totalSpecsFailed && "FAILURE: " || "SUCCESS: ") + summary_str,
-                result_color = totalSpecsFailed && "red+bold" || "green+bold";
+                other_str = totalOtherFailures === 0 ? "" :
+                    totalOtherFailures + (totalOtherFailures === 1 ? " suite/run-level error, " : " suite/run-level errors, "),
+                summary_str = spec_str + fail_str + other_str + skip_str + disabled_str + dur + "s.",
+                result_str = (failedOverall ? "FAILURE: " : "SUCCESS: ") + summary_str,
+                result_color = failedOverall ? "red+bold" : "green+bold";
 
             if (self.verbosity === 2) {
                 log('');

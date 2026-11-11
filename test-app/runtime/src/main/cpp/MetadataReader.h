@@ -7,6 +7,7 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <thread>
 #include "NativeScriptAssert.h"
 #include "robin_hood.h"
@@ -92,6 +93,12 @@ namespace tns {
         }
 
         std::string ReadTypeName(MetadataTreeNode *treeNode);
+
+        inline std::string_view ReadNameView(uint32_t offset) {
+            uint16_t length = *reinterpret_cast<uint16_t *>(m_nameData + offset);
+
+            return {reinterpret_cast<char *>(m_nameData + offset + sizeof(uint16_t)), length};
+        }
 
         inline std::string ReadName(uint32_t offset) {
             uint16_t length = *reinterpret_cast<short *>(m_nameData + offset);

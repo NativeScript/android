@@ -9,7 +9,7 @@ using namespace v8;
 using namespace tns;
 
 ArrayBufferHelper::ArrayBufferHelper()
-        : m_objectManager(nullptr), m_ByteBufferClass(nullptr), m_isDirectMethodID(nullptr),
+        : m_objectManager(nullptr), m_ByteBufferClass(nullptr),
           m_remainingMethodID(nullptr), m_getMethodID(nullptr) {
 }
 
@@ -20,6 +20,7 @@ void ArrayBufferHelper::CreateConvertFunctions(Local<Context> context, const Loc
     auto fromFunc = FunctionTemplate::New(isolate, CreateFromCallbackStatic, extData)->GetFunction(context).ToLocalChecked();
     auto arrBufferCtorFunc = global->Get(context, ArgConverter::ConvertToV8String(isolate, "ArrayBuffer")).ToLocalChecked().As<Function>();
     arrBufferCtorFunc->Set(context, ArgConverter::ConvertToV8String(isolate, "from"), fromFunc);
+    m_nativeObjectKey.Set(isolate, String::NewFromUtf8Literal(isolate, "nativeObject", NewStringType::kInternalized));
 }
 
 void ArrayBufferHelper::CreateFromCallbackStatic(const FunctionCallbackInfo<Value>& info) {
@@ -75,19 +76,11 @@ void ArrayBufferHelper::CreateFromCallbackImpl(const FunctionCallbackInfo<Value>
         throw NativeScriptException("Wrong type of argument (ByteBuffer expected)");
     }
 
-    if (m_isDirectMethodID == nullptr) {
-        m_isDirectMethodID = env.GetMethodID(m_ByteBufferClass, "isDirect", "()Z");
-        NS_CHECK(m_isDirectMethodID != nullptr);
-    }
-
-    auto ret = env.CallBooleanMethod(obj, m_isDirectMethodID);
-
-    auto isDirectBuffer = ret == JNI_TRUE;
-
     Local<ArrayBuffer> arrayBuffer;
 
-    if (isDirectBuffer) {
-        auto data = env.GetDirectBufferAddress(obj);
+    auto data = env.GetDirectBufferAddress(obj);
+
+    if (data != nullptr) {
         auto size = env.GetDirectBufferCapacity(obj);
 
         std::unique_ptr<v8::BackingStore> store = ArrayBuffer::NewBackingStore(
@@ -115,11 +108,11 @@ void ArrayBufferHelper::CreateFromCallbackImpl(const FunctionCallbackInfo<Value>
 
         auto byteArrayElements = env.GetByteArrayElements(byteArray, 0);
 
-        jbyte* data = new jbyte[bufferRemainingSize];
-        memcpy(data, byteArrayElements, bufferRemainingSize);
+        jbyte* copy = new jbyte[bufferRemainingSize];
+        memcpy(copy, byteArrayElements, bufferRemainingSize);
 
         std::unique_ptr<v8::BackingStore> store = ArrayBuffer::NewBackingStore(
-                data,
+                copy,
                 bufferRemainingSize,
                 [](void *data, size_t length, void *deleter_data) {
                     delete[] ((jbyte*)data);
@@ -131,7 +124,7 @@ void ArrayBufferHelper::CreateFromCallbackImpl(const FunctionCallbackInfo<Value>
     }
 
     auto ctx = isolate->GetCurrentContext();
-    arrayBuffer->Set(ctx, ArgConverter::ConvertToV8String(isolate, "nativeObject"), argObj);
+    arrayBuffer->Set(ctx, m_nativeObjectKey.Get(isolate), argObj);
 
     info.GetReturnValue().Set(arrayBuffer);
 }

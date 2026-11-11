@@ -62,7 +62,7 @@ namespace tns {
 
         static v8::Local<v8::Value>
         CallJSMethod(v8::Isolate *isolate, JNIEnv *_env, const v8::Local<v8::Object> &jsObject,
-                     const std::string &methodName, jobjectArray args);
+                     const v8::Local<v8::String> &methodName, const JavaCallArgs &args);
 
         static v8::Local<v8::Value>
         GetJavaField(v8::Isolate *isolate, const v8::Local<v8::Object> &caller,
@@ -93,8 +93,7 @@ namespace tns {
 
         static void ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
-        static void CreateGlobalCastFunctions(v8::Isolate *isolate,
-                                              const v8::Local<v8::ObjectTemplate> &globalTemplate);
+        static bool AddCastFunctions(v8::Local<v8::Context> context, v8::Local<v8::Object> target);
 
         static std::vector<std::string> GetTypeMetadata(const std::string &name, int index);
 
@@ -168,7 +167,7 @@ namespace tns {
         CallbackHandlers() {
         }
 
-        static void AdjustAmountOfExternalAllocatedMemory(JEnv &env, v8::Isolate *isolate);
+        static void AdjustAmountOfExternalAllocatedMemory(v8::Isolate *isolate, int64_t usedJavaMemory);
 
         /*
          * Helper method that creates a java string array for sending strings over JNI
@@ -187,7 +186,11 @@ namespace tns {
 
         static jfieldID CURRENT_OBJECTID_FIELD_ID;
 
-        static jmethodID MAKE_INSTANCE_STRONG_ID;
+        static jfieldID CURRENT_OBJECTCLASS_FIELD_ID;
+
+        class ConstructionScope;
+
+        static jmethodID REGISTER_CONSTRUCTED_INSTANCE_ID;
 
         static jmethodID GET_TYPE_METADATA;
 
@@ -201,21 +204,6 @@ namespace tns {
 
         static FieldAccessor fieldAccessor;
 
-        struct JavaObjectIdScope {
-            JavaObjectIdScope(JEnv &env, jfieldID fieldId, jobject runtime, int javaObjectId)
-                    : _env(env), _fieldID(fieldId), _runtime(runtime) {
-                _env.SetIntField(_runtime, _fieldID, javaObjectId);
-            }
-
-            ~JavaObjectIdScope() {
-                _env.SetIntField(_runtime, _fieldID, -1);
-            }
-
-        private:
-            JEnv _env;
-            jfieldID _fieldID;
-            jobject _runtime;
-        };
 
         static std::atomic_int64_t count_;
 

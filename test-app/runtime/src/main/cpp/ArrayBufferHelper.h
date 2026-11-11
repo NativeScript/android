@@ -20,7 +20,7 @@ namespace tns {
             ObjectManager* m_objectManager;
 
             jclass m_ByteBufferClass;
-            jmethodID m_isDirectMethodID;
+            v8::Eternal<v8::String> m_nativeObjectKey;
             jmethodID m_remainingMethodID;
             jmethodID m_getMethodID;
     };

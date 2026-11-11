@@ -18,12 +18,8 @@ describe("HTTP ESM Loader", function () {
         }
     }
 
-    // This Jasmine's fail() throws, which inside a promise reaction surfaces as
-    // an opaque spec timeout instead of a diff. Every rejection handler below
-    // reports through a non-throwing expect for that reason.
     function reportRejection(error, done) {
-        expect("rejected: " + formatError(error)).toBe("resolved");
-        done();
+        done.fail("rejected: " + formatError(error));
     }
 
     function withTimeout(promise, ms, label) {

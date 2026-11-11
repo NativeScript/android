@@ -35,6 +35,7 @@
     "dayjs": "^1.11.7",
     "eslint": "^9.15.0",
     "globals": "^15.12.0",
+    "jasmine-core": "7.0.2",
     "semver": "^7.5.0"
   }
 }

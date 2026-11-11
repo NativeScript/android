@@ -4,7 +4,6 @@
 
 #include "ArgConverter.h"
 #include "JniLocalRef.h"
-#include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
 #include "V8StringConstants.h"
@@ -173,24 +172,8 @@ static void EscapeExceptionCallback(const FunctionCallbackInfo<Value>& info) {
     info.GetReturnValue().Set(errObj);
 }
 
-void Interop::Init(Local<Context> context) {
-    auto isolate = v8::Isolate::GetCurrent();
-    auto global = context->Global();
-
-    auto interop = Object::New(isolate);
-
-    Local<Function> escapeException;
-    if (!Function::New(context, EscapeExceptionCallback).ToLocal(&escapeException)) {
-        throw NativeScriptException("Interop::Init: failed to create escapeException");
-    }
-
-    if (!interop->Set(context, ArgConverter::ConvertToV8String(isolate, "escapeException"),
-                      escapeException)
-                 .FromMaybe(false) ||
-        !global->Set(context, ArgConverter::ConvertToV8String(isolate, "interop"), interop)
-                 .FromMaybe(false)) {
-        throw NativeScriptException("Interop::Init: failed to install the interop global");
-    }
+MaybeLocal<Function> Interop::CreateEscapeException(Local<Context> context) {
+    return Function::New(context, EscapeExceptionCallback);
 }
 
 static string GetPayloadString(Local<Context> context, Local<Object> payload,

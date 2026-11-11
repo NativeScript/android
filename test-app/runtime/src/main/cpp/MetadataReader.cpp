@@ -245,9 +245,14 @@ MetadataTreeNode *MetadataReader::GetRoot() const {
 }
 
 uint8_t MetadataReader::GetNodeType(MetadataTreeNode *treeNode) {
+    uint8_t memoized = treeNode->type.load(std::memory_order_relaxed);
+    if (memoized != MetadataTreeNode::INVALID_TYPE) {
+        return memoized;
+    }
+
     StateLock lock(m_stateMutex);
 
-    if (treeNode->type == MetadataTreeNode::INVALID_TYPE) {
+    if (treeNode->type.load(std::memory_order_relaxed) == MetadataTreeNode::INVALID_TYPE) {
         uint8_t nodeType;
 
         uint32_t offsetValue = treeNode->offsetValue;
@@ -267,10 +272,10 @@ uint8_t MetadataReader::GetNodeType(MetadataTreeNode *treeNode) {
             nodeType = *(m_valueData + arrElemNode->offsetValue);
         }
 
-        treeNode->type = nodeType;
+        treeNode->type.store(nodeType, std::memory_order_relaxed);
     }
 
-    return treeNode->type;
+    return treeNode->type.load(std::memory_order_relaxed);
 }
 
 MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &className) {
@@ -396,11 +401,12 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
 
                 if ((cKind == 'C') || (cKind == 'I')) {
                     child->metadata = new string(part);
-                    child->type = (cKind == 'C') ? MetadataTreeNode::CLASS
-                                                 : MetadataTreeNode::INTERFACE;
+                    uint8_t childType = (cKind == 'C') ? MetadataTreeNode::CLASS
+                                                       : MetadataTreeNode::INTERFACE;
                     if (name == "S") {
-                        child->type |= MetadataTreeNode::STATIC;
+                        childType |= MetadataTreeNode::STATIC;
                     }
+                    child->type.store(childType, std::memory_order_relaxed);
 
                     getline(s, line);
                     stringstream baseClassLine(line);
@@ -412,11 +418,11 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
                     auto baseClassNodeId = GetNodeId(baseClassTreeNode);
 
                     child->offsetValue = m_valueLength;
-                    m_valueData[m_valueLength++] = child->type;
+                    m_valueData[m_valueLength++] = childType;
                     *reinterpret_cast<uint16_t *>(m_valueData + m_valueLength) = baseClassNodeId;
                     m_valueLength += sizeof(uint16_t);
                 } else {
-                    child->type = MetadataTreeNode::PACKAGE;
+                    child->type.store(MetadataTreeNode::PACKAGE, std::memory_order_relaxed);
                 }
 
                 m_v.push_back(child);

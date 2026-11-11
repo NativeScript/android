@@ -22,19 +22,26 @@ const intrinsics = {
   // Constructors.
   Date,
   Error,
+  EvalError,
   FinalizationRegistry,
   Map,
   Number,
+  Promise,
   RangeError,
+  ReferenceError,
   Set,
   String,
+  SyntaxError,
   TypeError,
   Uint8Array,
   Uint32Array,
+  URIError,
   URL,
   WeakRef,
+  WeakSet,
 
   // Well-known symbols.
+  SymbolFor: Symbol.for,
   SymbolIterator: Symbol.iterator,
   SymbolToStringTag: Symbol.toStringTag,
 
@@ -62,6 +69,8 @@ const intrinsics = {
   ObjectIs: Object.is,
   ObjectKeys: Object.keys,
   ObjectSetPrototypeOf: Object.setPrototypeOf,
+  // Promise.resolve reads its receiver to pick the species to construct.
+  PromiseResolve: Promise.resolve.bind(Promise),
 
   // Instance methods, uncurried.
   ArrayPrototypeForEach: uncurryThis(Array.prototype.forEach),
@@ -81,8 +90,11 @@ const intrinsics = {
   MapPrototypeEntries: uncurryThis(Map.prototype.entries),
   MapPrototypeGet: uncurryThis(Map.prototype.get),
   MapPrototypeSet: uncurryThis(Map.prototype.set),
+  ObjectPrototypeHasOwnProperty: uncurryThis(Object.prototype.hasOwnProperty),
+  ObjectPrototypeIsPrototypeOf: uncurryThis(Object.prototype.isPrototypeOf),
   ObjectPrototypePropertyIsEnumerable: uncurryThis(Object.prototype.propertyIsEnumerable),
   ObjectPrototypeToString: uncurryThis(Object.prototype.toString),
+  PromisePrototypeThen: uncurryThis(Promise.prototype.then),
   RegExpPrototypeTest: uncurryThis(RegExp.prototype.test),
   RegExpPrototypeToString: uncurryThis(RegExp.prototype.toString),
   SetPrototypeAdd: uncurryThis(Set.prototype.add),
@@ -97,6 +109,9 @@ const intrinsics = {
   StringPrototypeStartsWith: uncurryThis(String.prototype.startsWith),
   SymbolPrototypeToString: uncurryThis(Symbol.prototype.toString),
   WeakRefPrototypeDeref: uncurryThis(WeakRef.prototype.deref),
+  WeakSetPrototypeAdd: uncurryThis(WeakSet.prototype.add),
+  WeakSetPrototypeDelete: uncurryThis(WeakSet.prototype.delete),
+  WeakSetPrototypeHas: uncurryThis(WeakSet.prototype.has),
 
   // Iterator-protocol escape hatches: the captured `next` of the live map/set
   // iterator prototypes, so entries can be walked with early exit even after

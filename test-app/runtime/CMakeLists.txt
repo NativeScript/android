@@ -49,9 +49,6 @@ endif()
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/include_directories.html
 include_directories(
-        # V8 uses a custom STL compiled with the LIBCPP_ABI_UNSTABLE flag. To maintain the ABI
-        # compatibility we use this same STL headers for building the runtime
-        src/main/cpp/include/libc++
         src/main/cpp
         src/main/cpp/include
         src/main/cpp/v8_inspector
@@ -71,14 +68,21 @@ set(RUNTIME_BUILTIN_JS
         ${RUNTIME_BUILTIN_JS_DIR}/abort-signal.js
         ${RUNTIME_BUILTIN_JS_DIR}/base64.js
         ${RUNTIME_BUILTIN_JS_DIR}/blob-url.js
+        ${RUNTIME_BUILTIN_JS_DIR}/broadcast-channel.js
         ${RUNTIME_BUILTIN_JS_DIR}/dom-exception.js
         ${RUNTIME_BUILTIN_JS_DIR}/error-events.js
         ${RUNTIME_BUILTIN_JS_DIR}/events.js
         ${RUNTIME_BUILTIN_JS_DIR}/inspect.js
+        ${RUNTIME_BUILTIN_JS_DIR}/interop-globals.js
         ${RUNTIME_BUILTIN_JS_DIR}/json-helper.js
+        ${RUNTIME_BUILTIN_JS_DIR}/message-channel.js
+        ${RUNTIME_BUILTIN_JS_DIR}/message-event.js
         ${RUNTIME_BUILTIN_JS_DIR}/node-module.js
         ${RUNTIME_BUILTIN_JS_DIR}/node-url.js
         ${RUNTIME_BUILTIN_JS_DIR}/node-util.js
+        ${RUNTIME_BUILTIN_JS_DIR}/node-worker-threads.js
+        ${RUNTIME_BUILTIN_JS_DIR}/ns-interop-android.js
+        ${RUNTIME_BUILTIN_JS_DIR}/ns-interop.js
         ${RUNTIME_BUILTIN_JS_DIR}/ns-module.js
         ${RUNTIME_BUILTIN_JS_DIR}/ns-runtime.js
         ${RUNTIME_BUILTIN_JS_DIR}/ns-util.js
@@ -88,6 +92,7 @@ set(RUNTIME_BUILTIN_JS
         ${RUNTIME_BUILTIN_JS_DIR}/structured-clone.js
         ${RUNTIME_BUILTIN_JS_DIR}/text-encoding.js
         ${RUNTIME_BUILTIN_JS_DIR}/weak-ref.js
+        ${RUNTIME_BUILTIN_JS_DIR}/worker-events.js
 )
 set(RUNTIME_BUILTINS_GENERATED_DIR ${PROJECT_SOURCE_DIR}/src/main/cpp/generated)
 get_filename_component(RUNTIME_BUILTINS_JS2C ${PROJECT_SOURCE_DIR}/../../tools/js2c.mjs ABSOLUTE)
@@ -177,10 +182,10 @@ add_library(
         src/main/cpp/ConcurrentQueue.cpp
         src/main/cpp/Constants.cpp
         src/main/cpp/CrashBreadcrumbs.cpp
-        src/main/cpp/DirectBuffer.cpp
         src/main/cpp/ErrorEvents.cpp
         src/main/cpp/EventLoop.cpp
         src/main/cpp/Events.cpp
+        src/main/cpp/ExtendFileIdentifier.cpp
         src/main/cpp/FrameCallbacks.cpp
         src/main/cpp/FieldAccessor.cpp
         src/main/cpp/File.cpp
@@ -201,6 +206,7 @@ add_library(
         src/main/cpp/MetadataReader.cpp
         src/main/cpp/MetadataTreeNode.cpp
         src/main/cpp/MetadataEntry.cpp
+        src/main/cpp/Messaging.cpp
         src/main/cpp/MethodCache.cpp
         src/main/cpp/ModuleBinding.cpp
         src/main/cpp/ModuleInternal.cpp
@@ -225,15 +231,12 @@ add_library(
         src/main/cpp/V8GlobalHelpers.cpp
         src/main/cpp/V8StringConstants.cpp
         src/main/cpp/WeakRef.cpp
+        src/main/cpp/WorkerEvents.cpp
         src/main/cpp/WorkerWrapper.cpp
         src/main/cpp/Timers.cpp
         src/main/cpp/com_tns_AssetExtractor.cpp
         src/main/cpp/com_tns_Runtime.cpp
         src/main/cpp/console/Console.cpp
-        src/main/cpp/conversions/JSToJavaConverter.cpp
-        src/main/cpp/conversions/objects/JSToJavaObjectsConverter.cpp
-        src/main/cpp/conversions/arrays/JSToJavaArraysConverter.cpp
-        src/main/cpp/conversions/primitives/JSToJavaPrimitivesConverter.cpp
         src/main/cpp/ada/ada.cpp
         src/main/cpp/URLImpl.cpp
         src/main/cpp/URLSearchParamsImpl.cpp
@@ -260,18 +263,23 @@ add_library(
 
 set(NATIVES_BLOB_INCLUDE_DIRECTORIES ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/include)
 
+# Calls between this library's own exported functions bind directly instead of going
+# through the PLT. Exported functions stay callable from plugins; data symbols stay
+# interposable so a plugin and the runtime never end up with two copies of one variable.
+set(NS_SYMBOLIC_FUNCTIONS "-Wl,-Bsymbolic-functions")
+
 if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
     set_target_properties(
             NativeScript
             # The version script keeps V8's public API linkable for plugins while hiding
             # the ~60k v8::internal:: symbols the static monolith would otherwise export.
-            PROPERTIES LINK_FLAGS "-Wl,--allow-multiple-definition -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exported-symbols.map"
+            PROPERTIES LINK_FLAGS "-Wl,--allow-multiple-definition -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exported-symbols.map ${NS_SYMBOLIC_FUNCTIONS}"
             INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
     )
 else ()
     set_target_properties(
             NativeScript
-            PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition
+            PROPERTIES LINK_FLAGS "-Wl,--allow-multiple-definition ${NS_SYMBOLIC_FUNCTIONS}"
             INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
     )
 endif ()
@@ -286,8 +294,11 @@ MESSAGE(STATUS "# CMAKE_C_FLAGS: " ${CMAKE_C_FLAGS})
 MESSAGE(STATUS "# CMAKE_CXX_FLAGS: " ${CMAKE_CXX_FLAGS})
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/target_link_libraries.html
-# linking v8 and custom STL libraries to the runtime (NativeScript library)
 target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libzip.a)
+# libv8_monolith.a carries the NDK libc++ it was compiled against, and libc++ is
+# only ABI-compatible with itself, so v8-buildscripts has to build V8 with the
+# same NDK the runtime uses (its android_ndk_root gn arg) -- see
+# docs/knowledge/v8-14-migration.md.
 target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_monolith.a)
 
 

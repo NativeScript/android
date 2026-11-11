@@ -1,0 +1,153 @@
+#include "WorkerEvents.h"
+
+#include "ArgConverter.h"
+#include "BuiltinLoader.h"
+#include "NativeScriptException.h"
+#include "Runtime.h"
+#include "RuntimeState.h"
+
+using namespace v8;
+
+namespace tns {
+
+namespace {
+
+/*
+ * The worker-events builtin's delivery callouts for this isolate. Both message
+ * directions share emitMessage; only the receiver differs. emitError and
+ * emitEnded are parent-side only.
+ */
+struct WorkerEventsState {
+    Global<v8::Function> emitMessage;
+    Global<v8::Function> emitError;
+    Global<v8::Function> emitEnded;
+};
+
+Local<v8::Function> CalloutOf(Local<Object> exports, Isolate* isolate, const char* name) {
+    Local<Value> callout;
+    if (!exports->Get(isolate->GetCurrentContext(),
+                      ArgConverter::ConvertToV8String(isolate, name))
+                 .ToLocal(&callout) ||
+        !callout->IsFunction()) {
+        throw NativeScriptException(std::string("WorkerEvents::Init: the worker-events "
+                                                "bootstrap did not return ") +
+                                    name);
+    }
+    return callout.As<v8::Function>();
+}
+
+}  // namespace
+
+void WorkerEvents::Init(Local<Context> context) {
+    Isolate* isolate = v8::Isolate::GetCurrent();
+
+    Local<Object> exports;
+    if (!BuiltinLoader::GetExports(context, BuiltinId::kWorkerEvents, nullptr)
+                 .ToLocal(&exports)) {
+        throw NativeScriptException("WorkerEvents::Init: the worker-events bootstrap failed");
+    }
+
+    Local<v8::Function> emitMessage = CalloutOf(exports, isolate, "emitMessage");
+    Local<v8::Function> emitError = CalloutOf(exports, isolate, "emitError");
+    Local<v8::Function> emitEnded = CalloutOf(exports, isolate, "emitEnded");
+
+    auto* state = RuntimeState::For<WorkerEventsState>(isolate);
+    if (state == nullptr) {
+        throw NativeScriptException("WorkerEvents::Init: no runtime state for isolate");
+    }
+    state->emitMessage.Reset(isolate, emitMessage);
+    state->emitError.Reset(isolate, emitError);
+    state->emitEnded.Reset(isolate, emitEnded);
+}
+
+void WorkerEvents::EmitMessage(Isolate* isolate, Local<Object> receiver,
+                               const std::shared_ptr<worker::Message>& message) {
+    // Callers drain a whole batch under one scope; without this the handles of
+    // every message in the batch stay alive until the batch ends.
+    HandleScope handleScope(isolate);
+    auto* state = RuntimeState::For<WorkerEventsState>(isolate);
+    if (state == nullptr || state->emitMessage.IsEmpty()) {
+        return;
+    }
+    Runtime* runtime = Runtime::TryGetRuntime(isolate);
+    if (runtime == nullptr) {
+        return;
+    }
+    Local<Context> context = runtime->GetContext();
+
+    Local<Value> data;
+    Local<Value> ports;
+    const char* type = "message";
+    {
+        TryCatch tc(isolate);
+        if (!message->Deserialize(isolate, context, &ports).ToLocal(&data)) {
+            if (tc.HasTerminated()) {
+                return;
+            }
+            // HTML: a message that cannot be read still reaches its target, as
+            // a `messageerror` event. Its `data` is the failure, the same as a
+            // port's (NativeMessagePort::Drain) and as what Node hands
+            // `worker.on("messageerror")`; null when nothing was thrown, since
+            // delivery stores the payload as given and a bare undefined would
+            // surface as such.
+            data = tc.HasCaught() ? tc.Exception() : Local<Value>();
+            if (data.IsEmpty() || data->IsUndefined()) {
+                data = v8::Null(isolate);
+            }
+            tc.Reset();
+            ports = Local<Value>();
+            type = "messageerror";
+        }
+    }
+
+    Local<Value> args[3]{data,
+                         ports.IsEmpty() ? v8::Undefined(isolate).As<Value>() : ports,
+                         ArgConverter::ConvertToV8String(isolate, type)};
+    Local<Value> result;
+    // A throw here is left pending on purpose: on the worker side the drain's
+    // TryCatch turns it into the scope's error event, and on the parent side
+    // the internal-lane entry runs with no TryCatch of its own, so V8's
+    // uncaught-message listener reports it.
+    (void)state->emitMessage.Get(isolate)->Call(context, receiver, 3, args).ToLocal(&result);
+}
+
+MaybeLocal<Value> WorkerEvents::EmitError(Isolate* isolate, Local<Object> receiver,
+                                          const std::string& message, const std::string& source,
+                                          const std::string& stackTrace, int lineNumber,
+                                          Local<String> errorName,
+                                          Local<String> errorMessage) {
+    auto* state = RuntimeState::For<WorkerEventsState>(isolate);
+    if (state == nullptr || state->emitError.IsEmpty()) {
+        return MaybeLocal<Value>();
+    }
+    Runtime* runtime = Runtime::TryGetRuntime(isolate);
+    if (runtime == nullptr) {
+        return MaybeLocal<Value>();
+    }
+    Local<Context> context = runtime->GetContext();
+
+    Local<Value> args[6]{ArgConverter::ConvertToV8String(isolate, message),
+                         ArgConverter::ConvertToV8String(isolate, source),
+                         Number::New(isolate, lineNumber),
+                         ArgConverter::ConvertToV8String(isolate, stackTrace),
+                         errorName,
+                         errorMessage};
+    return state->emitError.Get(isolate)->Call(context, receiver, 6, args);
+}
+
+void WorkerEvents::EmitEnded(Isolate* isolate, Local<Object> receiver) {
+    auto* state = RuntimeState::For<WorkerEventsState>(isolate);
+    if (state == nullptr || state->emitEnded.IsEmpty()) {
+        return;
+    }
+    Runtime* runtime = Runtime::TryGetRuntime(isolate);
+    if (runtime == nullptr) {
+        return;
+    }
+    Local<Context> context = runtime->GetContext();
+
+    Local<Value> result;
+    (void)state->emitEnded.Get(isolate)->Call(context, receiver, 0, nullptr).ToLocal(&result);
+}
+
+}  // namespace tns

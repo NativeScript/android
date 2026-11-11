@@ -1,12 +1,18 @@
 const { exec } = require("child_process");
 
 const appId = "com.tns.testapplication";
-const runOnDeviceOrEmulator = process.argv[2] || "";
-const adbPrefix = `adb ${runOnDeviceOrEmulator} -e`;
-const resultsPath = `/data/data/${appId}/android_unit_test_results.xml`;
+const runOnDeviceOrEmulator = process.argv.slice(2).join(" ") || "-e";
+const adbPrefix = `adb ${runOnDeviceOrEmulator}`;
+const resultsFileName = "android_unit_test_results.xml";
 
 const processTimeoutMs = 20 * 60 * 1000; // 20 minutes timeout (empirical constant)
 const pollIntervalMs = 10 * 1000;
+// adb can hang outright on a wedged or overloaded device; a hung call would also stall the
+// overall timeout check, which only runs between calls.
+const adbCallTimeoutMs = 30 * 1000;
+// exec kills the child past maxBuffer (1 MiB by default); the results XML and a full logcat
+// dump can both exceed that.
+const adbExecOptions = { timeout: adbCallTimeoutMs, maxBuffer: 64 * 1024 * 1024 };
 const scriptStartTime = new Date();
 const logcatCutoffTime = new Date(scriptStartTime.getTime() - 60 * 1000); // 1 minute before start
 
@@ -16,7 +22,7 @@ console.error = console.log; // Redirect stderr to stdout for easier logcat capt
 
 function execAndStream(command, streamOutput = false) {
   return new Promise((resolve) => {
-    const child = exec(command, (error, stdout, stderr) => {
+    const child = exec(command, adbExecOptions, (error, stdout, stderr) => {
       resolve({ error, stdout, stderr });
     });
 
@@ -73,7 +79,7 @@ async function readAndFilterLogcat() {
 	// if we have a PID, filter by it
   if (appPID !== -1) {
     return new Promise((resolve) => {
-      exec(`${adbPrefix} logcat -d --pid=${appPID}`, (error, stdout) => {
+      exec(`${adbPrefix} logcat -d --pid=${appPID}`, adbExecOptions, (error, stdout) => {
         resolve(filterLogcatFromCutoff(stdout || ""));
       });
     });
@@ -81,7 +87,7 @@ async function readAndFilterLogcat() {
 	// otherwise, do a general logcat read
   return new Promise((resolve) => {
 		console.log('Reading full logcat since app PID is unknown');
-    exec(`${adbPrefix} logcat -d`, (error, stdout) => {
+    exec(`${adbPrefix} logcat -d`, adbExecOptions, (error, stdout) => {
       resolve(filterLogcatFromCutoff(stdout || ""));
     });
   });
@@ -97,27 +103,43 @@ async function exitWithLogcatDump() {
   }
 }
 
+// A single slow or failed adb call on a loaded host is not a crash; only give up after
+// several consecutive misses.
+const maxConsecutiveLivenessMisses = 3;
+let consecutiveLivenessMisses = 0;
+let appPID = -1;
+
+// pidof prints "<pid>". API 21-23 images have no pidof, so fall back to their ps, whose rows
+// are "<user> <pid> ...".
+function parseAppPid(output) {
+  const text = (output || "").trim();
+  const match = /^(\d+)/.exec(text) || /^\S+\s+(\d+)/.exec(text);
+  return match ? parseInt(match[1], 10) : NaN;
+}
+
 async function ensureProcessAlive() {
   const { stdout } = await execAndStream(
-    `${adbPrefix} shell "ps | grep ${appId}"`
+    `${adbPrefix} shell "pidof ${appId} 2>/dev/null || ps | grep ${appId}"`
   );
+  const pid = parseAppPid(stdout);
 
-  if (!stdout) {
+  if (!Number.isFinite(pid)) {
+    consecutiveLivenessMisses++;
+    if (consecutiveLivenessMisses < maxConsecutiveLivenessMisses) {
+      console.log(
+        `${appId} process not found (${consecutiveLivenessMisses}/${maxConsecutiveLivenessMisses}), checking again`
+      );
+      return;
+    }
     console.error(`${appId} process died or never started!`);
     await exitWithLogcatDump();
   }
-	await updateAppPID();
 
-  console.log(`${appId} process is running`);
-}
-let appPID = -1;
-async function updateAppPID() {
-  if (appPID !== -1) {
-    return appPID;
+  consecutiveLivenessMisses = 0;
+  if (appPID === -1) {
+    appPID = pid;
   }
-  const { stdout } = await execAndStream(`${adbPrefix} shell "pidof ${appId}"`);
-  appPID = parseInt(stdout.trim(), 10);
-  return appPID;
+  console.log(`${appId} process is running`);
 }
 
 async function checkForErrorActivity() {
@@ -139,32 +161,15 @@ function isCompleteJunitXml(text) {
   return /<testsuites[\s>]/.test(trimmed) && trimmed.includes("</testsuites>");
 }
 
+// The app writes into its private data dir. `run-as` reads it without root, as
+// long as the installed build is debuggable.
 async function tryPullResultsFile() {
-  const { error } = await execAndStream(`${adbPrefix} pull ${resultsPath}`);
-
-  if (!error) {
-    const fs = require("fs");
-    try {
-      const text = fs.readFileSync("android_unit_test_results.xml", "utf8");
-      if (isCompleteJunitXml(text)) {
-        console.log("Tests results file found!");
-        process.exit(0);
-      }
-    } catch (e) {
-      // Missing or unreadable; keep polling.
-    }
-  }
-
-  // Play Store / userdebug-less images reject `adb root` and cannot pull
-  // /data/data directly. Debug apps can still read their own files via run-as.
-  const localPath = "android_unit_test_results.xml";
-  const { error: runAsError, stdout } = await execAndStream(
-    `${adbPrefix} exec-out run-as ${appId} cat android_unit_test_results.xml`
+  const { error, stdout } = await execAndStream(
+    `${adbPrefix} exec-out run-as ${appId} cat ${resultsFileName}`
   );
-  if (!runAsError && isCompleteJunitXml(stdout)) {
-    const fs = require("fs");
-    fs.writeFileSync(localPath, stdout);
-    console.log("Tests results file found via run-as!");
+  if (!error && isCompleteJunitXml(stdout)) {
+    require("fs").writeFileSync(resultsFileName, stdout);
+    console.log("Tests results file found!");
     process.exit(0);
   }
 }

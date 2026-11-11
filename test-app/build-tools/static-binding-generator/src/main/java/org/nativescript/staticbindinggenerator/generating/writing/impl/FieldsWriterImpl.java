@@ -7,11 +7,22 @@ public class FieldsWriterImpl implements FieldsWriter {
 
 
     private static final String THIZ_KEYWORD = "thiz";
+    private static final String RUNTIME_TAG_FIELD_DECLARATION = "private volatile int runtimeTag__ns;";
+    private static final String OBJECT_ID_FIELD_DECLARATION = "private int objectId__ns;";
 
     private final Writer writer;
 
     public FieldsWriterImpl(final Writer writer) {
         this.writer = writer;
+    }
+
+    @Override
+    public void writeRuntimeTagField() {
+        writer.write(TABULATION_LITERAL);
+        writer.writeln(RUNTIME_TAG_FIELD_DECLARATION);
+        writer.write(TABULATION_LITERAL);
+        writer.writeln(OBJECT_ID_FIELD_DECLARATION);
+        writer.writeln();
     }
 
     @Override

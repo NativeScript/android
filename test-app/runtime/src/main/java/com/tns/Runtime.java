@@ -11,7 +11,6 @@ import com.tns.system.classloaders.impl.ClassLoadersCollectionImpl;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.ref.WeakReference;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -36,13 +35,14 @@ import dalvik.annotation.optimization.FastNative;
 
 public class Runtime {
     private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName,
-                                         Object[] v8Options, String callingDir, int maxLogcatObjectSize, boolean forceLog);
+                                         String v8Flags, boolean codeCache, String profilerOutputDir, boolean discardUncaughtJsExceptions, String uncaughtErrorPolicy,
+                                         String callingDir, int maxLogcatObjectSize, boolean forceLog);
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
 
     private native Object runScript(int runtimeId, String filePath) throws NativeScriptException;
 
-    private native Object callJSMethodNative(int runtimeId, int javaObjectID, String methodName, int retType, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
+    private native Object callJSMethodNative(int runtimeId, Object javaObject, int javaObjectID, String methodName, int methodNameId, int retType, boolean isConstructor, int argCount, long[] argValues, Object[] argRefs, long[] primitiveResult) throws NativeScriptException;
 
     private native void createJSInstanceNative(int runtimeId, Object javaObject, int javaObjectID, String canonicalName);
 
@@ -56,6 +56,12 @@ public class Runtime {
     @CriticalNative
     private static native int generateNewObjectIdCritical(int runtimeId);
     private static native int generateNewObjectIdLegacy(int runtimeId);
+
+    /**
+     * How long a Java thread calling into JS spins for the isolate before sleeping, in
+     * microseconds; negative lets callers go straight to V8's lock.
+     */
+    public static native void setAdmissionSpinMicros(int micros);
 
     private static int generateNewObjectId(int runtimeId) {
         return SUPPORTS_OPTIMIZED_NATIVE
@@ -124,12 +130,49 @@ public class Runtime {
         passExceptionToJsNative(getRuntimeId(), ex, ex.getMessage(), Runtime.getStackTraceErrorMessage(ex), Runtime.getJSStackTrace(ex), true);
     }
 
+    /**
+     * For callers with no binding instance at hand; the calling thread's runtime
+     * is only a guess at where the exception belongs.
+     */
     public static void passSuppressedExceptionToJs(Throwable ex, String methodName) {
-        com.tns.Runtime runtime = com.tns.Runtime.getCurrentRuntime();
+        passSuppressedExceptionToJs(null, ex, methodName);
+    }
+
+    public static void passSuppressedExceptionToJs(Object instance, Throwable ex, String methodName) {
+        int owningRuntimeId = getOwningRuntimeId(instance);
+
+        // A known owner that has terminated gets nothing: any other runtime
+        // receiving the report would surface an error that is not its own.
+        com.tns.Runtime runtime = (owningRuntimeId != NO_OWNING_RUNTIME)
+                ? runtimeCache.get(owningRuntimeId)
+                : com.tns.Runtime.getCurrentRuntime();
+
         if (runtime != null) {
-            String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for " + methodName + "\n";
-            runtime.passDiscardedExceptionToJs(ex, "");
+            runtime.postDiscardedExceptionToJs(ex);
+        } else {
+            android.util.Log.w("Warning", "NativeScript discarding suppressed exception from \"" + methodName
+                    + "\": no runtime is left to report it to", ex);
         }
+    }
+
+    /*
+     * Reports on the owning runtime's thread without waiting: the caller has
+     * already swallowed the exception and has no result to collect. A runtime
+     * whose looper is gone simply drops the report - throwing out of an
+     * error-reporting path would replace a suppressed exception with a live one.
+     */
+    private void postDiscardedExceptionToJs(final Throwable ex) {
+        if (config.appConfig.getEnableMultithreadedJavascript() || threadScheduler.getThread().equals(Thread.currentThread())) {
+            passDiscardedExceptionToJs(ex, "");
+            return;
+        }
+
+        threadScheduler.post(new Runnable() {
+            @Override
+            public void run() {
+                passDiscardedExceptionToJs(ex, "");
+            }
+        });
     }
 
     private boolean initialized;
@@ -138,20 +181,33 @@ public class Runtime {
             "Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
             "If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
 
-    private Map<Integer, Object> strongInstances = new HashMap<>();
+    // Any thread may read it and register new objects through findOrRegister (see
+    // ObjectTable); every other mutation comes from the thread holding this runtime's
+    // isolate lock.
+    private final ObjectTable objectTable;
 
-    private Map<Integer, WeakReference<Object>> weakInstances = new HashMap<>();
+    private final ObjectTable.IdSource objectIds = new ObjectTable.IdSource() {
+        @Override
+        public int newId() {
+            return generateNewObjectId(getRuntimeId());
+        }
+    };
 
-    private Map<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
-
-    private Map<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
+    // Set in a packed argument when packageArgs registered the object itself, before the
+    // isolate lock; native then wraps it without asking Java again.
+    private static final long FRESH_ARG = 1L << 63;
 
     private Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
 
     private final java.lang.Runtime dalvikRuntime = java.lang.Runtime.getRuntime();
 
     private final Object keyNotFoundObject = new Object();
+    // The id and class of the instance JS is constructing, set by the native side around
+    // the Java constructor call. Only an instance of exactly that class may take the id: any
+    // other binding instance created while that constructor runs was created by Java. The
+    // class is only meaningful while the id is set, and only native code writes it.
     private int currentObjectId = -1;
+    private Class<?> currentObjectClass;
 
     private ExtractPolicy extractPolicy;
 
@@ -188,6 +244,8 @@ public class Runtime {
     };
 
     private final StaticConfiguration config;
+    private final boolean discardUncaughtJsExceptions;
+    private final boolean multithreadedJavascript;
     private static StaticConfiguration staticConfiguration;
 
     private final DynamicConfiguration dynamicConfig;
@@ -209,24 +267,74 @@ public class Runtime {
      */
     private static volatile Runtime mainRuntime;
     private final static Map<Integer, Runtime> runtimeCache = new ConcurrentHashMap<>();
+    // runtimeCache by id for the Java->JS call path, which would otherwise box the id and
+    // probe the map on every call; ids past its length fall back to the map.
+    private static volatile Runtime[] runtimesById = new Runtime[8];
+    private static final int MAX_INDEXED_RUNTIME_ID = 1024;
+
+    private static synchronized void indexRuntime(int runtimeId, Runtime runtime) {
+        if (runtimeId < 0 || runtimeId >= MAX_INDEXED_RUNTIME_ID) {
+            return;
+        }
+        Runtime[] index = runtimesById;
+        index = Arrays.copyOf(index, Math.max(index.length, Integer.highestOneBit(runtimeId) * 2));
+        index[runtimeId] = runtime;
+        runtimesById = index;
+    }
+
+    private static Runtime runtimeForId(int runtimeId) {
+        Runtime[] index = runtimesById;
+        if (runtimeId >= 0 && runtimeId < index.length) {
+            return index[runtimeId];
+        }
+        return runtimeCache.get(runtimeId);
+    }
     public static boolean nativeLibraryLoaded;
 
     private static final ClassStorageService classStorageService = new ClassStorageServiceImpl(ClassCacheImpl.INSTANCE, ClassLoadersCollectionImpl.INSTANCE);
 
-    public Runtime(ClassResolver classResolver, GcListener gcListener, StaticConfiguration config, DynamicConfiguration dynamicConfig, int runtimeId, int workerId, HashMap<Integer, Object> strongInstances, HashMap<Integer, WeakReference<Object>> weakInstances, NativeScriptHashMap<Object, Integer> strongJavaObjectToId, NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToId) {
+    // A dense index per runtime class, shared by every runtime, so native code can cache a
+    // class's name and global ref by index instead of asking Java for them per object. 0 is
+    // never assigned; native reads it as "no index".
+    private static final ConcurrentHashMap<Class<?>, Integer> classIndices = new ConcurrentHashMap<>();
+    private static int nextClassIndex = 1;
+
+    static int classIndexOf(Class<?> clazz) {
+        Integer index = classIndices.get(clazz);
+        return index != null ? index : registerClass(clazz);
+    }
+
+    private static int registerClass(Class<?> clazz) {
+        synchronized (classIndices) {
+            Integer index = classIndices.get(clazz);
+            if (index == null) {
+                classStorageService.storeClass(clazz.getName(), clazz);
+                index = nextClassIndex++;
+                classIndices.put(clazz, index);
+            }
+            return index;
+        }
+    }
+
+    // An object id in the low half, the object's class index in the high half.
+    static long packIdAndClass(int objectId, Object obj) {
+        return ((long) classIndexOf(obj.getClass()) << 32) | (objectId & 0xFFFFFFFFL);
+    }
+
+    public Runtime(ClassResolver classResolver, GcListener gcListener, StaticConfiguration config, DynamicConfiguration dynamicConfig, int runtimeId, int workerId, ObjectTable objectTable) {
         this.classResolver = classResolver;
         this.gcListener = gcListener;
         this.config = config;
+        this.discardUncaughtJsExceptions = config != null && config.appConfig != null && config.appConfig.getDiscardUncaughtJsExceptions();
+        this.multithreadedJavascript = config != null && config.appConfig != null && config.appConfig.getEnableMultithreadedJavascript();
         this.dynamicConfig = dynamicConfig;
         this.runtimeId = runtimeId;
         this.workerId = workerId;
-        this.strongInstances = strongInstances;
-        this.weakInstances = weakInstances;
-        this.strongJavaObjectToID = strongJavaObjectToId;
-        this.weakJavaObjectToID = weakJavaObjectToId;
+        this.objectTable = objectTable;
     }
 
     public Runtime(StaticConfiguration config, DynamicConfiguration dynamicConfiguration) {
+        this.objectTable = new ObjectTable();
         synchronized (Runtime.currentRuntime) {
             ManualInstrumentation.Frame frame = ManualInstrumentation.start("new Runtime");
             try {
@@ -237,18 +345,16 @@ public class Runtime {
 
                 this.runtimeId = nextRuntimeId.getAndIncrement();
                 this.config = config;
+                this.discardUncaughtJsExceptions = config.appConfig.getDiscardUncaughtJsExceptions();
+                this.multithreadedJavascript = config.appConfig.getEnableMultithreadedJavascript();
                 this.dynamicConfig = dynamicConfiguration;
                 this.threadScheduler = dynamicConfiguration.myThreadScheduler;
                 this.workerId = dynamicConfiguration.workerId;
                 // if multithreadedJS, make all maps concurrent or synchronized:
                 if (config.appConfig.getEnableMultithreadedJavascript()) {
-                    this.strongInstances = new ConcurrentHashMap<>();
-                    this.weakInstances = new ConcurrentHashMap<>();
                     // TODO: can't use a ConcurrentHashMap for loadedJavaScriptExtends because it loads null objects, which aren't supported
                     // either leave it like this or create a separate set for null caches
                     this.loadedJavaScriptExtends = Collections.synchronizedMap(new HashMap<>());
-                    this.strongJavaObjectToID = Collections.synchronizedMap(new NativeScriptHashMap<>());
-                    this.weakJavaObjectToID = Collections.synchronizedMap(new NativeScriptWeakHashMap<>());
                 }
 
                 classResolver = new ClassResolver(classStorageService);
@@ -261,6 +367,7 @@ public class Runtime {
                 // the thread-local or the cache
                 currentRuntime.set(this);
                 runtimeCache.put(this.runtimeId, this);
+                indexRuntime(this.runtimeId, this);
             } finally {
                 frame.close();
             }
@@ -394,17 +501,41 @@ public class Runtime {
         return new String[0];
     }
 
-    private static Runtime getObjectRuntime(Object object) {
-        Runtime runtime = null;
+    private static final int NO_OWNING_RUNTIME = -1;
 
-        for (Runtime r : runtimeCache.values()) {
-            if (r.getJavaObjectID(object) != null) {
-                runtime = r;
-                break;
+    /*
+     * Records which runtime a binding instance belongs to. Called once, from
+     * initInstance, by the runtime that registers the instance; later
+     * registrations in other runtimes (getOrCreateJavaObjectID when the instance
+     * crosses into another isolate) must not overwrite it, because only the
+     * creating runtime holds the JS implementation behind the generated overrides.
+     *
+     * The tag is the runtime id plus one, so that the field's zero default means
+     * "no owner yet": runtime id 0 is the main runtime's.
+     */
+    private static void recordOwningRuntime(Object instance, int runtimeId, int objectId) {
+        if (instance instanceof NativeScriptRuntimeBound) {
+            NativeScriptRuntimeBound bound = (NativeScriptRuntimeBound) instance;
+            if (bound.getRuntimeTag__ns() == 0) {
+                // Before the tag: readers take the id only once they see a tag.
+                bound.setObjectId__ns(objectId);
+                bound.setRuntimeTag__ns(runtimeId + 1);
             }
         }
+    }
 
-        return runtime;
+    /*
+     * The id of the runtime that created the instance, or NO_OWNING_RUNTIME when
+     * nothing has recorded one yet. A returned id may name a runtime that has
+     * since been torn down; callers decide how to report that.
+     */
+    private static int getOwningRuntimeId(Object javaObject) {
+        if (!(javaObject instanceof NativeScriptRuntimeBound)) {
+            return NO_OWNING_RUNTIME;
+        }
+
+        int tag = ((NativeScriptRuntimeBound) javaObject).getRuntimeTag__ns();
+        return (tag == 0) ? NO_OWNING_RUNTIME : tag - 1;
     }
 
     /*
@@ -474,15 +605,6 @@ public class Runtime {
         }
     }
 
-    @RuntimeCallable
-    public int getMarkingModeOrdinal() {
-        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
-            return staticConfiguration.appConfig.getMarkingMode().ordinal();
-        } else {
-            return ((MarkingMode) AppConfig.KnownKeys.MarkingMode.getDefaultValue()).ordinal();
-        }
-    }
-
     public static boolean isInitialized() {
         Runtime runtime = Runtime.getCurrentRuntime();
         return (runtime != null) ? runtime.isInitializedImpl() : false;
@@ -503,18 +625,10 @@ public class Runtime {
         }
     }
 
+    // Only native code may call this, from the thread holding the isolate lock.
+    @RuntimeCallable
     public void releaseNativeCounterpart(int nativeObjectId) {
-        Object strongRef = strongInstances.get(nativeObjectId);
-        if (strongRef != null) {
-            strongInstances.remove(nativeObjectId);
-            strongJavaObjectToID.remove(strongRef);
-        }
-
-        WeakReference<Object> weakRef = weakInstances.get(nativeObjectId);
-        if (weakRef != null) {
-            weakInstances.remove(nativeObjectId);
-            weakJavaObjectToID.remove(weakRef);
-        }
+        objectTable.remove(nativeObjectId);
     }
 
     /*
@@ -576,6 +690,7 @@ public class Runtime {
     @RuntimeCallable
     public static void detachWorkerRuntime(int runtimeId) {
         Runtime runtime = runtimeCache.remove(runtimeId);
+        indexRuntime(runtimeId, null);
         if (runtime != null) {
             GcListener.unsubscribe(runtime);
 
@@ -600,6 +715,7 @@ public class Runtime {
             // failed bootstrap doesn't leave a stale, half-initialized runtime
             // reachable through the caches
             runtimeCache.remove(runtime.getRuntimeId());
+            indexRuntime(runtime.getRuntimeId(), null);
             currentRuntime.remove();
             GcListener.unsubscribe(runtime);
             throw t;
@@ -652,7 +768,9 @@ public class Runtime {
 
             boolean forceConsoleLog = appConfig.getForceLog() || "timeline".equalsIgnoreCase(appConfig.getProfilingMode());
 
-            initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName, appConfig.getAsArray(),
+            initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName,
+                    appConfig.getV8Flags(), appConfig.getCodeCache(), appConfig.getProfilerOutputDir(),
+                    appConfig.getDiscardUncaughtJsExceptions(), appConfig.getUncaughtErrorPolicy(),
                     callingJsDir, appConfig.getMaxLogcatObjectSize(), forceConsoleLog);
 
             if (logger.isEnabled()) {
@@ -756,7 +874,6 @@ public class Runtime {
         return javaClass;
     }
 
-    @RuntimeCallable
     private long getUsedMemory() {
         long usedMemory = dalvikRuntime.totalMemory() - dalvikRuntime.freeMemory();
         return usedMemory;
@@ -810,22 +927,30 @@ public class Runtime {
         try {
             Runtime runtime = Runtime.getCurrentRuntime();
 
+            if (runtime == null) {
+                throw new NativeScriptException("Cannot initialize an instance of " + instance.getClass().getName()
+                        + ": no NativeScript runtime is bound to thread \"" + Thread.currentThread().getName()
+                        + "\". Construct it on the runtime's own thread, or from JS.");
+            }
+
             int objectId = runtime.currentObjectId;
 
-            if (objectId != -1) {
+            if (objectId != -1 && instance.getClass() == runtime.currentObjectClass) {
+                runtime.currentObjectId = -1;
                 runtime.makeInstanceStrong(instance, objectId);
             } else {
-                runtime.createJSInstance(instance);
+                objectId = runtime.createJSInstance(instance);
             }
+
+            recordOwningRuntime(instance, runtime.getRuntimeId(), objectId);
         } finally {
             frame.close();
         }
     }
 
-    private void createJSInstance(Object instance) {
+    private int createJSInstance(Object instance) {
+        // Registered by createJSInstanceNative, which holds the isolate lock.
         int javaObjectID = generateNewObjectId(getRuntimeId());
-
-        makeInstanceStrong(instance, javaObjectID);
 
         Class<?> clazz = instance.getClass();
 
@@ -847,6 +972,8 @@ public class Runtime {
         if (logger.isEnabled()) {
             logger.write("JSInstance for " + instance.getClass().toString() + " created with overrides");
         }
+
+        return javaObjectID;
     }
 
     @RuntimeCallable
@@ -962,6 +1089,13 @@ public class Runtime {
         return ret;
     }
 
+    // One upcall for what native needs after constructing an object from JS.
+    @RuntimeCallable
+    private long registerConstructedInstance(Object instance, int objectId) {
+        makeInstanceStrong(instance, objectId);
+        return getUsedMemory();
+    }
+
     @RuntimeCallable
     private void makeInstanceStrong(Object instance, int objectId) {
         if (instance == null) {
@@ -969,98 +1103,27 @@ public class Runtime {
         }
 
         int key = objectId;
-        strongInstances.put(key, instance);
-        strongJavaObjectToID.put(instance, key);
+        objectTable.putStrong(key, instance);
 
-        Class<?> clazz = instance.getClass();
-        classStorageService.storeClass(clazz.getName(), clazz);
+        // Stores the class by name on its first registration.
+        classIndexOf(instance.getClass());
 
         if (logger != null && logger.isEnabled()) {
             logger.write("MakeInstanceStrong (" + key + ", " + instance.getClass().toString() + ")");
         }
     }
 
-    private void makeInstanceWeak(int javaObjectID, boolean keepAsWeak) {
+    /*
+     * One call per finalizer batch: the JS wrappers of these ids were collected. weaken holds
+     * first collections (held strongly until now), check later ones. Each entry whose Java
+     * object is already gone is overwritten with -1 so its wrapper can be released too.
+     */
+    @RuntimeCallable
+    private void processFinalizedBatch(int[] weaken, int weakenCount, int[] check, int checkCount) {
+        objectTable.weakenAndCheckAlive(weaken, weakenCount);
+        objectTable.weakenAndCheckAlive(check, checkCount);
         if (logger.isEnabled()) {
-            logger.write("makeInstanceWeak instance " + javaObjectID + " keepAsWeak=" + keepAsWeak);
-        }
-        Object instance = strongInstances.get(javaObjectID);
-
-        if (keepAsWeak) {
-            weakJavaObjectToID.put(instance, Integer.valueOf(javaObjectID));
-            weakInstances.put(javaObjectID, new WeakReference<Object>(instance));
-        }
-
-        strongInstances.remove(javaObjectID);
-        strongJavaObjectToID.remove(instance);
-    }
-
-    @RuntimeCallable
-    private void makeInstanceWeak(ByteBuffer buff, int length, boolean keepAsWeak) {
-        buff.position(0);
-        for (int i = 0; i < length; i++) {
-            int javaObjectId = buff.getInt();
-            makeInstanceWeak(javaObjectId, keepAsWeak);
-        }
-    }
-
-    @RuntimeCallable
-    private boolean makeInstanceWeakAndCheckIfAlive(int javaObjectID) {
-        if (logger.isEnabled()) {
-            logger.write("makeInstanceWeakAndCheckIfAlive instance " + javaObjectID);
-        }
-        Object instance = strongInstances.get(javaObjectID);
-        if (instance == null) {
-            WeakReference<Object> ref = weakInstances.get(javaObjectID);
-            if (ref == null) {
-                return false;
-            } else {
-                instance = ref.get();
-                if (instance == null) {
-                    // The Java was moved from strong to weak, and then the Java instance was collected.
-                    weakInstances.remove(javaObjectID);
-                    weakJavaObjectToID.remove(ref);
-                    return false;
-                } else {
-                    return true;
-                }
-            }
-        } else {
-            strongInstances.remove(javaObjectID);
-            strongJavaObjectToID.remove(instance);
-
-            weakJavaObjectToID.put(instance, javaObjectID);
-            weakInstances.put(javaObjectID, new WeakReference<Object>(instance));
-
-            return true;
-        }
-    }
-
-    @RuntimeCallable
-    private void checkWeakObjectAreAlive(ByteBuffer input, ByteBuffer output, int length) {
-        input.position(0);
-        output.position(0);
-        for (int i = 0; i < length; i++) {
-            int javaObjectId = input.getInt();
-
-            WeakReference<Object> weakRef = weakInstances.get(javaObjectId);
-
-            int isReleased;
-
-            if (weakRef != null) {
-                Object instance = weakRef.get();
-
-                if (instance == null) {
-                    isReleased = 1;
-                    weakInstances.remove(javaObjectId);
-                } else {
-                    isReleased = 0;
-                }
-            } else {
-                isReleased = (strongInstances.get(javaObjectId) == null) ? 1 : 0;
-            }
-
-            output.putInt(isReleased);
+            logger.write("processFinalizedBatch weakened=" + weakenCount + " checked=" + checkCount);
         }
     }
 
@@ -1070,51 +1133,62 @@ public class Runtime {
             logger.write("Platform.getJavaObjectByID:" + javaObjectID);
         }
 
-        Object instance = strongInstances.get(javaObjectID);
-
+        Object instance = objectTable.get(javaObjectID);
         if (instance == null) {
-            instance = keyNotFoundObject;
+            throw new NativeScriptException(objectTable.contains(javaObjectID)
+                    ? "Attempt to use cleared object reference id=" + javaObjectID
+                    : "No weak reference found. Attempt to use cleared object reference id=" + javaObjectID);
         }
 
-        if (instance == keyNotFoundObject) {
-            WeakReference<Object> wr = weakInstances.get(javaObjectID);
-            if (wr == null) {
-                throw new NativeScriptException("No weak reference found. Attempt to use cleared object reference id=" + javaObjectID);
-            }
-
-            instance = wr.get();
-            if (instance == null) {
-                throw new NativeScriptException("Attempt to use cleared object reference id=" + javaObjectID);
-            }
-        }
-
-        // Log.d(DEFAULT_LOG_TAG,
-        // "Platform.getJavaObjectByID found strong object with id:" +
-        // javaObjectID);
         return instance;
     }
 
     private Integer getJavaObjectID(Object obj) {
-        Integer id = strongJavaObjectToID.get(obj);
-        if (id == null) {
-            id = weakJavaObjectToID.get(obj);
-        }
+        int id = objectTable.findId(obj);
+        return id == ObjectTable.NO_ID ? null : id;
+    }
 
-        return id;
+    // Removes id's entry if its object was collected; returns whether it was.
+    @RuntimeCallable
+    private boolean releaseIfCollected(int javaObjectID) {
+        if (objectTable.get(javaObjectID) != null) {
+            return false;
+        }
+        objectTable.remove(javaObjectID);
+        return true;
+    }
+
+    @RuntimeCallable
+    private int findJavaObjectID(Object obj) {
+        return objectTable.findId(obj);
+    }
+
+    // The class index is only needed to create a wrapper, and an object that already has
+    // an id almost always has one; native asks for the class itself when it does not.
+    @RuntimeCallable
+    private long getOrCreateJavaObjectIDAndClass(Object obj) {
+        long found = getOrCreateObjectId(obj);
+        if ((found & ObjectTable.FRESH) == 0) {
+            return found;
+        }
+        return packIdAndClass((int) found, obj);
     }
 
     @RuntimeCallable
     private int getOrCreateJavaObjectID(Object obj) {
-        Integer result = getJavaObjectID(obj);
-
-        if (result == null) {
-            int objectId = generateNewObjectId(getRuntimeId());
-            makeInstanceStrong(obj, objectId);
-
-            result = objectId;
+        long found = getOrCreateObjectId(obj);
+        if ((found & ObjectTable.FRESH) != 0) {
+            // Stores the class by name on its first registration.
+            classIndexOf(obj.getClass());
         }
+        return (int) found;
+    }
 
-        return result;
+    // obj's id (low 32 bits), registering it strongly under a new id if it has none, with
+    // ObjectTable.FRESH set then. Threads registering call arguments (packageArgs) do not
+    // hold the isolate lock, so the lookup and insert are one atomic step.
+    private long getOrCreateObjectId(Object obj) {
+        return objectTable.findOrRegister(obj, objectIds);
     }
 
     public static Object callJSMethodFromPossibleNonMainThread(Object javaObject, String methodName, Class<?> retType, Object... args) throws NativeScriptException {
@@ -1172,65 +1246,150 @@ public class Runtime {
     }
 
     public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException {
-        Runtime runtime = Runtime.getCurrentRuntime();
-
-        // if we're not in a runtime or the runtime we're in does not have the object, try to find the right one (this might happen if a worker fires a JS method on an object created in the main thread or another worker)
-        if (runtime == null || runtime.getJavaObjectID(javaObject) == null) {
-            runtime = getObjectRuntime(javaObject);
+        int owningRuntimeId = NO_OWNING_RUNTIME;
+        int objectIdHint = -1;
+        if (javaObject instanceof NativeScriptRuntimeBound) {
+            NativeScriptRuntimeBound bound = (NativeScriptRuntimeBound) javaObject;
+            int tag = bound.getRuntimeTag__ns();
+            if (tag != 0) {
+                owningRuntimeId = tag - 1;
+                objectIdHint = bound.getObjectId__ns();
+            }
         }
+        Runtime runtime;
 
-        if (runtime == null) {
-            throw new NativeScriptException("Cannot find runtime for instance=" + ((javaObject == null) ? "null" : javaObject));
-        }
+        if (owningRuntimeId != NO_OWNING_RUNTIME) {
+            runtime = runtimeForId(owningRuntimeId);
 
-        return runtime.callJSMethodImpl(javaObject, methodName, retType, isConstructor, delay, args);
-    }
+            if (runtime == null) {
+                return discardCall(methodName, retType, describeInstance(javaObject)
+                        + " outlived the runtime that created it (id=" + owningRuntimeId + ")");
+            }
+        } else {
+            // No owner recorded yet: the instance is still being constructed and
+            // registered (a generated method invoked from the superclass
+            // constructor, or re-entered while initInstance runs), so only the
+            // constructing thread's runtime can hold it.
+            runtime = Runtime.getCurrentRuntime();
 
-    private Object callJSMethodImpl(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException {
-        Integer javaObjectID = getJavaObjectID(javaObject);
-        if (javaObjectID == null) {
-            throw new NativeScriptException("Cannot find object id for instance=" + ((javaObject == null) ? "null" : javaObject));
-        }
-
-        if (logger.isEnabled()) {
-            logger.write("Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
-        }
-
-        Object result = dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, delay, retType, args);
-
-        return result;
-    }
-
-    // Packages args in format (typeID, value, null) except for objects where it is
-    // (typeid, javaObjectID, canonicalName)
-    // if javaObject has no javaObjecID meaning javascript object does not
-    // exists for this object we assign one.
-    private Object[] packageArgs(Object... args) {
-        int len = (args != null) ? (args.length * 3) : 0;
-        Object[] packagedArgs = new Object[len];
-
-        if (len > 0) {
-            int jsArgsIndex = 0;
-
-            for (int i = 0; i < args.length; i++) {
-                Object value = args[i];
-                int typeId = TypeIDs.GetObjectTypeId(value);
-                String javaClassPath = null;
-
-                if (typeId == TypeIDs.JsObject) {
-                    javaClassPath = value.getClass().getName();
-                    value = getOrCreateJavaObjectID(value);
-                }
-
-                packagedArgs[jsArgsIndex++] = typeId;
-
-                packagedArgs[jsArgsIndex++] = value;
-
-                packagedArgs[jsArgsIndex++] = javaClassPath;
+            if (runtime == null) {
+                throw new NativeScriptException("Cannot find runtime for " + describeInstance(javaObject));
             }
         }
 
-        return packagedArgs;
+        return runtime.dispatchCallJSMethodNative(javaObject, objectIdHint, methodName, isConstructor, delay, retType, args);
+    }
+
+    /*
+     * Names the class rather than calling toString(): that may be one of the JS
+     * overrides, and these messages are built exactly when calling into JS is
+     * not possible.
+     */
+    private static String describeInstance(Object javaObject) {
+        return (javaObject == null) ? "null" : "an instance of " + javaObject.getClass().getName();
+    }
+
+    /*
+     * Arguments cross to native in one long[] so the native side reads them with
+     * a single region copy instead of unboxing each through JNI: count values
+     * (primitives as raw bits, float/double via floatToRawIntBits/
+     * doubleToRawLongBits; objects as a packed id and class index), then the
+     * TypeIDs.GetObjectTypeId(Object) of each, one per byte. refs holds strings
+     * and objects. Must match JavaCallArgs in ArgConverter.h.
+     */
+    private static final class PackagedArgs {
+        final int count;
+        final long[] values;
+        final Object[] refs;
+
+        PackagedArgs(int count, long[] values, Object[] refs) {
+            this.count = count;
+            this.values = values;
+            this.refs = refs;
+        }
+    }
+
+    private static final PackagedArgs NO_ARGS = new PackagedArgs(0, null, null);
+
+    // If a javaObject has no javaObjectID, meaning no JavaScript object exists
+    // for it yet, it is assigned one.
+    private PackagedArgs packageArgs(Object... args) {
+        int len = (args != null) ? args.length : 0;
+        if (len == 0) {
+            return NO_ARGS;
+        }
+
+        long[] values = new long[len + (len + 7) / 8];
+        Object[] refs = null;
+
+        for (int i = 0; i < len; i++) {
+            Object value = args[i];
+            int typeId;
+
+            if (value == null) {
+                typeId = TypeIDs.Null;
+            } else if (value instanceof Integer) {
+                typeId = TypeIDs.Int;
+                values[i] = (Integer) value;
+            } else if (value instanceof Boolean) {
+                typeId = TypeIDs.Boolean;
+                values[i] = ((Boolean) value) ? 1 : 0;
+            } else if (value instanceof Character) {
+                typeId = TypeIDs.Char;
+                values[i] = (Character) value;
+            } else if (value instanceof Byte) {
+                typeId = TypeIDs.Byte;
+                values[i] = (Byte) value;
+            } else if (value instanceof Short) {
+                typeId = TypeIDs.Short;
+                values[i] = (Short) value;
+            } else if (value instanceof Long) {
+                typeId = TypeIDs.Long;
+                values[i] = (Long) value;
+            } else if (value instanceof Float) {
+                typeId = TypeIDs.Float;
+                values[i] = Float.floatToRawIntBits((Float) value);
+            } else if (value instanceof Double) {
+                typeId = TypeIDs.Double;
+                values[i] = Double.doubleToRawLongBits((Double) value);
+            } else if (value instanceof String) {
+                typeId = TypeIDs.string;
+                if (refs == null) {
+                    refs = new Object[len];
+                }
+                refs[i] = value;
+            } else {
+                typeId = TypeIDs.JsObject;
+                if (refs == null) {
+                    refs = new Object[len];
+                }
+                refs[i] = value;
+                int id = ObjectTable.NO_ID;
+                if (value instanceof NativeScriptRuntimeBound) {
+                    // A binding of this runtime carries its id (written before the tag, never
+                    // reused); native resolves it like an identity-index hint.
+                    NativeScriptRuntimeBound bound = (NativeScriptRuntimeBound) value;
+                    if (bound.getRuntimeTag__ns() == getRuntimeId() + 1) {
+                        id = bound.getObjectId__ns();
+                    }
+                }
+                long fresh = 0;
+                if (id == ObjectTable.NO_ID) {
+                    // Registered here rather than under the isolate lock, so threads calling
+                    // in with new objects only serialize on creating their wrappers.
+                    long found = objectTable.findOrRegister(value, objectIds);
+                    id = (int) found;
+                    if ((found & ObjectTable.FRESH) != 0) {
+                        fresh = FRESH_ARG;
+                    }
+                }
+                values[i] = packIdAndClass(id, value) | fresh;
+            }
+
+            values[len + (i >> 3)] |= (long) typeId << ((i & 7) * 8);
+        }
+
+        return new PackagedArgs(len, values, refs);
     }
 
     static Class<?> getClassForName(String className) {
@@ -1293,25 +1452,64 @@ public class Runtime {
         return arr;
     }
 
-    private Object dispatchCallJSMethodNative(final int javaObjectID, final String methodName, boolean isConstructor, Class<?> retType, final Object[] args) throws NativeScriptException {
-        return dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, 0, retType, args);
+    /*
+     * While a cross-thread call waits, the owner may terminate. Looper.quit()
+     * discards queued messages, so a call posted just before that never runs and
+     * nothing would wake the caller; it re-checks the owner at this interval.
+     */
+    private static final long QUEUED_CALL_LIVENESS_CHECK_MS = 100;
+
+    private boolean isAcceptingWork() {
+        return runtimeCache.get(runtimeId) == this && threadScheduler.getThread().isAlive();
     }
 
-    private Object dispatchCallJSMethodNative(final int javaObjectID, final String methodName, boolean isConstructor, long delay, Class<?> retType, final Object[] args) throws NativeScriptException {
+    /*
+     * Must run on this runtime's thread unless multithreaded JS is enabled: the
+     * object maps are otherwise unsynchronized, and a weak-map lookup is not even
+     * read-only (it expunges stale entries).
+     */
+    private int resolveJavaObjectID(Object javaObject, String methodName) throws NativeScriptException {
+        Integer javaObjectID = getJavaObjectID(javaObject);
+        if (javaObjectID == null) {
+            throw new NativeScriptException("Cannot find object id for " + describeInstance(javaObject));
+        }
+
+        if (logger.isEnabled()) {
+            logger.write("Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
+        }
+
+        return javaObjectID;
+    }
+
+    private Object dispatchCallJSMethodNative(final Object javaObject, int objectIdHint, final String methodName, boolean isConstructor, long delay, Class<?> retType, final Object[] args) throws NativeScriptException {
         final int returnType = TypeIDs.GetObjectTypeId(retType);
         Object ret = null;
 
         boolean isWorkThread = threadScheduler.getThread().equals(Thread.currentThread());
 
         final Object[] tmpArgs = extendConstructorArgs(methodName, isConstructor, args);
-        final boolean discardUncaughtJsExceptions = this.config.appConfig.getDiscardUncaughtJsExceptions();
-        boolean enableMultithreadedJavascript = this.config.appConfig.getEnableMultithreadedJavascript();
+        final boolean discardUncaughtJsExceptions = this.discardUncaughtJsExceptions;
+        boolean enableMultithreadedJavascript = this.multithreadedJavascript;
 
         if (enableMultithreadedJavascript || isWorkThread) {
-            Object[] packagedArgs = packageArgs(tmpArgs);
+            PackagedArgs packagedArgs = packageArgs(tmpArgs);
+            long[] primitiveResult = newPrimitiveResult(returnType);
             try {
-                ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
+                // A hint: other threads may be writing the table, so native re-checks it under the
+                // isolate lock and resolves the id itself on a miss.
+                ret = callJSMethodNative(getRuntimeId(), javaObject,
+                        objectIdHint != ObjectTable.NO_ID ? objectIdHint : objectTable.findId(javaObject), methodName, MethodNameIds.idOf(methodName), returnType, isConstructor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult);
+                ret = takePrimitiveResult(ret, returnType, primitiveResult);
             } catch (NativeScriptException e) {
+                // With multithreaded JS the owner can be torn down between the
+                // routing check and the native call, which then throws
+                // "Cannot find runtime"; that is the same lifecycle race the
+                // other dead-owner paths drop.
+                if (!isAcceptingWork()) {
+                    return discardCall(methodName, retType, "runtime id=" + getRuntimeId() + " (workerId=" + workerId
+                            + ") terminated during the call");
+                }
+
                 if (discardUncaughtJsExceptions && !e.isEscapedFromJs()) {
                     String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
                     android.util.Log.w("Warning", "NativeScript discarding uncaught JS exception!");
@@ -1321,7 +1519,9 @@ public class Runtime {
                 }
             }
         } else {
-            final Object[] arr = new Object[2];
+            // [0] result, [1] completion flag, [2] a lookup failure to rethrow on
+            // the calling thread rather than on the runtime's looper
+            final Object[] arr = new Object[3];
 
             final boolean isCtor = isConstructor;
 
@@ -1330,8 +1530,16 @@ public class Runtime {
                 public void run() {
                     synchronized (this) {
                         try {
-                            final Object[] packagedArgs = packageArgs(tmpArgs);
-                            arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs);
+                            final int javaObjectID;
+                            try {
+                                javaObjectID = resolveJavaObjectID(javaObject, methodName);
+                            } catch (NativeScriptException e) {
+                                arr[2] = e;
+                                return;
+                            }
+                            final PackagedArgs packagedArgs = packageArgs(tmpArgs);
+                            final long[] primitiveResult = newPrimitiveResult(returnType);
+                            arr[0] = takePrimitiveResult(callJSMethodNative(getRuntimeId(), javaObject, javaObjectID, methodName, MethodNameIds.idOf(methodName), returnType, isCtor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult), returnType, primitiveResult);
                         } catch (NativeScriptException e) {
                             if (discardUncaughtJsExceptions && !e.isEscapedFromJs()) {
                                 String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
@@ -1360,13 +1568,27 @@ public class Runtime {
             if (success) {
                 synchronized (r) {
                     try {
-                        if (arr[1] == null) {
-                            r.wait();
+                        while (arr[1] == null) {
+                            r.wait(QUEUED_CALL_LIVENESS_CHECK_MS);
+
+                            if (arr[1] == null && !isAcceptingWork()) {
+                                logDiscardedCall(methodName, "runtime id=" + getRuntimeId() + " (workerId=" + workerId
+                                        + ") terminated before the call ran");
+                                break;
+                            }
                         }
                     } catch (InterruptedException e) {
                         ret = e;
                     }
                 }
+            } else {
+                // arr[0] stays null and primitive returns are defaulted below
+                logDiscardedCall(methodName, "runtime id=" + getRuntimeId() + " (workerId=" + workerId
+                        + ") is no longer accepting work");
+            }
+
+            if (arr[2] != null) {
+                throw (NativeScriptException) arr[2];
             }
 
             ret = arr[0];
@@ -1380,6 +1602,60 @@ public class Runtime {
         }
 
         return ret;
+    }
+
+    private static void logDiscardedCall(String methodName, String reason) {
+        android.util.Log.w("Warning", "NativeScript discarding call to \"" + methodName + "\": " + reason);
+    }
+
+    /*
+     * A call with nowhere left to run is dropped rather than thrown. These arrive
+     * on Android callbacks - lifecycle, listeners, draw - where an exception would
+     * take down the process because a worker ended, so the loss is contained to
+     * the one call and reported through the log instead. Primitive returns still
+     * need a value the generated cast can unbox.
+     */
+    private static Object discardCall(String methodName, Class<?> retType, String reason) {
+        logDiscardedCall(methodName, reason);
+
+        return (retType != null && retType.isPrimitive() && retType != void.class)
+                ? defaultPrimitiveValue(retType)
+                : null;
+    }
+
+    /*
+     * For primitive return types the native side hands the converted value back
+     * as raw bits: it writes {bits, 1} here and returns null, or leaves the
+     * array untouched and returns a boxed value from the generic conversion.
+     */
+    private static long[] newPrimitiveResult(int returnType) {
+        boolean primitive = returnType >= TypeIDs.Boolean && returnType <= TypeIDs.Double;
+        return primitive ? new long[2] : null;
+    }
+
+    private static Object takePrimitiveResult(Object nativeResult, int returnType, long[] primitiveResult) {
+        if (primitiveResult == null || primitiveResult[1] == 0) {
+            return nativeResult;
+        }
+
+        long bits = primitiveResult[0];
+        if (returnType == TypeIDs.Boolean) {
+            return bits != 0;
+        } else if (returnType == TypeIDs.Char) {
+            return (char) bits;
+        } else if (returnType == TypeIDs.Byte) {
+            return (byte) bits;
+        } else if (returnType == TypeIDs.Short) {
+            return (short) bits;
+        } else if (returnType == TypeIDs.Int) {
+            return (int) bits;
+        } else if (returnType == TypeIDs.Long) {
+            return bits;
+        } else if (returnType == TypeIDs.Float) {
+            return Float.intBitsToFloat((int) bits);
+        } else {
+            return Double.longBitsToDouble(bits);
+        }
     }
 
     private static Object defaultPrimitiveValue(Class<?> type) {
