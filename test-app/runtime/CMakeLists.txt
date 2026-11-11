@@ -273,7 +273,10 @@ if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
             NativeScript
             # The version script keeps V8's public API linkable for plugins while hiding
             # the ~60k v8::internal:: symbols the static monolith would otherwise export.
-            PROPERTIES LINK_FLAGS "-Wl,--allow-multiple-definition -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exported-symbols.map ${NS_SYMBOLIC_FUNCTIONS}"
+            # --icf=all folds identical functions even when their addresses are taken;
+            # --icf=safe folds nothing here, as V8's objects carry no address-significance
+            # tables.
+            PROPERTIES LINK_FLAGS "-Wl,--allow-multiple-definition -Wl,--gc-sections -Wl,--icf=all -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exported-symbols.map ${NS_SYMBOLIC_FUNCTIONS}"
             INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
     )
 else ()
