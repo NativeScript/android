@@ -238,6 +238,7 @@ add_library(
         src/main/cpp/WorkerEvents.cpp
         src/main/cpp/WorkerWrapper.cpp
         src/main/cpp/Timers.cpp
+        src/main/cpp/com_tns_AppFiles.cpp
         src/main/cpp/com_tns_AssetExtractor.cpp
         src/main/cpp/com_tns_Runtime.cpp
         src/main/cpp/console/Console.cpp

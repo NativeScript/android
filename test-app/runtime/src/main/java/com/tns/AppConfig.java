@@ -52,14 +52,14 @@ class AppConfig {
 
     public AppConfig(File appDir) {
         values = makeDefaultOptions();
-        File packageInfo = new File(appDir, "/app/package.json");
-        if (!packageInfo.exists()) {
+        String packageText = AppFiles.readText(new File(appDir, "app/package.json").getAbsolutePath());
+        if (packageText == null) {
             return;
         }
 
         JSONObject rootObject;
         try {
-            rootObject = FileSystem.readJSONFile(packageInfo);
+            rootObject = new JSONObject(packageText);
             if (rootObject != null) {
                 // Parse security configuration
                 if (rootObject.has(SecurityKey)) {

@@ -173,8 +173,8 @@ bool LayeredRelativePath(const std::string& path, std::string& relative) {
     if (s_state.files.empty()) {
         return false;
     }
-    std::string logical = Normalize(path);
-    if (!HasDirPrefix(logical, s_state.files)) {
+    std::string logical;
+    if (!ToLogical(path, logical) || !HasDirPrefix(logical, s_state.files)) {
         return false;
     }
     std::string rest = logical.substr(s_state.files.size() + 1);
@@ -229,23 +229,22 @@ const std::string& AppRootPrefix() {
     return s_state.appPrefix;
 }
 
-std::string Normalize(const std::string& path) {
+bool ToLogical(const std::string& path, std::string& logical) {
     if (s_state.files.empty() || path.empty() || path[0] != '/') {
-        return path;
+        return false;
     }
     std::string collapsed = CollapseDotSegments(path);
     if (collapsed == s_state.files || HasDirPrefix(collapsed, s_state.files)) {
-        return collapsed;
+        logical = std::move(collapsed);
+        return true;
     }
     for (const auto& alias : s_state.aliases) {
-        if (collapsed == alias) {
-            return s_state.files;
-        }
-        if (HasDirPrefix(collapsed, alias)) {
-            return s_state.files + collapsed.substr(alias.size());
+        if (collapsed == alias || HasDirPrefix(collapsed, alias)) {
+            logical = s_state.files + collapsed.substr(alias.size());
+            return true;
         }
     }
-    return path;
+    return false;
 }
 
 bool IsFile(const std::string& path) {

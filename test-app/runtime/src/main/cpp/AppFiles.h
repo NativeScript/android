@@ -27,11 +27,11 @@ const std::string& MetadataRoot();
 const std::string& AppRootPrefix();
 
 /*
- * The logical spelling of `path`: "." / ".." / "//" are collapsed and any
- * alias of the files directory becomes FilesRoot(). A path that does not end
- * up inside the files directory is returned unchanged.
+ * True when `path` names something inside the files directory under any of
+ * its spellings. `logical` is then that path with "//", "." and ".."
+ * collapsed and the directory spelled as FilesRoot().
  */
-std::string Normalize(const std::string& path);
+bool ToLogical(const std::string& path, std::string& logical);
 
 /*
  * Reads of app files. A path under the app, internal or metadata root is

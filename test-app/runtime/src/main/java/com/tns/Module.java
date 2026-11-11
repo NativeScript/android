@@ -32,7 +32,8 @@ class Module {
         }
 
         RootPackageDir = rootPackageDir.getCanonicalPath();
-        ApplicationFilesPath = applicationFilesDir.getCanonicalPath();
+        AppFiles.init(applicationFilesDir);
+        ApplicationFilesPath = AppFiles.filesRoot();
 
         ModulesFilesPath = "/app/";
 
@@ -79,18 +80,32 @@ class Module {
             }
         }
 
-        String resolvedPath;
+        return pathKey(file);
+    }
 
+    /*
+     * Inside the files directory a path is only normalized lexically: files
+     * there need not exist on disk, so there is nothing to canonicalize
+     * against. Elsewhere the real file system decides.
+     */
+    private static String pathKey(File file) {
+        String absolutePath = file.getAbsolutePath();
+        String logicalPath = AppFiles.logicalPath(absolutePath);
+        if (logicalPath != null) {
+            return logicalPath;
+        }
         try {
-            resolvedPath = file.getCanonicalPath();
+            return file.getCanonicalPath();
         } catch (IOException e) {
             if (com.tns.Runtime.isDebuggable()) {
                 e.printStackTrace();
             }
-            resolvedPath = file.getAbsolutePath();
+            return absolutePath;
         }
+    }
 
-        return resolvedPath;
+    private static boolean isFile(File file) {
+        return AppFiles.isFile(file.getAbsolutePath());
     }
 
     private static boolean isFileExternal(File source, File target) {
@@ -120,8 +135,9 @@ class Module {
             File possibleRelativeAbsoluteModule = prepareRelativeOrAbsoluteDir(path, baseDir);
 
             //cache
-            if (folderAsModuleCache.containsKey(possibleRelativeAbsoluteModule.getCanonicalPath())) {
-                return new File(folderAsModuleCache.get(possibleRelativeAbsoluteModule.getCanonicalPath()));
+            String cached = folderAsModuleCache.get(pathKey(possibleRelativeAbsoluteModule));
+            if (cached != null) {
+                return new File(cached);
             }
 
             if (possibleRelativeAbsoluteModule != null) {
@@ -134,8 +150,9 @@ class Module {
             File possibleNativeModule = new File(NativeScriptModulesFilesPath, path);
 
             //cache
-            if (folderAsModuleCache.containsKey(possibleNativeModule.getCanonicalPath())) {
-                return new File(folderAsModuleCache.get(possibleNativeModule.getCanonicalPath()));
+            String cached = folderAsModuleCache.get(pathKey(possibleNativeModule));
+            if (cached != null) {
+                return new File(cached);
             }
 
             foundModule = resolveFromFileOrDirectory(NativeScriptModulesFilesPath, path, possibleNativeModule);
@@ -149,8 +166,9 @@ class Module {
                 File possibleRelativeModule = new File(possibleDir, path);
 
                 //cache
-                if (folderAsModuleCache.containsKey(possibleRelativeModule.getCanonicalPath())) {
-                    return new File(folderAsModuleCache.get(possibleRelativeModule.getCanonicalPath()));
+                String cachedModule = folderAsModuleCache.get(pathKey(possibleRelativeModule));
+                if (cachedModule != null) {
+                    return new File(cachedModule);
                 }
 
                 foundModule = resolveFromFileOrDirectory(possibleDir, path, possibleRelativeModule);
@@ -202,7 +220,7 @@ class Module {
 
         //cache resolved directory
         if (foundModule != null) {
-            folderAsModuleCache.put(fileOrDirectory.getCanonicalPath(), foundModule.getCanonicalPath());
+            folderAsModuleCache.put(pathKey(fileOrDirectory), pathKey(foundModule));
 
             return foundModule;
         }
@@ -219,35 +237,19 @@ class Module {
 
         if (isJSFile || isMJSFile || isJSONFile || isSOFile) {
             // File already has an extension, try as-is
-            try {
-                File canonicalFile = path.getCanonicalFile();
-                if (canonicalFile.exists() && canonicalFile.isFile()) {
-                    return path;
-                }
-            } catch (IOException e) {
-                // continue to try with extensions
+            if (isFile(path)) {
+                return path;
             }
         } else {
             // No extension provided, try .js first, then .mjs
             File jsFile = new File(path.getAbsolutePath() + ".js");
-            try {
-                File canonicalFile = jsFile.getCanonicalFile();
-                if (canonicalFile.exists() && canonicalFile.isFile()) {
-                    return jsFile;
-                }
-            } catch (IOException e) {
-                // continue to try .mjs
+            if (isFile(jsFile)) {
+                return jsFile;
             }
-            
-            // Try .mjs extension
+
             File mjsFile = new File(path.getAbsolutePath() + ".mjs");
-            try {
-                File canonicalFile = mjsFile.getCanonicalFile();
-                if (canonicalFile.exists() && canonicalFile.isFile()) {
-                    return mjsFile;
-                }
-            } catch (IOException e) {
-                // return null
+            if (isFile(mjsFile)) {
+                return mjsFile;
             }
         }
 
@@ -262,17 +264,16 @@ class Module {
         File packageFile = new File(path, "/package.json");
         File foundFile = null;
 
-        if (packageFile.exists()) {
+        String packageText = AppFiles.readText(packageFile.getAbsolutePath());
+        if (packageText != null) {
             try {
-                JSONObject object = FileSystem.readJSONFile(packageFile);
-                if (object != null) {
-                    String mainFile = object.getString("main");
+                JSONObject object = new JSONObject(packageText);
+                String mainFile = object.getString("main");
 
-                    File pathFromMain = new File(path, mainFile);
-                    foundFile = resolveFromFileOrDirectory(baseDir, currentPath, pathFromMain);
-                    if (foundFile != null) {
-                        return foundFile;
-                    }
+                File pathFromMain = new File(path, mainFile);
+                foundFile = resolveFromFileOrDirectory(baseDir, currentPath, pathFromMain);
+                if (foundFile != null) {
+                    return foundFile;
                 }
             } catch (IOException e) {
                 throw new NativeScriptException(e.getMessage());
@@ -285,22 +286,14 @@ class Module {
 
         //fallback to index.js
         foundFile = new File(path, "index.js");
-        try {
-            if (foundFile.getCanonicalFile().exists()) {
-                return foundFile;
-            }
-        } catch (IOException e) {
-            // continue to try index.mjs
+        if (isFile(foundFile)) {
+            return foundFile;
         }
 
         //fallback to index.mjs
         foundFile = new File(path, "index.mjs");
-        try {
-            if (foundFile.getCanonicalFile().exists()) {
-                return foundFile;
-            }
-        } catch (IOException e) {
-            return null;
+        if (isFile(foundFile)) {
+            return foundFile;
         }
 
         //TODO: plamen5kov: add later if necessary

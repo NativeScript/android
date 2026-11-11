@@ -71,6 +71,7 @@ public final class RuntimeHelper {
             } finally {
                 loadLibraryFrame.close();
             }
+            AppFiles.init(context.getFilesDir());
 
             Logger logger = new LogcatLogger(context);
 
@@ -205,7 +206,7 @@ public final class RuntimeHelper {
 //                runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
 
                 File javaClassesModule = new File(appDir, "app/tns-java-classes.js");
-                if (javaClassesModule.exists()) {
+                if (AppFiles.isFile(javaClassesModule.getAbsolutePath())) {
                     runtime.runModule(javaClassesModule);
                 }
 
