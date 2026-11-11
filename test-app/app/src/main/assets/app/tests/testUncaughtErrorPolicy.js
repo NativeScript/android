@@ -1,3 +1,5 @@
+const { raisesGlobalErrors } = require("../Infrastructure/Jasmine/globalErrorSpy");
+
 describe("uncaughtErrorPolicy (default: report)", function () {
     // Under the default "report" policy, an uncaught JS throw in a
     // native-initiated callback is contained: reported through the `error`
@@ -53,7 +55,7 @@ describe("uncaughtErrorPolicy (default: report)", function () {
         }, 20);
     }
 
-    it("contains an uncaught throw in a native-initiated callback and keeps the app alive", function (done) {
+    it("contains an uncaught throw in a native-initiated callback and keeps the app alive", raisesGlobalErrors(function (done) {
         var reason = new Error("contained-post-throw");
         var received = null;
         onGlobal("error", function (e) {
@@ -83,9 +85,9 @@ describe("uncaughtErrorPolicy (default: report)", function () {
             expect(1 + 1).toBe(2);
             done();
         });
-    });
+    }));
 
-    it("preventDefault() on the error event suppresses the legacy hook", function (done) {
+    it("preventDefault() on the error event suppresses the legacy hook", raisesGlobalErrors(function (done) {
         var reason = new Error("contained-prevented-throw");
         var ran = false;
         onGlobal("error", function (e) {
@@ -108,9 +110,9 @@ describe("uncaughtErrorPolicy (default: report)", function () {
                 done();
             });
         });
-    });
+    }));
 
-    it("contains an uncaught throw in a setTimeout callback", function (done) {
+    it("contains an uncaught throw in a setTimeout callback", raisesGlobalErrors(function (done) {
         var reason = new Error("contained-timer-throw");
         setTimeout(function () {
             throw reason;
@@ -121,9 +123,9 @@ describe("uncaughtErrorPolicy (default: report)", function () {
             expect(1 + 1).toBe(2);
             done();
         });
-    });
+    }));
 
-    it("a contained throw in a primitive-returning override yields the type's default", function (done) {
+    it("a contained throw in a primitive-returning override yields the type's default", raisesGlobalErrors(function (done) {
         var reason = new Error("contained-compare-throw");
         var doneRan = false;
         var comparator = new java.util.Comparator({
@@ -144,7 +146,7 @@ describe("uncaughtErrorPolicy (default: report)", function () {
             expect(uncaughtSeen(reason)).toBe(true);
             done();
         });
-    });
+    }));
 
     it("propagates a JS-initiated chain back to the outer JS catch with identity", function () {
         var reason = new Error("chain-identity");

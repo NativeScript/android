@@ -9,10 +9,11 @@
 // constructor through require("internal/dom-exception") at throw time, so
 // this file never runs in an app that never touches a DOMException.
 //
-// Not implemented: the spec's [Serializable] slot. structuredClone and worker
-// postMessage go through v8::ValueSerializer, which has no hook for a plain
-// JS class, so a DOMException inside a cloned graph degrades the same way any
-// custom Error subclass does.
+// [Serializable]: the constructor stamps every instance with a native private
+// brand (binding.markCloneable), which the serialization delegates in
+// StructuredSerialization.cpp claim through V8's IsHostObject hook — name,
+// message and stack travel across structuredClone and worker postMessage,
+// Node's JSTransferable approach reduced to the one class.
 const {
   ErrorCaptureStackTrace,
   ErrorPrototype,
@@ -20,6 +21,8 @@ const {
   ObjectSetPrototypeOf,
   SymbolToStringTag,
 } = primordials;
+
+const { markCloneable } = binding;
 
 // Web IDL §4.3.4: the closed table of names with a legacy code. Any name
 // outside it — including every post-table spec name — has code 0.
@@ -62,6 +65,7 @@ class DOMException {
     this.#message = `${message}`;
     this.#name = `${name}`;
     ErrorCaptureStackTrace(this, DOMException);
+    markCloneable(this);
   }
 
   get name() {

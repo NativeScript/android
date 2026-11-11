@@ -2,6 +2,7 @@
 #define CONCURRENTQUEUE_H_
 
 #include <android/looper.h>
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -30,7 +31,10 @@ private:
     std::queue<std::shared_ptr<worker::Message>> messagesQueue_;
     ALooper* looper_ = nullptr;
     int fd_ = -1;
-    bool terminated_ = false;
+    // Read under either lock: Terminate() sets it holding the lifecycle lock
+    // and empties the queue holding the queue mutex, and a push must be turned
+    // away by whichever of the two it reaches first.
+    std::atomic<bool> terminated_{false};
     std::mutex mutex_;
     std::mutex initializationMutex_;
 };

@@ -23,6 +23,11 @@ shared.runStructuredCloneTests();
 shared.runTextEncodingTests();
 shared.runDOMExceptionTests();
 shared.runEventsTests();
+shared.runMessageEventTests();
+shared.runMessageChannelTests();
+shared.runBroadcastChannelTests();
+shared.runWorkerEventsTests();
+shared.runNodeWorkerThreadsTests();
 require("./tests/testWebAssembly");
 require("./tests/testEventLoop");
 require("./tests/testMultithreadedJavascript");
@@ -30,6 +35,7 @@ require("./tests/testWorkerTerminateDuringLoad");
 require("./tests/testWorkerTerminateAfterClose");
 require("./tests/testWorkerOptions");
 require("./tests/testWorkerResourceLimits");
+require("./tests/testMessaging");
 require("./tests/testInterfaceDefaultMethods");
 require("./tests/testInterfaceStaticMethods");
 require("./tests/testMetadata");
@@ -60,11 +66,15 @@ require("./tests/java-array-test");
 require("./tests/field-access-test");
 require("./tests/byte-buffer-test");
 require("./tests/shared-array-buffer-test");
+require("./tests/testTypedArrayArgs");
 require("./tests/dex-interface-implementation");
 require("./tests/testClassForNameDiscovery");
+require("./tests/testPrebuiltExtendClasses");
 require("./tests/testInterfaceImplementation");
+require("./tests/testPrimitiveCallbackReturns");
 require("./tests/testRuntimeImplementedAPIs");
 require("./tests/testsInstanceOfOperator");
+require("./tests/testProxyReceivers");
 require("./tests/testReleaseNativeCounterpart");
 require("./tests/testJSONObjects");
 require("./tests/kotlin/companions/testCompanionObjectsSupport");
@@ -96,6 +106,7 @@ require('./tests/testInspect');
 // The ns:/node: builtin modules
 require('./tests/testNsUtil');
 require('./tests/testNsRuntime');
+require('./tests/testNsInterop');
 require('./tests/testNsModule');
 // Remote-module security gate (debug builds allow remote modules outright)
 require('./tests/testRemoteModuleSecurity');
@@ -105,6 +116,10 @@ require('./tests/testCreateRequire');
 require('./tests/testNodeUrlModule');
 require('./tests/testImportMetaResolution');
 require('./tests/testWorkerEsmEntry');
+// Worker wrapper reachability across GC (strong while running, collectable after)
+require('./tests/testWorkerLifetime');
+// Java->JS calls route to the runtime that created the object
+require('./tests/testRuntimeBoundDispatch');
 // Fetches from the in-app loopback fixture server, so it goes last
 require('./tests/testEsmHttpLoader');
 // Node-API addon surface

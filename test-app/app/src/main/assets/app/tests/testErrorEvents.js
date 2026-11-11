@@ -1,3 +1,5 @@
+const { raisesGlobalErrors } = require("../Infrastructure/Jasmine/globalErrorSpy");
+
 describe("WHATWG error events", function () {
     // Many tests exercise the global error path, which ends in the
     // __onUncaughtError / __onDiscardedError hooks when a listener does not
@@ -47,7 +49,7 @@ describe("WHATWG error events", function () {
         }, 25);
     }
 
-    it("reportError fires an 'error' listener with an ErrorEvent carrying error and message", function (done) {
+    it("reportError fires an 'error' listener with an ErrorEvent carrying error and message", raisesGlobalErrors(function (done) {
         var err = new Error("x");
         var received = null;
         onGlobal("error", function (e) {
@@ -67,9 +69,9 @@ describe("WHATWG error events", function () {
             expect(uncaught.length).toBe(0);
             done();
         });
-    });
+    }));
 
-    it("reportError without preventDefault still invokes __onUncaughtError (back-compat)", function () {
+    it("reportError without preventDefault still invokes __onUncaughtError (back-compat)", raisesGlobalErrors(function (done) {
         var err = new Error("back-compat");
         var received = null;
         onGlobal("error", function (e) {
@@ -82,7 +84,8 @@ describe("WHATWG error events", function () {
         expect(received.error).toBe(err);
         expect(uncaught.length).toBe(1);
         expect(uncaught[0]).toBe(err);
-    });
+        done();
+    }));
 
     it("reportError throws TypeError when called with no arguments", function () {
         expect(function () {
@@ -90,7 +93,7 @@ describe("WHATWG error events", function () {
         }).toThrowError(TypeError);
     });
 
-    it("a discarded Java exception dispatches an 'error' event before __onDiscardedError", function () {
+    it("a discarded Java exception dispatches an 'error' event before __onDiscardedError", raisesGlobalErrors(function (done) {
         var received = null;
         onGlobal("error", function (e) {
             received = e;
@@ -106,9 +109,10 @@ describe("WHATWG error events", function () {
         // Unprevented, so the existing hook still fires (back-compat).
         expect(discarded.length).toBe(1);
         expect(discarded[0]).toBe(received.error);
-    });
+        done();
+    }));
 
-    it("preventDefault() on the 'error' event suppresses __onDiscardedError", function () {
+    it("preventDefault() on the 'error' event suppresses __onDiscardedError", raisesGlobalErrors(function (done) {
         var received = null;
         onGlobal("error", function (e) {
             received = e;
@@ -120,7 +124,8 @@ describe("WHATWG error events", function () {
 
         expect(received).not.toBeNull();
         expect(discarded.length).toBe(0);
-    });
+        done();
+    }));
 
     describe("constructors and EventTarget semantics", function () {
         it("Event is spec-sane and cancelable via preventDefault", function () {
@@ -219,7 +224,7 @@ describe("WHATWG error events", function () {
         });
     });
 
-    it("reportError still fires listeners after globalThis.dispatchEvent is overwritten", function (done) {
+    it("reportError still fires listeners after globalThis.dispatchEvent is overwritten", raisesGlobalErrors(function (done) {
         var err = new Error("resilient");
         var received = null;
         onGlobal("error", function (e) {
@@ -241,5 +246,5 @@ describe("WHATWG error events", function () {
             expect(uncaught.length).toBe(0);
             done();
         });
-    });
+    }));
 });

@@ -257,23 +257,54 @@ var es5_visitors = (function() {
 
                 return matchingNodes.length > 0 ? matchingNodes[0].declarations[0].init.left : null;
             }
+
+            /** Getting the super.apply node from the return of a class without a constructor
+                return _super !== null && _super.apply(this, arguments) || this;
+                return _super.apply(this, arguments) || this;
+             */
+            function getReturnSuperCallLineNode(nodes, superIdentifier) {
+                function isSuperCall(node) {
+                    return types.isCallExpression(node) &&
+                        types.isMemberExpression(node.callee) &&
+                        node.callee.object.name === superIdentifier;
+                }
+
+                for (var i = 0; i < nodes.length; i++) {
+                    var argument = nodes[i].argument;
+                    if (!types.isLogicalExpression(argument)) {
+                        continue;
+                    }
+                    var left = argument.left;
+                    if (isSuperCall(left)) {
+                        return left;
+                    }
+                    if (types.isLogicalExpression(left) && isSuperCall(left.right)) {
+                        return left.right;
+                    }
+                }
+                return null;
+            }
             ////
 
             if (superVariableIdentifier) {
                 var possibleVariableDeclarations = [];
                 var possibleExpressionStatements = [];
+                var possibleReturnStatements = [];
 
                 constructorFunctionScope.body.body.forEach(node => {
                     if (types.isVariableDeclaration(node)) {
                         possibleVariableDeclarations.push(node);
                     } else if (types.isExpressionStatement(node)) {
                         possibleExpressionStatements.push(node);
+                    } else if (types.isReturnStatement(node)) {
+                        possibleReturnStatements.push(node);
                     }
                 });
 
-                if (possibleVariableDeclarations.length > 0 || possibleExpressionStatements.length > 0) {
+                if (possibleVariableDeclarations.length > 0 || possibleExpressionStatements.length > 0 || possibleReturnStatements.length > 0) {
                     var superCallRHS = getThisDeclarationSuperCallLineNode(possibleVariableDeclarations, superVariableIdentifier) ||
-                        getThisAssignmentSuperCallLineNode(possibleExpressionStatements, superVariableIdentifier);
+                        getThisAssignmentSuperCallLineNode(possibleExpressionStatements, superVariableIdentifier) ||
+                        getReturnSuperCallLineNode(possibleReturnStatements, superVariableIdentifier);
 
                     if (superCallRHS) {
                         var superCallee = superCallRHS.callee.property;

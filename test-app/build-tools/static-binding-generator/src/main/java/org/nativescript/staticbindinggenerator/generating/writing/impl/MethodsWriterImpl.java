@@ -47,6 +47,14 @@ public class MethodsWriterImpl implements MethodsWriter {
 
     private static final String INTERNAL_RUNTIME_EQUALS_METHOD_SIGNATURE = "public boolean equals__super(java.lang.Object other)";
     private static final String INTERNAL_RUNTIME_HASHCODE_METHOD_SIGNATURE = "public int hashCode__super()";
+    private static final String INTERNAL_RUNTIME_GET_RUNTIME_TAG_METHOD_SIGNATURE = "public int getRuntimeTag__ns()";
+    private static final String INTERNAL_RUNTIME_GET_RUNTIME_TAG_RETURN_STATEMENT = "return runtimeTag__ns;";
+    private static final String INTERNAL_RUNTIME_SET_RUNTIME_TAG_METHOD_SIGNATURE = "public void setRuntimeTag__ns(int tag)";
+    private static final String INTERNAL_RUNTIME_SET_RUNTIME_TAG_ASSIGNMENT = "runtimeTag__ns = tag;";
+    private static final String INTERNAL_RUNTIME_GET_OBJECT_ID_METHOD_SIGNATURE = "public int getObjectId__ns()";
+    private static final String INTERNAL_RUNTIME_GET_OBJECT_ID_RETURN_STATEMENT = "return objectId__ns;";
+    private static final String INTERNAL_RUNTIME_SET_OBJECT_ID_METHOD_SIGNATURE = "public void setObjectId__ns(int id)";
+    private static final String INTERNAL_RUNTIME_SET_OBJECT_ID_ASSIGNMENT = "objectId__ns = id;";
     private static final String INTERNAL_SERVICES_ONCREATE_METHOD_SIGNATURE = "public void " + ON_CREATE_METHOD_NAME + "()";
 
     private static final String RETURN_KEYWORD = "return";
@@ -369,7 +377,7 @@ public class MethodsWriterImpl implements MethodsWriter {
         if (shouldSuppressCallJsMethodExceptions) {
             writer.write(CLOSING_CURLY_BRACKET_LITERAL);
             writer.write(GENERIC_CATCH_BLOCK_BEGINNING);
-            writer.writeln("\t\t\tcom.tns.Runtime.passSuppressedExceptionToJs(throwable, \"" + methodName + "\");");
+            writer.writeln("\t\t\tcom.tns.Runtime.passSuppressedExceptionToJs(this, throwable, \"" + methodName + "\");");
             writer.writeln(ANDROID_LOG_METHOD_CALL_STATEMENT);
 
             if (!returnType.equals(Type.VOID)) {
@@ -396,6 +404,14 @@ public class MethodsWriterImpl implements MethodsWriter {
     @Override
     public void writeInternalRuntimeHashCodeMethod() {
         writeInternalRuntimeMethod(INTERNAL_RUNTIME_HASHCODE_METHOD_SIGNATURE, INTERNAL_RUNTIME_HASHCODE_METHOD_RETURN_STATEMENT);
+    }
+
+    @Override
+    public void writeInternalRuntimeTagAccessorMethods() {
+        writeInternalRuntimeMethod(INTERNAL_RUNTIME_GET_RUNTIME_TAG_METHOD_SIGNATURE, INTERNAL_RUNTIME_GET_RUNTIME_TAG_RETURN_STATEMENT);
+        writeInternalRuntimeMethod(INTERNAL_RUNTIME_SET_RUNTIME_TAG_METHOD_SIGNATURE, INTERNAL_RUNTIME_SET_RUNTIME_TAG_ASSIGNMENT);
+        writeInternalRuntimeMethod(INTERNAL_RUNTIME_GET_OBJECT_ID_METHOD_SIGNATURE, INTERNAL_RUNTIME_GET_OBJECT_ID_RETURN_STATEMENT);
+        writeInternalRuntimeMethod(INTERNAL_RUNTIME_SET_OBJECT_ID_METHOD_SIGNATURE, INTERNAL_RUNTIME_SET_OBJECT_ID_ASSIGNMENT);
     }
 
     private void writeInternalRuntimeMethod(String signature, String returnStatement) {

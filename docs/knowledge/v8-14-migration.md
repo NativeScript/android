@@ -34,7 +34,7 @@ new, and why:
   **`v8_array_buffer_view_internal_field_count=2`** — both default to `0` in
   14.9 and defaulted to `2` in 10.3. When an `ArrayBuffer`/`SharedArrayBuffer`/
   typed array is marshalled to a Java NIO buffer,
-  `JSToJavaObjectsConverter` calls `ObjectManager::Link` on the buffer object
+  `JsArgConverter` calls `ObjectManager::Link` on the buffer object
   itself, and `Link` stores its `JSInstanceInfo` in internal field 0. With zero
   internal fields every such conversion throws *"Trying to link invalid 'this'
   to a Java object"*. `v8-array-buffer.h` still falls back to `2` when the macro

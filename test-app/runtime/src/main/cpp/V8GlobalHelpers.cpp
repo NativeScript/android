@@ -19,17 +19,12 @@ static std::string ToDottedName(std::string name) {
     return name;
 }
 
-// A JS object linked to a Java counterpart holds a JSInstanceInfo External in
-// its first internal field. The field count alone does not identify one: V8
-// hands typed arrays and array buffers the same number of embedder fields.
 static bool HasJavaCounterpart(Isolate* isolate, const Local<Object>& object) {
     auto objectManager = tns::Runtime::GetObjectManager(isolate);
     if (objectManager == nullptr || !objectManager->IsJsRuntimeObject(object)) {
         return false;
     }
-
-    const int jsInfoIdx = static_cast<int>(tns::ObjectManager::MetadataNodeKeys::JsInfo);
-    return object->GetInternalField(jsInfoIdx).As<Value>()->IsExternal();
+    return tns::ObjectManager::HasJsInfo(object);
 }
 
 std::string tns::GetNativeWrapperHint(Isolate* isolate, const Local<Value>& value) {
@@ -64,10 +59,18 @@ std::string tns::GetNativeWrapperHint(Isolate* isolate, const Local<Value>& valu
     return "JavaObject";
 }
 
+Local<Context> tns::GetCreationContextOrCurrent(Isolate* isolate, const Local<Object>& obj) {
+    Local<Context> context;
+    if (obj->GetCreationContext(isolate).ToLocal(&context)) {
+        return context;
+    }
+    return isolate->GetCurrentContext();
+}
+
 bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<String>& propName, Local<Value>& out) {
     auto privateKey = Private::ForApi(isolate, propName);
 
-    auto context = obj->GetCreationContext(isolate).ToLocalChecked();
+    auto context = GetCreationContextOrCurrent(isolate, obj);
     auto hasPrivate = obj->HasPrivate(context, privateKey);
 
     if (hasPrivate.IsNothing()) {
@@ -93,13 +96,41 @@ bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Lo
 
 bool tns::V8SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<String>& propName, const Local<Value>& value) {
     auto privateKey = Private::ForApi(isolate, propName);
-    auto context = obj->GetCreationContext(isolate).ToLocalChecked();
+    auto context = GetCreationContextOrCurrent(isolate, obj);
     auto res = obj->SetPrivate(context, privateKey, value);
 
     if (res.IsNothing()) {
         stringstream ss;
         ss << "Failed to Set Private Value for prop: " << ArgConverter::ConvertToString(propName).c_str() << endl;
         throw tns::NativeScriptException(ss.str());
+    }
+
+    return res.FromMaybe(false);
+}
+
+// An absent private reads as undefined, so one GetPrivate replaces the
+// HasPrivate + GetPrivate pair; callers never store undefined under these keys.
+bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<Private>& privateKey, Local<Value>& out) {
+    auto context = GetCreationContextOrCurrent(isolate, obj);
+    Local<Value> value;
+    if (!obj->GetPrivate(context, privateKey).ToLocal(&value)) {
+        throw tns::NativeScriptException("Failed to Get Private Value");
+    }
+
+    if (value->IsUndefined()) {
+        return false;
+    }
+
+    out = value;
+    return true;
+}
+
+bool tns::V8SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<Private>& privateKey, const Local<Value>& value) {
+    auto context = GetCreationContextOrCurrent(isolate, obj);
+    auto res = obj->SetPrivate(context, privateKey, value);
+
+    if (res.IsNothing()) {
+        throw tns::NativeScriptException("Failed to Set Private Value");
     }
 
     return res.FromMaybe(false);

@@ -29,10 +29,7 @@ describe("ns:module", function () {
             expect(ns.configureLoader).toBe(nsModule.configureLoader);
             done();
         }).catch(function (error) {
-            // fail() throws in this Jasmine, which inside a promise chain
-            // surfaces as an opaque timeout instead of the real reason.
-            expect("rejected: " + String((error && error.message) || error)).toBe("resolved");
-            done();
+            done.fail("rejected: " + String((error && error.message) || error));
         });
     });
 

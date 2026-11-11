@@ -89,12 +89,15 @@ public:
 
     /*
      * Posts the worker object's `onerror` invocation to the parent's thread.
-     * Strings only - must not hold any v8 handles from the worker isolate.
+     * `thrown` is the value the worker threw, when there is one: its name and
+     * message are read here, on the worker's isolate, for the parent to
+     * rebuild the error from. Without it the parent's error is an Error
+     * carrying `message`. Strings only cross to the parent's thread.
      */
-    void PassUncaughtExceptionFromWorkerToParent(const std::string& message,
-                                                 const std::string& filename,
-                                                 const std::string& stackTrace,
-                                                 int lineno);
+    void PassUncaughtExceptionFromWorkerToParent(
+            const std::string& message, const std::string& filename,
+            const std::string& stackTrace, int lineno,
+            v8::Local<v8::Value> thrown = v8::Local<v8::Value>());
 
     /*
      * WHATWG parity: the worker's implicit port message queue starts disabled;
@@ -128,6 +131,16 @@ public:
      * removes the wrapper from the registry. Idempotent.
      */
     static void ClearWorkerOnParent(int workerId);
+
+    /*
+     * Parent thread only, from the worker thread's last act: dispatches
+     * `nsworkerended` on the Worker object and only then releases it. The
+     * Worker object stays rooted from construction until this runs, so a
+     * terminate() that is still draining can never lose its wrapper. A parent
+     * that is itself tearing down clears its children directly and never gets
+     * here, so the notification is best effort.
+     */
+    static void NotifyThreadEndedOnParent(int workerId);
 
     /*
      * Terminates and clears all workers whose parent is the given isolate.
@@ -172,7 +185,9 @@ private:
     static void FireErrorOnParentWorkerObject(int workerId, const std::string& message,
                                             const std::string& stackTrace,
                                             const std::string& filename, int lineno,
-                                            const std::string& threadName);
+                                            const std::string& threadName,
+                                            v8::Local<v8::String> errorName,
+                                            v8::Local<v8::String> errorMessage);
 
     v8::Isolate* parentIsolate_;
     // The parent runtime's task queue; weak so a child outliving its parent

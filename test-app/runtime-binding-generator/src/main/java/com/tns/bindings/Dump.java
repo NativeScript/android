@@ -23,6 +23,8 @@ public class Dump {
     static final String runtimeClass = LCOM_TNS_RUNTIME;
     static final String callJSMethodName = "callJSMethod";
     static final String initInstanceMethodName = "initInstance";
+    static final String RUNTIME_TAG_FIELD_NAME = "runtimeTag__ns";
+    static final String OBJECT_ID_FIELD_NAME = "objectId__ns";
 
     static final StringBuffer methodDescriptorBuilder = new StringBuffer();
 
@@ -493,6 +495,30 @@ public class Dump {
 
         generateEqualsSuper(cv);
         generateHashCodeSuper(cv);
+        generateIntGetter(cv, tnsClassSignature, "getRuntimeTag__ns", RUNTIME_TAG_FIELD_NAME);
+        generateIntSetter(cv, tnsClassSignature, "setRuntimeTag__ns", RUNTIME_TAG_FIELD_NAME);
+        generateIntGetter(cv, tnsClassSignature, "getObjectId__ns", OBJECT_ID_FIELD_NAME);
+        generateIntSetter(cv, tnsClassSignature, "setObjectId__ns", OBJECT_ID_FIELD_NAME);
+    }
+
+    // 2 registers, 1 parameter: 'this' takes the last one, v0 is left as scratch
+    private void generateIntGetter(ClassVisitor cv, String tnsClassSignature, String methodName, String fieldName) {
+        MethodVisitor mv = cv.visitMethod(org.ow2.asmdex.Opcodes.ACC_PUBLIC, methodName, "I", null, null);
+        mv.visitCode();
+        mv.visitMaxs(2, 0);
+        mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET, tnsClassSignature, fieldName, "I", 0, 1);
+        mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_RETURN, 0);
+        mv.visitEnd();
+    }
+
+    // 2 registers, 2 parameters: v0 is 'this' and v1 the value, leaving no scratch
+    private void generateIntSetter(ClassVisitor cv, String tnsClassSignature, String methodName, String fieldName) {
+        MethodVisitor mv = cv.visitMethod(org.ow2.asmdex.Opcodes.ACC_PUBLIC, methodName, "VI", null, null);
+        mv.visitCode();
+        mv.visitMaxs(2, 0);
+        mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT, tnsClassSignature, fieldName, "I", 1, 0);
+        mv.visitInsn(org.ow2.asmdex.Opcodes.INSN_RETURN_VOID);
+        mv.visitEnd();
     }
 
     private void generateEqualsSuper(ClassVisitor cv) {
@@ -804,10 +830,18 @@ public class Dump {
     private void generateFields(ClassVisitor cv) {
         FieldVisitor fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE, "__initialized", "Z", null, null);
         fv.visitEnd();
+
+        // left at its zero default, which NativeScriptRuntimeBound defines as "no runtime yet"
+        fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE | org.ow2.asmdex.Opcodes.ACC_VOLATILE, RUNTIME_TAG_FIELD_NAME, "I", null, null);
+        fv.visitEnd();
+
+        // only read once the tag is set, which is written after it
+        fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE, OBJECT_ID_FIELD_NAME, "I", null, null);
+        fv.visitEnd();
     }
 
-    static final String[] classImplentedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;" };
-    static final String[] interfaceImplementedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", "" };
+    static final String[] classImplentedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", "Lcom/tns/NativeScriptRuntimeBound;" };
+    static final String[] interfaceImplementedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", "Lcom/tns/NativeScriptRuntimeBound;", "" };
 
     private ClassVisitor generateClass(ApplicationWriter aw, ClassDescriptor classTo, String classSignature, String tnsClassSignature, HashSet<ClassDescriptor> implementedInterfaces, AnnotationDescriptor[] annotations) {
         ClassVisitor cv;
@@ -817,7 +851,7 @@ public class Dump {
         ArrayList<String> interfacesToImplement = new ArrayList(Arrays.asList(classImplentedInterfaces));
 
         if (classTo.isInterface()) {
-            interfaceImplementedInterfaces[1] = classSignature; //new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", classSignature };
+            interfaceImplementedInterfaces[interfaceImplementedInterfaces.length - 1] = classSignature;
             for (String interfaceToImpl : interfaceImplementedInterfaces) {
                 if (!interfacesToImplement.contains(interfaceToImpl)) {
                     interfacesToImplement.add(interfaceToImpl);

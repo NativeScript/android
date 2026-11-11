@@ -3,6 +3,8 @@
 #include "ArgConverter.h"
 #include "Base64.h"
 #include "BuiltinLoader.h"
+#include "Messaging.h"
+#include "StructuredSerialization.h"
 #include "TextEncoding.h"
 
 using namespace v8;
@@ -38,11 +40,15 @@ constexpr LazyGlobalEntry kLazyGlobals[] = {
         {"TextDecoder", "TextDecoder", TextEncoding::GetExports},
         {"atob", "atob", Base64::GetExports},
         {"btoa", "btoa", Base64::GetExports},
-        {"DOMException", "DOMException", BuiltinExports<BuiltinId::kDomException>},
+        {"DOMException", "DOMException", serialization::GetDomExceptionExports},
         // events.js is an eager builtin (Events::Init), so this row never runs
         // a file: the read hits the exports cache and only the placement is
         // lazy.
         {"CustomEvent", "CustomEvent", BuiltinExports<BuiltinId::kEvents>},
+        {"MessageEvent", "MessageEvent", BuiltinExports<BuiltinId::kMessageEvent>},
+        {"MessagePort", "MessagePort", messaging::GetMessageChannelExports},
+        {"MessageChannel", "MessageChannel", messaging::GetMessageChannelExports},
+        {"BroadcastChannel", "BroadcastChannel", messaging::GetBroadcastChannelExports},
 };
 
 void LazyGlobalGetter(Local<v8::Name> property,
