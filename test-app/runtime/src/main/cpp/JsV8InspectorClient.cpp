@@ -1,4 +1,5 @@
 #include "JsV8InspectorClient.h"
+#include "AppFiles.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -196,7 +197,7 @@ bool GetInt32(const json& value, long long& out) {
 bool ShouldRewriteSourceMapURLs() {
     static bool disabled = []() {
         int length = 0;
-        auto* data = static_cast<uint8_t*>(File::ReadBinary(Constants::APP_ROOT_FOLDER_PATH + "package.json", length));
+        auto* data = static_cast<uint8_t*>(File::ReadBinary(AppFiles::AppRootPrefix() + "package.json", length));
         if (data == nullptr) {
             return false;
         }
@@ -837,7 +838,7 @@ std::string JsV8InspectorClient::HandleLoadNetworkResource(long long msgId, cons
         auto addVariants = [&addCandidate](const std::string& p) {
             addCandidate(p);
             if (p[0] != '/') {
-                addCandidate(Constants::APP_ROOT_FOLDER_PATH + p);
+                addCandidate(AppFiles::AppRootPrefix() + p);
             }
             // /data/data/<pkg> and /data/user/0/<pkg> alias the same files;
             // urls may use either spelling depending on who built them.

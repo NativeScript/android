@@ -5,6 +5,7 @@
  *      Author: gatanasov
  */
 #include "ModuleInternal.h"
+#include "AppFiles.h"
 #include "ModuleInternalCallbacks.h"
 #include "BuiltinLoader.h"
 #include "File.h"
@@ -169,8 +170,6 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
         RESOLVE_PATH_METHOD_ID = env.GetStaticMethodID(MODULE_CLASS, "resolvePath", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
         NS_CHECK(RESOLVE_PATH_METHOD_ID != nullptr);
         
-        GET_APPLICATION_FILES_PATH_METHOD_ID = env.GetStaticMethodID(MODULE_CLASS, "getApplicationFilesPath", "()Ljava/lang/String;");
-        NS_CHECK(GET_APPLICATION_FILES_PATH_METHOD_ID != nullptr);
     }
 
     m_isolate = isolate;
@@ -209,7 +208,7 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
         globalRequire = GetRequireFunction(isolate, baseDir, RequireEvaluationOptions(
                 ModuleEvaluationPolicy::kSyncStrict));
     } else {
-        globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH,
+        globalRequire = GetRequireFunction(isolate, AppFiles::AppRootPrefix(),
                                            RequireEvaluationOptions(
                                                    ModuleEvaluationPolicy::kSyncStrict));
     }
@@ -684,7 +683,7 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleNam
             if (!moduleName.empty() && moduleName[0] == '~') {
                 // Convert ~/path to ApplicationPath/path
                 std::string tail = moduleName.size() >= 2 && moduleName[1] == '/' ? moduleName.substr(2) : moduleName.substr(1);
-                resolvedModuleName = Constants::APP_ROOT_FOLDER_PATH + "/" + tail;
+                resolvedModuleName = AppFiles::AppRootPrefix() + tail;
                 
                 // For .mjs files with tilde paths, use resolved path directly
                 if (Util::EndsWith(resolvedModuleName, ".mjs")) {
@@ -1706,7 +1705,6 @@ ModuleInternal::ModulePathKind ModuleInternal::GetModulePathKind(const std::stri
 
 jclass ModuleInternal::MODULE_CLASS = nullptr;
 jmethodID ModuleInternal::RESOLVE_PATH_METHOD_ID = nullptr;
-jmethodID ModuleInternal::GET_APPLICATION_FILES_PATH_METHOD_ID = nullptr;
 
 const char* ModuleInternal::MODULE_PROLOGUE = "(function(module, exports, require, __filename, __dirname){ ";
 const char* ModuleInternal::MODULE_EPILOGUE = "\n})";

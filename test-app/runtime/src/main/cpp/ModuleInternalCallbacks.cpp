@@ -16,6 +16,7 @@
 #include <time.h>
 #include <vector>
 
+#include "AppFiles.h"
 #include "ArgConverter.h"
 #include "EventLoop.h"
 #include "HttpLoader.h"
@@ -75,25 +76,6 @@ static std::string WithExtension(const std::string& path, const std::string& ext
     return path;
   }
   return path + ext;
-}
-
-// Application filesystem root for on-disk .mjs/.js resolution.
-// Mirrors Module.java's getApplicationFilesPath + "/app". Cached after first
-// JNI call — the value is process-stable, and re-entering JNI on every
-// resolver hit would add avoidable overhead to hot module-graph walks.
-static std::string GetApplicationPath() {
-  static std::string cached;
-  static std::once_flag flag;
-  std::call_once(flag, []() {
-    JEnv env;
-    jstring applicationFilesPath = (jstring)env.CallStaticObjectMethod(
-        ModuleInternal::MODULE_CLASS,
-        ModuleInternal::GET_APPLICATION_FILES_PATH_METHOD_ID);
-    if (applicationFilesPath != nullptr) {
-      cached = ArgConverter::jstringToString(applicationFilesPath) + "/app";
-    }
-  });
-  return cached;
 }
 
 // Collapse "." and ".." segments, preserving a leading "/".
@@ -1191,7 +1173,7 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
   if (referrer.empty() && specIsRelative) {
     TNS_DEBUG(Esm, "[resolver] No referrer for relative '%s' - assuming app root",
                    spec.c_str());
-    referrer = GetApplicationPath() + "/index.mjs";
+    referrer = AppFiles::AppRootPrefix() + "index.mjs";
   }
   size_t slash = referrer.find_last_of("/\\");
   const std::string baseDir =
@@ -1234,7 +1216,7 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
   // Build the filesystem candidates for this specifier shape. The specifier may
   // omit its extension or name a directory, so each candidate is probed with
   // Node-style extension and index fallbacks below.
-  const std::string appPath = GetApplicationPath();
+  const std::string& appPath = AppFiles::AppRoot();
   std::vector<std::string> candidateBases;
 
   if (specIsRelative) {

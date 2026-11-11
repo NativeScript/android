@@ -1,4 +1,5 @@
 #include "MetadataNode.h"
+#include "AppFiles.h"
 #include "RuntimeState.h"
 #include "NativeScriptAssert.h"
 #include "Constants.h"
@@ -906,7 +907,7 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
                 Local<External> funcData = External::New(isolate, callbackData, v8::kExternalPointerTypeTagDefault);
                 Local<FunctionTemplate> funcTemplate = NewNonConstructor(isolate, MethodCallback, funcData);
                 auto func = funcTemplate->GetFunction(context).ToLocalChecked();
-                std::string origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
+                std::string origin = AppFiles::AppRootPrefix() + GetOrCreateInternal(treeNode)->m_name;
                 Local<Function> wrapperFunc = Wrap(isolate, func, methodName, origin,
                                                    false /* isCtorFunc */);
                 Local<Function> ctorFunc = ctorFuncTemplate->GetFunction(context).ToLocalChecked();
@@ -1069,7 +1070,7 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
         MethodCallbackData* callbackData = nullptr;
         auto cache = GetMetadataNodeCache(isolate);
 
-        auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
+        auto origin = AppFiles::AppRootPrefix() + GetOrCreateInternal(treeNode)->m_name;
 
         //get candidates from static methods metadata
         auto staticMethodCout = *reinterpret_cast<uint16_t*>(curPtr);
@@ -1286,7 +1287,7 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     auto context = isolate->GetCurrentContext();
     auto ctorFunc = ctorFuncTemplate->GetFunction(context).ToLocalChecked();
 
-    auto origin = Constants::APP_ROOT_FOLDER_PATH + node->m_name;
+    auto origin = AppFiles::AppRootPrefix() + node->m_name;
 
     auto wrappedCtorFunc = Wrap(isolate, ctorFunc, node->m_treeNode->name, origin, true /* isCtorFunc */);
 
@@ -2123,7 +2124,7 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
                     normalized.resize(queryOrFragment);
                 }
 
-                const string& appRoot = Constants::APP_ROOT_FOLDER_PATH;
+                const string& appRoot = AppFiles::AppRootPrefix();
                 if (!appRoot.empty()) {
                     stripPrefix(normalized, appRoot);
                 }

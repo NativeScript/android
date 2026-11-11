@@ -174,6 +174,7 @@ add_library(
         SHARED
 
         # Runtime source
+        src/main/cpp/AppFiles.cpp
         src/main/cpp/ArgConverter.cpp
         src/main/cpp/ArrayBufferHelper.cpp
         src/main/cpp/ArrayElementAccessor.cpp

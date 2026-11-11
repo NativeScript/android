@@ -1,4 +1,5 @@
 #include "Runtime.h"
+#include "AppFiles.h"
 
 #include <console/Console.h>
 
@@ -254,7 +255,7 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
   CrashBreadcrumbs::OpenStore(filesRoot);
   CrashBreadcrumbs::RegisterRuntime(m_id);
 
-  Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
+  AppFiles::Init(filesRoot);
   Constants::V8_STARTUP_FLAGS = options.v8Flags;
   Constants::V8_CACHE_COMPILED_CODE = options.codeCache;
   m_discardUncaughtJsExceptions = options.discardUncaughtJsExceptions;
