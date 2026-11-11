@@ -75,6 +75,10 @@ void ObjectManager::InitializeJNI() {
       env.GetMethodID(runtimeClass, "releaseNativeCounterpart", "(I)V");
   NS_CHECK(RELEASE_NATIVE_INSTANCE_METHOD_ID != nullptr);
 
+  RELEASE_IF_COLLECTED_METHOD_ID =
+      env.GetMethodID(runtimeClass, "releaseIfCollected", "(I)Z");
+  NS_CHECK(RELEASE_IF_COLLECTED_METHOD_ID != nullptr);
+
   JAVA_LANG_CLASS = env.FindClass("java/lang/Class");
   NS_CHECK(JAVA_LANG_CLASS != nullptr);
 
@@ -126,6 +130,43 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(
   }
 
   return JniLocalRef();
+}
+
+JniLocalRef ObjectManager::GetLiveJavaObjectByJsObject(
+    const Local<Object>& object) {
+  JSInstanceInfo* jsInstanceInfo = GetJSInstanceInfo(object);
+  if (jsInstanceInfo == nullptr) {
+    return JniLocalRef();
+  }
+  auto javaObjectID = jsInstanceInfo->javaObjectID;
+
+  // Only a collected object may be relinked: releasing the link of a live one would
+  // leave it pointing at memory nothing keeps alive any more.
+  JniLocalRef javaObject;
+  try {
+    javaObject = GetJavaObjectByJsObject(object);
+  } catch (const NativeScriptException&) {
+    if (!ReleaseIfCollected(javaObjectID)) {
+      throw;
+    }
+    return JniLocalRef();
+  }
+  if (javaObject.IsNull() && !ReleaseIfCollected(javaObjectID)) {
+    throw NativeScriptException("Failed to get Java object by ID. id=" +
+                                std::to_string(javaObjectID));
+  }
+  return javaObject;
+}
+
+bool ObjectManager::ReleaseIfCollected(int javaObjectID) {
+  JEnv env;
+  AssertIsolateLocked();
+  if (env.CallBooleanMethod(m_javaRuntimeObject, RELEASE_IF_COLLECTED_METHOD_ID,
+                            javaObjectID) != JNI_TRUE) {
+    return false;
+  }
+  ReleaseCollectedWrapper(javaObjectID);
+  return true;
 }
 
 ObjectManager::JSInstanceInfo* ObjectManager::GetJSInstanceInfo(
@@ -896,3 +937,4 @@ jmethodID ObjectManager::FIND_JAVA_OBJECT_ID_METHOD_ID = nullptr;
 jmethodID ObjectManager::MAKE_INSTANCE_STRONG_METHOD_ID = nullptr;
 jmethodID ObjectManager::PROCESS_FINALIZED_BATCH_METHOD_ID = nullptr;
 jmethodID ObjectManager::RELEASE_NATIVE_INSTANCE_METHOD_ID = nullptr;
+jmethodID ObjectManager::RELEASE_IF_COLLECTED_METHOD_ID = nullptr;
