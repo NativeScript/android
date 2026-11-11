@@ -74,8 +74,9 @@ class WorkerInspectorClient final : public v8_inspector::V8InspectorClient,
             return runningPauseLoop_.load(std::memory_order_acquire);
         }
 
-        // Worker thread. Mirrors JsV8InspectorClient::consoleLogCallback for this
-        // isolate.
+        // Thread holding the worker isolate's Locker (the worker thread, or the
+        // main thread under __runOnMainThread). Mirrors
+        // JsV8InspectorClient::consoleLogCallback for this isolate.
         void consoleLog(v8_inspector::ConsoleAPIType method,
                         const std::vector<v8::Local<v8::Value>>& args);
 

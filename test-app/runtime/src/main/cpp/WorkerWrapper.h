@@ -166,8 +166,10 @@ public:
 
 #ifdef APPLICATION_IN_DEBUG
     /*
-     * Worker thread (console.* fires on the isolate's own thread). Forwards
-     * to the worker's inspector so the log reaches DevTools' worker target.
+     * Any thread holding the worker isolate's Locker: the worker thread, or
+     * the main thread while it runs a worker callback through
+     * __runOnMainThread. Forwards to the worker's inspector so the log
+     * reaches DevTools' worker target.
      */
     void ConsoleLog(v8_inspector::ConsoleAPIType method,
                     const std::vector<v8::Local<v8::Value>>& args);
@@ -257,7 +259,13 @@ private:
     void DestroyInspector();
 
     WorkerInspectorClient* inspector_ = nullptr;
-    std::mutex inspectorMutex_;
+    // Held across consoleLog, which allocates and runs user JS while it
+    // stringifies the arguments; releasing it there would let the worker
+    // thread delete the client under a __runOnMainThread caller. Recursive
+    // because that call re-enters on the same thread: a nested console call
+    // from a getter, or a near-heap-limit callback raised by an allocation,
+    // which calls Terminate().
+    std::recursive_mutex inspectorMutex_;
 #endif
 
     static std::mutex registryMutex_;
