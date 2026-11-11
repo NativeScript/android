@@ -56,9 +56,12 @@ void CallbackHandlers::Init(Isolate *isolate) {
         CURRENT_OBJECTID_FIELD_ID = env.GetFieldID(RUNTIME_CLASS, "currentObjectId", "I");
         NS_CHECK(CURRENT_OBJECTID_FIELD_ID != nullptr);
 
-        MAKE_INSTANCE_STRONG_ID = env.GetMethodID(RUNTIME_CLASS, "makeInstanceStrong",
-                                                  "(Ljava/lang/Object;I)V");
-        NS_CHECK(MAKE_INSTANCE_STRONG_ID != nullptr);
+        CURRENT_OBJECTCLASS_FIELD_ID = env.GetFieldID(RUNTIME_CLASS, "currentObjectClass", "Ljava/lang/Class;");
+        NS_CHECK(CURRENT_OBJECTCLASS_FIELD_ID != nullptr);
+
+        REGISTER_CONSTRUCTED_INSTANCE_ID = env.GetMethodID(RUNTIME_CLASS, "registerConstructedInstance",
+                                                           "(Ljava/lang/Object;I)J");
+        NS_CHECK(REGISTER_CONSTRUCTED_INSTANCE_ID != nullptr);
 
         GET_TYPE_METADATA = env.GetStaticMethodID(RUNTIME_CLASS, "getTypeMetadata",
                                                   "(Ljava/lang/String;I)[Ljava/lang/String;");
@@ -88,6 +91,7 @@ void CallbackHandlers::Init(Isolate *isolate) {
 namespace {
 struct JavaCallScope {
     explicit JavaCallScope(Runtime* runtime) : runtime_(runtime) {
+        runtime_->GetObjectManager()->FlushFinalizedBatchIfPending();
         runtime_->EnterJavaCall();
     }
     ~JavaCallScope() {
@@ -96,6 +100,41 @@ struct JavaCallScope {
     Runtime* runtime_;
 };
 }  // namespace
+
+// Publishes the instance JS is constructing to Runtime.initInstance for the duration of the
+// Java constructor, and restores the enclosing construction afterwards: JS run by a
+// callback the constructor makes may construct another instance. Raw JNI, so that the
+// destructor never throws.
+class CallbackHandlers::ConstructionScope {
+public:
+    ConstructionScope(Runtime* runtime, int javaObjectId, jclass clazz)
+            : _runtime(runtime), _previous(runtime->CurrentConstruction()) {
+        Publish({javaObjectId, clazz});
+    }
+
+    ~ConstructionScope() {
+        Publish(_previous);
+    }
+
+private:
+    // The class is written only when it changes: initInstance reads it only while an id is
+    // published, so a stale one is harmless, and repeated constructions of one class then
+    // cost a single field write each way.
+    void Publish(const Runtime::Construction& construction) {
+        _runtime->CurrentConstruction() = construction;
+        JNIEnv* env = JEnv();
+        jobject javaRuntime = _runtime->GetJavaRuntime();
+        jclass& published = _runtime->PublishedConstructionClass();
+        if (construction.id != -1 && construction.clazz != published) {
+            env->SetObjectField(javaRuntime, CURRENT_OBJECTCLASS_FIELD_ID, construction.clazz);
+            published = construction.clazz;
+        }
+        env->SetIntField(javaRuntime, CURRENT_OBJECTID_FIELD_ID, construction.id);
+    }
+
+    Runtime* _runtime;
+    Runtime::Construction _previous;
+};
 
 bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &jsObject,
                                         const std::string &fullClassName,
@@ -125,15 +164,12 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     objectManager->Link(jsObject, javaObjectID, nullptr);
 
     // resolve constructor
-    auto mi = MethodCache::ResolveConstructorSignature(argWrapper, fullClassName,
+    const auto &mi = MethodCache::ResolveConstructorSignature(argWrapper, fullClassName,
                                                        generatedJavaClass, isInterface);
 
-    // while the "instance" is being created, if an exception is thrown during the construction
-    // this scope will guarantee the "javaObjectID" will be set to -1 and won't have an invalid value
     jobject instance;
     {
-        JavaObjectIdScope objIdScope(env, CURRENT_OBJECTID_FIELD_ID, runtime->GetJavaRuntime(),
-                                     javaObjectID);
+        ConstructionScope construction(runtime, javaObjectID, generatedJavaClass);
 
         if (argWrapper.type == ArgType::Interface) {
             instance = env.NewObject(generatedJavaClass, mi.mid);
@@ -146,9 +182,10 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
         }
     }
 
-    env.CallVoidMethod(runtime->GetJavaRuntime(), MAKE_INSTANCE_STRONG_ID, instance, javaObjectID);
+    jlong usedJavaMemory = env.CallLongMethod(runtime->GetJavaRuntime(), REGISTER_CONSTRUCTED_INSTANCE_ID,
+                                              instance, javaObjectID);
 
-    AdjustAmountOfExternalAllocatedMemory(env, isolate);
+    AdjustAmountOfExternalAllocatedMemory(isolate, usedJavaMemory);
 
     JniLocalRef localInstance(instance);
     success = !localInstance.IsNull();
@@ -252,10 +289,10 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 
     jclass clazz;
     jmethodID mid;
-    string *sig = nullptr;
-    string *returnType = nullptr;
+    const string *sig = nullptr;
+    const string *returnType = nullptr;
     auto retType = MethodReturnType::Unknown;
-    MethodCache::CacheMethodInfo mi;
+    const MethodCache::CacheMethodInfo *mi = nullptr;
 
     auto isolate = args.GetIsolate();
 
@@ -338,8 +375,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 
         clazz = env.FindClass(className);
         if (clazz != nullptr) {
-            mi = MethodCache::ResolveMethodSignature(className, methodName, args, isStatic);
-            if (mi.mid == nullptr) {
+            mi = &MethodCache::ResolveMethodSignature(className, methodName, args, isStatic);
+            if (mi->mid == nullptr) {
                 DEBUG_WRITE("Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d",
                             className.c_str(), methodName.c_str(), isStatic, isSuper);
                 return;
@@ -349,8 +386,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             const string callerClassName = callerNode->GetName();
             DEBUG_WRITE("Resolving method on caller class: %s.%s on className %s",
                         callerClassName.c_str(), methodName.c_str(), className.c_str());
-            mi = MethodCache::ResolveMethodSignature(callerClassName, methodName, args, isStatic);
-            if (mi.mid == nullptr) {
+            mi = &MethodCache::ResolveMethodSignature(callerClassName, methodName, args, isStatic);
+            if (mi->mid == nullptr) {
                 DEBUG_WRITE(
                         "Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d, callerClass=%s",
                         className.c_str(), methodName.c_str(), isStatic, isSuper,
@@ -359,11 +396,11 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             }
         }
 
-        clazz = mi.clazz;
-        mid = mi.mid;
-        sig = &mi.signature;
-        returnType = &mi.returnType;
-        retType = mi.retType;
+        clazz = mi->clazz;
+        mid = mi->mid;
+        sig = &mi->signature;
+        returnType = &mi->returnType;
+        retType = mi->retType;
     }
 
     if (!isStatic) {
@@ -560,13 +597,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                 if (isString) {
                     objectResult = ArgConverter::jstringToV8String(isolate, (jstring) result);
                 } else {
-                    jint javaObjectID = objectManager->GetOrCreateObjectId(result);
-                    objectResult = objectManager->GetJsObjectByJavaObject(javaObjectID);
-
-                    if (objectResult.IsEmpty()) {
-                        objectResult = objectManager->CreateJSWrapper(javaObjectID, *returnType,
-                                                                      result);
-                    }
+                    objectResult = objectManager->GetOrCreateJSWrapper(result);
                 }
 
                 args.GetReturnValue().Set(objectResult);
@@ -590,9 +621,9 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 //    }
 }
 
-void CallbackHandlers::AdjustAmountOfExternalAllocatedMemory(JEnv &env, Isolate *isolate) {
+void CallbackHandlers::AdjustAmountOfExternalAllocatedMemory(Isolate *isolate, int64_t usedJavaMemory) {
     auto runtime = Runtime::GetRuntime(isolate);
-    runtime->AdjustAmountOfExternalAllocatedMemory();
+    runtime->AdjustAmountOfExternalAllocatedMemory(usedJavaMemory);
     runtime->TryCallGC();
 }
 
@@ -1029,7 +1060,7 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
         EscapableHandleScope handleScope(isolate);
 
         auto jsMethod = method.As<Function>();
-        int argc = ArgConverter::GetJavaArgsLength(env, args);
+        int argc = args.count;
 
         constexpr int kInlineArgs = 16;
         Local<Value> inlineArguments[kInlineArgs];
@@ -1078,12 +1109,7 @@ Local<Object> CallbackHandlers::FindClass(Isolate *isolate, const string &classN
         auto runtime = Runtime::GetRuntime(isolate);
         auto objectManager = runtime->GetObjectManager();
 
-        jint javaObjectID = objectManager->GetOrCreateObjectId(c);
-        clazz = objectManager->GetJsObjectByJavaObject(javaObjectID);
-
-        if (clazz.IsEmpty()) {
-            clazz = objectManager->CreateJSWrapper(javaObjectID, "Ljava/lang/Class;", c);
-        }
+        clazz = objectManager->GetOrCreateJSWrapper(c);
     }
     return clazz;
 }
@@ -1956,8 +1982,9 @@ short CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH = 100;
 jclass CallbackHandlers::RUNTIME_CLASS = nullptr;
 jclass CallbackHandlers::JAVA_LANG_STRING = nullptr;
 jfieldID CallbackHandlers::CURRENT_OBJECTID_FIELD_ID = nullptr;
+jfieldID CallbackHandlers::CURRENT_OBJECTCLASS_FIELD_ID = nullptr;
 jmethodID CallbackHandlers::RESOLVE_CLASS_METHOD_ID = nullptr;
-jmethodID CallbackHandlers::MAKE_INSTANCE_STRONG_ID = nullptr;
+jmethodID CallbackHandlers::REGISTER_CONSTRUCTED_INSTANCE_ID = nullptr;
 jmethodID CallbackHandlers::GET_TYPE_METADATA = nullptr;
 jmethodID CallbackHandlers::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::DISABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;

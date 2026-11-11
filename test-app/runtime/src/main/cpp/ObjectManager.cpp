@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include "ArgConverter.h"
+#include "JType.h"
 #include "ManualInstrumentation.h"
 #include "MetadataNode.h"
 #include "NativeScriptAssert.h"
@@ -20,6 +21,7 @@ using namespace tns;
 
 ObjectManager::ObjectManager(jobject javaRuntimeObject)
     : m_javaRuntimeObject(javaRuntimeObject),
+      m_isolate(nullptr),
       m_currentObjectId(0),
       m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback,
               ValidateWeakGlobalRefCallback, 1000, this) {
@@ -53,9 +55,21 @@ void ObjectManager::InitializeJNI() {
       runtimeClass, "getOrCreateJavaObjectID", "(Ljava/lang/Object;)I");
   NS_CHECK(GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID != nullptr);
 
-  MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID =
-      env.GetMethodID(runtimeClass, "makeInstanceWeakAndCheckIfAlive", "(I)Z");
-  NS_CHECK(MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID != nullptr);
+  GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID = env.GetMethodID(
+      runtimeClass, "getOrCreateJavaObjectIDAndClass", "(Ljava/lang/Object;)J");
+  NS_CHECK(GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID != nullptr);
+
+  FIND_JAVA_OBJECT_ID_METHOD_ID = env.GetMethodID(
+      runtimeClass, "findJavaObjectID", "(Ljava/lang/Object;)I");
+  NS_CHECK(FIND_JAVA_OBJECT_ID_METHOD_ID != nullptr);
+
+  MAKE_INSTANCE_STRONG_METHOD_ID = env.GetMethodID(
+      runtimeClass, "makeInstanceStrong", "(Ljava/lang/Object;I)V");
+  NS_CHECK(MAKE_INSTANCE_STRONG_METHOD_ID != nullptr);
+
+  PROCESS_FINALIZED_BATCH_METHOD_ID =
+      env.GetMethodID(runtimeClass, "processFinalizedBatch", "([II[II)V");
+  NS_CHECK(PROCESS_FINALIZED_BATCH_METHOD_ID != nullptr);
 
   RELEASE_NATIVE_INSTANCE_METHOD_ID =
       env.GetMethodID(runtimeClass, "releaseNativeCounterpart", "(I)V");
@@ -82,6 +96,7 @@ void ObjectManager::Init(Isolate* isolate) {
   auto jsWrapperFunc =
       jsWrapperFuncTemplate->GetFunction(context).ToLocalChecked();
   m_poJsWrapperFunc = new Persistent<Function>(isolate, jsWrapperFunc);
+  m_jsWrapperTemplate.Reset(isolate, jsWrapperFuncTemplate->InstanceTemplate());
 }
 
 JniLocalRef ObjectManager::GetJavaObjectByJsObject(
@@ -91,12 +106,12 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(
   if (jsInstanceInfo != nullptr) {
     jweak existingObject;
     try {
-      existingObject = GetJavaObjectByID(jsInstanceInfo->JavaObjectID);
+      existingObject = GetJavaObjectByID(jsInstanceInfo->javaObjectID);
     } catch (const NativeScriptException& e) {
       // this captures usually the error
-      auto className = GetClassName(jsInstanceInfo->ObjectClazz);
+      auto className = GetClassName(jsInstanceInfo->objectClazz);
       throw NativeScriptException("Failed to get Java object by ID. id=" +
-                                  std::to_string(jsInstanceInfo->JavaObjectID) +
+                                  std::to_string(jsInstanceInfo->javaObjectID) +
                                   ", class=" + className + ". " +
                                   e.GetErrorMessage());
     }
@@ -169,9 +184,21 @@ MaybeLocal<Array> ObjectManager::ReadArrayThroughProxy(Local<Context> context,
   return scope.Escape(snapshot);
 }
 
+int ObjectManager::LinkedIdOf(const Local<Object>& object) {
+  auto field = object->GetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo)).As<Value>();
+  if (!field->IsUint32()) {
+    return -1;
+  }
+  return static_cast<int>(field.As<Uint32>()->Value() - 1u);
+}
+
+void ObjectManager::SetJsInfo(const Local<Object>& object, uint32_t javaObjectID) {
+  object->SetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo),
+                           Integer::NewFromUnsigned(m_isolate, javaObjectID + 1));
+}
+
 Local<Object> ObjectManager::GetJSInstanceInfoOwner(const Local<Object>& object) {
-  const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-  if (object->GetInternalField(jsInfoIdx).As<Value>()->IsExternal()) {
+  if (HasJsInfo(object)) {
     return object;
   }
 
@@ -181,8 +208,7 @@ Local<Object> ObjectManager::GetJSInstanceInfoOwner(const Local<Object>& object)
   if (!prototypeObject.IsEmpty() && prototypeObject->IsObject()) {
     DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d",
                 prototypeObject->GetIdentityHash());
-    if (IsJsRuntimeObject(prototypeObject) &&
-        prototypeObject->GetInternalField(jsInfoIdx).As<Value>()->IsExternal()) {
+    if (IsJsRuntimeObject(prototypeObject) && HasJsInfo(prototypeObject)) {
       return prototypeObject;
     }
   }
@@ -192,21 +218,31 @@ Local<Object> ObjectManager::GetJSInstanceInfoOwner(const Local<Object>& object)
 
 ObjectManager::JSInstanceInfo*
 ObjectManager::GetJSInstanceInfoFromRuntimeObject(const Local<Object>& object) {
-  HandleScope handleScope(m_isolate);
-
-  auto owner = GetJSInstanceInfoOwner(object);
-  if (owner.IsEmpty()) {
-    return nullptr;
+  int id = LinkedIdOf(object);
+  if (id == -1) {
+    HandleScope handleScope(m_isolate);
+    auto owner = GetJSInstanceInfoOwner(object);
+    if (owner.IsEmpty()) {
+      return nullptr;
+    }
+    id = LinkedIdOf(owner);
   }
 
-  auto external = owner->GetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo)).As<External>();
-  return static_cast<JSInstanceInfo*>(external->Value(v8::kExternalPointerTypeTagDefault));
+  auto state = m_idToObject.Find(id);
+  return state != nullptr && state->linked ? state : nullptr;
 }
+
+// Array buffers and their views are linked to Java buffers through V8's own embedder
+// fields, which must cover JsInfo and CallSuper; they have no Metadata field.
+static_assert(V8_ARRAY_BUFFER_INTERNAL_FIELD_COUNT ==
+              static_cast<int>(ObjectManager::MetadataNodeKeys::Metadata));
+static_assert(V8_ARRAY_BUFFER_VIEW_INTERNAL_FIELD_COUNT ==
+              static_cast<int>(ObjectManager::MetadataNodeKeys::Metadata));
 
 bool ObjectManager::IsJsRuntimeObject(const v8::Local<v8::Object>& object) {
   int internalFieldCount = object->InternalFieldCount();
-  const int count = static_cast<int>(MetadataNodeKeys::END);
-  return internalFieldCount == count;
+  return internalFieldCount == static_cast<int>(MetadataNodeKeys::END) ||
+         internalFieldCount == V8_ARRAY_BUFFER_INTERNAL_FIELD_COUNT;
 }
 
 jweak ObjectManager::GetJavaObjectByID(uint32_t javaObjectID) {
@@ -217,6 +253,7 @@ jweak ObjectManager::GetJavaObjectByID(uint32_t javaObjectID) {
 
 jobject ObjectManager::GetJavaObjectByIDImpl(uint32_t javaObjectID) {
   JEnv env;
+  AssertIsolateLocked();
   jobject object = env.CallObjectMethod(
       m_javaRuntimeObject, GET_JAVAOBJECT_BY_ID_METHOD_ID, javaObjectID);
   return object;
@@ -230,37 +267,100 @@ jclass ObjectManager::GetJavaClass(const Local<Object>& instance) {
   DEBUG_WRITE("GetClass called");
 
   JSInstanceInfo* jsInfo = GetJSInstanceInfo(instance);
-  jclass clazz = jsInfo->ObjectClazz;
+  jclass clazz = jsInfo->objectClazz;
 
   return clazz;
 }
 
 void ObjectManager::SetJavaClass(const Local<Object>& instance, jclass clazz) {
   JSInstanceInfo* jsInfo = GetJSInstanceInfo(instance);
-  jsInfo->ObjectClazz = clazz;
+  jsInfo->objectClazz = clazz;
 }
 
 int ObjectManager::GetOrCreateObjectId(jobject object) {
   JEnv env;
+  AssertIsolateLocked();
   jint javaObjectID = env.CallIntMethod(
       m_javaRuntimeObject, GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID, object);
 
   return javaObjectID;
 }
 
+int ObjectManager::FindObjectId(jobject object) {
+  JEnv env;
+  AssertIsolateLocked();
+  return env.CallIntMethod(m_javaRuntimeObject, FIND_JAVA_OBJECT_ID_METHOD_ID,
+                           object);
+}
+
+void ObjectManager::RegisterStrong(jobject object, int javaObjectID) {
+  JEnv env;
+  AssertIsolateLocked();
+  env.CallVoidMethod(m_javaRuntimeObject, MAKE_INSTANCE_STRONG_METHOD_ID,
+                     object, javaObjectID);
+}
+
 Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID) {
   auto isolate = m_isolate;
   EscapableHandleScope handleScope(isolate);
 
-  auto it = m_idToObject.find(javaObjectID);
-  if (it == m_idToObject.end()) {
+  auto state = m_idToObject.Find(javaObjectID);
+  if (state == nullptr) {
     return handleScope.Escape(Local<Object>());
   }
 
-  Persistent<Object>* jsObject = it->second->target;
+  return handleScope.Escape(JsObjectFor(state));
+}
 
-  auto localObject = Local<Object>::New(isolate, *jsObject);
-  return handleScope.Escape(localObject);
+Local<Object> ObjectManager::JsObjectFor(ObjectWeakCallbackState* state) {
+  if (state->queued) {
+    state->reacquired = true;
+  }
+  return Local<Object>::New(m_isolate, *state->target);
+}
+
+void ObjectManager::ReleaseUnwrappedArgs(const JavaCallArgs& args) {
+  if (args.converted || args.count == 0) {
+    return;
+  }
+  JEnv env;
+  JNIEnv* raw = env;
+  // Runs after the failure was rethrown to Java; keep that exception for the caller.
+  jthrowable pending = raw->ExceptionOccurred();
+  raw->ExceptionClear();
+
+  jsize argc = args.count;
+  std::vector<jlong> values(JavaCallArgs::PackedLength(argc));
+  raw->GetLongArrayRegion(args.values, 0, values.size(), values.data());
+  AssertIsolateLocked();
+  for (jsize i = 0; i < argc; i++) {
+    if (JavaCallArgs::TypeAt(values.data(), argc, i) != Type::JsObject ||
+        (values[i] & JavaCallArgs::FreshArg) == 0) {
+      continue;
+    }
+    auto javaObjectID = static_cast<jint>(values[i]);
+    if (HasJsObject(javaObjectID)) {
+      continue;
+    }
+    raw->CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,
+                        javaObjectID);
+    if (raw->ExceptionCheck()) {
+      raw->ExceptionClear();
+    }
+  }
+
+  if (pending != nullptr) {
+    raw->Throw(pending);
+    raw->DeleteLocalRef(pending);
+  }
+}
+
+Local<Object> ObjectManager::GetLinkedJsObjectByJavaObject(int javaObjectID) {
+  auto state = m_idToObject.Find(javaObjectID);
+  if (state == nullptr || !state->linked) {
+    return Local<Object>();
+  }
+  return JsObjectFor(state);
 }
 
 Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID,
@@ -268,30 +368,86 @@ Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID,
   return CreateJSWrapperHelper(javaObjectID, typeName, nullptr);
 }
 
-Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID,
-                                             const string& typeName,
-                                             jobject instance) {
+Local<Object> ObjectManager::GetOrCreateJSWrapper(jobject object) {
   JEnv env;
-  JniLocalRef clazz(env.GetObjectClass(instance));
+  AssertIsolateLocked();
+  jlong packed = env.CallLongMethod(
+      m_javaRuntimeObject, GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID,
+      object);
+  auto javaObjectID = static_cast<jint>(packed);
+  auto wrapper = GetJsObjectByJavaObject(javaObjectID);
+  if (!wrapper.IsEmpty()) {
+    return wrapper;
+  }
+  return CreateJSWrapper(javaObjectID, static_cast<int>(packed >> 32), object);
+}
 
-  return CreateJSWrapperHelper(javaObjectID, typeName, clazz);
+Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, int classIndex,
+                                             jobject instance) {
+  jclass clazz;
+  std::string scratch;
+  MetadataNode* node = nullptr;
+  const auto& className = WrapperClassFor(classIndex, instance, clazz, scratch, node);
+  return CreateJSWrapperHelper(javaObjectID, className, clazz, node);
+}
+
+const std::string& ObjectManager::WrapperClassFor(int classIndex,
+                                                  jobject instance,
+                                                  jclass& clazz,
+                                                  std::string& scratch,
+                                                  MetadataNode*& node) {
+  if (classIndex > 0 &&
+      static_cast<size_t>(classIndex) < m_wrapperClasses.size() &&
+      m_wrapperClasses[classIndex] != nullptr) {
+    auto& entry = *m_wrapperClasses[classIndex];
+    if (entry.node == nullptr) {
+      entry.node = MetadataNode::GetOrCreate(entry.name);
+    }
+    clazz = entry.clazz;
+    node = entry.node;
+    return entry.name;
+  }
+
+  JEnv env;
+  JniLocalRef localClass(env.GetObjectClass(instance));
+  auto name = GetClassName(static_cast<jclass>(localClass));
+  if (classIndex <= 0) {
+    scratch = std::move(name);
+    clazz = nullptr;
+    return scratch;
+  }
+
+  // The object's own class, not whatever its name resolves to: they differ
+  // when two class loaders define the same name.
+  auto entry = std::make_unique<WrapperClass>();
+  entry->name = std::move(name);
+  entry->clazz = static_cast<jclass>(env.NewGlobalRef(localClass));
+  if (static_cast<size_t>(classIndex) >= m_wrapperClasses.size()) {
+    m_wrapperClasses.resize(classIndex + 1);
+  }
+  m_wrapperClasses[classIndex] = std::move(entry);
+  clazz = m_wrapperClasses[classIndex]->clazz;
+  return m_wrapperClasses[classIndex]->name;
 }
 
 Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
-                                                   const string& typeName,
-                                                   jclass clazz) {
+                                                   const string& className,
+                                                   jclass clazz,
+                                                   MetadataNode* node) {
   auto isolate = m_isolate;
 
-  auto className = (clazz != nullptr) ? GetClassName(clazz) : typeName;
-
-  auto node = MetadataNode::GetOrCreate(className);
+  if (node == nullptr) {
+    node = MetadataNode::GetOrCreate(className);
+  }
 
   auto jsWrapper = node->CreateJSWrapper(isolate, this);
 
   if (!jsWrapper.IsEmpty()) {
-    JEnv env;
-    auto claz = env.FindClass(className);
-    Link(jsWrapper, javaObjectID, claz);
+    if (clazz == nullptr) {
+      JEnv env;
+      clazz = env.FindClass(className);
+    }
+    Link(jsWrapper, javaObjectID, clazz);
   }
   return jsWrapper;
 }
@@ -311,24 +467,19 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
   DEBUG_WRITE("Linking js object: %d and java instance id: %d",
               object->GetIdentityHash(), javaObjectID);
 
-  auto jsInstanceInfo =
-      new JSInstanceInfo(javaObjectID, clazz);
-
-  auto objectHandle = new Persistent<Object>(isolate, object);
-  auto state = new ObjectWeakCallbackState(this, jsInstanceInfo, objectHandle);
+  auto state = new ObjectWeakCallbackState(this, javaObjectID, clazz, isolate, object);
 
   // subscribe for JS GC event
-  objectHandle->SetWeak(state, JSObjectFinalizerStatic,
-                        WeakCallbackType::kFinalizer);
+  state->target->SetWeak(state, JSObjectFinalizerStatic,
+                         WeakCallbackType::kFinalizer);
 
-  auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+  SetJsInfo(object, javaObjectID);
 
-  auto jsInfo = External::New(isolate, jsInstanceInfo, v8::kExternalPointerTypeTagDefault);
-
-  // link
-  object->SetInternalField(jsInfoIdx, jsInfo);
-
-  m_idToObject.emplace(javaObjectID, state);
+  bool inserted = m_idToObject.Insert(javaObjectID, state);
+  // A second link for one id would leave this state's finalizer weakening the first
+  // wrapper's Java object.
+  NS_DCHECK(inserted);
+  (void) inserted;
 }
 
 bool ObjectManager::CloneLink(const Local<Object>& src,
@@ -384,37 +535,196 @@ void ObjectManager::JSObjectFinalizer(Isolate* isolate,
                                       ObjectWeakCallbackState* callbackState) {
   HandleScope handleScope(m_isolate);
   Persistent<Object>* po = callbackState->target;
-  auto jsInstanceInfo = GetJSInstanceInfoFromRuntimeObject(po->Get(m_isolate));
 
-  if (jsInstanceInfo == nullptr) {
+  if (!callbackState->linked) {
     // The link was already torn down (ReleaseNativeCounterpart); nothing but
     // the registration is left to drop.
-    m_idToObject.erase(callbackState->javaObjectID);
+    m_idToObject.Erase(callbackState->javaObjectID);
     po->Reset();
-    delete po;
     delete callbackState;
     return;
   }
 
-  auto javaObjectID = jsInstanceInfo->JavaObjectID;
-  JEnv env;
-  jboolean isJavaInstanceAlive = env.CallBooleanMethod(
-      m_javaRuntimeObject, MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID,
-      javaObjectID);
-  if (isJavaInstanceAlive) {
-    // If the Java instance is alive, keep the JavaScript instance alive.
-    po->SetWeak(callbackState, JSObjectFinalizerStatic,
-                WeakCallbackType::kFinalizer);
-  } else {
-    // If the Java instance is dead, this JavaScript instance can be let die.
-    delete jsInstanceInfo;
-    auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-    po->Get(m_isolate)->SetInternalField(jsInfoIdx, Undefined(m_isolate));
-    po->Reset();
-    m_idToObject.erase(javaObjectID);
-    delete po;
-    delete callbackState;
+  // Kept alive until the batch has asked the Java side whether it may die.
+  po->SetWeak(callbackState, JSObjectFinalizerStatic,
+              WeakCallbackType::kFinalizer);
+
+  if (callbackState->queued) {
+    // Collected again before the flush, so whatever handed it back has let go.
+    callbackState->reacquired = false;
+    return;
   }
+  callbackState->queued = true;
+  auto javaObjectID = static_cast<jint>(callbackState->javaObjectID);
+  (callbackState->javaWeakened ? m_pendingCheck : m_pendingWeaken)
+      .push_back(javaObjectID);
+
+  // Never flushed from here: that would call into Java and free other
+  // wrappers' handles in the middle of V8's finalizer pass. The next JS<->Java
+  // crossing flushes; this task covers a thread that goes idle first, and is
+  // delayed so that a busy runtime does not wake its event loop per GC.
+  constexpr double kIdleFlushDelayMs = 4;
+  ScheduleFinalizedBatchFlush(kIdleFlushDelayMs);
+}
+
+bool ObjectManager::ScheduleFinalizedBatchFlush(double delayMs) {
+  if (m_flushScheduled) {
+    return true;
+  }
+  auto runtime = Runtime::GetRuntime(m_isolate);
+  auto eventLoop = runtime->GetEventLoop();
+  if (eventLoop == nullptr) {
+    return false;
+  }
+  m_flushScheduled = true;
+  int runtimeId = runtime->GetId();
+  auto flush = [runtimeId]() {
+    // Runs on the runtime's own thread; skip if the runtime is gone.
+    auto current = Runtime::GetCurrentRuntime();
+    if (current == nullptr || current->GetId() != runtimeId) {
+      return;
+    }
+    auto isolate = current->GetIsolate();
+    v8::Locker locker(isolate);
+    Isolate::Scope isolateScope(isolate);
+    HandleScope handleScope(isolate);
+    current->GetObjectManager()->FlushFinalizedBatch();
+  };
+  if (delayMs > 0) {
+    eventLoop->PostInternalDelayed(std::move(flush), delayMs);
+  } else {
+    eventLoop->PostInternal(std::move(flush));
+  }
+  return true;
+}
+
+void ObjectManager::FlushFinalizedBatch() {
+  m_flushScheduled = false;
+  m_flushBackingOff = false;
+  if (m_pendingWeaken.empty() && m_pendingCheck.empty()) {
+    return;
+  }
+  // A failed Java->JS call returns with its exception pending: JNI may not be used until it
+  // is thrown, and the flush must not mistake it for its own failure and clear it.
+  if (JEnv().ExceptionCheck()) {
+    ScheduleFinalizedBatchFlush();
+    return;
+  }
+  HandleScope handleScope(m_isolate);
+
+  auto weaken = std::move(m_pendingWeaken);
+  auto check = std::move(m_pendingCheck);
+  m_pendingWeaken.clear();
+  m_pendingCheck.clear();
+
+  // A wrapper handed back to JS since it was queued is reachable again: its
+  // Java side keeps its current strength until a later collection.
+  auto keepCollected = [this](std::vector<jint>& ids) {
+    size_t kept = 0;
+    for (jint id : ids) {
+      ObjectWeakCallbackState* state = m_idToObject.Find(id);
+      if (state == nullptr) {
+        continue;
+      }
+      if (state->reacquired) {
+        state->reacquired = false;
+        state->queued = false;
+        continue;
+      }
+      ids[kept++] = id;
+    }
+    ids.resize(kept);
+  };
+  keepCollected(weaken);
+  keepCollected(check);
+  if (weaken.empty() && check.empty()) {
+    return;
+  }
+
+  JEnv env;
+  JNIEnv* raw = env;
+  auto toJava = [raw](const std::vector<jint>& ids) -> jintArray {
+    if (ids.empty()) {
+      return nullptr;
+    }
+    auto count = static_cast<jsize>(ids.size());
+    jintArray array = raw->NewIntArray(count);
+    if (array != nullptr) {
+      raw->SetIntArrayRegion(array, 0, count, ids.data());
+    }
+    return array;
+  };
+  JniLocalRef weakenArray(toJava(weaken));
+  JniLocalRef checkArray(toJava(check));
+  bool failed = (!weaken.empty() && weakenArray.IsNull()) ||
+                (!check.empty() && checkArray.IsNull());
+  if (!failed) {
+    // Java overwrites the id of every object that is already dead with -1.
+    // Called without JEnv's check, which would throw into whichever JS call
+    // happens to be crossing.
+    AssertIsolateLocked();
+    raw->CallVoidMethod(m_javaRuntimeObject, PROCESS_FINALIZED_BATCH_METHOD_ID,
+                        (jintArray) weakenArray,
+                        static_cast<jint>(weaken.size()),
+                        (jintArray) checkArray,
+                        static_cast<jint>(check.size()));
+    failed = raw->ExceptionCheck();
+  }
+  if (failed) {
+    // Most likely an OutOfMemoryError. Every Java-side step is idempotent, so
+    // the whole batch is retried, after a pause so a persistent failure
+    // cannot spin the event loop.
+    if (raw->ExceptionCheck()) {
+      raw->ExceptionDescribe();
+      raw->ExceptionClear();
+    }
+    m_pendingWeaken.insert(m_pendingWeaken.end(), weaken.begin(), weaken.end());
+    m_pendingCheck.insert(m_pendingCheck.end(), check.begin(), check.end());
+    constexpr double kRetryDelayMs = 100;
+    m_flushBackingOff = ScheduleFinalizedBatchFlush(kRetryDelayMs);
+    return;
+  }
+
+  auto settle = [this, raw](const std::vector<jint>& ids, jintArray array,
+                            bool weakened) {
+    if (ids.empty()) {
+      return;
+    }
+    std::vector<jint> results(ids.size());
+    raw->GetIntArrayRegion(array, 0, static_cast<jsize>(ids.size()),
+                           results.data());
+    for (size_t i = 0; i < ids.size(); i++) {
+      ObjectWeakCallbackState* state = m_idToObject.Find(ids[i]);
+      if (state == nullptr) {
+        continue;
+      }
+      if (results[i] < 0) {
+        ReleaseCollectedWrapper(ids[i]);
+        continue;
+      }
+      state->queued = false;
+      if (weakened) {
+        state->javaWeakened = true;
+      }
+    }
+  };
+  settle(weaken, (jintArray) weakenArray, true);
+  settle(check, (jintArray) checkArray, false);
+}
+
+void ObjectManager::ReleaseCollectedWrapper(int javaObjectID) {
+  ObjectWeakCallbackState* state = m_idToObject.Find(javaObjectID);
+  if (state == nullptr) {
+    return;
+  }
+  Persistent<Object>* po = state->target;
+  if (state->linked) {
+    auto object = po->Get(m_isolate);
+    object->SetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo), Undefined(m_isolate));
+  }
+  m_idToObject.Erase(javaObjectID);
+  po->Reset();
+  delete state;
 }
 
 int ObjectManager::GenerateNewObjectID() {
@@ -427,36 +737,33 @@ int ObjectManager::GenerateNewObjectID() {
 void ObjectManager::ReleaseAllRegistered() {
   HandleScope handleScope(m_isolate);
 
+  m_pendingWeaken.clear();
+  m_pendingCheck.clear();
+
   auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
 
   // Detached first: nothing below should observe a half-emptied map, and the
   // finalizers these handles were armed with will never run now anyway.
-  auto survivors = std::move(m_idToObject);
-  m_idToObject.clear();
-
-  for (auto& entry : survivors) {
-    ObjectWeakCallbackState* state = entry.second;
+  m_idToObject.DrainAll([this, jsInfoIdx](ObjectWeakCallbackState* state) {
     Persistent<Object>* po = state->target;
 
     if (!po->IsEmpty()) {
       auto local = po->Get(m_isolate);
       if (!local.IsEmpty()) {
-        // Drop the back-pointer before the JSInstanceInfo goes away.
         local->SetInternalField(jsInfoIdx, Undefined(m_isolate));
       }
       po->Reset();
     }
 
-    delete po;
-    delete state->jsInfo;
     delete state;
-  }
+  });
 
   if (m_poJsWrapperFunc != nullptr) {
     m_poJsWrapperFunc->Reset();
     delete m_poJsWrapperFunc;
     m_poJsWrapperFunc = nullptr;
   }
+  m_jsWrapperTemplate.Reset();
 }
 
 ObjectManager::~ObjectManager() {
@@ -466,6 +773,14 @@ ObjectManager::~ObjectManager() {
   // objects abandoned the whole cache when it died. ART's weak-global table is
   // bounded, so enough worker cycles turned that leak into an abort.
   m_cache.clear();
+
+  JEnv env;
+  for (const auto& entry : m_wrapperClasses) {
+    if (entry != nullptr) {
+      env.DeleteGlobalRef(entry->clazz);
+    }
+  }
+  m_wrapperClasses.clear();
 }
 
 jweak ObjectManager::NewWeakGlobalRefCallback(const int& javaObjectID,
@@ -494,9 +809,9 @@ bool ObjectManager::ValidateWeakGlobalRefCallback(const int& javaObjectID,
 }
 
 Local<Object> ObjectManager::GetEmptyObject(Isolate* isolate) {
-  auto emptyObjCtorFunc = Local<Function>::New(isolate, *m_poJsWrapperFunc);
+  // The same object `new` on m_poJsWrapperFunc makes, without entering its callback.
   auto context = Runtime::GetRuntime(isolate)->GetContext();
-  auto val = emptyObjCtorFunc->CallAsConstructor(context, 0, nullptr);
+  auto val = m_jsWrapperTemplate.Get(isolate)->NewInstance(context);
   if (val.IsEmpty()) {
     return Local<Object>();
   }
@@ -522,7 +837,7 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
   }
   auto instance = source.As<Object>();
 
-  // A `super` object shares its owner's JsInfo External; the owner is the one
+  // A `super` object shares its owner's JsInfo link; the owner is the one
   // registered, so the release is resolved and recorded there.
   Local<Value> superOwner;
   V8GetPrivateValue(m_isolate, instance, ArgConverter::ConvertToV8String(m_isolate, "superowner"), superOwner);
@@ -539,25 +854,23 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
   }
 
   auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-  auto jsInstanceInfo = static_cast<JSInstanceInfo*>(
-      owner->GetInternalField(jsInfoIdx).As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+  auto javaObjectID = LinkedIdOf(owner);
 
   JEnv env;
+  AssertIsolateLocked();
   env.CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,
-                     jsInstanceInfo->JavaObjectID);
+                     javaObjectID);
 
   // The registration outlives the link: it is dropped by the finalizer once
-  // the wrapper is collected. Until then the entry must not point at the
-  // JSInstanceInfo being freed here.
-  auto it = m_idToObject.find(jsInstanceInfo->JavaObjectID);
-  if (it != m_idToObject.end()) {
-    it->second->jsInfo = nullptr;
+  // the wrapper is collected.
+  auto state = m_idToObject.Find(javaObjectID);
+  if (state != nullptr) {
+    state->linked = false;
   }
 
-  delete jsInstanceInfo;
   owner->SetInternalField(jsInfoIdx, Undefined(m_isolate));
 
-  // Every alias of the freed External must be cleared with it.
+  // Every alias of the link is cleared with it.
   Local<Value> aliasesValue;
   V8GetPrivateValue(m_isolate, owner, ArgConverter::ConvertToV8String(m_isolate, "superaliases"), aliasesValue);
   if (!aliasesValue.IsEmpty() && aliasesValue->IsArray()) {
@@ -577,6 +890,9 @@ jclass ObjectManager::JAVA_LANG_CLASS = nullptr;
 jmethodID ObjectManager::GET_NAME_METHOD_ID = nullptr;
 jmethodID ObjectManager::GET_JAVAOBJECT_BY_ID_METHOD_ID = nullptr;
 jmethodID ObjectManager::GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID = nullptr;
-jmethodID ObjectManager::MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID =
+jmethodID ObjectManager::GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID =
     nullptr;
+jmethodID ObjectManager::FIND_JAVA_OBJECT_ID_METHOD_ID = nullptr;
+jmethodID ObjectManager::MAKE_INSTANCE_STRONG_METHOD_ID = nullptr;
+jmethodID ObjectManager::PROCESS_FINALIZED_BATCH_METHOD_ID = nullptr;
 jmethodID ObjectManager::RELEASE_NATIVE_INSTANCE_METHOD_ID = nullptr;

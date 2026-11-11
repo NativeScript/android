@@ -13,6 +13,7 @@
 #include "File.h"
 #include "Timers.h"
 #include "EventLoop.h"
+#include "AdmissionGate.h"
 #include <atomic>
 #include <condition_variable>
 #include <optional>
@@ -108,7 +109,7 @@ class Runtime {
          * thread hosts at most one runtime and only that thread may destroy it.
          */
         static Runtime* GetCurrentRuntime() {
-            return s_currentRuntime;
+            return s_current.runtime;
         }
 
         /*
@@ -168,14 +169,34 @@ class Runtime {
 
         ObjectManager* GetObjectManager() const;
 
+        AdmissionGate& GetAdmissionGate() {
+            return m_admissionGate;
+        }
+
+        // The instance JS is constructing, as last published to the Java runtime's
+        // currentObjectId and currentObjectClass.
+        struct Construction {
+            int id = -1;
+            jclass clazz = nullptr;
+        };
+
+        Construction& CurrentConstruction() {
+            return m_construction;
+        }
+
+        // What the Java runtime's currentObjectClass holds; only native code writes it.
+        jclass& PublishedConstructionClass() {
+            return m_publishedConstructionClass;
+        }
+
         void RunModule(JNIEnv* _env, jobject obj, jstring scriptFile);
         void RunModule(const char *moduleName);
         void RunWorker(const std::string& filePath);
         jobject RunScript(JNIEnv* _env, jobject obj, jstring scriptFile);
-        jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, const JavaCallArgs& args, jlongArray primitiveResult);
+        jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jobject javaObject, jint javaObjectID, jstring methodName, jint methodNameId, jint retType, jboolean isConstructor, const JavaCallArgs& args, jlongArray primitiveResult);
         void CreateJSInstanceNative(JNIEnv* _env, jobject obj, jobject javaObject, jint javaObjectID, jstring className);
         jint GenerateNewObjectId(JNIEnv* env, jobject obj);
-        void AdjustAmountOfExternalAllocatedMemory();
+        void AdjustAmountOfExternalAllocatedMemory(int64_t usedJavaMemory);
         bool NotifyGC(JNIEnv* env, jobject obj);
         bool TryCallGC();
         /*
@@ -333,6 +354,12 @@ class Runtime {
 
         ObjectManager* m_objectManager;
 
+        AdmissionGate m_admissionGate;
+
+        Construction m_construction;
+
+        jclass m_publishedConstructionClass = nullptr;
+
         ModuleInternal m_module;
 
         ArrayBufferHelper m_arrayBufferHelper;
@@ -417,7 +444,6 @@ class Runtime {
 
         static JavaVM* s_jvm;
 
-        static jmethodID GET_USED_MEMORY_METHOD_ID;
 
         /*
          * The main runtime has finished initializing. Distinct from the
@@ -435,8 +461,12 @@ class Runtime {
 
         static std::shared_ptr<EventLoop> s_mainEventLoop;
 
-        static thread_local Runtime* s_currentRuntime;
-        static thread_local int s_currentRuntimeId;
+        // One struct because without ELF TLS (minSdk < 29) every thread_local costs a lookup.
+        struct CurrentRuntime {
+            Runtime* runtime = nullptr;
+            int id = -1;
+        };
+        static thread_local CurrentRuntime s_current;
         static thread_local PendingIsolateSetup s_pendingIsolateSetup;
 
 #ifdef APPLICATION_IN_DEBUG

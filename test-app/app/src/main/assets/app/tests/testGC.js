@@ -314,4 +314,107 @@ describe("Tests garbage collection", function () {
 
 		test.postCallback();
 	});
+	describe("collected wrappers waiting for a flush", function () {
+		var Holder = com.tns.tests.WrapperHolder;
+
+		it("keep a callback's error when wrappers were collected after its last Java call", function () {
+			var callable = new java.util.concurrent.Callable({
+				call: function () {
+					for (var i = 0; i < 2000; i++) {
+						new java.lang.Object();
+					}
+					gc();
+					throw new Error("thrown with a batch pending");
+				}
+			});
+			var task = new java.util.concurrent.FutureTask(callable);
+			task.run();
+
+			expect(task.isDone()).toBe(true);
+			expect(function () { task.get(); }).toThrow();
+		});
+
+		function collectJava() {
+			for (var i = 0; i < 3; i++) {
+				java.lang.Runtime.getRuntime().gc();
+				java.lang.System.runFinalization();
+			}
+		}
+
+		afterEach(function () {
+			Holder.held = null;
+		});
+
+		it("keep the Java object of a wrapper handed back to JS before the flush", function () {
+			(function () {
+				Holder.held = new java.lang.StringBuilder("reacquired");
+			})();
+			gc();
+			var again = Holder.held;
+			Holder.held = null;
+			collectJava();
+
+			expect(again.toString()).toBe("reacquired");
+		});
+
+		it("keep a wrapper handed back to JS while its liveness check is queued", function () {
+			(function () {
+				Holder.held = new java.lang.StringBuilder("checked");
+			})();
+			gc();
+			collectJava();
+			gc();
+			var again = Holder.held;
+			collectJava();
+
+			expect(again.toString()).toBe("checked");
+			again = null;
+			gc();
+			collectJava();
+		});
+
+		it("release an object Java registered for a call that failed before reaching it", function () {
+			// Not a function: the call fails before its argument is converted.
+			var target = new com.tns.tests.FreshArgs.Target({ take: 42 });
+			var ref = com.tns.tests.FreshArgs.callWithNewObject(target);
+			collectJava();
+
+			expect(ref.get()).toBe(null);
+		});
+
+		it("give threads passing the same new object at once one wrapper", function (done) {
+			var FreshArgs = com.tns.tests.FreshArgs;
+			var received = [];
+			var target = new FreshArgs.Target({
+				take: function (o) {
+					received.push(o);
+				}
+			});
+			FreshArgs.startFromThreadsAtOnce(target, 4);
+			(function poll() {
+				if (FreshArgs.finishedCalls() < 4) {
+					setTimeout(poll, 10);
+					return;
+				}
+				expect(received.length).toBe(4);
+				for (var i = 1; i < received.length; i++) {
+					expect(received[i] === received[0]).toBe(true);
+				}
+				done();
+			})();
+		});
+
+		it("let Java reclaim objects during a synchronous loop that never yields", function () {
+			// Far more than the Java heap: every buffer must become collectable while the loop runs.
+			var total = 0;
+			for (var i = 0; i < 160; i++) {
+				var stream = new java.io.ByteArrayOutputStream(4 * 1024 * 1024);
+				total += stream.size() + 1;
+				if (i % 8 === 7) {
+					gc();
+				}
+			}
+			expect(total).toBe(160);
+		});
+	});
 });

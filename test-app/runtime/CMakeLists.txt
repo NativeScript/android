@@ -265,18 +265,23 @@ add_library(
 
 set(NATIVES_BLOB_INCLUDE_DIRECTORIES ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/include)
 
+# Calls between this library's own exported functions bind directly instead of going
+# through the PLT. Exported functions stay callable from plugins; data symbols stay
+# interposable so a plugin and the runtime never end up with two copies of one variable.
+set(NS_SYMBOLIC_FUNCTIONS "-Wl,-Bsymbolic-functions")
+
 if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
     set_target_properties(
             NativeScript
             # The version script keeps V8's public API linkable for plugins while hiding
             # the ~60k v8::internal:: symbols the static monolith would otherwise export.
-            PROPERTIES LINK_FLAGS "-Wl,--allow-multiple-definition -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exported-symbols.map"
+            PROPERTIES LINK_FLAGS "-Wl,--allow-multiple-definition -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exported-symbols.map ${NS_SYMBOLIC_FUNCTIONS}"
             INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
     )
 else ()
     set_target_properties(
             NativeScript
-            PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition
+            PROPERTIES LINK_FLAGS "-Wl,--allow-multiple-definition ${NS_SYMBOLIC_FUNCTIONS}"
             INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
     )
 endif ()

@@ -41,7 +41,7 @@ class MetadataNode {
 
         static void EnableProfiler(bool enableProfiler);
 
-        std::string GetName();
+        const std::string& GetName();
 
         bool IsNodeTypeInterface();
 
@@ -139,6 +139,10 @@ class MetadataNode {
 
         static MetadataNode* GetInstanceMetadata(v8::Isolate* isolate, const v8::Local<v8::Object>& value);
 
+        struct InstanceData;
+        // This runtime's per-instance data for this node, created on first use.
+        InstanceData& GetInstanceData(v8::Isolate* isolate);
+
         static void SetInstanceMetadata(v8::Isolate* isolate, v8::Local<v8::Object> value, MetadataNode* node);
 
         static TypeMetadata* GetTypeMetadata(v8::Isolate* isolate, const v8::Local<v8::Function>& value);
@@ -158,6 +162,10 @@ class MetadataNode {
 
         static void FieldAccessorGetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void FieldAccessorSetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+
+        static void StaticFieldGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+
+        static void StaticFieldSetterCallback(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Boolean>& info);
         static void PropertyAccessorGetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void PropertyAccessorSetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
@@ -265,6 +273,13 @@ class MetadataNode {
             std::string name;
         };
 
+        // A node's metadata External is shared by all its instances, so marking an
+        // instance allocates nothing. instanceTemplate is set once a wrapper was made.
+        struct InstanceData {
+            v8::Persistent<v8::External>* metadata = nullptr;
+            v8::Persistent<v8::ObjectTemplate>* instanceTemplate = nullptr;
+        };
+
         struct CtorCacheData {
             CtorCacheData(v8::Persistent<v8::FunctionTemplate>* _ft, std::vector<MethodCallbackData*> _instanceMethodCallbacks)
                 :
@@ -278,14 +293,16 @@ class MetadataNode {
         struct ExtendedClassCacheData {
             ExtendedClassCacheData()
                 :
-                extendedCtorFunction(nullptr), node(nullptr) {
+                extendedCtorFunction(nullptr), instanceTemplate(nullptr), node(nullptr) {
             }
-            ExtendedClassCacheData(const v8::Local<v8::Function>& extCtorFunc, const std::string& _extendedName, MetadataNode* _node)
+            ExtendedClassCacheData(const v8::Local<v8::Function>& extCtorFunc, const v8::Local<v8::ObjectTemplate>& _instanceTemplate, const std::string& _extendedName, MetadataNode* _node)
                 :
                 extendedName(_extendedName), node(_node) {
                 extendedCtorFunction = new v8::Persistent<v8::Function>(v8::Isolate::GetCurrent(), extCtorFunc);
+                instanceTemplate = new v8::Persistent<v8::ObjectTemplate>(v8::Isolate::GetCurrent(), _instanceTemplate);
             }
             v8::Persistent<v8::Function>* extendedCtorFunction;
+            v8::Persistent<v8::ObjectTemplate>* instanceTemplate;
             std::string extendedName;
             MetadataNode* node;
         };
@@ -317,6 +334,8 @@ class MetadataNode {
              * runtime's teardown walked every node to erase its entry.
              */
             robin_hood::unordered_map<MetadataNode*, v8::Persistent<v8::Function>*> CtorFunctions;
+
+            robin_hood::unordered_node_map<MetadataNode*, InstanceData> Instances;
 
             /*
              * Owns every callback payload this runtime hands to V8 as External
@@ -352,6 +371,10 @@ class MetadataNode {
                 for (auto& entry : CtorFunctions) {
                     delete entry.second;
                 }
+                for (auto& entry : Instances) {
+                    delete entry.second.metadata;
+                    delete entry.second.instanceTemplate;
+                }
                 /*
                  * Freed from the maps rather than from CtorCacheData and
                  * ExtendedClassCacheData themselves: both are held by value and
@@ -364,6 +387,7 @@ class MetadataNode {
                 }
                 for (auto& entry : ExtendedCtorFuncCache) {
                     delete entry.second.extendedCtorFunction;
+                    delete entry.second.instanceTemplate;
                 }
             }
         };

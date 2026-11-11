@@ -33,13 +33,13 @@ JNIEnv* JEnv::GetEnvSlow() {
 }
 
 void JEnv::PinThreadEnv(JNIEnv* env) {
-    s_threadEnv = env;
-    s_threadEnvPinned = true;
+    s_thread.env = env;
+    s_thread.pinned = true;
 }
 
 void JEnv::UnpinThreadEnv() {
-    s_threadEnv = nullptr;
-    s_threadEnvPinned = false;
+    s_thread.env = nullptr;
+    s_thread.pinned = false;
 }
 
 JEnv::operator JNIEnv* () const {
@@ -892,8 +892,7 @@ void JEnv::CheckForJavaException() {
 }
 
 JavaVM *JEnv::s_jvm = nullptr;
-thread_local JNIEnv *JEnv::s_threadEnv = nullptr;
-thread_local bool JEnv::s_threadEnvPinned = false;
+thread_local JEnv::ThreadEnv JEnv::s_thread;
 robin_hood::unordered_map<string, jclass> JEnv::s_classCache;
 robin_hood::unordered_map<string, jthrowable> JEnv::s_missingClasses;
 jclass JEnv::RUNTIME_CLASS = nullptr;

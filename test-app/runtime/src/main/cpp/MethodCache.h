@@ -32,17 +32,18 @@ class MethodCache {
 
         static void Init();
 
-        static CacheMethodInfo ResolveMethodSignature(const std::string& className, const std::string& methodName, const v8::FunctionCallbackInfo<v8::Value>& args, bool isStatic);
+        // The returned entry lives as long as the process; mid is null when nothing matched.
+        static const CacheMethodInfo& ResolveMethodSignature(const std::string& className, const std::string& methodName, const v8::FunctionCallbackInfo<v8::Value>& args, bool isStatic);
 
-        static CacheMethodInfo ResolveConstructorSignature(const ArgsWrapper& argWrapper, const std::string& fullClassName, jclass javaClass, bool isInterface);
+        static const CacheMethodInfo& ResolveConstructorSignature(const ArgsWrapper& argWrapper, const std::string& fullClassName, jclass javaClass, bool isInterface);
 
     private:
         MethodCache() {
         }
 
-        static std::string EncodeSignature(const std::string& className, const std::string& methodName, const v8::FunctionCallbackInfo<v8::Value>& args, bool isStatic);
+        static void EncodeSignature(std::string& out, const std::string& className, const std::string& methodName, const v8::FunctionCallbackInfo<v8::Value>& args, bool isStatic);
 
-        static std::string GetType(v8::Isolate* isolate, const v8::Local<v8::Value>& value);
+        static void AppendType(std::string& out, v8::Isolate* isolate, const v8::Local<v8::Value>& value);
 
         static std::string ResolveJavaMethod(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& className, const std::string& methodName);
 
@@ -58,8 +59,9 @@ class MethodCache {
          * "s_mthod_ctor_signature_cache" holding all resolved CacheMethodInfo against an encoded_signature string.
          *  Used for caching the resolved constructor or method signature.
          * The encoded signature has template: <className>.S/I.<methodName>.<argsCount>.<arg1class>.<...>
+         * A node map, never erased from: callers keep references to its entries.
          */
-        static robin_hood::unordered_map<std::string, CacheMethodInfo> s_mthod_ctor_signature_cache;
+        static robin_hood::unordered_node_map<std::string, CacheMethodInfo> s_mthod_ctor_signature_cache;
 };
 }
 

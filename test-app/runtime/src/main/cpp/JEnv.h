@@ -8,7 +8,7 @@
 namespace tns {
 class JEnv {
     public:
-        JEnv() : m_env(s_threadEnv != nullptr ? s_threadEnv : GetEnvSlow()) {
+        JEnv() : m_env(CachedOrSlowEnv()) {
         }
 
         JEnv(JNIEnv* jniEnv) : m_env(jniEnv != nullptr ? jniEnv : JEnv().m_env) {
@@ -346,6 +346,16 @@ class JEnv {
 
         static void UnpinThreadEnv();
 
+    private:
+        // env is never filled from GetEnvSlow: its lazy attach is never detached by
+        // us, so nothing would tell us when the cached env goes stale. One struct
+        // because without ELF TLS (minSdk < 29) every thread_local costs a lookup.
+        struct ThreadEnv {
+            JNIEnv* env = nullptr;
+            bool pinned = false;
+        };
+
+    public:
         /*
          * Caches a JNI entry point's env for the duration of the call; leaves a
          * pinned env alone. The env passed to a native method is valid until
@@ -354,15 +364,15 @@ class JEnv {
         class EntryScope {
             public:
                 explicit EntryScope(JNIEnv* env)
-                    : m_active(!s_threadEnvPinned), m_previous(s_threadEnv) {
+                    : m_thread(s_thread), m_active(!m_thread.pinned), m_previous(m_thread.env) {
                     if (m_active) {
-                        s_threadEnv = env;
+                        m_thread.env = env;
                     }
                 }
 
                 ~EntryScope() {
-                    if (m_active && !s_threadEnvPinned) {
-                        s_threadEnv = m_previous;
+                    if (m_active && !m_thread.pinned) {
+                        m_thread.env = m_previous;
                     }
                 }
 
@@ -370,6 +380,7 @@ class JEnv {
                 EntryScope& operator=(const EntryScope&) = delete;
 
             private:
+                ThreadEnv& m_thread;
                 bool m_active;
                 JNIEnv* m_previous;
         };
@@ -377,14 +388,16 @@ class JEnv {
     private:
         static JNIEnv* GetEnvSlow();
 
+        static JNIEnv* CachedOrSlowEnv() {
+            JNIEnv* env = s_thread.env;
+            return env != nullptr ? env : GetEnvSlow();
+        }
+
         void CheckForJavaException();
 
         JNIEnv* m_env;
 
-        // Never filled from GetEnvSlow: its lazy attach is never detached by us,
-        // so nothing would tell us when the cached env goes stale.
-        static thread_local JNIEnv* s_threadEnv;
-        static thread_local bool s_threadEnvPinned;
+        static thread_local ThreadEnv s_thread;
 
         static JavaVM* s_jvm;
 

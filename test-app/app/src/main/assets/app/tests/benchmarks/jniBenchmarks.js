@@ -6,8 +6,14 @@
 // the median and minimum ns/op. Java -> JS benchmarks are timed in Java with System.nanoTime.
 
 var JniBench = com.tns.tests.JniBench;
-var ROUNDS = 7;
+var ROUNDS = com.tns.tests.JniBenchConfig.getRounds() || 7;
 var FILTER = String(JniBench.getFilter());
+var VARIANTS = String(com.tns.tests.JniBenchConfig.getVariants()).split(",").filter(function (v) { return v !== ""; }).map(Number);
+// Several names may be given, separated by "|"; a benchmark runs when its name contains any.
+var FILTERS = FILTER ? FILTER.split("|") : [];
+function skipped(name) {
+    return FILTERS.length > 0 && !FILTERS.some(function (f) { return name.indexOf(f) >= 0; });
+}
 var SCALE = JniBench.getScale();
 
 function median(values) {
@@ -15,19 +21,23 @@ function median(values) {
     return sorted[Math.floor(sorted.length / 2)];
 }
 
-function report(name, nsPerOp) {
+function report(name, nsPerOp, refNsPerOp) {
     var result = {
         name: name,
         median: Math.round(median(nsPerOp) * 10) / 10,
         min: Math.round(Math.min.apply(null, nsPerOp) * 10) / 10
     };
+    if (refNsPerOp) {
+        result.ref = Math.round(median(refNsPerOp) * 10) / 10;
+        result.refMin = Math.round(Math.min.apply(null, refNsPerOp) * 10) / 10;
+    }
     console.log("JNIBENCH " + JSON.stringify(result));
     return result;
 }
 
 // body(n) runs the operation n times; returning a value keeps V8 from dropping the loop.
 function measureJs(name, iterations, body) {
-    if (FILTER && name.indexOf(FILTER) < 0) return null;
+    if (skipped(name)) return null;
     iterations *= SCALE;
     var sink = body(Math.max(1000, iterations >> 2));
     var samples = [];
@@ -41,16 +51,30 @@ function measureJs(name, iterations, body) {
     return report(name, samples);
 }
 
+// Callback rows drift with the device's performance state independently of the other rows,
+// so each round also times a fixed reference callback (twoInts on its own object). Compare
+// launches by median / ref rather than by median alone.
+var REF_CALLBACK_KIND = 1;
+var REF_CALLBACK_ITERATIONS = 20000;
+var refCallback = null;
+
 function measureCallback(name, cb, kind, iterations) {
-    if (FILTER && name.indexOf(FILTER) < 0) return null;
+    if (skipped(name)) return null;
     iterations *= SCALE;
+    var refIterations = REF_CALLBACK_ITERATIONS * SCALE;
+    if (refCallback === null) {
+        refCallback = new JniBench.Callback({ twoInts: function (a, b) { } });
+    }
+    JniBench.runCallbacks(refCallback, REF_CALLBACK_KIND, refIterations >> 2);
     JniBench.runCallbacks(cb, kind, Math.max(1000, iterations >> 2));
     var samples = [];
+    var ref = [];
     for (var r = 0; r < ROUNDS; r++) {
+        ref.push(Number(JniBench.runCallbacks(refCallback, REF_CALLBACK_KIND, refIterations)) / refIterations);
         var nanos = JniBench.runCallbacks(cb, kind, iterations);
         samples.push(Number(nanos) / iterations);
     }
-    return report(name, samples);
+    return report(name, samples, ref);
 }
 
 
@@ -58,7 +82,7 @@ function measureCallback(name, cb, kind, iterations) {
 // V8 GC (wrapper finalization and the Java-side strong -> weak bookkeeping), and the
 // Java GC that follows. Each phase is reported per object.
 function measureLifecycle(name, count, create) {
-    if (FILTER && name.indexOf(FILTER) < 0) return null;
+    if (skipped(name)) return null;
     count *= SCALE;
     var javaRuntime = java.lang.Runtime.getRuntime();
     var alloc = [], release = [], javaGc = [];
@@ -87,6 +111,56 @@ function measureLifecycle(name, count, create) {
     return report(name + " [release: Java gc]", javaGc);
 }
 
+
+
+// Aggregate ns per call while `threads` Java threads call into JS at once. Runs
+// asynchronously: the JS thread must go idle and release the isolate for the
+// callers to get in, so it polls for the result.
+function measureContention(name, sink, threads, calls, mode, done) {
+    if (skipped(name)) {
+        done(null);
+        return;
+    }
+    var Bench = com.tns.tests.ContentionBench;
+    calls *= SCALE;
+    // Variants alternate round by round inside one launch, so a change in the device's
+    // performance state between launches cannot favour one of them.
+    var variants = VARIANTS.length > 0 ? VARIANTS : [null];
+    var samples = variants.map(function () { return []; });
+    var round = -variants.length;
+    var total = ROUNDS * variants.length;
+    function variantOf(r) {
+        return ((r % variants.length) + variants.length) % variants.length;
+    }
+    function startRound() {
+        var spin = variants[variantOf(round)];
+        if (spin !== null) {
+            com.tns.Runtime.setAdmissionSpinMicros(spin);
+        }
+        Bench.start(sink, threads, calls, mode);
+        setTimeout(poll, 5);
+    }
+    function poll() {
+        var nanos = Number(Bench.result());
+        if (nanos < 0) {
+            setTimeout(poll, 5);
+            return;
+        }
+        if (round >= 0) {
+            samples[variantOf(round)].push(nanos / (threads * calls));
+        }
+        round++;
+        if (round < total) {
+            gc();
+            setTimeout(startRound, 20);
+        } else {
+            done(variants.map(function (spin, i) {
+                return report(spin === null ? name : name + " [spin=" + spin + "]", samples[i]);
+            }));
+        }
+    }
+    startRound();
+}
 
 function buildBenchmarks() {
     var bench = new JniBench();
@@ -146,6 +220,22 @@ function buildBenchmarks() {
             return measureJs("instance.noop()", 50000, function (n) {
                 for (var i = 0; i < n; i++) bench.instanceNoop();
                 return n;
+            });
+        },
+        function () {
+            if (skipped("instance.getAlpha() [android.view.View]")) return null;
+            var view = new android.view.View(com.tns.NativeScriptApplication.getInstance());
+            return measureJs("instance.getAlpha() [android.view.View]", 50000, function (n) {
+                var s = 0;
+                for (var i = 0; i < n; i++) s = view.getAlpha();
+                return s;
+            });
+        },
+        function () {
+            return measureJs("package member read android.view.View", 200000, function (n) {
+                var s = null;
+                for (var i = 0; i < n; i++) s = android.view.View;
+                return s;
             });
         },
         function () {
@@ -232,6 +322,13 @@ function buildBenchmarks() {
             });
         },
         function () {
+            return measureJs("static.newObjectOfManyClasses() [16 classes]", 20000, function (n) {
+                var s;
+                for (var i = 0; i < n; i++) s = JniBench.newObjectOfManyClasses();
+                return s;
+            });
+        },
+        function () {
             return measureJs("static.newObjectInJava() [new wrapper]", 20000, function (n) {
                 var s;
                 for (var i = 0; i < n; i++) s = JniBench.newObjectInJava();
@@ -249,6 +346,37 @@ function buildBenchmarks() {
             return measureJs("new Object.extend({})()", 20000, function (n) {
                 var s;
                 for (var i = 0; i < n; i++) s = new Extended();
+                return s;
+            });
+        },
+        function () {
+            return measureJs("static field get int [small class]", 50000, function (n) {
+                var Fields = com.tns.tests.StaticFieldBench;
+                var s = 0;
+                for (var i = 0; i < n; i++) s = Fields.counter;
+                return s;
+            });
+        },
+        function () {
+            return measureJs("static field get final int [small class]", 50000, function (n) {
+                var Fields = com.tns.tests.StaticFieldBench;
+                var s = 0;
+                for (var i = 0; i < n; i++) s = Fields.CONSTANT;
+                return s;
+            });
+        },
+        function () {
+            return measureJs("static field set int [small class]", 50000, function (n) {
+                var Fields = com.tns.tests.StaticFieldBench;
+                for (var i = 0; i < n; i++) Fields.counter = i;
+                return n;
+            });
+        },
+        function () {
+            return measureJs("static field get final int [android.R.id]", 50000, function (n) {
+                var ids = android.R.id;
+                var s = 0;
+                for (var i = 0; i < n; i++) s = ids.content;
                 return s;
             });
         },
@@ -290,12 +418,23 @@ function buildBenchmarks() {
             });
         },
         function () {
+            if (skipped("static.newInstance(extended class) [Java-created]")) return null;
+            var Created = java.lang.Object.extend({ toString: function () { return "created"; } });
+            var createdClass = new Created().getClass();
+            var JavaCreated = com.tns.tests.JavaCreated;
+            return measureJs("static.newInstance(extended class) [Java-created]", 10000, function (n) {
+                var o;
+                for (var i = 0; i < n; i++) o = JavaCreated.newInstance(createdClass);
+                return o;
+            });
+        },
+        function () {
             return measureLifecycle("lifecycle JniBench.newObjectInJava()", 20000, function () {
                 return JniBench.newObjectInJava();
             });
         },
         function () {
-            if (FILTER && "instance.self() [50k live wrappers]".indexOf(FILTER) < 0) return null;
+            if (skipped("instance.self() [50k live wrappers]")) return null;
             var live = new Array(50000);
             for (var i = 0; i < live.length; i++) live[i] = new java.lang.Object();
             // Pinned from a global: an optimized frame may drop a local after its last use.
@@ -322,24 +461,105 @@ function buildBenchmarks() {
         },
         function () {
             return measureCallback("callback.oneObject(Object)", callback, 4, 20000);
+        },
+        function () {
+            return measureCallback("callback.oneObject(new Object)", callback, 5, 20000);
+        },
+        function () {
+            return measureCallback("callback.oneObject(new, 16 classes)", callback, 6, 20000);
+        },
+        function () {
+            return measureCallback("callback.oneObject(binding)", callback, 7, 20000);
         }
     ];
 }
 
-exports.run = function () {
-    var benchmarks = buildBenchmarks();
+function buildContentionBenchmarks() {
+    var Bench = com.tns.tests.ContentionBench;
+    var sink = new Bench.Sink({
+        call0: function () { },
+        call3: function (a, b, c) { }
+    });
+    var list = [];
+    [1, 2, 4].forEach(function (threads) {
+        [["no args", Bench.NO_ARGS], ["3 existing objects", Bench.EXISTING_OBJECTS], ["3 new objects", Bench.NEW_OBJECTS], ["3 new objects of 16 classes", Bench.NEW_OBJECTS_MANY_CLASSES]].forEach(function (mode) {
+            list.push(function (done) {
+                measureContention("contention " + threads + " thread(s), " + mode[0], sink, threads, 20000, mode[1], done);
+            });
+        });
+    });
+    return list;
+}
+
+// The first touch of a class builds its JS constructor and installs every static member, once
+// per runtime, so each row is a single sample and must run before anything else touches the class.
+function measureFirstAccess() {
+    var rows = [
+        ["first access android.R", function () { return android.R; }],
+        ["first access android.R.attr", function () { return android.R.attr; }],
+        ["first access android.R.id", function () { return android.R.id; }],
+        ["first access android.R.style", function () { return android.R.style; }],
+        ["first access android.R.drawable", function () { return android.R.drawable; }],
+        ["first access android.R.string", function () { return android.R.string; }],
+        ["first read android.R.id.content", function () { return android.R.id.content; }],
+        ["first read android.R.id.text1", function () { return android.R.id.text1; }],
+        ["first read android.R.attr.textColor", function () { return android.R.attr.textColor; }],
+        ["first read android.R.style.Theme", function () { return android.R.style.Theme; }],
+        ["first access android.view [package]", function () { return android.view; }],
+        ["first access android.view.View", function () { return android.view.View; }],
+        ["first access android.widget [package]", function () { return android.widget; }],
+        ["first access android.widget.TextView", function () { return android.widget.TextView; }],
+        ["first access android.content.Context", function () { return android.content.Context; }],
+        ["first access android.app.Activity", function () { return android.app.Activity; }]
+    ];
     var results = [];
+    rows.forEach(function (row) {
+        if (skipped(row[0])) return;
+        gc();
+        var start = performance.now();
+        globalThis.__jniBenchSink = row[1]();
+        results.push(report(row[0], [(performance.now() - start) * 1e6]));
+    });
+    var name = "first calls of 20 android.view.View methods";
+    if (!skipped(name)) {
+        var view = new android.view.View(com.tns.NativeScriptApplication.getInstance());
+        gc();
+        var start = performance.now();
+        globalThis.__jniBenchSink = [view.getAlpha(), view.getRotation(), view.getX(), view.getY(), view.getId(),
+            view.getWidth(), view.getHeight(), view.getLeft(), view.getTop(), view.getRight(),
+            view.getBottom(), view.getPaddingLeft(), view.getPaddingTop(), view.getScaleX(), view.getScaleY(),
+            view.getTranslationX(), view.getTranslationY(), view.getVisibility(), view.isEnabled(), view.isFocused()];
+        results.push(report(name, [(performance.now() - start) * 1e6]));
+    }
+    return results;
+}
+
+exports.run = function () {
+    var results = measureFirstAccess();
+    var benchmarks = buildBenchmarks();
     var index = 0;
     // Yield to the looper between benchmarks so GC and queued work run outside timed rounds.
     function next() {
         if (index >= benchmarks.length) {
-            console.log("JNIBENCH_DONE " + JSON.stringify(results));
+            runContention();
             return;
         }
         gc();
         var result = benchmarks[index++]();
         if (result) results.push(result);
         setTimeout(next, 50);
+    }
+    var contention = buildContentionBenchmarks();
+    var contentionIndex = 0;
+    function runContention() {
+        if (contentionIndex >= contention.length) {
+            console.log("JNIBENCH_DONE " + JSON.stringify(results));
+            return;
+        }
+        contention[contentionIndex++](function (result) {
+            if (result) results.push.apply(results, [].concat(result));
+            setTimeout(runContention, 50);
+        });
     }
     setTimeout(next, 500);
 };

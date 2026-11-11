@@ -194,7 +194,7 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_runScript(JNIEnv* _env, jobjec
     return result;
 }
 
-extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _env, jobject obj, jint runtimeId, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jintArray argTypes, jlongArray argValues, jobjectArray argRefs, jlongArray primitiveResult) {
+extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _env, jobject obj, jint runtimeId, jobject javaObject, jint javaObjectID, jstring methodName, jint methodNameId, jint retType, jboolean isConstructor, jint argCount, jlongArray argValues, jobjectArray argRefs, jlongArray primitiveResult) {
     JEnv::EntryScope envScope(_env);
     jobject result = nullptr;
 
@@ -204,14 +204,16 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _en
     }
 
     auto isolate = runtime->GetIsolate();
+    AdmissionScope admission(runtime->GetAdmissionGate(), isolate);
     v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
     auto context = runtime->GetContext();
     v8::Context::Scope context_scope(context);
 
+    JavaCallArgs args{argCount, argValues, argRefs};
     try {
-        result = runtime->CallJSMethodNative(_env, obj, javaObjectID, methodName, retType, isConstructor, JavaCallArgs{argTypes, argValues, argRefs}, primitiveResult);
+        result = runtime->CallJSMethodNative(_env, obj, javaObject, javaObjectID, methodName, methodNameId, retType, isConstructor, args, primitiveResult);
     } catch (NativeScriptException& e) {
         e.ReThrowToJava();
     } catch (std::exception e) {
@@ -223,6 +225,11 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _en
         NativeScriptException nsEx(std::string("Error: c++ exception!"));
         nsEx.ReThrowToJava();
     }
+    auto objectManager = runtime->GetObjectManager();
+    // Objects Java registered for a call that never reached them would stay strong.
+    objectManager->ReleaseUnwrappedArgs(args);
+    // Wrappers collected during the call, settled while the isolate is still held.
+    objectManager->FlushFinalizedBatchIfPending();
     return result;
 }
 
@@ -234,6 +241,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv* _e
     }
 
     auto isolate = runtime->GetIsolate();
+    AdmissionScope admission(runtime->GetAdmissionGate(), isolate);
     v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
@@ -373,4 +381,8 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_ResetDateTimeConfigurationCache(J
 
     auto isolate = runtime->GetIsolate();
     isolate->DateTimeConfigurationChangeNotification(Isolate::TimeZoneDetection::kRedetect);
+}
+
+extern "C" JNIEXPORT void Java_com_tns_Runtime_setAdmissionSpinMicros(JNIEnv* _env, jclass clazz, jint micros) {
+    AdmissionGate::s_spinMicros.store(micros, std::memory_order_relaxed);
 }

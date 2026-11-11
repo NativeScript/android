@@ -2,6 +2,7 @@
 #define OBJECTMANAGER_H_
 
 #include <map>
+#include <memory>
 #include <set>
 #include <stack>
 #include <string>
@@ -11,9 +12,14 @@
 #include "JEnv.h"
 #include "JniLocalRef.h"
 #include "LRUCache.h"
+#include "NativeScriptAssert.h"
+#include "ObjectIdIndex.h"
 #include "v8.h"
 
 namespace tns {
+struct JavaCallArgs;
+class MetadataNode;
+
 class ObjectManager {
  public:
   ObjectManager(jobject javaRuntimeObject);
@@ -44,13 +50,44 @@ class ObjectManager {
   void SetJavaClass(const v8::Local<v8::Object>& instance, jclass clazz);
   int GetOrCreateObjectId(jobject object);
 
+  // The id object is registered under, or -1.
+  int FindObjectId(jobject object);
+
+  void RegisterStrong(jobject object, int javaObjectID);
+
   v8::Local<v8::Object> GetJsObjectByJavaObject(int javaObjectID);
+
+  // Settles the wrappers collected since the last flush. Called on JS<->Java calls and
+  // constructions; field and array-element reads that hand JS a Java object skip it and
+  // rely on the delayed flush task.
+  void FlushFinalizedBatchIfPending() {
+    if (!m_flushBackingOff &&
+        (!m_pendingWeaken.empty() || !m_pendingCheck.empty())) {
+      FlushFinalizedBatch();
+    }
+  }
+
+  // Whether a wrapper was ever created for this id and not yet collected.
+  bool HasJsObject(int javaObjectID) const {
+    return m_idToObject.Find(javaObjectID) != nullptr;
+  }
+
+  // After a failed Java->JS call: drops the Java registration of every object Java
+  // registered for the call (JavaCallArgs::FreshArg) that never got a wrapper.
+  void ReleaseUnwrappedArgs(const JavaCallArgs& args);
+
+  // As GetJsObjectByJavaObject, but empty once the wrapper's link to the Java object was
+  // released.
+  v8::Local<v8::Object> GetLinkedJsObjectByJavaObject(int javaObjectID);
 
   v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID,
                                         const std::string& typeName);
 
-  v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID,
-                                        const std::string& typeName,
+  // The wrapper of object, registering it and creating the wrapper if needed.
+  v8::Local<v8::Object> GetOrCreateJSWrapper(jobject object);
+
+  // classIndex is Runtime.classIndexOf(instance's class), or 0 when unknown.
+  v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, int classIndex,
                                         jobject instance);
 
   void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
@@ -64,9 +101,16 @@ class ObjectManager {
   /*
    * Whether GetInternalField is safe to call on this exact object. False for
    * a Proxy even when its target qualifies; unwrap first where a Proxy should
-   * be accepted.
+   * be accepted. Any object with this many internal fields is read as a runtime
+   * object, so embedder code must never store an aligned pointer in field 0 of
+   * an object with 2 or 3 internal fields.
    */
   static bool IsJsRuntimeObject(const v8::Local<v8::Object>& object);
+
+  // Whether object is a runtime object with a Metadata field: not an array buffer.
+  static bool HasMetadataField(const v8::Local<v8::Object>& object) {
+    return object->InternalFieldCount() == static_cast<int>(MetadataNodeKeys::END);
+  }
 
   /*
    * The runtime object holding the JsInfo External for `object`: the object
@@ -75,6 +119,12 @@ class ObjectManager {
    * the link must go through this object, never through a Proxy or a child.
    */
   static v8::Local<v8::Object> GetJSInstanceInfoOwner(const v8::Local<v8::Object>& object);
+
+  // Whether a runtime object's JsInfo field holds a link. The field holds id + 1, so
+  // the zero V8 stores in a typed array's embedder fields never reads as a link.
+  static bool HasJsInfo(const v8::Local<v8::Object>& object) {
+    return LinkedIdOf(object) != -1;
+  }
 
   /*
    * The innermost target of a Proxy chain; any other value is returned as is.
@@ -101,49 +151,108 @@ class ObjectManager {
 
   v8::Local<v8::Object> GetEmptyObject(v8::Isolate* isolate);
 
-  enum class MetadataNodeKeys { JsInfo, CallSuper, END };
+  enum class MetadataNodeKeys { JsInfo, CallSuper, Metadata, END };
 
  private:
   static void InitializeJNI();
-  struct JSInstanceInfo {
-   public:
-    JSInstanceInfo(uint32_t javaObjectID, jclass claz)
-        : JavaObjectID(javaObjectID), ObjectClazz(claz) {}
 
-    uint32_t JavaObjectID;
-    jclass ObjectClazz;
-  };
-
+  // The registration of one linked Java object id, reached from the wrapper's JsInfo
+  // field through m_idToObject.
   struct ObjectWeakCallbackState {
-    ObjectWeakCallbackState(ObjectManager* _thisPtr, JSInstanceInfo* _jsInfo,
-                            v8::Persistent<v8::Object>* _target)
+    ObjectWeakCallbackState(ObjectManager* _thisPtr, uint32_t _javaObjectID,
+                            jclass clazz, v8::Isolate* isolate,
+                            v8::Local<v8::Object> object)
         : thisPtr(_thisPtr),
-          jsInfo(_jsInfo),
-          target(_target),
-          javaObjectID(_jsInfo->JavaObjectID) {}
+          handle(isolate, object),
+          target(&handle),
+          javaObjectID(_javaObjectID),
+          objectClazz(clazz) {}
 
     ObjectManager* thisPtr;
-    JSInstanceInfo* jsInfo;
+    // Persistent, not Global: its destructor never calls into V8, so a state may be
+    // freed after its isolate is gone.
+    v8::Persistent<v8::Object> handle;
     v8::Persistent<v8::Object>* target;
-    // Duplicated from jsInfo: the finalizer has to unregister itself even when
-    // the JsInfo field was already cleared and jsInfo freed.
     uint32_t javaObjectID;
+    jclass objectClazz;
+    // Cleared by ReleaseNativeCounterpart; the registration itself lives until the
+    // wrapper is collected.
+    bool linked = true;
+    // The Java side holds the object weakly; a finalization now only asks
+    // whether it is still alive.
+    bool javaWeakened = false;
+    // Queued in a finalizer batch that has not been flushed yet.
+    bool queued = false;
+    // Handed back to JS while queued: the wrapper is reachable again, so the flush must
+    // leave the Java side alone and let a later collection queue it anew.
+    bool reacquired = false;
   };
 
+  using JSInstanceInfo = ObjectWeakCallbackState;
+
+  // The linked state of object, or null.
   JSInstanceInfo* GetJSInstanceInfo(const v8::Local<v8::Object>& object);
 
   JSInstanceInfo* GetJSInstanceInfoFromRuntimeObject(
       const v8::Local<v8::Object>& object);
 
+  // The id in a runtime object's JsInfo field (an unsigned 32-bit id carried in an int),
+  // or -1.
+  static int LinkedIdOf(const v8::Local<v8::Object>& object);
+
+  void SetJsInfo(const v8::Local<v8::Object>& object, uint32_t javaObjectID);
+
+  // clazz must be a global ref, or null to look className up.
   v8::Local<v8::Object> CreateJSWrapperHelper(jint javaObjectID,
-                                              const std::string& typeName,
-                                              jclass clazz);
+                                              const std::string& className,
+                                              jclass clazz,
+                                              MetadataNode* node = nullptr);
+
+  struct WrapperClass {
+    std::string name;
+    jclass clazz;  // global ref
+    MetadataNode* node = nullptr;  // process-wide, never freed
+  };
+
+  // The JNI name and a global ref of instance's class, cached by class index.
+  // node is set only for a cached class.
+  const std::string& WrapperClassFor(int classIndex, jobject instance,
+                                     jclass& clazz, std::string& scratch,
+                                     MetadataNode*& node);
+
+  // Indexed by class index. Entries are never replaced, so references to them
+  // survive a nested wrap growing the vector.
+  std::vector<std::unique_ptr<WrapperClass>> m_wrapperClasses;
+
+  // state's wrapper, marking a queued one as handed back to JS.
+  v8::Local<v8::Object> JsObjectFor(ObjectWeakCallbackState* state);
 
   static void JSObjectFinalizerStatic(
       const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
 
   void JSObjectFinalizer(v8::Isolate* isolate,
                          ObjectWeakCallbackState* callbackState);
+
+  // The Java object table may only be touched by the thread holding the
+  // isolate lock; every upcall into it checks that in debug builds.
+  void AssertIsolateLocked() const {
+    NS_DCHECK(m_isolate == nullptr || v8::Locker::IsLocked(m_isolate));
+  }
+
+  void FlushFinalizedBatch();
+
+  // Whether a flush task is pending afterwards; false on a thread with no event loop.
+  bool ScheduleFinalizedBatchFlush(double delayMs = 0);
+
+  void ReleaseCollectedWrapper(int javaObjectID);
+
+  // Ids whose JS wrapper was collected, waiting for one JNI call that weakens
+  // (first collection) or liveness-checks (later ones) their Java objects.
+  std::vector<jint> m_pendingWeaken;
+  std::vector<jint> m_pendingCheck;
+  bool m_flushScheduled = false;
+  // A flush failed; crossings leave the retry to the delayed task.
+  bool m_flushBackingOff = false;
 
   jweak GetJavaObjectByID(uint32_t javaObjectID);
 
@@ -163,7 +272,7 @@ class ObjectManager {
 
   v8::Isolate* m_isolate;
 
-  std::unordered_map<int, ObjectWeakCallbackState*> m_idToObject;
+  ObjectIdIndex<ObjectWeakCallbackState> m_idToObject;
 
   LRUCache<int, jweak> m_cache;
 
@@ -179,11 +288,18 @@ class ObjectManager {
 
   static jmethodID GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID;
 
-  static jmethodID MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID;
+  static jmethodID GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID;
+
+  static jmethodID FIND_JAVA_OBJECT_ID_METHOD_ID;
+
+  static jmethodID MAKE_INSTANCE_STRONG_METHOD_ID;
+
+  static jmethodID PROCESS_FINALIZED_BATCH_METHOD_ID;
 
   static jmethodID RELEASE_NATIVE_INSTANCE_METHOD_ID;
 
   v8::Persistent<v8::Function>* m_poJsWrapperFunc;
+  v8::Persistent<v8::ObjectTemplate> m_jsWrapperTemplate;
 };
 }  // namespace tns
 

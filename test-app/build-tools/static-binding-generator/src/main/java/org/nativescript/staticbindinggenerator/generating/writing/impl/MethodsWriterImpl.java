@@ -51,6 +51,10 @@ public class MethodsWriterImpl implements MethodsWriter {
     private static final String INTERNAL_RUNTIME_GET_RUNTIME_TAG_RETURN_STATEMENT = "return runtimeTag__ns;";
     private static final String INTERNAL_RUNTIME_SET_RUNTIME_TAG_METHOD_SIGNATURE = "public void setRuntimeTag__ns(int tag)";
     private static final String INTERNAL_RUNTIME_SET_RUNTIME_TAG_ASSIGNMENT = "runtimeTag__ns = tag;";
+    private static final String INTERNAL_RUNTIME_GET_OBJECT_ID_METHOD_SIGNATURE = "public int getObjectId__ns()";
+    private static final String INTERNAL_RUNTIME_GET_OBJECT_ID_RETURN_STATEMENT = "return objectId__ns;";
+    private static final String INTERNAL_RUNTIME_SET_OBJECT_ID_METHOD_SIGNATURE = "public void setObjectId__ns(int id)";
+    private static final String INTERNAL_RUNTIME_SET_OBJECT_ID_ASSIGNMENT = "objectId__ns = id;";
     private static final String INTERNAL_SERVICES_ONCREATE_METHOD_SIGNATURE = "public void " + ON_CREATE_METHOD_NAME + "()";
 
     private static final String RETURN_KEYWORD = "return";
@@ -406,6 +410,8 @@ public class MethodsWriterImpl implements MethodsWriter {
     public void writeInternalRuntimeTagAccessorMethods() {
         writeInternalRuntimeMethod(INTERNAL_RUNTIME_GET_RUNTIME_TAG_METHOD_SIGNATURE, INTERNAL_RUNTIME_GET_RUNTIME_TAG_RETURN_STATEMENT);
         writeInternalRuntimeMethod(INTERNAL_RUNTIME_SET_RUNTIME_TAG_METHOD_SIGNATURE, INTERNAL_RUNTIME_SET_RUNTIME_TAG_ASSIGNMENT);
+        writeInternalRuntimeMethod(INTERNAL_RUNTIME_GET_OBJECT_ID_METHOD_SIGNATURE, INTERNAL_RUNTIME_GET_OBJECT_ID_RETURN_STATEMENT);
+        writeInternalRuntimeMethod(INTERNAL_RUNTIME_SET_OBJECT_ID_METHOD_SIGNATURE, INTERNAL_RUNTIME_SET_OBJECT_ID_ASSIGNMENT);
     }
 
     private void writeInternalRuntimeMethod(String signature, String returnStatement) {

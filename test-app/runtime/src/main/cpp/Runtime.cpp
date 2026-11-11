@@ -132,7 +132,7 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
       m_runGC(false) {
   // GetRuntime(int) and the thread's pinned JNIEnv assume one runtime per
   // thread; com.tns.Runtime's constructor enforces the same on the Java side.
-  NS_CHECK(s_currentRuntime == nullptr);
+  NS_CHECK(s_current.runtime == nullptr);
 
   m_runtime = env->NewGlobalRef(runtime);
   m_objectManager = new ObjectManager(m_runtime);
@@ -141,22 +141,14 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_id2RuntimeCache.emplace(id, this);
   }
-
-  if (GET_USED_MEMORY_METHOD_ID == nullptr) {
-    auto RUNTIME_CLASS = env->FindClass("com/tns/Runtime");
-    NS_CHECK(RUNTIME_CLASS != nullptr);
-
-    GET_USED_MEMORY_METHOD_ID =
-        env->GetMethodID(RUNTIME_CLASS, "getUsedMemory", "()J");
-    NS_CHECK(GET_USED_MEMORY_METHOD_ID != nullptr);
-  }
 }
 
 Runtime* Runtime::GetRuntime(int runtimeId) {
   // A runtime is only destroyed on its own thread, which is busy in this call,
   // so the calling thread's own runtime needs neither the lock nor the map.
-  if (runtimeId == s_currentRuntimeId) {
-    return s_currentRuntime;
+  auto& current = s_current;
+  if (runtimeId == current.id) {
+    return current.runtime;
   }
 
   Runtime* runtime = nullptr;
@@ -296,9 +288,9 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
 
 Runtime::~Runtime() {
   NS_CHECK(std::this_thread::get_id() == m_ownerThread);
-  if (s_currentRuntime == this) {
-    s_currentRuntime = nullptr;
-    s_currentRuntimeId = -1;
+  if (s_current.runtime == this) {
+    s_current.runtime = nullptr;
+    s_current.id = -1;
   }
 
   /*
@@ -603,8 +595,34 @@ static bool TryGetPrimitiveReturnBits(Isolate* isolate,
   }
 }
 
+namespace {
+// Indexed by the id Java's MethodNameIds gives each method name.
+struct CallbackMethodNames {
+  std::vector<v8::Global<v8::String>> byId;
+};
+
+Local<String> GetCallbackMethodName(Isolate* isolate, JNIEnv* env,
+                                    jstring methodName, jint methodNameId) {
+  auto* names = RuntimeState::For<CallbackMethodNames>(isolate);
+  if (names == nullptr || methodNameId < 0) {
+    return ArgConverter::jstringToInternalizedV8String(isolate, env, methodName);
+  }
+  auto index = static_cast<size_t>(methodNameId);
+  if (index < names->byId.size() && !names->byId[index].IsEmpty()) {
+    return names->byId[index].Get(isolate);
+  }
+  auto name = ArgConverter::jstringToInternalizedV8String(isolate, env, methodName);
+  if (index >= names->byId.size()) {
+    names->byId.resize(index + 1);
+  }
+  names->byId[index].Reset(isolate, name);
+  return name;
+}
+}  // namespace
+
 jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
-                                    jint javaObjectID, jstring methodName,
+                                    jobject javaObject, jint javaObjectID,
+                                    jstring methodName, jint methodNameId,
                                     jint retType, jboolean isConstructor,
                                     const JavaCallArgs& args,
                                     jlongArray primitiveResult) {
@@ -616,7 +634,22 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
 
   DEBUG_WRITE("CallJSMethodNative called javaObjectID=%d", javaObjectID);
 
-  auto jsObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID);
+  m_objectManager->FlushFinalizedBatchIfPending();
+
+  // javaObjectID may be a hint read without the isolate lock; resolve it exactly when it
+  // does not name a linked wrapper.
+  Local<Object> jsObject;
+  if (javaObjectID != -1) {
+    jsObject = m_objectManager->GetLinkedJsObjectByJavaObject(javaObjectID);
+  }
+  if (jsObject.IsEmpty() && javaObject != nullptr) {
+    javaObjectID = m_objectManager->FindObjectId(javaObject);
+    if (javaObjectID == -1) {
+      throw NativeScriptException("Cannot find object id for an instance of " +
+                                  m_objectManager->GetClassName(javaObject));
+    }
+    jsObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID);
+  }
   if (jsObject.IsEmpty()) {
     stringstream ss;
     ss << "JavaScript object for Java ID " << javaObjectID << " not found."
@@ -638,7 +671,7 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
               jsObject->GetIdentityHash());
 
   auto jsMethodName =
-      ArgConverter::jstringToInternalizedV8String(m_isolate, env, methodName);
+      GetCallbackMethodName(m_isolate, _env, methodName, methodNameId);
   auto jsResult = CallbackHandlers::CallJSMethod(m_isolate, env, jsObject,
                                                  jsMethodName, args);
 
@@ -657,9 +690,9 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
   }
 
   int classReturnType = retType;
-  jobject javaObject =
+  jobject javaResult =
       ConvertJsValueToJavaObject(env, jsResult, classReturnType);
-  return javaObject;
+  return javaResult;
 }
 
 void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
@@ -672,6 +705,9 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
   auto isolate = m_isolate;
 
   JEnv env(_env);
+
+  m_objectManager->FlushFinalizedBatchIfPending();
+  m_objectManager->RegisterStrong(javaObject, javaObjectID);
 
   string existingClassName = ArgConverter::jstringToString(className);
   string jniName = Util::ConvertFromCanonicalToJniName(existingClassName);
@@ -708,9 +744,7 @@ jint Runtime::GenerateNewObjectId(JNIEnv* env, jobject obj) {
   return objectId;
 }
 
-void Runtime::AdjustAmountOfExternalAllocatedMemory() {
-  JEnv env;
-  int64_t usedMemory = env.CallLongMethod(m_runtime, GET_USED_MEMORY_METHOD_ID);
+void Runtime::AdjustAmountOfExternalAllocatedMemory(int64_t usedMemory) {
   int64_t changeInBytes = usedMemory - m_lastUsedMemory;
   int64_t externalMemory = 0;
 
@@ -732,7 +766,7 @@ bool Runtime::NotifyGC(JNIEnv* env, jobject obj) {
 }
 
 bool Runtime::TryCallGC() {
-  auto success = m_gcFunc != nullptr;
+  auto success = m_gcFunc != nullptr && m_runGC;
   if (success) {
     success = __sync_bool_compare_and_swap(&m_runGC, true, false);
     if (success) {
@@ -1208,8 +1242,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   this->m_context = new Persistent<Context>(isolate, context);
 
   this->m_napiEnv = NapiEnv::Create(context, m_eventLoop);
-  s_currentRuntime = this;
-  s_currentRuntimeId = m_id;
+  s_current.runtime = this;
+  s_current.id = m_id;
   // The runtime's thread stays attached until DestroyRuntime: the main thread
   // for the process, a worker thread until after it tears its runtime down.
   JEnv::PinThreadEnv(JEnv());
@@ -1288,9 +1322,9 @@ void Runtime::DestroyRuntime() {
     NapiEnv::Destroy(static_cast<NapiEnv*>(m_napiEnv));
     m_napiEnv = nullptr;
   }
-  if (s_currentRuntime == this) {
-    s_currentRuntime = nullptr;
-    s_currentRuntimeId = -1;
+  if (s_current.runtime == this) {
+    s_current.runtime = nullptr;
+    s_current.id = -1;
     JEnv::UnpinThreadEnv();
   }
   // The events state holds v8::Global handles (backing event target, dispatch
@@ -1322,8 +1356,8 @@ void Runtime::DestroyRuntime() {
   // is alive and its destructors can still touch v8::Global handles.
   IsolateTracked::SweepAll(m_isolate);
 
-  // Same reason: every still-linked Java<->JS wrapper holds a Persistent, a
-  // JSInstanceInfo and its weak-callback state, and those finalizers will
+  // Same reason: every still-linked Java<->JS wrapper holds a Persistent in
+  // its weak-callback state, and those finalizers will
   // never run now. The JNI half of ObjectManager is released later, in its
   // destructor, once the isolate is gone.
   if (m_objectManager != nullptr) {
@@ -1374,7 +1408,6 @@ int Runtime::GetId() { return this->m_id; }
 
 
 JavaVM* Runtime::s_jvm = nullptr;
-jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 robin_hood::unordered_map<int, Runtime*> Runtime::s_id2RuntimeCache;
 robin_hood::unordered_map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 std::mutex Runtime::s_runtimeCacheMutex;
@@ -1387,8 +1420,7 @@ v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 std::shared_ptr<EventLoop> Runtime::s_mainEventLoop;
 
-thread_local Runtime* Runtime::s_currentRuntime = nullptr;
-thread_local int Runtime::s_currentRuntimeId = -1;
+thread_local Runtime::CurrentRuntime Runtime::s_current;
 thread_local PendingIsolateSetup Runtime::s_pendingIsolateSetup;
 
 void Runtime::SetPendingIsolateSetup(PendingIsolateSetup setup) {

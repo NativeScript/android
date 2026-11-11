@@ -110,8 +110,7 @@ void ArrayHelper::CreateJavaArray(const v8::FunctionCallbackInfo<v8::Value>& inf
         return;
     }
 
-    jint javaObjectID = objectManager->GetOrCreateObjectId(array);
-    auto jsWrapper = objectManager->CreateJSWrapper(javaObjectID, "" /* ignored */, array);
+    auto jsWrapper = objectManager->GetOrCreateJSWrapper(array);
     info.GetReturnValue().Set(jsWrapper);
 }
 

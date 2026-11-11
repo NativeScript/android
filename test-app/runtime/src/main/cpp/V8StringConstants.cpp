@@ -84,6 +84,12 @@ Local<String> V8StringConstants::GetPrototype(Isolate* isolate) {
     return Local<String>::New(isolate, *consts->PROTOTYPE_PERSISTENT);
 }
 
+Local<String> V8StringConstants::GetConstructor(Isolate* isolate) {
+    auto consts = GetConstantsForIsolate(isolate);
+
+    return Local<String>::New(isolate, *consts->CONSTRUCTOR_PERSISTENT);
+}
+
 Local<String> V8StringConstants::GetSuper(Isolate* isolate) {
     auto consts = GetConstantsForIsolate(isolate);
 
@@ -149,6 +155,7 @@ const string V8StringConstants::STACK_TRACE = "stackTrace";
 const string V8StringConstants::STACK = "stack";
 const string V8StringConstants::LONG_NUMBER = "NativeScriptLongNumber";
 const string V8StringConstants::PROTOTYPE = "prototype";
+const string V8StringConstants::CONSTRUCTOR = "constructor";
 const string V8StringConstants::SUPER = "super";
 const string V8StringConstants::TARGET = "target";
 const string V8StringConstants::TO_STRING = "toString";

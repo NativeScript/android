@@ -29,6 +29,8 @@ class V8StringConstants {
 
         static v8::Local<v8::String> GetPrototype(v8::Isolate* isolate);
 
+        static v8::Local<v8::String> GetConstructor(v8::Isolate* isolate);
+
         static v8::Local<v8::String> GetSuper(v8::Isolate* isolate);
 
         static v8::Local<v8::String> GetTarget(v8::Isolate* isolate);
@@ -62,6 +64,7 @@ class V8StringConstants {
         static const std::string STACK_TRACE;
         static const std::string LONG_NUMBER;
         static const std::string PROTOTYPE;
+        static const std::string CONSTRUCTOR;
         static const std::string SUPER;
         static const std::string TARGET;
         static const std::string TO_STRING;
@@ -80,82 +83,85 @@ class V8StringConstants {
          */
         struct PerIsolateV8Constants {
             PerIsolateV8Constants(v8::Isolate* isolate) {
-                auto str = String::NewFromUtf8(isolate, CLASS_IMPLEMENTATION_OBJECT.c_str()).ToLocalChecked();
+                auto str = String::NewFromUtf8(isolate, CLASS_IMPLEMENTATION_OBJECT.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 CLASS_IMPLEMENTATION_OBJECT_PERSISTENT = new Persistent<String>(isolate, str);
 
 
-                str = String::NewFromUtf8(isolate, EXTEND.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, EXTEND.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 EXTEND_PERSISTENT = new Persistent<String>(isolate, str);
 
 
-                str = String::NewFromUtf8(isolate, NULL_OBJECT.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, NULL_OBJECT.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 NULL_OBJECT_PERSISTENT = new Persistent<String>(isolate, str);
 
 
-                str = String::NewFromUtf8(isolate, NULL_NODE_NAME.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, NULL_NODE_NAME.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 NULL_NODE_NAME_PERSISTENT = new Persistent<String>(isolate, str);
 
 
-                str = String::NewFromUtf8(isolate, IS_PROTOTYPE_IMPLEMENTATION_OBJECT.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, IS_PROTOTYPE_IMPLEMENTATION_OBJECT.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 IS_PROTOTYPE_IMPLEMENTATION_OBJECT_PERSISTENT = new Persistent<String>(isolate,
                         str);
 
 
-                str = String::NewFromUtf8(isolate, NATIVE_EXCEPTION.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, NATIVE_EXCEPTION.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 NATIVE_EXCEPTION_PERSISTENT = new Persistent<String>(isolate, str);
 
-                str = String::NewFromUtf8(isolate, STACK.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, STACK.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 STACK_PERSISTENT = new Persistent<String>(isolate, str);
 
-                str = String::NewFromUtf8(isolate, STACK_TRACE.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, STACK_TRACE.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 STACK_TRACE_PERSISTENT = new Persistent<String>(isolate, str);
 
 
-                str = String::NewFromUtf8(isolate, LONG_NUMBER.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, LONG_NUMBER.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 LONG_NUMBER_PERSISTENT = new Persistent<String>(isolate, str);
 
 
-                str = String::NewFromUtf8(isolate, PROTOTYPE.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, PROTOTYPE.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 PROTOTYPE_PERSISTENT = new Persistent<String>(isolate, str);
 
+                str = String::NewFromUtf8(isolate, CONSTRUCTOR.c_str(), NewStringType::kInternalized).ToLocalChecked();
+                CONSTRUCTOR_PERSISTENT = new Persistent<String>(isolate, str);
 
-                str = String::NewFromUtf8(isolate, SUPER.c_str()).ToLocalChecked();
+
+                str = String::NewFromUtf8(isolate, SUPER.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 SUPER_PERSISTENT = new Persistent<String>(isolate, str);
 
 
-                str = String::NewFromUtf8(isolate, TARGET.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, TARGET.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 TARGET_PERSISTENT = new Persistent<String>(isolate, str);
 
 
-                str = String::NewFromUtf8(isolate, TO_STRING.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, TO_STRING.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 TO_STRING_PERSISTENT = new Persistent<String>(isolate, str);
 
 
-                str = String::NewFromUtf8(isolate, JAVA_LONG.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, JAVA_LONG.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 JAVA_LONG_PERSISTENT = new Persistent<String>(isolate, str);
 
 
-                str = String::NewFromUtf8(isolate, VALUE.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, VALUE.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 VALUE_PERSISTENT = new Persistent<String>(isolate, str);
 
 
-                str = String::NewFromUtf8(isolate, VALUE_OF.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, VALUE_OF.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 VALUE_OF_PERSISTENT = new Persistent<String>(isolate, str);
 
 
-                str = String::NewFromUtf8(isolate, UNCAUGHT_ERROR.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, UNCAUGHT_ERROR.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 UNCAUGHT_ERROR_PERSISTENT = new Persistent<String>(isolate, str);
 
-                str = String::NewFromUtf8(isolate, DISCARDED_ERROR.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, DISCARDED_ERROR.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 DISCARDED_ERROR_PERSISTENT = new Persistent<String>(isolate, str);
 
-                str = String::NewFromUtf8(isolate, IMPLEMENTATION_OBJECT.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, IMPLEMENTATION_OBJECT.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 IMPLEMENTATION_OBJECT_PERSISTENT = new Persistent<String>(isolate, str);
 
                 // Private::ForApi resolves its name through the isolate's registry
                 // on every call, so the keys read per bridge call are resolved once.
                 NULL_NODE_PRIVATE.Reset(isolate, Private::ForApi(isolate, Local<String>::New(isolate, *NULL_NODE_NAME_PERSISTENT)));
-                str = String::NewFromUtf8(isolate, CAST_MARKER.c_str()).ToLocalChecked();
+                str = String::NewFromUtf8(isolate, CAST_MARKER.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 CAST_MARKER_PRIVATE.Reset(isolate, Private::ForApi(isolate, str));
             };
 
@@ -178,6 +184,7 @@ class V8StringConstants {
                 ResetAndDelete(NULL_NODE_NAME_PERSISTENT);
                 ResetAndDelete(NULL_OBJECT_PERSISTENT);
                 ResetAndDelete(PROTOTYPE_PERSISTENT);
+                ResetAndDelete(CONSTRUCTOR_PERSISTENT);
                 ResetAndDelete(STACK_PERSISTENT);
                 ResetAndDelete(STACK_TRACE_PERSISTENT);
                 ResetAndDelete(SUPER_PERSISTENT);
@@ -207,6 +214,7 @@ class V8StringConstants {
             v8::Persistent<v8::String>* STACK_TRACE_PERSISTENT = nullptr;
             v8::Persistent<v8::String>* LONG_NUMBER_PERSISTENT = nullptr;
             v8::Persistent<v8::String>* PROTOTYPE_PERSISTENT = nullptr;
+            v8::Persistent<v8::String>* CONSTRUCTOR_PERSISTENT = nullptr;
             v8::Persistent<v8::String>* SUPER_PERSISTENT = nullptr;
             v8::Persistent<v8::String>* TARGET_PERSISTENT = nullptr;
             v8::Persistent<v8::String>* TO_STRING_PERSISTENT = nullptr;
