@@ -11,7 +11,8 @@
 		"suppressCallJSMethodExceptions": false,
 		"enableLineBreakpoints": false,
 		"enableMultithreadedJavascript": true,
-		"codeCache": true
+		"codeCache": true,
+		"alwaysExtract": ["tests/alwaysExtracted/**"]
 	},
 	"discardUncaughtJsExceptions": false,
 	"security": {
