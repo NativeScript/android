@@ -30,7 +30,7 @@ var MyActivity = (function (_super) {
 		_super.prototype.onCreate.call(this, bundle);
 
         require('./tests/testsWithContext').run(this);
-        execute(); //run jasmine
+        require('./Infrastructure/Jasmine/boot').execute();
 
         var layout = new android.widget.LinearLayout(this);
         layout.setOrientation(1);
