@@ -192,7 +192,6 @@ add_library(
         src/main/cpp/ExtendFileIdentifier.cpp
         src/main/cpp/FrameCallbacks.cpp
         src/main/cpp/FieldAccessor.cpp
-        src/main/cpp/File.cpp
         src/main/cpp/Interop.cpp
         src/main/cpp/IsolateTracked.cpp
         src/main/cpp/JEnv.cpp
@@ -226,6 +225,7 @@ add_library(
         src/main/cpp/ReadWriteLock.cpp
         src/main/cpp/Runtime.cpp
         src/main/cpp/RuntimeState.cpp
+        src/main/cpp/ScriptCache.cpp
         src/main/cpp/SimpleAllocator.cpp
         src/main/cpp/SimpleProfiler.cpp
         src/main/cpp/StructuredClone.cpp

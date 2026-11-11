@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "AppFiles.h"
+#include "ScriptCache.h"
 
 using namespace tns;
 
@@ -32,12 +33,14 @@ jstring ToJString(JNIEnv* env, const std::string& value) {
 
 extern "C" JNIEXPORT void JNICALL Java_com_tns_AppFiles_nativeInit(JNIEnv* env, jclass,
                                                                    jstring filesRoot,
-                                                                   jstring alias) {
+                                                                   jstring alias,
+                                                                   jstring codeCacheDir) {
     std::vector<std::string> aliases;
     if (alias != nullptr) {
         aliases.push_back(ToStdString(env, alias));
     }
     AppFiles::Init(ToStdString(env, filesRoot), aliases);
+    ScriptCache::Init(ToStdString(env, codeCacheDir));
 }
 
 extern "C" JNIEXPORT jstring JNICALL Java_com_tns_AppFiles_filesRoot(JNIEnv* env, jclass) {

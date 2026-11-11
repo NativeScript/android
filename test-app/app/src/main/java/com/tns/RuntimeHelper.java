@@ -71,7 +71,7 @@ public final class RuntimeHelper {
             } finally {
                 loadLibraryFrame.close();
             }
-            AppFiles.init(context.getFilesDir());
+            AppFiles.init(context.getFilesDir(), context.getCodeCacheDir());
 
             Logger logger = new LogcatLogger(context);
 

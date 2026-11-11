@@ -14,10 +14,12 @@ public final class AppFiles {
     }
 
     /**
-     * Sets the files directory. Only the first call takes effect, so every
-     * caller that may run first can make it.
+     * Sets the files directory and the directory V8 code caches go under
+     * (the app's code cache dir, which Android clears on app updates). Only
+     * the first call takes effect, so every caller that may run first can
+     * make it.
      */
-    public static void init(File filesDir) {
+    public static void init(File filesDir, File codeCacheDir) {
         String absolute = filesDir.getAbsolutePath();
         String canonical;
         try {
@@ -25,7 +27,7 @@ public final class AppFiles {
         } catch (IOException e) {
             canonical = absolute;
         }
-        nativeInit(canonical, absolute);
+        nativeInit(canonical, absolute, codeCacheDir.getAbsolutePath());
     }
 
     /** UTF-8 contents, or null when the file cannot be read. */
@@ -51,5 +53,5 @@ public final class AppFiles {
 
     private static native byte[] readBytes(String path);
 
-    private static native void nativeInit(String filesRoot, String alias);
+    private static native void nativeInit(String filesRoot, String alias, String codeCacheDir);
 }

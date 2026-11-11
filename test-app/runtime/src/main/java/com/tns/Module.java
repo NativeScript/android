@@ -32,7 +32,7 @@ class Module {
         }
 
         RootPackageDir = rootPackageDir.getCanonicalPath();
-        AppFiles.init(applicationFilesDir);
+        AppFiles.init(applicationFilesDir, new File(rootPackageDir, "code_cache"));
         ApplicationFilesPath = AppFiles.filesRoot();
 
         ModulesFilesPath = "/app/";

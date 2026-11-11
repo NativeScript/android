@@ -2,7 +2,6 @@
 #include "ModuleInternalCallbacks.h"
 
 #include <unistd.h>
-#include <sys/stat.h>
 #include <v8.h>
 
 #include <algorithm>

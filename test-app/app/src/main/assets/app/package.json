@@ -10,7 +10,8 @@
 		"forceLog": false,
 		"suppressCallJSMethodExceptions": false,
 		"enableLineBreakpoints": false,
-		"enableMultithreadedJavascript": true
+		"enableMultithreadedJavascript": true,
+		"codeCache": true
 	},
 	"discardUncaughtJsExceptions": false,
 	"security": {

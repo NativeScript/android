@@ -8,7 +8,6 @@
 #include "AppFiles.h"
 #include "ModuleInternalCallbacks.h"
 #include "BuiltinLoader.h"
-#include "File.h"
 #include "HttpLoader.h"
 #include "JniLocalRef.h"
 #include "ArgConverter.h"
@@ -24,13 +23,12 @@
 #include "CallbackHandlers.h"
 #include "ManualInstrumentation.h"
 #include "Runtime.h"
+#include "ScriptCache.h"
 #include "TraceLog.h"
 #include <sstream>
 #include <libgen.h>
 #include <dlfcn.h>
-#include <sys/stat.h>
 #include <time.h>
-#include <utime.h>
 #include <unistd.h>
 #include <chrono>
 #include <cmath>
@@ -970,33 +968,37 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, c
 
     TryCatch tc(isolate);
 
-    auto scriptText = ModuleInternal::WrapModuleContent(path);
+    std::string scriptText = ModuleInternal::WrapModuleContent(path);
 
     DEBUG_WRITE("Compiling script (module %s)", path.c_str());
-    //
-    auto cacheData = TryLoadScriptCache(path, ScriptCacheKind::Classic);
+
+    ScriptCache cache(path, ScriptCache::Kind::Classic, scriptText);
+    // The Source takes ownership of the CachedData, so the pointer stays valid
+    // for the `rejected` read below and is freed with the Source.
+    auto cacheData = cache.Load();
 
     auto fullRequiredModulePathWithSchema = ArgConverter::ConvertToV8String(isolate, "file://" + path);
     ScriptOrigin origin(fullRequiredModulePathWithSchema);
-    ScriptCompiler::Source source(scriptText, origin, cacheData);
-    ScriptCompiler::CompileOptions option = ScriptCompiler::kNoCompileOptions;
+    ScriptCompiler::Source source(ArgConverter::ConvertToV8String(isolate, scriptText), origin,
+                                  cacheData);
 
-    if (cacheData != nullptr) {
-        tns::instrumentation::Frame frame("Compile, cached");
-        option = ScriptCompiler::kConsumeCodeCache;
-        auto maybeScript = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option);
+    {
+        tns::instrumentation::Frame frame(cacheData != nullptr ? "Compile, cached"
+                                                               : "Compile, no cache");
+        auto maybeScript = ScriptCompiler::Compile(
+                isolate->GetCurrentContext(), &source,
+                cacheData != nullptr ? ScriptCompiler::kConsumeCodeCache
+                                     : ScriptCompiler::kNoCompileOptions);
         if (maybeScript.IsEmpty() || tc.HasCaught()) {
             throw NativeScriptException(tc, "Cannot compile " + path);
         }
         script = maybeScript.ToLocalChecked();
-    } else {
-        tns::instrumentation::Frame frame("Compile, no cache");
-        auto maybeScript = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option);
-        if (maybeScript.IsEmpty() || tc.HasCaught()) {
-            throw NativeScriptException(tc, "Cannot compile " + path);
-        }
-        script = maybeScript.ToLocalChecked();
-        SaveScriptCache(script, path);
+    }
+
+    // A rejected cache (produced by another V8 build or under other flags)
+    // still compiles, but stays useless until it is rewritten from this compile.
+    if (cache.Enabled() && (cacheData == nullptr || cacheData->rejected)) {
+        cache.Save(ScriptCompiler::CreateCodeCache(script->GetUnboundScript()));
     }
 
     DEBUG_WRITE("Compiled script (module %s)", path.c_str());
@@ -1068,6 +1070,7 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
         throw NativeScriptException("Cannot read module " + path);
     }
 
+    ScriptCache cache(path, ScriptCache::Kind::Module, content);
     Local<String> sourceText = ArgConverter::ConvertToV8String(isolate, content);
 
     Local<String> urlString;
@@ -1081,7 +1084,7 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
 
     // The Source takes ownership of the CachedData, so the pointer stays valid
     // for the `rejected` read below and is freed with the Source.
-    ScriptCompiler::CachedData* cacheData = TryLoadScriptCache(path, ScriptCacheKind::Module);
+    ScriptCompiler::CachedData* cacheData = cache.Load();
     ScriptCompiler::Source source(sourceText, origin, cacheData);
 
     Local<Module> module;
@@ -1093,12 +1096,10 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
         return MaybeLocal<Module>();
     }
 
-    // A rejected cache (stale, or produced under different V8 flags) still
-    // compiles — V8 falls back to a full parse — but leaves the file on disk
-    // unusable forever unless it is republished from this compile.
-    if (Constants::V8_CACHE_COMPILED_CODE && (cacheData == nullptr || cacheData->rejected)) {
-        SaveScriptCache(ScriptCompiler::CreateCodeCache(module->GetUnboundModuleScript()), path,
-                        ScriptCacheKind::Module);
+    // A rejected cache (produced by another V8 build or under other flags)
+    // still compiles, but stays useless until it is rewritten from this compile.
+    if (cache.Enabled() && (cacheData == nullptr || cacheData->rejected)) {
+        cache.Save(ScriptCompiler::CreateCodeCache(module->GetUnboundModuleScript()));
     }
 
     return MaybeLocal<Module>(module);
@@ -1598,7 +1599,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     return module->GetModuleNamespace();
 }
 
-Local<String> ModuleInternal::WrapModuleContent(const string& path) {
+string ModuleInternal::WrapModuleContent(const string& path) {
     TNSPERF();
 
     Runtime* runtime = Runtime::TryGetRuntime(m_isolate);
@@ -1614,76 +1615,7 @@ Local<String> ModuleInternal::WrapModuleContent(const string& path) {
     result += content;
     result += MODULE_EPILOGUE;
 
-    return ArgConverter::ConvertToV8String(m_isolate, result);
-}
-
-ScriptCompiler::CachedData* ModuleInternal::TryLoadScriptCache(const std::string& path,
-                                                               ScriptCacheKind kind) {
-    TNSPERF();
-    if (!Constants::V8_CACHE_COMPILED_CODE) {
-        return nullptr;
-    }
-
-    auto cachePath = path + (kind == ScriptCacheKind::Module ? ".mcache" : ".cache");
-
-    struct stat result;
-    if (stat(cachePath.c_str(), &result) == 0) {
-        auto cacheLastModifiedTime = result.st_mtime;
-        if (stat(path.c_str(), &result) == 0) {
-            auto jsLastModifiedTime = result.st_mtime;
-            if (jsLastModifiedTime != cacheLastModifiedTime) {
-                // files have different dates, ignore the cache file (this is enforced by the
-                // SaveScriptCache function)
-                return nullptr;
-            }
-        }
-    }
-
-    int length = 0;
-    auto data = File::ReadBinary(cachePath, length);
-    if (!data) {
-        return nullptr;
-    }
-
-    return new ScriptCompiler::CachedData(reinterpret_cast<uint8_t*>(data), length, ScriptCompiler::CachedData::BufferOwned);
-}
-
-void ModuleInternal::SaveScriptCache(const ScriptCompiler::CachedData* cache,
-                                     const std::string& path, ScriptCacheKind kind) {
-    if (cache == nullptr) {
-        return;
-    }
-    if (!Constants::V8_CACHE_COMPILED_CODE) {
-        delete cache;
-        return;
-    }
-
-    tns::instrumentation::Frame frame("SaveScriptCache");
-
-    int length = cache->length;
-    auto cachePath = path + (kind == ScriptCacheKind::Module ? ".mcache" : ".cache");
-    File::WriteBinary(cachePath, cache->data, length);
-    delete cache;
-    // make sure cache and js file have the same modification date
-    struct stat result;
-    struct utimbuf new_times;
-    new_times.actime = time(nullptr);
-    new_times.modtime = time(nullptr);
-    if (stat(path.c_str(), &result) == 0) {
-        auto jsLastModifiedTime = result.st_mtime;
-        new_times.modtime = jsLastModifiedTime;
-    }
-    utime(cachePath.c_str(), &new_times);
-}
-
-void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::string& path) {
-    if (!Constants::V8_CACHE_COMPILED_CODE) {
-        return;
-    }
-
-    Local<UnboundScript> unboundScript = script->GetUnboundScript();
-    SaveScriptCache(ScriptCompiler::CreateCodeCache(unboundScript), path,
-                    ScriptCacheKind::Classic);
+    return result;
 }
 
 ModuleInternal::ModulePathKind ModuleInternal::GetModulePathKind(const std::string& path) {
