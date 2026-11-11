@@ -55,6 +55,23 @@ describe("Prebuilt classes of anonymous extends", function () {
         expect(generatedDexFiles(instance)).toEqual([]);
     });
 
+    it("loads a TypeScript-compiled native class without a constructor from the APK", function () {
+        var NoConstructorClass = (function (_super) {
+            __extends(NoConstructorClass, _super);
+            function NoConstructorClass() {
+                return _super !== null && _super.apply(this, arguments) || this;
+            }
+            NoConstructorClass.prototype.toString = function () {
+                return "no constructor";
+            };
+            return NoConstructorClass;
+        }(java.lang.Object));
+        var instance = new NoConstructorClass();
+
+        expect(instance.toString()).toBe("no constructor");
+        expect(generatedDexFiles(instance)).toEqual([]);
+    });
+
     it("loads the class of an extend on the first line of an ES module from the APK", function () {
         var LineOneObject = require("./prebuiltExtendLineOne.mjs").LineOneObject;
         var instance = new LineOneObject();
