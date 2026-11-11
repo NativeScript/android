@@ -7,9 +7,8 @@ import java.lang.ref.WeakReference;
  * holds its object strongly while the JS wrapper is reachable and through a WeakReference
  * after the wrapper was collected (until the object is collected too).
  *
- * When concurrent, any thread may read and findOrRegister: every access synchronizes on the
- * table. Otherwise every mutation and every read must come from the thread that holds the
- * runtime's isolate lock. Neither table allocates per entry.
+ * Any thread may read and findOrRegister: every access synchronizes on the table. Neither
+ * table allocates per entry.
  *
  * A monitor rather than java.util.concurrent locks: those live in the boot classpath but
  * outside the boot image, so on device they run interpreted, and an app's profile can't
@@ -23,30 +22,6 @@ final class ObjectTable {
 
     interface IdSource {
         int newId();
-    }
-
-    private final boolean concurrent;
-
-    ObjectTable() {
-        this(false);
-    }
-
-    ObjectTable(boolean concurrent) {
-        this.concurrent = concurrent;
-    }
-
-    /**
-     * The id obj is registered under, from any thread, without the isolate lock; NO_ID when
-     * the table isn't concurrent. A hit was correct at the time of the read; the object may
-     * have been released since, which the caller must check under the isolate lock.
-     */
-    int findIdOptimistic(Object obj) {
-        if (!concurrent) {
-            return NO_ID;
-        }
-        synchronized (this) {
-            return findIdLocked(obj);
-        }
     }
 
     private static Object deref(Object value) {
@@ -94,10 +69,6 @@ final class ObjectTable {
 
     /** Registers obj under id, held strongly, replacing whatever id held before. */
     void putStrong(int id, Object obj) {
-        if (!concurrent) {
-            putStrongLocked(id, obj);
-            return;
-        }
         synchronized (this) {
             putStrongLocked(id, obj);
         }
@@ -130,15 +101,10 @@ final class ObjectTable {
         identityCount++;
     }
 
-    boolean allowsConcurrentRegistration() {
-        return concurrent;
-    }
-
     /**
      * The id obj is registered under, registering it strongly under a new id from ids when
      * it has none; FRESH is set in the result when this call registered it. The lookup and
-     * the insert happen under one lock, so concurrent calls agree on one id. Only when
-     * allowsConcurrentRegistration().
+     * the insert happen under one lock, so concurrent calls agree on one id.
      */
     long findOrRegister(Object obj, IdSource ids) {
         synchronized (this) {
@@ -153,11 +119,11 @@ final class ObjectTable {
         }
     }
 
-    /** The id obj is registered under, or NO_ID. */
+    /**
+     * The id obj is registered under, or NO_ID. From a thread without the isolate lock, the
+     * object may have been released since, which the caller must check under the lock.
+     */
     int findId(Object obj) {
-        if (!concurrent) {
-            return findIdLocked(obj);
-        }
         synchronized (this) {
             return findIdLocked(obj);
         }
@@ -185,9 +151,6 @@ final class ObjectTable {
 
     /** The object registered under id; null if there is none or it was collected. */
     Object get(int id) {
-        if (!concurrent) {
-            return getLocked(id);
-        }
         synchronized (this) {
             return getLocked(id);
         }
@@ -199,9 +162,6 @@ final class ObjectTable {
     }
 
     boolean contains(int id) {
-        if (!concurrent) {
-            return rawLocked(id) != null;
-        }
         synchronized (this) {
             return rawLocked(id) != null;
         }
@@ -212,9 +172,6 @@ final class ObjectTable {
      * the object is still alive; an entry whose object was already collected is removed.
      */
     boolean weakenAndCheckAlive(int id) {
-        if (!concurrent) {
-            return weakenAndCheckAliveLocked(id);
-        }
         synchronized (this) {
             return weakenAndCheckAliveLocked(id);
         }
@@ -226,10 +183,6 @@ final class ObjectTable {
      */
     void weakenAndCheckAlive(int[] ids, int count) {
         if (count == 0) {
-            return;
-        }
-        if (!concurrent) {
-            weakenAndCheckAliveAllLocked(ids, count);
             return;
         }
         synchronized (this) {
@@ -263,10 +216,6 @@ final class ObjectTable {
     }
 
     void remove(int id) {
-        if (!concurrent) {
-            removeLocked(id);
-            return;
-        }
         synchronized (this) {
             removeLocked(id);
         }

@@ -79,7 +79,7 @@ public class ObjectTableTest {
 
     @Test
     public void concurrentReadsFindStableEntriesWhileAnotherThreadWrites() throws Exception {
-        final ObjectTable table = new ObjectTable(true);
+        final ObjectTable table = new ObjectTable();
         final int stableCount = 64;
         final Object[] stable = new Object[stableCount];
         for (int i = 0; i < stableCount; i++) {
@@ -124,7 +124,7 @@ public class ObjectTableTest {
                     Random random = new Random(seed);
                     while (!done.get()) {
                         int expected = random.nextInt(stableCount);
-                        int id = table.findIdOptimistic(stable[expected]);
+                        int id = table.findId(stable[expected]);
                         if (id == expected) {
                             hits.incrementAndGet();
                         } else {
@@ -152,7 +152,7 @@ public class ObjectTableTest {
 
     @Test
     public void concurrentRegistrationsAgreeOnOneIdPerObject() throws Exception {
-        final ObjectTable table = new ObjectTable(true);
+        final ObjectTable table = new ObjectTable();
         final java.util.concurrent.atomic.AtomicInteger nextId = new java.util.concurrent.atomic.AtomicInteger();
         final ObjectTable.IdSource ids = new ObjectTable.IdSource() {
             @Override
@@ -215,7 +215,7 @@ public class ObjectTableTest {
 
     @Test
     public void exactReadsStayExactWhileAnotherThreadRegisters() throws Exception {
-        final ObjectTable table = new ObjectTable(true);
+        final ObjectTable table = new ObjectTable();
         final java.util.concurrent.atomic.AtomicInteger nextId = new java.util.concurrent.atomic.AtomicInteger(1000);
         final ObjectTable.IdSource ids = new ObjectTable.IdSource() {
             @Override
@@ -309,7 +309,7 @@ public class ObjectTableTest {
 
     @Test
     public void idsPastIntMaxAreUnsigned() {
-        ObjectTable table = new ObjectTable(true);
+        ObjectTable table = new ObjectTable();
         Object a = new Object();
         Object b = new Object();
         table.putStrong(Integer.MIN_VALUE + 3, a);
@@ -333,14 +333,6 @@ public class ObjectTableTest {
         assertNull(table.get(-7));
         assertEquals(ObjectTable.NO_ID, table.findId(b));
         assertEquals(1, table.size());
-    }
-
-    @Test
-    public void optimisticReadsMissWhenDisabled() {
-        ObjectTable table = new ObjectTable(false);
-        Object a = new Object();
-        table.putStrong(1, a);
-        assertEquals(ObjectTable.NO_ID, table.findIdOptimistic(a));
     }
 
     @Test
