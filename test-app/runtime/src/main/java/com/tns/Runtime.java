@@ -181,9 +181,9 @@ public class Runtime {
             "Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
             "If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
 
-    // Any thread may read it optimistically and register new objects through findOrRegister
-    // (see ObjectTable); every other mutation and every exact read comes from the thread
-    // holding this runtime's isolate lock.
+    // Any thread may read it and register new objects through findOrRegister (see
+    // ObjectTable); every other mutation comes from the thread holding this runtime's
+    // isolate lock.
     private final ObjectTable objectTable;
 
     private final ObjectTable.IdSource objectIds = new ObjectTable.IdSource() {
@@ -334,7 +334,7 @@ public class Runtime {
     }
 
     public Runtime(StaticConfiguration config, DynamicConfiguration dynamicConfiguration) {
-        this.objectTable = new ObjectTable(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N);
+        this.objectTable = new ObjectTable();
         synchronized (Runtime.currentRuntime) {
             ManualInstrumentation.Frame frame = ManualInstrumentation.start("new Runtime");
             try {
@@ -1186,19 +1186,9 @@ public class Runtime {
 
     // obj's id (low 32 bits), registering it strongly under a new id if it has none, with
     // ObjectTable.FRESH set then. Threads registering call arguments (packageArgs) do not
-    // hold the isolate lock, so where they may, the lookup and insert are one atomic step.
+    // hold the isolate lock, so the lookup and insert are one atomic step.
     private long getOrCreateObjectId(Object obj) {
-        // Exact: only the isolate-lock holder (this thread) removes entries.
-        int id = objectTable.findId(obj);
-        if (id != ObjectTable.NO_ID) {
-            return id & 0xFFFFFFFFL;
-        }
-        if (objectTable.allowsConcurrentRegistration()) {
-            return objectTable.findOrRegister(obj, objectIds);
-        }
-        id = generateNewObjectId(getRuntimeId());
-        makeInstanceStrong(obj, id);
-        return (id & 0xFFFFFFFFL) | ObjectTable.FRESH;
+        return objectTable.findOrRegister(obj, objectIds);
     }
 
     public static Object callJSMethodFromPossibleNonMainThread(Object javaObject, String methodName, Class<?> retType, Object... args) throws NativeScriptException {
@@ -1383,11 +1373,8 @@ public class Runtime {
                         id = bound.getObjectId__ns();
                     }
                 }
-                if (id == ObjectTable.NO_ID) {
-                    id = objectTable.findIdOptimistic(value);
-                }
                 long fresh = 0;
-                if (id == ObjectTable.NO_ID && objectTable.allowsConcurrentRegistration()) {
+                if (id == ObjectTable.NO_ID) {
                     // Registered here rather than under the isolate lock, so threads calling
                     // in with new objects only serialize on creating their wrappers.
                     long found = objectTable.findOrRegister(value, objectIds);
@@ -1396,8 +1383,6 @@ public class Runtime {
                         fresh = FRESH_ARG;
                     }
                 }
-                // Otherwise the id is a hint, resolved or registered natively under the
-                // isolate lock.
                 values[i] = packIdAndClass(id, value) | fresh;
             }
 
@@ -1513,7 +1498,7 @@ public class Runtime {
                 // A hint: other threads may be writing the table, so native re-checks it under the
                 // isolate lock and resolves the id itself on a miss.
                 ret = callJSMethodNative(getRuntimeId(), javaObject,
-                        objectIdHint != ObjectTable.NO_ID ? objectIdHint : objectTable.findIdOptimistic(javaObject), methodName, MethodNameIds.idOf(methodName), returnType, isConstructor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult);
+                        objectIdHint != ObjectTable.NO_ID ? objectIdHint : objectTable.findId(javaObject), methodName, MethodNameIds.idOf(methodName), returnType, isConstructor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult);
                 ret = takePrimitiveResult(ret, returnType, primitiveResult);
             } catch (NativeScriptException e) {
                 // With multithreaded JS the owner can be torn down between the
