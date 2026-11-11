@@ -34,6 +34,7 @@ require("./tests/testMultithreadedJavascript");
 require("./tests/testWorkerTerminateDuringLoad");
 require("./tests/testWorkerOptions");
 require("./tests/testWorkerResourceLimits");
+require("./tests/testWorkerNestedConsole");
 require("./tests/testMessaging");
 require("./tests/testInterfaceDefaultMethods");
 require("./tests/testInterfaceStaticMethods");
