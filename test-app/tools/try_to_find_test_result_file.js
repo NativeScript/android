@@ -17,9 +17,10 @@ const adbCallTimeoutMs = 30 * 1000;
 const adbExecOptions = { timeout: adbCallTimeoutMs, maxBuffer: 64 * 1024 * 1024 };
 const scriptStartTime = new Date();
 const cutoffMarginMs = 60 * 1000;
-// Logcat stamps are device-local wall-clock time, so main() replaces this with
-// the device's clock when it can read it; the host clock is only a fallback.
-let logcatCutoffTime = new Date(scriptStartTime.getTime() - cutoffMarginMs);
+// Logcat stamps are device-local wall-clock time, so the cutoff comes from the
+// device's clock. Until main() reads it (or if it can't), logcat stays
+// unfiltered: a host-clock cutoff could drop the whole run when zones differ.
+let logcatCutoffTime = null;
 // Uploaded by CI as an artifact when the run fails.
 const diagnosticsDir = path.join(__dirname, "..", "dist", "crash-diagnostics");
 
@@ -69,6 +70,7 @@ function parseLogcatTimestamp(line) {
 }
 
 function filterLogcatFromCutoff(logcatOutput) {
+  if (!logcatCutoffTime) return logcatOutput;
   const lines = logcatOutput.split("\n");
 
   // Find the first line that is at or after the cutoff time
