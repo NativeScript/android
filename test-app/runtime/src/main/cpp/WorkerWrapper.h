@@ -30,6 +30,21 @@ class WorkerInspectorClient;
 #endif
 
 /*
+ * Lets a thread other than the worker's own take the worker's Locker without
+ * racing its disposal. A caller holds `mutex`, gives up if `open` is false,
+ * and releases `mutex` only once it owns the Locker. The worker's shutdown
+ * closes the gate before it takes its teardown Locker, so a closed gate means
+ * the isolate may already be gone.
+ *
+ * Never take `mutex` while holding the worker's Locker: a gated caller waits
+ * for that Locker with `mutex` held.
+ */
+struct IsolateGate {
+    std::mutex mutex;
+    bool open = true;
+};
+
+/*
  * Owns a worker's native thread and its lifecycle, mirroring the iOS
  * runtime's WorkerWrapper. The thread is a std::thread that attaches to the
  * JVM, prepares a Java Looper (so worker/plugin code can keep using Android
@@ -53,6 +68,7 @@ public:
     bool IsTerminating() const { return isTerminating_; }
     bool IsClosing() const { return isClosing_; }
     bool IsDisposed() const { return isDisposed_; }
+    const std::shared_ptr<IsolateGate>& Gate() const { return gate_; }
 
     /*
      * Spawns the (detached) worker thread. The thread holds a shared_ptr to
@@ -224,6 +240,7 @@ private:
     std::atomic_bool isClosing_;
     std::atomic_bool isTerminating_;
     std::atomic_bool isDisposed_;
+    const std::shared_ptr<IsolateGate> gate_ = std::make_shared<IsolateGate>();
     // False until the entry script has finished evaluating
     // (EnableMessageQueue); DrainPendingTasks leaves the queue untouched while
     // disabled. Written and read on the worker thread only - the atomic is
