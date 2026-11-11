@@ -348,7 +348,7 @@ public class DexFactory {
         }
 
         AnnotationDescriptor[] annotations = null;
-        return proxyGenerator.generateProxy(proxyName, new ClassInfo(classToProxy), methodOverridesSet, implementedInterfacesSet, isInterface, annotations);
+        return proxyGenerator.generateProxy(proxyName, contentDigest, new ClassInfo(classToProxy), methodOverridesSet, implementedInterfacesSet, isInterface, annotations);
     }
 
     private void updateDexThumbAndPurgeCache() {

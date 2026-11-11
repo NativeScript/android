@@ -67,6 +67,7 @@ require("./tests/byte-buffer-test");
 require("./tests/shared-array-buffer-test");
 require("./tests/dex-interface-implementation");
 require("./tests/testClassForNameDiscovery");
+require("./tests/testPrebuiltExtendClasses");
 require("./tests/testInterfaceImplementation");
 require("./tests/testPrimitiveCallbackReturns");
 require("./tests/testRuntimeImplementedAPIs");

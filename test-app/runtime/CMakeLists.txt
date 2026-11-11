@@ -188,6 +188,7 @@ add_library(
         src/main/cpp/ErrorEvents.cpp
         src/main/cpp/EventLoop.cpp
         src/main/cpp/Events.cpp
+        src/main/cpp/ExtendFileIdentifier.cpp
         src/main/cpp/FrameCallbacks.cpp
         src/main/cpp/FieldAccessor.cpp
         src/main/cpp/File.cpp
