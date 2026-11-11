@@ -1148,6 +1148,16 @@ public class Runtime {
         return id == ObjectTable.NO_ID ? null : id;
     }
 
+    // Removes id's entry if its object was collected; returns whether it was.
+    @RuntimeCallable
+    private boolean releaseIfCollected(int javaObjectID) {
+        if (objectTable.get(javaObjectID) != null) {
+            return false;
+        }
+        objectTable.remove(javaObjectID);
+        return true;
+    }
+
     @RuntimeCallable
     private int findJavaObjectID(Object obj) {
         return objectTable.findId(obj);

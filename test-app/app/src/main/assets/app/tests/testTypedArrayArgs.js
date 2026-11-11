@@ -154,6 +154,66 @@ describe("Typed arrays passed to Java parameters", function () {
 		expect(holder.get(4095)).toBe(7);
 	});
 
+	it("links a new buffer when Java has collected the one a reused typed array had", function () {
+		var list = new java.util.ArrayList();
+		(function () {
+			list.add(new Uint8Array([9, 8, 7]));
+		})();
+		// Collecting the typed array makes Java hold its buffer weakly from then on.
+		for (var i = 0; i < 3; i++) {
+			gc();
+			java.lang.System.gc();
+		}
+		var bytes = list.remove(0);
+		expect(bytes instanceof Uint8Array).toBe(true);
+		for (var i = 0; i < 3; i++) {
+			java.lang.System.gc();
+		}
+
+		list.add(bytes);
+		expect(list.get(0)).toBe(bytes);
+		expect(T.totalCapacity(list.toArray())).toBe(3);
+		var copy = java.nio.ByteBuffer.allocate(3);
+		copy.put(bytes);
+		expect(toArray(copy.array())).toEqual([9, 8, 7]);
+	});
+
+	function conversionError(call) {
+		try {
+			call();
+		} catch (e) {
+			return e.message;
+		}
+		return "no error";
+	}
+
+	it("throws for array elements that cannot convert to the element type", function () {
+		expect(conversionError(function () { T.echoLongs([1n, 2n]); }))
+			.toContain("Cannot convert array to [J at index 0");
+		expect(conversionError(function () { T.echoInts([1, 2n]); })).toContain("BigInt");
+		expect(conversionError(function () { T.echoInts([1, Symbol("s")]); })).toContain("Symbol");
+		expect(conversionError(function () { T.echoChars([Symbol("s")]); })).toContain("Symbol");
+		expect(conversionError(function () {
+			T.echoDoubles([{ valueOf: function () { throw new Error("no value"); } }]);
+		})).toContain("no value");
+
+		var withThrowingGetter = [1, 2];
+		Object.defineProperty(withThrowingGetter, 1, { get: function () { throw new Error("no element"); } });
+		expect(conversionError(function () { T.echoInts(withThrowingGetter); })).toContain("no element");
+		expect(conversionError(function () { T.describeObjects(withThrowingGetter); })).toContain("no element");
+	});
+
+	it("throws for a BigInt passed to a long parameter, as in an array", function () {
+		expect(conversionError(function () { java.lang.Long.toHexString(5n); }))
+			.toContain("Cannot convert bigint to J at index 0");
+	});
+
+	it("throws for an array longer than a Java array can be", function () {
+		var sparse = [];
+		sparse.length = 2147483648;
+		expect(conversionError(function () { T.echoInts(sparse); })).toContain("Cannot convert array to [I");
+	});
+
 	it("converts a JS array too large for the thread's stack", function () {
 		var count = 4 * 1024 * 1024;
 		var values = new Array(count);

@@ -235,10 +235,18 @@ JniLocalRef JsArgConverter::LinkNewJavaBuffer(ObjectManager *objectManager, cons
     return std::move(buffer);
 }
 
+JniLocalRef JsArgConverter::GetOrLinkJavaBuffer(ObjectManager *objectManager, const Local<Object> &object) {
+    auto buffer = objectManager->GetLiveJavaObjectByJsObject(object);
+    if (buffer.IsNull()) {
+        buffer = LinkNewJavaBuffer(objectManager, object);
+    }
+    return buffer;
+}
+
 bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
     bool success = false;
 
-    char buff[1024];
+    char buff[1024] = "";
 
     const auto &typeSignature = m_tokens->at(index);
 
@@ -274,7 +282,16 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
             }
 
             if (success) {
-                success = ConvertJavaScriptArray(jsArr, static_cast<jsize>(jsArr->Length()), index);
+                TryCatch tc(m_isolate);
+                success = ConvertJavaScriptArray(jsArr, jsArr->Length(), index);
+                if (!success && tc.HasCaught()) {
+                    trapThrew = true;
+                    auto context = m_isolate->GetCurrentContext();
+                    string reason = ArgConverter::ConvertToString(
+                            tc.Exception()->ToString(context).FromMaybe(Local<String>()));
+                    snprintf(buff, sizeof(buff), "Cannot convert array to %s at index %d: %s",
+                             typeSignature.c_str(), index, reason.c_str());
+                }
             }
         }
 
@@ -401,11 +418,9 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
                     break;
                 }
 
-                obj = objectManager->GetJavaObjectByJsObject(jsObject);
-
-                if (obj.IsNull() && IsArrayBufferLike(jsObject)) {
-                    obj = LinkNewJavaBuffer(objectManager, jsObject);
-                }
+                obj = IsArrayBufferLike(jsObject)
+                      ? GetOrLinkJavaBuffer(objectManager, jsObject)
+                      : objectManager->GetJavaObjectByJsObject(jsObject);
 
                 V8GetPrivateValue(m_isolate, jsObject, V8StringConstants::GetNullNodePrivate(m_isolate),
                                   castValue);
@@ -435,6 +450,9 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
     } else {
         SetConvertedObject(index, nullptr);
         success = false;
+        auto typeName = ArgConverter::ConvertToString(arg->TypeOf(m_isolate));
+        snprintf(buff, sizeof(buff), "Cannot convert %s to %s at index %d", typeName.c_str(),
+                 typeSignature.c_str(), index);
     }
 
     if (!success) {
@@ -547,148 +565,161 @@ bool JsArgConverter::ConvertJavaScriptString(const Local<Value> &jsValue, int in
     return true;
 }
 
-bool JsArgConverter::ConvertJavaScriptArray(const Local<Object> &source, jsize arrLength, int index) {
-    bool success = true;
-
-    jarray arr = nullptr;
+bool JsArgConverter::ConvertJavaScriptArray(const Local<Object> &source, size_t length, int index) {
+    // Java arrays are indexed by jint.
+    if (length > INT32_MAX) {
+        return false;
+    }
+    auto arrLength = static_cast<jsize>(length);
 
     const auto &arraySignature = m_tokens->at(index);
     auto context = m_isolate->GetCurrentContext();
 
-    string elementType = arraySignature.substr(1);
+    // Each read fails, with a JS exception scheduled, when an element getter or a
+    // conversion throws (a BigInt or Symbol element, a throwing valueOf).
+    auto elementAt = [&](jsize i, Local<Value> &element) {
+        return source->Get(context, i).ToLocal(&element);
+    };
+    auto int32At = [&](jsize i, int32_t &value) {
+        Local<Value> element;
+        return elementAt(i, element) && element->Int32Value(context).To(&value);
+    };
+    auto numberAt = [&](jsize i, double &value) {
+        Local<Value> element;
+        return elementAt(i, element) && element->NumberValue(context).To(&value);
+    };
 
-    const char elementTypePrefix = elementType[0];
-
-    jclass elementClass;
-    string strippedClassName;
+    jarray arr = nullptr;
 
     JEnv env;
-    switch (elementTypePrefix) {
+    switch (arraySignature[1]) {
         case 'Z': {
-            arr = env.NewBooleanArray(arrLength);
             std::vector<jboolean> bools(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                bools[i] = source
-                        ->Get(context, i)
-                        .ToLocalChecked()
-                        ->BooleanValue(m_isolate);
+                Local<Value> element;
+                if (!elementAt(i, element)) {
+                    return false;
+                }
+                bools[i] = element->BooleanValue(m_isolate);
             }
+            arr = env.NewBooleanArray(arrLength);
             env.SetBooleanArrayRegion((jbooleanArray) arr, 0, arrLength, bools.data());
             break;
         }
         case 'B': {
-            arr = env.NewByteArray(arrLength);
             std::vector<jbyte> bytes(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                bytes[i] = source
-                        ->Get(context, i)
-                        .ToLocalChecked()
-                        ->Int32Value(context)
-                        .ToChecked();
+                int32_t value;
+                if (!int32At(i, value)) {
+                    return false;
+                }
+                bytes[i] = (jbyte) value;
             }
+            arr = env.NewByteArray(arrLength);
             env.SetByteArrayRegion((jbyteArray) arr, 0, arrLength, bytes.data());
             break;
         }
         case 'C': {
-            arr = env.NewCharArray(arrLength);
             std::vector<jchar> chars(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                String::Utf8Value utf8(m_isolate, source->Get(context, i).ToLocalChecked()->ToString(
-                        context).ToLocalChecked());
+                Local<Value> element;
+                Local<String> str;
+                if (!elementAt(i, element) || !element->ToString(context).ToLocal(&str)) {
+                    return false;
+                }
+                String::Utf8Value utf8(m_isolate, str);
                 JniLocalRef s(env.NewString((jchar *) *utf8, 1));
                 const char *singleChar = env.GetStringUTFChars(s, nullptr);
                 chars[i] = *singleChar;
                 env.ReleaseStringUTFChars(s, singleChar);
             }
+            arr = env.NewCharArray(arrLength);
             env.SetCharArrayRegion((jcharArray) arr, 0, arrLength, chars.data());
             break;
         }
         case 'S': {
-            arr = env.NewShortArray(arrLength);
             std::vector<jshort> shorts(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                shorts[i] = source
-                        ->Get(context, i)
-                        .ToLocalChecked()
-                        ->Int32Value(context)
-                        .ToChecked();
+                int32_t value;
+                if (!int32At(i, value)) {
+                    return false;
+                }
+                shorts[i] = (jshort) value;
             }
+            arr = env.NewShortArray(arrLength);
             env.SetShortArrayRegion((jshortArray) arr, 0, arrLength, shorts.data());
             break;
         }
         case 'I': {
-            arr = env.NewIntArray(arrLength);
             std::vector<jint> ints(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                ints[i] = source
-                        ->Get(context, i)
-                        .ToLocalChecked()
-                        ->Int32Value(context)
-                        .ToChecked();
+                int32_t value;
+                if (!int32At(i, value)) {
+                    return false;
+                }
+                ints[i] = value;
             }
+            arr = env.NewIntArray(arrLength);
             env.SetIntArrayRegion((jintArray) arr, 0, arrLength, ints.data());
             break;
         }
         case 'J': {
-            arr = env.NewLongArray(arrLength);
             std::vector<jlong> longs(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                longs[i] = source
-                        ->Get(context, i)
-                        .ToLocalChecked()
-                        ->NumberValue(context)
-                        .ToChecked();
+                double value;
+                if (!numberAt(i, value)) {
+                    return false;
+                }
+                longs[i] = (jlong) value;
             }
+            arr = env.NewLongArray(arrLength);
             env.SetLongArrayRegion((jlongArray) arr, 0, arrLength, longs.data());
             break;
         }
         case 'F': {
-            arr = env.NewFloatArray(arrLength);
             std::vector<jfloat> floats(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                floats[i] = source
-                        ->Get(context, i)
-                        .ToLocalChecked()
-                        ->NumberValue(context)
-                        .ToChecked();
+                double value;
+                if (!numberAt(i, value)) {
+                    return false;
+                }
+                floats[i] = (jfloat) value;
             }
+            arr = env.NewFloatArray(arrLength);
             env.SetFloatArrayRegion((jfloatArray) arr, 0, arrLength, floats.data());
             break;
         }
         case 'D': {
-            arr = env.NewDoubleArray(arrLength);
             std::vector<jdouble> doubles(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                doubles[i] = source
-                        ->Get(context, i)
-                        .ToLocalChecked()
-                        ->NumberValue(context)
-                        .ToChecked();
+                if (!numberAt(i, doubles[i])) {
+                    return false;
+                }
             }
+            arr = env.NewDoubleArray(arrLength);
             env.SetDoubleArrayRegion((jdoubleArray) arr, 0, arrLength, doubles.data());
             break;
         }
-        case 'L':
-            strippedClassName = elementType.substr(1, elementType.length() - 2);
-            elementClass = env.FindClass(strippedClassName);
-            arr = env.NewObjectArray(arrLength, elementClass, nullptr);
-            for (int i = 0; i < arrLength; i++) {
-                auto v = source->Get(context, i).ToLocalChecked();
-                JsArgToArrayConverter c(context, v, false, (int) Type::Null);
-                jobject o = c.GetConvertedArg();
-                env.SetObjectArrayElement((jobjectArray) arr, i, o);
+        case 'L': {
+            auto elementClass = env.FindClass(arraySignature.substr(2, arraySignature.length() - 3));
+            JniLocalRef objects(env.NewObjectArray(arrLength, elementClass, nullptr));
+            for (jsize i = 0; i < arrLength; i++) {
+                Local<Value> element;
+                if (!elementAt(i, element)) {
+                    return false;
+                }
+                JsArgToArrayConverter c(context, element, false, (int) Type::Null);
+                env.SetObjectArrayElement((jobjectArray) objects, i, c.GetConvertedArg());
             }
+            arr = (jarray) objects.Move();
             break;
+        }
         default:
-            success = false;
-            break;
+            return false;
     }
 
-    if (success) {
-        SetConvertedObject(index, arr);
-    }
-
-    return success;
+    SetConvertedObject(index, arr);
+    return true;
 }
 
 bool JsArgConverter::ConvertArrayBufferToJavaArray(const Local<Object> &source, int index) {
@@ -728,7 +759,7 @@ bool JsArgConverter::ConvertArrayBufferToJavaArray(const Local<Object> &source, 
                     return false;
                 }
                 // Element by element, exactly as a plain array holding the same numbers.
-                return ConvertJavaScriptArray(source, static_cast<jsize>(array->Length()), index);
+                return ConvertJavaScriptArray(source, array->Length(), index);
             }
         }
 

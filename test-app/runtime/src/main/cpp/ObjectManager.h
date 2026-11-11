@@ -43,6 +43,10 @@ class ObjectManager {
 
   JniLocalRef GetJavaObjectByJsObject(const v8::Local<v8::Object>& object);
 
+  // As GetJavaObjectByJsObject, but a link whose Java object was already collected is
+  // released and reported as no link, so the JS object can be linked again.
+  JniLocalRef GetLiveJavaObjectByJsObject(const v8::Local<v8::Object>& object);
+
   void UpdateCache(int objectID, jobject obj);
 
   jclass GetJavaClass(const v8::Local<v8::Object>& instance);
@@ -246,6 +250,9 @@ class ObjectManager {
 
   void ReleaseCollectedWrapper(int javaObjectID);
 
+  // Drops id's registrations on both sides if Java has collected its object.
+  bool ReleaseIfCollected(int javaObjectID);
+
   // Ids whose JS wrapper was collected, waiting for one JNI call that weakens
   // (first collection) or liveness-checks (later ones) their Java objects.
   std::vector<jint> m_pendingWeaken;
@@ -297,6 +304,7 @@ class ObjectManager {
   static jmethodID PROCESS_FINALIZED_BATCH_METHOD_ID;
 
   static jmethodID RELEASE_NATIVE_INSTANCE_METHOD_ID;
+  static jmethodID RELEASE_IF_COLLECTED_METHOD_ID;
 
   v8::Persistent<v8::Function>* m_poJsWrapperFunc;
   v8::Persistent<v8::ObjectTemplate> m_jsWrapperTemplate;

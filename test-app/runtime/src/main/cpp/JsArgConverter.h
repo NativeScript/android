@@ -63,11 +63,15 @@ namespace tns {
         // object, and with it the memory, lives as long as the buffer.
         static JniLocalRef LinkNewJavaBuffer(ObjectManager* objectManager, const v8::Local<v8::Object>& object);
 
+        // The Java buffer linked to an array buffer or view, linking a new one when there is
+        // none or Java has collected it.
+        static JniLocalRef GetOrLinkJavaBuffer(ObjectManager* objectManager, const v8::Local<v8::Object>& object);
+
     private:
 
         bool ConvertArg(const v8::Local<v8::Value>& jsArg, int index);
 
-        bool ConvertJavaScriptArray(const v8::Local<v8::Object>& source, jsize length, int index);
+        bool ConvertJavaScriptArray(const v8::Local<v8::Object>& source, size_t length, int index);
 
         bool ConvertArrayBufferToJavaArray(const v8::Local<v8::Object>& source, int index);
 

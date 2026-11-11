@@ -251,11 +251,9 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                 break;
 
             case CastType::None:
-                obj = objectManager->GetJavaObjectByJsObject(jsObj);
-
-                if (obj.IsNull() && JsArgConverter::IsArrayBufferLike(jsObj)) {
-                    obj = JsArgConverter::LinkNewJavaBuffer(objectManager, jsObj);
-                }
+                obj = JsArgConverter::IsArrayBufferLike(jsObj)
+                      ? JsArgConverter::GetOrLinkJavaBuffer(objectManager, jsObj)
+                      : objectManager->GetJavaObjectByJsObject(jsObj);
 
                 V8GetPrivateValue(isolate, jsObj, V8StringConstants::GetNullNodePrivate(isolate),
                                   castValue);
