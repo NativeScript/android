@@ -198,6 +198,16 @@ Local<Object> MetadataNode::CreateExtendedJSWrapper(Isolate* isolate, ObjectMana
         // running its constructor callback.
         auto context = Runtime::GetRuntime(isolate)->GetContext();
         if (cacheData.instanceTemplate->Get(isolate)->NewInstance(context).ToLocal(&extInstance)) {
+            // V8 may copy instances from a cached instantiation of the template, which keeps the
+            // prototype the class had then. This only matters if code reassigns the extended
+            // class's `prototype` property, which nothing in the runtime or core does; consider
+            // dropping the check.
+            auto extdCtorFunc = Local<Function>::New(isolate, *cacheData.extendedCtorFunction);
+            Local<Value> prototype;
+            if (extdCtorFunc->Get(context, V8StringConstants::GetPrototype(isolate)).ToLocal(&prototype) &&
+                !prototype->StrictEquals(extInstance->GetPrototype())) {
+                extInstance->SetPrototype(context, prototype);
+            }
             extInstance->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
             SetInstanceMetadata(isolate, extInstance, cacheData.node);
         }

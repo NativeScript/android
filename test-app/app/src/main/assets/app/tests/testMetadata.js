@@ -110,6 +110,19 @@ describe("Java object wrappers", function () {
 		expect(String(made.toString())).toBe("inner");
 	});
 
+	it("give a Java-created extended instance its class's current prototype", function () {
+		var Created = java.lang.Object.extend({ toString: function () { return "created"; } });
+		var createdClass = new Created().getClass();
+		com.tns.tests.JavaCreated.newInstance(createdClass);
+		var replacement = Object.create(Object.getPrototypeOf(Created.prototype));
+		Created.prototype = replacement;
+
+		var created = com.tns.tests.JavaCreated.newInstance(createdClass);
+
+		expect(Object.getPrototypeOf(created)).toBe(replacement);
+		expect(String(created.toString())).toBe("created");
+	});
+
 	it("hand back the same wrapper for the same Java object", function () {
 		var builder = new java.lang.StringBuilder();
 
