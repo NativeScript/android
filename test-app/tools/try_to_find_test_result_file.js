@@ -1,4 +1,6 @@
 const { exec } = require("child_process");
+const fs = require("fs");
+const path = require("path");
 
 const appId = "com.tns.testapplication";
 const runOnDeviceOrEmulator = process.argv.slice(2).join(" ") || "-e";
@@ -14,7 +16,13 @@ const adbCallTimeoutMs = 30 * 1000;
 // dump can both exceed that.
 const adbExecOptions = { timeout: adbCallTimeoutMs, maxBuffer: 64 * 1024 * 1024 };
 const scriptStartTime = new Date();
-const logcatCutoffTime = new Date(scriptStartTime.getTime() - 60 * 1000); // 1 minute before start
+const cutoffMarginMs = 60 * 1000;
+// Logcat stamps are device-local wall-clock time, so the cutoff comes from the
+// device's clock. Until main() reads it (or if it can't), logcat stays
+// unfiltered: a host-clock cutoff could drop the whole run when zones differ.
+let logcatCutoffTime = null;
+// Uploaded by CI as an artifact when the run fails.
+const diagnosticsDir = path.join(__dirname, "..", "dist", "crash-diagnostics");
 
 let timedOut = false;
 // TODO: check why gradle doesn't show error logs
@@ -62,6 +70,7 @@ function parseLogcatTimestamp(line) {
 }
 
 function filterLogcatFromCutoff(logcatOutput) {
+  if (!logcatCutoffTime) return logcatOutput;
   const lines = logcatOutput.split("\n");
 
   // Find the first line that is at or after the cutoff time
@@ -75,29 +84,150 @@ function filterLogcatFromCutoff(logcatOutput) {
   return lines.slice(startIndex).join("\n");
 }
 
-async function readAndFilterLogcat() {
-	// if we have a PID, filter by it
-  if (appPID !== -1) {
-    return new Promise((resolve) => {
-      exec(`${adbPrefix} logcat -d --pid=${appPID}`, adbExecOptions, (error, stdout) => {
-        resolve(filterLogcatFromCutoff(stdout || ""));
-      });
-    });
-  }
-	// otherwise, do a general logcat read
+function adbOutput(args) {
   return new Promise((resolve) => {
-		console.log('Reading full logcat since app PID is unknown');
-    exec(`${adbPrefix} logcat -d`, adbExecOptions, (error, stdout) => {
-      resolve(filterLogcatFromCutoff(stdout || ""));
+    exec(`${adbPrefix} ${args}`, adbExecOptions, (error, stdout, stderr) => {
+      resolve({ error, stdout: stdout || "", stderr: stderr || "" });
     });
   });
 }
 
-async function exitWithLogcatDump() {
-  console.log("Dumping logcat for debugging:");
+function writeDiagnostic(name, contents) {
   try {
-    const logcat = await readAndFilterLogcat();
-    console.log(logcat);
+    fs.mkdirSync(diagnosticsDir, { recursive: true });
+    fs.writeFileSync(path.join(diagnosticsDir, name), contents);
+  } catch (err) {
+    console.log(`Could not write ${name}: ${err.message}`);
+  }
+}
+
+// An empty capture keeps adb's own error, so an empty artifact says why.
+function adbText({ error, stdout, stderr }) {
+  if (stdout.trim()) return stdout;
+  return stderr || (error ? String(error.message) : "");
+}
+
+function lastLines(text, count) {
+  const lines = text.split("\n");
+  return lines.slice(Math.max(0, lines.length - count)).join("\n");
+}
+
+// The newest ApplicationExitInfo record: its reason (native crash, crash, ANR,
+// low memory, signaled...) is the one thing that tells a crash from a kill.
+// Records survive reinstalls, so one from before this run is not reported.
+function latestExitRecord(exitInfo) {
+  const start = exitInfo.indexOf("ApplicationExitInfo #0:");
+  if (start === -1) return "";
+  const next = exitInfo.indexOf("ApplicationExitInfo #1:", start);
+  const record = exitInfo.slice(start, next === -1 ? undefined : next).trim();
+  const stamp = /timestamp=(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})\.(\d{3})/.exec(record);
+  if (stamp && logcatCutoffTime) {
+    const [, y, mo, d, h, mi, sec, ms] = stamp.map((v) => parseInt(v, 10));
+    if (new Date(y, mo - 1, d, h, mi, sec, ms) < logcatCutoffTime) {
+      return "(no exit recorded during this run)";
+    }
+  }
+  return record;
+}
+
+// threadtime lines: "MM-DD HH:mm:ss.mmm  PID  TID L TAG: message"
+function linesOfPid(logcat, pid) {
+  return logcat
+    .split("\n")
+    .filter((line) => {
+      const match = /^\d{2}-\d{2}\s+\S+\s+(\d+)\s/.exec(line);
+      return match && parseInt(match[1], 10) === pid;
+    })
+    .join("\n");
+}
+
+async function currentAppPid() {
+  const { stdout } = await adbOutput(
+    `shell "pidof ${appId} 2>/dev/null || ps | grep ${appId}"`
+  );
+  return parseAppPid(stdout);
+}
+
+async function collectDiagnostics() {
+  const sections = [];
+  fs.rmSync(diagnosticsDir, { recursive: true, force: true });
+
+  // Unfiltered by pid on purpose: crash_dump's backtrace (tag DEBUG), the
+  // ActivityManager death/ANR lines and lmkd kills are logged by other pids.
+  // Repeated -b, not a comma list, and no --pid: both need API 24.
+  const fullLogcat = filterLogcatFromCutoff(
+    adbText(await adbOutput("logcat -d -v threadtime -b main -b system -b crash"))
+  );
+  writeDiagnostic("logcat.txt", fullLogcat);
+
+  if (appPID !== -1) {
+    const appLogcat = linesOfPid(fullLogcat, appPID);
+    writeDiagnostic("logcat-app.txt", appLogcat);
+    sections.push(["Last app logcat lines", lastLines(appLogcat, 150)]);
+  }
+
+  const crashBuffer = filterLogcatFromCutoff(
+    adbText(await adbOutput("logcat -d -v threadtime -b crash"))
+  );
+  writeDiagnostic("logcat-crash.txt", crashBuffer);
+  sections.push(["Crash buffer", lastLines(crashBuffer, 200)]);
+
+  const exitInfo = adbText(await adbOutput(`shell dumpsys activity exit-info ${appId}`));
+  writeDiagnostic("exit-info.txt", exitInfo);
+  sections.push(["Latest process exit", latestExitRecord(exitInfo)]);
+
+  // Tombstones and other processes' stacks need root, which emulator images
+  // without Google Play grant. Restarting adbd breaks every other adb client
+  // of the device, so only CI, which owns its emulator, asks for it.
+  if (process.env.CI) {
+    await adbOutput("root");
+    await adbOutput("wait-for-device");
+  }
+
+  const livePid = await currentAppPid();
+  if (Number.isFinite(livePid)) {
+    const stacks = await adbOutput(`shell debuggerd -b ${livePid}`);
+    writeDiagnostic("stacks.txt", adbText(stacks));
+    const captured = !stacks.error && stacks.stdout.trim();
+    sections.push([
+      captured
+        ? "App is still alive; thread stacks written to stacks.txt"
+        : "App is still alive; debuggerd failed, see stacks.txt",
+      "",
+    ]);
+  }
+
+  // stat's mtime is epoch seconds, independent of the device's time zone.
+  const cutoffSeconds = Math.floor((scriptStartTime.getTime() - cutoffMarginMs) / 1000);
+  const { stdout: tombstoneList } = await adbOutput(
+    `shell "stat -c '%Y %n' /data/tombstones/tombstone_* 2>/dev/null"`
+  );
+  const tombstones = tombstoneList
+    .split("\n")
+    .map((line) => line.trim().split(" "))
+    .filter(([mtime, file]) => file && !file.endsWith(".pb") && parseInt(mtime, 10) >= cutoffSeconds)
+    .map(([, file]) => file);
+  for (const file of tombstones) {
+    const { stdout } = await adbOutput(`exec-out cat ${file}`);
+    writeDiagnostic(path.basename(file) + ".txt", stdout);
+  }
+  sections.push([
+    "Tombstones from this run",
+    tombstones.length ? tombstones.join("\n") : "(none, or not readable without root)",
+  ]);
+
+  for (const [title, body] of sections) {
+    console.log(`----- ${title} -----`);
+    if (body) console.log(body);
+  }
+  console.log(`Full diagnostics written to ${diagnosticsDir}`);
+}
+
+async function exitWithDiagnostics() {
+  try {
+    await collectDiagnostics();
+  } catch (err) {
+    console.log(`Collecting diagnostics failed: ${err && err.message}`);
   } finally {
     process.exit(1);
   }
@@ -132,7 +262,7 @@ async function ensureProcessAlive() {
       return;
     }
     console.error(`${appId} process died or never started!`);
-    await exitWithLogcatDump();
+    await exitWithDiagnostics();
   }
 
   consecutiveLivenessMisses = 0;
@@ -149,7 +279,7 @@ async function checkForErrorActivity() {
 
   if (!error) {
     console.error("App has crashed - ErrorReportActivity is displaying!");
-    await exitWithLogcatDump();
+    await exitWithDiagnostics();
   }
 }
 
@@ -181,7 +311,7 @@ async function pollForResults() {
 
   if (timedOut) {
     console.error("Tests results file not found within timeout window.");
-    await exitWithLogcatDump();
+    await exitWithDiagnostics();
   }
 
   setTimeout(pollForResults, pollIntervalMs);
@@ -191,7 +321,16 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function useDeviceClockForLogcatCutoff() {
+  const { stdout } = await adbOutput(`shell "date '+%m-%d %H:%M:%S.000'"`);
+  const deviceNow = parseLogcatTimestamp(stdout);
+  if (deviceNow) {
+    logcatCutoffTime = new Date(deviceNow.getTime() - cutoffMarginMs);
+  }
+}
+
 async function main() {
+  await useDeviceClockForLogcatCutoff();
   setTimeout(() => {
     timedOut = true;
   }, processTimeoutMs);
