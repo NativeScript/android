@@ -40,6 +40,14 @@ Local<String> V8StringConstants::GetNullNodeName(Isolate* isolate) {
     return Local<String>::New(isolate, *consts->NULL_NODE_NAME_PERSISTENT);
 }
 
+Local<Private> V8StringConstants::GetNullNodePrivate(Isolate* isolate) {
+    return GetConstantsForIsolate(isolate)->NULL_NODE_PRIVATE.Get(isolate);
+}
+
+Local<Private> V8StringConstants::GetCastMarkerPrivate(Isolate* isolate) {
+    return GetConstantsForIsolate(isolate)->CAST_MARKER_PRIVATE.Get(isolate);
+}
+
 Local<String> V8StringConstants::GetIsPrototypeImplementationObject(Isolate* isolate) {
     auto consts = GetConstantsForIsolate(isolate);
 
@@ -74,6 +82,12 @@ Local<String> V8StringConstants::GetPrototype(Isolate* isolate) {
     auto consts = GetConstantsForIsolate(isolate);
 
     return Local<String>::New(isolate, *consts->PROTOTYPE_PERSISTENT);
+}
+
+Local<String> V8StringConstants::GetConstructor(Isolate* isolate) {
+    auto consts = GetConstantsForIsolate(isolate);
+
+    return Local<String>::New(isolate, *consts->CONSTRUCTOR_PERSISTENT);
 }
 
 Local<String> V8StringConstants::GetSuper(Isolate* isolate) {
@@ -134,12 +148,14 @@ const string V8StringConstants::CLASS_IMPLEMENTATION_OBJECT = "t::ClassImplement
 const string V8StringConstants::EXTEND = "extend";
 const string V8StringConstants::NULL_OBJECT = "null";
 const string V8StringConstants::NULL_NODE_NAME = "nullNode";
+const string V8StringConstants::CAST_MARKER = "t::cast";
 const string V8StringConstants::IS_PROTOTYPE_IMPLEMENTATION_OBJECT = "__isPrototypeImplementationObject";
 const string V8StringConstants::NATIVE_EXCEPTION = "nativeException";
 const string V8StringConstants::STACK_TRACE = "stackTrace";
 const string V8StringConstants::STACK = "stack";
 const string V8StringConstants::LONG_NUMBER = "NativeScriptLongNumber";
 const string V8StringConstants::PROTOTYPE = "prototype";
+const string V8StringConstants::CONSTRUCTOR = "constructor";
 const string V8StringConstants::SUPER = "super";
 const string V8StringConstants::TARGET = "target";
 const string V8StringConstants::TO_STRING = "toString";

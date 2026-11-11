@@ -8,16 +8,91 @@
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include "V8GlobalHelpers.h"
+#include "NativeScriptAssert.h"
 #include <cstdlib>
+#include <vector>
 
 using namespace v8;
 using namespace std;
 using namespace tns;
 
+namespace {
+    struct NioBuffers {
+        jmethodID order;
+        jobject nativeOrder;
+        // Indexed by BufferCastType; no view method for Byte.
+        jmethodID asView[6];
+        jclass viewClass[6];
+    };
+
+    // Method ids and global refs are valid VM-wide, so one set serves every runtime.
+    const NioBuffers &GetNioBuffers() {
+        static const NioBuffers nio = [] {
+            JEnv env;
+            NioBuffers n{};
+            jclass byteBuffer = env.FindClass("java/nio/ByteBuffer");
+            jclass byteOrder = env.FindClass("java/nio/ByteOrder");
+            NS_CHECK(byteBuffer != nullptr && byteOrder != nullptr);
+
+            n.order = env.GetMethodID(byteBuffer, "order", "(Ljava/nio/ByteOrder;)Ljava/nio/ByteBuffer;");
+            auto nativeOrderId = env.GetStaticMethodID(byteOrder, "nativeOrder", "()Ljava/nio/ByteOrder;");
+            JniLocalRef nativeOrder(env.CallStaticObjectMethodA(byteOrder, nativeOrderId, nullptr));
+            n.nativeOrder = env.NewGlobalRef(nativeOrder);
+
+            struct View {
+                BufferCastType type;
+                const char *method;
+                const char *className;
+            };
+            const View views[] = {
+                    {BufferCastType::Byte,   nullptr,          "java/nio/ByteBuffer"},
+                    {BufferCastType::Short,  "asShortBuffer",  "java/nio/ShortBuffer"},
+                    {BufferCastType::Int,    "asIntBuffer",    "java/nio/IntBuffer"},
+                    {BufferCastType::Long,   "asLongBuffer",   "java/nio/LongBuffer"},
+                    {BufferCastType::Float,  "asFloatBuffer",  "java/nio/FloatBuffer"},
+                    {BufferCastType::Double, "asDoubleBuffer", "java/nio/DoubleBuffer"},
+            };
+            for (const auto &view : views) {
+                auto i = static_cast<int>(view.type);
+                n.viewClass[i] = env.FindClass(view.className);
+                NS_CHECK(n.viewClass[i] != nullptr);
+                if (view.method != nullptr) {
+                    n.asView[i] = env.GetMethodID(byteBuffer, view.method,
+                                                  string("()L") + view.className + ";");
+                }
+            }
+            return n;
+        }();
+        return nio;
+    }
+
+    // The element size when the typed array's elements have the Java element type's
+    // layout, else 0.
+    size_t SameLayoutElementSize(const Local<TypedArray> &array, char javaElementType) {
+        switch (javaElementType) {
+            case 'B':
+                return array->IsInt8Array() || array->IsUint8Array() || array->IsUint8ClampedArray() ? 1 : 0;
+            case 'S':
+            case 'C':
+                return array->IsInt16Array() || array->IsUint16Array() ? 2 : 0;
+            case 'I':
+                return array->IsInt32Array() || array->IsUint32Array() ? 4 : 0;
+            case 'J':
+                return array->IsBigInt64Array() || array->IsBigUint64Array() ? 8 : 0;
+            case 'F':
+                return array->IsFloat32Array() ? 4 : 0;
+            case 'D':
+                return array->IsFloat64Array() ? 8 : 0;
+            default:
+                return 0;
+        }
+    }
+}
+
 JsArgConverter::JsArgConverter(const Local<Object> &caller,
                                const v8::FunctionCallbackInfo<Value> &args,
                                const string &methodSignature, MetadataEntry *entry)
-        : m_isolate(args.GetIsolate()), m_methodSignature(methodSignature), m_isValid(true),
+        : m_isolate(args.GetIsolate()), m_isValid(true),
           m_error(Error()) {
     int v8ProvidedArgumentsLength = args.Length();
     m_argsLen = 1 + v8ProvidedArgumentsLength;
@@ -25,13 +100,13 @@ JsArgConverter::JsArgConverter(const Local<Object> &caller,
     if (m_argsLen > 0) {
         if ((entry != nullptr) && (entry->getIsResolved())) {
             if (entry->parsedSig.empty()) {
-                JniSignatureParser parser(m_methodSignature);
+                JniSignatureParser parser(methodSignature);
                 entry->parsedSig = parser.Parse();
             }
-            m_tokens = entry->parsedSig;
+            m_tokens = &entry->parsedSig;
         } else {
-            JniSignatureParser parser(m_methodSignature);
-            m_tokens = parser.Parse();
+            JniSignatureParser parser(methodSignature);
+            m_ownedTokens = parser.Parse();
         }
 
         m_isValid = ConvertArg(caller, 0);
@@ -53,20 +128,20 @@ JsArgConverter::JsArgConverter(const Local<Object> &caller,
 JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
                                bool hasImplementationObject, const string &methodSignature,
                                MetadataEntry *entry)
-        : m_isolate(args.GetIsolate()), m_methodSignature(methodSignature), m_isValid(true),
+        : m_isolate(args.GetIsolate()), m_isValid(true),
           m_error(Error()) {
     m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 1;
 
     if (m_argsLen > 0) {
         if ((entry != nullptr) && (entry->getIsResolved())) {
             if (entry->parsedSig.empty()) {
-                JniSignatureParser parser(m_methodSignature);
+                JniSignatureParser parser(methodSignature);
                 entry->parsedSig = parser.Parse();
             }
-            m_tokens = entry->parsedSig;
+            m_tokens = &entry->parsedSig;
         } else {
-            JniSignatureParser parser(m_methodSignature);
-            m_tokens = parser.Parse();
+            JniSignatureParser parser(methodSignature);
+            m_ownedTokens = parser.Parse();
         }
 
         for (int i = 0; i < m_argsLen; i++) {
@@ -81,12 +156,14 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
 
 JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
                                const string &methodSignature)
-        : m_isolate(args.GetIsolate()), m_methodSignature(methodSignature), m_isValid(true),
+        : m_isolate(args.GetIsolate()), m_isValid(true),
           m_error(Error()) {
     m_argsLen = args.Length();
 
-    JniSignatureParser parser(m_methodSignature);
-    m_tokens = parser.Parse();
+    if (m_argsLen > 0) {
+        JniSignatureParser parser(methodSignature);
+        m_ownedTokens = parser.Parse();
+    }
 
     for (int i = 0; i < m_argsLen; i++) {
         m_isValid = ConvertArg(args[i], i);
@@ -112,44 +189,132 @@ tns::BufferCastType JsArgConverter::GetCastType(const v8::Local<v8::ArrayBufferV
     return tns::BufferCastType::Byte;
 }
 
-bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
+bool JsArgConverter::IsArrayBufferLike(const Local<Object> &object) {
+    return object->IsArrayBuffer() || object->IsSharedArrayBuffer() || object->IsArrayBufferView();
+}
+
+JniLocalRef JsArgConverter::LinkNewJavaBuffer(ObjectManager *objectManager, const Local<Object> &object) {
+    auto castType = BufferCastType::Byte;
+    uint8_t *data;
+    size_t length;
+    if (object->IsArrayBuffer()) {
+        auto buffer = object.As<ArrayBuffer>();
+        data = static_cast<uint8_t *>(buffer->Data());
+        length = buffer->ByteLength();
+    } else if (object->IsSharedArrayBuffer()) {
+        auto buffer = object.As<SharedArrayBuffer>();
+        data = static_cast<uint8_t *>(buffer->Data());
+        length = buffer->ByteLength();
+    } else {
+        // Buffer() moves an on-heap view's elements off the heap, where they stay put.
+        auto view = object.As<ArrayBufferView>();
+        data = static_cast<uint8_t *>(view->Buffer()->Data()) + view->ByteOffset();
+        length = view->ByteLength();
+        castType = GetCastType(view);
+    }
+
+    if (length > INT32_MAX) {
+        throw NativeScriptException("Cannot pass a buffer larger than 2 GiB to Java");
+    }
+
+    const auto &nio = GetNioBuffers();
+    auto type = static_cast<int>(castType);
+
+    JEnv env;
+    JniLocalRef bytes(env.NewDirectByteBuffer(data, static_cast<jlong>(length)));
+    JniLocalRef ordered(env.CallObjectMethod(bytes, nio.order, nio.nativeOrder));
+    JniLocalRef view;
+    if (nio.asView[type] != nullptr) {
+        view = JniLocalRef(env.CallObjectMethodA(ordered, nio.asView[type], nullptr));
+    }
+    JniLocalRef &buffer = view.IsNull() ? ordered : view;
+
+    int id = objectManager->GetOrCreateObjectId(buffer);
+    objectManager->Link(object, id, nio.viewClass[type]);
+
+    return std::move(buffer);
+}
+
+JniLocalRef JsArgConverter::GetOrLinkJavaBuffer(ObjectManager *objectManager, const Local<Object> &object) {
+    auto buffer = objectManager->GetLiveJavaObjectByJsObject(object);
+    if (buffer.IsNull()) {
+        buffer = LinkNewJavaBuffer(objectManager, object);
+    }
+    return buffer;
+}
+
+bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
     bool success = false;
 
-    char buff[1024];
+    char buff[1024] = "";
 
-    const auto &typeSignature = m_tokens.at(index);
+    const auto &typeSignature = m_tokens->at(index);
+
+    // Classify by the target, which holds the Java link and internal slots;
+    // array elements are read through the Proxy itself.
+    auto arg = jsArg.IsEmpty() ? jsArg : ObjectManager::UnwrapProxy(jsArg);
 
     if (arg.IsEmpty()) {
         SetConvertedObject(index, nullptr);
         success = false;
+    } else if (jsArg->IsProxy() && !arg->IsObject()) {
+        SetConvertedObject(index, nullptr);
+        snprintf(buff, sizeof(buff), "Cannot convert a revoked Proxy to %s at index %d", typeSignature.c_str(), index);
     } else if (arg->IsArray()) {
         success = typeSignature[0] == '[';
 
+        bool trapThrew = false;
         if (success) {
-            auto jsArr = Local<Array>::Cast(arg);
-            success = ConvertJavaScriptArray(jsArr, index);
+            Local<Array> jsArr;
+            if (jsArg->IsProxy()) {
+                TryCatch tc(m_isolate);
+                auto context = m_isolate->GetCurrentContext();
+                if (!ObjectManager::ReadArrayThroughProxy(context, jsArg.As<Object>()).ToLocal(&jsArr)) {
+                    trapThrew = true;
+                    success = false;
+                    string reason = tc.HasCaught()
+                            ? ArgConverter::ConvertToString(tc.Exception()->ToString(context).FromMaybe(Local<String>()))
+                            : string("unknown error");
+                    snprintf(buff, sizeof(buff), "%s", reason.c_str());
+                }
+            } else {
+                jsArr = arg.As<Array>();
+            }
+
+            if (success) {
+                TryCatch tc(m_isolate);
+                success = ConvertJavaScriptArray(jsArr, jsArr->Length(), index);
+                if (!success && tc.HasCaught()) {
+                    trapThrew = true;
+                    auto context = m_isolate->GetCurrentContext();
+                    string reason = ArgConverter::ConvertToString(
+                            tc.Exception()->ToString(context).FromMaybe(Local<String>()));
+                    snprintf(buff, sizeof(buff), "Cannot convert array to %s at index %d: %s",
+                             typeSignature.c_str(), index, reason.c_str());
+                }
+            }
         }
 
-        if (!success) {
-            sprintf(buff, "Cannot convert array to %s at index %d", typeSignature.c_str(), index);
+        if (!success && !trapThrew) {
+            snprintf(buff, sizeof(buff), "Cannot convert array to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsNumber() || arg->IsNumberObject()) {
         success = ConvertJavaScriptNumber(arg, index);
 
         if (!success) {
-            sprintf(buff, "Cannot convert number to %s at index %d", typeSignature.c_str(), index);
+            snprintf(buff, sizeof(buff), "Cannot convert number to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsBoolean() || arg->IsBooleanObject()) {
         success = ConvertJavaScriptBoolean(arg, index);
 
         if (!success) {
-            sprintf(buff, "Cannot convert boolean to %s at index %d", typeSignature.c_str(), index);
+            snprintf(buff, sizeof(buff), "Cannot convert boolean to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsString() || arg->IsStringObject()) {
         success = ConvertJavaScriptString(arg, index);
 
         if (!success) {
-            sprintf(buff, "Cannot convert string to %s at index %d", typeSignature.c_str(), index);
+            snprintf(buff, sizeof(buff), "Cannot convert string to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsObject()) {
         auto context = m_isolate->GetCurrentContext();
@@ -243,106 +408,21 @@ bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
 
 
             case CastType::None:
-                obj = objectManager->GetJavaObjectByJsObject(jsObject);
-
-                if (obj.IsNull() && (jsObject->IsTypedArray() || jsObject->IsArrayBuffer() ||
-                                     jsObject->IsArrayBufferView() ||
-                                     jsObject->IsSharedArrayBuffer())) {
-
-                    BufferCastType bufferCastType = tns::BufferCastType::Byte;
-                    shared_ptr<BackingStore> store;
-                    size_t offset = 0;
-                    size_t length;
-                    uint8_t *data = nullptr;
-                    if (jsObject->IsArrayBuffer()) {
-                        auto array = jsObject.As<v8::ArrayBuffer>();
-                        store = array->GetBackingStore();
-                        length = array->ByteLength();
-                        data = static_cast<uint8_t *>(store->Data());
-                    } else if (jsObject->IsSharedArrayBuffer()) {
-                        auto array = jsObject.As<v8::SharedArrayBuffer>();
-                        store = array->GetBackingStore();
-                        length = array->ByteLength();
-                        data = static_cast<uint8_t *>(store->Data());
-                    } else if (jsObject->IsArrayBufferView()) {
-                        auto array = jsObject.As<v8::ArrayBufferView>();
-                        offset = array->ByteOffset();
-                        length = array->ByteLength();
-                        store = array->Buffer()->GetBackingStore();
-                        data = static_cast<uint8_t *>(store->Data()) + offset;
-                        bufferCastType = JsArgConverter::GetCastType(array);
-                    } else {
-                        auto array = jsObject.As<v8::TypedArray>();
-                        offset = array->ByteOffset();
-                        store = array->Buffer()->GetBackingStore();
-                        length = array->ByteLength();
-                        data = static_cast<uint8_t *>(store->Data()) + offset;
-                        bufferCastType = JsArgConverter::GetCastType(array);
+                if (typeSignature[0] == '[' && IsArrayBufferLike(jsObject)) {
+                    success = ConvertArrayBufferToJavaArray(jsObject, index);
+                    if (!success) {
+                        auto typeName = ArgConverter::ConvertToString(jsObject->GetConstructorName());
+                        snprintf(buff, sizeof(buff), "Cannot convert %s to %s at index %d",
+                                 typeName.c_str(), typeSignature.c_str(), index);
                     }
-
-                    auto directBuffer = env.NewDirectByteBuffer(
-                            data,
-                            length);
-
-                    auto directBufferClazz = env.GetObjectClass(directBuffer);
-
-                    auto byteOrderId = env.GetMethodID(directBufferClazz, "order",
-                                                       "(Ljava/nio/ByteOrder;)Ljava/nio/ByteBuffer;");
-
-                    auto byteOrderClazz = env.FindClass("java/nio/ByteOrder");
-
-                    auto byteOrderEnumId = env.GetStaticMethodID(byteOrderClazz, "nativeOrder",
-                                                                 "()Ljava/nio/ByteOrder;");
-
-                    auto nativeByteOrder = env.CallStaticObjectMethodA(byteOrderClazz,
-                                                                       byteOrderEnumId,
-                                                                       nullptr);
-
-                    directBuffer = env.CallObjectMethod(directBuffer, byteOrderId, nativeByteOrder);
-
-                    jobject buffer;
-
-                    if (bufferCastType == BufferCastType::Short) {
-
-                        auto id = env.GetMethodID(directBufferClazz, "asShortBuffer",
-                                                  "()Ljava/nio/ShortBuffer;");
-                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    } else if (bufferCastType == BufferCastType::Int) {
-
-                        auto id = env.GetMethodID(directBufferClazz, "asIntBuffer",
-                                                  "()Ljava/nio/IntBuffer;");
-                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    } else if (bufferCastType == BufferCastType::Long) {
-
-                        auto id = env.GetMethodID(directBufferClazz, "asLongBuffer",
-                                                  "()Ljava/nio/LongBuffer;");
-                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    } else if (bufferCastType == BufferCastType::Float) {
-
-                        auto id = env.GetMethodID(directBufferClazz, "asFloatBuffer",
-                                                  "()Ljava/nio/FloatBuffer;");
-                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    } else if (bufferCastType == BufferCastType::Double) {
-
-                        auto id = env.GetMethodID(directBufferClazz, "asDoubleBuffer",
-                                                  "()Ljava/nio/DoubleBuffer;");
-                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    } else {
-                        buffer = directBuffer;
-                    }
-
-                    buffer = env.NewGlobalRef(buffer);
-
-                    int id = objectManager->GetOrCreateObjectId(buffer);
-                    auto clazz = env.GetObjectClass(buffer);
-
-                    objectManager->Link(jsObject, id, clazz);
-
-                    obj = objectManager->GetJavaObjectByJsObject(jsObject);
+                    break;
                 }
 
-                V8GetPrivateValue(m_isolate, jsObject, ArgConverter::ConvertToV8String(m_isolate,
-                                                                                       V8StringConstants::NULL_NODE_NAME),
+                obj = IsArrayBufferLike(jsObject)
+                      ? GetOrLinkJavaBuffer(objectManager, jsObject)
+                      : objectManager->GetJavaObjectByJsObject(jsObject);
+
+                V8GetPrivateValue(m_isolate, jsObject, V8StringConstants::GetNullNodePrivate(m_isolate),
                                   castValue);
 
                 if (!castValue.IsEmpty()) {
@@ -356,7 +436,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
                 if (success) {
                     SetConvertedObject(index, obj.Move(), obj.IsGlobal());
                 } else {
-                    sprintf(buff, "Cannot convert object to %s at index %d", typeSignature.c_str(),
+                    snprintf(buff, sizeof(buff), "Cannot convert object to %s at index %d", typeSignature.c_str(),
                             index);
                 }
                 break;
@@ -370,6 +450,9 @@ bool JsArgConverter::ConvertArg(const Local<Value> &arg, int index) {
     } else {
         SetConvertedObject(index, nullptr);
         success = false;
+        auto typeName = ArgConverter::ConvertToString(arg->TypeOf(m_isolate));
+        snprintf(buff, sizeof(buff), "Cannot convert %s to %s at index %d", typeName.c_str(),
+                 typeSignature.c_str(), index);
     }
 
     if (!success) {
@@ -394,7 +477,7 @@ bool JsArgConverter::ConvertJavaScriptNumber(const Local<Value> &jsValue, int in
             0
     };
 
-    const auto &typeSignature = m_tokens.at(index);
+    const auto &typeSignature = m_tokens->at(index);
     auto context = m_isolate->GetCurrentContext();
 
     const char typePrefix = typeSignature[0];
@@ -445,7 +528,7 @@ bool JsArgConverter::ConvertJavaScriptNumber(const Local<Value> &jsValue, int in
 bool JsArgConverter::ConvertJavaScriptBoolean(const Local<Value> &jsValue, int index) {
     bool success;
 
-    const auto &typeSignature = m_tokens.at(index);
+    const auto &typeSignature = m_tokens->at(index);
     auto context = m_isolate->GetCurrentContext();
 
     if (typeSignature == "Z") {
@@ -482,157 +565,278 @@ bool JsArgConverter::ConvertJavaScriptString(const Local<Value> &jsValue, int in
     return true;
 }
 
-bool JsArgConverter::ConvertJavaScriptArray(const Local<Array> &jsArr, int index) {
-    bool success = true;
+bool JsArgConverter::ConvertJavaScriptArray(const Local<Object> &source, size_t length, int index) {
+    // Java arrays are indexed by jint.
+    if (length > INT32_MAX) {
+        return false;
+    }
+    auto arrLength = static_cast<jsize>(length);
+
+    const auto &arraySignature = m_tokens->at(index);
+    auto context = m_isolate->GetCurrentContext();
+
+    // Each read fails, with a JS exception scheduled, when an element getter or a
+    // conversion throws (a BigInt or Symbol element, a throwing valueOf).
+    auto elementAt = [&](jsize i, Local<Value> &element) {
+        return source->Get(context, i).ToLocal(&element);
+    };
+    auto int32At = [&](jsize i, int32_t &value) {
+        Local<Value> element;
+        return elementAt(i, element) && element->Int32Value(context).To(&value);
+    };
+    auto numberAt = [&](jsize i, double &value) {
+        Local<Value> element;
+        return elementAt(i, element) && element->NumberValue(context).To(&value);
+    };
 
     jarray arr = nullptr;
 
-    jsize arrLength = jsArr->Length();
-
-    const auto &arraySignature = m_tokens.at(index);
-    auto context = m_isolate->GetCurrentContext();
-
-    string elementType = arraySignature.substr(1);
-
-    const char elementTypePrefix = elementType[0];
-
-    jclass elementClass;
-    string strippedClassName;
-
     JEnv env;
-    switch (elementTypePrefix) {
+    switch (arraySignature[1]) {
         case 'Z': {
-            arr = env.NewBooleanArray(arrLength);
-            jboolean bools[arrLength];
+            std::vector<jboolean> bools(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                bools[i] = jsArr
-                        ->Get(context, i)
-                        .ToLocalChecked()
-                        ->BooleanValue(m_isolate);
+                Local<Value> element;
+                if (!elementAt(i, element)) {
+                    return false;
+                }
+                bools[i] = element->BooleanValue(m_isolate);
             }
-            env.SetBooleanArrayRegion((jbooleanArray) arr, 0, arrLength, bools);
+            arr = env.NewBooleanArray(arrLength);
+            env.SetBooleanArrayRegion((jbooleanArray) arr, 0, arrLength, bools.data());
             break;
         }
         case 'B': {
-            arr = env.NewByteArray(arrLength);
-            jbyte bytes[arrLength];
+            std::vector<jbyte> bytes(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                bytes[i] = jsArr
-                        ->Get(context, i)
-                        .ToLocalChecked()
-                        ->Int32Value(context)
-                        .ToChecked();
+                int32_t value;
+                if (!int32At(i, value)) {
+                    return false;
+                }
+                bytes[i] = (jbyte) value;
             }
-            env.SetByteArrayRegion((jbyteArray) arr, 0, arrLength, bytes);
+            arr = env.NewByteArray(arrLength);
+            env.SetByteArrayRegion((jbyteArray) arr, 0, arrLength, bytes.data());
             break;
         }
         case 'C': {
-            arr = env.NewCharArray(arrLength);
-            jchar chars[arrLength];
+            std::vector<jchar> chars(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                String::Utf8Value utf8(m_isolate, jsArr->Get(context, i).ToLocalChecked()->ToString(
-                        context).ToLocalChecked());
+                Local<Value> element;
+                Local<String> str;
+                if (!elementAt(i, element) || !element->ToString(context).ToLocal(&str)) {
+                    return false;
+                }
+                String::Utf8Value utf8(m_isolate, str);
                 JniLocalRef s(env.NewString((jchar *) *utf8, 1));
                 const char *singleChar = env.GetStringUTFChars(s, nullptr);
                 chars[i] = *singleChar;
                 env.ReleaseStringUTFChars(s, singleChar);
             }
-            env.SetCharArrayRegion((jcharArray) arr, 0, arrLength, chars);
+            arr = env.NewCharArray(arrLength);
+            env.SetCharArrayRegion((jcharArray) arr, 0, arrLength, chars.data());
             break;
         }
         case 'S': {
-            arr = env.NewShortArray(arrLength);
-            jshort shorts[arrLength];
+            std::vector<jshort> shorts(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                shorts[i] = jsArr
-                        ->Get(context, i)
-                        .ToLocalChecked()
-                        ->Int32Value(context)
-                        .ToChecked();
+                int32_t value;
+                if (!int32At(i, value)) {
+                    return false;
+                }
+                shorts[i] = (jshort) value;
             }
-            env.SetShortArrayRegion((jshortArray) arr, 0, arrLength, shorts);
+            arr = env.NewShortArray(arrLength);
+            env.SetShortArrayRegion((jshortArray) arr, 0, arrLength, shorts.data());
             break;
         }
         case 'I': {
-            arr = env.NewIntArray(arrLength);
-            jint ints[arrLength];
+            std::vector<jint> ints(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                ints[i] = jsArr
-                        ->Get(context, i)
-                        .ToLocalChecked()
-                        ->Int32Value(context)
-                        .ToChecked();
+                int32_t value;
+                if (!int32At(i, value)) {
+                    return false;
+                }
+                ints[i] = value;
             }
-            env.SetIntArrayRegion((jintArray) arr, 0, arrLength, ints);
+            arr = env.NewIntArray(arrLength);
+            env.SetIntArrayRegion((jintArray) arr, 0, arrLength, ints.data());
             break;
         }
         case 'J': {
-            arr = env.NewLongArray(arrLength);
-            jlong longs[arrLength];
+            std::vector<jlong> longs(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                longs[i] = jsArr
-                        ->Get(context, i)
-                        .ToLocalChecked()
-                        ->NumberValue(context)
-                        .ToChecked();
+                double value;
+                if (!numberAt(i, value)) {
+                    return false;
+                }
+                longs[i] = (jlong) value;
             }
-            env.SetLongArrayRegion((jlongArray) arr, 0, arrLength, longs);
+            arr = env.NewLongArray(arrLength);
+            env.SetLongArrayRegion((jlongArray) arr, 0, arrLength, longs.data());
             break;
         }
         case 'F': {
-            arr = env.NewFloatArray(arrLength);
-            jfloat floats[arrLength];
+            std::vector<jfloat> floats(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                floats[i] = jsArr
-                        ->Get(context, i)
-                        .ToLocalChecked()
-                        ->NumberValue(context)
-                        .ToChecked();
+                double value;
+                if (!numberAt(i, value)) {
+                    return false;
+                }
+                floats[i] = (jfloat) value;
             }
-            env.SetFloatArrayRegion((jfloatArray) arr, 0, arrLength, floats);
+            arr = env.NewFloatArray(arrLength);
+            env.SetFloatArrayRegion((jfloatArray) arr, 0, arrLength, floats.data());
             break;
         }
         case 'D': {
-            arr = env.NewDoubleArray(arrLength);
-            jdouble doubles[arrLength];
+            std::vector<jdouble> doubles(arrLength);
             for (jsize i = 0; i < arrLength; i++) {
-                doubles[i] = jsArr
-                        ->Get(context, i)
-                        .ToLocalChecked()
-                        ->NumberValue(context)
-                        .ToChecked();
+                if (!numberAt(i, doubles[i])) {
+                    return false;
+                }
             }
-            env.SetDoubleArrayRegion((jdoubleArray) arr, 0, arrLength, doubles);
+            arr = env.NewDoubleArray(arrLength);
+            env.SetDoubleArrayRegion((jdoubleArray) arr, 0, arrLength, doubles.data());
             break;
         }
-        case 'L':
-            strippedClassName = elementType.substr(1, elementType.length() - 2);
-            elementClass = env.FindClass(strippedClassName);
-            arr = env.NewObjectArray(arrLength, elementClass, nullptr);
-            for (int i = 0; i < arrLength; i++) {
-                auto v = jsArr->Get(context, i).ToLocalChecked();
-                JsArgToArrayConverter c(context, v, false, (int) Type::Null);
-                jobject o = c.GetConvertedArg();
-                env.SetObjectArrayElement((jobjectArray) arr, i, o);
+        case 'L': {
+            auto elementClass = env.FindClass(arraySignature.substr(2, arraySignature.length() - 3));
+            JniLocalRef objects(env.NewObjectArray(arrLength, elementClass, nullptr));
+            for (jsize i = 0; i < arrLength; i++) {
+                Local<Value> element;
+                if (!elementAt(i, element)) {
+                    return false;
+                }
+                JsArgToArrayConverter c(context, element, false, (int) Type::Null);
+                env.SetObjectArrayElement((jobjectArray) objects, i, c.GetConvertedArg());
+            }
+            arr = (jarray) objects.Move();
+            break;
+        }
+        default:
+            return false;
+    }
+
+    SetConvertedObject(index, arr);
+    return true;
+}
+
+bool JsArgConverter::ConvertArrayBufferToJavaArray(const Local<Object> &source, int index) {
+    const char elementType = m_tokens->at(index)[1];
+
+    const uint8_t *bytes;
+    size_t byteLength;
+    size_t elementSize;
+    std::vector<uint8_t> onHeapCopy;
+
+    if (source->IsArrayBuffer() || source->IsSharedArrayBuffer()) {
+        if (elementType != 'B') {
+            return false;
+        }
+        elementSize = 1;
+        if (source->IsArrayBuffer()) {
+            auto buffer = source.As<ArrayBuffer>();
+            bytes = static_cast<const uint8_t *>(buffer->Data());
+            byteLength = buffer->ByteLength();
+        } else {
+            auto buffer = source.As<SharedArrayBuffer>();
+            bytes = static_cast<const uint8_t *>(buffer->Data());
+            byteLength = buffer->ByteLength();
+        }
+    } else {
+        auto view = source.As<ArrayBufferView>();
+        if (view->IsDataView()) {
+            if (elementType != 'B') {
+                return false;
+            }
+            elementSize = 1;
+        } else {
+            auto array = view.As<TypedArray>();
+            elementSize = SameLayoutElementSize(array, elementType);
+            if (elementSize == 0) {
+                if (array->IsBigInt64Array() || array->IsBigUint64Array()) {
+                    return false;
+                }
+                // Element by element, exactly as a plain array holding the same numbers.
+                return ConvertJavaScriptArray(source, array->Length(), index);
+            }
+        }
+
+        byteLength = view->ByteLength();
+        if (view->HasBuffer()) {
+            bytes = static_cast<const uint8_t *>(view->Buffer()->Data()) + view->ByteOffset();
+        } else {
+            onHeapCopy.resize(byteLength);
+            view->CopyContents(onHeapCopy.data(), byteLength);
+            bytes = onHeapCopy.data();
+        }
+    }
+
+    size_t count = byteLength / elementSize;
+    if (count > INT32_MAX) {
+        return false;
+    }
+    auto length = static_cast<jsize>(count);
+
+    JEnv env;
+    jarray arr;
+    switch (elementType) {
+        case 'B':
+            arr = env.NewByteArray(length);
+            if (length > 0) {
+                env.SetByteArrayRegion((jbyteArray) arr, 0, length, reinterpret_cast<const jbyte *>(bytes));
+            }
+            break;
+        case 'S':
+            arr = env.NewShortArray(length);
+            if (length > 0) {
+                env.SetShortArrayRegion((jshortArray) arr, 0, length, reinterpret_cast<const jshort *>(bytes));
+            }
+            break;
+        case 'C':
+            arr = env.NewCharArray(length);
+            if (length > 0) {
+                env.SetCharArrayRegion((jcharArray) arr, 0, length, reinterpret_cast<const jchar *>(bytes));
+            }
+            break;
+        case 'I':
+            arr = env.NewIntArray(length);
+            if (length > 0) {
+                env.SetIntArrayRegion((jintArray) arr, 0, length, reinterpret_cast<const jint *>(bytes));
+            }
+            break;
+        case 'J':
+            arr = env.NewLongArray(length);
+            if (length > 0) {
+                env.SetLongArrayRegion((jlongArray) arr, 0, length, reinterpret_cast<const jlong *>(bytes));
+            }
+            break;
+        case 'F':
+            arr = env.NewFloatArray(length);
+            if (length > 0) {
+                env.SetFloatArrayRegion((jfloatArray) arr, 0, length, reinterpret_cast<const jfloat *>(bytes));
+            }
+            break;
+        case 'D':
+            arr = env.NewDoubleArray(length);
+            if (length > 0) {
+                env.SetDoubleArrayRegion((jdoubleArray) arr, 0, length, reinterpret_cast<const jdouble *>(bytes));
             }
             break;
         default:
-            success = false;
-            break;
+            return false;
     }
 
-    if (success) {
-        SetConvertedObject(index, arr);
-    }
-
-    return success;
+    SetConvertedObject(index, arr);
+    return true;
 }
 
 template<typename T>
 bool JsArgConverter::ConvertFromCastFunctionObject(T value, int index) {
     bool success = false;
 
-    const auto &typeSignature = m_tokens.at(index);
+    const auto &typeSignature = m_tokens->at(index);
 
     const char typeSignaturePrefix = typeSignature[0];
 

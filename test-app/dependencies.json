@@ -1,2 +1,7 @@
 [
+  {
+    "name": "test-runner-deps",
+    "directory": "test-runner-deps",
+    "dependencies": []
+  }
 ]

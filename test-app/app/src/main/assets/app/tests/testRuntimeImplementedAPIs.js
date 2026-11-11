@@ -62,11 +62,79 @@ describe("DOMException canary", function () {
   it("is not reachable as a module from app code", function () {
     expect(function () { require("internal/dom-exception"); }).toThrow();
   });
+
+  it("serializes through structuredClone on this runtime", function () {
+    var original = new DOMException("x", "AbortError");
+    original.stack = "DOMException stack sentinel";
+    var clone = structuredClone(original);
+    expect(clone instanceof DOMException).toBe(true);
+    expect(clone.name).toBe("AbortError");
+    expect(clone.stack).toBe("DOMException stack sentinel");
+  });
+
+  it("clones the isolate's first DOMException even when a getter creates it mid-clone", function (done) {
+    var worker = new Worker("./domExceptionFirstCloneWorker.js");
+    worker.onmessage = function (event) {
+      expect(event.data.isDomException).toBe(true);
+      expect(event.data.name).toBe("AbortError");
+      expect(event.data.message).toBe("first in this isolate");
+      worker.terminate();
+      done();
+    };
+    worker.onerror = function (event) {
+      fail("worker error: " + event.message);
+      worker.terminate();
+      done();
+      return true;
+    };
+  });
+
+  // Once an isolate holds a DOMException the serializer claims host objects
+  // itself, and V8 then stops detecting native wrappers on its own. These are
+  // the shapes that would silently clone as {} if the claim missed them.
+  it("still rejects native wrappers once a DOMException exists", function () {
+    new DOMException("x", "AbortError");
+    var wrappers = [new java.lang.Object(), new URL("https://example.com/")];
+    for (var i = 0; i < wrappers.length; i++) {
+      var error;
+      try {
+        structuredClone(wrappers[i]);
+      } catch (e) {
+        error = e;
+      }
+      expect(error instanceof DOMException).toBe(true);
+      expect(error.name).toBe("DataCloneError");
+    }
+  });
 });
 
 describe("CustomEvent canary", function () {
   it("is implemented by this runtime", function () {
     expect(typeof CustomEvent).toBe("function");
     expect(new CustomEvent("x") instanceof Event).toBe(true);
+  });
+});
+
+// Same contract again for the shared messaging suites (MessageChannel,
+// BroadcastChannel, MessageEvent, WorkerEvents, NodeWorkerThreads): they
+// self-gate, these unguarded specs turn absence into a failure.
+describe("messaging canary", function () {
+  it("implements the messaging interfaces as globals", function () {
+    expect(typeof MessagePort).toBe("function");
+    expect(typeof MessageChannel).toBe("function");
+    expect(typeof BroadcastChannel).toBe("function");
+    expect(typeof MessageEvent).toBe("function");
+  });
+
+  it("is not reachable as a module from app code", function () {
+    expect(function () { require("internal/message-channel"); }).toThrow();
+    expect(function () { require("internal/message-event"); }).toThrow();
+    expect(function () { require("internal/broadcast-channel"); }).toThrow();
+  });
+
+  it("resolves node:worker_threads on the main thread", function () {
+    var workerThreads = require("node:worker_threads");
+    expect(workerThreads.isMainThread).toBe(true);
+    expect(workerThreads.MessageChannel).toBe(MessageChannel);
   });
 });

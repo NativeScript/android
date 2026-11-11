@@ -2,6 +2,7 @@
 #define RUNTIME_H_
 
 #include "v8.h"
+#include <thread>
 #include "JniLocalRef.h"
 #include "ObjectManager.h"
 #include "SimpleAllocator.h"
@@ -12,6 +13,7 @@
 #include "File.h"
 #include "Timers.h"
 #include "EventLoop.h"
+#include "AdmissionGate.h"
 #include <atomic>
 #include <condition_variable>
 #include <optional>
@@ -25,6 +27,7 @@
 typedef struct napi_env__* napi_env;
 
 namespace tns {
+struct JavaCallArgs;
 class PromiseRejectionTracker;
 class RuntimeState;
 
@@ -102,12 +105,11 @@ class Runtime {
 
         /*
          * The runtime whose home thread is the calling thread, or null. Set at
-         * the end of PrepareV8Runtime; may be stale after a Runtime destroyed
-         * on another thread, so consumers must validate through
-         * GetNapiEnvIfAlive rather than dereference it.
+         * the end of PrepareV8Runtime and cleared when it is torn down; a
+         * thread hosts at most one runtime and only that thread may destroy it.
          */
         static Runtime* GetCurrentRuntime() {
-            return s_currentRuntime;
+            return s_current.runtime;
         }
 
         /*
@@ -132,12 +134,21 @@ class Runtime {
 
         static void Init(JavaVM* vm, void* reserved);
 
-        static void Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibsDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize,
+        // The com.tns.AppConfig values initNativeScript passes by name.
+        struct StartupOptions {
+            std::string v8Flags;
+            bool codeCache;
+            std::string profilerOutputDir;
+            bool discardUncaughtJsExceptions;
+            std::string uncaughtErrorPolicy;
+        };
+
+        static void Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibsDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, const StartupOptions& options, jstring callingDir, int maxLogcatObjectSize,
                          bool forceLog);
 
         static void SetManualInstrumentationMode(jstring mode);
 
-        void Init(JNIEnv* env, jstring filesPath, jstring nativeLibsDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog);
+        void Init(JNIEnv* env, jstring filesPath, jstring nativeLibsDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, const StartupOptions& options, jstring callingDir, int maxLogcatObjectSize, bool forceLog);
 
         v8::Isolate* GetIsolate() const;
 
@@ -158,14 +169,34 @@ class Runtime {
 
         ObjectManager* GetObjectManager() const;
 
+        AdmissionGate& GetAdmissionGate() {
+            return m_admissionGate;
+        }
+
+        // The instance JS is constructing, as last published to the Java runtime's
+        // currentObjectId and currentObjectClass.
+        struct Construction {
+            int id = -1;
+            jclass clazz = nullptr;
+        };
+
+        Construction& CurrentConstruction() {
+            return m_construction;
+        }
+
+        // What the Java runtime's currentObjectClass holds; only native code writes it.
+        jclass& PublishedConstructionClass() {
+            return m_publishedConstructionClass;
+        }
+
         void RunModule(JNIEnv* _env, jobject obj, jstring scriptFile);
         void RunModule(const char *moduleName);
         void RunWorker(const std::string& filePath);
         jobject RunScript(JNIEnv* _env, jobject obj, jstring scriptFile);
-        jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs);
+        jobject CallJSMethodNative(JNIEnv* _env, jobject obj, jobject javaObject, jint javaObjectID, jstring methodName, jint methodNameId, jint retType, jboolean isConstructor, const JavaCallArgs& args, jlongArray primitiveResult);
         void CreateJSInstanceNative(JNIEnv* _env, jobject obj, jobject javaObject, jint javaObjectID, jstring className);
         jint GenerateNewObjectId(JNIEnv* env, jobject obj);
-        void AdjustAmountOfExternalAllocatedMemory();
+        void AdjustAmountOfExternalAllocatedMemory(int64_t usedJavaMemory);
         bool NotifyGC(JNIEnv* env, jobject obj);
         bool TryCallGC();
         /*
@@ -316,10 +347,18 @@ class Runtime {
         Runtime(JNIEnv* env, jobject runtime, int id);
 
         int m_id;
+
+        std::thread::id m_ownerThread;
         jobject m_runtime;
         v8::Isolate* m_isolate;
 
         ObjectManager* m_objectManager;
+
+        AdmissionGate m_admissionGate;
+
+        Construction m_construction;
+
+        jclass m_publishedConstructionClass = nullptr;
 
         ModuleInternal m_module;
 
@@ -405,7 +444,6 @@ class Runtime {
 
         static JavaVM* s_jvm;
 
-        static jmethodID GET_USED_MEMORY_METHOD_ID;
 
         /*
          * The main runtime has finished initializing. Distinct from the
@@ -423,7 +461,12 @@ class Runtime {
 
         static std::shared_ptr<EventLoop> s_mainEventLoop;
 
-        static thread_local Runtime* s_currentRuntime;
+        // One struct because without ELF TLS (minSdk < 29) every thread_local costs a lookup.
+        struct CurrentRuntime {
+            Runtime* runtime = nullptr;
+            int id = -1;
+        };
+        static thread_local CurrentRuntime s_current;
         static thread_local PendingIsolateSetup s_pendingIsolateSetup;
 
 #ifdef APPLICATION_IN_DEBUG

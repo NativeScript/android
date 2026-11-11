@@ -1,4 +1,4 @@
-describe("Tests Kotlin extension functions support", function () {
+describe("Tests Kotlin enums support", function () {
 
     it("Test Kotlin enum entries are accessible", function () {
         var enumEntry = com.tns.tests.kotlin.enums.KotlinEnum.TEST_ENTRY;

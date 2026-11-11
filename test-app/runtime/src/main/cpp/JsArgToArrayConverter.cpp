@@ -58,17 +58,23 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Valu
     m_isValid = success;
 }
 
-bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value> &arg, int index) {
+bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value> &jsArg, int index) {
     bool success = false;
-    stringstream s;
+    std::string error;
 
     JEnv env;
 
     Type returnType = JType::getClassType(m_return_type);
     auto isolate = v8::Isolate::GetCurrent();
 
+    // A Proxy's target is what holds the Java link.
+    auto arg = jsArg.IsEmpty() ? jsArg : ObjectManager::UnwrapProxy(jsArg);
+
     if (arg.IsEmpty()) {
-        s << "Cannot convert empty JavaScript object";
+        error = "Cannot convert empty JavaScript object";
+        success = false;
+    } else if (jsArg->IsProxy() && !arg->IsObject()) {
+        error = "Cannot marshal a revoked Proxy at index " + std::to_string(index) + " to Java type.";
         success = false;
     } else if (arg->IsInt32() && (returnType == Type::Int || returnType == Type::Null)) {
         jint value = arg->Int32Value(context).ToChecked();
@@ -245,113 +251,18 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                 break;
 
             case CastType::None:
-                obj = objectManager->GetJavaObjectByJsObject(jsObj);
+                obj = JsArgConverter::IsArrayBufferLike(jsObj)
+                      ? JsArgConverter::GetOrLinkJavaBuffer(objectManager, jsObj)
+                      : objectManager->GetJavaObjectByJsObject(jsObj);
 
-
-                if (obj.IsNull() && (jsObj->IsTypedArray() || jsObj->IsArrayBuffer() ||
-                                     jsObj->IsArrayBufferView() || jsObj->IsSharedArrayBuffer())) {
-
-                    BufferCastType bufferCastType = tns::BufferCastType::Byte;
-                    shared_ptr<BackingStore> store;
-                    size_t offset = 0;
-                    size_t length;
-                    uint8_t *data = nullptr;
-                    if (jsObj->IsArrayBuffer()) {
-                        auto array = jsObj.As<v8::ArrayBuffer>();
-                        store = array->GetBackingStore();
-                        length = array->ByteLength();
-                        data = static_cast<uint8_t *>(store->Data());
-                    } else if (jsObj->IsSharedArrayBuffer()) {
-                        auto array = jsObj.As<v8::SharedArrayBuffer>();
-                        store = array->GetBackingStore();
-                        length = array->ByteLength();
-                        data = static_cast<uint8_t *>(store->Data());
-                    } else if (jsObj->IsArrayBufferView()) {
-                        auto array = jsObj.As<v8::ArrayBufferView>();
-
-                        offset = array->ByteOffset();
-                        length = array->ByteLength();
-                        store = array->Buffer()->GetBackingStore();
-                        bufferCastType = JsArgConverter::GetCastType(array);
-                        data = static_cast<uint8_t *>(store->Data()) + offset;
-                    } else {
-                        auto array = jsObj.As<v8::TypedArray>();
-                        offset = array->ByteOffset();
-                        store = array->Buffer()->GetBackingStore();
-                        length = array->ByteLength();
-                        bufferCastType = JsArgConverter::GetCastType(array);
-                        data = static_cast<uint8_t *>(store->Data()) + offset;
-                    }
-
-                    auto directBuffer = env.NewDirectByteBuffer(
-                            data,
-                            length);
-
-                    auto directBufferClazz = env.GetObjectClass(directBuffer);
-
-                    auto byteOrderId = env.GetMethodID(directBufferClazz, "order",
-                                                       "(Ljava/nio/ByteOrder;)Ljava/nio/ByteBuffer;");
-
-                    auto byteOrderClazz = env.FindClass("java/nio/ByteOrder");
-
-                    auto byteOrderEnumId = env.GetStaticMethodID(byteOrderClazz, "nativeOrder",
-                                                                 "()Ljava/nio/ByteOrder;");
-
-                    auto nativeByteOrder = env.CallStaticObjectMethodA(byteOrderClazz,
-                                                                       byteOrderEnumId,
-                                                                       nullptr);
-
-                    directBuffer = env.CallObjectMethod(directBuffer, byteOrderId, nativeByteOrder);
-
-                    jobject buffer;
-
-                    if (bufferCastType == BufferCastType::Short) {
-
-                        auto id = env.GetMethodID(directBufferClazz, "asShortBuffer",
-                                                  "()Ljava/nio/ShortBuffer;");
-                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    } else if (bufferCastType == BufferCastType::Int) {
-
-                        auto id = env.GetMethodID(directBufferClazz, "asIntBuffer",
-                                                  "()Ljava/nio/IntBuffer;");
-                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    } else if (bufferCastType == BufferCastType::Long) {
-
-                        auto id = env.GetMethodID(directBufferClazz, "asLongBuffer",
-                                                  "()Ljava/nio/LongBuffer;");
-                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    } else if (bufferCastType == BufferCastType::Float) {
-
-                        auto id = env.GetMethodID(directBufferClazz, "asFloatBuffer",
-                                                  "()Ljava/nio/FloatBuffer;");
-                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    } else if (bufferCastType == BufferCastType::Double) {
-
-                        auto id = env.GetMethodID(directBufferClazz, "asDoubleBuffer",
-                                                  "()Ljava/nio/DoubleBuffer;");
-                        buffer = env.CallObjectMethodA(directBuffer, id, nullptr);
-                    } else {
-                        buffer = directBuffer;
-                    }
-
-                    buffer = env.NewGlobalRef(buffer);
-
-                    int id = objectManager->GetOrCreateObjectId(buffer);
-                    auto clazz = env.GetObjectClass(buffer);
-                    objectManager->Link(jsObj, id, clazz);
-
-                    obj = objectManager->GetJavaObjectByJsObject(jsObj);
-                }
-
-
-                V8GetPrivateValue(isolate, jsObj, V8StringConstants::GetNullNodeName(isolate),
+                V8GetPrivateValue(isolate, jsObj, V8StringConstants::GetNullNodePrivate(isolate),
                                   castValue);
 
                 if (!castValue.IsEmpty()) {
                     auto node = reinterpret_cast<MetadataNode *>(castValue.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
                     if (node == nullptr) {
-                        s << "Cannot get type of the null argument at index " << index;
+                        error = "Cannot get type of the null argument at index " + std::to_string(index);
                         success = false;
                         break;
                     }
@@ -380,9 +291,9 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                     SetConvertedObject(env, index, obj.Move(), obj.IsGlobal());
                 } else {
                     String::Utf8Value jsObjStr(isolate, jsObj);
-                    s << "Cannot marshal JavaScript argument "
-                      << (*jsObjStr ? *jsObjStr : "<failed-to-string>") << " at index " << index
-                      << " to Java type.";
+                    error = std::string("Cannot marshal JavaScript argument ") +
+                            (*jsObjStr ? *jsObjStr : "<failed-to-string>") + " at index " +
+                            std::to_string(index) + " to Java type.";
                 }
                 break;
 
@@ -393,13 +304,13 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
         SetConvertedObject(env, index, nullptr);
         success = true;
     } else {
-        s << "Cannot marshal JavaScript argument at index " << index << " to Java type.";
+        error = "Cannot marshal JavaScript argument at index " + std::to_string(index) + " to Java type.";
         success = false;
     }
 
     if (!success) {
         m_error.index = index;
-        m_error.msg = s.str();
+        m_error.msg = std::move(error);
     }
 
     return success;

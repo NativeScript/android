@@ -61,9 +61,11 @@ describe("Worker resourceLimits", function () {
             expect("worker posted a message").toBe("worker exhausted its heap");
         };
 
+        // Returns true so the error is not re-reported on the main global scope,
+        // where Jasmine would charge it to whatever spec runs next.
         worker.onerror = function (e) {
             if (settled) {
-                return;
+                return true;
             }
             settled = true;
             var message = String(e && e.message ? e.message : e);
@@ -73,6 +75,7 @@ describe("Worker resourceLimits", function () {
             expect(message).toMatch(/maxOldGenerationSizeMb: 32/);
             worker.terminate();
             done();
+            return true;
         };
     });
 

@@ -17,7 +17,11 @@ enum class CastType {
 
 class NumericCasts {
     public:
-        void CreateGlobalCastFunctions(v8::Isolate* isolate, const v8::Local<v8::ObjectTemplate>& globalTemplate);
+        /*
+         * Sets long, byte, short, char, float and double on target, as new
+         * functions bound to this instance.
+         */
+        bool AddCastFunctions(v8::Local<v8::Context> context, v8::Local<v8::Object> target);
 
         static CastType GetCastType(v8::Isolate* isolate, const v8::Local<v8::Object>& object);
 
@@ -54,7 +58,6 @@ class NumericCasts {
 
         static NumericCasts* GetThis(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-        static std::string s_castMarker;
 };
 }
 

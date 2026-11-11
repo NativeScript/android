@@ -95,13 +95,22 @@ Node's single-quoted style.
 
 ### `ns:runtime`
 
-Runtime-level configuration. Keys, value domains, and scope are defined and
-validated natively; the module surface is a thin frozen wrapper.
+Runtime-level configuration and runtime plumbing. Keys, value domains, and
+scope are defined and validated natively; the module surface is a thin frozen
+wrapper.
 
 | export | description |
 |---|---|
 | `setConfig(key, value)` | Sets a runtime config key. Throws `TypeError` on an unknown key, an invalid value, or (for process-wide keys) when called from a worker isolate. |
 | `getConfig(key)` | Returns the current value of a config key. Throws `TypeError` on an unknown key. Readable from any isolate. |
+| `escapeException(x)` | Returns an `Error` branded so that, when it is thrown back across a native callback boundary, the native caller receives the original native exception `x` carries rather than the runtime's wrapper exception. Idempotent: a branded error is returned unchanged. Throws `TypeError` when called with no argument. The global `interop.escapeException` is this same function (see [Legacy globals](#legacy-globals)). |
+
+*Platform note (Android):* the original exception is the Java throwable `x`
+wraps, or its `nativeException`; a Java `catch` of the concrete type then
+matches instead of receiving a `com.tns.NativeScriptException`. A branded error
+with no underlying throwable escapes as a `com.tns.NativeScriptException`
+carrying the JS message and stack, as an unbranded one does, but bypasses
+`discardUncaughtJsExceptions`.
 
 Config keys:
 
@@ -169,6 +178,53 @@ a release build that cannot be diagnosed.
 *Platform note (Android):* each category writes under its own logcat tag —
 `TNS.esm`, `TNS.fetch`, `TNS.registry` — so `adb logcat -s TNS.esm` can filter
 them without matching message text.
+
+### `ns:interop`
+
+The cross-platform interop surface: working with native values, as opposed to
+finding native symbols. It exists on every platform with whatever members that
+platform supports, so a feature check (`"Pointer" in interop`) is how portable
+code asks; a member a platform lacks is absent, never present-but-throwing.
+
+On Android the namespace is **empty**: Android has none of the native-memory
+members iOS exports here (`Pointer`, `Reference`, `sizeof`, …). It is still a
+frozen module, so `import * as interop from "ns:interop"` resolves everywhere.
+
+### `ns:interop/android`
+
+Java-specific interop helpers. Android only: on other platforms the specifier
+is not registered and fails like any unknown builtin.
+
+| export | description |
+|---|---|
+| `long(x)`, `byte(x)`, `short(x)`, `char(x)`, `float(x)`, `double(x)` | Mark a JS value as the named Java primitive, for overload resolution and argument conversion: `method(long("123456789012"))` picks the `long` overload and passes the full 64-bit value. Each takes exactly one argument. |
+| `newArray(type, length)` | Creates a Java array of `length` elements. `type` is a primitive type name (`"int"`, `"char"`, `"boolean"`, …), a fully qualified Java class name (`"java.lang.String"`), or a Java class constructor (`java.lang.String`). Throws on any other arity, a non-integer or negative length, or a class name that does not resolve. |
+
+```js
+import { long, newArray } from "ns:interop/android";
+
+const bytes = newArray("byte", 1024); // byte[1024]
+const names = newArray(java.lang.String, 3); // String[3]
+someJavaObject.setTimestamp(long(Date.now()));
+```
+
+### Legacy globals
+
+Before these modules existed the same functions were reachable only as
+globals, and app code and `@nativescript/core` read them at module top level.
+They remain, installed before any app code runs, as **aliases of the module
+exports** — the very same function objects, per realm:
+
+| global | module export |
+|---|---|
+| `interop.escapeException` | `ns:runtime`'s `escapeException` |
+| `long`, `byte`, `short`, `char`, `float`, `double` (Android) | `ns:interop/android`'s members of those names |
+| `Array.create` (Android) | `ns:interop/android`'s `newArray` |
+
+The global `interop` object, the cast globals and `Array.create` are ordinary
+writable, enumerable, configurable data properties. On Android the global
+`interop` has exactly one member, `escapeException`; it is a plain object, not
+the `ns:interop` namespace. New code should import from the modules.
 
 ### `ns:module`
 
@@ -380,14 +436,17 @@ npm packages that require Node builtins by their prefixed names can run
 unmodified where a shim exists:
 
 - A shim implements a documented **subset** of the corresponding Node module's
-  API, backed by `ns:` modules. Unimplemented members are simply absent
+  API, backed by the runtime's own modules. Unimplemented members are simply absent
   (so `typeof util.promisify === "function"` feature-checks behave
-  correctly); they are never present-but-throwing.
+  correctly); they are never present-but-throwing. The one exception is a
+  member whose silent absence would read as a delivery bug rather than as a
+  missing feature — it may be present and throw, and the table below names
+  every such member.
 - **One source file per specifier.** A shim is its own module that consumes
-  the `ns:` module it adapts through the internal require, and it owns *all*
-  the adaptation — argument shapes, option names, aliases, anything that has
-  to track Node. A standard `ns:` module never contains compatibility code
-  and never knows a shim exists.
+  the module it adapts through the internal require, and it owns *all* the
+  adaptation — argument shapes, option names, aliases, anything that has to
+  track Node. A standard `ns:` module never contains compatibility code and
+  never knows a shim exists.
 - Shims are **lazy**: a shim's source is only evaluated when its specifier is
   first resolved, so an app that never touches the `node:` scheme never pays
   for one.
@@ -411,6 +470,7 @@ unmodified where a shim exists:
 | `node:util` | `inspect`, `format`, `TextEncoder`, `TextDecoder` | Re-exports `ns:util`'s members unchanged (`nodeUtil.inspect === nsUtil.inspect`) from a **distinct, separately frozen module object**. `TextEncoder`/`TextDecoder` are the globals of those names, as they are in Node. Documented as partial. |
 | `node:url` | `fileURLToPath`, `pathToFileURL` | Node-strict converters between `file:` URLs and paths. Documented as partial — no `URL`/`URLSearchParams` re-exports (both are globals), no legacy `url.parse`/`format`/`resolve`. |
 | `node:module` | `createRequire` | Re-exports `ns:module`'s `createRequire` unchanged from a **distinct, separately frozen module object**. `createPumpingRequire` is deliberately absent: it has no Node counterpart, so code written against this shim keeps running on Node. `require.resolve`/`.cache`/`.main` are not implemented, and neither is any other `node:module` member (`Module`, `builtinModules`, `isBuiltin`, `register`, `syncBuiltinESMExports`). Documented as partial. |
+| `node:worker_threads` | the messaging and thread surface — see [worker-threads.md](worker-threads.md) | The channel half (`MessagePort`, `MessageChannel`, `BroadcastChannel`, `receiveMessageOnPort`) is the real implementation, the same objects the globals of those names hold; the thread half is a bridge over the runtime's own `Worker`. It has no `ns:` counterpart — the surface tracks Node's, so there is nothing for a standard module to own. The one place it breaks the absent-not-throwing rule below is deliberate: `postMessageToThread` and `moveMessagePortToContext` are present and throw an `Error` naming themselves, because silently missing thread-addressed messaging reads as a delivery bug rather than as an unsupported call. Documented as partial. |
 
 `node:url`'s parsing goes through the URL intrinsic, so `file://localhost/x` is
 accepted (the URL spec folds a `localhost` authority to none) while any other
@@ -719,21 +779,32 @@ shims are built on, so it is normative: both runtimes provide it.
   Android-only) note in between.
 - Internal runtime machinery must never be reachable through the scheme.
 
-That last rule holds because public modules and internal builtins are **two
-separate loading paths**, not one registry with a per-entry flag:
+That last rule holds because every registry row carries its tier, and the two
+resolvers read the same table differently:
 
-- The **public registry** is a table mapping specifier → builtin, and it is the
-  only thing the `ns:`/`node:` resolver consults. A specifier absent from it
-  does not resolve, full stop. Today it holds six entries: `ns:module`,
-  `ns:runtime`, `ns:util`, `node:module`, `node:url`, `node:util`.
-- **Internal builtins** (the intrinsics snapshot, the require factory, the
-  console formatter, and so on) are invoked directly from their own native call
-  sites. They are never named in the public registry, so there is no specifier
-  that could reach them and nothing to mark private.
+- The **`ns:`/`node:` resolver** — the app-facing one, behind `require()`,
+  `import` and `import()` — serves only rows *not* marked internal-only. An
+  internal-only specifier fails exactly as a name absent from the table does.
+  Nine rows are public today: `ns:interop`, `ns:interop/android`, `ns:module`,
+  `ns:runtime`, `ns:util`, `node:module`, `node:url`, `node:util`,
+  `node:worker_threads`.
+- The **internal require** builtins receive (previous section) is the only
+  thing that can name an internal-only row. Seven rows are marked that way:
+  `internal/broadcast-channel`, `internal/dom-exception`, `internal/events`,
+  `internal/interop-globals`, `internal/message-channel`,
+  `internal/message-event`, `internal/worker-events`. Their exports carry
+  capabilities app code must not hold — listener-accounting hook keys, the
+  error-reporter setter, the key a worker's rebuilt error travels under, base
+  classes that must be the runtime's own rather than whatever a global
+  currently names — or, for `internal/interop-globals`, install the legacy
+  globals.
+- Builtins with **no row at all** (the intrinsics snapshot, the require
+  factory, the console formatter) are invoked straight from their native call
+  sites. There is no specifier that could reach them and nothing to mark.
 
-Adding an internal builtin therefore cannot accidentally expose it; exposing
-one is an explicit registry entry, which is also the change this document has
-to describe.
+So a builtin is unreachable from app code unless a registry row says
+otherwise, and exposing one means editing that row's tier — which is also the
+change this document has to describe.
 
 ## Source-text modules: deliberately not supported
 
@@ -765,8 +836,14 @@ internal require is a fixed parameter of the builtin function wrapper
 The files under `js/` that are *not* in the public registry — `primordials.js`,
 `require-factory.js`, `inspect.js`, `json-helper.js`, `events.js`,
 `error-events.js`, `structured-clone.js`, `blob-url.js`, `performance.js`,
-`weak-ref.js` — are the internal builtins: each is run from its own native call
-site and none is named in the registry table.
+`weak-ref.js`, `interop-globals.js` — are the internal builtins: each is run
+from its own native call site and none is named in the public registry.
+
+`interop-globals.js` is the [legacy globals](#legacy-globals) layer. It runs
+eagerly from `Runtime::PrepareV8Runtime` in every isolate, requires
+`ns:runtime` and `ns:interop/android` through the internal require and assigns
+their functions to the globals, so the compat knowledge lives only in that
+consumer and neither module refers to it.
 
 Per-realm builtin state — the exports objects, the synthetic modules, the
 in-progress set that produces the circular-require error, the cached `format`,

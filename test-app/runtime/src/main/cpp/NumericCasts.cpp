@@ -11,20 +11,35 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-void NumericCasts::CreateGlobalCastFunctions(Isolate* isolate, const Local<ObjectTemplate>& globalTemplate) {
+bool NumericCasts::AddCastFunctions(Local<Context> context, Local<Object> target) {
+    auto isolate = v8::Isolate::GetCurrent();
     auto ext = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
 
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "long"), FunctionTemplate::New(isolate, NumericCasts::MarkAsLongCallbackStatic, ext));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "byte"), FunctionTemplate::New(isolate, NumericCasts::MarkAsByteCallbackStatic, ext));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "short"), FunctionTemplate::New(isolate, NumericCasts::MarkAsShortCallbackStatic, ext));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "double"), FunctionTemplate::New(isolate, NumericCasts::MarkAsDoubleCallbackStatic, ext));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "float"), FunctionTemplate::New(isolate, NumericCasts::MarkAsFloatCallbackStatic, ext));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "char"), FunctionTemplate::New(isolate, NumericCasts::MarkAsCharCallbackStatic, ext));
+    const struct {
+        const char* name;
+        FunctionCallback callback;
+    } casts[] = {
+            {"long", NumericCasts::MarkAsLongCallbackStatic},
+            {"byte", NumericCasts::MarkAsByteCallbackStatic},
+            {"short", NumericCasts::MarkAsShortCallbackStatic},
+            {"double", NumericCasts::MarkAsDoubleCallbackStatic},
+            {"float", NumericCasts::MarkAsFloatCallbackStatic},
+            {"char", NumericCasts::MarkAsCharCallbackStatic},
+    };
+
+    for (const auto& cast : casts) {
+        Local<Function> func;
+        if (!FunctionTemplate::New(isolate, cast.callback, ext)->GetFunction(context).ToLocal(&func) ||
+            !target->Set(context, ArgConverter::ConvertToV8String(isolate, cast.name), func).FromMaybe(false)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 CastType NumericCasts::GetCastType(Isolate* isolate, const Local<Object>& object) {
     auto ret = CastType::None;
-    auto key = ArgConverter::ConvertToV8String(isolate, s_castMarker);
+    auto key = V8StringConstants::GetCastMarkerPrivate(isolate);
     Local<Value> hidden;
     V8GetPrivateValue(isolate, object, key, hidden);
     if (!hidden.IsEmpty()) {
@@ -37,7 +52,7 @@ CastType NumericCasts::GetCastType(Isolate* isolate, const Local<Object>& object
 
 Local<Value> NumericCasts::GetCastValue(const Local<Object>& object) {
     auto isolate = v8::Isolate::GetCurrent();
-    auto context = object->GetCreationContext(isolate).ToLocalChecked();
+    auto context = GetCreationContextOrCurrent(isolate, object);
     Local<Value> value;
     object->Get(context, V8StringConstants::GetValue(isolate)).ToLocal(&value);
     return value;
@@ -361,13 +376,12 @@ void NumericCasts::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& a
 }
 
 void NumericCasts::MarkJsObject(Isolate* isolate, const Local<Object>& object, CastType castType, const Local<Value>& value) {
-    auto key = ArgConverter::ConvertToV8String(isolate, s_castMarker);
+    auto key = V8StringConstants::GetCastMarkerPrivate(isolate);
     auto type = Integer::New(isolate, static_cast<int>(castType));
     V8SetPrivateValue(isolate, object, key, type);
-    auto context = object->GetCreationContext(isolate).ToLocalChecked();
+    auto context = GetCreationContextOrCurrent(isolate, object);
     object->Set(context, V8StringConstants::GetValue(isolate), value);
 
     DEBUG_WRITE("MarkJsObject: Marking js object: %d with cast type: %d", object->GetIdentityHash(), castType);
 }
 
-std::string NumericCasts::s_castMarker = "t::cast";

@@ -1,0 +1,42 @@
+// Copies the npm packages the test app's Jasmine harness loads at runtime from
+// the repo's node_modules (`npm install` at the repo root) into a generated
+// assets folder. Each package's files land flat in
+// app/Infrastructure/Jasmine/vendor/<package>/.
+def testRunnerDepsNodeModules = new File(rootDir, "../node_modules").canonicalFile
+def testRunnerDepsPackages = [
+    "jasmine-core": ["lib/jasmine-core/jasmine.js", "LICENSE"],
+]
+def testRunnerDepsAssetsDir = new File(project.buildDir, "generated/test-runner-deps/assets")
+
+def stageTestRunnerDeps = project.tasks.register("stageTestRunnerDeps") {
+    def sources = [:]
+    testRunnerDepsPackages.each { name, files ->
+        files.each { path ->
+            sources[new File(testRunnerDepsNodeModules, "$name/$path")] = "app/Infrastructure/Jasmine/vendor/$name/${new File(path).name}"
+        }
+    }
+    def outDir = testRunnerDepsAssetsDir
+    def nodeModules = testRunnerDepsNodeModules
+
+    inputs.files(sources.keySet())
+    outputs.dir(outDir)
+
+    doLast {
+        def missing = sources.keySet().findAll { !it.isFile() }
+        if (!missing.isEmpty()) {
+            throw new GradleException("Test runner dependencies are not installed (missing ${missing.join(', ')}). " +
+                    "Run 'npm install' in ${nodeModules.parentFile}.")
+        }
+        outDir.deleteDir()
+        sources.each { from, to ->
+            def dest = new File(outDir, to)
+            dest.parentFile.mkdirs()
+            java.nio.file.Files.copy(from.toPath(), dest.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+}
+
+android.sourceSets.main.assets.srcDir(testRunnerDepsAssetsDir)
+project.tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn stageTestRunnerDeps
+}

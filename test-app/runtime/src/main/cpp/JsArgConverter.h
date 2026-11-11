@@ -4,10 +4,13 @@
 #include <string>
 #include <vector>
 #include "JEnv.h"
+#include "JniLocalRef.h"
 #include "v8.h"
 #include "MetadataEntry.h"
 
 namespace tns {
+
+    class ObjectManager;
 
     enum class BufferCastType {
         Byte,
@@ -26,6 +29,10 @@ namespace tns {
         JsArgConverter(const v8::FunctionCallbackInfo<v8::Value>& args, bool hasImplementationObject, const std::string& methodSignature, MetadataEntry* entry);
 
         JsArgConverter(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& methodSignature);
+
+        JsArgConverter(const JsArgConverter&) = delete;
+
+        JsArgConverter& operator=(const JsArgConverter&) = delete;
 
         ~JsArgConverter();
 
@@ -50,11 +57,23 @@ namespace tns {
 
         static BufferCastType GetCastType(const v8::Local<v8::ArrayBufferView>& view);
 
+        static bool IsArrayBufferLike(const v8::Local<v8::Object>& object);
+
+        // A direct Java buffer over the object's memory, linked to the object so that the
+        // object, and with it the memory, lives as long as the buffer.
+        static JniLocalRef LinkNewJavaBuffer(ObjectManager* objectManager, const v8::Local<v8::Object>& object);
+
+        // The Java buffer linked to an array buffer or view, linking a new one when there is
+        // none or Java has collected it.
+        static JniLocalRef GetOrLinkJavaBuffer(ObjectManager* objectManager, const v8::Local<v8::Object>& object);
+
     private:
 
-        bool ConvertArg(const v8::Local<v8::Value>& arg, int index);
+        bool ConvertArg(const v8::Local<v8::Value>& jsArg, int index);
 
-        bool ConvertJavaScriptArray(const v8::Local<v8::Array>& jsArr, int index);
+        bool ConvertJavaScriptArray(const v8::Local<v8::Object>& source, size_t length, int index);
+
+        bool ConvertArrayBufferToJavaArray(const v8::Local<v8::Object>& source, int index);
 
         bool ConvertJavaScriptNumber(const v8::Local<v8::Value>& jsValue, int index);
 
@@ -77,9 +96,10 @@ namespace tns {
         int m_args_refs[255];
         int m_args_refs_size = 0;
 
-        std::string m_methodSignature;
+        std::vector<std::string> m_ownedTokens;
 
-        std::vector<std::string> m_tokens;
+        // May point at m_ownedTokens, which is why the converter is not copyable.
+        const std::vector<std::string>* m_tokens = &m_ownedTokens;
 
         Error m_error;
     };

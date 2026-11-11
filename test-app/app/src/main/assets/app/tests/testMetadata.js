@@ -36,3 +36,112 @@ describe("Tests metadata", function () {
 		expect(keywordClass.getValue5()).toBe(expected);
 	});
 });
+describe("Java members", function () {
+	it("are not constructors", function () {
+		var list = new java.util.ArrayList();
+
+		expect(function () { return new list.size(); }).toThrowError(TypeError);
+		expect(list.size.prototype).toBeUndefined();
+	});
+
+	it("keep static methods constructible, so new on a static factory returns its object", function () {
+		var id = new java.util.UUID.randomUUID();
+
+		expect(id instanceof java.util.UUID).toBe(true);
+	});
+
+	it("leave class constructors constructible", function () {
+		var MyObject = java.lang.Object.extend({ toString: function () { return "mine"; } });
+
+		expect(new java.util.ArrayList().size()).toBe(0);
+		expect(new MyObject().toString()).toBe("mine");
+		expect(java.util.UUID.randomUUID() instanceof java.util.UUID).toBe(true);
+	});
+});
+
+describe("Java object wrappers", function () {
+	it("resolve constructor through the class prototype, with no own properties", function () {
+		var id = java.util.UUID.randomUUID();
+
+		expect(Object.getPrototypeOf(id)).toBe(java.util.UUID.prototype);
+		expect(id.constructor).toBe(java.util.UUID);
+		expect(Object.prototype.hasOwnProperty.call(id, "constructor")).toBe(false);
+		expect(Object.keys(id)).toEqual([]);
+	});
+
+	it("share a prototype between Java-created and JS-created instances", function () {
+		var created = new java.lang.StringBuilder("a");
+		var returned = new java.lang.StringBuilder().append("b").append(created);
+
+		expect(Object.getPrototypeOf(returned)).toBe(Object.getPrototypeOf(created));
+		expect(returned instanceof java.lang.StringBuilder).toBe(true);
+		expect(String(returned.toString())).toBe("ba");
+	});
+
+	it("read super through an implementation object that is not a Java instance", function () {
+		var impl = { toString: function () { return "impl"; } };
+		java.lang.Object.extend(impl);
+
+		expect(function () { return impl.super; }).not.toThrow();
+	});
+
+	it("leave an extended instance Java creates during a JS construction its own JS object", function () {
+		var Inner = java.lang.Object.extend({ toString: function () { return "inner"; } });
+		var Outer = com.tns.tests.NestedConstruction.extend({ toString: function () { return "outer"; } });
+		var outer = new Outer(new Inner().getClass(), null);
+
+		expect(String(outer.toString())).toBe("outer");
+		expect(String(outer.getCreated().toString())).toBe("inner");
+		expect(Object.prototype.hasOwnProperty.call(outer.getCreated(), "constructor")).toBe(false);
+	});
+
+	it("keep a JS construction's instance when a callback constructs another during it", function () {
+		var Inner = java.lang.Object.extend({ toString: function () { return "inner"; } });
+		var Outer = com.tns.tests.NestedConstruction.extend({ toString: function () { return "outer:" + this.tag; } });
+		var made = null;
+		var outer = new Outer(null, new java.lang.Runnable({
+			run: function () {
+				made = new Inner();
+			}
+		}));
+		outer.tag = "mine";
+
+		expect(String(outer.toString())).toBe("outer:mine");
+		expect(String(made.toString())).toBe("inner");
+	});
+
+	it("give a Java-created extended instance its class's current prototype", function () {
+		var Created = java.lang.Object.extend({ toString: function () { return "created"; } });
+		var createdClass = new Created().getClass();
+		com.tns.tests.JavaCreated.newInstance(createdClass);
+		var replacement = Object.create(Object.getPrototypeOf(Created.prototype));
+		Created.prototype = replacement;
+
+		var created = com.tns.tests.JavaCreated.newInstance(createdClass);
+
+		expect(Object.getPrototypeOf(created)).toBe(replacement);
+		expect(String(created.toString())).toBe("created");
+	});
+
+	it("hand back the same wrapper for the same Java object", function () {
+		var builder = new java.lang.StringBuilder();
+
+		expect(builder.append("x")).toBe(builder);
+	});
+
+	it("stay linked while thousands of later wrappers are collected", function () {
+		var list = new java.util.ArrayList();
+		var first = java.util.UUID.randomUUID();
+		list.add(first);
+		for (var round = 0; round < 3; round++) {
+			for (var i = 0; i < 3000; i++) {
+				java.util.UUID.randomUUID();
+			}
+			gc();
+			java.lang.System.gc();
+		}
+
+		expect(list.get(0)).toBe(first);
+		expect(String(list.get(0).toString())).toBe(String(first.toString()));
+	});
+});

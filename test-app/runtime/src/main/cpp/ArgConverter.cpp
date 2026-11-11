@@ -1,4 +1,5 @@
 #include "ArgConverter.h"
+#include "JniLocalRef.h"
 #include "ObjectManager.h"
 #include "Util.h"
 #include "V8StringConstants.h"
@@ -8,7 +9,9 @@
 #include "V8GlobalHelpers.h"
 #include "NativeScriptAssert.h"
 #include "RuntimeState.h"
+#include <cstring>
 #include <sstream>
+#include <vector>
 
 using namespace v8;
 using namespace std;
@@ -89,61 +92,78 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
     }
 }
 
-Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Local<Context> context, jobjectArray args) {
-    JEnv env;
+void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const JavaCallArgs& args, int argc, Local<Value>* out) {
+    if (argc == 0) {
+        args.converted = true;
+        return;
+    }
 
-    int argc = env.GetArrayLength(args) / 3;
-    auto isolate = v8::Isolate::GetCurrent();
-    Local<Array> arr(Array::New(isolate, argc));
+    constexpr int kInlineArgs = 16;
+    jlong inlineValues[JavaCallArgs::PackedLength(kInlineArgs)];
+    std::vector<jlong> heapValues;
+    jlong* values = inlineValues;
+    if (argc > kInlineArgs) {
+        heapValues.resize(JavaCallArgs::PackedLength(argc));
+        values = heapValues.data();
+    }
 
-    auto runtime = Runtime::GetRuntime(isolate);
-    auto objectManager = runtime->GetObjectManager();
+    env->GetLongArrayRegion(args.values, 0, JavaCallArgs::PackedLength(argc), values);
 
-    int jArrayIndex = 0;
+    auto objectManager = Runtime::GetRuntime(isolate)->GetObjectManager();
+
     for (int i = 0; i < argc; i++) {
-        JniLocalRef argTypeIDObj(env.GetObjectArrayElement(args, jArrayIndex++));
-        JniLocalRef arg(env.GetObjectArrayElement(args, jArrayIndex++));
-        JniLocalRef argJavaClassPath(env.GetObjectArrayElement(args, jArrayIndex++));
-
-        Type argTypeID = (Type) JType::IntValue(env, argTypeIDObj);
-
+        jlong bits = values[i];
         Local<Value> jsArg;
-        switch (argTypeID) {
+        switch (JavaCallArgs::TypeAt(values, argc, i)) {
         case Type::Boolean:
-            jsArg = Boolean::New(isolate, JType::BooleanValue(env, arg));
+            jsArg = Boolean::New(isolate, bits != 0);
             break;
         case Type::Char:
-            jsArg = jcharToV8String(isolate, JType::CharValue(env, arg));
+            jsArg = jcharToV8String(isolate, static_cast<jchar>(bits));
             break;
         case Type::Byte:
-            jsArg = Number::New(isolate, JType::ByteValue(env, arg));
-            break;
         case Type::Short:
-            jsArg = Number::New(isolate, JType::ShortValue(env, arg));
-            break;
         case Type::Int:
-            jsArg = Number::New(isolate, JType::IntValue(env, arg));
-            break;
         case Type::Long:
-            jsArg = Number::New(isolate, JType::LongValue(env, arg));
+            jsArg = Number::New(isolate, static_cast<double>(bits));
             break;
-        case Type::Float:
-            jsArg = Number::New(isolate, JType::FloatValue(env, arg));
+        case Type::Float: {
+            auto raw = static_cast<int32_t>(bits);
+            float value;
+            memcpy(&value, &raw, sizeof(value));
+            jsArg = Number::New(isolate, value);
             break;
-        case Type::Double:
-            jsArg = Number::New(isolate, JType::DoubleValue(env, arg));
+        }
+        case Type::Double: {
+            double value;
+            memcpy(&value, &bits, sizeof(value));
+            jsArg = Number::New(isolate, value);
             break;
-        case Type::String:
-            jsArg = jstringToV8String(isolate, (jstring) arg);
+        }
+        case Type::String: {
+            JniLocalRef str(env->GetObjectArrayElement(args.refs, i));
+            jsArg = jstringToV8String(isolate, (jstring) str);
             break;
+        }
         case Type::JsObject: {
-            jint javaObjectID = JType::IntValue(env, arg);
-            jsArg = objectManager->GetJsObjectByJavaObject(javaObjectID);
-
+            // values[i] packs an id in its low half (exact when FreshArg is set, else a
+            // hint Java read without the isolate lock, or -1) and the class index above.
+            auto hintedObjectID = static_cast<jint>(bits);
+            auto classIndex = static_cast<int>((bits >> 32) & 0x7fffffff);
+            if ((bits & JavaCallArgs::FreshArg) != 0 &&
+                !objectManager->HasJsObject(hintedObjectID)) {
+                JniLocalRef arg(env->GetObjectArrayElement(args.refs, i));
+                jsArg = objectManager->CreateJSWrapper(hintedObjectID, classIndex, arg);
+            } else if (hintedObjectID != -1) {
+                jsArg = objectManager->GetLinkedJsObjectByJavaObject(hintedObjectID);
+            }
             if (jsArg.IsEmpty()) {
-                string argClassName = jstringToString(ObjectToString(argJavaClassPath));
-                argClassName = Util::ConvertFromCanonicalToJniName(argClassName);
-                jsArg = objectManager->CreateJSWrapper(javaObjectID, argClassName);
+                JniLocalRef arg(env->GetObjectArrayElement(args.refs, i));
+                auto javaObjectID = objectManager->GetOrCreateObjectId(arg);
+                jsArg = objectManager->GetJsObjectByJavaObject(javaObjectID);
+                if (jsArg.IsEmpty()) {
+                    jsArg = objectManager->CreateJSWrapper(javaObjectID, classIndex, arg);
+                }
             }
             break;
         }
@@ -152,10 +172,9 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Local<Context> context, jobje
             break;
         }
 
-        arr->Set(context, i, jsArg);
+        out[i] = jsArg;
     }
-
-    return arr;
+    args.converted = true;
 }
 
 Local<Value> ArgConverter::ConvertFromJavaLong(Isolate* isolate, jlong value) {

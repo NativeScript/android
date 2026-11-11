@@ -109,9 +109,9 @@ describe("Tests for runtime binding generator", function () {
 
         var interfaces = clazz.getInterfaces();
 
-        var expectedInterfaces = ["java.util.jar.Pack200$Packer", "java.util.Formattable", "java.util.Observer", "java.util.jar.Pack200$Unpacker", "com.tns.NativeScriptHashCodeProvider"];
+        var expectedInterfaces = ["java.util.jar.Pack200$Packer", "java.util.Formattable", "java.util.Observer", "java.util.jar.Pack200$Unpacker", "com.tns.NativeScriptHashCodeProvider", "com.tns.NativeScriptRuntimeBound"];
 
-        expect(interfaces.length).toBe(5);
+        expect(interfaces.length).toBe(6);
 
         for(var i = 0; i < interfaces.length; i++) {
             var interfaceName = interfaces[i].getName().toString();
@@ -168,9 +168,9 @@ describe("Tests for runtime binding generator", function () {
 
             var interfaces = clazz.getInterfaces();
 
-            var expectedInterfaces = ["java.util.jar.Pack200$Packer", "java.util.Formattable", "java.util.Observer", "java.util.jar.Pack200$Unpacker", "com.tns.NativeScriptHashCodeProvider"];
+            var expectedInterfaces = ["java.util.jar.Pack200$Packer", "java.util.Formattable", "java.util.Observer", "java.util.jar.Pack200$Unpacker", "com.tns.NativeScriptHashCodeProvider", "com.tns.NativeScriptRuntimeBound"];
 
-            expect(interfaces.length).toBe(5);
+            expect(interfaces.length).toBe(6);
 
             for(var i = 0; i < interfaces.length; i++) {
                 var interfaceName = interfaces[i].getName().toString();

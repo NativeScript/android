@@ -243,6 +243,34 @@ describe("parser/js_parser tests", function () {
             });
         });
 
+        it("Generated metadata for a transpiled typescript class without a constructor should contain the super call location", function (done) {
+            let input = path.normalize(path.join(prefix, "extends_ts_no_constructor", "app")),
+                generatedJavaClassesRoot = path.normalize(path.join(prefix, "extends_ts_no_constructor", "src", "main", "java"));
+
+            clearOutput();
+
+            execGradle(input, generatedJavaClassesRoot, function (error, stdout, stderr) {
+                if (error) {
+                    console.error(`exec error: ${error}`);
+                    return done.fail(error);
+                }
+
+                logExecResult(stdout, stderr)
+
+                let bindingsContent = fs.readFileSync(sbgBindingOutoutFile, "utf-8").toString().trim().split('\n');
+
+                // JavaClass*file*line*column*NewClass*...: the runtime names the class from
+                // the location of the `_super.apply` call (the column of `apply`, 1-based).
+                let locations = bindingsContent.map(line => line.split("*").slice(1, 5).join("*")).sort();
+                expect(locations).toEqual([
+                    "no_constructor*11*87*Minified",
+                    "no_constructor*4*42*NoConstructor"
+                ]);
+
+                done();
+            });
+        });
+
         it("Generated metadata for bindings should return proper JavaClass name when there is a static property and double assignment", function (done) {
             let input = path.normalize(path.join(prefix, "decorated_double_assignment_ts", "app")),
                 generatedJavaClassesRoot = path.normalize(path.join(prefix, "decorated_double_assignment_ts", "src", "main", "java"));
