@@ -182,6 +182,13 @@ jobs:
         with:
           name: android-unit-test-results
           path: test-app/dist/android_unit_test_results.xml
+      - name: Upload crash diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-crash-diagnostics
+          path: test-app/dist/crash-diagnostics/
+          if-no-files-found: ignore
       - name: Test report summary
         if: ${{ !cancelled() }}
         # annotate_only keeps this usable from fork PRs: it reports via workflow
