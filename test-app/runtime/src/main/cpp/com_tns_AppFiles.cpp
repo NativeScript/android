@@ -1,3 +1,4 @@
+#include <android/asset_manager_jni.h>
 #include <jni.h>
 
 #include <string>
@@ -31,24 +32,38 @@ jstring ToJString(JNIEnv* env, const std::string& value) {
 
 }  // namespace
 
-extern "C" JNIEXPORT void JNICALL Java_com_tns_AppFiles_nativeInit(JNIEnv* env, jclass,
-                                                                   jstring filesRoot,
-                                                                   jstring alias,
-                                                                   jstring codeCacheDir) {
-    std::vector<std::string> aliases;
+extern "C" JNIEXPORT void JNICALL Java_com_tns_AppFiles_nativeInit(
+        JNIEnv* env, jclass, jstring filesRoot, jstring alias, jstring codeCacheDir,
+        jobject assetManager, jboolean loadCodeFromApk,
+        jobjectArray alwaysExtract) {
+    AppFiles::Config config;
+    config.filesRoot = ToStdString(env, filesRoot);
     if (alias != nullptr) {
-        aliases.push_back(ToStdString(env, alias));
+        config.aliases.push_back(ToStdString(env, alias));
     }
-    AppFiles::Init(ToStdString(env, filesRoot), aliases);
+    if (assetManager != nullptr) {
+        // Sources keep using the AAssetManager for the life of the process.
+        config.assets = AAssetManager_fromJava(env, env->NewGlobalRef(assetManager));
+    }
+    config.loadCodeFromApk = loadCodeFromApk == JNI_TRUE;
+    if (alwaysExtract != nullptr) {
+        jsize count = env->GetArrayLength(alwaysExtract);
+        for (jsize i = 0; i < count; i++) {
+            auto glob = static_cast<jstring>(env->GetObjectArrayElement(alwaysExtract, i));
+            config.alwaysExtract.push_back(ToStdString(env, glob));
+            env->DeleteLocalRef(glob);
+        }
+    }
+    AppFiles::Init(config);
     ScriptCache::Init(ToStdString(env, codeCacheDir));
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_com_tns_AppFiles_loadsCodeFromApk(JNIEnv*, jclass) {
+    return AppFiles::LoadsCodeFromApk() ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jstring JNICALL Java_com_tns_AppFiles_filesRoot(JNIEnv* env, jclass) {
     return ToJString(env, AppFiles::FilesRoot());
-}
-
-extern "C" JNIEXPORT jstring JNICALL Java_com_tns_AppFiles_appRoot(JNIEnv* env, jclass) {
-    return ToJString(env, AppFiles::AppRoot());
 }
 
 extern "C" JNIEXPORT jstring JNICALL Java_com_tns_AppFiles_logicalPath(JNIEnv* env, jclass,

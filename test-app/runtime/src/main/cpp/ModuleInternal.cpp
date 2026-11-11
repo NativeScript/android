@@ -866,7 +866,12 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
         // attributed to whatever `.so` happens to load next.
         NapiModules::ClaimPendingModule();
 
-        auto handle = dlopen(modulePath.c_str(), RTLD_LAZY);
+        // dlopen needs a real file; a library served from the APK has none.
+        std::string libraryPath;
+        if (!AppFiles::RealFilePath(modulePath, libraryPath)) {
+            libraryPath = modulePath;
+        }
+        auto handle = dlopen(libraryPath.c_str(), RTLD_LAZY);
         if (handle == nullptr) {
             auto error = dlerror();
             string errMsg(error != nullptr ? error : "dlopen failed for " + modulePath);

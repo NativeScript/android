@@ -103,6 +103,9 @@ static std::string NormalizeDotSegments(const std::string& path) {
 // Foundation dependency (no HOME expansion, which we never used anyway).
 static std::string NormalizePath(const std::string& path) {
   if (path.empty()) return path;
+  // Every spelling of the files directory has to key the same registry entry.
+  std::string logical;
+  if (AppFiles::ToLogical(path, logical)) return logical;
   return NormalizeDotSegments(path);
 }
 
@@ -1249,11 +1252,13 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
                    base.c_str(), baseApp.c_str());
   } else if (specIsRootAbs) {
     // Dynamic import may already have resolved a relative specifier to a real
-    // filesystem path under the application root; use that as-is so we don't
-    // prefix ApplicationPath twice. Bundle-relative paths like /app/... or
-    // /src/... still resolve against appPath.
-    if (!appPath.empty() && spec.rfind(appPath, 0) == 0) {
-      candidateBases.push_back(NormalizePath(spec));
+    // filesystem path under the application root, in any spelling of it; use
+    // that as-is so we don't prefix ApplicationPath twice. Bundle-relative
+    // paths like /app/... or /src/... still resolve against appPath.
+    std::string logicalSpec;
+    if (!appPath.empty() && AppFiles::ToLogical(spec, logicalSpec) &&
+        (logicalSpec == appPath || logicalSpec.rfind(AppFiles::AppRootPrefix(), 0) == 0)) {
+      candidateBases.push_back(logicalSpec);
       TNS_DEBUG(Esm, "[resolver][abs-fs] spec=%s", spec.c_str());
     } else {
       std::string base = NormalizePath(appPath + spec);

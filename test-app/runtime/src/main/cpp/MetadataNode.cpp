@@ -2215,11 +2215,15 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
     string baseDir = filesPath;
     baseDir.append("/metadata");
 
-    DIR* dir = opendir(baseDir.c_str());
+    // Unreadable while credential-encrypted storage is locked (direct boot).
+    // Metadata served from the APK has no directory of its own, so the files
+    // directory stands in for it.
+    const string& guardDir = AppFiles::LoadsCodeFromApk() ? filesPath : baseDir;
+    DIR* dir = opendir(guardDir.c_str());
 
     if(dir == nullptr){
         stringstream ss;
-        ss << "metadata folder couldn't be opened! (Error: ";
+        ss << (AppFiles::LoadsCodeFromApk() ? "files" : "metadata") << " folder couldn't be opened! (Error: ";
         ss << errno;
         ss << ") ";
 
@@ -2248,6 +2252,7 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
           throw NativeScriptException(ss.str());
         }
     }
+    closedir(dir);
 
     string nodesFile = baseDir + "/treeNodeStream.dat";
     string namesFile = baseDir + "/treeStringsStream.dat";

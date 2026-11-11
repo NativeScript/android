@@ -6,15 +6,32 @@
 #include <string>
 #include <vector>
 
+struct AAssetManager;
+
 namespace tns {
 namespace AppFiles {
 
+struct Config {
+    // The canonical files directory: the logical root V8 sees.
+    std::string filesRoot;
+    // Other spellings of filesRoot.
+    std::vector<std::string> aliases;
+    // The APK's assets; required when loadCodeFromApk is set.
+    AAssetManager* assets = nullptr;
+    bool loadCodeFromApk = false;
+    // Globs relative to the app root that are extracted even when they are code.
+    std::vector<std::string> alwaysExtract;
+};
+
 /*
- * Sets the app's files directory: the canonical path, which is the logical
- * root V8 sees, plus any other spellings of it. Only the first call takes
- * effect, so every runtime may call it; the roots below are empty until then.
+ * Only the first call takes effect, so every runtime may call it; the roots
+ * below are empty until then. Must run before any read and before assets are
+ * extracted, since the extractor consults IsApkServed.
  */
-void Init(const std::string& filesRoot, const std::vector<std::string>& aliases = {});
+void Init(const Config& config);
+
+// Files directory only, every app file read from disk.
+void Init(const std::string& filesRoot);
 
 // The logical "<files>", "<files>/app", "<files>/internal" and "<files>/metadata",
 // with no trailing slash.
@@ -25,6 +42,16 @@ const std::string& MetadataRoot();
 
 // "<files>/app/", for prefix checks and joining relative names.
 const std::string& AppRootPrefix();
+
+bool LoadsCodeFromApk();
+
+/*
+ * The one rule for which files are served from the APK instead of being
+ * extracted: with loadCodeFromApk, .js/.mjs/.cjs/.map under app/ (minus the
+ * alwaysExtract globs) and everything under internal/ and metadata/.
+ * `relative` is relative to the files root, e.g. "app/main.js".
+ */
+bool IsApkServed(const std::string& relative);
 
 /*
  * True when `path` names something inside the files directory under any of
@@ -54,6 +81,12 @@ public:
 // Null when the file cannot be opened, with errno describing why.
 // A Reader belongs to one thread at a time.
 std::unique_ptr<Reader> Open(const std::string& path);
+
+/*
+ * The real file that serves `path`, for consumers that need one (dlopen).
+ * False when `path` is served from the APK or does not exist.
+ */
+bool RealFilePath(const std::string& path, std::string& realPath);
 
 }  // namespace AppFiles
 }  // namespace tns
