@@ -1134,9 +1134,9 @@ void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<
 }
 
 void JsV8InspectorClient::consoleLogCallback(Isolate* isolate, ConsoleAPIType method, const std::vector<v8::Local<v8::Value>>& args) {
-    // Worker isolates route to their own inspector (we're on the worker's
-    // thread here). Checked first so worker logging never lazily constructs
-    // the root client.
+    // Worker isolates route to their own inspector (from the worker thread,
+    // or the main thread under __runOnMainThread). Checked first so worker
+    // logging never lazily constructs the root client.
     WorkerWrapper* worker = WorkerWrapper::FromIsolate(isolate);
     if (worker != nullptr) {
         worker->ConsoleLog(method, args);
