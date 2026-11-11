@@ -101,6 +101,12 @@ function writeDiagnostic(name, contents) {
   }
 }
 
+// An empty capture keeps adb's own error, so an empty artifact says why.
+function adbText({ error, stdout, stderr }) {
+  if (stdout.trim()) return stdout;
+  return stderr || (error ? String(error.message) : "");
+}
+
 function lastLines(text, count) {
   const lines = text.split("\n");
   return lines.slice(Math.max(0, lines.length - count)).join("\n");
@@ -108,11 +114,31 @@ function lastLines(text, count) {
 
 // The newest ApplicationExitInfo record: its reason (native crash, crash, ANR,
 // low memory, signaled...) is the one thing that tells a crash from a kill.
+// Records survive reinstalls, so one from before this run is not reported.
 function latestExitRecord(exitInfo) {
   const start = exitInfo.indexOf("ApplicationExitInfo #0:");
   if (start === -1) return "";
   const next = exitInfo.indexOf("ApplicationExitInfo #1:", start);
-  return exitInfo.slice(start, next === -1 ? undefined : next).trim();
+  const record = exitInfo.slice(start, next === -1 ? undefined : next).trim();
+  const stamp = /timestamp=(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})\.(\d{3})/.exec(record);
+  if (stamp && logcatCutoffTime) {
+    const [, y, mo, d, h, mi, sec, ms] = stamp.map((v) => parseInt(v, 10));
+    if (new Date(y, mo - 1, d, h, mi, sec, ms) < logcatCutoffTime) {
+      return "(no exit recorded during this run)";
+    }
+  }
+  return record;
+}
+
+// threadtime lines: "MM-DD HH:mm:ss.mmm  PID  TID L TAG: message"
+function linesOfPid(logcat, pid) {
+  return logcat
+    .split("\n")
+    .filter((line) => {
+      const match = /^\d{2}-\d{2}\s+\S+\s+(\d+)\s/.exec(line);
+      return match && parseInt(match[1], 10) === pid;
+    })
+    .join("\n");
 }
 
 async function currentAppPid() {
@@ -124,29 +150,29 @@ async function currentAppPid() {
 
 async function collectDiagnostics() {
   const sections = [];
+  fs.rmSync(diagnosticsDir, { recursive: true, force: true });
 
   // Unfiltered by pid on purpose: crash_dump's backtrace (tag DEBUG), the
   // ActivityManager death/ANR lines and lmkd kills are logged by other pids.
+  // Repeated -b, not a comma list, and no --pid: both need API 24.
   const fullLogcat = filterLogcatFromCutoff(
-    (await adbOutput("logcat -d -v threadtime -b main,system,crash")).stdout
+    adbText(await adbOutput("logcat -d -v threadtime -b main -b system -b crash"))
   );
   writeDiagnostic("logcat.txt", fullLogcat);
 
   if (appPID !== -1) {
-    const appLogcat = filterLogcatFromCutoff(
-      (await adbOutput(`logcat -d -v threadtime --pid=${appPID}`)).stdout
-    );
+    const appLogcat = linesOfPid(fullLogcat, appPID);
     writeDiagnostic("logcat-app.txt", appLogcat);
     sections.push(["Last app logcat lines", lastLines(appLogcat, 150)]);
   }
 
   const crashBuffer = filterLogcatFromCutoff(
-    (await adbOutput("logcat -d -v threadtime -b crash")).stdout
+    adbText(await adbOutput("logcat -d -v threadtime -b crash"))
   );
   writeDiagnostic("logcat-crash.txt", crashBuffer);
   sections.push(["Crash buffer", lastLines(crashBuffer, 200)]);
 
-  const exitInfo = (await adbOutput(`shell dumpsys activity exit-info ${appId}`)).stdout;
+  const exitInfo = adbText(await adbOutput(`shell dumpsys activity exit-info ${appId}`));
   writeDiagnostic("exit-info.txt", exitInfo);
   sections.push(["Latest process exit", latestExitRecord(exitInfo)]);
 
@@ -161,8 +187,14 @@ async function collectDiagnostics() {
   const livePid = await currentAppPid();
   if (Number.isFinite(livePid)) {
     const stacks = await adbOutput(`shell debuggerd -b ${livePid}`);
-    writeDiagnostic("stacks.txt", stacks.stdout + stacks.stderr);
-    sections.push(["App is still alive; thread stacks written to stacks.txt", ""]);
+    writeDiagnostic("stacks.txt", adbText(stacks));
+    const captured = !stacks.error && stacks.stdout.trim();
+    sections.push([
+      captured
+        ? "App is still alive; thread stacks written to stacks.txt"
+        : "App is still alive; debuggerd failed, see stacks.txt",
+      "",
+    ]);
   }
 
   // stat's mtime is epoch seconds, independent of the device's time zone.
