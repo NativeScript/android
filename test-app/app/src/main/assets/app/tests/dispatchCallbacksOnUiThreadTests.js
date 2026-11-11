@@ -1,8 +1,8 @@
 describe("Tests dispatch callbacks on UI thread ", function () {
 	
-	it("TestProcessDataCallbackShouldBeExecutedOnUiThread", function (done) {
+	it("TestProcessDataCallbackFromBackgroundThreadReceivesAllData", function (done) {
 
-		__log("TEST: TestProcessDataCallbackShouldBeExecutedOnUiThread");
+		__log("TEST: TestProcessDataCallbackFromBackgroundThreadReceivesAllData");
 
 		var received = [];
 		var D = com.tns.tests.DispatchAsyncOpOnUIThreadTest.extend("DispatchAsyncOpOnUIThreadTest", {

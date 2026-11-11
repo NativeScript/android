@@ -21,6 +21,8 @@
 		}
 	}
 */
+var testRunStarted = false;
+
 var MyActivity = (function (_super) {
 	__extends(MyActivity, _super);
 	function MyActivity() {
@@ -29,8 +31,13 @@ var MyActivity = (function (_super) {
 	MyActivity.prototype.onCreate = function (bundle) {
 		_super.prototype.onCreate.call(this, bundle);
 
-        require('./tests/testsWithContext').run(this);
-        require('./Infrastructure/Jasmine/boot').execute();
+        // A recreated activity in the same process must not register or run the
+        // suite again: Jasmine rejects both once the run has started.
+        if (!testRunStarted) {
+            testRunStarted = true;
+            require('./tests/testsWithContext').run(this);
+            require('./Infrastructure/Jasmine/boot').execute();
+        }
 
         var layout = new android.widget.LinearLayout(this);
         layout.setOrientation(1);

@@ -36,9 +36,22 @@ env.addReporter(new TerminalReporter({
 }));
 env.addReporter(new JUnitXmlReporter());
 
+// Without a results file the runtests harness only gives up after its full
+// timeout, so a run that cannot start still writes one failing testcase.
+function saveRunFailure(message) {
+    var xml = '<?xml version="1.0" encoding="UTF-8" ?>\n<testsuites>' +
+        '\n <testsuite name="Jasmine run" hostname="localhost" time="0" errors="0" tests="1" skipped="0" failures="1">' +
+        '\n  <testcase classname="Jasmine run" name="(run could not start)" time="0">' +
+        '\n   <failure type="exception" message="Jasmine could not run the suite">' +
+        '<![CDATA[' + message.replace(/\]\]>/g, ']]]]><![CDATA[>') + ']]>' +
+        '\n   </failure>\n  </testcase>\n </testsuite>\n</testsuites>';
+    global.__JUnitSaveResults(xml);
+}
+
 exports.execute = function () {
     env.execute().catch(function (e) {
-        // No JUnit report follows; the runtests harness times out waiting for it.
-        console.log("Jasmine could not run the suite: " + ((e && e.stack) || e));
+        var message = String((e && e.stack) || e);
+        console.log("Jasmine could not run the suite: " + message);
+        saveRunFailure(message);
     });
 };
