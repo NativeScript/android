@@ -17,6 +17,7 @@
 #include <android/log.h>
 #include <unistd.h>
 #include "ManualInstrumentation.h"
+#include "ExtendFileIdentifier.h"
 #include "JSONObjectHelper.h"
 
 
@@ -2078,6 +2079,8 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
             string srcFileName = ArgConverter::ConvertToString(scriptName);
 
             string fullPathToFile;
+            // ES modules (`.mjs`, and HTTP-loaded modules) have no CommonJS wrapper.
+            bool hasCommonJsPrologue = true;
             if (srcFileName == "<embedded>") {
                 // Corner case, extend call is coming from the heap snapshot script
                 // This is possible for lazily compiled code - e.g. from the body of a function
@@ -2105,6 +2108,7 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
                 stripPrefix(normalized, "file://");
                 if (normalized.rfind("http://", 0) == 0 ||
                     normalized.rfind("https://", 0) == 0) {
+                    hasCommonJsPrologue = false;
                     size_t schemeEnd = normalized.find("://");
                     size_t pathStart = normalized.find('/', schemeEnd + 3);
                     if (pathStart == string::npos) {
@@ -2129,39 +2133,13 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
                            s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
                 };
                 if (endsWith(normalized, ".mjs")) {
+                    hasCommonJsPrologue = false;
                     normalized.resize(normalized.size() - 4);
                 } else if (endsWith(normalized, ".js")) {
                     normalized.resize(normalized.size() - 3);
                 }
 
-                fullPathToFile = normalized;
-
-                for (char& ch : fullPathToFile) {
-                    const unsigned char c = static_cast<unsigned char>(ch);
-                    const bool isIdentifierChar =
-                            (c >= 'A' && c <= 'Z') ||
-                            (c >= 'a' && c <= 'z') ||
-                            (c >= '0' && c <= '9') ||
-                            ch == '_';
-                    if (!isIdentifierChar) {
-                        ch = '_';
-                    }
-                }
-
-                std::vector<std::string> pathParts;
-                Util::SplitString(fullPathToFile, "_", pathParts);
-
-                std::string lastPathPart;
-                for (auto it = pathParts.rbegin(); it != pathParts.rend(); ++it) {
-                    if (!it->empty()) {
-                        lastPathPart = *it;
-                        break;
-                    }
-                }
-                if (lastPathPart.empty()) {
-                    lastPathPart = "script";
-                }
-                fullPathToFile = lastPathPart;
+                fullPathToFile = ExtendFileIdentifier(normalized);
             }
 
             int lineNumber = frame->GetLineNumber();
@@ -2180,7 +2158,7 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
 
             // Account for the column length offset added by the addition of the Common JS function wrapper
             // See issue https://github.com/NativeScript/android-runtime/issues/975
-            if (lineNumber == 1) {
+            if (lineNumber == 1 && hasCommonJsPrologue) {
                 column = column - ModuleInternal::MODULE_PROLOGUE_LENGTH;
             }
 

@@ -82,25 +82,18 @@ public class DexFactory {
         String fullClassName = className.replace("$", "_");
         String originalFullClassName = fullClassName;
 
-        // try to get pre-generated binding classes
-        try {
-            if (logger.isEnabled()) {
-                logger.write("getting pre-generated proxy class with name:  " + fullClassName.replace("-", "_"));
-            }
-
-            Class<?> pregeneratedClass = classLoader.loadClass(fullClassName.replace("-", "_"));
-
-            if (logger.isEnabled()) {
-                logger.write("Pre-generated class found:  " + fullClassName.replace("-", "_"));
-            }
-
-            return pregeneratedClass;
-        } catch (Exception e) {
-            if (logger.isEnabled()) {
-                logger.write("Pre-generated class not found:  " + fullClassName.replace("-", "_"));
-            }
+        // The static binding generator keeps a `$` from the script's file name in an
+        // anonymous extend's class name; the runtime already replaced the base class's `$`.
+        Class<?> pregeneratedClass = null;
+        if (!fullClassName.equals(className)) {
+            pregeneratedClass = loadPregeneratedClass(className.replace("-", "_"));
         }
-        //
+        if (pregeneratedClass == null) {
+            pregeneratedClass = loadPregeneratedClass(fullClassName.replace("-", "_"));
+        }
+        if (pregeneratedClass != null) {
+            return pregeneratedClass;
+        }
 
         // new: com.tns.gen.android.widget.DatePicker_MyActivity_59_56_
         // old: com.tns.tests.Button1_fMyActivity_l56_c44__MyButton
@@ -248,6 +241,27 @@ public class DexFactory {
         return sbStr.toString();
     }
 
+    private Class<?> loadPregeneratedClass(String name) {
+        try {
+            if (logger.isEnabled()) {
+                logger.write("getting pre-generated proxy class with name:  " + name);
+            }
+
+            Class<?> pregeneratedClass = classLoader.loadClass(name);
+
+            if (logger.isEnabled()) {
+                logger.write("Pre-generated class found:  " + name);
+            }
+
+            return pregeneratedClass;
+        } catch (Exception e) {
+            if (logger.isEnabled()) {
+                logger.write("Pre-generated class not found:  " + name);
+            }
+            return null;
+        }
+    }
+
     private String getClassToProxyName(String className) throws InvalidClassException {
         String classToProxy = className;
 
@@ -348,7 +362,7 @@ public class DexFactory {
         }
 
         AnnotationDescriptor[] annotations = null;
-        return proxyGenerator.generateProxy(proxyName, new ClassInfo(classToProxy), methodOverridesSet, implementedInterfacesSet, isInterface, annotations);
+        return proxyGenerator.generateProxy(proxyName, contentDigest, new ClassInfo(classToProxy), methodOverridesSet, implementedInterfacesSet, isInterface, annotations);
     }
 
     private void updateDexThumbAndPurgeCache() {
