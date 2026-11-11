@@ -20,6 +20,11 @@
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
+#include <memory>
+
+namespace tns {
+    struct IsolateGate;
+}
 
 namespace tns {
     class CallbackHandlers {
@@ -218,9 +223,11 @@ namespace tns {
 
 
         struct CacheEntry {
-            CacheEntry(v8::Isolate* isolate, v8::Local<v8::Function> callback)
+            CacheEntry(v8::Isolate* isolate, v8::Local<v8::Function> callback,
+                       std::shared_ptr<IsolateGate> gate)
                     : isolate_(isolate),
-                      callback_(isolate, callback) {
+                      callback_(isolate, callback),
+                      gate_(std::move(gate)) {
             }
 
             ~CacheEntry() {
@@ -229,6 +236,8 @@ namespace tns {
 
             v8::Isolate* isolate_;
             v8::Global<v8::Function> callback_;
+            // null for the main isolate, which is never disposed
+            std::shared_ptr<IsolateGate> gate_;
         };
 
         static robin_hood::unordered_map<uint64_t, CacheEntry> cache_;
