@@ -60,13 +60,8 @@ static inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate,
   return ArgConverter::ConvertToV8String(isolate, str);
 }
 
-// Filesystem: `path` names an existing regular file.
 static bool IsFile(const std::string& path) {
-  struct stat st;
-  if (stat(path.c_str(), &st) != 0) {
-    return false;
-  }
-  return (st.st_mode & S_IFMT) == S_IFREG;
+  return AppFiles::IsFile(path);
 }
 
 // Append `ext` if `path` doesn't already carry it.

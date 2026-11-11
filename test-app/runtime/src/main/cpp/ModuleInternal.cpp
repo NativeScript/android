@@ -1049,8 +1049,7 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
     // routes (app main, worker main) reach here straight from the caller's
     // specifier — so the existence check has to live here, or a missing entry
     // reads a null FILE* instead of failing with a name.
-    struct stat st;
-    if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) {
+    if (!AppFiles::IsFile(path)) {
         throw NativeScriptException("Cannot find module " + path);
     }
 

@@ -2253,8 +2253,8 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
     string namesFile = baseDir + "/treeStringsStream.dat";
     string valuesFile = baseDir + "/treeValueStream.dat";
 
-    FILE* f = fopen(nodesFile.c_str(), "rb");
-    if (f == nullptr) {
+    auto nodesReader = AppFiles::Open(nodesFile);
+    if (nodesReader == nullptr) {
         stringstream ss;
         ss << "metadata file (treeNodeStream.dat) couldn't be opened! (Error: ";
         ss << errno;
@@ -2262,11 +2262,9 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
 
         throw NativeScriptException(ss.str());
     }
-    fseek(f, 0, SEEK_END);
-    int lenNodes = ftell(f);
+    int lenNodes = static_cast<int>(nodesReader->size());
     if (lenNodes < 0 ||
         (static_cast<size_t>(lenNodes) % sizeof(MetadataTreeNodeRawData)) != 0) {
-        fclose(f);
         stringstream ss;
         ss << "Metadata file " << nodesFile << " is " << lenNodes
            << " bytes, which is not a whole number of "
@@ -2275,41 +2273,36 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
         throw NativeScriptException(ss.str());
     }
     char* nodes = new char[lenNodes];
-    rewind(f);
-    fread(nodes, 1, lenNodes, f);
-    fclose(f);
+    nodesReader->read(nodes, lenNodes);
+    nodesReader.reset();
 
     const int _512KB = 524288;
 
-    f = fopen(namesFile.c_str(), "rb");
-    if (f == nullptr) {
+    auto namesReader = AppFiles::Open(namesFile);
+    if (namesReader == nullptr) {
         stringstream ss;
         ss << "metadata file (treeStringsStream.dat) couldn't be opened! (Error: ";
         ss << errno;
         ss << ") ";
         throw NativeScriptException(ss.str());
     }
-    fseek(f, 0, SEEK_END);
-    int lenNames = ftell(f);
+    int lenNames = static_cast<int>(namesReader->size());
     char* names = new char[lenNames + _512KB];
-    rewind(f);
-    fread(names, 1, lenNames, f);
-    fclose(f);
+    namesReader->read(names, lenNames);
+    namesReader.reset();
 
-    f = fopen(valuesFile.c_str(), "rb");
-    if (f == nullptr) {
+    auto valuesReader = AppFiles::Open(valuesFile);
+    if (valuesReader == nullptr) {
         stringstream ss;
         ss << "metadata file (treeValueStream.dat) couldn't be opened! (Error: ";
         ss << errno;
         ss << ") ";
         throw NativeScriptException(ss.str());
     }
-    fseek(f, 0, SEEK_END);
-    int lenValues = ftell(f);
+    int lenValues = static_cast<int>(valuesReader->size());
     char* values = new char[lenValues + _512KB];
-    rewind(f);
-    fread(values, 1, lenValues, f);
-    fclose(f);
+    valuesReader->read(values, lenValues);
+    valuesReader.reset();
 
     timeval time2;
     gettimeofday(&time2, nullptr);

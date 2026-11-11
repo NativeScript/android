@@ -1,5 +1,4 @@
 #include "JsV8InspectorClient.h"
-#include "AppFiles.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -17,9 +16,9 @@
 #include "NativeScriptAssert.h"
 #include "NativeScriptPlatform.h"
 
+#include "AppFiles.h"
 #include "ArgConverter.h"
 #include "Constants.h"
-#include "File.h"
 #include "Util.h"
 #include "Utils.h"
 #include "WorkerInspectorClient.h"
@@ -196,13 +195,10 @@ bool GetInt32(const json& value, long long& out) {
 // key at the top level.
 bool ShouldRewriteSourceMapURLs() {
     static bool disabled = []() {
-        int length = 0;
-        auto* data = static_cast<uint8_t*>(File::ReadBinary(AppFiles::AppRootPrefix() + "package.json", length));
-        if (data == nullptr) {
+        std::string content;
+        if (!AppFiles::ReadText(AppFiles::AppRootPrefix() + "package.json", content)) {
             return false;
         }
-        std::string content(reinterpret_cast<const char*>(data), length);
-        delete[] data;
 
         auto parsed = json::parse(content, nullptr, false);
         if (parsed.is_discarded() || !parsed.is_object()) {
@@ -859,11 +855,7 @@ std::string JsV8InspectorClient::HandleLoadNetworkResource(long long msgId, cons
         }
 
         for (const auto& candidate : candidates) {
-            int length = 0;
-            auto* data = static_cast<uint8_t*>(File::ReadBinary(candidate, length));
-            if (data != nullptr) {
-                content.assign(reinterpret_cast<const char*>(data), length);
-                delete[] data;
+            if (AppFiles::ReadText(candidate, content)) {
                 loaded = true;
                 break;
             }
