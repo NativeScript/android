@@ -16,7 +16,10 @@ const adbCallTimeoutMs = 30 * 1000;
 // dump can both exceed that.
 const adbExecOptions = { timeout: adbCallTimeoutMs, maxBuffer: 64 * 1024 * 1024 };
 const scriptStartTime = new Date();
-const logcatCutoffTime = new Date(scriptStartTime.getTime() - 60 * 1000); // 1 minute before start
+const cutoffMarginMs = 60 * 1000;
+// Logcat stamps are device-local wall-clock time, so main() replaces this with
+// the device's clock when it can read it; the host clock is only a fallback.
+let logcatCutoffTime = new Date(scriptStartTime.getTime() - cutoffMarginMs);
 // Uploaded by CI as an artifact when the run fails.
 const diagnosticsDir = path.join(__dirname, "..", "dist", "crash-diagnostics");
 
@@ -110,11 +113,11 @@ function latestExitRecord(exitInfo) {
   return exitInfo.slice(start, next === -1 ? undefined : next).trim();
 }
 
-async function isAppAlive() {
+async function currentAppPid() {
   const { stdout } = await adbOutput(
     `shell "pidof ${appId} 2>/dev/null || ps | grep ${appId}"`
   );
-  return Number.isFinite(parseAppPid(stdout));
+  return parseAppPid(stdout);
 }
 
 async function collectDiagnostics() {
@@ -153,13 +156,15 @@ async function collectDiagnostics() {
     await adbOutput("wait-for-device");
   }
 
-  if (appPID !== -1 && (await isAppAlive())) {
-    const stacks = await adbOutput(`shell debuggerd -b ${appPID}`);
+  const livePid = await currentAppPid();
+  if (Number.isFinite(livePid)) {
+    const stacks = await adbOutput(`shell debuggerd -b ${livePid}`);
     writeDiagnostic("stacks.txt", stacks.stdout + stacks.stderr);
     sections.push(["App is still alive; thread stacks written to stacks.txt", ""]);
   }
 
-  const cutoffSeconds = Math.floor(logcatCutoffTime.getTime() / 1000);
+  // stat's mtime is epoch seconds, independent of the device's time zone.
+  const cutoffSeconds = Math.floor((scriptStartTime.getTime() - cutoffMarginMs) / 1000);
   const { stdout: tombstoneList } = await adbOutput(
     `shell "stat -c '%Y %n' /data/tombstones/tombstone_* 2>/dev/null"`
   );
@@ -282,7 +287,16 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function useDeviceClockForLogcatCutoff() {
+  const { stdout } = await adbOutput(`shell "date '+%m-%d %H:%M:%S.000'"`);
+  const deviceNow = parseLogcatTimestamp(stdout);
+  if (deviceNow) {
+    logcatCutoffTime = new Date(deviceNow.getTime() - cutoffMarginMs);
+  }
+}
+
 async function main() {
+  await useDeviceClockForLogcatCutoff();
   setTimeout(() => {
     timedOut = true;
   }, processTimeoutMs);
