@@ -30,12 +30,26 @@ jstring ToJString(JNIEnv* env, const std::string& value) {
     return env->NewStringUTF(value.c_str());
 }
 
+std::string ElementString(JNIEnv* env, jobjectArray array, jsize index) {
+    auto element = static_cast<jstring>(env->GetObjectArrayElement(array, index));
+    std::string result = ToStdString(env, element);
+    env->DeleteLocalRef(element);
+    return result;
+}
+
+std::vector<jint> ToIntVector(JNIEnv* env, jintArray array) {
+    std::vector<jint> result(env->GetArrayLength(array));
+    env->GetIntArrayRegion(array, 0, static_cast<jsize>(result.size()), result.data());
+    return result;
+}
+
 }  // namespace
 
 extern "C" JNIEXPORT void JNICALL Java_com_tns_AppFiles_nativeInit(
         JNIEnv* env, jclass, jstring filesRoot, jstring alias, jstring codeCacheDir,
         jobject assetManager, jboolean loadCodeFromApk,
-        jobjectArray alwaysExtract) {
+        jobjectArray alwaysExtract, jintArray layerKinds, jobjectArray layerRoots,
+        jintArray mapStart, jobjectArray mapKeys, jintArray mapKinds, jobjectArray mapTargets) {
     AppFiles::Config config;
     config.filesRoot = ToStdString(env, filesRoot);
     if (alias != nullptr) {
@@ -49,9 +63,32 @@ extern "C" JNIEXPORT void JNICALL Java_com_tns_AppFiles_nativeInit(
     if (alwaysExtract != nullptr) {
         jsize count = env->GetArrayLength(alwaysExtract);
         for (jsize i = 0; i < count; i++) {
-            auto glob = static_cast<jstring>(env->GetObjectArrayElement(alwaysExtract, i));
-            config.alwaysExtract.push_back(ToStdString(env, glob));
-            env->DeleteLocalRef(glob);
+            config.alwaysExtract.push_back(ElementString(env, alwaysExtract, i));
+        }
+    }
+    if (layerKinds != nullptr) {
+        // Values mirror AppFileLayers.Snapshot and AppFileLayer.Entry.Kind.
+        static const AppFiles::Layer::Kind kLayerKinds[] = {
+                AppFiles::Layer::Kind::Extracted, AppFiles::Layer::Kind::Apk,
+                AppFiles::Layer::Kind::Directory, AppFiles::Layer::Kind::ApkAssets,
+                AppFiles::Layer::Kind::Map};
+        static const AppFiles::LayerEntry::Kind kEntryKinds[] = {
+                AppFiles::LayerEntry::Kind::File, AppFiles::LayerEntry::Kind::Asset,
+                AppFiles::LayerEntry::Kind::Whiteout};
+        std::vector<jint> kinds = ToIntVector(env, layerKinds);
+        std::vector<jint> starts = ToIntVector(env, mapStart);
+        std::vector<jint> entryKinds = ToIntVector(env, mapKinds);
+        for (size_t i = 0; i < kinds.size(); i++) {
+            AppFiles::Layer layer;
+            layer.kind = kLayerKinds[kinds[i]];
+            layer.root = ElementString(env, layerRoots, static_cast<jsize>(i));
+            for (jint e = starts[i]; e < starts[i + 1]; e++) {
+                AppFiles::LayerEntry entry;
+                entry.kind = kEntryKinds[entryKinds[e]];
+                entry.target = ElementString(env, mapTargets, e);
+                layer.entries.emplace_back(ElementString(env, mapKeys, e), std::move(entry));
+            }
+            config.layers.push_back(std::move(layer));
         }
     }
     AppFiles::Init(config);

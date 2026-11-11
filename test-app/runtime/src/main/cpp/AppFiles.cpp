@@ -18,12 +18,15 @@ namespace {
 enum class Lookup {
     Miss,
     Hit,
+    // Stop: not found, whatever the sources below hold.
+    Whiteout,
 };
 
 /*
  * One place app files can come from. `relative` is relative to the files
  * root, e.g. "app/main.js" or "metadata/treeNodeStream.dat". Sources are
  * immutable after Init, apart from internal caches they guard themselves.
+ * Layers from customizers only answer paths under app/.
  */
 class Source {
 public:
@@ -36,10 +39,11 @@ public:
     }
 };
 
-// Which part of the layered roots a built-in source answers for.
+// Which part of the layered roots a source answers for.
 enum class Serves {
     Everything,
     ApkServedOnly,
+    AppOnly,
 };
 
 bool InScope(Serves serves, const std::string& relative) {
@@ -48,6 +52,8 @@ bool InScope(Serves serves, const std::string& relative) {
             return true;
         case Serves::ApkServedOnly:
             return IsApkServed(relative);
+        case Serves::AppOnly:
+            return relative.compare(0, 4, "app/") == 0;
     }
     return false;
 }
@@ -129,55 +135,50 @@ private:
     AAsset* m_asset;
 };
 
+/*
+ * Files under `root`. A built-in source mirrors the files root; a customizer's
+ * directory is laid out like the app root.
+ */
 class DirectorySource final : public Source {
 public:
-    DirectorySource(std::string root, Serves serves) : m_root(std::move(root)), m_serves(serves) {}
+    DirectorySource(std::string root, Serves serves)
+        : m_root(std::move(root)), m_serves(serves) {}
 
     Lookup Find(const std::string& relative) const override {
-        return InScope(m_serves, relative) && IsRegularFile(m_root + "/" + relative)
-                ? Lookup::Hit
-                : Lookup::Miss;
+        return InScope(m_serves, relative) && IsRegularFile(PathFor(relative)) ? Lookup::Hit
+                                                                               : Lookup::Miss;
     }
 
     std::unique_ptr<Reader> Open(const std::string& relative) const override {
-        return OpenRegularFile(m_root + "/" + relative);
+        return OpenRegularFile(PathFor(relative));
     }
 
     bool RealFilePath(const std::string& relative, std::string& realPath) const override {
-        realPath = m_root + "/" + relative;
+        realPath = PathFor(relative);
         return true;
     }
 
 private:
+    std::string PathFor(const std::string& relative) const {
+        return m_root + "/" + (m_serves == Serves::AppOnly ? relative.substr(4) : relative);
+    }
+
     std::string m_root;
     Serves m_serves;
 };
 
 /*
- * The APK's assets, whose paths mirror the files root ("app/main.js" is the
- * asset "app/main.js"). Existence is answered from one AAssetManager_openDir
- * listing per directory, taken on first use; AAssets are never shared, every
- * Open gets its own.
+ * Which APK assets exist. One AAssetManager_openDir listing per directory,
+ * taken on first use; AAssets themselves are never shared, every open gets
+ * its own.
  */
-class ApkSource final : public Source {
+class AssetIndex {
 public:
-    ApkSource(AAssetManager* assets, Serves serves) : m_assets(assets), m_serves(serves) {}
+    explicit AssetIndex(AAssetManager* assets) : m_assets(assets) {}
 
-    Lookup Find(const std::string& relative) const override {
-        return InScope(m_serves, relative) && AssetExists(relative) ? Lookup::Hit : Lookup::Miss;
-    }
+    AAssetManager* assets() const { return m_assets; }
 
-    std::unique_ptr<Reader> Open(const std::string& relative) const override {
-        AAsset* asset = AAssetManager_open(m_assets, relative.c_str(), AASSET_MODE_STREAMING);
-        if (asset == nullptr) {
-            errno = ENOENT;
-            return nullptr;
-        }
-        return std::unique_ptr<Reader>(new AssetReader(asset));
-    }
-
-private:
-    bool AssetExists(const std::string& assetPath) const {
+    bool Exists(const std::string& assetPath) const {
         size_t slash = assetPath.find_last_of('/');
         std::string dir = slash == std::string::npos ? std::string() : assetPath.substr(0, slash);
         std::string name = slash == std::string::npos ? assetPath : assetPath.substr(slash + 1);
@@ -197,11 +198,105 @@ private:
         return it->second.count(name) != 0;
     }
 
+    std::unique_ptr<Reader> Open(const std::string& assetPath) const {
+        AAsset* asset = AAssetManager_open(m_assets, assetPath.c_str(), AASSET_MODE_STREAMING);
+        if (asset == nullptr) {
+            errno = ENOENT;
+            return nullptr;
+        }
+        return std::unique_ptr<Reader>(new AssetReader(asset));
+    }
+
+private:
     AAssetManager* m_assets;
-    Serves m_serves;
     mutable std::mutex m_mutex;
     // Directory -> the regular files directly in it.
     mutable std::unordered_map<std::string, std::unordered_set<std::string>> m_listings;
+};
+
+/*
+ * APK assets. The built-in source mirrors the files root ("app/main.js" is
+ * the asset "app/main.js"); a customizer's lays out `base` like the app root.
+ */
+class ApkSource final : public Source {
+public:
+    ApkSource(const AssetIndex& index, Serves serves, std::string base = std::string())
+        : m_index(index), m_serves(serves), m_base(std::move(base)) {}
+
+    Lookup Find(const std::string& relative) const override {
+        return InScope(m_serves, relative) && m_index.Exists(AssetFor(relative)) ? Lookup::Hit
+                                                                                  : Lookup::Miss;
+    }
+
+    std::unique_ptr<Reader> Open(const std::string& relative) const override {
+        return m_index.Open(AssetFor(relative));
+    }
+
+private:
+    std::string AssetFor(const std::string& relative) const {
+        return m_serves == Serves::AppOnly ? m_base + "/" + relative.substr(4) : relative;
+    }
+
+    const AssetIndex& m_index;
+    Serves m_serves;
+    std::string m_base;
+};
+
+// Exactly the listed app-relative paths, each a file, an asset or a whiteout.
+class MapSource final : public Source {
+public:
+    MapSource(const AssetIndex* index, std::unordered_map<std::string, LayerEntry> entries)
+        : m_index(index), m_entries(std::move(entries)) {}
+
+    Lookup Find(const std::string& relative) const override {
+        const LayerEntry* entry = EntryFor(relative);
+        if (entry == nullptr) {
+            return Lookup::Miss;
+        }
+        switch (entry->kind) {
+            case LayerEntry::Kind::File:
+                return IsRegularFile(entry->target) ? Lookup::Hit : Lookup::Miss;
+            case LayerEntry::Kind::Asset:
+                return m_index != nullptr && m_index->Exists(entry->target) ? Lookup::Hit
+                                                                            : Lookup::Miss;
+            case LayerEntry::Kind::Whiteout:
+                return Lookup::Whiteout;
+        }
+        return Lookup::Miss;
+    }
+
+    std::unique_ptr<Reader> Open(const std::string& relative) const override {
+        const LayerEntry* entry = EntryFor(relative);
+        if (entry != nullptr && entry->kind == LayerEntry::Kind::File) {
+            return OpenRegularFile(entry->target);
+        }
+        if (entry != nullptr && entry->kind == LayerEntry::Kind::Asset && m_index != nullptr) {
+            return m_index->Open(entry->target);
+        }
+        errno = ENOENT;
+        return nullptr;
+    }
+
+    bool RealFilePath(const std::string& relative, std::string& realPath) const override {
+        const LayerEntry* entry = EntryFor(relative);
+        if (entry == nullptr || entry->kind != LayerEntry::Kind::File) {
+            return false;
+        }
+        realPath = entry->target;
+        return true;
+    }
+
+private:
+    const LayerEntry* EntryFor(const std::string& relative) const {
+        if (relative.compare(0, 4, "app/") != 0) {
+            return nullptr;
+        }
+        auto it = m_entries.find(relative.substr(4));
+        return it == m_entries.end() ? nullptr : &it->second;
+    }
+
+    const AssetIndex* m_index;
+    std::unordered_map<std::string, LayerEntry> m_entries;
 };
 
 struct State {
@@ -214,6 +309,7 @@ struct State {
     std::vector<std::string> aliases;
     bool loadCodeFromApk = false;
     std::vector<std::string> alwaysExtract;
+    std::unique_ptr<AssetIndex> assetIndex;
     // Searched in order; the first source that has a file serves it.
     std::vector<std::unique_ptr<Source>> sources;
 };
@@ -366,11 +462,55 @@ bool LayeredRelativePath(const std::string& path, std::string& relative) {
 // The first source that has `relative`, or null.
 const Source* FindSource(const std::string& relative) {
     for (const auto& source : s_state.sources) {
-        if (source->Find(relative) == Lookup::Hit) {
-            return source.get();
+        switch (source->Find(relative)) {
+            case Lookup::Hit:
+                return source.get();
+            case Lookup::Whiteout:
+                return nullptr;
+            case Lookup::Miss:
+                break;
         }
     }
     return nullptr;
+}
+
+// Disk first: what LiveSync or the app itself writes into the files
+// directory wins over the APK's copy.
+std::vector<Layer> DefaultLayers() {
+    std::vector<Layer> layers(2);
+    layers[0].kind = Layer::Kind::Extracted;
+    layers[1].kind = Layer::Kind::Apk;
+    return layers;
+}
+
+void AddSource(const Layer& layer) {
+    const AssetIndex* index = s_state.assetIndex.get();
+    switch (layer.kind) {
+        case Layer::Kind::Extracted:
+            s_state.sources.emplace_back(new DirectorySource(s_state.files, Serves::Everything));
+            break;
+        case Layer::Kind::Apk:
+            if (s_state.loadCodeFromApk) {
+                s_state.sources.emplace_back(new ApkSource(*index, Serves::ApkServedOnly));
+            }
+            break;
+        case Layer::Kind::Directory:
+            s_state.sources.emplace_back(new DirectorySource(layer.root, Serves::AppOnly));
+            break;
+        case Layer::Kind::ApkAssets:
+            if (index != nullptr) {
+                s_state.sources.emplace_back(new ApkSource(*index, Serves::AppOnly, layer.root));
+            }
+            break;
+        case Layer::Kind::Map: {
+            std::unordered_map<std::string, LayerEntry> entries;
+            for (const auto& entry : layer.entries) {
+                entries[entry.first] = entry.second;
+            }
+            s_state.sources.emplace_back(new MapSource(index, std::move(entries)));
+            break;
+        }
+    }
 }
 
 }  // namespace
@@ -394,12 +534,13 @@ void Init(const Config& config) {
 
         s_state.loadCodeFromApk = config.loadCodeFromApk && config.assets != nullptr;
         s_state.alwaysExtract = config.alwaysExtract;
+        if (config.assets != nullptr) {
+            s_state.assetIndex.reset(new AssetIndex(config.assets));
+        }
 
-        // Disk first: what LiveSync or the app itself writes into the files
-        // directory wins over the APK's copy.
-        s_state.sources.emplace_back(new DirectorySource(s_state.files, Serves::Everything));
-        if (s_state.loadCodeFromApk) {
-            s_state.sources.emplace_back(new ApkSource(config.assets, Serves::ApkServedOnly));
+        const std::vector<Layer>& layers = config.layers.empty() ? DefaultLayers() : config.layers;
+        for (const auto& layer : layers) {
+            AddSource(layer);
         }
     });
 }

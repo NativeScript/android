@@ -116,6 +116,7 @@ require('./tests/testNodeUrlModule');
 require('./tests/testImportMetaResolution');
 require('./tests/testWorkerEsmEntry');
 require('./tests/testCodeCache');
+require('./tests/testAppFileLayers');
 // Worker wrapper reachability across GC (strong while running, collectable after)
 require('./tests/testWorkerLifetime');
 // Java->JS calls route to the runtime that created the object

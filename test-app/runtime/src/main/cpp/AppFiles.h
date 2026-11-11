@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct AAssetManager;
@@ -11,16 +12,50 @@ struct AAssetManager;
 namespace tns {
 namespace AppFiles {
 
+// What a map layer answers for one app-relative path.
+struct LayerEntry {
+    enum class Kind {
+        File,
+        Asset,
+        Whiteout,
+    };
+    Kind kind = Kind::Whiteout;
+    // An absolute file path or an asset path.
+    std::string target;
+};
+
+struct Layer {
+    enum class Kind {
+        // The files directory, laid out like the files root.
+        Extracted,
+        // The APK-served set, straight from the APK.
+        Apk,
+        // From customizers; these answer only paths under app/.
+        Directory,
+        ApkAssets,
+        Map,
+    };
+    Kind kind = Kind::Extracted;
+    // Directory: a directory laid out like the app root. ApkAssets: an asset
+    // directory laid out like the app root.
+    std::string root;
+    // Map: app-relative path -> entry.
+    std::vector<std::pair<std::string, LayerEntry>> entries;
+};
+
 struct Config {
     // The canonical files directory: the logical root V8 sees.
     std::string filesRoot;
     // Other spellings of filesRoot.
     std::vector<std::string> aliases;
-    // The APK's assets; required when loadCodeFromApk is set.
+    // The APK's assets; needed by loadCodeFromApk and by asset layers.
     AAssetManager* assets = nullptr;
     bool loadCodeFromApk = false;
     // Globs relative to the app root that are extracted even when they are code.
     std::vector<std::string> alwaysExtract;
+    // Searched top first. Empty means the built-in order: the extracted files,
+    // then the APK. An Apk layer is inert without loadCodeFromApk.
+    std::vector<Layer> layers;
 };
 
 /*

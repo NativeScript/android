@@ -26,15 +26,18 @@ public final class AppFiles {
 
     /**
      * Configures app file access from the APK's own app/package.json
-     * ({@code android.loadCodeFromApk}, {@code android.alwaysExtract}). Must run
-     * before assets are extracted, since the extractor skips what is served
-     * from the APK.
+     * ({@code android.loadCodeFromApk}, {@code android.alwaysExtract}) and the
+     * registered {@link AppFileLayersCustomizer}s. Must run before assets are
+     * extracted, since the extractor skips what is served from the APK.
+     *
+     * @param appUpdated whether this is the first launch after an install or update
      */
-    public static void init(Context context) {
+    public static void init(Context context, boolean appUpdated) {
         AssetManager assets = context.getAssets();
         ApkFlags flags = ApkFlags.read(assets);
-        init(context.getFilesDir(), context.getCodeCacheDir(), flags.loadCodeFromApk ? assets : null,
-                flags.loadCodeFromApk, flags.alwaysExtract);
+        AppFileLayers.Snapshot layers = AppFileLayers.build(context, appUpdated, flags.loadCodeFromApk);
+        init(context.getFilesDir(), context.getCodeCacheDir(), assets, flags.loadCodeFromApk,
+                flags.alwaysExtract, layers);
     }
 
     /**
@@ -42,11 +45,12 @@ public final class AppFiles {
      * effect, so every caller that may run first can make it.
      */
     public static void init(File filesDir, File codeCacheDir) {
-        init(filesDir, codeCacheDir, null, false, new String[0]);
+        init(filesDir, codeCacheDir, null, false, new String[0], null);
     }
 
     private static void init(File filesDir, File codeCacheDir, AssetManager assets,
-                             boolean loadCodeFromApk, String[] alwaysExtract) {
+                             boolean loadCodeFromApk, String[] alwaysExtract,
+                             AppFileLayers.Snapshot layers) {
         String absolute = filesDir.getAbsolutePath();
         String canonical;
         try {
@@ -54,8 +58,14 @@ public final class AppFiles {
         } catch (IOException e) {
             canonical = absolute;
         }
-        nativeInit(canonical, absolute, codeCacheDir.getAbsolutePath(), assets, loadCodeFromApk,
-                alwaysExtract);
+        if (layers == null) {
+            nativeInit(canonical, absolute, codeCacheDir.getAbsolutePath(), assets, loadCodeFromApk,
+                    alwaysExtract, null, null, null, null, null, null);
+        } else {
+            nativeInit(canonical, absolute, codeCacheDir.getAbsolutePath(), assets, loadCodeFromApk,
+                    alwaysExtract, layers.kinds, layers.roots, layers.mapStart,
+                    layers.mapKeys, layers.mapKinds, layers.mapTargets);
+        }
     }
 
     /** UTF-8 contents, or null when the file cannot be read. */
@@ -83,7 +93,9 @@ public final class AppFiles {
 
     private static native void nativeInit(String filesRoot, String alias, String codeCacheDir,
                                           AssetManager assets, boolean loadCodeFromApk,
-                                          String[] alwaysExtract);
+                                          String[] alwaysExtract,
+                                          int[] layerKinds, String[] layerRoots, int[] mapStart,
+                                          String[] mapKeys, int[] mapKinds, String[] mapTargets);
 
     /*
      * Read from the APK's copy of app/package.json, never through the app file

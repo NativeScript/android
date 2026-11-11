@@ -71,7 +71,6 @@ public final class RuntimeHelper {
             } finally {
                 loadLibraryFrame.close();
             }
-            AppFiles.init(context);
 
             Logger logger = new LogcatLogger(context);
 
@@ -84,6 +83,7 @@ public final class RuntimeHelper {
                 Thread.setDefaultUncaughtExceptionHandler(exHandler);
 
                 DefaultExtractPolicy extractPolicy = new DefaultExtractPolicy(logger);
+                AppFiles.init(context, extractPolicy.shouldExtract(context));
                 boolean skipAssetExtraction = Util.runPlugin(logger, context);
 
                 String appName = context.getPackageName();
