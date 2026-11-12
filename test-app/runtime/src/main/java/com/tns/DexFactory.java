@@ -178,10 +178,7 @@ public class DexFactory {
         String classNameToLoad = isInterface ? fullClassName : desiredDexClassName;
 
         boolean injectIntoParent = injectIntoParentClassLoader && classLoader instanceof BaseDexClassLoader;
-        if (injectIntoParent) {
-            // ART's mark-compact GC can lose a DexCache field store (SIGSEGV in
-            // ClassLinker::RegisterDexFileLocked) when a collection overlaps
-            // registering a dex with this long-lived loader.
+        if (injectIntoParent && ProxyRegistrationGc.isRequired()) {
             // The dex is registered by the first loadClass below, so the blocking
             // collection has to stay immediately before it.
             java.lang.Runtime.getRuntime().gc();
