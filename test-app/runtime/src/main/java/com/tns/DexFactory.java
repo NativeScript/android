@@ -177,8 +177,14 @@ public class DexFactory {
         Class<?> result = null;
         String classNameToLoad = isInterface ? fullClassName : desiredDexClassName;
 
-        if (injectIntoParentClassLoader && classLoader instanceof BaseDexClassLoader
-                && injectDexIntoClassLoader((BaseDexClassLoader) classLoader, jarFilePath)) {
+        boolean injectIntoParent = injectIntoParentClassLoader && classLoader instanceof BaseDexClassLoader;
+        if (injectIntoParent && ProxyRegistrationGc.isRequired()) {
+            // The dex is registered by the first loadClass below, so the blocking
+            // collection has to stay immediately before it.
+            java.lang.Runtime.getRuntime().gc();
+        }
+
+        if (injectIntoParent && injectDexIntoClassLoader((BaseDexClassLoader) classLoader, jarFilePath)) {
             try {
                 result = classLoader.loadClass(classNameToLoad);
             } catch (ClassNotFoundException e) {
