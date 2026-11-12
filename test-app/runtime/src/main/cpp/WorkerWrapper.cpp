@@ -718,6 +718,12 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
         }
     }
 
+    // No Locker is held here, as the gate requires.
+    {
+        std::lock_guard<std::mutex> lock(gate_->mutex);
+        gate_->open = false;
+    }
+
     // Terminate any workers this worker created (nested workers). Their
     // Worker object persistents live in this isolate, so they must be
     // released before the isolate is disposed below. Each child cascades to

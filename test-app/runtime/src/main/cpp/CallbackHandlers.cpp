@@ -741,10 +741,16 @@ void CallbackHandlers::RunOnMainThreadCallback(const FunctionCallbackInfo<v8::Va
         return;
     }
 
+    std::shared_ptr<IsolateGate> gate;
+    if (auto wrapper = WorkerWrapper::FromIsolate(isolate)) {
+        gate = wrapper->Gate();
+    }
+
     {
         std::lock_guard<std::mutex> lock(cacheMutex_);
         bool inserted;
-        std::tie(std::ignore, inserted) = cache_.try_emplace(key, isolate, callback);
+        std::tie(std::ignore, inserted) = cache_.try_emplace(key, isolate, callback,
+                                                             std::move(gate));
         NS_DCHECK(inserted && "Main thread callback ID should not be duplicated");
     }
 
@@ -756,6 +762,7 @@ void CallbackHandlers::RunOnMainThreadCallback(const FunctionCallbackInfo<v8::Va
 
 void CallbackHandlers::RunMainThreadEntry(uint64_t key) {
     Isolate *isolate;
+    std::shared_ptr<IsolateGate> gate;
     {
         std::lock_guard<std::mutex> lock(cacheMutex_);
         auto it = cache_.find(key);
@@ -763,9 +770,23 @@ void CallbackHandlers::RunMainThreadEntry(uint64_t key) {
             return;
         }
         isolate = it->second.isolate_;
+        gate = it->second.gate_;
+    }
+
+    // A worker that has started shutting down may dispose its isolate at any
+    // moment, so its callback is dropped without touching the isolate.
+    std::unique_lock<std::mutex> gateLock;
+    if (gate != nullptr) {
+        gateLock = std::unique_lock<std::mutex>(gate->mutex);
+        if (!gate->open) {
+            return;
+        }
     }
 
     v8::Locker locker(isolate);
+    if (gateLock.owns_lock()) {
+        gateLock.unlock();
+    }
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     Local<v8::Function> cb;
@@ -788,6 +809,14 @@ void CallbackHandlers::RunMainThreadEntry(uint64_t key) {
 
     if (tc.HasCaught() &&
         !NativeScriptException::ContainUncaughtCallbackException(isolate, tc)) {
+        if (gate != nullptr) {
+            // A worker's error belongs to the worker, as if the callback had
+            // run on its own thread: its onerror, then the parent's Worker
+            // object. Thrown from here it would become a Java exception on the
+            // main thread.
+            CallWorkerScopeOnErrorHandle(isolate, tc);
+            return;
+        }
         // surfaces via the event loop's guard as a pending Java exception
         throw NativeScriptException(tc);
     }
