@@ -2,7 +2,6 @@
 #include "ModuleInternalCallbacks.h"
 
 #include <unistd.h>
-#include <sys/stat.h>
 #include <v8.h>
 
 #include <algorithm>
@@ -16,6 +15,7 @@
 #include <time.h>
 #include <vector>
 
+#include "AppFiles.h"
 #include "ArgConverter.h"
 #include "EventLoop.h"
 #include "HttpLoader.h"
@@ -59,13 +59,8 @@ static inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate,
   return ArgConverter::ConvertToV8String(isolate, str);
 }
 
-// Filesystem: `path` names an existing regular file.
 static bool IsFile(const std::string& path) {
-  struct stat st;
-  if (stat(path.c_str(), &st) != 0) {
-    return false;
-  }
-  return (st.st_mode & S_IFMT) == S_IFREG;
+  return AppFiles::IsFile(path);
 }
 
 // Append `ext` if `path` doesn't already carry it.
@@ -75,25 +70,6 @@ static std::string WithExtension(const std::string& path, const std::string& ext
     return path;
   }
   return path + ext;
-}
-
-// Application filesystem root for on-disk .mjs/.js resolution.
-// Mirrors Module.java's getApplicationFilesPath + "/app". Cached after first
-// JNI call — the value is process-stable, and re-entering JNI on every
-// resolver hit would add avoidable overhead to hot module-graph walks.
-static std::string GetApplicationPath() {
-  static std::string cached;
-  static std::once_flag flag;
-  std::call_once(flag, []() {
-    JEnv env;
-    jstring applicationFilesPath = (jstring)env.CallStaticObjectMethod(
-        ModuleInternal::MODULE_CLASS,
-        ModuleInternal::GET_APPLICATION_FILES_PATH_METHOD_ID);
-    if (applicationFilesPath != nullptr) {
-      cached = ArgConverter::jstringToString(applicationFilesPath) + "/app";
-    }
-  });
-  return cached;
 }
 
 // Collapse "." and ".." segments, preserving a leading "/".
@@ -127,6 +103,9 @@ static std::string NormalizeDotSegments(const std::string& path) {
 // Foundation dependency (no HOME expansion, which we never used anyway).
 static std::string NormalizePath(const std::string& path) {
   if (path.empty()) return path;
+  // Every spelling of the files directory has to key the same registry entry.
+  std::string logical;
+  if (AppFiles::ToLogical(path, logical)) return logical;
   return NormalizeDotSegments(path);
 }
 
@@ -1191,7 +1170,7 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
   if (referrer.empty() && specIsRelative) {
     TNS_DEBUG(Esm, "[resolver] No referrer for relative '%s' - assuming app root",
                    spec.c_str());
-    referrer = GetApplicationPath() + "/index.mjs";
+    referrer = AppFiles::AppRootPrefix() + "index.mjs";
   }
   size_t slash = referrer.find_last_of("/\\");
   const std::string baseDir =
@@ -1234,7 +1213,7 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
   // Build the filesystem candidates for this specifier shape. The specifier may
   // omit its extension or name a directory, so each candidate is probed with
   // Node-style extension and index fallbacks below.
-  const std::string appPath = GetApplicationPath();
+  const std::string& appPath = AppFiles::AppRoot();
   std::vector<std::string> candidateBases;
 
   if (specIsRelative) {
@@ -1273,11 +1252,13 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
                    base.c_str(), baseApp.c_str());
   } else if (specIsRootAbs) {
     // Dynamic import may already have resolved a relative specifier to a real
-    // filesystem path under the application root; use that as-is so we don't
-    // prefix ApplicationPath twice. Bundle-relative paths like /app/... or
-    // /src/... still resolve against appPath.
-    if (!appPath.empty() && spec.rfind(appPath, 0) == 0) {
-      candidateBases.push_back(NormalizePath(spec));
+    // filesystem path under the application root, in any spelling of it; use
+    // that as-is so we don't prefix ApplicationPath twice. Bundle-relative
+    // paths like /app/... or /src/... still resolve against appPath.
+    std::string logicalSpec;
+    if (!appPath.empty() && AppFiles::ToLogical(spec, logicalSpec) &&
+        (logicalSpec == appPath || logicalSpec.rfind(AppFiles::AppRootPrefix(), 0) == 0)) {
+      candidateBases.push_back(logicalSpec);
       TNS_DEBUG(Esm, "[resolver][abs-fs] spec=%s", spec.c_str());
     } else {
       std::string base = NormalizePath(appPath + spec);

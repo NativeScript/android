@@ -1,4 +1,5 @@
 #include "CallbackHandlers.h"
+#include "AppFiles.h"
 #include "NativeScriptAssert.h"
 #include "MetadataNode.h"
 #include "Util.h"
@@ -1514,7 +1515,7 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         if (!isHttpEntry && !workerPath.empty() && workerPath[0] == '~') {
             // Convert ~/path to ApplicationPath/path
             std::string tail = workerPath.size() >= 2 && workerPath[1] == '/' ? workerPath.substr(2) : workerPath.substr(1);
-            resolvedPath = Constants::APP_ROOT_FOLDER_PATH + tail;
+            resolvedPath = AppFiles::AppRootPrefix() + tail;
         }
 
         /*
@@ -1523,7 +1524,7 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
          * the script may not be found there - in both cases fall back to
          * app-root-relative resolution, mirroring the iOS runtime.
          */
-        std::string currentDir = Constants::APP_ROOT_FOLDER_PATH;
+        std::string currentDir = AppFiles::AppRootPrefix();
         auto stack = isHttpEntry
                              ? Local<StackTrace>()
                              : StackTrace::CurrentStackTrace(isolate, 1, StackTrace::kScriptName);
@@ -1558,13 +1559,13 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
             try {
                 entryPath = ModuleInternal::CheckFileExists(isolate, resolvedPath, currentDir);
             } catch (NativeScriptException& e) {
-                if (currentDir == Constants::APP_ROOT_FOLDER_PATH) {
+                if (currentDir == AppFiles::AppRootPrefix()) {
                     throw;
                 }
                 // not found next to the caller - retry against the app root
                 entryPath = ModuleInternal::CheckFileExists(isolate, resolvedPath,
-                                                            Constants::APP_ROOT_FOLDER_PATH);
-                currentDir = Constants::APP_ROOT_FOLDER_PATH;
+                                                            AppFiles::AppRootPrefix());
+                currentDir = AppFiles::AppRootPrefix();
             }
         }
 

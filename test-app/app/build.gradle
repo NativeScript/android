@@ -216,8 +216,30 @@ def computeNamespace = { ->
     return "com.tns.testapplication"
 }
 
+/*
+ * With "android": { "storeCodeUncompressed": true } in app/package.json, code
+ * is stored in the APK uncompressed, so loadCodeFromApk reads it without
+ * inflating. noCompress matches by file-name suffix across the whole APK, not
+ * only under assets/app, so the metadata streams are named in full.
+ */
+project.ext.nsUncompressedCodeSuffixes = [".js", ".mjs", ".cjs", ".map",
+                                          "treeNodeStream.dat", "treeStringsStream.dat", "treeValueStream.dat"]
+
+def computeStoreCodeUncompressed = { ->
+    def appPackageJsonFile = file("${APP_DIR}/$PACKAGE_JSON")
+    if (!appPackageJsonFile.exists()) {
+        return false
+    }
+    def packageJsonMap = new JsonSlurper().parseText(appPackageJsonFile.getText("UTF-8"))
+    return packageJsonMap?.android?.storeCodeUncompressed == true
+}
+
 android {
     namespace = computeNamespace()
+
+    if (computeStoreCodeUncompressed()) {
+        androidResources.noCompress.addAll(project.ext.nsUncompressedCodeSuffixes)
+    }
 
     applyBeforePluginGradleConfiguration()
 

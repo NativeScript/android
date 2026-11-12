@@ -83,6 +83,7 @@ public final class RuntimeHelper {
                 Thread.setDefaultUncaughtExceptionHandler(exHandler);
 
                 DefaultExtractPolicy extractPolicy = new DefaultExtractPolicy(logger);
+                AppFiles.init(context, extractPolicy.shouldExtract(context));
                 boolean skipAssetExtraction = Util.runPlugin(logger, context);
 
                 String appName = context.getPackageName();
@@ -108,9 +109,13 @@ public final class RuntimeHelper {
                         // will force deletion of previously extracted files in app/files directories
                         // see https://github.com/NativeScript/NativeScript/issues/4137 for reference
                         boolean removePreviouslyInstalledAssets = true;
-                        aE.extractAssets(context, "app", outputDir, extractPolicy, removePreviouslyInstalledAssets);
-                        aE.extractAssets(context, "internal", outputDir, extractPolicy, removePreviouslyInstalledAssets);
-                        aE.extractAssets(context, "metadata", outputDir, extractPolicy, false);
+                        if (AppFiles.loadsCodeFromApk() && removePreviousVersionFiles(context, extractPolicy)) {
+                            aE.extractAssets(context, "app", outputDir, extractPolicy, false, true);
+                        } else {
+                            aE.extractAssets(context, "app", outputDir, extractPolicy, removePreviouslyInstalledAssets, false);
+                            aE.extractAssets(context, "internal", outputDir, extractPolicy, removePreviouslyInstalledAssets, false);
+                            aE.extractAssets(context, "metadata", outputDir, extractPolicy, false, false);
+                        }
 
                         extractPolicy.setAssetsThumb(context);
                     } finally {
@@ -205,7 +210,7 @@ public final class RuntimeHelper {
 //                runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
 
                 File javaClassesModule = new File(appDir, "app/tns-java-classes.js");
-                if (javaClassesModule.exists()) {
+                if (AppFiles.isFile(javaClassesModule.getAbsolutePath())) {
                     runtime.runModule(javaClassesModule);
                 }
 
@@ -235,6 +240,36 @@ public final class RuntimeHelper {
         } finally {
             frame.close();
         }
+    }
+
+    /*
+     * Extracted files are searched before the APK, so on an update every copy
+     * the previous version left must go, or it would shadow the new APK. When
+     * that fails, everything is extracted over it instead, as without
+     * loadCodeFromApk.
+     */
+    private static boolean removePreviousVersionFiles(Context context, ExtractPolicy extractPolicy) {
+        if (!extractPolicy.shouldExtract(context)) {
+            return true;
+        }
+        File filesDir = context.getFilesDir();
+        boolean removed = deleteRecursively(new File(filesDir, "app"));
+        removed = deleteRecursively(new File(filesDir, "internal")) && removed;
+        removed = deleteRecursively(new File(filesDir, "metadata")) && removed;
+        if (!removed) {
+            Log.w(logTag, "Could not remove the files of the previous app version; extracting all assets, code included, so none of them is served in place of the APK's copy.");
+        }
+        return removed;
+    }
+
+    private static boolean deleteRecursively(File file) {
+        File[] children = file.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                deleteRecursively(child);
+            }
+        }
+        return file.delete() || !file.exists();
     }
 
     private static void waitForLiveSync(Context context) {

@@ -1,4 +1,5 @@
 #include "MetadataNode.h"
+#include "AppFiles.h"
 #include "RuntimeState.h"
 #include "NativeScriptAssert.h"
 #include "Constants.h"
@@ -906,7 +907,7 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
                 Local<External> funcData = External::New(isolate, callbackData, v8::kExternalPointerTypeTagDefault);
                 Local<FunctionTemplate> funcTemplate = NewNonConstructor(isolate, MethodCallback, funcData);
                 auto func = funcTemplate->GetFunction(context).ToLocalChecked();
-                std::string origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
+                std::string origin = AppFiles::AppRootPrefix() + GetOrCreateInternal(treeNode)->m_name;
                 Local<Function> wrapperFunc = Wrap(isolate, func, methodName, origin,
                                                    false /* isCtorFunc */);
                 Local<Function> ctorFunc = ctorFuncTemplate->GetFunction(context).ToLocalChecked();
@@ -1069,7 +1070,7 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
         MethodCallbackData* callbackData = nullptr;
         auto cache = GetMetadataNodeCache(isolate);
 
-        auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
+        auto origin = AppFiles::AppRootPrefix() + GetOrCreateInternal(treeNode)->m_name;
 
         //get candidates from static methods metadata
         auto staticMethodCout = *reinterpret_cast<uint16_t*>(curPtr);
@@ -1286,7 +1287,7 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     auto context = isolate->GetCurrentContext();
     auto ctorFunc = ctorFuncTemplate->GetFunction(context).ToLocalChecked();
 
-    auto origin = Constants::APP_ROOT_FOLDER_PATH + node->m_name;
+    auto origin = AppFiles::AppRootPrefix() + node->m_name;
 
     auto wrappedCtorFunc = Wrap(isolate, ctorFunc, node->m_treeNode->name, origin, true /* isCtorFunc */);
 
@@ -2123,7 +2124,7 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
                     normalized.resize(queryOrFragment);
                 }
 
-                const string& appRoot = Constants::APP_ROOT_FOLDER_PATH;
+                const string& appRoot = AppFiles::AppRootPrefix();
                 if (!appRoot.empty()) {
                     stripPrefix(normalized, appRoot);
                 }
@@ -2214,11 +2215,15 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
     string baseDir = filesPath;
     baseDir.append("/metadata");
 
-    DIR* dir = opendir(baseDir.c_str());
+    // Unreadable while credential-encrypted storage is locked (direct boot).
+    // Metadata served from the APK has no directory of its own, so the files
+    // directory stands in for it.
+    const string& guardDir = AppFiles::LoadsCodeFromApk() ? filesPath : baseDir;
+    DIR* dir = opendir(guardDir.c_str());
 
     if(dir == nullptr){
         stringstream ss;
-        ss << "metadata folder couldn't be opened! (Error: ";
+        ss << (AppFiles::LoadsCodeFromApk() ? "files" : "metadata") << " folder couldn't be opened! (Error: ";
         ss << errno;
         ss << ") ";
 
@@ -2247,13 +2252,14 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
           throw NativeScriptException(ss.str());
         }
     }
+    closedir(dir);
 
     string nodesFile = baseDir + "/treeNodeStream.dat";
     string namesFile = baseDir + "/treeStringsStream.dat";
     string valuesFile = baseDir + "/treeValueStream.dat";
 
-    FILE* f = fopen(nodesFile.c_str(), "rb");
-    if (f == nullptr) {
+    auto nodesReader = AppFiles::Open(nodesFile);
+    if (nodesReader == nullptr) {
         stringstream ss;
         ss << "metadata file (treeNodeStream.dat) couldn't be opened! (Error: ";
         ss << errno;
@@ -2261,11 +2267,9 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
 
         throw NativeScriptException(ss.str());
     }
-    fseek(f, 0, SEEK_END);
-    int lenNodes = ftell(f);
+    int lenNodes = static_cast<int>(nodesReader->size());
     if (lenNodes < 0 ||
         (static_cast<size_t>(lenNodes) % sizeof(MetadataTreeNodeRawData)) != 0) {
-        fclose(f);
         stringstream ss;
         ss << "Metadata file " << nodesFile << " is " << lenNodes
            << " bytes, which is not a whole number of "
@@ -2274,41 +2278,36 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
         throw NativeScriptException(ss.str());
     }
     char* nodes = new char[lenNodes];
-    rewind(f);
-    fread(nodes, 1, lenNodes, f);
-    fclose(f);
+    nodesReader->read(nodes, lenNodes);
+    nodesReader.reset();
 
     const int _512KB = 524288;
 
-    f = fopen(namesFile.c_str(), "rb");
-    if (f == nullptr) {
+    auto namesReader = AppFiles::Open(namesFile);
+    if (namesReader == nullptr) {
         stringstream ss;
         ss << "metadata file (treeStringsStream.dat) couldn't be opened! (Error: ";
         ss << errno;
         ss << ") ";
         throw NativeScriptException(ss.str());
     }
-    fseek(f, 0, SEEK_END);
-    int lenNames = ftell(f);
+    int lenNames = static_cast<int>(namesReader->size());
     char* names = new char[lenNames + _512KB];
-    rewind(f);
-    fread(names, 1, lenNames, f);
-    fclose(f);
+    namesReader->read(names, lenNames);
+    namesReader.reset();
 
-    f = fopen(valuesFile.c_str(), "rb");
-    if (f == nullptr) {
+    auto valuesReader = AppFiles::Open(valuesFile);
+    if (valuesReader == nullptr) {
         stringstream ss;
         ss << "metadata file (treeValueStream.dat) couldn't be opened! (Error: ";
         ss << errno;
         ss << ") ";
         throw NativeScriptException(ss.str());
     }
-    fseek(f, 0, SEEK_END);
-    int lenValues = ftell(f);
+    int lenValues = static_cast<int>(valuesReader->size());
     char* values = new char[lenValues + _512KB];
-    rewind(f);
-    fread(values, 1, lenValues, f);
-    fclose(f);
+    valuesReader->read(values, lenValues);
+    valuesReader.reset();
 
     timeval time2;
     gettimeofday(&time2, nullptr);

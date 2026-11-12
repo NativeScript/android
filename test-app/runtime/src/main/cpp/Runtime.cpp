@@ -10,6 +10,7 @@
 #include <sstream>
 #include <thread>
 
+#include "AppFiles.h"
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
 #include "CallbackHandlers.h"
@@ -18,7 +19,6 @@
 #include "ErrorEvents.h"
 #include "EventLoop.h"
 #include "Events.h"
-#include "File.h"
 #include "FrameCallbacks.h"
 #include "HttpLoader.h"
 #include "IsolateTracked.h"
@@ -254,7 +254,7 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
   CrashBreadcrumbs::OpenStore(filesRoot);
   CrashBreadcrumbs::RegisterRuntime(m_id);
 
-  Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
+  AppFiles::Init(filesRoot);
   Constants::V8_STARTUP_FLAGS = options.v8Flags;
   Constants::V8_CACHE_COMPILED_CODE = options.codeCache;
   m_discardUncaughtJsExceptions = options.discardUncaughtJsExceptions;
@@ -329,17 +329,20 @@ Runtime::~Runtime() {
 }
 
 std::string Runtime::ReadFileText(const std::string& filePath) {
-#ifdef APPLICATION_IN_DEBUG
-  std::lock_guard<std::mutex> lock(m_fileWriteMutex);
-#endif
-  return File::ReadText(filePath);
+  bool ok;
+  return ReadFileText(filePath, ok);
 }
 
 std::string Runtime::ReadFileText(const std::string& filePath, bool& ok) {
 #ifdef APPLICATION_IN_DEBUG
   std::lock_guard<std::mutex> lock(m_fileWriteMutex);
 #endif
-  return File::ReadText(filePath, ok);
+  std::string content;
+  ok = AppFiles::ReadText(filePath, content);
+  if (!ok) {
+    DEBUG_WRITE_FORCE("Runtime::ReadFileText: cannot open %s", filePath.c_str());
+  }
+  return content;
 }
 
 void Runtime::Lock() {

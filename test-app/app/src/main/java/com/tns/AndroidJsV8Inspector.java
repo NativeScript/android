@@ -129,7 +129,7 @@ class AndroidJsV8Inspector {
         List<Pair<String, String>> resources = traverseResources(rootFilesDir);
 
         @SuppressWarnings("unchecked")
-        Pair<String, String>[] result = resources.toArray((Pair<String, String>[]) Array.newInstance(resources.get(0).getClass(), resources.size()));
+        Pair<String, String>[] result = resources.toArray((Pair<String, String>[]) Array.newInstance(Pair.class, resources.size()));
         return result;
     }
 
@@ -143,6 +143,9 @@ class AndroidJsV8Inspector {
             File currentDir = directories.poll();
 
             File[] files = currentDir.listFiles();
+            if (files == null) {
+                continue;
+            }
             for (File file : files) {
                 if (file.isDirectory()) {
                     directories.add(file);
