@@ -306,7 +306,7 @@ class ObjectManager {
   static jmethodID RELEASE_NATIVE_INSTANCE_METHOD_ID;
   static jmethodID RELEASE_IF_COLLECTED_METHOD_ID;
 
-  v8::Persistent<v8::Function>* m_poJsWrapperFunc;
+  v8::Persistent<v8::Function>* m_poJsWrapperFunc = nullptr;
   v8::Persistent<v8::ObjectTemplate> m_jsWrapperTemplate;
 };
 }  // namespace tns
