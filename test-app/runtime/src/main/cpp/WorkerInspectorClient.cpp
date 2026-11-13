@@ -34,13 +34,15 @@ std::string ToUtf8String(const StringView& view) {
 }  // namespace
 
 WorkerInspectorClient::WorkerInspectorClient(int workerId, Isolate* isolate, ALooper* workerLooper,
-                                             const std::string& url)
+                                             const std::string& url,
+                                             const std::atomic_bool& workerTerminating)
     : workerId_(workerId),
       sessionId_("NS_WORKER_" + std::to_string(workerId)),
       targetId_("ns-worker-" + std::to_string(workerId)),
       url_(url),
       isolate_(isolate),
-      workerLooper_(workerLooper) {
+      workerLooper_(workerLooper),
+      workerTerminating_(workerTerminating) {
     // Wakes the worker looper when CDP messages arrive on the socket thread;
     // same mechanism as the worker's message inbox (ConcurrentQueue).
     eventFd_ = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
@@ -206,13 +208,13 @@ void WorkerInspectorClient::MaybeResetSession() {
 }
 
 void WorkerInspectorClient::runMessageLoopOnPause(int contextGroupId) {
-    if (runningPauseLoop_.load(std::memory_order_acquire) || dying_) {
+    if (runningPauseLoop_.load(std::memory_order_acquire) || dying_ || workerTerminating_) {
         return;
     }
     runningPauseLoop_.store(true, std::memory_order_release);
     pauseTerminated_ = false;
 
-    while (!pauseTerminated_ && !dying_) {
+    while (!pauseTerminated_ && !dying_ && !workerTerminating_) {
         std::string message = this->PopMessage();
         bool shouldWait = message.empty();
         if (!shouldWait) {
@@ -225,7 +227,7 @@ void WorkerInspectorClient::runMessageLoopOnPause(int contextGroupId) {
                 ->GetEventLoop(isolate_)
                 ->RunNestableV8Tasks();
 
-        if (shouldWait && !pauseTerminated_ && !dying_) {
+        if (shouldWait && !pauseTerminated_ && !dying_ && !workerTerminating_) {
             std::unique_lock<std::mutex> lock(messageArrivedMutex_);
             messageArrived_.wait_for(lock, std::chrono::milliseconds(1));
         }

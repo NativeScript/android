@@ -950,7 +950,8 @@ void WorkerWrapper::CreateInspector(Isolate* isolate) {
                               ? workerPath_
                               : "file://" + workerPath_;
 
-    auto* client = new WorkerInspectorClient(workerId_, isolate, ALooper_forThread(), url);
+    auto* client = new WorkerInspectorClient(workerId_, isolate, ALooper_forThread(), url,
+                                             isTerminating_);
     {
         std::lock_guard<std::recursive_mutex> lock(inspectorMutex_);
         inspector_ = client;
