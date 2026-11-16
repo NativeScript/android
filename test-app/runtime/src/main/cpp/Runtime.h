@@ -10,7 +10,6 @@
 #include "ArrayBufferHelper.h"
 #include "Profiler.h"
 #include "ModuleInternal.h"
-#include "File.h"
 #include "Timers.h"
 #include "EventLoop.h"
 #include "AdmissionGate.h"

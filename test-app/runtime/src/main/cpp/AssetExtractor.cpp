@@ -10,11 +10,13 @@
 #include <cstdlib>
 #include <string>
 #include "AssetExtractor.h"
+#include "AppFiles.h"
 
 using namespace tns;
 
-void AssetExtractor::ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstring input, jstring outputDir, jboolean _forceOverwrite) {
+void AssetExtractor::ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstring input, jstring outputDir, jboolean _forceOverwrite, jboolean _skipApkServed) {
     auto forceOverwrite = JNI_TRUE == _forceOverwrite;
+    auto skipApkServed = JNI_TRUE == _skipApkServed;
     auto strApk = jstringToString(env, apk);
 
     auto baseDir = jstringToString(env, outputDir);
@@ -40,6 +42,9 @@ void AssetExtractor::ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstrin
         zip_stat_index(z, i, ZIP_STAT_MTIME, &sb);
         if (strstr(sb.name, prfx) == sb.name) {
             auto name = sb.name + prefixLen; // strlen("assets/") == 7
+            if (skipApkServed && AppFiles::IsApkServed(name)) {
+                continue;
+            }
 
             std::string assetFullname(baseDir);
             assetFullname.append(name);

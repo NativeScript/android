@@ -7,7 +7,7 @@ import android.content.Context;
 import android.util.Log;
 
 public class AssetExtractor {
-    private native void extractAssets(String apkPath, String input, String outputDir, boolean checkForNewerFiles);
+    private native void extractAssets(String apkPath, String input, String outputDir, boolean checkForNewerFiles, boolean skipApkServed);
     private final Logger logger;
 
     public AssetExtractor(File libPath, Logger logger) {
@@ -15,6 +15,13 @@ public class AssetExtractor {
     }
 
     public void extractAssets(Context context, String inputPath, String outputPath, ExtractPolicy extractPolicy, boolean shouldCleanUpPreviousAssets) {
+        extractAssets(context, inputPath, outputPath, extractPolicy, shouldCleanUpPreviousAssets, true);
+    }
+
+    /**
+     * @param skipApkServed leave out the files {@link AppFiles} serves straight from the APK
+     */
+    public void extractAssets(Context context, String inputPath, String outputPath, ExtractPolicy extractPolicy, boolean shouldCleanUpPreviousAssets, boolean skipApkServed) {
         FileExtractor extractor = extractPolicy.extractor();
         if (extractor != null) {
             boolean success = extractor.extract(context);
@@ -35,7 +42,7 @@ public class AssetExtractor {
 
             boolean forceOverwrite = extractPolicy.forceOverwrite();
 
-            extractAssets(apkPath, inputPath, outputPath, forceOverwrite);
+            extractAssets(apkPath, inputPath, outputPath, forceOverwrite, skipApkServed);
         } else {
             if (logger.isEnabled()) {
                 logger.write("Skipped extraction of assets in " + inputPath);

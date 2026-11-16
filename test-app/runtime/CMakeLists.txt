@@ -171,6 +171,7 @@ add_library(
         SHARED
 
         # Runtime source
+        src/main/cpp/AppFiles.cpp
         src/main/cpp/ArgConverter.cpp
         src/main/cpp/ArrayBufferHelper.cpp
         src/main/cpp/ArrayElementAccessor.cpp
@@ -188,7 +189,6 @@ add_library(
         src/main/cpp/ExtendFileIdentifier.cpp
         src/main/cpp/FrameCallbacks.cpp
         src/main/cpp/FieldAccessor.cpp
-        src/main/cpp/File.cpp
         src/main/cpp/Interop.cpp
         src/main/cpp/IsolateTracked.cpp
         src/main/cpp/JEnv.cpp
@@ -222,6 +222,7 @@ add_library(
         src/main/cpp/ReadWriteLock.cpp
         src/main/cpp/Runtime.cpp
         src/main/cpp/RuntimeState.cpp
+        src/main/cpp/ScriptCache.cpp
         src/main/cpp/SimpleAllocator.cpp
         src/main/cpp/SimpleProfiler.cpp
         src/main/cpp/StructuredClone.cpp
@@ -234,6 +235,7 @@ add_library(
         src/main/cpp/WorkerEvents.cpp
         src/main/cpp/WorkerWrapper.cpp
         src/main/cpp/Timers.cpp
+        src/main/cpp/com_tns_AppFiles.cpp
         src/main/cpp/com_tns_AssetExtractor.cpp
         src/main/cpp/com_tns_Runtime.cpp
         src/main/cpp/console/Console.cpp

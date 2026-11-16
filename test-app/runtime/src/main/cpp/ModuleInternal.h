@@ -197,7 +197,7 @@ class ModuleInternal {
         void RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args,
                                  bool honorEvaluationOptions);
 
-        v8::Local<v8::String> WrapModuleContent(const std::string& path);
+        std::string WrapModuleContent(const std::string& path);
 
         v8::Local<v8::Object> LoadImpl(v8::Isolate* isolate, const std::string& moduleName,
                                        const std::string& baseDir, bool& isData,
@@ -221,33 +221,11 @@ class ModuleInternal {
                                                    const std::string& dirName,
                                                    const ModuleEvaluationOptions& options);
 
-        /*
-         * A V8 code cache produced by a classic-script compile and one produced by a
-         * module compile are not interchangeable, and a `.js` file is reachable both
-         * ways — require() compiles it classic, an `import` of the same file compiles
-         * it as a module. Sharing one cache file would make each path reject and
-         * overwrite the other's blob on every load, so the kind is part of the name.
-         */
-        enum class ScriptCacheKind {
-            Classic,
-            Module,
-        };
-
-        static v8::ScriptCompiler::CachedData* TryLoadScriptCache(const std::string& path,
-                                                                  ScriptCacheKind kind);
-
-        // Takes ownership of `cache`.
-        static void SaveScriptCache(const v8::ScriptCompiler::CachedData* cache,
-                                    const std::string& path, ScriptCacheKind kind);
-
-        static void SaveScriptCache(const v8::Local<v8::Script> script, const std::string& path);
-
         ModulePathKind GetModulePathKind(const std::string& path);
 
     public:
         static jclass MODULE_CLASS;
         static jmethodID RESOLVE_PATH_METHOD_ID;
-        static jmethodID GET_APPLICATION_FILES_PATH_METHOD_ID;
         static const char* MODULE_PROLOGUE;
         static const char* MODULE_EPILOGUE;
 

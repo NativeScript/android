@@ -9,3 +9,5 @@
 
 # Preserve annotation metadata so reflection sees them
 -keepattributes RuntimeVisibleAnnotations
+# Customizers are only named in the manifest and created by reflection
+-keep class * implements com.tns.AppFileLayersCustomizer { <init>(); }

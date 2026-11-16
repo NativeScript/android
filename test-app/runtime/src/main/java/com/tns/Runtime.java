@@ -824,7 +824,7 @@ public class Runtime {
     public Object runScript(File jsFile, final boolean waitForResultOnMainThread) throws NativeScriptException {
         Object result = null;
 
-        if (jsFile.exists() && jsFile.isFile()) {
+        if (AppFiles.isFile(jsFile.getAbsolutePath())) {
             final String filePath = jsFile.getAbsolutePath();
 
             boolean isWorkThread = threadScheduler.getThread().equals(Thread.currentThread());

@@ -465,6 +465,13 @@ def getRunTestsBuildArguments = { taskName ->
     if (onlyX86) {
         arguments.add("-PonlyX86")
     }
+    // App file modes, see test-app/tools/appfiles-test-mode.init.gradle
+    if (project.hasProperty("loadCodeFromApk")) {
+        arguments.add("-PloadCodeFromApk")
+    }
+    if (project.hasProperty("storeCodeUncompressed")) {
+        arguments.add("-PstoreCodeUncompressed")
+    }
     if (project.hasProperty("abis")) {
         arguments.add("-Pabis=${project.property('abis')}")
     }

@@ -75,6 +75,14 @@ def getBuildArguments = { ->
 
     arguments.add("-PuseKotlin=true")
 
+    arguments += ["-I", "$rootDir/tools/appfiles-test-mode.init.gradle"]
+    if (project.hasProperty("loadCodeFromApk")) {
+        arguments.add("-PloadCodeFromApk")
+    }
+    if (project.hasProperty("storeCodeUncompressed")) {
+        arguments.add("-PstoreCodeUncompressed")
+    }
+
     return arguments
 }
 

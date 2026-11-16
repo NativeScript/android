@@ -1,0 +1,42 @@
+// Test-only. Builds the test app as if its app/package.json set the app file
+// flags, without editing the source package.json:
+//   -PloadCodeFromApk        sets android.loadCodeFromApk in the packaged app/package.json
+//   -PstoreCodeUncompressed  also stores code uncompressed, using the suffix list app/build.gradle exports
+// Always applied by runtests.gradle, so switching modes reruns the patched tasks.
+
+def loadCodeFromApk = gradle.startParameter.projectProperties.containsKey("loadCodeFromApk")
+def storeCodeUncompressed = gradle.startParameter.projectProperties.containsKey("storeCodeUncompressed")
+
+gradle.beforeProject { project ->
+    if (project.path != ":app") {
+        return
+    }
+
+    project.plugins.withId("com.android.application") {
+        project.androidComponents.finalizeDsl { android ->
+            if (storeCodeUncompressed) {
+                android.androidResources.noCompress.addAll(project.ext.nsUncompressedCodeSuffixes)
+            }
+        }
+    }
+
+    project.tasks.matching { it.name ==~ /merge\w*Assets/ }.configureEach { task ->
+        task.inputs.property("nsTestLoadCodeFromApk", loadCodeFromApk)
+        task.inputs.property("nsTestStoreCodeUncompressed", storeCodeUncompressed)
+        if (!loadCodeFromApk && !storeCodeUncompressed) {
+            return
+        }
+        task.doLast {
+            def packageJson = new File(task.outputDir.get().asFile, "app/package.json")
+            def json = new groovy.json.JsonSlurper().parseText(packageJson.getText("UTF-8"))
+            json.android = json.android ?: [:]
+            if (loadCodeFromApk) {
+                json.android.loadCodeFromApk = true
+            }
+            if (storeCodeUncompressed) {
+                json.android.storeCodeUncompressed = true
+            }
+            packageJson.setText(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(json)), "UTF-8")
+        }
+    }
+}

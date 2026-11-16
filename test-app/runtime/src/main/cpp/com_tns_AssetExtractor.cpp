@@ -7,9 +7,9 @@
 using namespace tns;
 using namespace std;
 
-extern "C" JNIEXPORT void Java_com_tns_AssetExtractor_extractAssets(JNIEnv* env, jobject obj, jstring apk, jstring inputDir, jstring outputDir, jboolean _forceOverwrite) {
+extern "C" JNIEXPORT void Java_com_tns_AssetExtractor_extractAssets(JNIEnv* env, jobject obj, jstring apk, jstring inputDir, jstring outputDir, jboolean _forceOverwrite, jboolean skipApkServed) {
     try {
-        AssetExtractor::ExtractAssets(env, obj, apk, inputDir, outputDir, _forceOverwrite);
+        AssetExtractor::ExtractAssets(env, obj, apk, inputDir, outputDir, _forceOverwrite, skipApkServed);
     } catch (NativeScriptException& e) {
         e.ReThrowToJava();
     } catch (std::exception e) {

@@ -6,7 +6,7 @@
 namespace tns {
 class AssetExtractor {
     public:
-        static void ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstring inputDir, jstring outputDir, jboolean _forceOverwrite);
+        static void ExtractAssets(JNIEnv* env, jobject obj, jstring apk, jstring inputDir, jstring outputDir, jboolean _forceOverwrite, jboolean skipApkServed);
 
     private:
         static std::string jstringToString(JNIEnv* env, jstring value);

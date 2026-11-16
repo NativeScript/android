@@ -23,6 +23,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <meta-data
+            android:name="com.tns.tests.TestAppFileLayersCustomizer"
+            android:value="org.nativescript.AppFileLayersCustomizer" />
         <activity
             android:name="com.tns.ErrorReportActivity"
             android:label="ErrorActivity">
