@@ -51,6 +51,14 @@ compileKotlin {
     }
 }
 
+// Without this the test sources target whatever JDK runs the build, and Kotlin refuses a
+// target that differs from the Java one.
+compileTestKotlin {
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
 repositories {
     google()
     mavenCentral()
