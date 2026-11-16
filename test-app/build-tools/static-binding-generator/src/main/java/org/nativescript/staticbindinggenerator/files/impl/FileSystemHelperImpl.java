@@ -122,6 +122,9 @@ public class FileSystemHelperImpl implements FileSystemHelper {
         while (!d.isEmpty()) {
             File cur = d.pollFirst();
             File[] files = cur.listFiles();
+            if (files == null) {
+                continue;
+            }
             for (File f : files) {
                 if (f.isFile() && f.getName().endsWith(CLASS_EXT)) {
                     ClassParser cp = new ClassParser(f.getAbsolutePath());
@@ -133,6 +136,7 @@ public class FileSystemHelperImpl implements FileSystemHelper {
                             throw new RuntimeException("Error while parsing class file!", e);
                         } else {
                             e.printStackTrace();
+                            continue;
                         }
                     }
                     String name = clazz.getClassName();

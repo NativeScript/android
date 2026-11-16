@@ -18,6 +18,7 @@
 *            -PandroidXMaterial=[androidx_material_version]
 *            -PappPath=[app_path]
 *            -PappResourcesPath=[app_resources_path]
+*            -PskipSbgAppClasses  //don't show the app's own Java classes to the static binding generator
 */
 
 import groovy.json.JsonSlurper
@@ -25,12 +26,17 @@ import groovy.xml.XmlSlurper
 import org.apache.commons.io.FileUtils
 
 import javax.inject.Inject
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
+import javax.tools.Diagnostic
+import javax.tools.DiagnosticCollector
+import javax.tools.ToolProvider
 
 import static org.gradle.internal.logging.text.StyledTextOutput.Style
 
@@ -488,8 +494,121 @@ if (failOnCompilationWarningsEnabled()) {
 ///////////////////////////// EXECUTION PHASE /////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
+def SBG_APP_CLASSES_DIR = layout.buildDirectory.dir("nativescript/sbg-app-classes")
+def sbgAppClassesEnabled = { ->
+    !project.hasProperty("skipSbgAppClasses") || project.property("skipSbgAppClasses").toString() == "false"
+}
+
+// The static binding generator runs before javac, so on its own it cannot see the
+// classes and interfaces declared in this module's Java sources (App_Resources) and
+// leaves every JS subclass of them to be generated on the device. This compiles them
+// for it alone. Best-effort: sources that only compile together with the rest of the
+// build (Kotlin, annotation processors, generated code) are left out, and any failure
+// leaves the generator exactly as it would be without this task.
+tasks.register("compileAppClassesForSbg") {
+    dependsOn "collectAllJars"
+    onlyIf { sbgAppClassesEnabled() }
+
+    def classesDir = SBG_APP_CLASSES_DIR
+    def dependenciesFile = file("$BUILD_TOOLS_PATH/$SBG_JAVA_DEPENDENCIES")
+    // The first line of the static binding generator's Generator.AUTO_GENERATED_FILE_PROLOGUE.
+    // It writes named classes (`extend("a.b.C", ...)`, @JavaProxy) outside com/tns/gen too.
+    def sbgSourcePrefix = "/* AUTO-GENERATED FILE. DO NOT MODIFY.".getBytes(StandardCharsets.UTF_8)
+    def sources = fileTree(OUTPUT_JAVA_DIR) {
+        include "**/*.java"
+        exclude "com/tns/gen/**"
+    }.filter { File source ->
+        try {
+            !source.withInputStream { Arrays.equals(it.readNBytes(sbgSourcePrefix.length), sbgSourcePrefix) }
+        } catch (IOException ignored) {
+            true
+        }
+    }
+    def sourceLevel = provider { android.compileOptions.sourceCompatibility.toString() }
+    def targetLevel = provider { android.compileOptions.targetCompatibility.toString() }
+    def sourceEncoding = provider { android.compileOptions.encoding ?: "UTF-8" }
+
+    inputs.files(sources).skipWhenEmpty().withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("sources")
+    inputs.files(provider {
+        dependenciesFile.exists() ? dependenciesFile.readLines().findAll { it } : []
+    }).withPropertyName("classpath")
+    inputs.property("sourceLevel", sourceLevel)
+    inputs.property("targetLevel", targetLevel)
+    inputs.property("sourceEncoding", sourceEncoding)
+    outputs.dir(classesDir).withPropertyName("classes")
+
+    doLast {
+        def outDir = classesDir.get().asFile
+        outDir.deleteDir()
+        outDir.mkdirs()
+
+        def remaining = sources.files.sort()
+        def total = remaining.size()
+        def leftOut = []
+        def firstError = null
+        try {
+            def compiler = ToolProvider.getSystemJavaCompiler()
+            if (compiler == null) {
+                logger.warn("compileAppClassesForSbg: ${System.getProperty('java.home')} has no Java compiler, so the app's own classes get no prebuilt bindings")
+                return
+            }
+            def options = ["-proc:none", "-nowarn",
+                           "-source", sourceLevel.get(), "-target", targetLevel.get(),
+                           "-encoding", sourceEncoding.get(),
+                           "-classpath", dependenciesFile.readLines().findAll { it }.join(File.pathSeparator),
+                           "-d", outDir.absolutePath]
+
+            // javac writes no class files after its first error, so each failing round
+            // leaves out the sources that reported errors and compiles the rest again.
+            // A round that cannot leave any source out ends the loop.
+            def compiled = false
+            while (!remaining.isEmpty() && !compiled) {
+                def diagnostics = new DiagnosticCollector()
+                def fileManager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, Charset.forName(sourceEncoding.get()))
+                try {
+                    def units = fileManager.getJavaFileObjectsFromFiles(remaining).toList()
+                    def sourceByUri = [units, remaining].transpose().collectEntries { unit, source -> [(unit.toUri()): source] }
+                    compiled = compiler.getTask(new StringWriter(), fileManager, diagnostics, options, null, units).call()
+                    if (!compiled) {
+                        def errors = diagnostics.diagnostics.findAll { it.kind == Diagnostic.Kind.ERROR }
+                        if (firstError == null && !errors.isEmpty()) {
+                            firstError = errors[0].getMessage(Locale.ROOT).readLines().take(2).join(" ").replaceAll(/\s+/, " ")
+                        }
+                        def failing = errors.collect { it.source == null ? null : sourceByUri[it.source.toUri()] }.toSet()
+                        if (failing.isEmpty() || failing.contains(null)) {
+                            break
+                        }
+                        remaining.removeAll(failing)
+                        leftOut.addAll(failing)
+                    }
+                } finally {
+                    fileManager.close()
+                }
+                if (!compiled) {
+                    outDir.deleteDir()
+                    outDir.mkdirs()
+                }
+            }
+
+            if (!compiled && !remaining.isEmpty()) {
+                logger.warn("compileAppClassesForSbg: the app's Java sources did not compile on their own, so the app's own classes get no prebuilt bindings (${firstError})")
+            } else if (!leftOut.isEmpty()) {
+                def names = leftOut.collect { it.name }.sort()
+                logger.info("compileAppClassesForSbg: ${leftOut.size()} of ${total} Java sources get no prebuilt bindings because they only compile with the rest of the build: ${names.take(5).join(', ')}${names.size() > 5 ? ', ...' : ''} (${firstError})")
+            }
+        } catch (Exception | LinkageError e) {
+            outDir.deleteDir()
+            outDir.mkdirs()
+            logger.warn("compileAppClassesForSbg: the app's own classes get no prebuilt bindings: ${e}")
+        }
+    }
+}
+
 task runSbg(type: BuildToolTask) {
     dependsOn "collectAllJars"
+    dependsOn "compileAppClassesForSbg"
+    inputs.files(tasks.named("compileAppClassesForSbg")).withPropertyName("appClasses")
+    inputs.property("sbgAppClassesEnabled", provider { sbgAppClassesEnabled() })
     def rootPath = ""
     if (!findProject(':static-binding-generator').is(null)) {
         rootPath = Paths.get(project(':static-binding-generator').projectDir.path, "build/libs").toString()
@@ -514,8 +633,15 @@ task runSbg(type: BuildToolTask) {
 
     args paramz
 
+    def sbgDependenciesFile = file("$BUILD_TOOLS_PATH/$SBG_JAVA_DEPENDENCIES")
     doFirst {
         new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir()
+
+        // Not written by collectAllJars: the metadata generator reads the real compiled classes.
+        def appClassesDir = SBG_APP_CLASSES_DIR.get().asFile
+        if (sbgAppClassesEnabled() && appClassesDir.isDirectory()) {
+            sbgDependenciesFile.withWriterAppend { it.println(appClassesDir.absolutePath) }
+        }
     }
 }
 

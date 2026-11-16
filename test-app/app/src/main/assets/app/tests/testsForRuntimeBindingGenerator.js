@@ -1,4 +1,6 @@
 describe("Tests for runtime binding generator", function () {
+	// Computed members and aliases keep these call sites from the static binding
+	// generator, so their classes are generated at runtime.
 	
 	var myCustomEquality = function(first, second) {
 		return first == second;
@@ -12,7 +14,7 @@ describe("Tests for runtime binding generator", function () {
 
 		__log("TEST: When_generating_a_proxy_of_nested_interface_at_runtime");
 		
-		var MyButton = com.tns.tests.Button1.extend("MyButton10", {
+		var MyButton = com.tns.tests.Button1["extend"]("MyButton10", {
 			toString : function() {
 			  	return "button1";	
 			},
@@ -36,7 +38,7 @@ describe("Tests for runtime binding generator", function () {
 		
 		__log("TEST: When_generating_a_proxy_of_android_class_at_runtime");
 		
-		var MyButton = com.tns.tests.Button1.extend("MyButton36", {
+		var MyButton = com.tns.tests.Button1["extend"]("MyButton36", {
 			toString : function() {
 			  	return "button1";	
 			},
@@ -50,7 +52,8 @@ describe("Tests for runtime binding generator", function () {
 	});
 
     it("When_implementing_interface_and_its_implemented_interfaces", function() {
-	    var impl = new com.tns.tests.MyDerivedPublicInterface({
+	    var DerivedInterface = com.tns.tests.MyDerivedPublicInterface;
+	    var impl = new DerivedInterface({
         		methodOfMyDerivedPublicInterface: function(input) {
       			    return "Le java " + input;
         		},

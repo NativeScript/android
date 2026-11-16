@@ -77,6 +77,7 @@ require("./tests/testClassForNameDiscovery");
 require("./tests/testPrebuiltExtendClasses");
 require("./tests/testRuntimeGenerationReport");
 require("./tests/testInterfaceExtendClasses");
+require("./tests/testAppModuleBindings");
 require("./tests/testProxyRegistrationGc");
 require("./tests/testInterfaceImplementation");
 require("./tests/testPrimitiveCallbackReturns");

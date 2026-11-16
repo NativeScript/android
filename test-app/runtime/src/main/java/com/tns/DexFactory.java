@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -89,8 +90,9 @@ public class DexFactory {
     static long totalMultiDexTime = 0;
     static long totalLoadDexTime = 0;
 
-    // Process-wide: every runtime (main and workers) has its own DexFactory.
-    private static final ArrayList<String> runtimeGeneratedClasses = new ArrayList<String>();
+    // Process-wide: every runtime (main and workers) has its own DexFactory, and
+    // each one resolves the same classes again, so entries are kept unique.
+    private static final LinkedHashSet<String> runtimeGeneratedClasses = new LinkedHashSet<String>();
 
     /**
      * The classes this process resolved without a prebuilt class from the APK,
@@ -105,10 +107,11 @@ public class DexFactory {
 
     private static void recordRuntimeGeneratedClass(String requestedName, Class<?> loadedClass, boolean isInterface, boolean generated) {
         String entry = (generated ? "generated" : "cached") + " " + (isInterface ? "interface" : "class") + " " + loadedClass.getName() + " " + requestedName;
+        boolean added;
         synchronized (runtimeGeneratedClasses) {
-            runtimeGeneratedClasses.add(entry);
+            added = runtimeGeneratedClasses.add(entry);
         }
-        if (com.tns.Runtime.isDebuggable()) {
+        if (added && com.tns.Runtime.isDebuggable()) {
             Log.i("JS", (generated ? "Generated class at runtime: " : "Loaded runtime-generated class from the dex cache: ") + loadedClass.getName() + " (requested as " + requestedName + ")");
         }
     }

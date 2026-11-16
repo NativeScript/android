@@ -27,23 +27,60 @@ public class GetInterfaceNames {
         currentDir = System.getProperty("user.dir");
         String outputFileName = Main.SBG_INTERFACE_NAMES;
 
+        List<String> interfacesList = collectInterfaceNames(rows);
+
         PrintWriter out = ensureOutputFile(outputFileName);
+        for (String line : interfacesList) {
+            out.println(line);
+        }
+
+        out.close();
+    }
+
+    /**
+     * The interfaces declared in the given dependencies: jars, and directories of
+     * class files. Nested interfaces are named with '.' separators.
+     */
+    public static List<String> collectInterfaceNames(List<DataRow> rows) {
         List<String> interfacesList = Collections.synchronizedList(new ArrayList<>());
 
         final ThrowingConsumer<DataRow> consumer = dr -> {
             String pathToDependency = dr.getRow();
             if (pathToDependency.endsWith(".jar")) {
                 generateInterfaceNames(pathToDependency, interfacesList);
+            } else {
+                generateInterfaceNamesFromDirectory(new File(pathToDependency), interfacesList);
             }
         };
 
         rows.parallelStream().forEach(consumer);
 
-        for (String line : interfacesList) {
-            out.println(line);
+        return interfacesList;
+    }
+
+    // Class directories hold the app's own classes compiled on a best-effort basis
+    // before the build's real compilation, so an unreadable entry is skipped
+    // rather than failing the build.
+    private static void generateInterfaceNamesFromDirectory(File dir, List<String> interfacesList) {
+        File[] entries = dir.listFiles();
+        if (entries == null) {
+            return;
         }
 
-        out.close();
+        for (File entry : entries) {
+            if (entry.isDirectory()) {
+                generateInterfaceNamesFromDirectory(entry, interfacesList);
+            } else if (entry.getName().endsWith(CLASS_EXT)) {
+                try {
+                    JavaClass clazz = new ClassParser(entry.getAbsolutePath()).parse();
+                    if (clazz.isInterface()) {
+                        interfacesList.add(clazz.getClassName().replace('$', '.'));
+                    }
+                } catch (IOException | RuntimeException e) {
+                    System.out.println("Skipping unreadable class file " + entry.getAbsolutePath() + ": " + e);
+                }
+            }
+        }
     }
 
     private static void generateInterfaceNames(String pathToJar, List<String> interfacesList) {
