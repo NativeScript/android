@@ -5,8 +5,11 @@ using namespace tns;
 
 MetadataTreeNode::MetadataTreeNode()
     :
-    children(nullptr), parent(nullptr), metadata(nullptr), runtimeBaseClass(nullptr), offsetValue(0), type(INVALID_TYPE) {
+    parent(nullptr), children(nullptr), metadata(nullptr), runtimeBaseClass(nullptr), offsetValue(0), type(INVALID_TYPE) {
 }
+
+static_assert(sizeof(void*) != 8 || sizeof(MetadataTreeNode) == 64,
+              "MetadataTreeNode grew; see the note on its member order");
 
 MetadataTreeNode* MetadataTreeNode::GetChild(const string& name) {
     MetadataTreeNode* child = nullptr;
