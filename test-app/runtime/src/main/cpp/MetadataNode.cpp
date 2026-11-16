@@ -181,12 +181,7 @@ MetadataNode::MetadataNode(MetadataTreeNode* treeNode) :
     m_isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
 
     if (!m_isArray && m_isInterface) {
-        bool isPrefix;
-        auto impTypeName = s_metadataReader.ReadInterfaceImplementationTypeName(m_treeNode, isPrefix);
-        m_implType = isPrefix
-                     ? (impTypeName + m_name)
-                     :
-                     impTypeName;
+        m_implType = TNS_PREFIX + m_name;
     }
 }
 
@@ -821,17 +816,11 @@ void MetadataNode::SetInstanceMethodsFromStaticMetadata(
         MetadataTreeNode *treeNode, uint8_t* &curPtr) {
     SET_PROFILER_FRAME();
 
-    curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
-
-    auto nodeType = s_metadataReader.GetNodeType(treeNode);
+    uint8_t sections = s_metadataReader.GetClassSections(treeNode);
+    curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue
+             + MetadataReader::CLASS_VALUE_SECTIONS_OFFSET + sizeof(sections);
 
     auto curType = s_metadataReader.ReadTypeName(treeNode);
-
-    curPtr += sizeof(uint16_t /* baseClassId */);
-
-    if (s_metadataReader.IsNodeTypeInterface(nodeType)) {
-        curPtr += sizeof(uint8_t) + sizeof(uint32_t);
-    }
 
     string lastMethodName;
     MethodCallbackData *callbackData = nullptr;
@@ -852,8 +841,8 @@ void MetadataNode::SetInstanceMethodsFromStaticMetadata(
         return itFound != baseMethodsByName.end() ? itFound->second : nullptr;
     };
 
-    auto extensionFunctionsCount = *reinterpret_cast<uint16_t *>(curPtr);
-    curPtr += sizeof(uint16_t);
+    auto extensionFunctionsCount = MetadataReader::ReadSectionCount(
+            sections, MetadataReader::SECTION_EXTENSION_FUNCTIONS, &curPtr);
     for (auto i = 0; i < extensionFunctionsCount; i++) {
         auto entry = MetadataReader::ReadExtensionFunctionEntry(&curPtr);
 
@@ -876,8 +865,8 @@ void MetadataNode::SetInstanceMethodsFromStaticMetadata(
 
 
     //get candidates from instance methods metadata
-    auto instanceMethodCount = *reinterpret_cast<uint16_t *>(curPtr);
-    curPtr += sizeof(uint16_t);
+    auto instanceMethodCount = MetadataReader::ReadSectionCount(
+            sections, MetadataReader::SECTION_INSTANCE_METHODS, &curPtr);
 
     for (auto i = 0; i < instanceMethodCount; i++) {
         auto entry = MetadataReader::ReadInstanceMethodEntry(&curPtr);
@@ -926,8 +915,8 @@ void MetadataNode::SetInstanceMethodsFromStaticMetadata(
     }
 
     //get candidates from instance fields metadata
-    auto instanceFieldCout = *reinterpret_cast<uint16_t*>(curPtr);
-    curPtr += sizeof(uint16_t);
+    auto instanceFieldCout = MetadataReader::ReadSectionCount(
+            sections, MetadataReader::SECTION_INSTANCE_FIELDS, &curPtr);
     for (auto i = 0; i < instanceFieldCout; i++) {
         auto entry = MetadataReader::ReadInstanceFieldEntry(&curPtr);
         auto fieldName = entry.getName();
@@ -936,27 +925,23 @@ void MetadataNode::SetInstanceMethodsFromStaticMetadata(
         protoFiller.FillPrototypeField(isolate, fieldName, fieldInfo);
     }
 
-    auto kotlinPropertiesCount = *reinterpret_cast<uint16_t*>(curPtr);
-    curPtr += sizeof(uint16_t);
+    auto kotlinPropertiesCount = MetadataReader::ReadSectionCount(
+            sections, MetadataReader::SECTION_PROPERTIES, &curPtr);
     for (int i = 0; i < kotlinPropertiesCount; ++i) {
         uint32_t nameOffset = *reinterpret_cast<uint32_t*>(curPtr);
         string propertyName = s_metadataReader.ReadName(nameOffset);
         curPtr += sizeof(uint32_t);
 
-        auto hasGetter = *reinterpret_cast<uint16_t*>(curPtr);
-        curPtr += sizeof(uint16_t);
+        uint8_t accessors = *curPtr++;
 
         std::string getterMethodName = "";
-        if(hasGetter>=1){
+        if (accessors & MetadataReader::PROPERTY_HAS_GETTER) {
             auto entry = MetadataReader::ReadInstanceMethodEntry(&curPtr);
             getterMethodName = entry.getName();
         }
 
-        auto hasSetter = *reinterpret_cast<uint16_t*>(curPtr);
-        curPtr += sizeof(uint16_t);
-
         std::string setterMethodName = "";
-        if(hasSetter >= 1){
+        if (accessors & MetadataReader::PROPERTY_HAS_SETTER) {
             auto entry = MetadataReader::ReadInstanceMethodEntry(&curPtr);
             setterMethodName = entry.getName();
         }
@@ -1062,9 +1047,11 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
 
         auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
 
+        uint8_t sections = s_metadataReader.GetClassSections(treeNode);
+
         //get candidates from static methods metadata
-        auto staticMethodCout = *reinterpret_cast<uint16_t*>(curPtr);
-        curPtr += sizeof(uint16_t);
+        auto staticMethodCout = MetadataReader::ReadSectionCount(
+                sections, MetadataReader::SECTION_STATIC_METHODS, &curPtr);
         for (auto i = 0; i < staticMethodCout; i++) {
             auto entry = MetadataReader::ReadStaticMethodEntry(&curPtr);
             auto &methodName = entry.getName();
@@ -1087,8 +1074,8 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
         ctorFunction->Set(context, extendFuncName, extendFuncTemplate->GetFunction(context).ToLocalChecked());
 
         //get candidates from static fields metadata
-        auto staticFieldCout = *reinterpret_cast<uint16_t*>(curPtr);
-        curPtr += sizeof(uint16_t);
+        auto staticFieldCout = MetadataReader::ReadSectionCount(
+                sections, MetadataReader::SECTION_STATIC_FIELDS, &curPtr);
         // A class with many static fields (every android.R inner class) installs all of them
         // on first touch. Native accessors skip creating a getter and a setter function per
         // field, but adding them one by one to a fast-mode object copies its descriptors each
@@ -1101,6 +1088,8 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
         }
         for (auto i = 0; i < staticFieldCout; i++) {
             auto entry = MetadataReader::ReadStaticFieldEntry(&curPtr);
+            // A static field that does not name its declaring type is this class's own.
+            entry.treeNode = treeNode;
 
             auto fieldName = NewMemberName(isolate, s_metadataReader.ReadNameView(entry.sfi->nameOffset));
             auto fieldData = External::New(isolate, cache->Own<FieldCallbackData>(entry), v8::kExternalPointerTypeTagDefault);
@@ -2180,13 +2169,7 @@ MetadataEntry MetadataNode::GetChildMetadataForPackage(MetadataNode *node, const
             child.type = static_cast<NodeType>(s_metadataReader.GetNodeType(treeNodeChild));
 
             if (s_metadataReader.IsNodeTypeInterface((uint8_t) child.type)) {
-                bool isPrefix;
-                string declaringType = s_metadataReader.ReadInterfaceImplementationTypeName(
-                        treeNodeChild, isPrefix);
-                child.declaringType = isPrefix
-                                      ? (declaringType +
-                                         s_metadataReader.ReadTypeName(child.treeNode))
-                                      : declaringType;
+                child.declaringType = TNS_PREFIX + s_metadataReader.ReadTypeName(child.treeNode);
             }
         }
     }

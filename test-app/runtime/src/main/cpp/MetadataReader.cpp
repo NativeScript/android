@@ -12,12 +12,29 @@ using namespace tns;
 MetadataReader::MetadataReader() : m_root(nullptr), m_nodesLength(0), m_nameLength(0),
                                    m_valueLength(0),
                                    m_nodeData(nullptr), m_nameData(nullptr), m_valueData(nullptr),
+                                   m_signatureData(nullptr),
                                    m_getTypeMetadataCallback(nullptr) {}
 
 void MetadataReader::Initialize(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength,
                                 uint8_t *nameData, uint32_t valueLength, uint8_t *valueData,
                                 GetTypeMetadataCallback getTypeMetadataCallback) {
     StateLock lock(m_stateMutex);
+
+    uint32_t format = 0;
+    uint32_t signaturesLength = 0;
+    if (valueLength >= VALUE_HEADER_SIZE) {
+        memcpy(&format, valueData, sizeof(format));
+        memcpy(&signaturesLength, valueData + sizeof(format), sizeof(signaturesLength));
+    }
+    if (format != FORMAT || signaturesLength > valueLength - VALUE_HEADER_SIZE) {
+        stringstream ss;
+        ss << "The app's metadata is not in the format this runtime reads (found 0x" << hex
+           << format << ", expected 0x" << FORMAT
+           << "). It was generated for a different version of the runtime, or is damaged. Rebuild the app.";
+        throw NativeScriptException(ss.str());
+    }
+
+    m_signatureData = valueData + VALUE_HEADER_SIZE;
 
     m_nodesLength = nodesLength;
     m_nodeData = nodeData;

@@ -4,6 +4,7 @@
 #include "MetadataEntry.h"
 #include "MetadataFieldInfo.h"
 #include <condition_variable>
+#include <cstring>
 #include <map>
 #include <mutex>
 #include <string>
@@ -18,6 +19,36 @@ namespace tns {
 
     class MetadataReader {
     public:
+        /*
+         * The layout of the value stream, which the metadata generator's
+         * Writer.java produces and has to be changed together with:
+         *
+         *   format             4 bytes, FORMAT
+         *   signatures length  4 bytes
+         *   signatures         each distinct method signature once: a byte holding
+         *                      the number of type ids less one, then the ids, the
+         *                      return type first
+         *   values             one per primitive type and per class or interface,
+         *                      at the offset its tree node gives
+         *
+         * A class value is its type (1 byte), its base class id (2 bytes) and a
+         * byte with a bit for each member section it has. Those sections follow
+         * in the order of the bits, each a 2-byte count and its entries.
+         */
+        static constexpr uint32_t FORMAT = 'N' | ('S' << 8) | ('M' << 16) | (2 << 24);
+        static constexpr uint32_t VALUE_HEADER_SIZE = 2 * sizeof(uint32_t);
+        static constexpr uint32_t CLASS_VALUE_SECTIONS_OFFSET = sizeof(uint8_t) + sizeof(uint16_t);
+
+        static constexpr uint8_t SECTION_EXTENSION_FUNCTIONS = 1;
+        static constexpr uint8_t SECTION_INSTANCE_METHODS = 1 << 1;
+        static constexpr uint8_t SECTION_INSTANCE_FIELDS = 1 << 2;
+        static constexpr uint8_t SECTION_PROPERTIES = 1 << 3;
+        static constexpr uint8_t SECTION_STATIC_METHODS = 1 << 4;
+        static constexpr uint8_t SECTION_STATIC_FIELDS = 1 << 5;
+
+        static constexpr uint8_t PROPERTY_HAS_GETTER = 1;
+        static constexpr uint8_t PROPERTY_HAS_SETTER = 1 << 1;
+
         MetadataReader();
 
         /*
@@ -45,7 +76,10 @@ namespace tns {
             entry.isStatic = true;
             entry.isTypeMember = false;
 
-            *data += sizeof(StaticFieldInfo);
+            *data += sizeof(FieldInfo);
+            if (entry.sfi->flags & FieldInfo::HAS_DECLARING_TYPE) {
+                *data += sizeof(uint16_t);
+            }
 
             return entry;
         }
@@ -109,34 +143,29 @@ namespace tns {
             return name;
         }
 
-        inline std::string
-        ReadInterfaceImplementationTypeName(MetadataTreeNode *treeNode, bool &isPrefix) {
-            // A type resolved at run time has only the head of a class record, not
-            // the implementation type name a static interface record carries after it.
-            if (treeNode->metadata != nullptr) {
-                isPrefix = false;
-                return {};
-            }
+        uint8_t *GetValueData() const;
 
-            uint8_t *data =
-                    m_valueData + treeNode->offsetValue + sizeof(uint8_t) + sizeof(uint16_t);
-
-            isPrefix = *data == 1;
-
-            uint32_t pos = *reinterpret_cast<uint32_t *>(data + sizeof(uint8_t));
-
-            uint16_t len = *reinterpret_cast<uint16_t *>(m_nameData + pos);
-
-            char *ptr = reinterpret_cast<char *>(m_nameData + pos + sizeof(uint16_t));
-
-            std::string name(ptr, len);
-
-            NS_DCHECK(name.length() == len);
-
-            return name;
+        inline const uint8_t *GetSignatureData() const {
+            return m_signatureData;
         }
 
-        uint8_t *GetValueData() const;
+        inline uint8_t GetClassSections(MetadataTreeNode *treeNode) const {
+            return m_valueData[treeNode->offsetValue + CLASS_VALUE_SECTIONS_OFFSET];
+        }
+
+        // The number of entries in one member section of a class value, leaving
+        // data at the first of them. A section the class lacks takes no bytes.
+        inline static uint16_t ReadSectionCount(uint8_t sections, uint8_t section, uint8_t **data) {
+            if ((sections & section) == 0) {
+                return 0;
+            }
+
+            uint16_t count;
+            memcpy(&count, *data, sizeof(count));
+            *data += sizeof(count);
+
+            return count;
+        }
 
         uint8_t GetNodeType(MetadataTreeNode *treeNode);
 
@@ -343,6 +372,7 @@ namespace tns {
         uint8_t *m_nodeData;
         uint8_t *m_nameData;
         uint8_t *m_valueData;
+        const uint8_t *m_signatureData;
         std::vector<MetadataTreeNode *> m_v;
         // Nodes created at run time, in creation order and by parent. They stay out
         // of MetadataTreeNode::children so the static tree never changes once

@@ -1,6 +1,7 @@
 #ifndef METHODINFOSMARTPOINTER_H_
 #define METHODINFOSMARTPOINTER_H_
 
+#include <cstdint>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -8,36 +9,26 @@
 using namespace std;
 
 namespace tns {
+    /*
+     * A view of one method record in the metadata's value stream. The record is
+     * the offset of the method's name (4 bytes) and a reference to its signature
+     * (3 bytes); a static method or an extension function is followed by the id
+     * of its declaring type. Nothing is copied out of the record, and the
+     * signature itself is only read when the method is first resolved.
+     */
     class MethodInfo {
     public:
+        static const int RECORD_SIZE = sizeof(uint32_t) + 3;
 
-        MethodInfo(uint8_t *pValue)
-                : isStatic(false),  m_pData(pValue), m_pStartData(pValue), m_signatureLength(0),
-                  sizeMeasured(false), nameOffset(0), resolvedData(0),
-                  declaringNodeId(0){
-        }
-        
-        MethodInfo(const MethodInfo& other) = default;
-
-        MethodInfo& operator=(const MethodInfo& other) {
-            if (this != &other) {
-                isStatic = other.isStatic;
-                m_pData = other.m_pData;
-                m_pStartData = other.m_pStartData;
-                m_signatureLength = other.m_signatureLength;
-                sizeMeasured = other.sizeMeasured;
-                nameOffset = other.nameOffset;
-                resolvedData = other.resolvedData;
-                declaringNodeId = other.declaringNodeId;
-                nodeIds = other.nodeIds;
-            }
-            return *this;
+        MethodInfo(uint8_t *record)
+                : isStatic(false), m_record(record) {
         }
 
         std::string GetName();
 
         uint8_t CheckIsResolved();
 
+        // The return type and the parameter types.
         uint16_t GetSignatureLength();
 
         std::string GetSignature();
@@ -49,17 +40,11 @@ namespace tns {
         bool isStatic;
 
     private:
-        uint8_t *m_pData; //where we currently read
-        uint8_t *m_pStartData;  // pointer to the beginning
-        uint16_t m_signatureLength;
-        bool sizeMeasured;
+        // The signature's record in the signature region: a byte holding the
+        // number of type ids less one, then the ids.
+        const uint8_t *Signature();
 
-        uint32_t nameOffset;
-        uint8_t resolvedData;
-        uint16_t declaringNodeId;
-        std::vector<uint16_t> nodeIds;
-
-
+        uint8_t *m_record;
     };
 }
 
