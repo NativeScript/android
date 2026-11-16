@@ -2489,10 +2489,6 @@ std::string MetadataNode::GetJniClassName(MetadataEntry& entry) {
     return fullClassName;
 }
 
-MetadataReader* MetadataNode::getMetadataReader() {
-    return &MetadataNode::s_metadataReader;
-}
-
 string MetadataNode::TNS_PREFIX = "com/tns/gen/";
 MetadataReader MetadataNode::s_metadataReader;
 robin_hood::unordered_map<std::string, MetadataNode*> MetadataNode::s_name2NodeCache;

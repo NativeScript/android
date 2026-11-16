@@ -75,7 +75,9 @@ class MetadataNode {
         static bool TryGetPackageName(v8::Isolate* isolate, const v8::Local<v8::Object>& value, std::string& out);
 
 
-        static MetadataReader* getMetadataReader();
+        static MetadataReader* getMetadataReader() {
+            return &s_metadataReader;
+        }
     private:
         struct MethodCallbackData;
 
