@@ -813,7 +813,8 @@ void CallbackHandlers::RunMainThreadEntry(uint64_t key) {
             // A worker's error belongs to the worker, as if the callback had
             // run on its own thread: its onerror, then the parent's Worker
             // object. Thrown from here it would become a Java exception on the
-            // main thread.
+            // main thread. Under the "report" policy the containment above
+            // is the whole report: the parent never hears about the error.
             CallWorkerScopeOnErrorHandle(isolate, tc);
             return;
         }

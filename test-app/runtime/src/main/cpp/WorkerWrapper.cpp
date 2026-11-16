@@ -723,6 +723,12 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
         std::lock_guard<std::mutex> lock(gate_->mutex);
         gate_->open = false;
     }
+    // Waits out a main-thread callback that already owned the Locker when the
+    // gate closed: the teardown below (inspector, Java detach) must not run
+    // beside it, and none can start once the gate is closed.
+    if (runtime_ != nullptr) {
+        v8::Locker locker(runtime_->GetIsolate());
+    }
 
     // Terminate any workers this worker created (nested workers). Their
     // Worker object persistents live in this isolate, so they must be
