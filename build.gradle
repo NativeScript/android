@@ -474,6 +474,9 @@ def getRunTestsBuildArguments = { taskName ->
     if (selectedAbis != null) {
         arguments.add("-Pabis=${selectedAbis}")
     }
+    if (project.hasProperty("narrowMetadataFields")) {
+        arguments.add("-PnarrowMetadataFields")
+    }
     arguments += ["--warning-mode", "all"]
     return arguments
 }
