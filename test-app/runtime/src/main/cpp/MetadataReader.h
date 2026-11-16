@@ -141,6 +141,11 @@ namespace tns {
 
         MetadataTreeNode *GetBaseClassNode(MetadataTreeNode *treeNode);
 
+        // A copy: the node's own list can grow under another runtime's thread.
+        std::vector<MetadataTreeNode *> GetChildren(MetadataTreeNode *treeNode);
+
+        MetadataTreeNode *GetChild(MetadataTreeNode *treeNode, const std::string &name);
+
         MetadataTreeNode *GetNodeById(uint32_t nodeId);
 
         inline bool IsNodeTypeArray(uint8_t type) {

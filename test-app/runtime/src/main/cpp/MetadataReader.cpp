@@ -385,14 +385,7 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
             }
 
             for (const auto &part: api) {
-                vector<MetadataTreeNode *> *children = treeNode->children;
-                if (children == nullptr) {
-                    children = treeNode->children = new vector<MetadataTreeNode *>;
-                }
-
-                child = new MetadataTreeNode;
-                child->name = *it++;
-                child->parent = treeNode;
+                const string &childName = *it++;
 
                 string line;
                 string kind;
@@ -407,14 +400,16 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
                 // package, class, interface
                 NS_DCHECK((cKind == 'P') || (cKind == 'C') || (cKind == 'I'));
 
-                if ((cKind == 'C') || (cKind == 'I')) {
-                    child->metadata = new string(part);
-                    uint8_t childType = (cKind == 'C') ? MetadataTreeNode::CLASS
-                                                       : MetadataTreeNode::INTERFACE;
+                bool isType = (cKind == 'C') || (cKind == 'I');
+                uint8_t childType = MetadataTreeNode::PACKAGE;
+                MetadataTreeNode *baseClass = nullptr;
+
+                if (isType) {
+                    childType = (cKind == 'C') ? MetadataTreeNode::CLASS
+                                               : MetadataTreeNode::INTERFACE;
                     if (name == "S") {
                         childType |= MetadataTreeNode::STATIC;
                     }
-                    child->type.store(childType, std::memory_order_relaxed);
 
                     getline(s, line);
                     stringstream baseClassLine(line);
@@ -422,21 +417,41 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
                     cKind = kind[0];
 
                     NS_DCHECK(cKind == 'B');
-                    child->runtimeBaseClass = GetOrCreateTreeNodeByName(name);
-
-                    // Laid out like the head of a static class record. Only the type
-                    // byte is read back, for the element type of an array; the base
-                    // class id slot stays empty because runtimeBaseClass holds the link.
-                    child->offsetValue = m_valueLength;
-                    m_valueData[m_valueLength++] = childType;
-                    *reinterpret_cast<uint16_t *>(m_valueData + m_valueLength) = 0;
-                    m_valueLength += sizeof(uint16_t);
-                } else {
-                    child->type.store(MetadataTreeNode::PACKAGE, std::memory_order_relaxed);
+                    baseClass = GetOrCreateTreeNodeByName(name);
                 }
 
-                m_runtimeNodes.push_back(child);
-                children->push_back(child);
+                // Resolving the base class can release the state lock, so another
+                // thread may have published this node since the lookup above. Nothing
+                // from this lookup to the push_backs releases the lock.
+                child = treeNode->GetChild(childName);
+
+                if (child == nullptr) {
+                    child = new MetadataTreeNode;
+                    child->name = childName;
+                    child->parent = treeNode;
+                    child->type.store(childType, std::memory_order_relaxed);
+
+                    if (isType) {
+                        child->metadata = new string(part);
+                        child->runtimeBaseClass = baseClass;
+
+                        // Laid out like the head of a static class record. Only the
+                        // type byte is read back, for the element type of an array;
+                        // the base class id slot stays empty because
+                        // runtimeBaseClass holds the link.
+                        child->offsetValue = m_valueLength;
+                        m_valueData[m_valueLength++] = childType;
+                        *reinterpret_cast<uint16_t *>(m_valueData + m_valueLength) = 0;
+                        m_valueLength += sizeof(uint16_t);
+                    }
+
+                    if (treeNode->children == nullptr) {
+                        treeNode->children = new vector<MetadataTreeNode *>;
+                    }
+
+                    m_runtimeNodes.push_back(child);
+                    treeNode->children->push_back(child);
+                }
 
                 treeNode = child;
             }
@@ -449,6 +464,22 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
     }
 
     return treeNode;
+}
+
+vector<MetadataTreeNode *> MetadataReader::GetChildren(MetadataTreeNode *treeNode) {
+    StateLock lock(m_stateMutex);
+
+    if (treeNode->children == nullptr) {
+        return {};
+    }
+
+    return *treeNode->children;
+}
+
+MetadataTreeNode *MetadataReader::GetChild(MetadataTreeNode *treeNode, const string &name) {
+    StateLock lock(m_stateMutex);
+
+    return treeNode->GetChild(name);
 }
 
 MetadataTreeNode *MetadataReader::GetBaseClassNode(MetadataTreeNode *treeNode) {

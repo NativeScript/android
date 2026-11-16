@@ -398,19 +398,16 @@ Local<Object> MetadataNode::CreatePackageObject(Isolate* isolate) {
                            Private::ForApi(isolate, Local<String>::New(isolate, *cache->PackageKey)),
                            extData).ToChecked();
 
-    auto ptrChildren = this->m_treeNode->children;
-    if (ptrChildren != nullptr) {
-        const auto& children = *ptrChildren;
-        if (children.size() > kManyMembers) {
-            MoveToDictionaryMode(isolate, ctx, packageObj);
-        }
-        for (auto childNode: children) {
-            packageObj->SetLazyDataProperty(ctx,
-                                            NewMemberName(isolate, childNode->name),
-                                            PackageGetterCallback,
-                                            extData,
-                                            PropertyAttribute::ReadOnly).ToChecked();
-        }
+    auto children = s_metadataReader.GetChildren(this->m_treeNode);
+    if (children.size() > kManyMembers) {
+        MoveToDictionaryMode(isolate, ctx, packageObj);
+    }
+    for (auto childNode: children) {
+        packageObj->SetLazyDataProperty(ctx,
+                                        NewMemberName(isolate, childNode->name),
+                                        PackageGetterCallback,
+                                        extData,
+                                        PropertyAttribute::ReadOnly).ToChecked();
     }
 
     return packageObj;
@@ -1145,21 +1142,18 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
 }
 
 void MetadataNode::SetInnerTypes(v8::Isolate* isolate, Local<Function>& ctorFunction, MetadataTreeNode *treeNode) {
-    if (treeNode->children != nullptr) {
-        auto context = isolate->GetCurrentContext();
-        const auto &children = *treeNode->children;
-        for (auto curChild: children) {
-            auto childName = NewMemberName(isolate, curChild->name);
-            bool hasOwnProperty = ctorFunction->HasOwnProperty(context, childName).ToChecked();
-                // Child is defined as a function already when the inner type is a companion object
-                if (!hasOwnProperty) {
-                    ctorFunction->SetNativeDataProperty(
-                        context,
-                        childName,
-                        InnerTypeAccessorGetterCallback, nullptr,
-                        v8::External::New(isolate, curChild, v8::kExternalPointerTypeTagDefault)
-                ).ToChecked();
-            }
+    auto context = isolate->GetCurrentContext();
+    for (auto curChild: s_metadataReader.GetChildren(treeNode)) {
+        auto childName = NewMemberName(isolate, curChild->name);
+        bool hasOwnProperty = ctorFunction->HasOwnProperty(context, childName).ToChecked();
+        // Child is defined as a function already when the inner type is a companion object
+        if (!hasOwnProperty) {
+            ctorFunction->SetNativeDataProperty(
+                    context,
+                    childName,
+                    InnerTypeAccessorGetterCallback, nullptr,
+                    v8::External::New(isolate, curChild, v8::kExternalPointerTypeTagDefault)
+            ).ToChecked();
         }
     }
 }
@@ -2180,27 +2174,23 @@ MetadataNode* MetadataNode::GetNodeFromHandle(const Local<Object>& value) {
 }
 
 MetadataEntry MetadataNode::GetChildMetadataForPackage(MetadataNode *node, const std::string &propName) {
-    NS_DCHECK(node->m_treeNode->children != nullptr);
-
     MetadataEntry child(nullptr, NodeType::Class);
 
-    const auto &children = *node->m_treeNode->children;
+    auto treeNodeChild = s_metadataReader.GetChild(node->m_treeNode, propName);
 
-    for (auto treeNodeChild: children) {
-        if (propName == treeNodeChild->name) {
-            child.name = propName;
-            child.treeNode = treeNodeChild;
-            child.type = static_cast<NodeType>(s_metadataReader.GetNodeType(treeNodeChild));
+    if (treeNodeChild != nullptr) {
+        child.name = propName;
+        child.treeNode = treeNodeChild;
+        child.type = static_cast<NodeType>(s_metadataReader.GetNodeType(treeNodeChild));
 
-            if (s_metadataReader.IsNodeTypeInterface((uint8_t) child.type)) {
-                bool isPrefix;
-                string declaringType = s_metadataReader.ReadInterfaceImplementationTypeName(
-                        treeNodeChild, isPrefix);
-                child.declaringType = isPrefix
-                                      ? (declaringType +
-                                         s_metadataReader.ReadTypeName(child.treeNode))
-                                      : declaringType;
-            }
+        if (s_metadataReader.IsNodeTypeInterface((uint8_t) child.type)) {
+            bool isPrefix;
+            string declaringType = s_metadataReader.ReadInterfaceImplementationTypeName(
+                    treeNodeChild, isPrefix);
+            child.declaringType = isPrefix
+                                  ? (declaringType +
+                                     s_metadataReader.ReadTypeName(child.treeNode))
+                                  : declaringType;
         }
     }
 
@@ -2335,9 +2325,7 @@ void MetadataNode::CreateTopLevelNamespaces(Isolate* isolate, const Local<Object
     auto context = isolate->GetCurrentContext();
     auto root = s_metadataReader.GetRoot();
 
-    const auto& children = *root->children;
-
-    for (auto treeNode : children) {
+    for (auto treeNode : s_metadataReader.GetChildren(root)) {
         uint8_t nodeType = s_metadataReader.GetNodeType(treeNode);
 
         if (nodeType == MetadataTreeNode::PACKAGE) {
