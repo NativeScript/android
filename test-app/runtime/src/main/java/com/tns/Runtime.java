@@ -42,6 +42,8 @@ public class Runtime {
 
     private native Object runScript(int runtimeId, String filePath) throws NativeScriptException;
 
+    private static native void unwindFailedBootstrap(int runtimeId);
+
     private native Object callJSMethodNative(int runtimeId, Object javaObject, int javaObjectID, String methodName, int methodNameId, int retType, boolean isConstructor, int argCount, long[] argValues, Object[] argRefs, long[] primitiveResult) throws NativeScriptException;
 
     private native void createJSInstanceNative(int runtimeId, Object javaObject, int javaObjectID, String canonicalName);
@@ -718,6 +720,15 @@ public class Runtime {
             indexRuntime(runtime.getRuntimeId(), null);
             currentRuntime.remove();
             GcListener.unsubscribe(runtime);
+            // ts_helpers.js runs after the native runtime is fully built, so a
+            // failure there leaves the isolate behind unless it is torn down
+            // here as well; after the unsubscribe, so no GC notification can
+            // still be running against it
+            try {
+                unwindFailedBootstrap(runtime.getRuntimeId());
+            } catch (Throwable unwindError) {
+                t.addSuppressed(unwindError);
+            }
             throw t;
         }
 
