@@ -14,7 +14,10 @@
 #include <cctype>
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <android/log.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include "ManualInstrumentation.h"
 #include "ExtendFileIdentifier.h"
@@ -2177,10 +2180,47 @@ MetadataEntry MetadataNode::GetChildMetadataForPackage(MetadataNode *node, const
     return child;
 }
 
-void MetadataNode::BuildMetadata(const string& filesPath) {
-    timeval time1;
-    gettimeofday(&time1, nullptr);
+namespace {
+    struct MappedMetadataFile {
+        uint8_t* data;
+        size_t length;
+    };
 
+    /*
+     * Maps one of the metadata files read-only rather than reading it into the
+     * heap: only the pages the app touches are loaded, and being clean and
+     * file-backed they can be dropped under memory pressure. The extractor
+     * replaces these files by renaming a new one over them, never by writing in
+     * place, so a mapping keeps the contents it was made from.
+     */
+    MappedMetadataFile MapMetadataFile(const string& dir, const char* name) {
+        string path = dir + "/" + name;
+
+        void* data = MAP_FAILED;
+        struct stat info{};
+        int fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+        if (fd >= 0) {
+            if (fstat(fd, &info) == 0 && info.st_size > 0) {
+                data = mmap(nullptr, static_cast<size_t>(info.st_size), PROT_READ, MAP_PRIVATE, fd, 0);
+            }
+            int error = errno;
+            close(fd);
+            errno = error;
+        }
+
+        if (data == MAP_FAILED) {
+            stringstream ss;
+            ss << "metadata file (" << name << ") couldn't be opened! (Error: ";
+            ss << errno;
+            ss << ") ";
+            throw NativeScriptException(ss.str());
+        }
+
+        return {static_cast<uint8_t*>(data), static_cast<size_t>(info.st_size)};
+    }
+}
+
+void MetadataNode::BuildMetadata(const string& filesPath) {
     string baseDir = filesPath;
     baseDir.append("/metadata");
 
@@ -2218,83 +2258,25 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
         }
     }
 
-    string nodesFile = baseDir + "/treeNodeStream.dat";
-    string namesFile = baseDir + "/treeStringsStream.dat";
-    string valuesFile = baseDir + "/treeValueStream.dat";
-
-    FILE* f = fopen(nodesFile.c_str(), "rb");
-    if (f == nullptr) {
+    auto nodes = MapMetadataFile(baseDir, "treeNodeStream.dat");
+    if ((nodes.length % sizeof(MetadataTreeNodeRawData)) != 0) {
         stringstream ss;
-        ss << "metadata file (treeNodeStream.dat) couldn't be opened! (Error: ";
-        ss << errno;
-        ss << ") ";
-
-        throw NativeScriptException(ss.str());
-    }
-    fseek(f, 0, SEEK_END);
-    int lenNodes = ftell(f);
-    if (lenNodes < 0 ||
-        (static_cast<size_t>(lenNodes) % sizeof(MetadataTreeNodeRawData)) != 0) {
-        fclose(f);
-        stringstream ss;
-        ss << "Metadata file " << nodesFile << " is " << lenNodes
+        ss << "Metadata file " << baseDir << "/treeNodeStream.dat is " << nodes.length
            << " bytes, which is not a whole number of "
            << sizeof(MetadataTreeNodeRawData)
            << "-byte records. The metadata is truncated or corrupt.";
         throw NativeScriptException(ss.str());
     }
-    char* nodes = new char[lenNodes];
-    rewind(f);
-    fread(nodes, 1, lenNodes, f);
-    fclose(f);
+    auto names = MapMetadataFile(baseDir, "treeStringsStream.dat");
+    auto values = MapMetadataFile(baseDir, "treeValueStream.dat");
 
-    const int _512KB = 524288;
+    DEBUG_WRITE("lenNodes=%zu, lenNames=%zu, lenValues=%zu", nodes.length, names.length, values.length);
 
-    f = fopen(namesFile.c_str(), "rb");
-    if (f == nullptr) {
-        stringstream ss;
-        ss << "metadata file (treeStringsStream.dat) couldn't be opened! (Error: ";
-        ss << errno;
-        ss << ") ";
-        throw NativeScriptException(ss.str());
-    }
-    fseek(f, 0, SEEK_END);
-    int lenNames = ftell(f);
-    char* names = new char[lenNames + _512KB];
-    rewind(f);
-    fread(names, 1, lenNames, f);
-    fclose(f);
+    BuildMetadata(nodes.length, nodes.data, names.length, names.data, values.length, values.data);
 
-    f = fopen(valuesFile.c_str(), "rb");
-    if (f == nullptr) {
-        stringstream ss;
-        ss << "metadata file (treeValueStream.dat) couldn't be opened! (Error: ";
-        ss << errno;
-        ss << ") ";
-        throw NativeScriptException(ss.str());
-    }
-    fseek(f, 0, SEEK_END);
-    int lenValues = ftell(f);
-    char* values = new char[lenValues + _512KB];
-    rewind(f);
-    fread(values, 1, lenValues, f);
-    fclose(f);
-
-    timeval time2;
-    gettimeofday(&time2, nullptr);
-
-    DEBUG_WRITE("lenNodes=%d, lenNames=%d, lenValues=%d", lenNodes, lenNames, lenValues);
-
-    long millis1 = (time1.tv_sec * 1000) + (time1.tv_usec / 1000);
-    long millis2 = (time2.tv_sec * 1000) + (time2.tv_usec / 1000);
-
-    DEBUG_WRITE("time=%ld", (millis2 - millis1));
-
-    BuildMetadata(lenNodes, reinterpret_cast<uint8_t*>(nodes), lenNames, reinterpret_cast<uint8_t*>(names), lenValues, reinterpret_cast<uint8_t*>(values));
-
-    delete[] nodes;
-    //delete[] names;
-    //delete[] values;
+    // The tree is built from the nodes; the names and the values stay mapped for
+    // the life of the process.
+    munmap(nodes.data, nodes.length);
 }
 
 void MetadataNode::BuildMetadata(uint32_t nodesLength, uint8_t* nodeData, uint32_t nameLength, uint8_t* nameData, uint32_t valueLength, uint8_t* valueData) {

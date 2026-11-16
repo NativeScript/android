@@ -295,7 +295,7 @@ uint8_t MetadataReader::GetNodeType(MetadataTreeNode *treeNode) {
             if (arrElemNode == nullptr) {
                 throw NativeScriptException("Cannot resolve an array element type: the metadata refers to a node that does not exist.");
             }
-            nodeType = *(m_valueData + arrElemNode->offsetValue);
+            nodeType = GetNodeType(arrElemNode);
         }
 
         treeNode->type.store(nodeType, std::memory_order_relaxed);
@@ -467,14 +467,7 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
                         child->metadata = new string(part);
                         child->runtimeBaseClass = baseClass;
 
-                        // Laid out like the head of a static class record. Only the
-                        // type byte is read back, for the element type of an array;
-                        // the base class id slot stays empty because
-                        // runtimeBaseClass holds the link.
-                        child->offsetValue = m_valueLength;
-                        m_valueData[m_valueLength++] = childType;
-                        *reinterpret_cast<uint16_t *>(m_valueData + m_valueLength) = 0;
-                        m_valueLength += sizeof(uint16_t);
+                        child->offsetValue = RUNTIME_TYPE_VALUE_OFFSET;
                     }
 
                     AddRuntimeChild(treeNode, child);

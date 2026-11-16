@@ -342,6 +342,12 @@ namespace tns {
 
         static const uint32_t ARRAY_OFFSET = INT32_MAX; // 2147483647
 
+        // A type resolved at run time has no value in the stream, which is mapped
+        // read-only. Its node only needs an offset that reads as "a class": not 0,
+        // which means a package, and below ARRAY_OFFSET. This one is inside the
+        // stream's header, where no value starts.
+        static const uint32_t RUNTIME_TYPE_VALUE_OFFSET = 1;
+
         // The static metadata addresses its nodes with 16-bit ids. Nodes created at
         // run time are numbered from here in every app, so a path that narrows one
         // of their ids fails everywhere rather than only once the static tree is
