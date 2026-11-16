@@ -216,10 +216,13 @@ class ModuleInternal {
          * The options ride along as trailing arguments to the require factory, so
          * nothing about them is ambient — and they are resolved once at mint time,
          * never per require() call.
+         *
+         * Empty when minting was interrupted - the isolate is terminating - in
+         * which case nothing is cached and the termination is left pending.
          */
-        v8::Local<v8::Function> GetRequireFunction(v8::Isolate* isolate,
-                                                   const std::string& dirName,
-                                                   const ModuleEvaluationOptions& options);
+        v8::MaybeLocal<v8::Function> GetRequireFunction(v8::Isolate* isolate,
+                                                        const std::string& dirName,
+                                                        const ModuleEvaluationOptions& options);
 
         /*
          * A V8 code cache produced by a classic-script compile and one produced by a

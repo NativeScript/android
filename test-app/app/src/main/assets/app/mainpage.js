@@ -32,6 +32,8 @@ require("./tests/testWebAssembly");
 require("./tests/testEventLoop");
 require("./tests/testMultithreadedJavascript");
 require("./tests/testWorkerTerminateDuringLoad");
+require("./tests/testWorkerTerminateDuringRequireMint");
+require("./tests/testWorkerTerminateCaughtRequire");
 require("./tests/testWorkerTerminateAfterClose");
 require("./tests/testWorkerOptions");
 require("./tests/testWorkerResourceLimits");
