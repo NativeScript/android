@@ -236,6 +236,12 @@ NativeScriptException::NativeScriptException(TryCatch& tc,
 
 void NativeScriptException::ReThrowToV8() {
   auto isolate = Isolate::GetCurrent();
+  // Throwing replaces whatever is pending. A pending termination has to keep
+  // unwinding as one: turned into an ordinary error, a catch block in the
+  // worker's JS would swallow terminate().
+  if (isolate->IsExecutionTerminating()) {
+    return;
+  }
   auto context = isolate->GetCurrentContext();
   Local<Value> errObj;
 
