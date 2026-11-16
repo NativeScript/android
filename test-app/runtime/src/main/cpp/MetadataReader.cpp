@@ -28,6 +28,7 @@ void MetadataReader::Initialize(uint32_t nodesLength, uint8_t *nodeData, uint32_
     m_getTypeMetadataCallback = getTypeMetadataCallback;
     m_v.clear();
     m_runtimeNodes.clear();
+    m_runtimeChildren.clear();
     m_typeNameCache.clear();
 
     m_root = BuildTree();
@@ -286,6 +287,41 @@ uint8_t MetadataReader::GetNodeType(MetadataTreeNode *treeNode) {
     return treeNode->type.load(std::memory_order_relaxed);
 }
 
+template<typename Predicate>
+MetadataTreeNode *MetadataReader::FindChildIf(MetadataTreeNode *parent, Predicate matches) {
+    if (parent->children != nullptr) {
+        for (auto child: *parent->children) {
+            if (matches(child)) {
+                return child;
+            }
+        }
+    }
+
+    auto itFound = m_runtimeChildren.find(parent);
+    if (itFound != m_runtimeChildren.end()) {
+        for (auto child: itFound->second) {
+            if (matches(child)) {
+                return child;
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+MetadataTreeNode *MetadataReader::FindChild(MetadataTreeNode *parent, const string &name) {
+    return FindChildIf(parent, [&name](MetadataTreeNode *child) {
+        return child->name == name;
+    });
+}
+
+void MetadataReader::AddRuntimeChild(MetadataTreeNode *parent, MetadataTreeNode *child) {
+    child->parent = parent;
+
+    m_runtimeNodes.push_back(child);
+    m_runtimeChildren[parent].push_back(child);
+}
+
 MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &className) {
     StateLock lock(m_stateMutex);
 
@@ -295,21 +331,14 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
     string arrayName = "[";
 
     while (className[++arrayIdx] == '[') {
-        MetadataTreeNode * child = treeNode->GetChild(arrayName);
+        MetadataTreeNode * child = FindChild(treeNode, arrayName);
 
         if (child == nullptr) {
-            vector<MetadataTreeNode *> *children = treeNode->children;
-            if (children == nullptr) {
-                children = treeNode->children = new vector<MetadataTreeNode *>;
-            }
-
             child = new MetadataTreeNode;
             child->name = "[";
-            child->parent = treeNode;
             child->offsetValue = ARRAY_OFFSET;
 
-            children->push_back(child);
-            m_runtimeNodes.push_back(child);
+            AddRuntimeChild(treeNode, child);
         }
 
         treeNode = child;
@@ -328,44 +357,31 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
     Util::SplitString(cn, "/$", names);
 
     if (arrayIdx > 0) {
-        bool found = false;
         MetadataTreeNode * forwardedNode = GetOrCreateTreeNodeByName(cn);
 
         uint32_t forwardedNodeId = GetNodeId(forwardedNode);
-        if (treeNode->children == nullptr) {
-            treeNode->children = new vector<MetadataTreeNode *>();
-        }
-        vector<MetadataTreeNode *> &children = *treeNode->children;
-        for (auto childNode: children) {
+        MetadataTreeNode * forwardNode = FindChildIf(treeNode, [&](MetadataTreeNode *childNode) {
             uint32_t childNodeId = (childNode->offsetValue >= ARRAY_OFFSET)
                                    ? (childNode->offsetValue - ARRAY_OFFSET)
                                    :
                                    GetNodeId(childNode);
 
-            if (childNodeId == forwardedNodeId) {
-                treeNode = childNode;
-                found = true;
-                break;
-            }
-        }
+            return childNodeId == forwardedNodeId;
+        });
 
-        if (!found) {
-            MetadataTreeNode * forwardNode = new MetadataTreeNode;
+        if (forwardNode == nullptr) {
+            forwardNode = new MetadataTreeNode;
             forwardNode->offsetValue = forwardedNodeId + ARRAY_OFFSET;
-            forwardNode->parent = treeNode;
 
-            m_runtimeNodes.push_back(forwardNode);
-            children.push_back(forwardNode);
-
-            treeNode = forwardNode;
+            AddRuntimeChild(treeNode, forwardNode);
         }
 
-        return treeNode;
+        return forwardNode;
     }
 
     int curIdx = 0;
     for (auto it = names.begin(); it != names.end(); ++it) {
-        MetadataTreeNode * child = treeNode->GetChild(*it);
+        MetadataTreeNode * child = FindChild(treeNode, *it);
 
         if (child == nullptr) {
             vector<string> api;
@@ -377,7 +393,7 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
             }
 
             // Another thread may have resolved the same type meanwhile.
-            child = treeNode->GetChild(*it);
+            child = FindChild(treeNode, *it);
             if (child != nullptr) {
                 treeNode = child;
                 ++curIdx;
@@ -422,13 +438,12 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
 
                 // Resolving the base class can release the state lock, so another
                 // thread may have published this node since the lookup above. Nothing
-                // from this lookup to the push_backs releases the lock.
-                child = treeNode->GetChild(childName);
+                // from this lookup to AddRuntimeChild releases the lock.
+                child = FindChild(treeNode, childName);
 
                 if (child == nullptr) {
                     child = new MetadataTreeNode;
                     child->name = childName;
-                    child->parent = treeNode;
                     child->type.store(childType, std::memory_order_relaxed);
 
                     if (isType) {
@@ -445,12 +460,7 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
                         m_valueLength += sizeof(uint16_t);
                     }
 
-                    if (treeNode->children == nullptr) {
-                        treeNode->children = new vector<MetadataTreeNode *>;
-                    }
-
-                    m_runtimeNodes.push_back(child);
-                    treeNode->children->push_back(child);
+                    AddRuntimeChild(treeNode, child);
                 }
 
                 treeNode = child;
@@ -464,22 +474,6 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
     }
 
     return treeNode;
-}
-
-vector<MetadataTreeNode *> MetadataReader::GetChildren(MetadataTreeNode *treeNode) {
-    StateLock lock(m_stateMutex);
-
-    if (treeNode->children == nullptr) {
-        return {};
-    }
-
-    return *treeNode->children;
-}
-
-MetadataTreeNode *MetadataReader::GetChild(MetadataTreeNode *treeNode, const string &name) {
-    StateLock lock(m_stateMutex);
-
-    return treeNode->GetChild(name);
 }
 
 MetadataTreeNode *MetadataReader::GetBaseClassNode(MetadataTreeNode *treeNode) {

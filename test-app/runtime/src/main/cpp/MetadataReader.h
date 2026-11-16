@@ -141,11 +141,6 @@ namespace tns {
 
         MetadataTreeNode *GetBaseClassNode(MetadataTreeNode *treeNode);
 
-        // A copy: the node's own list can grow under another runtime's thread.
-        std::vector<MetadataTreeNode *> GetChildren(MetadataTreeNode *treeNode);
-
-        MetadataTreeNode *GetChild(MetadataTreeNode *treeNode, const std::string &name);
-
         MetadataTreeNode *GetNodeById(uint32_t nodeId);
 
         inline bool IsNodeTypeArray(uint8_t type) {
@@ -319,6 +314,15 @@ namespace tns {
 
         MetadataTreeNode *BuildTree();
 
+        // Looks through the node's static children, then the ones created at run
+        // time. The caller holds the state lock.
+        template<typename Predicate>
+        MetadataTreeNode *FindChildIf(MetadataTreeNode *parent, Predicate matches);
+
+        MetadataTreeNode *FindChild(MetadataTreeNode *parent, const std::string &name);
+
+        void AddRuntimeChild(MetadataTreeNode *parent, MetadataTreeNode *child);
+
         std::string ReadTypeNameInternal(MetadataTreeNode *treeNode);
 
         void FillEntryWithFiedldInfo(FieldInfo *fi, MetadataEntry &entry);
@@ -333,7 +337,11 @@ namespace tns {
         uint8_t *m_nameData;
         uint8_t *m_valueData;
         std::vector<MetadataTreeNode *> m_v;
+        // Nodes created at run time, in creation order and by parent. They stay out
+        // of MetadataTreeNode::children so the static tree never changes once
+        // built, which is what lets MetadataNode walk it without this reader's lock.
         std::vector<MetadataTreeNode *> m_runtimeNodes;
+        robin_hood::unordered_node_map<MetadataTreeNode *, std::vector<MetadataTreeNode *>> m_runtimeChildren;
         GetTypeMetadataCallback m_getTypeMetadataCallback;
 
         robin_hood::unordered_map<MetadataTreeNode *, std::string> m_typeNameCache;

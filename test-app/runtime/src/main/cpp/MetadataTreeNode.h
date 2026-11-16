@@ -10,15 +10,13 @@ namespace tns {
 struct MetadataTreeNode {
     MetadataTreeNode();
 
-    MetadataTreeNode* GetChild(const std::string& name);
-
     // There is one of these per metadata node, tens of thousands in a large app, so
     // the two narrow members sit together at the end rather than each leaving a hole.
     std::string name;
     MetadataTreeNode* parent;
-    // Grows when a type under this node is resolved at run time, on any runtime's
-    // thread. Outside MetadataReader, read it through MetadataReader::GetChildren
-    // or MetadataReader::GetChild.
+    // Fixed once the static tree is built, so any runtime's thread can walk it
+    // without the reader's lock. Nodes created at run time never appear here;
+    // MetadataReader tracks them itself.
     std::vector<MetadataTreeNode*>* children;
     // Set for a type resolved at run time, null for one from the static metadata.
     std::string* metadata;
