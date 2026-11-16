@@ -24,20 +24,24 @@ namespace tns {
          * Writer.java produces and has to be changed together with:
          *
          *   format             4 bytes, FORMAT
+         *   widths             the bytes a node id, an offset into the names and a
+         *                      signature reference each take (1 to 4), and a
+         *                      reserved byte. The generator picks the fewest that
+         *                      hold this metadata's largest value of each.
          *   signatures length  4 bytes
          *   signatures         each distinct method signature once: a byte holding
          *                      the number of type ids less one, then the ids, the
          *                      return type first
          *   values             one per primitive type and per class or interface,
          *                      at the offset its tree node gives
+         *   padding            4 bytes, so the last field can be read at full width
          *
-         * A class value is its type (1 byte), its base class id (2 bytes) and a
-         * byte with a bit for each member section it has. Those sections follow
-         * in the order of the bits, each a 2-byte count and its entries.
+         * A class value is its type (1 byte), its base class id and a byte with a
+         * bit for each member section it has. Those sections follow in the order
+         * of the bits, each a 2-byte count and its entries.
          */
-        static constexpr uint32_t FORMAT = 'N' | ('S' << 8) | ('M' << 16) | (2 << 24);
-        static constexpr uint32_t VALUE_HEADER_SIZE = 2 * sizeof(uint32_t);
-        static constexpr uint32_t CLASS_VALUE_SECTIONS_OFFSET = sizeof(uint8_t) + sizeof(uint16_t);
+        static constexpr uint32_t FORMAT = 'N' | ('S' << 8) | ('M' << 16) | (3 << 24);
+        static constexpr uint32_t VALUE_HEADER_SIZE = 3 * sizeof(uint32_t);
 
         static constexpr uint8_t SECTION_EXTENSION_FUNCTIONS = 1;
         static constexpr uint8_t SECTION_INSTANCE_METHODS = 1 << 1;
@@ -59,26 +63,80 @@ namespace tns {
                         uint8_t *nameData, uint32_t valueLength, uint8_t *valueData,
                         GetTypeMetadataCallback getTypeMetadataCallack);
 
-        inline static MetadataEntry ReadInstanceFieldEntry(uint8_t **data) {
+        /*
+         * A field of the node or value stream that is 1 to 4 bytes wide. It always
+         * loads four bytes and masks, so there is no branch on the width: the
+         * value stream is padded for its last field, and a node record ends in a
+         * full four-byte one.
+         */
+        inline static uint32_t ReadField(const uint8_t *data, uint32_t mask) {
+            uint32_t value;
+            memcpy(&value, data, sizeof(value));
+            return value & mask;
+        }
+
+        inline uint32_t ReadId(const uint8_t *data) const {
+            return ReadField(data, m_idMask);
+        }
+
+        inline uint32_t ReadNameOffset(const uint8_t *data) const {
+            return ReadField(data, m_nameMask);
+        }
+
+        inline uint32_t ReadSignatureReference(const uint8_t *data) const {
+            return ReadField(data, m_signatureMask);
+        }
+
+        inline uint32_t IdBytes() const {
+            return m_idBytes;
+        }
+
+        inline uint32_t NameBytes() const {
+            return m_nameBytes;
+        }
+
+        inline uint32_t SignatureBytes() const {
+            return m_signatureBytes;
+        }
+
+        // A field record: its name, the id of its type, its flags (see FieldInfo)
+        // and, on a static field flagged for it, the id of its declaring type.
+        inline uint32_t FieldNameOffset(const uint8_t *field) const {
+            return ReadNameOffset(field);
+        }
+
+        inline uint32_t FieldTypeId(const uint8_t *field) const {
+            return ReadId(field + m_nameBytes);
+        }
+
+        inline uint8_t FieldFlags(const uint8_t *field) const {
+            return field[m_nameBytes + m_idBytes];
+        }
+
+        inline uint32_t FieldDeclaringTypeId(const uint8_t *field) const {
+            return ReadId(field + m_nameBytes + m_idBytes + sizeof(uint8_t));
+        }
+
+        inline MetadataEntry ReadInstanceFieldEntry(uint8_t **data) {
             MetadataEntry entry(nullptr, NodeType::Field);
-            entry.fi = *reinterpret_cast<FieldInfo **>(data);
+            entry.field = *data;
             entry.isStatic = false;
             entry.isTypeMember = false;
 
-            *data += sizeof(FieldInfo);
+            *data += m_nameBytes + m_idBytes + sizeof(uint8_t);
 
             return entry;
         }
 
-        inline static MetadataEntry ReadStaticFieldEntry(uint8_t **data) {
+        inline MetadataEntry ReadStaticFieldEntry(uint8_t **data) {
             MetadataEntry entry(nullptr, NodeType::StaticField);
-            entry.sfi = *reinterpret_cast<StaticFieldInfo **>(data);
+            entry.field = *data;
             entry.isStatic = true;
             entry.isTypeMember = false;
 
-            *data += sizeof(FieldInfo);
-            if (entry.sfi->flags & FieldInfo::HAS_DECLARING_TYPE) {
-                *data += sizeof(uint16_t);
+            *data += m_nameBytes + m_idBytes + sizeof(uint8_t);
+            if (FieldFlags(entry.field) & FieldInfo::HAS_DECLARING_TYPE) {
+                *data += m_idBytes;
             }
 
             return entry;
@@ -150,7 +208,13 @@ namespace tns {
         }
 
         inline uint8_t GetClassSections(MetadataTreeNode *treeNode) const {
-            return m_valueData[treeNode->offsetValue + CLASS_VALUE_SECTIONS_OFFSET];
+            return m_valueData[treeNode->offsetValue + sizeof(uint8_t) + m_idBytes];
+        }
+
+        // Where a class value's member sections start: after its type, its base
+        // class id and the byte saying which sections it has.
+        inline uint8_t *GetClassMembers(MetadataTreeNode *treeNode) const {
+            return m_valueData + treeNode->offsetValue + sizeof(uint8_t) + m_idBytes + sizeof(uint8_t);
         }
 
         // The number of entries in one member section of a class value, leaving
@@ -348,11 +412,10 @@ namespace tns {
         // stream's header, where no value starts.
         static const uint32_t RUNTIME_TYPE_VALUE_OFFSET = 1;
 
-        // The static metadata addresses its nodes with 16-bit ids. Nodes created at
-        // run time are numbered from here in every app, so a path that narrows one
-        // of their ids fails everywhere rather than only once the static tree is
-        // nearly full.
-        static const uint32_t RUNTIME_NODE_ID_BASE = 1 << 16;
+        // The static metadata numbers its nodes from 0, and the generator stops
+        // before this many. Nodes created at run time are numbered from here, which
+        // still leaves an array's marker, ARRAY_OFFSET plus an id, within 32 bits.
+        static const uint32_t RUNTIME_NODE_ID_BASE = 1 << 30;
 
         MetadataTreeNode *BuildTree();
 
@@ -379,6 +442,12 @@ namespace tns {
         uint8_t *m_nameData;
         uint8_t *m_valueData;
         const uint8_t *m_signatureData;
+        uint32_t m_idBytes;
+        uint32_t m_nameBytes;
+        uint32_t m_signatureBytes;
+        uint32_t m_idMask;
+        uint32_t m_nameMask;
+        uint32_t m_signatureMask;
         std::vector<MetadataTreeNode *> m_v;
         // Nodes created at run time, in creation order and by parent. They stay out
         // of MetadataTreeNode::children so the static tree never changes once

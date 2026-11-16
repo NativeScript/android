@@ -50,8 +50,7 @@ namespace tns {
                 clazz = other.clazz;
                 parsedSig = other.parsedSig;
                 mi = other.mi;
-                fi = other.fi;
-                sfi = other.sfi;
+                field = other.field;
                 name = other.name;
                 sig = other.sig;
                 returnType = other.returnType;
@@ -92,8 +91,8 @@ namespace tns {
         std::vector<std::string> parsedSig;
 
         MethodInfo mi;
-        FieldInfo *fi;
-        StaticFieldInfo *sfi;
+        // A field's record in the value stream.
+        const uint8_t *field;
 
         std::string name;
         std::string sig;

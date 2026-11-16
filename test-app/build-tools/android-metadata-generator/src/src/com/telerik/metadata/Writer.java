@@ -7,9 +7,6 @@ import com.telerik.metadata.TreeNode.MethodInfo;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
-import java.nio.Buffer;
-import java.nio.ByteOrder;
-import java.nio.IntBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.HashMap;
@@ -25,10 +22,14 @@ public class Writer {
     private final StreamWriter outDebugStream;
 
     // The bytes "NSM" and the format version. The runtime refuses any other value.
-    private static final int FORMAT = 'N' | ('S' << 8) | ('M' << 16) | (2 << 24);
+    private static final int FORMAT = 'N' | ('S' << 8) | ('M' << 16) | (3 << 24);
 
-    // A method record refers to its signature with 23 bits.
-    private static final int MAX_SIGNATURE_BYTES = 1 << 23;
+    // The runtime numbers the nodes it creates itself from here.
+    private static final int MAX_NODES = 1 << 30;
+
+    // The widest a field can be. The runtime reads every field as this many bytes and
+    // masks off what is not the field's.
+    private static final int MAX_FIELD_BYTES = 4;
 
     private static final int SECTION_EXTENSION_FUNCTIONS = 1;
     private static final int SECTION_INSTANCE_METHODS = 1 << 1;
@@ -48,23 +49,53 @@ public class Writer {
     private final HashMap<ByteBuffer, Integer> signatureOffsets = new HashMap<>();
     private final ByteArrayOutputStream signatures = new ByteArrayOutputStream();
 
+    // How many bytes a node id, an offset into the strings and a signature reference take.
+    // Each is the fewest that hold the largest value this metadata needs, and the value
+    // stream's header tells the runtime what they are.
+    private int idBytes;
+    private int nameBytes;
+    private int signatureBytes;
+
+    // Makes every one of those a byte wider than needed. The runtime's tests are built
+    // this way, so the widths only a very large app would get are the ones they cover.
+    private final boolean widenFields;
+
     public Writer(StreamWriter outNodeStream, StreamWriter outValueStream,
                   StreamWriter outStringsStream) {
         this(outNodeStream, outValueStream, outStringsStream, null);
     }
     public Writer(StreamWriter outNodeStream, StreamWriter outValueStream,
                   StreamWriter outStringsStream, StreamWriter outDebugStream) {
+        this(outNodeStream, outValueStream, outStringsStream, outDebugStream, false);
+    }
+    public Writer(StreamWriter outNodeStream, StreamWriter outValueStream,
+                  StreamWriter outStringsStream, StreamWriter outDebugStream,
+                  boolean widenFields) {
         this.outNodeStream = outNodeStream;
         this.outValueStream = outValueStream;
         this.outStringsStream = outStringsStream;
         this.outDebugStream = outDebugStream;
+        this.widenFields = widenFields;
+    }
+
+    private int fieldBytes(long largestValue) {
+        int bytes = 1;
+        while (bytes < MAX_FIELD_BYTES && (largestValue >>> (8 * bytes)) != 0) {
+            bytes++;
+        }
+
+        return widenFields ? Math.min(MAX_FIELD_BYTES, bytes + 1) : bytes;
+    }
+
+    private static void writeField(int value, int bytes, StreamWriter out) throws Exception {
+        for (int i = 0; i < bytes; i++) {
+            out.write((byte) ((value >>> (8 * i)) & 0xFF));
+        }
     }
 
     private final static byte[] writeUniqueName_lenBuff = new byte[2];
     private final static byte[] writeInt_buff = new byte[4];
-    private final static byte[] writeTreeNodeId_buff = new byte[2];
     private final static byte[] writeLength_lenBuff = new byte[2];
-    private final static byte[] writeSignatureReference_buff = new byte[3];
 
     private static int writeUniqueName(String name,
                                        HashMap<String, Integer> uniqueStrings,
@@ -94,20 +125,21 @@ public class Writer {
 
     // One length byte, holding the count of ids less one, then the ids: the return type
     // followed by the parameter types.
-    private static ByteBuffer encodeSignature(MethodInfo mi) throws Exception {
+    private ByteBuffer encodeSignature(MethodInfo mi) throws Exception {
         int length = mi.signature.size();
         if (length < 1 || length > 256) {
             throw new Exception("Method " + mi.name + " has a signature of " + length
                     + " types, which the metadata cannot hold. Please report this issue.");
         }
 
-        byte[] record = new byte[1 + 2 * length];
+        byte[] record = new byte[1 + idBytes * length];
         record[0] = (byte) (length - 1);
         for (int i = 0; i < length; i++) {
             TreeNode type = mi.signature.get(i);
-            int id = (type == null) ? 0 : Short.toUnsignedInt(type.id);
-            record[1 + 2 * i] = (byte) (id & 0xFF);
-            record[2 + 2 * i] = (byte) ((id >> 8) & 0xFF);
+            int id = (type == null) ? 0 : type.id;
+            for (int b = 0; b < idBytes; b++) {
+                record[1 + idBytes * i + b] = (byte) ((id >>> (8 * b)) & 0xFF);
+            }
         }
 
         return ByteBuffer.wrap(record);
@@ -150,11 +182,6 @@ public class Writer {
             d.addAll(n.children);
         }
 
-        if (signatures.size() >= MAX_SIGNATURE_BYTES) {
-            throw new Exception("Metadata is too big: the method signatures take " + signatures.size()
-                    + " bytes and the format can address " + MAX_SIGNATURE_BYTES
-                    + ". Please report this issue.");
-        }
     }
 
     // An array's element node takes its value from the node it stands for, so it has no
@@ -166,30 +193,20 @@ public class Writer {
                 || ((n.nodeType & TreeNode.Interface) == TreeNode.Interface));
     }
 
-    // The name, then three bytes: the signature's offset in the signature region, shifted
-    // left by one, with the low bit set when the method is resolved.
+    // The name, then the signature reference: the signature's offset in the signature
+    // region, shifted left by one, with the low bit set when the method is resolved.
     private void writeMethodInfo(MethodInfo mi,
                                  HashMap<String, Integer> uniqueStrings, StreamWriter outValueStream)
             throws Exception {
-        int pos = uniqueStrings.get(mi.name);
-        writeInt(pos, outValueStream);
+        writeField(uniqueStrings.get(mi.name), nameBytes, outValueStream);
 
         int reference = (signatureOffsets.get(encodeSignature(mi)) << 1) | (mi.isResolved ? 1 : 0);
-        writeSignatureReference_buff[0] = (byte) (reference & 0xFF);
-        writeSignatureReference_buff[1] = (byte) ((reference >> 8) & 0xFF);
-        writeSignatureReference_buff[2] = (byte) ((reference >> 16) & 0xFF);
-        outValueStream.write(writeSignatureReference_buff);
+        writeField(reference, signatureBytes, outValueStream);
     }
 
-    private static void writeTreeNodeId(TreeNode node, StreamWriter out)
+    private void writeTreeNodeId(TreeNode node, StreamWriter out)
             throws Exception {
-        if (node == null) {
-            writeTreeNodeId_buff[0] = writeTreeNodeId_buff[1] = 0;
-        } else {
-            writeTreeNodeId_buff[0] = (byte) (node.id & 0xFF);
-            writeTreeNodeId_buff[1] = (byte) ((node.id >> 8) & 0xFF);
-        }
-        out.write(writeTreeNodeId_buff);
+        writeField((node == null) ? 0 : node.id, idBytes, out);
     }
 
     private static int writeLength(int length, StreamWriter out)
@@ -242,7 +259,7 @@ public class Writer {
         if (!instanceFields.isEmpty()) {
             writeLength(instanceFields.size(), writer);
             for (FieldInfo fi : instanceFields) {
-                writeInt(stringsMap.get(fi.name), writer);
+                writeField(stringsMap.get(fi.name), nameBytes, writer);
                 writeTreeNodeId(fi.valueType, writer);
                 writer.write((byte) (fi.isFinalType ? FIELD_FINAL : 0));
             }
@@ -251,7 +268,7 @@ public class Writer {
         if (!propertyInfos.isEmpty()) {
             writeLength(propertyInfos.size(), writer);
             for (TreeNode.PropertyInfo propertyInfo : propertyInfos) {
-                writeInt(stringsMap.get(propertyInfo.getPropertyName()), writer);
+                writeField(stringsMap.get(propertyInfo.getPropertyName()), nameBytes, writer);
 
                 Optional<MethodInfo> propertyGetter = propertyInfo.getGetterMethod();
                 Optional<MethodInfo> propertySetter = propertyInfo.getSetterMethod();
@@ -283,7 +300,7 @@ public class Writer {
                 // inherited ones name their declaring type.
                 boolean hasDeclaringType = fi.declaringType != n;
 
-                writeInt(stringsMap.get(fi.name), writer);
+                writeField(stringsMap.get(fi.name), nameBytes, writer);
                 writeTreeNodeId(fi.valueType, writer);
                 writer.write((byte) ((fi.isFinalType ? FIELD_FINAL : 0)
                         | (hasDeclaringType ? FIELD_HAS_DECLARING_TYPE : 0)));
@@ -295,7 +312,7 @@ public class Writer {
     }
 
     public void writeTree(TreeNode root) throws Exception {
-        short curId = 0;
+        int curId = 0;
 
         ArrayDeque<TreeNode> d = new ArrayDeque<>();
 
@@ -312,8 +329,7 @@ public class Writer {
         d.push(root);
         while (!d.isEmpty()) {
             TreeNode n = d.pollFirst();
-            if (Short.toUnsignedInt((short)(curId + 1)) < Short.toUnsignedInt(curId)) {
-                // we have overflowed our maximum (16 bit) metadata size
+            if (curId == MAX_NODES) {
                 throw new Exception("Metadata is too big and has overflown our current limit, please report this issue");
             }
             n.id = n.firstChildId = n.nextSiblingId = curId++;
@@ -390,14 +406,23 @@ public class Writer {
             d.addAll(n.children);
         }
 
+        idBytes = fieldBytes(curId - 1);
+        nameBytes = fieldBytes(outStringsStream.getPosition() - 1);
+
         outStringsStream.flush();
         outStringsStream.close();
 
-        // The value stream opens with the format, the size of the signature region and
-        // the region itself. No value starts at offset 0, which a package node uses to
-        // say it has none.
         collectSignatures(root);
+        signatureBytes = fieldBytes(((long) Math.max(signatures.size() - 1, 0) << 1) | 1);
+
+        // The value stream opens with the format, the three field widths, the size of the
+        // signature region and the region itself. No value starts at offset 0, which a
+        // package node uses to say it has none.
         writeInt(FORMAT, outValueStream);
+        outValueStream.write((byte) idBytes);
+        outValueStream.write((byte) nameBytes);
+        outValueStream.write((byte) signatureBytes);
+        outValueStream.write((byte) 0);
         writeInt(signatures.size(), outValueStream);
         outValueStream.write(signatures.toByteArray());
 
@@ -434,6 +459,9 @@ public class Writer {
             d.addAll(n.children);
         }
 
+        // Room for the runtime to read the stream's last field at full width.
+        outValueStream.write(new byte[MAX_FIELD_BYTES]);
+
         outValueStream.flush();
         outValueStream.close();
 
@@ -442,7 +470,7 @@ public class Writer {
             TreeNode n = d.pollFirst();
 
             if (n.arrayElement != null) {
-                n.offsetValue = array_offset + Short.toUnsignedInt(n.arrayElement.id);
+                n.offsetValue = array_offset + n.arrayElement.id;
             }
 
             if (!n.children.isEmpty()) {
@@ -457,23 +485,17 @@ public class Writer {
                 d.add(n.children.get(i));
             }
         }
-        int[] nodeData = new int[3];
-
-        ByteBuffer byteBuffer = ByteBuffer.allocate(nodeData.length * 4);
-        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
-        IntBuffer intBuffer = byteBuffer.asIntBuffer();
-
+        // A node record: the ids of its first child and next sibling, its name and the
+        // offset of its value, which is always four bytes because its top range marks
+        // arrays.
         d.push(root);
         while (!d.isEmpty()) {
             TreeNode n = d.pollFirst();
 
-            nodeData[0] = (n.firstChildId & 0xFFFF) | (n.nextSiblingId << 16);
-            nodeData[1] = n.offsetName;
-            nodeData[2] = n.offsetValue;
-
-            ((Buffer)intBuffer).clear();
-            intBuffer.put(nodeData);
-            outNodeStream.write(byteBuffer.array());
+            writeField(n.firstChildId, idBytes, outNodeStream);
+            writeField(n.nextSiblingId, idBytes, outNodeStream);
+            writeField(n.offsetName, nameBytes, outNodeStream);
+            writeInt(n.offsetValue, outNodeStream);
 
             d.addAll(n.children);
         }
@@ -487,9 +509,9 @@ public class Writer {
             while (!d.isEmpty()) {
                 TreeNode n = d.pollFirst();
                 JsonObject obj = new JsonObject();
-                obj.addProperty("id", Short.toUnsignedInt(n.id));
-                obj.addProperty("nextSiblingId", Short.toUnsignedInt(n.nextSiblingId));
-                obj.addProperty("firstChildId", Short.toUnsignedInt(n.firstChildId));
+                obj.addProperty("id", n.id);
+                obj.addProperty("nextSiblingId", n.nextSiblingId);
+                obj.addProperty("firstChildId", n.firstChildId);
                 obj.addProperty("offsetName", Integer.toUnsignedLong(n.offsetName));
                 obj.addProperty("offsetValue", Integer.toUnsignedLong(n.offsetValue));
                 obj.addProperty("name", n.getName());
