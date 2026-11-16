@@ -203,16 +203,14 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
     global->Set(context, ArgConverter::ConvertToV8String(isolate, "__nativeRequire"),
                 publicRequireTemplate->GetFunction(context).ToLocalChecked());
 
+    // terminate() cannot reach this isolate yet - a worker's is published to its
+    // parent only once the runtime is up - so this mint is checked as hard as
+    // the factory's own load above.
     Local<Function> globalRequire;
-
-    if (!baseDir.empty()) {
-        globalRequire = GetRequireFunction(isolate, baseDir, RequireEvaluationOptions(
-                ModuleEvaluationPolicy::kSyncStrict));
-    } else {
-        globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH,
-                                           RequireEvaluationOptions(
-                                                   ModuleEvaluationPolicy::kSyncStrict));
-    }
+    const bool minted = GetRequireFunction(
+            isolate, baseDir.empty() ? Constants::APP_ROOT_FOLDER_PATH : baseDir,
+            RequireEvaluationOptions(ModuleEvaluationPolicy::kSyncStrict)).ToLocal(&globalRequire);
+    NS_CHECK(minted);
     global->Set(context, ArgConverter::ConvertToV8String(isolate, "require"), globalRequire);
 }
 
@@ -269,8 +267,8 @@ static std::string RequireCacheKey(const std::string& dirName,
     return key;
 }
 
-Local<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const string& dirName,
-                                                   const ModuleEvaluationOptions& options) {
+MaybeLocal<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const string& dirName,
+                                                        const ModuleEvaluationOptions& options) {
     TNSPERF();
     Local<Function> requireFunc;
 
@@ -297,9 +295,14 @@ Local<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const strin
         };
         Local<Value> result;
         auto thiz = Object::New(isolate);
-        auto success = requireFuncFactory->Call(context, thiz, 6, args).ToLocal(&result);
+        // The factory cannot throw, but entering it is an interrupt check: a
+        // terminate() that reached this isolate since its last one surfaces
+        // here and stays pending for the caller to unwind with.
+        if (!requireFuncFactory->Call(context, thiz, 6, args).ToLocal(&result)) {
+            return MaybeLocal<Function>();
+        }
 
-        NS_CHECK(success && !result.IsEmpty() && result->IsFunction());
+        NS_CHECK(result->IsFunction());
 
         requireFunc = result.As<Function>();
 
@@ -351,7 +354,10 @@ void ModuleInternal::CreateRequireCallback(const v8::FunctionCallbackInfo<v8::Va
         options.pumpRunLoop = args[4]->BooleanValue(isolate);
     }
 
-    args.GetReturnValue().Set(moduleInternal->GetRequireFunction(isolate, dirName, options));
+    Local<Function> require;
+    if (moduleInternal->GetRequireFunction(isolate, dirName, options).ToLocal(&require)) {
+        args.GetReturnValue().Set(require);
+    }
 }
 
 bool ModuleInternal::InstallCreateRequireBinding(Local<Context> context, Local<Object> binding) {
@@ -931,7 +937,10 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
     auto dirName = ArgConverter::ConvertToV8String(isolate, strDirName);
     // A module's own require inherits the options it was loaded under, so a
     // pumping require's whole dependency tree keeps pumping.
-    auto require = GetRequireFunction(isolate, strDirName, options);
+    Local<Function> require;
+    if (!GetRequireFunction(isolate, strDirName, options).ToLocal(&require)) {
+        throw NativeScriptException(tc, "Cannot create the require function for " + modulePath);
+    }
     Local<Value> requireArgs[5] {
         moduleObj, exportsObj, require, fileName, dirName
     };
