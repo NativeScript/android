@@ -31,6 +31,8 @@ void MetadataReader::Initialize(uint32_t nodesLength, uint8_t *nodeData, uint32_
         ss << "The app's metadata is not in the format this runtime reads (found 0x" << hex
            << format << ", expected 0x" << FORMAT
            << "). It was generated for a different version of the runtime, or is damaged. Rebuild the app.";
+        // Logged here as well: nothing is set up yet to report an exception this early.
+        __android_log_print(ANDROID_LOG_ERROR, "TNS.error", "%s", ss.str().c_str());
         throw NativeScriptException(ss.str());
     }
 
