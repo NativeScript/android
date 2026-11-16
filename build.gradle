@@ -454,6 +454,17 @@ task runSbgTests (type: Exec, dependsOn: 'runAstTests') {
     }
 }
 
+task runMetadataGeneratorTests (type: Exec) {
+    doFirst {
+        workingDir "$TEST_APP_PATH"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew", ":android-metadata-generator:test", "--warning-mode", "all"
+        } else {
+            commandLine "./gradlew", ":android-metadata-generator:test", "--warning-mode", "all"
+        }
+    }
+}
+
 def getRunTestsBuildArguments = { taskName ->
     def arguments = []
     if (isWinOs) {
