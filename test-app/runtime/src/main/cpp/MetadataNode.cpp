@@ -14,7 +14,10 @@
 #include <cctype>
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <android/log.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include "ManualInstrumentation.h"
 #include "ExtendFileIdentifier.h"
@@ -181,12 +184,7 @@ MetadataNode::MetadataNode(MetadataTreeNode* treeNode) :
     m_isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
 
     if (!m_isArray && m_isInterface) {
-        bool isPrefix;
-        auto impTypeName = s_metadataReader.ReadInterfaceImplementationTypeName(m_treeNode, isPrefix);
-        m_implType = isPrefix
-                     ? (impTypeName + m_name)
-                     :
-                     impTypeName;
+        m_implType = TNS_PREFIX + m_name;
     }
 }
 
@@ -793,7 +791,7 @@ private:
     std::unordered_set<std::string> m_addedNames;
 };
 
-std::vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembers(
+void MetadataNode::SetInstanceMembers(
         Isolate* isolate, Local<FunctionTemplate>& ctorFuncTemplate,
         PrototypeTemplateFiller& protoFiller,
         vector<MethodCallbackData*>& instanceMethodsCallbackData,
@@ -802,17 +800,18 @@ std::vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembers(
     auto hasCustomMetadata = treeNode->metadata != nullptr;
 
     if (hasCustomMetadata) {
-        return SetInstanceMembersFromRuntimeMetadata(
+        SetInstanceMembersFromRuntimeMetadata(
             isolate, protoFiller, instanceMethodsCallbackData,
             baseInstanceMethodsCallbackData, treeNode);
+        return;
     }
 
-    return SetInstanceMethodsFromStaticMetadata(
+    SetInstanceMethodsFromStaticMetadata(
         isolate, ctorFuncTemplate, protoFiller, instanceMethodsCallbackData,
         baseInstanceMethodsCallbackData, treeNode, curPtr);
 }
 
-vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromStaticMetadata(
+void MetadataNode::SetInstanceMethodsFromStaticMetadata(
         Isolate *isolate, Local<FunctionTemplate> &ctorFuncTemplate,
         PrototypeTemplateFiller& protoFiller,
         vector<MethodCallbackData *> &instanceMethodsCallbackData,
@@ -820,19 +819,11 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
         MetadataTreeNode *treeNode, uint8_t* &curPtr) {
     SET_PROFILER_FRAME();
 
-    std::vector<MethodCallbackData *> instanceMethodData;
-
-    curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
-
-    auto nodeType = s_metadataReader.GetNodeType(treeNode);
+    uint8_t sections = s_metadataReader.GetClassSections(treeNode);
+    curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue
+             + MetadataReader::CLASS_VALUE_SECTIONS_OFFSET + sizeof(sections);
 
     auto curType = s_metadataReader.ReadTypeName(treeNode);
-
-    curPtr += sizeof(uint16_t /* baseClassId */);
-
-    if (s_metadataReader.IsNodeTypeInterface(nodeType)) {
-        curPtr += sizeof(uint8_t) + sizeof(uint32_t);
-    }
 
     string lastMethodName;
     MethodCallbackData *callbackData = nullptr;
@@ -853,8 +844,8 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
         return itFound != baseMethodsByName.end() ? itFound->second : nullptr;
     };
 
-    auto extensionFunctionsCount = *reinterpret_cast<uint16_t *>(curPtr);
-    curPtr += sizeof(uint16_t);
+    auto extensionFunctionsCount = MetadataReader::ReadSectionCount(
+            sections, MetadataReader::SECTION_EXTENSION_FUNCTIONS, &curPtr);
     for (auto i = 0; i < extensionFunctionsCount; i++) {
         auto entry = MetadataReader::ReadExtensionFunctionEntry(&curPtr);
 
@@ -877,8 +868,8 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
 
 
     //get candidates from instance methods metadata
-    auto instanceMethodCount = *reinterpret_cast<uint16_t *>(curPtr);
-    curPtr += sizeof(uint16_t);
+    auto instanceMethodCount = MetadataReader::ReadSectionCount(
+            sections, MetadataReader::SECTION_INSTANCE_METHODS, &curPtr);
 
     for (auto i = 0; i < instanceMethodCount; i++) {
         auto entry = MetadataReader::ReadInstanceMethodEntry(&curPtr);
@@ -896,8 +887,6 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
                 std::pair<std::string, MethodCallbackData *> p(methodName, callbackData);
                 collectedExtensionMethodDatas.emplace(p);
             }
-
-            instanceMethodData.push_back(callbackData);
 
             instanceMethodsCallbackData.push_back(callbackData);
             callbackData->parent = findBaseMethod(methodName);
@@ -929,8 +918,8 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
     }
 
     //get candidates from instance fields metadata
-    auto instanceFieldCout = *reinterpret_cast<uint16_t*>(curPtr);
-    curPtr += sizeof(uint16_t);
+    auto instanceFieldCout = MetadataReader::ReadSectionCount(
+            sections, MetadataReader::SECTION_INSTANCE_FIELDS, &curPtr);
     for (auto i = 0; i < instanceFieldCout; i++) {
         auto entry = MetadataReader::ReadInstanceFieldEntry(&curPtr);
         auto fieldName = entry.getName();
@@ -939,27 +928,23 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
         protoFiller.FillPrototypeField(isolate, fieldName, fieldInfo);
     }
 
-    auto kotlinPropertiesCount = *reinterpret_cast<uint16_t*>(curPtr);
-    curPtr += sizeof(uint16_t);
+    auto kotlinPropertiesCount = MetadataReader::ReadSectionCount(
+            sections, MetadataReader::SECTION_PROPERTIES, &curPtr);
     for (int i = 0; i < kotlinPropertiesCount; ++i) {
         uint32_t nameOffset = *reinterpret_cast<uint32_t*>(curPtr);
         string propertyName = s_metadataReader.ReadName(nameOffset);
         curPtr += sizeof(uint32_t);
 
-        auto hasGetter = *reinterpret_cast<uint16_t*>(curPtr);
-        curPtr += sizeof(uint16_t);
+        uint8_t accessors = *curPtr++;
 
         std::string getterMethodName = "";
-        if(hasGetter>=1){
+        if (accessors & MetadataReader::PROPERTY_HAS_GETTER) {
             auto entry = MetadataReader::ReadInstanceMethodEntry(&curPtr);
             getterMethodName = entry.getName();
         }
 
-        auto hasSetter = *reinterpret_cast<uint16_t*>(curPtr);
-        curPtr += sizeof(uint16_t);
-
         std::string setterMethodName = "";
-        if(hasSetter >= 1){
+        if (accessors & MetadataReader::PROPERTY_HAS_SETTER) {
             auto entry = MetadataReader::ReadInstanceMethodEntry(&curPtr);
             setterMethodName = entry.getName();
         }
@@ -967,8 +952,6 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
         auto propertyInfo = cache->Own<PropertyCallbackData>(propertyName, getterMethodName, setterMethodName);
         protoFiller.FillPrototypeProperty(isolate, propertyName, propertyInfo);
     }
-
-    return instanceMethodData;
 }
 
 MetadataNode::MethodCallbackData *MetadataNode::tryGetExtensionMethodCallbackData(
@@ -989,7 +972,7 @@ MetadataNode::MethodCallbackData *MetadataNode::tryGetExtensionMethodCallbackDat
 }
 
 
-vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembersFromRuntimeMetadata(
+void MetadataNode::SetInstanceMembersFromRuntimeMetadata(
         Isolate* isolate, PrototypeTemplateFiller& protoFiller,
         vector<MethodCallbackData*>& instanceMethodsCallbackData,
         const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData,
@@ -997,8 +980,6 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembersFromRu
     SET_PROFILER_FRAME();
 
     NS_DCHECK(treeNode->metadata != nullptr);
-
-    std::vector<MethodCallbackData*> instanceMethodData;
 
     string line;
     const string& metadata = *treeNode->metadata;
@@ -1035,7 +1016,6 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembersFromRu
         if (chKind == 'M') {
             if (entry.name != lastMethodName) {
                 callbackData = cache->Own<MethodCallbackData>(this);
-                instanceMethodData.push_back(callbackData);
 
                 instanceMethodsCallbackData.push_back(callbackData);
                 auto itBegin = baseInstanceMethodsCallbackData.begin();
@@ -1056,7 +1036,6 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembersFromRu
             protoFiller.FillPrototypeField(isolate, entry.name, fieldInfo);
         }
     }
-    return instanceMethodData;
 }
 
 
@@ -1071,9 +1050,11 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
 
         auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
 
+        uint8_t sections = s_metadataReader.GetClassSections(treeNode);
+
         //get candidates from static methods metadata
-        auto staticMethodCout = *reinterpret_cast<uint16_t*>(curPtr);
-        curPtr += sizeof(uint16_t);
+        auto staticMethodCout = MetadataReader::ReadSectionCount(
+                sections, MetadataReader::SECTION_STATIC_METHODS, &curPtr);
         for (auto i = 0; i < staticMethodCout; i++) {
             auto entry = MetadataReader::ReadStaticMethodEntry(&curPtr);
             auto &methodName = entry.getName();
@@ -1096,8 +1077,8 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
         ctorFunction->Set(context, extendFuncName, extendFuncTemplate->GetFunction(context).ToLocalChecked());
 
         //get candidates from static fields metadata
-        auto staticFieldCout = *reinterpret_cast<uint16_t*>(curPtr);
-        curPtr += sizeof(uint16_t);
+        auto staticFieldCout = MetadataReader::ReadSectionCount(
+                sections, MetadataReader::SECTION_STATIC_FIELDS, &curPtr);
         // A class with many static fields (every android.R inner class) installs all of them
         // on first touch. Native accessors skip creating a getter and a setter function per
         // field, but adding them one by one to a fast-mode object copies its descriptors each
@@ -1110,6 +1091,8 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
         }
         for (auto i = 0; i < staticFieldCout; i++) {
             auto entry = MetadataReader::ReadStaticFieldEntry(&curPtr);
+            // A static field that does not name its declaring type is this class's own.
+            entry.treeNode = treeNode;
 
             auto fieldName = NewMemberName(isolate, s_metadataReader.ReadNameView(entry.sfi->nameOffset));
             auto fieldData = External::New(isolate, cache->Own<FieldCallbackData>(entry), v8::kExternalPointerTypeTagDefault);
@@ -1255,10 +1238,9 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     Local<Function> baseCtorFunc;
     std::vector<MethodCallbackData*> baseInstanceMethodsCallbackData;
     auto tmpTreeNode = treeNode;
-    std::vector<MetadataTreeNode*> skippedBaseTypes;
     while (true) {
         auto baseTreeNode = s_metadataReader.GetBaseClassNode(tmpTreeNode);
-        if (CheckClassHierarchy(env, currentClass, treeNode, baseTreeNode, skippedBaseTypes)) {
+        if (CheckClassHierarchy(env, currentClass, treeNode, baseTreeNode)) {
             tmpTreeNode = baseTreeNode;
             continue;
         }
@@ -1276,12 +1258,9 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
 
     uint8_t* curPtr = nullptr;
 
-    auto instanceMethodData = node->SetInstanceMembers(
+    node->SetInstanceMembers(
             isolate, ctorFuncTemplate, protoFiller, instanceMethodsCallbackData,
             baseInstanceMethodsCallbackData, treeNode, curPtr);
-    if (!skippedBaseTypes.empty()) {
-        node->SetMissingBaseMethods(isolate, skippedBaseTypes, instanceMethodData, protoFiller);
-    }
 
     auto context = isolate->GetCurrentContext();
     auto ctorFunc = ctorFuncTemplate->GetFunction(context).ToLocalChecked();
@@ -2193,13 +2172,7 @@ MetadataEntry MetadataNode::GetChildMetadataForPackage(MetadataNode *node, const
             child.type = static_cast<NodeType>(s_metadataReader.GetNodeType(treeNodeChild));
 
             if (s_metadataReader.IsNodeTypeInterface((uint8_t) child.type)) {
-                bool isPrefix;
-                string declaringType = s_metadataReader.ReadInterfaceImplementationTypeName(
-                        treeNodeChild, isPrefix);
-                child.declaringType = isPrefix
-                                      ? (declaringType +
-                                         s_metadataReader.ReadTypeName(child.treeNode))
-                                      : declaringType;
+                child.declaringType = TNS_PREFIX + s_metadataReader.ReadTypeName(child.treeNode);
             }
         }
     }
@@ -2207,10 +2180,55 @@ MetadataEntry MetadataNode::GetChildMetadataForPackage(MetadataNode *node, const
     return child;
 }
 
-void MetadataNode::BuildMetadata(const string& filesPath) {
-    timeval time1;
-    gettimeofday(&time1, nullptr);
+namespace {
+    struct MappedMetadataFile {
+        uint8_t* data;
+        size_t length;
+    };
 
+    /*
+     * Maps one of the metadata files read-only rather than reading it into the
+     * heap. Its pages are the file's own, clean ones, which the system can drop
+     * under memory pressure and load again, where a heap copy is private memory.
+     *
+     * The whole file is read ahead and mapped up front. Left to fault in on
+     * first touch, that cost and its variance land on the first access of each
+     * class. Populated without the read-ahead, the pages arrive one read-ahead
+     * window at a time and a cold start takes longer than a plain read.
+     *
+     * The extractor replaces these files by renaming a new one over them, never
+     * by writing in place, so a mapping keeps the contents it was made from.
+     */
+    MappedMetadataFile MapMetadataFile(const string& dir, const char* name) {
+        string path = dir + "/" + name;
+
+        void* data = MAP_FAILED;
+        struct stat info{};
+        int fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+        if (fd >= 0) {
+            if (fstat(fd, &info) == 0 && info.st_size > 0) {
+                posix_fadvise(fd, 0, info.st_size, POSIX_FADV_WILLNEED);
+                data = mmap(nullptr, static_cast<size_t>(info.st_size), PROT_READ,
+                            MAP_PRIVATE | MAP_POPULATE, fd, 0);
+            }
+            int error = errno;
+            close(fd);
+            errno = error;
+        }
+
+        if (data == MAP_FAILED) {
+            stringstream ss;
+            ss << "metadata file (" << name << ") couldn't be opened! (Error: ";
+            ss << errno;
+            ss << ") ";
+            throw NativeScriptException(ss.str());
+        }
+
+        return {static_cast<uint8_t*>(data), static_cast<size_t>(info.st_size)};
+    }
+}
+
+void MetadataNode::BuildMetadata(const string& filesPath) {
     string baseDir = filesPath;
     baseDir.append("/metadata");
 
@@ -2248,83 +2266,25 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
         }
     }
 
-    string nodesFile = baseDir + "/treeNodeStream.dat";
-    string namesFile = baseDir + "/treeStringsStream.dat";
-    string valuesFile = baseDir + "/treeValueStream.dat";
-
-    FILE* f = fopen(nodesFile.c_str(), "rb");
-    if (f == nullptr) {
+    auto nodes = MapMetadataFile(baseDir, "treeNodeStream.dat");
+    if ((nodes.length % sizeof(MetadataTreeNodeRawData)) != 0) {
         stringstream ss;
-        ss << "metadata file (treeNodeStream.dat) couldn't be opened! (Error: ";
-        ss << errno;
-        ss << ") ";
-
-        throw NativeScriptException(ss.str());
-    }
-    fseek(f, 0, SEEK_END);
-    int lenNodes = ftell(f);
-    if (lenNodes < 0 ||
-        (static_cast<size_t>(lenNodes) % sizeof(MetadataTreeNodeRawData)) != 0) {
-        fclose(f);
-        stringstream ss;
-        ss << "Metadata file " << nodesFile << " is " << lenNodes
+        ss << "Metadata file " << baseDir << "/treeNodeStream.dat is " << nodes.length
            << " bytes, which is not a whole number of "
            << sizeof(MetadataTreeNodeRawData)
            << "-byte records. The metadata is truncated or corrupt.";
         throw NativeScriptException(ss.str());
     }
-    char* nodes = new char[lenNodes];
-    rewind(f);
-    fread(nodes, 1, lenNodes, f);
-    fclose(f);
+    auto names = MapMetadataFile(baseDir, "treeStringsStream.dat");
+    auto values = MapMetadataFile(baseDir, "treeValueStream.dat");
 
-    const int _512KB = 524288;
+    DEBUG_WRITE("lenNodes=%zu, lenNames=%zu, lenValues=%zu", nodes.length, names.length, values.length);
 
-    f = fopen(namesFile.c_str(), "rb");
-    if (f == nullptr) {
-        stringstream ss;
-        ss << "metadata file (treeStringsStream.dat) couldn't be opened! (Error: ";
-        ss << errno;
-        ss << ") ";
-        throw NativeScriptException(ss.str());
-    }
-    fseek(f, 0, SEEK_END);
-    int lenNames = ftell(f);
-    char* names = new char[lenNames + _512KB];
-    rewind(f);
-    fread(names, 1, lenNames, f);
-    fclose(f);
+    BuildMetadata(nodes.length, nodes.data, names.length, names.data, values.length, values.data);
 
-    f = fopen(valuesFile.c_str(), "rb");
-    if (f == nullptr) {
-        stringstream ss;
-        ss << "metadata file (treeValueStream.dat) couldn't be opened! (Error: ";
-        ss << errno;
-        ss << ") ";
-        throw NativeScriptException(ss.str());
-    }
-    fseek(f, 0, SEEK_END);
-    int lenValues = ftell(f);
-    char* values = new char[lenValues + _512KB];
-    rewind(f);
-    fread(values, 1, lenValues, f);
-    fclose(f);
-
-    timeval time2;
-    gettimeofday(&time2, nullptr);
-
-    DEBUG_WRITE("lenNodes=%d, lenNames=%d, lenValues=%d", lenNodes, lenNames, lenValues);
-
-    long millis1 = (time1.tv_sec * 1000) + (time1.tv_usec / 1000);
-    long millis2 = (time2.tv_sec * 1000) + (time2.tv_usec / 1000);
-
-    DEBUG_WRITE("time=%ld", (millis2 - millis1));
-
-    BuildMetadata(lenNodes, reinterpret_cast<uint8_t*>(nodes), lenNames, reinterpret_cast<uint8_t*>(names), lenValues, reinterpret_cast<uint8_t*>(values));
-
-    delete[] nodes;
-    //delete[] names;
-    //delete[] values;
+    // The tree is built from the nodes; the names and the values stay mapped for
+    // the life of the process.
+    munmap(nodes.data, nodes.length);
 }
 
 void MetadataNode::BuildMetadata(uint32_t nodesLength, uint8_t* nodeData, uint32_t nameLength, uint8_t* nameData, uint32_t valueLength, uint8_t* valueData) {
@@ -2441,7 +2401,7 @@ Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& func
     return ret;
 }
 
-bool MetadataNode::CheckClassHierarchy(JEnv& env, jclass currentClass, MetadataTreeNode* curentTreeNode, MetadataTreeNode* baseTreeNode, std::vector<MetadataTreeNode*>& skippedBaseTypes) {
+bool MetadataNode::CheckClassHierarchy(JEnv& env, jclass currentClass, MetadataTreeNode* curentTreeNode, MetadataTreeNode* baseTreeNode) {
     auto shouldSkipBaseClass = false;
     if ((currentClass != nullptr) && (baseTreeNode != curentTreeNode) && (baseTreeNode != nullptr) &&
             (baseTreeNode->offsetValue > 0)) {
@@ -2449,75 +2409,10 @@ bool MetadataNode::CheckClassHierarchy(JEnv& env, jclass currentClass, MetadataT
         auto baseClass = env.FindClass(baseNode->m_name);
         if (baseClass != nullptr) {
             auto isBaseClass = env.IsAssignableFrom(currentClass, baseClass) == JNI_TRUE;
-            if (!isBaseClass) {
-                skippedBaseTypes.push_back(baseTreeNode);
-                shouldSkipBaseClass = true;
-            }
+            shouldSkipBaseClass = !isBaseClass;
         }
     }
     return shouldSkipBaseClass;
-}
-
-/*
- * This method handles scenrios like Bundle/BaseBundle class hierarchy change in API level 21.
- * See https://github.com/NativeScript/android-runtime/issues/628
- */
-void MetadataNode::SetMissingBaseMethods(
-        Isolate* isolate, const vector<MetadataTreeNode*>& skippedBaseTypes,
-        const vector<MethodCallbackData*>& instanceMethodData,
-        PrototypeTemplateFiller& protoFiller) {
-    auto cache = GetMetadataNodeCache(isolate);
-    for (auto treeNode: skippedBaseTypes) {
-        uint8_t* curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
-
-        auto nodeType = s_metadataReader.GetNodeType(treeNode);
-
-        auto curType = s_metadataReader.ReadTypeName(treeNode);
-
-        curPtr += sizeof(uint16_t /* baseClassId */);
-
-        if (s_metadataReader.IsNodeTypeInterface(nodeType)) {
-            curPtr += sizeof(uint8_t) + sizeof(uint32_t);
-        }
-
-        //get candidates from instance methods metadata
-        auto instanceMethodCount = *reinterpret_cast<uint16_t*>(curPtr);
-        curPtr += sizeof(uint16_t);
-        MethodCallbackData* callbackData = nullptr;
-
-        for (auto i = 0; i < instanceMethodCount; i++) {
-            auto entry = MetadataReader::ReadInstanceMethodEntry(&curPtr);
-
-            auto isConstructor = entry.getName() == "<init>";
-            if (isConstructor) {
-                continue;
-            }
-
-            for (auto data: instanceMethodData) {
-                if (data->candidates.front().getName() == entry.getName()) {
-                    callbackData = data;
-                    break;
-                }
-            }
-
-            if (callbackData == nullptr) {
-                callbackData = cache->Own<MethodCallbackData>(this);
-                protoFiller.FillPrototypeMethod(isolate, entry.getName(), callbackData);
-            }
-
-            bool foundSameSig = false;
-            for (auto &m: callbackData->candidates) {
-                foundSameSig = m.sig == entry.getSig();
-                if (foundSameSig) {
-                    break;
-                }
-            }
-
-            if (!foundSameSig) {
-                callbackData->candidates.push_back(std::move(entry));
-            }
-        }
-    }
 }
 
 void MetadataNode::RegisterSymbolHasInstanceCallback(Isolate* isolate, MetadataEntry& entry, Local<Value> interface) {

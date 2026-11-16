@@ -99,13 +99,13 @@ class MetadataNode {
         v8::Persistent<v8::Function>* GetPersistentConstructorFunction(v8::Isolate* isolate);
         static v8::Local<v8::ObjectTemplate> GetOrCreateArrayObjectTemplate(v8::Isolate* isolate);
 
-        std::vector<MethodCallbackData*> SetInstanceMembers(
+        void SetInstanceMembers(
                 v8::Isolate* isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate,
                 PrototypeTemplateFiller& protoFiller,
                 std::vector<MethodCallbackData*>& instanceMethodsCallbackData,
                 const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData,
                 MetadataTreeNode* treeNode, uint8_t* &curPtr);
-        std::vector<MethodCallbackData*> SetInstanceMethodsFromStaticMetadata(
+        void SetInstanceMethodsFromStaticMetadata(
                 v8::Isolate* isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate,
                 PrototypeTemplateFiller& protoFiller,
                 std::vector<MethodCallbackData*>& instanceMethodsCallbackData,
@@ -117,7 +117,7 @@ class MetadataNode {
         void SetInstanceFieldsFromStaticMetadata(
                 v8::Isolate* isolate, PrototypeTemplateFiller& protoFiller,
                 MetadataTreeNode* treeNode);
-        std::vector<MethodCallbackData*> SetInstanceMembersFromRuntimeMetadata(
+        void SetInstanceMembersFromRuntimeMetadata(
                 v8::Isolate* isolate, PrototypeTemplateFiller& protoFiller,
                 std::vector<MethodCallbackData*>& instanceMethodsCallbackData,
                 const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData,
@@ -189,11 +189,7 @@ class MetadataNode {
 
         static v8::Local<v8::Function> Wrap(v8::Isolate* isolate, const v8::Local<v8::Function>& function, const std::string& name, const std::string& origin, bool isCtorFunc);
 
-        static bool CheckClassHierarchy(JEnv& env, jclass currentClass, MetadataTreeNode* curentTreeNode, MetadataTreeNode* baseTreeNode, std::vector<MetadataTreeNode*>& skippedBaseTypes);
-        void SetMissingBaseMethods(v8::Isolate* isolate,
-                                   const std::vector<MetadataTreeNode*>& skippedBaseTypes,
-                                   const std::vector<MethodCallbackData*>& instanceMethodData,
-                                   PrototypeTemplateFiller& protoFiller);
+        static bool CheckClassHierarchy(JEnv& env, jclass currentClass, MetadataTreeNode* curentTreeNode, MetadataTreeNode* baseTreeNode);
 
         MetadataTreeNode* m_treeNode;
         std::string m_name;

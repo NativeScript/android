@@ -38,7 +38,7 @@ std::string &MetadataEntry::getSig() {
     } else if (type == NodeType::StaticField) {
         sig = reader->ReadTypeName(sfi->nodeId);
     } else if (type == NodeType::Method) {
-        uint8_t sigLength = mi.GetSignatureLength();
+        auto sigLength = mi.GetSignatureLength();
         if (sigLength > 0)
             sig = mi.GetSignature();
 
@@ -82,7 +82,9 @@ std::string &MetadataEntry::getDeclaringType() {
     auto reader = MetadataNode::getMetadataReader();
 
     if (type == NodeType::StaticField) {
-        declaringType = reader->ReadTypeName(sfi->declaringType);
+        declaringType = (sfi->flags & FieldInfo::HAS_DECLARING_TYPE)
+                        ? reader->ReadTypeName(sfi->declaringType)
+                        : reader->ReadTypeName(treeNode);
     } else if (type == NodeType::Method && isStatic) {
         declaringType = mi.GetDeclaringType();
     }
@@ -111,9 +113,9 @@ bool MetadataEntry::getIsFinal() {
     if (isFinalSet) return isFinal;
 
     if (type == NodeType::Field) {
-        isFinal = fi->finalModifier == MetadataTreeNode::FINAL;
+        isFinal = (fi->flags & FieldInfo::FINAL) != 0;
     } else if (type == NodeType::StaticField) {
-        isFinal = sfi->finalModifier == MetadataTreeNode::FINAL;
+        isFinal = (sfi->flags & FieldInfo::FINAL) != 0;
     }
 
     isFinalSet = true;
