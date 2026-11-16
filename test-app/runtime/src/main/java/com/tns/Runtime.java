@@ -116,6 +116,33 @@ public class Runtime {
 
     private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
+    private static native void initContentKeyedBindings(String[] collisions);
+
+    /**
+     * The static binding generator adds com.tns.gen.ContentKeyedBindings to an app
+     * whose bindings it names after their content, so the runtime names the classes
+     * it looks up the same way exactly when the generator did. Read once per process,
+     * before the first runtime runs JS.
+     */
+    private static final class ContentKeyedBindings {
+        static final boolean ENABLED = init();
+
+        private static boolean init() {
+            String[] collisions;
+            try {
+                Class<?> marker = Class.forName("com.tns.gen.ContentKeyedBindings", true, Runtime.class.getClassLoader());
+                collisions = (String[]) marker.getField("COLLISIONS").get(null);
+            } catch (ClassNotFoundException e) {
+                return false;
+            } catch (ReflectiveOperationException | ClassCastException e) {
+                android.util.Log.e("JS", "Could not read com.tns.gen.ContentKeyedBindings.COLLISIONS", e);
+                collisions = new String[0];
+            }
+            initContentKeyedBindings(collisions);
+            return true;
+        }
+    }
+
     /**
      * Reports an uncaught exception to JS (WHATWG `error` event, then the
      * `__onUncaughtError` hook). Returns true when an `error` event listener
@@ -770,6 +797,10 @@ public class Runtime {
             }
 
             boolean forceConsoleLog = appConfig.getForceLog() || "timeline".equalsIgnoreCase(appConfig.getProfilingMode());
+
+            if (ContentKeyedBindings.ENABLED && logger.isEnabled()) {
+                logger.write("Binding class names are content-keyed");
+            }
 
             initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName,
                     appConfig.getV8Flags(), appConfig.getCodeCache(), appConfig.getProfilerOutputDir(),

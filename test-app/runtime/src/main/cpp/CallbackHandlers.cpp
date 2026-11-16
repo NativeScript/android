@@ -9,6 +9,7 @@
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
 #include "v8-profiler.h"
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -208,7 +209,8 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
                                         const Local<Object> &implementationObject,
                                         bool isInterface,
                                         const std::string &baseClassName,
-                                        uint64_t defaultOverrides) {
+                                        uint64_t defaultOverrides,
+                                        const vector<string> *contentMemberNames) {
     bool success;
 
     DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
@@ -226,7 +228,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     // properties ResolveClass would otherwise read, getters included.
     jclass generatedJavaClass = ResolveClass(isolate, baseClassName, fullClassName,
                                              defaultOverrides != 0 ? Local<Object>() : implementationObject,
-                                             isInterface);
+                                             isInterface, contentMemberNames);
 
     int javaObjectID = objectManager->GenerateNewObjectID();
 
@@ -277,7 +279,8 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
 jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &baseClassName,
                                       const string &fullClassName,
-                                      const Local<Object> &implementationObject, bool isInterface) {
+                                      const Local<Object> &implementationObject, bool isInterface,
+                                      const vector<string> *contentMemberNames) {
     JEnv env;
     jclass globalRefToGeneratedClass = env.CheckForClassInCache(fullClassName);
 
@@ -287,7 +290,11 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &baseClassN
         JniLocalRef javaBaseClassName(env.NewStringUTF(baseClassName.c_str()));
         JniLocalRef javaFullClassName(env.NewStringUTF(fullClassName.c_str()));
 
-        jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
+        // A content-keyed class must get the overrides the static binding generator
+        // writes for its name, which are not only the function-valued members.
+        jobjectArray methodOverrides = contentMemberNames != nullptr
+                                       ? ToJavaStringArray(env, *contentMemberNames)
+                                       : GetMethodOverrides(env, implementationObject);
 
         jobjectArray implementedInterfaces = GetImplementedInterfaces(env, implementationObject);
 
@@ -710,14 +717,13 @@ Local<Object> CallbackHandlers::CreateJSWrapper(Isolate *isolate, jint javaObjec
 }
 
 
-jobjectArray
-CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &implementationObject) {
+vector<string>
+CallbackHandlers::CollectImplementedInterfaceNames(Isolate *isolate, const Local<Object> &implementationObject) {
+    vector<string> interfaceNames;
     if (implementationObject.IsEmpty()) {
-        return CallbackHandlers::GetJavaStringArray(env, 0);
+        return interfaceNames;
     }
 
-    vector<jstring> interfacesToImplement;
-    auto isolate = v8::Isolate::GetCurrent();
     auto context = GetCreationContextOrCurrent(isolate, implementationObject);
     Local<String> interfacesName = String::NewFromUtf8Literal(isolate, "interfaces");
     Local<Value> prop;
@@ -734,26 +740,95 @@ CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &imple
             if (element->IsFunction()) {
                 auto node = MetadataNode::GetTypeMetadataName(isolate, element);
 
-                node = Util::ReplaceAll(node, std::string("/"), std::string("."));
-
-                jstring value = env.NewStringUTF(node.c_str());
-                interfacesToImplement.push_back(value);
+                interfaceNames.push_back(Util::ReplaceAll(node, std::string("/"), std::string(".")));
             }
         }
     }
 
-    int interfacesCount = interfacesToImplement.size();
+    return interfaceNames;
+}
 
-    jobjectArray implementedInterfaces = CallbackHandlers::GetJavaStringArray(env, interfacesCount);
-    for (int i = 0; i < interfacesCount; i++) {
-        env.SetObjectArrayElement(implementedInterfaces, i, interfacesToImplement[i]);
+jobjectArray
+CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &implementationObject) {
+    return ToJavaStringArray(env, CollectImplementedInterfaceNames(v8::Isolate::GetCurrent(), implementationObject));
+}
+
+jobjectArray CallbackHandlers::ToJavaStringArray(JEnv &env, const vector<string> &values) {
+    int count = values.size();
+    jobjectArray result = CallbackHandlers::GetJavaStringArray(env, count);
+    for (int i = 0; i < count; i++) {
+        JniLocalRef value(env.NewStringUTF(values[i].c_str()));
+        env.SetObjectArrayElement(result, i, (jstring) value);
+    }
+    return result;
+}
+
+// Must select the same names as the static binding generator's
+// ContentKey.memberNames applied to the JS parser's member list.
+static bool IsContentMemberName(const string &name) {
+    if (name.empty()) {
+        return false;
+    }
+    for (size_t i = 0; i < name.size(); i++) {
+        char c = name[i];
+        bool valid = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_' || c == '$' ||
+                     (i > 0 && c >= '0' && c <= '9');
+        if (!valid) {
+            return false;
+        }
+    }
+    return name != "constructor" && name != "super" && name != "__parent" && name != "__child";
+}
+
+vector<string>
+CallbackHandlers::CollectContentMemberNames(Isolate *isolate, const Local<Object> &implementationObject) {
+    vector<string> memberNames;
+    if (implementationObject.IsEmpty()) {
+        return memberNames;
     }
 
-    for (int i = 0; i < interfacesCount; i++) {
-        env.DeleteLocalRef(interfacesToImplement[i]);
+    auto context = GetCreationContextOrCurrent(isolate, implementationObject);
+    Local<Array> keys;
+    if (!implementationObject->GetOwnPropertyNames(context,
+                                                   static_cast<PropertyFilter>(ONLY_ENUMERABLE | SKIP_SYMBOLS),
+                                                   KeyConversionMode::kConvertToString).ToLocal(&keys)) {
+        return memberNames;
     }
 
-    return implementedInterfaces;
+    auto interfacesName = String::NewFromUtf8Literal(isolate, "interfaces");
+    auto valueName = String::NewFromUtf8Literal(isolate, "value");
+    for (uint32_t i = 0; i < keys->Length(); i++) {
+        Local<Value> key;
+        if (!keys->Get(context, i).ToLocal(&key) || !key->IsString()) {
+            continue;
+        }
+        string name = ArgConverter::ConvertToString(key.As<String>());
+        if (!IsContentMemberName(name)) {
+            continue;
+        }
+
+        // Reads the descriptor, not the property: a getter must not run here.
+        Local<Value> descriptor;
+        if (!implementationObject->GetOwnPropertyDescriptor(context, key.As<String>()).ToLocal(&descriptor) ||
+            !descriptor->IsObject()) {
+            continue;
+        }
+        Local<Value> value;
+        auto descriptorObject = descriptor.As<Object>();
+        if (!descriptorObject->HasOwnProperty(context, valueName).FromMaybe(false) ||
+            !descriptorObject->Get(context, valueName).ToLocal(&value)) {
+            continue;
+        }
+        if (value->IsArray() && key.As<String>()->StringEquals(interfacesName)) {
+            continue;
+        }
+
+        memberNames.push_back(name);
+    }
+
+    sort(memberNames.begin(), memberNames.end());
+    memberNames.erase(unique(memberNames.begin(), memberNames.end()), memberNames.end());
+    return memberNames;
 }
 
 jobjectArray

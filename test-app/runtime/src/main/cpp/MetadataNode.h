@@ -28,7 +28,9 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -90,6 +92,20 @@ class MetadataNode {
 
         // com.tns.bindings.Dump.DEFAULT_OVERRIDING_SUFFIX
         static const char* const DEFAULT_OVERRIDING_SUFFIX;
+
+        /*
+         * Names the classes of JS subclasses of Java classes after their content, in
+         * every runtime of the process. Called once, before any runtime runs JS, with
+         * the content-keyed class names (dot-separated) the static binding generator
+         * saw more than one named extend() produce.
+         */
+        static void InitContentKeyedBindings(const std::vector<std::string>& collisions);
+
+        /*
+         * `h` and 16 hex digits of FNV-1a 64 over the canonical payload. Must agree
+         * with the static binding generator's ContentKey.
+         */
+        static std::string CreateContentKey(const std::string& baseClassName, std::vector<std::string> interfaceNames, std::vector<std::string> memberNames);
     private:
         // Index i is bit i of an instance's mask.
         struct DefaultMethodNames {
@@ -225,8 +241,14 @@ class MetadataNode {
         // Published once, never freed: nodes are shared by every isolate in the process.
         std::atomic<const DefaultMethodNames*> m_defaultMethodNames{nullptr};
 
+        struct ContentKeyedBindings {
+            std::unordered_set<std::string> collisions;
+        };
+
         static std::string TNS_PREFIX;
         static MetadataReader s_metadataReader;
+        // Written once, before the first extend() of any runtime; never freed.
+        static std::atomic<const ContentKeyedBindings*> s_contentKeyedBindings;
         static robin_hood::unordered_map<std::string, MetadataNode*> s_name2NodeCache;
         static robin_hood::unordered_map<std::string, MetadataTreeNode*> s_name2TreeNodeCache;
         static robin_hood::unordered_map<MetadataTreeNode*, MetadataNode*> s_treeNode2NodeCache;
@@ -286,6 +308,7 @@ class MetadataNode {
 
             std::string fullClassName;
             uint64_t defaultOverrides = 0;
+            std::optional<std::vector<std::string>> contentMemberNames;
         };
 
         struct TypeMetadata {
@@ -347,6 +370,15 @@ class MetadataNode {
             robin_hood::unordered_map<MetadataTreeNode*, CtorCacheData> CtorFuncCache;
 
             robin_hood::unordered_map<std::string, MetadataNode::ExtendedClassCacheData> ExtendedCtorFuncCache;
+
+            // A named extend's content-keyed class name -> the call-site class name of
+            // the extend() call that uses it in this runtime. Java finds a named
+            // extend's implementation by class name, so no other call site may share it.
+            robin_hood::unordered_map<std::string, std::string> ContentNameOwners;
+
+            // Content-keyed classes more than one extend() call registered -> whether
+            // Java creating one by class name was already reported.
+            robin_hood::unordered_map<std::string, bool> SharedExtendedClasses;
 
             // The array wrapper template for this runtime.
             v8::Persistent<v8::ObjectTemplate>* ArrayObjectTemplate = nullptr;

@@ -60,10 +60,13 @@ describe("Bindings of app-module types", function () {
 
     describe("App-module types generated at runtime", function () {
         it("generates a hidden extend of an app-module class", function () {
+            // A member no other extend has keeps a content-keyed name from matching
+            // the class prebuilt for the extend above.
             var Extended = com.tns.tests.Button1[ext]({
                 toString: function () {
                     return "runtime extend";
-                }
+                },
+                runtimeExtendMarker: true
             });
             var instance = new Extended();
 

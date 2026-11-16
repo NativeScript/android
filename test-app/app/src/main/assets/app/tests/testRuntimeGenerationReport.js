@@ -13,12 +13,15 @@ describe("Runtime class generation report", function () {
     }
 
     it("lists a class generated at runtime", function () {
-        // A computed member hides the extend from the static binding generator.
+        // A computed member hides the extend from the static binding generator, and
+        // a member no other extend has keeps a content-keyed name from matching a
+        // prebuilt class.
         var ext = "ex" + "tend";
         var ReportedObject = java.lang.Object[ext]({
             toString: function () {
                 return "reported";
-            }
+            },
+            reportedObjectMarker: true
         });
         var instance = new ReportedObject();
         expect(instance.toString()).toBe("reported");

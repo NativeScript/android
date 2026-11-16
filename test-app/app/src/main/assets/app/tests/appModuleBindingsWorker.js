@@ -12,7 +12,8 @@ try {
     var Extended = com.tns.tests.Button1[ext]({
         toString: function () {
             return "worker extend";
-        }
+        },
+        workerExtendMarker: true
     });
     var extended = new Extended();
     result.extendedClass = String(extended.getClass().getName());

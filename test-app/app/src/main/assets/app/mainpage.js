@@ -78,6 +78,7 @@ require("./tests/testPrebuiltExtendClasses");
 require("./tests/testRuntimeGenerationReport");
 require("./tests/testInterfaceExtendClasses");
 require("./tests/testAppModuleBindings");
+require("./tests/testContentKeyedBindings");
 require("./tests/testProxyRegistrationGc");
 require("./tests/testInterfaceImplementation");
 require("./tests/testPrimitiveCallbackReturns");

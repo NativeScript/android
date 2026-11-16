@@ -41,7 +41,8 @@ namespace tns {
                                      const v8::Local<v8::Object> &implementationObject,
                                      bool isInterface,
                                      const std::string &baseClassName = std::string(),
-                                     uint64_t defaultOverrides = 0);
+                                     uint64_t defaultOverrides = 0,
+                                     const std::vector<std::string> *contentMemberNames = nullptr);
 
         // Whether GetImplementedInterfaces would list any interface, without calling Java.
         static bool HasImplementedInterfaces(v8::Isolate *isolate, const v8::Local<v8::Object> &implementationObject);
@@ -49,10 +50,30 @@ namespace tns {
         // com.tns.Runtime.getDefaultMethodNames of the interface.
         static std::vector<std::string> GetDefaultMethodNames(const std::string &interfaceName);
 
+        /*
+         * contentMemberNames, when given, are the method overrides of a class generated
+         * at runtime, instead of the implementation object's function-valued members.
+         */
         static jclass ResolveClass(v8::Isolate *isolate, const std::string &baseClassName,
                                    const std::string &fullClassName,
                                    const v8::Local<v8::Object> &implementationObject,
-                                   bool isInterface);
+                                   bool isInterface,
+                                   const std::vector<std::string> *contentMemberNames = nullptr);
+
+        /*
+         * The interface names the implementation object's `interfaces` array lists,
+         * dot-separated, as GetImplementedInterfaces passes them to Java.
+         */
+        static std::vector<std::string>
+        CollectImplementedInterfaceNames(v8::Isolate *isolate, const v8::Local<v8::Object> &implementationObject);
+
+        /*
+         * The member set a content-keyed class name is derived from: the names of the
+         * object's own enumerable data properties that can name a Java method, except
+         * the ones extend() and __extends add, sorted by bytes and without duplicates.
+         */
+        static std::vector<std::string>
+        CollectContentMemberNames(v8::Isolate *isolate, const v8::Local<v8::Object> &implementationObject);
 
         static std::string ResolveClassName(v8::Isolate *isolate, jclass &clazz);
 
@@ -185,6 +206,8 @@ namespace tns {
          * Helper method that creates a java string array for sending strings over JNI
          */
         static jobjectArray GetJavaStringArray(JEnv &env, int length);
+
+        static jobjectArray ToJavaStringArray(JEnv &env, const std::vector<std::string> &values);
 
         static void validateProvidedArgumentsLength(const v8::FunctionCallbackInfo<v8::Value> &args, int expectedSize);
 

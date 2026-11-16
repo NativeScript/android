@@ -89,12 +89,15 @@ describe("Prebuilt classes of anonymous extends", function () {
     });
 
     it("caches a class generated at runtime under the name DexFactory looks up", function () {
-        // A computed member hides the extend from the static binding generator.
+        // A computed member hides the extend from the static binding generator, and
+        // a member no other extend has keeps a content-keyed name from matching a
+        // prebuilt class.
         var ext = "ex" + "tend";
         var RuntimeGenerated = java.lang.Object[ext]({
             toString: function () {
                 return "runtime generated";
-            }
+            },
+            runtimeGeneratedMarker: true
         });
         var instance = new RuntimeGenerated();
 

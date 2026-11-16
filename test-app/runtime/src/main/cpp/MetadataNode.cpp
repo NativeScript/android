@@ -10,6 +10,7 @@
 #include "CallbackHandlers.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
+#include <algorithm>
 #include <sstream>
 #include <cctype>
 #include <dirent.h>
@@ -115,6 +116,11 @@ static Local<Object> ResolveProxyReceiver(Isolate* isolate, const Local<Object>&
     return object;
 }
 
+static string DottedClassName(string className) {
+    std::replace(className.begin(), className.end(), '/', '.');
+    return className;
+}
+
 static Local<Object> ResolveImplementationObject(Isolate* isolate, const Local<Object>& implementationObject) {
     if (!implementationObject->IsProxy()) {
         return implementationObject;
@@ -193,6 +199,17 @@ Local<Object> MetadataNode::CreateExtendedJSWrapper(Isolate* isolate, ObjectMana
 
     auto cacheData = GetCachedExtendedClassData(isolate, proxyClassName);
     if (cacheData.node != nullptr) {
+        auto cache = GetMetadataNodeCache(isolate);
+        if (!cache->SharedExtendedClasses.empty()) {
+            auto shared = cache->SharedExtendedClasses.find(proxyClassName);
+            if (shared != cache->SharedExtendedClasses.end() && !shared->second) {
+                shared->second = true;
+                __android_log_print(ANDROID_LOG_WARN, "JS",
+                                    "Java created an instance of %s by its class name, but more than one extend() call shares that class; using the implementation of the first one. Give the class a unique name, e.g. with @JavaProxy.",
+                                    DottedClassName(proxyClassName).c_str());
+            }
+        }
+
         // Starts on the extended class's initial map, with its prototype, and without
         // running its constructor callback.
         auto context = Runtime::GetRuntime(isolate)->GetContext();
@@ -1507,7 +1524,8 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
         string fullClassName = extData->fullClassName;
 
-        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, implementationObject, false, extData->node->m_name, extData->defaultOverrides);
+        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, implementationObject, false, extData->node->m_name, extData->defaultOverrides,
+                                                          extData->contentMemberNames ? &*extData->contentMemberNames : nullptr);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -2057,6 +2075,57 @@ string MetadataNode::CreateFullClassName(const std::string& className, const std
     return fullClassName;
 }
 
+void MetadataNode::InitContentKeyedBindings(const vector<string>& collisions) {
+    static std::once_flag once;
+    std::call_once(once, [&collisions]() {
+        auto bindings = new ContentKeyedBindings();
+        bindings->collisions.insert(collisions.begin(), collisions.end());
+        s_contentKeyedBindings.store(bindings, std::memory_order_release);
+    });
+}
+
+// JS source spells a nested type like a package, `a.B.C`, and the static binding
+// generator reads names from JS source; both separators become '.'.
+static string CanonicalTypeName(string name) {
+    std::replace(name.begin(), name.end(), '/', '.');
+    std::replace(name.begin(), name.end(), '$', '.');
+    return name;
+}
+
+static string JoinSortedUnique(vector<string>& values) {
+    values.erase(std::remove(values.begin(), values.end(), string()), values.end());
+    std::sort(values.begin(), values.end());
+    values.erase(std::unique(values.begin(), values.end()), values.end());
+
+    string joined;
+    for (size_t i = 0; i < values.size(); i++) {
+        if (i > 0) {
+            joined += ",";
+        }
+        joined += values[i];
+    }
+    return joined;
+}
+
+string MetadataNode::CreateContentKey(const string& baseClassName, vector<string> interfaceNames, vector<string> memberNames) {
+    for (auto& interfaceName : interfaceNames) {
+        interfaceName = CanonicalTypeName(interfaceName);
+    }
+
+    string payload = CanonicalTypeName(baseClassName) + "|" + JoinSortedUnique(interfaceNames) + "|" + JoinSortedUnique(memberNames);
+
+    uint64_t hash = 0xcbf29ce484222325ULL;
+    for (unsigned char c : payload) {
+        hash ^= c;
+        hash *= 0x100000001b3ULL;
+    }
+
+    char key[18];
+    snprintf(key, sizeof(key), "h%016llx", static_cast<unsigned long long>(hash));
+    DEBUG_WRITE("CreateContentKey: %s -> %s", payload.c_str(), key);
+    return key;
+}
+
 void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     tns::instrumentation::Frame frame;
     try {
@@ -2116,9 +2185,10 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
 
         auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
-        DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", ArgConverter::ConvertToString(extendName).c_str());
+        string extendNameString = ArgConverter::ConvertToString(extendName);
+        DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", extendNameString.c_str());
 
-        string extendNameAndLocation = extendLocation + ArgConverter::ConvertToString(extendName);
+        string extendNameAndLocation = extendLocation + extendNameString;
         string fullClassName;
         string baseClassName = node->m_name;
         if (!hasDot) {
@@ -2127,9 +2197,43 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
             fullClassName = ArgConverter::ConvertToString(info[0].As<String>());
         }
 
-        //resolve class (pre-generated or generated runtime from dex generator)
         uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
         bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
+
+        // The call-site name identifies the extend() call within a runtime even when
+        // the Java class is named after its content and shared with other calls.
+        const string siteClassName = fullClassName;
+        auto contentKeyedBindings = s_contentKeyedBindings.load(std::memory_order_acquire);
+        bool contentKeyed = contentKeyedBindings != nullptr && !hasDot && !isInterface;
+        string contentClassName;
+        std::optional<vector<string>> contentMemberNames;
+        auto cache = GetMetadataNodeCache(isolate);
+        if (contentKeyed) {
+            auto cachedData = GetCachedExtendedClassData(isolate, siteClassName);
+            if (cachedData.extendedCtorFunction != nullptr) {
+                info.GetReturnValue().Set(Local<Function>::New(isolate, *cachedData.extendedCtorFunction));
+                return;
+            }
+
+            contentMemberNames = CallbackHandlers::CollectContentMemberNames(isolate, implementationObject);
+            auto contentKey = CreateContentKey(baseClassName, CallbackHandlers::CollectImplementedInterfaceNames(isolate, implementationObject), *contentMemberNames);
+            contentClassName = TNS_PREFIX + CreateFullClassName(baseClassName, extendNameString.empty() ? contentKey : extendNameString + "_" + contentKey);
+
+            // Java finds a named extend's implementation by its class name alone, so a
+            // named content-keyed class belongs to one call site: the generator's
+            // collision list names the ones it saw at more than one, and otherwise
+            // the first call site in this runtime keeps it.
+            bool useSiteClassName = false;
+            if (!extendNameString.empty()) {
+                auto owner = cache->ContentNameOwners.find(contentClassName);
+                useSiteClassName = (owner != cache->ContentNameOwners.end() && owner->second != siteClassName) ||
+                                   contentKeyedBindings->collisions.count(DottedClassName(contentClassName)) > 0;
+            }
+            if (!useSiteClassName) {
+                fullClassName = contentClassName;
+            }
+        }
+
         // Every instance of the extend shares its implementation object, and so its mask.
         uint64_t defaultOverrides = 0;
         // Such an extend gets a class of its own call site rather than the interface's.
@@ -2137,9 +2241,12 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         if (isInterface && !hasDot && !hasImplementedInterfaces) {
             defaultOverrides = node->GetDefaultOverrides(isolate, implementationObject);
         }
+
+        //resolve class (pre-generated or generated runtime from dex generator)
         auto clazz = defaultOverrides != 0
                      ? CallbackHandlers::ResolveClass(isolate, string(), node->m_implType + DEFAULT_OVERRIDING_SUFFIX, Local<Object>(), isInterface)
-                     : CallbackHandlers::ResolveClass(isolate, baseClassName, fullClassName, implementationObject, isInterface);
+                     : CallbackHandlers::ResolveClass(isolate, baseClassName, fullClassName, implementationObject, isInterface,
+                                                      contentMemberNames ? &*contentMemberNames : nullptr);
         auto fullExtendedName = CallbackHandlers::ResolveClassName(isolate, clazz);
         DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
         if (defaultOverrides != 0 || hasImplementedInterfaces) {
@@ -2152,9 +2259,10 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         }
 
         // Every anonymous extend of an interface resolves to the interface's one
-        // class, so keying its constructor by that class would hand each call
-        // site the implementation object of the first.
-        const string& extendedCtorKey = (isInterface && !hasDot) ? fullClassName : fullExtendedName;
+        // class, as do content-keyed extends with the same content, so keying
+        // their constructor by that class would hand each call site the
+        // implementation object of the first.
+        const string& extendedCtorKey = ((isInterface && !hasDot) || contentKeyed) ? siteClassName : fullExtendedName;
         auto cachedData = GetCachedExtendedClassData(isolate, extendedCtorKey);
         if (cachedData.extendedCtorFunction != nullptr) {
             auto cachedExtendedCtorFunc = Local<Function>::New(isolate, *cachedData.extendedCtorFunction);
@@ -2177,10 +2285,10 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
             throw NativeScriptException(s.str());
         }
 
-        auto cache = GetMetadataNodeCache(isolate);
         auto baseClassCtorFunc = node->GetConstructorFunction(isolate);
         auto extendedClassCallbackData = cache->Own<ExtendedClassCallbackData>(node, extendNameAndLocation, implementationObject, fullExtendedName);
         extendedClassCallbackData->defaultOverrides = defaultOverrides;
+        extendedClassCallbackData->contentMemberNames = std::move(contentMemberNames);
         auto extendData = External::New(isolate, extendedClassCallbackData, v8::kExternalPointerTypeTagDefault);
         auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, extendData);
         extendFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
@@ -2213,9 +2321,16 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         // CreateExtendedJSWrapper looks instances created from Java up by their
         // class name; the first extend of the class keeps serving those. Each
         // entry needs its own handles: the cache destructor frees them per entry.
-        if (extendedCtorKey != fullExtendedName &&
-            cache->ExtendedCtorFuncCache.find(fullExtendedName) == cache->ExtendedCtorFuncCache.end()) {
-            cache->ExtendedCtorFuncCache.emplace(fullExtendedName, ExtendedClassCacheData(extendFunc, extendFuncTemplate->InstanceTemplate(), fullExtendedName, node));
+        bool usesContentClassName = contentKeyed && fullClassName == contentClassName;
+        if (extendedCtorKey != fullExtendedName) {
+            if (cache->ExtendedCtorFuncCache.find(fullExtendedName) == cache->ExtendedCtorFuncCache.end()) {
+                cache->ExtendedCtorFuncCache.emplace(fullExtendedName, ExtendedClassCacheData(extendFunc, extendFuncTemplate->InstanceTemplate(), fullExtendedName, node));
+            } else if (usesContentClassName) {
+                cache->SharedExtendedClasses.emplace(fullExtendedName, false);
+            }
+        }
+        if (usesContentClassName && !extendNameString.empty()) {
+            cache->ContentNameOwners.emplace(contentClassName, siteClassName);
         }
 
         if (frame.check()) {
@@ -2788,4 +2903,5 @@ robin_hood::unordered_map<std::string, MetadataTreeNode*> MetadataNode::s_name2T
 robin_hood::unordered_map<MetadataTreeNode*, MetadataNode*> MetadataNode::s_treeNode2NodeCache;
 std::mutex MetadataNode::s_nodeCacheMutex;
 std::atomic<bool> MetadataNode::s_profilerEnabled{false};
+std::atomic<const MetadataNode::ContentKeyedBindings*> MetadataNode::s_contentKeyedBindings{nullptr};
 
