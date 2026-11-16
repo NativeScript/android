@@ -27,6 +27,7 @@ void MetadataReader::Initialize(uint32_t nodesLength, uint8_t *nodeData, uint32_
     m_valueData = valueData;
     m_getTypeMetadataCallback = getTypeMetadataCallback;
     m_v.clear();
+    m_runtimeNodes.clear();
     m_typeNameCache.clear();
 
     m_root = BuildTree();
@@ -94,12 +95,11 @@ MetadataTreeNode* MetadataReader::BuildTree() {
 
     int len = m_nodesLength / sizeof(MetadataTreeNodeRawData);
 
-    m_v.resize(len + 1000);
     MetadataTreeNode* emptyNode = nullptr;
-    fill(m_v.begin(), m_v.end(), emptyNode);
+    m_v.assign(len, emptyNode);
 
     for (int i = 0; i < len; i++) {
-        MetadataTreeNode* node = GetNodeById(i);
+        MetadataTreeNode* node = m_v[i];
         if (nullptr == node) {
             node = new MetadataTreeNode;
             node->name = ReadName(curNodeData->offsetName);
@@ -147,22 +147,26 @@ MetadataTreeNode* MetadataReader::BuildTree() {
     return GetNodeById(0);
 }
 
-MetadataTreeNode *MetadataReader::GetNodeById(uint16_t nodeId) {
+MetadataTreeNode *MetadataReader::GetNodeById(uint32_t nodeId) {
     StateLock lock(m_stateMutex);
 
-    if (nodeId >= m_v.size()) {
+    bool isRuntimeNode = nodeId >= RUNTIME_NODE_ID_BASE;
+    const auto &nodes = isRuntimeNode ? m_runtimeNodes : m_v;
+    size_t index = isRuntimeNode ? nodeId - RUNTIME_NODE_ID_BASE : nodeId;
+
+    if (index >= nodes.size()) {
         __android_log_print(ANDROID_LOG_ERROR, "TNS.error",
-                            "Metadata node id %u is out of range (%zu nodes). The metadata is inconsistent.",
-                            nodeId, m_v.size());
+                            "Metadata node id %u is out of range (%zu static nodes, %zu runtime nodes). The metadata is inconsistent.",
+                            nodeId, m_v.size(), m_runtimeNodes.size());
         return nullptr;
     }
 
-    return m_v[nodeId];
+    return nodes[index];
 }
 
 
 string MetadataReader::ReadTypeName(MetadataTreeNode *treeNode) {
-    // Guards the whole family: the uint16_t overload and ReadTypeNameInternal's
+    // Guards the whole family: the node id overload and ReadTypeNameInternal's
     // array-element forward both reach here with a GetNodeById result.
     if (treeNode == nullptr) {
         throw NativeScriptException("Cannot read a type name: the metadata refers to a node that does not exist.");
@@ -196,7 +200,7 @@ string MetadataReader::ReadTypeNameInternal(MetadataTreeNode *treeNode) {
         bool isArrayElement = treeNode->offsetValue > ARRAY_OFFSET;
 
         if (isArrayElement) {
-            uint16_t forwardNodeId = treeNode->offsetValue - ARRAY_OFFSET;
+            uint32_t forwardNodeId = treeNode->offsetValue - ARRAY_OFFSET;
             MetadataTreeNode * forwardNode = GetNodeById(forwardNodeId);
             name = ReadTypeName(forwardNode);
             uint8_t forwardNodeType = GetNodeType(forwardNode);
@@ -230,14 +234,18 @@ uint8_t *MetadataReader::GetValueData() const {
     return m_valueData;
 }
 
-uint16_t MetadataReader::GetNodeId(MetadataTreeNode *treeNode) {
+uint32_t MetadataReader::GetNodeId(MetadataTreeNode *treeNode) {
     StateLock lock(m_stateMutex);
 
-    auto itFound = find(m_v.begin(), m_v.end(), treeNode);
-    NS_DCHECK(itFound != m_v.end());
-    uint16_t nodeId = itFound - m_v.begin();
+    auto itStatic = find(m_v.begin(), m_v.end(), treeNode);
+    if (itStatic != m_v.end()) {
+        return static_cast<uint32_t>(itStatic - m_v.begin());
+    }
 
-    return nodeId;
+    auto itRuntime = find(m_runtimeNodes.begin(), m_runtimeNodes.end(), treeNode);
+    NS_DCHECK(itRuntime != m_runtimeNodes.end());
+
+    return RUNTIME_NODE_ID_BASE + static_cast<uint32_t>(itRuntime - m_runtimeNodes.begin());
 }
 
 MetadataTreeNode *MetadataReader::GetRoot() const {
@@ -264,7 +272,7 @@ uint8_t MetadataReader::GetNodeType(MetadataTreeNode *treeNode) {
         } else if (offsetValue == ARRAY_OFFSET) {
             nodeType = MetadataTreeNode::ARRAY;
         } else {
-            uint16_t nodeId = offsetValue - ARRAY_OFFSET;
+            uint32_t nodeId = offsetValue - ARRAY_OFFSET;
             MetadataTreeNode * arrElemNode = GetNodeById(nodeId);
             if (arrElemNode == nullptr) {
                 throw NativeScriptException("Cannot resolve an array element type: the metadata refers to a node that does not exist.");
@@ -301,7 +309,7 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
             child->offsetValue = ARRAY_OFFSET;
 
             children->push_back(child);
-            m_v.push_back(child);
+            m_runtimeNodes.push_back(child);
         }
 
         treeNode = child;
@@ -323,7 +331,7 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
         bool found = false;
         MetadataTreeNode * forwardedNode = GetOrCreateTreeNodeByName(cn);
 
-        uint16_t forwardedNodeId = GetNodeId(forwardedNode);
+        uint32_t forwardedNodeId = GetNodeId(forwardedNode);
         if (treeNode->children == nullptr) {
             treeNode->children = new vector<MetadataTreeNode *>();
         }
@@ -346,7 +354,7 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
             forwardNode->offsetValue = forwardedNodeId + ARRAY_OFFSET;
             forwardNode->parent = treeNode;
 
-            m_v.push_back(forwardNode);
+            m_runtimeNodes.push_back(forwardNode);
             children.push_back(forwardNode);
 
             treeNode = forwardNode;
@@ -414,18 +422,20 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
                     cKind = kind[0];
 
                     NS_DCHECK(cKind == 'B');
-                    auto baseClassTreeNode = GetOrCreateTreeNodeByName(name);
-                    auto baseClassNodeId = GetNodeId(baseClassTreeNode);
+                    child->runtimeBaseClass = GetOrCreateTreeNodeByName(name);
 
+                    // Laid out like the head of a static class record. Only the type
+                    // byte is read back, for the element type of an array; the base
+                    // class id slot stays empty because runtimeBaseClass holds the link.
                     child->offsetValue = m_valueLength;
                     m_valueData[m_valueLength++] = childType;
-                    *reinterpret_cast<uint16_t *>(m_valueData + m_valueLength) = baseClassNodeId;
+                    *reinterpret_cast<uint16_t *>(m_valueData + m_valueLength) = 0;
                     m_valueLength += sizeof(uint16_t);
                 } else {
                     child->type.store(MetadataTreeNode::PACKAGE, std::memory_order_relaxed);
                 }
 
-                m_v.push_back(child);
+                m_runtimeNodes.push_back(child);
                 children->push_back(child);
 
                 treeNode = child;
@@ -446,7 +456,9 @@ MetadataTreeNode *MetadataReader::GetBaseClassNode(MetadataTreeNode *treeNode) {
 
     MetadataTreeNode * baseClassNode = nullptr;
 
-    if (treeNode != nullptr) {
+    if (treeNode != nullptr && treeNode->metadata != nullptr) {
+        baseClassNode = treeNode->runtimeBaseClass;
+    } else if (treeNode != nullptr) {
         uint16_t baseClassNodeId = *reinterpret_cast<uint16_t *>(m_valueData +
                                                                  treeNode->offsetValue + 1);
 

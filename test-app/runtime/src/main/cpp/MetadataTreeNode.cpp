@@ -5,7 +5,7 @@ using namespace tns;
 
 MetadataTreeNode::MetadataTreeNode()
     :
-    children(nullptr), parent(nullptr), metadata(nullptr), offsetValue(0), type(INVALID_TYPE) {
+    children(nullptr), parent(nullptr), metadata(nullptr), runtimeBaseClass(nullptr), offsetValue(0), type(INVALID_TYPE) {
 }
 
 MetadataTreeNode* MetadataTreeNode::GetChild(const string& name) {

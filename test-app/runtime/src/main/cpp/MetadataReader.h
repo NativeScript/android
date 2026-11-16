@@ -86,7 +86,7 @@ namespace tns {
             return entry;
         }
 
-        inline std::string ReadTypeName(uint16_t nodeId) {
+        inline std::string ReadTypeName(uint32_t nodeId) {
             MetadataTreeNode *treeNode = GetNodeById(nodeId);
 
             return ReadTypeName(treeNode);
@@ -133,7 +133,7 @@ namespace tns {
 
         uint8_t GetNodeType(MetadataTreeNode *treeNode);
 
-        uint16_t GetNodeId(MetadataTreeNode *treeNode);
+        uint32_t GetNodeId(MetadataTreeNode *treeNode);
 
         MetadataTreeNode *GetRoot() const;
 
@@ -141,7 +141,7 @@ namespace tns {
 
         MetadataTreeNode *GetBaseClassNode(MetadataTreeNode *treeNode);
 
-        MetadataTreeNode *GetNodeById(uint16_t nodeId);
+        MetadataTreeNode *GetNodeById(uint32_t nodeId);
 
         inline bool IsNodeTypeArray(uint8_t type) {
             bool isArray = (((type & MetadataTreeNode::PRIMITIVE) == 0) &&
@@ -306,6 +306,12 @@ namespace tns {
 
         static const uint32_t ARRAY_OFFSET = INT32_MAX; // 2147483647
 
+        // The static metadata addresses its nodes with 16-bit ids. Nodes created at
+        // run time are numbered from here in every app, so a path that narrows one
+        // of their ids fails everywhere rather than only once the static tree is
+        // nearly full.
+        static const uint32_t RUNTIME_NODE_ID_BASE = 1 << 16;
+
         MetadataTreeNode *BuildTree();
 
         std::string ReadTypeNameInternal(MetadataTreeNode *treeNode);
@@ -322,6 +328,7 @@ namespace tns {
         uint8_t *m_nameData;
         uint8_t *m_valueData;
         std::vector<MetadataTreeNode *> m_v;
+        std::vector<MetadataTreeNode *> m_runtimeNodes;
         GetTypeMetadataCallback m_getTypeMetadataCallback;
 
         robin_hood::unordered_map<MetadataTreeNode *, std::string> m_typeNameCache;

@@ -16,8 +16,11 @@ struct MetadataTreeNode {
     MetadataTreeNode* parent;
     uint32_t offsetValue;
     std::vector<MetadataTreeNode*>* children;
-    //
+    // Set for a type resolved at run time, null for one from the static metadata.
     std::string* metadata;
+    // Base class of a type resolved at run time. That base can itself be resolved at
+    // run time, and the 16-bit base class id of a value record cannot address those.
+    MetadataTreeNode* runtimeBaseClass;
     // Write-once memo: INVALID_TYPE until GetNodeType derives it from the
     // immutable value data, so a reader that sees any other value can use it
     // without the reader's state lock.
