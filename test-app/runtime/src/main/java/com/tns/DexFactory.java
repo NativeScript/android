@@ -131,12 +131,27 @@ public class DexFactory {
         }
 
         String fullClassName = className.replace("$", "_");
+
+        // A named proxy (`Base.extend('a.b.C', {...})` / @JavaProxy) asks for
+        // exactly that Java class name; the substitutions below are for the
+        // anonymous form only, where the name is derived from the base.
+        boolean isNamedProxy = !fullClassName.startsWith(COM_TNS_GEN_PREFIX) && fullClassName.contains(".");
+
+        // An anonymous extend of an interface asks for a per-call-site name, but
+        // it gets the class `new Interface({...})` uses, whose body depends only
+        // on the interface. Resolving it under that name lets the APK's prebuilt
+        // class and the dex cache serve every call site. Extra implemented
+        // interfaces add methods the shared class lacks.
+        boolean usesSharedInterfaceClass = !baseClassName.isEmpty() && isInterface && !isNamedProxy && !hasImplementedInterfaces(implementedInterfaces);
+        if (usesSharedInterfaceClass) {
+            fullClassName = COM_TNS_GEN_PREFIX + this.getClassToProxyName(baseClassName).replace("$", "_");
+        }
         String originalFullClassName = fullClassName;
 
         // The static binding generator keeps a `$` from the script's file name in an
         // anonymous extend's class name; the runtime already replaced the base class's `$`.
         Class<?> pregeneratedClass = null;
-        if (!fullClassName.equals(className)) {
+        if (!usesSharedInterfaceClass && !fullClassName.equals(className)) {
             pregeneratedClass = loadPregeneratedClass(className.replace("-", "_"));
         }
         if (pregeneratedClass == null) {
@@ -184,11 +199,6 @@ public class DexFactory {
                     + ProxyGenerator.defaultOverridingFileSuffix(DefaultMethods.collect(Class.forName(classToProxy)), bodies);
         }
 
-        // A named proxy (`Base.extend('a.b.C', {...})` / @JavaProxy) asks for
-        // exactly that Java class name; the substitutions below are for the
-        // anonymous form only, where the name is derived from the base.
-        boolean isNamedProxy = !fullClassName.startsWith(COM_TNS_GEN_PREFIX) && fullClassName.contains(".");
-
         // An anonymous extend of an interface that lists interfaces of its own gets a class of
         // its call site, under the name asked for, which is also the name a prebuilt class of
         // the call site has: the interface's shared class cannot implement them for one call.
@@ -200,7 +210,7 @@ public class DexFactory {
         // when interfaces are extended as classes, we still want to preserve
         // just the interface name without the extra file, line, column information
         if (!baseClassName.isEmpty() && isInterface && !isNamedProxy && !isCallSiteInterfaceClass) {
-            fullClassName = COM_TNS_GEN_PREFIX + classToProxy;
+            fullClassName = COM_TNS_GEN_PREFIX + classToProxy.replace("$", "_");
         }
 
         // The thumb only changes on reinstall, so a cache key of name + thumb
@@ -331,6 +341,17 @@ public class DexFactory {
             sbStr.append(array[i]);
         }
         return sbStr.toString();
+    }
+
+    private static boolean hasImplementedInterfaces(String[] implementedInterfaces) {
+        if (implementedInterfaces != null) {
+            for (String implementedInterface : implementedInterfaces) {
+                if (implementedInterface != null && !implementedInterface.isEmpty()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private Class<?> loadPregeneratedClass(String name) {

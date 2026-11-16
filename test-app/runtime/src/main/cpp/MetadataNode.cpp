@@ -2151,7 +2151,11 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
             env.InsertClassIntoCache(fullExtendedName, localClass);
         }
 
-        auto cachedData = GetCachedExtendedClassData(isolate, fullExtendedName);
+        // Every anonymous extend of an interface resolves to the interface's one
+        // class, so keying its constructor by that class would hand each call
+        // site the implementation object of the first.
+        const string& extendedCtorKey = (isInterface && !hasDot) ? fullClassName : fullExtendedName;
+        auto cachedData = GetCachedExtendedClassData(isolate, extendedCtorKey);
         if (cachedData.extendedCtorFunction != nullptr) {
             auto cachedExtendedCtorFunc = Local<Function>::New(isolate, *cachedData.extendedCtorFunction);
             info.GetReturnValue().Set(cachedExtendedCtorFunc);
@@ -2205,7 +2209,14 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         }
 
         ExtendedClassCacheData cacheData(extendFunc, extendFuncTemplate->InstanceTemplate(), fullExtendedName, node);
-        cache->ExtendedCtorFuncCache.emplace(fullExtendedName, cacheData);
+        cache->ExtendedCtorFuncCache.emplace(extendedCtorKey, cacheData);
+        // CreateExtendedJSWrapper looks instances created from Java up by their
+        // class name; the first extend of the class keeps serving those. Each
+        // entry needs its own handles: the cache destructor frees them per entry.
+        if (extendedCtorKey != fullExtendedName &&
+            cache->ExtendedCtorFuncCache.find(fullExtendedName) == cache->ExtendedCtorFuncCache.end()) {
+            cache->ExtendedCtorFuncCache.emplace(fullExtendedName, ExtendedClassCacheData(extendFunc, extendFuncTemplate->InstanceTemplate(), fullExtendedName, node));
+        }
 
         if (frame.check()) {
             frame.log("Extending: " + node->m_name);
