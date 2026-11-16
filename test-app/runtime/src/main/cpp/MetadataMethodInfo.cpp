@@ -1,41 +1,26 @@
 #include "MetadataMethodInfo.h"
 #include "MetadataNode.h"
-#include <cstring>
 
 
 using namespace tns;
 
-namespace {
-    // The value stream is packed, so nothing in it is aligned.
-    inline uint16_t ReadUInt16(const uint8_t *data) {
-        uint16_t value;
-        memcpy(&value, data, sizeof(value));
-        return value;
-    }
-
-    inline uint32_t ReadUInt32(const uint8_t *data) {
-        uint32_t value;
-        memcpy(&value, data, sizeof(value));
-        return value;
-    }
-}
-
 std::string MethodInfo::GetName() {
-    string methodName = MetadataNode::getMetadataReader()->ReadName(ReadUInt32(m_record));
+    auto m_reader = MetadataNode::getMetadataReader();
+    string methodName = m_reader->ReadName(m_reader->ReadNameOffset(m_record));
     return methodName;
 }
 
 uint8_t MethodInfo::CheckIsResolved() {
-    return m_record[sizeof(uint32_t)] & 1;
+    return m_record[MetadataNode::getMetadataReader()->NameBytes()] & 1;
 }
 
 const uint8_t *MethodInfo::Signature() {
-    // Read a byte at a time: the record can be the last thing in the stream,
-    // and a four-byte load would run past it.
-    const uint8_t *reference = m_record + sizeof(uint32_t);
-    uint32_t offset = (reference[0] | (reference[1] << 8) | (reference[2] << 16)) >> 1;
+    // The reference is the signature's offset in the signature region, shifted
+    // left by one to leave the low bit for the resolved flag.
+    auto m_reader = MetadataNode::getMetadataReader();
+    uint32_t reference = m_reader->ReadSignatureReference(m_record + m_reader->NameBytes());
 
-    return MetadataNode::getMetadataReader()->GetSignatureData() + offset;
+    return m_reader->GetSignatureData() + (reference >> 1);
 }
 
 uint16_t MethodInfo::GetSignatureLength() {
@@ -51,7 +36,7 @@ std::string MethodInfo::GetSignature() { //use nodeId's to read the whole signat
     string signature = "(";
     string ret;
     for (int i = 0; i < signatureLength; i++) {
-        uint16_t nodeId = ReadUInt16(nodeIds + i * sizeof(uint16_t));
+        uint32_t nodeId = m_reader->ReadId(nodeIds + i * m_reader->IdBytes());
         string curArgTypeName = m_reader->ReadTypeName(nodeId);
         MetadataTreeNode* node = m_reader->GetNodeById(nodeId);
 
@@ -86,9 +71,12 @@ std::string MethodInfo::GetSignature() { //use nodeId's to read the whole signat
 std::string MethodInfo::GetDeclaringType() {
     auto m_reader = MetadataNode::getMetadataReader();
 
-    return m_reader->ReadTypeName(ReadUInt16(m_record + RECORD_SIZE));
+    return m_reader->ReadTypeName(
+            m_reader->ReadId(m_record + m_reader->NameBytes() + m_reader->SignatureBytes()));
 }
 
 int MethodInfo::GetSizeOfReadMethodInfo() {
-    return RECORD_SIZE + (isStatic ? sizeof(uint16_t) : 0);
+    auto m_reader = MetadataNode::getMetadataReader();
+
+    return m_reader->NameBytes() + m_reader->SignatureBytes() + (isStatic ? m_reader->IdBytes() : 0);
 }

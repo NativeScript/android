@@ -218,9 +218,9 @@ public class TreeNode {
 
     private String _name;
     //
-    public short id;
-    public short firstChildId;
-    public short nextSiblingId;
+    public int id;
+    public int firstChildId;
+    public int nextSiblingId;
     //
     public byte nodeType;
     public int offsetName;

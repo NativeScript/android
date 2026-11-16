@@ -7,7 +7,7 @@ using namespace tns;
 
 MetadataEntry::MetadataEntry(MetadataTreeNode *m_treeNode, NodeType nodeType) :
         treeNode(m_treeNode), type(nodeType), isExtensionFunction(false), isStatic(false),
-        isTypeMember(false), memberId(nullptr), clazz(nullptr), mi(nullptr),fi(nullptr), sfi(nullptr),
+        isTypeMember(false), memberId(nullptr), clazz(nullptr), mi(nullptr), field(nullptr),
         retType(MethodReturnType::Unknown),
         paramCount(-1), isFinal(false), isResolved(false), retTypeParsed(false),
         isFinalSet(false), isResolvedSet(false) {}
@@ -17,10 +17,8 @@ std::string &MetadataEntry::getName() {
 
     auto reader = MetadataNode::getMetadataReader();
 
-    if (type == NodeType::Field) {
-        name = reader->ReadName(fi->nameOffset);
-    } else if (type == NodeType::StaticField) {
-        name = reader->ReadName(sfi->nameOffset);
+    if (type == NodeType::Field || type == NodeType::StaticField) {
+        name = reader->ReadName(reader->FieldNameOffset(field));
     } else if (type == NodeType::Method) {
         name = mi.GetName();
     }
@@ -33,10 +31,8 @@ std::string &MetadataEntry::getSig() {
 
     auto reader = MetadataNode::getMetadataReader();
 
-    if (type == NodeType::Field) {
-        sig = reader->ReadTypeName(fi->nodeId);
-    } else if (type == NodeType::StaticField) {
-        sig = reader->ReadTypeName(sfi->nodeId);
+    if (type == NodeType::Field || type == NodeType::StaticField) {
+        sig = reader->ReadTypeName(reader->FieldTypeId(field));
     } else if (type == NodeType::Method) {
         auto sigLength = mi.GetSignatureLength();
         if (sigLength > 0)
@@ -82,8 +78,8 @@ std::string &MetadataEntry::getDeclaringType() {
     auto reader = MetadataNode::getMetadataReader();
 
     if (type == NodeType::StaticField) {
-        declaringType = (sfi->flags & FieldInfo::HAS_DECLARING_TYPE)
-                        ? reader->ReadTypeName(sfi->declaringType)
+        declaringType = (reader->FieldFlags(field) & FieldInfo::HAS_DECLARING_TYPE)
+                        ? reader->ReadTypeName(reader->FieldDeclaringTypeId(field))
                         : reader->ReadTypeName(treeNode);
     } else if (type == NodeType::Method && isStatic) {
         declaringType = mi.GetDeclaringType();
@@ -112,10 +108,9 @@ int MetadataEntry::getParamCount() {
 bool MetadataEntry::getIsFinal() {
     if (isFinalSet) return isFinal;
 
-    if (type == NodeType::Field) {
-        isFinal = (fi->flags & FieldInfo::FINAL) != 0;
-    } else if (type == NodeType::StaticField) {
-        isFinal = (sfi->flags & FieldInfo::FINAL) != 0;
+    if (type == NodeType::Field || type == NodeType::StaticField) {
+        auto reader = MetadataNode::getMetadataReader();
+        isFinal = (reader->FieldFlags(field) & FieldInfo::FINAL) != 0;
     }
 
     isFinalSet = true;

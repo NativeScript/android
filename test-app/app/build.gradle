@@ -95,6 +95,9 @@ def computeBuildToolsVersion = { ->
 
 def enableAnalytics = (project.hasProperty("gatherAnalyticsData") && project.gatherAnalyticsData == "true")
 def enableVerboseMDG = project.gradle.startParameter.logLevel.name() == 'DEBUG'
+// For the runtime's own tests: writes every variable-width metadata field a byte wider
+// than this app needs, the way only a very large app's metadata would otherwise be.
+def widenMetadataFields = project.hasProperty("widenMetadataFields")
 def analyticsFilePath = "$rootDir/analytics/build-statistics.json"
 def analyticsCollector = project.ext.AnalyticsCollector.withOutputPath(analyticsFilePath)
 if (enableAnalytics) {
@@ -998,6 +1001,8 @@ task buildMetadata(type: BuildToolTask) {
         }
     }
 
+    inputs.property("widenMetadataFields", widenMetadataFields)
+
     outputs.files("$METADATA_OUT_PATH/treeNodeStream.dat", "$METADATA_OUT_PATH/treeStringsStream.dat", "$METADATA_OUT_PATH/treeValueStream.dat")
 
     workingDir "$BUILD_TOOLS_PATH"
@@ -1081,6 +1086,10 @@ task buildMetadata(type: BuildToolTask) {
 
         if (enableVerboseMDG) {
             paramz.add("verbose")
+        }
+
+        if (widenMetadataFields) {
+            paramz.add("widen-fields")
         }
 
         args paramz.toArray()

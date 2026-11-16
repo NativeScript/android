@@ -20,6 +20,7 @@ public class Generator {
 
     private static final String VERBOSE_FLAG_NAME = "verbose";
     private static final String SKIP_FLAG_NAME = "skip";
+    private static final String WIDEN_FIELDS_FLAG_NAME = "widen-fields";
     private static final String ANALYTICS_ARGUMENT_BEGINNING = "analyticsFilePath=";
     private static final String MDG_OUTPUT_DIR = "mdg-output-dir.txt";
     private static final String MDG_JAVA_DEPENDENCIES = "mdg-java-dependencies.txt";
@@ -28,6 +29,7 @@ public class Generator {
     private static final String METADATA_JAVA_OUT = "mdg-java-out.txt";
 
     private static boolean verbose_mode = false;
+    private static boolean widen_fields = false;
 
     /**
      * @param args arguments
@@ -74,9 +76,9 @@ public class Generator {
             if (verbose_mode) {
                 FileOutputStream ods = new FileOutputStream(new File("metadata-debug.json"));
                 FileStreamWriter outDebugStream = new FileStreamWriter(ods);
-                new Writer(outNodeStream, outValueStream, outStringsStream, outDebugStream).writeTree(root);
+                new Writer(outNodeStream, outValueStream, outStringsStream, outDebugStream, widen_fields).writeTree(root);
             } else {
-                new Writer(outNodeStream, outValueStream, outStringsStream).writeTree(root);
+                new Writer(outNodeStream, outValueStream, outStringsStream, null, widen_fields).writeTree(root);
             }
         } catch (Throwable ex) {
             System.err.println(String.format("Error executing Metadata Generator: %s", ex.getMessage()));
@@ -93,6 +95,8 @@ public class Generator {
             } else if (VERBOSE_FLAG_NAME.equals(arg)) {
                 verbose_mode = true;
                 MetadataFilterConsoleLogger.INSTANCE.setEnabled(true);
+            } else if (WIDEN_FIELDS_FLAG_NAME.equals(arg)) {
+                widen_fields = true;
             } else if (SKIP_FLAG_NAME.equals(arg)) {
                 System.out.println("Skipping metadata generation: skip flag used.");
                 exit(0);

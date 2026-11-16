@@ -11,15 +11,14 @@ using namespace std;
 namespace tns {
     /*
      * A view of one method record in the metadata's value stream. The record is
-     * the offset of the method's name (4 bytes) and a reference to its signature
-     * (3 bytes); a static method or an extension function is followed by the id
-     * of its declaring type. Nothing is copied out of the record, and the
-     * signature itself is only read when the method is first resolved.
+     * the offset of the method's name and a reference to its signature; a static
+     * method or an extension function is followed by the id of its declaring
+     * type. MetadataReader knows how wide each of those is. Nothing is copied
+     * out of the record, and the signature itself is only read when the method
+     * is first resolved.
      */
     class MethodInfo {
     public:
-        static const int RECORD_SIZE = sizeof(uint32_t) + 3;
-
         MethodInfo(uint8_t *record)
                 : isStatic(false), m_record(record) {
         }

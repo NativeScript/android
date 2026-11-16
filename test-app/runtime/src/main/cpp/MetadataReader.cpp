@@ -13,6 +13,8 @@ MetadataReader::MetadataReader() : m_root(nullptr), m_nodesLength(0), m_nameLeng
                                    m_valueLength(0),
                                    m_nodeData(nullptr), m_nameData(nullptr), m_valueData(nullptr),
                                    m_signatureData(nullptr),
+                                   m_idBytes(0), m_nameBytes(0), m_signatureBytes(0),
+                                   m_idMask(0), m_nameMask(0), m_signatureMask(0),
                                    m_getTypeMetadataCallback(nullptr) {}
 
 void MetadataReader::Initialize(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength,
@@ -21,12 +23,22 @@ void MetadataReader::Initialize(uint32_t nodesLength, uint8_t *nodeData, uint32_
     StateLock lock(m_stateMutex);
 
     uint32_t format = 0;
+    uint32_t idBytes = 0;
+    uint32_t nameBytes = 0;
+    uint32_t signatureBytes = 0;
     uint32_t signaturesLength = 0;
     if (valueLength >= VALUE_HEADER_SIZE) {
         memcpy(&format, valueData, sizeof(format));
-        memcpy(&signaturesLength, valueData + sizeof(format), sizeof(signaturesLength));
+        idBytes = valueData[4];
+        nameBytes = valueData[5];
+        signatureBytes = valueData[6];
+        memcpy(&signaturesLength, valueData + 2 * sizeof(uint32_t), sizeof(signaturesLength));
     }
-    if (format != FORMAT || signaturesLength > valueLength - VALUE_HEADER_SIZE) {
+    auto isFieldWidth = [](uint32_t bytes) { return bytes >= 1 && bytes <= sizeof(uint32_t); };
+    if (format != FORMAT
+        || !isFieldWidth(idBytes) || !isFieldWidth(nameBytes) || !isFieldWidth(signatureBytes)
+        || signaturesLength > valueLength - VALUE_HEADER_SIZE
+        || nodesLength % (2 * idBytes + nameBytes + sizeof(uint32_t)) != 0) {
         stringstream ss;
         ss << "The app's metadata is not in the format this runtime reads (found 0x" << hex
            << format << ", expected 0x" << FORMAT
@@ -36,6 +48,15 @@ void MetadataReader::Initialize(uint32_t nodesLength, uint8_t *nodeData, uint32_
         throw NativeScriptException(ss.str());
     }
 
+    auto maskFor = [](uint32_t bytes) {
+        return bytes == sizeof(uint32_t) ? UINT32_MAX : (1u << (8 * bytes)) - 1;
+    };
+    m_idBytes = idBytes;
+    m_nameBytes = nameBytes;
+    m_signatureBytes = signatureBytes;
+    m_idMask = maskFor(idBytes);
+    m_nameMask = maskFor(nameBytes);
+    m_signatureMask = maskFor(signatureBytes);
     m_signatureData = valueData + VALUE_HEADER_SIZE;
 
     m_nodesLength = nodesLength;
@@ -109,59 +130,56 @@ void MetadataReader::StateMutex::Reacquire(unsigned depth) {
 //}
 
 MetadataTreeNode* MetadataReader::BuildTree() {
-    MetadataTreeNodeRawData* rootNodeData = reinterpret_cast<MetadataTreeNodeRawData*>(m_nodeData);
+    // A node record: the ids of the node's first child and of its next sibling,
+    // either of which is the node's own id when there is none, then the offset
+    // of its name and the four-byte offset of its value.
+    const uint32_t recordSize = 2 * m_idBytes + m_nameBytes + sizeof(uint32_t);
+    const uint32_t len = m_nodesLength / recordSize;
 
-    MetadataTreeNodeRawData* curNodeData = rootNodeData;
-
-    int len = m_nodesLength / sizeof(MetadataTreeNodeRawData);
+    auto createNode = [&](uint32_t id) {
+        const uint8_t* record = m_nodeData + id * recordSize + 2 * m_idBytes;
+        auto node = new MetadataTreeNode;
+        node->name = ReadName(ReadNameOffset(record));
+        memcpy(&node->offsetValue, record + m_nameBytes, sizeof(node->offsetValue));
+        return node;
+    };
 
     MetadataTreeNode* emptyNode = nullptr;
     m_v.assign(len, emptyNode);
 
-    for (int i = 0; i < len; i++) {
+    for (uint32_t i = 0; i < len; i++) {
         MetadataTreeNode* node = m_v[i];
         if (nullptr == node) {
-            node = new MetadataTreeNode;
-            node->name = ReadName(curNodeData->offsetName);
-            node->offsetValue = curNodeData->offsetValue;
+            node = createNode(i);
             m_v[i] = node;
         }
 
-        uint16_t curNodeDataId = curNodeData - rootNodeData;
+        uint32_t childId = ReadId(m_nodeData + i * recordSize);
 
-        if (curNodeDataId != curNodeData->firstChildId) {
+        if (childId != i) {
             node->children = new vector<MetadataTreeNode*>;
-            MetadataTreeNodeRawData* childNodeData = rootNodeData + curNodeData->firstChildId;
             while (true) {
-
-                uint16_t childNodeDataId = childNodeData - rootNodeData;
-
-                MetadataTreeNode* childNode;
                 // node (and its next siblings) already visited, so we don't need to visit it again
-                if (m_v[childNodeDataId] != emptyNode) {
-                    childNode = m_v[childNodeDataId];
-                    __android_log_print(ANDROID_LOG_ERROR, "TNS.error", "Consistency error in metadata. A child should never have been visited before its parent. Parent: %s Child: %s. Child metadata id: %u", node->name.c_str(), childNode->name.c_str(), childNodeDataId);
+                if (childId >= len || m_v[childId] != emptyNode) {
+                    __android_log_print(ANDROID_LOG_ERROR, "TNS.error", "Consistency error in metadata. A child should never have been visited before its parent. Parent: %s. Child metadata id: %u", node->name.c_str(), childId);
                     break;
-                } else {
-                    childNode = new MetadataTreeNode;
-                    childNode->name = ReadName(childNodeData->offsetName);
-                    childNode->offsetValue = childNodeData->offsetValue;
                 }
+
+                MetadataTreeNode* childNode = createNode(childId);
                 childNode->parent = node;
 
                 node->children->push_back(childNode);
 
-                m_v[childNodeDataId] = childNode;
+                m_v[childId] = childNode;
 
-                if (childNodeDataId == childNodeData->nextSiblingId) {
+                uint32_t siblingId = ReadId(m_nodeData + childId * recordSize + m_idBytes);
+                if (siblingId == childId) {
                     break;
                 }
 
-                childNodeData = rootNodeData + childNodeData->nextSiblingId;
+                childId = siblingId;
             }
         }
-
-        curNodeData++;
     }
 
     return GetNodeById(0);
@@ -496,8 +514,7 @@ MetadataTreeNode *MetadataReader::GetBaseClassNode(MetadataTreeNode *treeNode) {
     if (treeNode != nullptr && treeNode->metadata != nullptr) {
         baseClassNode = treeNode->runtimeBaseClass;
     } else if (treeNode != nullptr) {
-        uint16_t baseClassNodeId = *reinterpret_cast<uint16_t *>(m_valueData +
-                                                                 treeNode->offsetValue + 1);
+        uint32_t baseClassNodeId = ReadId(m_valueData + treeNode->offsetValue + sizeof(uint8_t));
 
         // Null for an id the metadata got wrong, which GetNodeById logs; every
         // caller already treats a missing base class as "no base class".

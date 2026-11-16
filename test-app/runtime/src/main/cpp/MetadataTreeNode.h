@@ -49,12 +49,6 @@ struct MetadataTreeNode {
     static const uint8_t INVALID_TYPE = 0xFF;
 };
 
-struct MetadataTreeNodeRawData {
-    uint16_t firstChildId;
-    uint16_t nextSiblingId;
-    uint32_t offsetName;
-    uint32_t offsetValue;
-};
 }
 
 #endif /* TREENODE_H_ */

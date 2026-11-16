@@ -820,8 +820,7 @@ void MetadataNode::SetInstanceMethodsFromStaticMetadata(
     SET_PROFILER_FRAME();
 
     uint8_t sections = s_metadataReader.GetClassSections(treeNode);
-    curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue
-             + MetadataReader::CLASS_VALUE_SECTIONS_OFFSET + sizeof(sections);
+    curPtr = s_metadataReader.GetClassMembers(treeNode);
 
     auto curType = s_metadataReader.ReadTypeName(treeNode);
 
@@ -921,7 +920,7 @@ void MetadataNode::SetInstanceMethodsFromStaticMetadata(
     auto instanceFieldCout = MetadataReader::ReadSectionCount(
             sections, MetadataReader::SECTION_INSTANCE_FIELDS, &curPtr);
     for (auto i = 0; i < instanceFieldCout; i++) {
-        auto entry = MetadataReader::ReadInstanceFieldEntry(&curPtr);
+        auto entry = s_metadataReader.ReadInstanceFieldEntry(&curPtr);
         auto fieldName = entry.getName();
         auto fieldInfo = cache->Own<FieldCallbackData>(entry);
         fieldInfo->metadata.declaringType = curType;
@@ -931,9 +930,8 @@ void MetadataNode::SetInstanceMethodsFromStaticMetadata(
     auto kotlinPropertiesCount = MetadataReader::ReadSectionCount(
             sections, MetadataReader::SECTION_PROPERTIES, &curPtr);
     for (int i = 0; i < kotlinPropertiesCount; ++i) {
-        uint32_t nameOffset = *reinterpret_cast<uint32_t*>(curPtr);
-        string propertyName = s_metadataReader.ReadName(nameOffset);
-        curPtr += sizeof(uint32_t);
+        string propertyName = s_metadataReader.ReadName(s_metadataReader.ReadNameOffset(curPtr));
+        curPtr += s_metadataReader.NameBytes();
 
         uint8_t accessors = *curPtr++;
 
@@ -1090,11 +1088,11 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
             MoveToDictionaryMode(isolate, context, ctorFunction);
         }
         for (auto i = 0; i < staticFieldCout; i++) {
-            auto entry = MetadataReader::ReadStaticFieldEntry(&curPtr);
+            auto entry = s_metadataReader.ReadStaticFieldEntry(&curPtr);
             // A static field that does not name its declaring type is this class's own.
             entry.treeNode = treeNode;
 
-            auto fieldName = NewMemberName(isolate, s_metadataReader.ReadNameView(entry.sfi->nameOffset));
+            auto fieldName = NewMemberName(isolate, s_metadataReader.ReadNameView(s_metadataReader.FieldNameOffset(entry.field)));
             auto fieldData = External::New(isolate, cache->Own<FieldCallbackData>(entry), v8::kExternalPointerTypeTagDefault);
             if (manyFields) {
                 if (entry.getIsFinal()) {
@@ -2267,14 +2265,6 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
     }
 
     auto nodes = MapMetadataFile(baseDir, "treeNodeStream.dat");
-    if ((nodes.length % sizeof(MetadataTreeNodeRawData)) != 0) {
-        stringstream ss;
-        ss << "Metadata file " << baseDir << "/treeNodeStream.dat is " << nodes.length
-           << " bytes, which is not a whole number of "
-           << sizeof(MetadataTreeNodeRawData)
-           << "-byte records. The metadata is truncated or corrupt.";
-        throw NativeScriptException(ss.str());
-    }
     auto names = MapMetadataFile(baseDir, "treeStringsStream.dat");
     auto values = MapMetadataFile(baseDir, "treeValueStream.dat");
 
