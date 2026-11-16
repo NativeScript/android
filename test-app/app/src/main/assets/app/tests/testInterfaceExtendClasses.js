@@ -165,4 +165,32 @@ describe("Anonymous extends of an interface", function () {
             done();
         };
     });
+
+    it("reuse the cached class of an interface whose implementations define different methods", function (done) {
+        var worker = new Worker("./interfaceExtendWorker.js");
+        worker.onmessage = function () {
+            worker.terminate();
+            // Only the worker has loaded this class, so this runtime has to load
+            // the dex the worker cached, although this object defines more methods.
+            // An extend, unlike new Action({...}), cannot reuse the class the
+            // worker left in the process-wide JNI class cache.
+            var Action = java.security.PrivilegedExceptionAction;
+            var Extended = Action[ext]({
+                run: function () {
+                    return "main extend";
+                },
+                describe: function () {
+                    return "not a Java method";
+                }
+            });
+
+            expect(String(callFromJava(new Extended(), "run"))).toBe("main extend");
+            var entries = reportEntriesFor("com.tns.gen.java.security.PrivilegedExceptionAction").filter(function (entry) {
+                return entry.requested.indexOf("_tests_testInterfaceExtendClasses_") > 0;
+            });
+            expect(entries.length).toBe(1);
+            expect(entries[0].source).toBe("cached");
+            done();
+        };
+    });
 });

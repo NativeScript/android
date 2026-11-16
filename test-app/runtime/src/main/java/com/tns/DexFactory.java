@@ -14,6 +14,7 @@ import com.tns.system.classes.loading.ClassStorageService;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -216,8 +217,13 @@ public class DexFactory {
         // The thumb only changes on reinstall, so a cache key of name + thumb
         // cannot see an edit to the proxy's contents: under HMR a named
         // proxy's new method overrides would silently load the previous dex.
-        // The digest carries the contents into the file name.
-        String contentDigest = computeContentDigest(classToProxy, methodOverrides, implementedInterfaces, isInterface);
+        // The digest carries the contents into the file name. The interface's
+        // shared class gets every abstract method whatever the JS object
+        // defines, so its overrides stay out of the key and all its call sites
+        // share one cached dex. A call site's own class stubs the default
+        // methods its JS object names, so its overrides stay in.
+        String[] digestedOverrides = isInterface && !isNamedProxy && !isCallSiteInterfaceClass ? null : methodOverrides;
+        String contentDigest = computeContentDigest(classToProxy, digestedOverrides, implementedInterfaces, isInterface);
 
         File dexFile = this.getDexFile(desiredDexClassName, contentDigest);
         boolean generated = dexFile == null;
@@ -249,18 +255,7 @@ public class DexFactory {
         File jarFile = new File(jarFilePath);
 
         if (!jarFile.exists()) {
-            FileOutputStream jarFileStream = new FileOutputStream(jarFile);
-            ZipOutputStream out = new ZipOutputStream(jarFileStream);
-
-            out.putNextEntry(new ZipEntry("classes.dex"));
-            byte[] dexData = new byte[(int) dexFile.length()];
-            FileInputStream fi = new FileInputStream(dexFile);
-            fi.read(dexData, 0, dexData.length);
-            fi.close();
-
-            out.write(dexData);
-            out.closeEntry();
-            out.close();
+            writeJar(dexFile, jarFile);
         }
         jarFile.setReadOnly();
 
@@ -341,6 +336,44 @@ public class DexFactory {
             sbStr.append(array[i]);
         }
         return sbStr.toString();
+    }
+
+    /**
+     * The jar only appears under its final name once complete and read-only:
+     * its existence is the cache hit, so a process killed mid-write must not
+     * leave a truncated one there. The temp name keeps the jar's thumb so
+     * purgeDexesByThumb also removes orphans, and is unique because several
+     * runtimes can resolve the same class at once.
+     */
+    private void writeJar(File dexFile, File jarFile) throws IOException {
+        byte[] dexData = new byte[(int) dexFile.length()];
+        DataInputStream in = new DataInputStream(new FileInputStream(dexFile));
+        try {
+            in.readFully(dexData);
+        } finally {
+            in.close();
+        }
+
+        File tempFile = File.createTempFile(jarFile.getName() + ".", ".tmp", jarFile.getParentFile());
+        try {
+            ZipOutputStream out = new ZipOutputStream(new FileOutputStream(tempFile));
+            try {
+                out.putNextEntry(new ZipEntry("classes.dex"));
+                out.write(dexData);
+                out.closeEntry();
+            } finally {
+                out.close();
+            }
+            tempFile.setReadOnly();
+
+            // A runtime that finished first already published identical contents,
+            // and may have a class loader on that file.
+            if (!jarFile.exists() && !tempFile.renameTo(jarFile) && !jarFile.exists()) {
+                throw new IOException("Could not move " + tempFile + " to " + jarFile);
+            }
+        } finally {
+            tempFile.delete();
+        }
     }
 
     private static boolean hasImplementedInterfaces(String[] implementedInterfaces) {

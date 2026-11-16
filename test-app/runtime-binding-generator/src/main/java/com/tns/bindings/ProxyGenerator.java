@@ -110,17 +110,34 @@ public class ProxyGenerator {
         return bodies.classSuffix + "-" + DefaultMethods.signaturesHash(defaultMethods);
     }
 
+    /**
+     * The dex only appears under its final name once complete: DexFactory
+     * trusts any dex that exists, so a process killed mid-write must not leave
+     * a truncated one there. The temp name keeps the proxy's thumb so the
+     * thumb purge also removes orphans, and is unique because several runtimes
+     * can generate the same proxy at once.
+     */
     private String saveProxy(String proxyName, byte[] proxyBytes) throws IOException {
         File file = new File(path + File.separator + proxyName + ".dex");
         File parentDir = file.getParentFile();
         if (parentDir != null && !parentDir.exists()) {
             parentDir.mkdirs();
         }
-        file.createNewFile();
-        FileOutputStream stream = new FileOutputStream(file);
-        stream.write(proxyBytes);
-        stream.flush();
-        stream.close();
+        File tempFile = File.createTempFile(file.getName() + ".", ".tmp", parentDir);
+        try {
+            FileOutputStream stream = new FileOutputStream(tempFile);
+            try {
+                stream.write(proxyBytes);
+                stream.flush();
+            } finally {
+                stream.close();
+            }
+            if (!tempFile.renameTo(file)) {
+                throw new IOException("Could not move " + tempFile + " to " + file);
+            }
+        } finally {
+            tempFile.delete();
+        }
 
         return file.getAbsolutePath();
     }
