@@ -2188,10 +2188,16 @@ namespace {
 
     /*
      * Maps one of the metadata files read-only rather than reading it into the
-     * heap: only the pages the app touches are loaded, and being clean and
-     * file-backed they can be dropped under memory pressure. The extractor
-     * replaces these files by renaming a new one over them, never by writing in
-     * place, so a mapping keeps the contents it was made from.
+     * heap. Its pages are the file's own, clean ones, which the system can drop
+     * under memory pressure and load again, where a heap copy is private memory.
+     *
+     * The whole file is read ahead and mapped up front. Left to fault in on
+     * first touch, that cost and its variance land on the first access of each
+     * class. Populated without the read-ahead, the pages arrive one read-ahead
+     * window at a time and a cold start takes longer than a plain read.
+     *
+     * The extractor replaces these files by renaming a new one over them, never
+     * by writing in place, so a mapping keeps the contents it was made from.
      */
     MappedMetadataFile MapMetadataFile(const string& dir, const char* name) {
         string path = dir + "/" + name;
@@ -2201,7 +2207,9 @@ namespace {
         int fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
         if (fd >= 0) {
             if (fstat(fd, &info) == 0 && info.st_size > 0) {
-                data = mmap(nullptr, static_cast<size_t>(info.st_size), PROT_READ, MAP_PRIVATE, fd, 0);
+                posix_fadvise(fd, 0, info.st_size, POSIX_FADV_WILLNEED);
+                data = mmap(nullptr, static_cast<size_t>(info.st_size), PROT_READ,
+                            MAP_PRIVATE | MAP_POPULATE, fd, 0);
             }
             int error = errno;
             close(fd);
