@@ -111,6 +111,13 @@ namespace tns {
 
         inline std::string
         ReadInterfaceImplementationTypeName(MetadataTreeNode *treeNode, bool &isPrefix) {
+            // A type resolved at run time has only the head of a class record, not
+            // the implementation type name a static interface record carries after it.
+            if (treeNode->metadata != nullptr) {
+                isPrefix = false;
+                return {};
+            }
+
             uint8_t *data =
                     m_valueData + treeNode->offsetValue + sizeof(uint8_t) + sizeof(uint16_t);
 
