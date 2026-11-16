@@ -4,6 +4,7 @@ sbg-js-parsed-files.txt
 sbg-input-file.txt
 sbg-output-file.txt
 sbg-java-dependencies.txt
+sbg-warnings.txt
 mdg-output-dir.txt
 mdg-java-dependencies.txt
 sbg-input-output-dirs.txt

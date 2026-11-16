@@ -488,6 +488,9 @@ def getRunTestsBuildArguments = { taskName ->
     if (project.hasProperty("narrowMetadataFields")) {
         arguments.add("-PnarrowMetadataFields")
     }
+    if (project.hasProperty("useContentBindings")) {
+        arguments.add("-PuseContentBindings=${project.property('useContentBindings')}")
+    }
     arguments += ["--warning-mode", "all"]
     return arguments
 }

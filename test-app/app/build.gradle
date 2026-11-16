@@ -19,6 +19,7 @@
 *            -PappPath=[app_path]
 *            -PappResourcesPath=[app_resources_path]
 *            -PskipSbgAppClasses  //don't show the app's own Java classes to the static binding generator
+*            -PuseContentBindings  //name the classes of JS subclasses of Java classes after their content
 */
 
 import groovy.json.JsonSlurper
@@ -604,11 +605,24 @@ tasks.register("compileAppClassesForSbg") {
     }
 }
 
+// Name the Java classes of JS subclasses of Java classes after what they contain instead
+// of where their extend() call is. Off unless the app sets -PuseContentBindings or
+// `project.ext.useContentBindings = true` in App_Resources/Android/app.gradle or
+// before-plugins.gradle. The runtime follows the class the generator then adds to the app.
+def useContentBindings = { ->
+    if (!project.hasProperty("useContentBindings")) {
+        return false
+    }
+    def value = project.property("useContentBindings").toString()
+    return value.isEmpty() || value.toBoolean()
+}
+
 task runSbg(type: BuildToolTask) {
     dependsOn "collectAllJars"
     dependsOn "compileAppClassesForSbg"
     inputs.files(tasks.named("compileAppClassesForSbg")).withPropertyName("appClasses")
     inputs.property("sbgAppClassesEnabled", provider { sbgAppClassesEnabled() })
+    inputs.property("useContentBindings", provider { useContentBindings() })
     def rootPath = ""
     if (!findProject(':static-binding-generator').is(null)) {
         rootPath = Paths.get(project(':static-binding-generator').projectDir.path, "build/libs").toString()
@@ -634,6 +648,7 @@ task runSbg(type: BuildToolTask) {
     args paramz
 
     def sbgDependenciesFile = file("$BUILD_TOOLS_PATH/$SBG_JAVA_DEPENDENCIES")
+    def sbgWarningsFile = file("$BUILD_TOOLS_PATH/sbg-warnings.txt")
     doFirst {
         new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir()
 
@@ -641,6 +656,16 @@ task runSbg(type: BuildToolTask) {
         def appClassesDir = SBG_APP_CLASSES_DIR.get().asFile
         if (sbgAppClassesEnabled() && appClassesDir.isDirectory()) {
             sbgDependenciesFile.withWriterAppend { it.println(appClassesDir.absolutePath) }
+        }
+
+        if (useContentBindings()) {
+            args("-content-keyed-bindings")
+        }
+    }
+    doLast {
+        // The generator's standard output only reaches runSbg.log.
+        if (sbgWarningsFile.isFile()) {
+            sbgWarningsFile.eachLine { logger.warn("runSbg: ${it}") }
         }
     }
 }

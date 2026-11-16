@@ -74,6 +74,9 @@ def getBuildArguments = { ->
     }
 
     arguments.add("-PuseKotlin=true")
+    if (project.hasProperty("useContentBindings")) {
+        arguments.add("-PuseContentBindings=${project.property('useContentBindings')}")
+    }
     // Ordinary apps get the narrowest metadata fields they can; the suite runs on the
     // wider ones, which nothing else would exercise. -PnarrowMetadataFields runs it on
     // the ones that ship.

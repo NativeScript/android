@@ -13,6 +13,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +25,7 @@ public class Main {
     public static final String SBG_BINDINGS_NAME = "sbg-bindings.txt";
     public static final String SBG_JS_PARSED_FILES = "sbg-js-parsed-files.txt";
     public static final String SBG_INTERFACE_NAMES = "sbg-interface-names.txt";
+    public static final String SBG_WARNINGS = "sbg-warnings.txt";
 
     private static String jsCodeAbsolutePath;
     private static List<String> inputJsFiles;
@@ -53,10 +56,22 @@ public class Main {
             Generator generator = new Generator(outputDir, rows, isSuppressCallJSMethodExceptionsEnabled());
 
             generator.writeBindings(inputBindingFilename);
+            writeWarnings(generator.getWarnings());
         } catch (Throwable ex) {
             System.err.println(String.format("Error executing Static Binding Generator: %s", ex.getMessage()));
             ex.printStackTrace(System.out);
             System.exit(1);
+        }
+    }
+
+    /*
+     * Standard output only reaches the build's log file; the build prints this file.
+     * */
+    private static void writeWarnings(List<String> warnings) throws IOException {
+        File warningsFile = new File(System.getProperty("user.dir"), SBG_WARNINGS);
+        Files.deleteIfExists(warningsFile.toPath());
+        if (!warnings.isEmpty()) {
+            Files.write(warningsFile.toPath(), warnings, StandardCharsets.UTF_8);
         }
     }
 
