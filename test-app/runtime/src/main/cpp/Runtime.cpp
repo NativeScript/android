@@ -933,6 +933,17 @@ void Runtime::UnwindFailedInit() {
    * hold the isolate's Locker: the wait for pins below would deadlock against
    * a pinned thread waiting for it.
    */
+  // Hands the election back even when the teardown below throws: an election
+  // left won would bring every later main bootstrap up as a non-main runtime.
+  struct MainElectionHandBack {
+    bool isMain;
+    ~MainElectionHandBack() {
+      if (isMain) {
+        SignalMainRuntimeReady(true /* failed */);
+      }
+    }
+  } handBack{m_isMainThread};
+
   if (m_isolate != nullptr) {
     NS_DCHECK(!v8::Locker::IsLocked(m_isolate));
     {
@@ -949,10 +960,6 @@ void Runtime::UnwindFailedInit() {
       NativeScriptPlatform::Instance()->IsolateDisposed(m_isolate, m_eventLoop);
     }
     m_isolate = nullptr;
-  }
-
-  if (m_isMainThread) {
-    SignalMainRuntimeReady(true /* failed */);
   }
 }
 
@@ -1274,11 +1281,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
     // outlives the runtime that built it, so a main runtime elected after an
     // earlier one failed past this point reads the tree already there. Only
     // the elected main runtime gets here, one at a time.
-    static bool metadataBuilt = false;
-    if (!metadataBuilt) {
-      MetadataNode::BuildMetadata(filesPath);
-      metadataBuilt = true;
-    }
+    static std::once_flag metadataBuilt;
+    std::call_once(metadataBuilt,
+                   [&filesPath]() { MetadataNode::BuildMetadata(filesPath); });
   }
 
   auto enableProfiler = !profilerOutputDir.empty();
