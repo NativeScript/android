@@ -86,7 +86,7 @@ namespace tns {
             return entry;
         }
 
-        inline std::string ReadTypeName(uint16_t nodeId) {
+        inline std::string ReadTypeName(uint32_t nodeId) {
             MetadataTreeNode *treeNode = GetNodeById(nodeId);
 
             return ReadTypeName(treeNode);
@@ -111,6 +111,13 @@ namespace tns {
 
         inline std::string
         ReadInterfaceImplementationTypeName(MetadataTreeNode *treeNode, bool &isPrefix) {
+            // A type resolved at run time has only the head of a class record, not
+            // the implementation type name a static interface record carries after it.
+            if (treeNode->metadata != nullptr) {
+                isPrefix = false;
+                return {};
+            }
+
             uint8_t *data =
                     m_valueData + treeNode->offsetValue + sizeof(uint8_t) + sizeof(uint16_t);
 
@@ -133,7 +140,7 @@ namespace tns {
 
         uint8_t GetNodeType(MetadataTreeNode *treeNode);
 
-        uint16_t GetNodeId(MetadataTreeNode *treeNode);
+        uint32_t GetNodeId(MetadataTreeNode *treeNode);
 
         MetadataTreeNode *GetRoot() const;
 
@@ -141,7 +148,7 @@ namespace tns {
 
         MetadataTreeNode *GetBaseClassNode(MetadataTreeNode *treeNode);
 
-        MetadataTreeNode *GetNodeById(uint16_t nodeId);
+        MetadataTreeNode *GetNodeById(uint32_t nodeId);
 
         inline bool IsNodeTypeArray(uint8_t type) {
             bool isArray = (((type & MetadataTreeNode::PRIMITIVE) == 0) &&
@@ -306,7 +313,22 @@ namespace tns {
 
         static const uint32_t ARRAY_OFFSET = INT32_MAX; // 2147483647
 
+        // The static metadata addresses its nodes with 16-bit ids. Nodes created at
+        // run time are numbered from here in every app, so a path that narrows one
+        // of their ids fails everywhere rather than only once the static tree is
+        // nearly full.
+        static const uint32_t RUNTIME_NODE_ID_BASE = 1 << 16;
+
         MetadataTreeNode *BuildTree();
+
+        // Looks through the node's static children, then the ones created at run
+        // time. The caller holds the state lock.
+        template<typename Predicate>
+        MetadataTreeNode *FindChildIf(MetadataTreeNode *parent, Predicate matches);
+
+        MetadataTreeNode *FindChild(MetadataTreeNode *parent, const std::string &name);
+
+        void AddRuntimeChild(MetadataTreeNode *parent, MetadataTreeNode *child);
 
         std::string ReadTypeNameInternal(MetadataTreeNode *treeNode);
 
@@ -322,6 +344,11 @@ namespace tns {
         uint8_t *m_nameData;
         uint8_t *m_valueData;
         std::vector<MetadataTreeNode *> m_v;
+        // Nodes created at run time, in creation order and by parent. They stay out
+        // of MetadataTreeNode::children so the static tree never changes once
+        // built, which is what lets MetadataNode walk it without this reader's lock.
+        std::vector<MetadataTreeNode *> m_runtimeNodes;
+        robin_hood::unordered_node_map<MetadataTreeNode *, std::vector<MetadataTreeNode *>> m_runtimeChildren;
         GetTypeMetadataCallback m_getTypeMetadataCallback;
 
         robin_hood::unordered_map<MetadataTreeNode *, std::string> m_typeNameCache;
