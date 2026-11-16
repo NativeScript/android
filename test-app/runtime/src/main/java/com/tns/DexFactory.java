@@ -88,6 +88,30 @@ public class DexFactory {
     static long totalMultiDexTime = 0;
     static long totalLoadDexTime = 0;
 
+    // Process-wide: every runtime (main and workers) has its own DexFactory.
+    private static final ArrayList<String> runtimeGeneratedClasses = new ArrayList<String>();
+
+    /**
+     * The classes this process resolved without a prebuilt class from the APK,
+     * one line each: {@code <generated|cached> <interface|class> <loaded name> <requested name>}.
+     * "cached" means the dex was reused from the on-disk dex cache.
+     */
+    public static String[] getRuntimeGeneratedClasses() {
+        synchronized (runtimeGeneratedClasses) {
+            return runtimeGeneratedClasses.toArray(new String[0]);
+        }
+    }
+
+    private static void recordRuntimeGeneratedClass(String requestedName, Class<?> loadedClass, boolean isInterface, boolean generated) {
+        String entry = (generated ? "generated" : "cached") + " " + (isInterface ? "interface" : "class") + " " + loadedClass.getName() + " " + requestedName;
+        synchronized (runtimeGeneratedClasses) {
+            runtimeGeneratedClasses.add(entry);
+        }
+        if (com.tns.Runtime.isDebuggable()) {
+            Log.i("JS", (generated ? "Generated class at runtime: " : "Loaded runtime-generated class from the dex cache: ") + loadedClass.getName() + " (requested as " + requestedName + ")");
+        }
+    }
+
     public Class<?> resolveClass(String baseClassName, String name, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
         // The interface's class name plus this suffix asks for the class that also stubs its
         // default methods. A prebuilt class of the interface is used instead when there is one.
@@ -186,9 +210,10 @@ public class DexFactory {
         String contentDigest = computeContentDigest(classToProxy, methodOverrides, implementedInterfaces, isInterface);
 
         File dexFile = this.getDexFile(desiredDexClassName, contentDigest);
+        boolean generated = dexFile == null;
 
         // generate dex file
-        if (dexFile == null) {
+        if (generated) {
             long startGenTime = System.nanoTime();
             if (logger.isEnabled()) {
                 logger.write("generating proxy in place");
@@ -259,6 +284,7 @@ public class DexFactory {
         generatedClassNames.add(result.getName());
         classStorageService.storeClass(result.getName(), result);
         this.injectedDexClasses.put(originalFullClassName, result);
+        recordRuntimeGeneratedClass(className, result, isInterface, generated);
 
         return result;
     }
