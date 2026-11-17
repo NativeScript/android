@@ -89,12 +89,12 @@ public class ProxyGenerator {
 
     /*
      * The dex file name part after the interface's name for its default-overriding class.
-     * The class's mask bits follow the order of the interface's default method names, so a
-     * dex cached for another list (a platform update that adds a default method) must not
-     * be loaded: the names' hash keeps it from matching.
+     * The class stubs exactly these methods, and its mask bits follow the order of their
+     * names, so a dex cached for another list (a platform update that adds a default method
+     * or an overload of one) must not be loaded: the methods' hash keeps it from matching.
      */
     public static String defaultOverridingFileSuffix(List<Method> defaultMethods) {
-        return Dump.DEFAULT_OVERRIDING_SUFFIX + "-" + DefaultMethods.namesHash(defaultMethods);
+        return Dump.DEFAULT_OVERRIDING_SUFFIX + "-" + DefaultMethods.signaturesHash(defaultMethods);
     }
 
     private String saveProxy(String proxyName, byte[] proxyBytes) throws IOException {

@@ -131,16 +131,16 @@ public final class DefaultMethods {
         return names.toArray(new String[0]);
     }
 
-    /** 8 hex digits of FNV-1a 32 over the sorted distinct names of the methods. */
-    public static String namesHash(List<Method> methods) {
-        TreeSet<String> names = new TreeSet<>();
+    /** 8 hex digits of FNV-1a 32 over the sorted keys of the methods. */
+    public static String signaturesHash(List<Method> methods) {
+        TreeSet<String> keys = new TreeSet<>();
         for (Method method : methods) {
-            names.add(method.getName());
+            keys.add(key(method));
         }
         int hash = 0x811c9dc5;
-        for (String name : names) {
-            for (int i = 0; i < name.length(); i++) {
-                hash ^= name.charAt(i);
+        for (String key : keys) {
+            for (int i = 0; i < key.length(); i++) {
+                hash ^= key.charAt(i);
                 hash *= 0x01000193;
             }
             hash ^= ',';

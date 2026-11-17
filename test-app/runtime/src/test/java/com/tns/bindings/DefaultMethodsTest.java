@@ -276,6 +276,9 @@ public class DefaultMethodsTest {
         assertEquals(suffix, ProxyGenerator.defaultOverridingFileSuffix(new ArrayList<>(iteratorDefaults)));
         assertFalse(suffix.equals(ProxyGenerator.defaultOverridingFileSuffix(withoutRemove)));
         assertFalse(suffix.equals(ProxyGenerator.defaultOverridingFileSuffix(withAnother)));
+        List<Method> withOverload = new ArrayList<>(iteratorDefaults);
+        withOverload.add(java.util.PrimitiveIterator.OfInt.class.getMethod("forEachRemaining", java.util.function.IntConsumer.class));
+        assertFalse(suffix.equals(ProxyGenerator.defaultOverridingFileSuffix(withOverload)));
 
         java.io.File dir = java.nio.file.Files.createTempDirectory("proxies").toFile();
         try {
