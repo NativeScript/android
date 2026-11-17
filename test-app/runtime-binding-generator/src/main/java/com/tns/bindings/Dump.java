@@ -179,14 +179,15 @@ public class Dump {
     }
 
     /**
-     * defaultMethods, for an anonymous interface implementation, are the interface's
-     * DefaultMethods.collect: the class gets the DEFAULT_OVERRIDING_SUFFIX name and a stub
-     * for each of them as well. For a class, they are inherited default methods the JS
-     * object implements, stubbed like the class's other overrides. null adds neither.
+     * defaultMethods, for an anonymous interface implementation (a proxyName without '.'),
+     * are the interface's DefaultMethods.collect: the class gets the DEFAULT_OVERRIDING_SUFFIX
+     * name and a stub for each of them as well. For a class or a named interface
+     * implementation, they are inherited default methods the JS object implements, stubbed
+     * like the class's other overrides. null adds neither.
      */
     public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, AnnotationDescriptor[] annotations, List<java.lang.reflect.Method> defaultMethods) {
         String classSignature = getAsmDescriptor(classTo);
-        boolean overridesDefaults = defaultMethods != null && classTo.isInterface();
+        boolean overridesDefaults = defaultMethods != null && classTo.isInterface() && !proxyName.contains(".");
 
         String tnsClassSignature;
         if (proxyName.contains(".")) {

@@ -338,6 +338,115 @@ describe("Interface default methods implemented in JS", function () {
         expect(produced).toBe(1);
     });
 
+    function namedIterator(drains) {
+        return {
+            hasNext: function () { return false; },
+            next: function () { return null; },
+            forEachRemaining: function () { drains.push("forEachRemaining"); }
+        };
+    }
+
+    // Computed member: the static binding generator does not see these named extends.
+    var ext = "ex" + "tend";
+
+    it("are called through a named class extended from the interface at runtime", function () {
+        if (sdk < 24) {
+            return;
+        }
+        var drains = [];
+        var Named = It[ext]("com.tns.tests.defaults.NamedRuntimeIterator", namedIterator(drains));
+        var named = new Named();
+
+        expect(F.className(named)).toBe("com.tns.tests.defaults.NamedRuntimeIterator");
+        expect(F.isRuntimeGenerated(named)).toBe(true);
+        expect(F.drain(named)).toBe("");
+        expect(drains).toEqual(["forEachRemaining"]);
+        expect(F.remove(named)).toBe("java.lang.UnsupportedOperationException");
+    });
+
+    it("are called through a named class the static binding generator prebuilt from the interface", function () {
+        if (sdk < 24) {
+            return;
+        }
+        var drains = [];
+        // An object literal: the static binding generator reads the methods it lists.
+        var Named = java.util.Iterator.extend("com.tns.tests.defaults.NamedPrebuiltIterator", {
+            hasNext: function () { return false; },
+            next: function () { return null; },
+            forEachRemaining: function () { drains.push("forEachRemaining"); }
+        });
+        var named = new Named();
+
+        expect(F.className(named)).toBe("com.tns.tests.defaults.NamedPrebuiltIterator");
+        expect(F.isRuntimeGenerated(named)).toBe(false);
+        expect(F.drain(named)).toBe("");
+        expect(drains).toEqual(["forEachRemaining"]);
+        expect(F.remove(named)).toBe("java.lang.UnsupportedOperationException");
+    });
+
+    it("are called through a JavaProxy-named class extended from the interface at runtime", function () {
+        if (sdk < 24) {
+            return;
+        }
+        var Sized = (function (_super) {
+            __extends(Sized, _super);
+            function Sized() {
+                return _super !== null && _super.apply(this, arguments) || this;
+            }
+            Sized.prototype.tryAdvance = function () { return false; };
+            Sized.prototype.trySplit = function () { return null; };
+            Sized.prototype.estimateSize = function () { return 9; };
+            Sized.prototype.characteristics = function () { return Split.SIZED; };
+            // The Java body would answer estimateSize(), 9.
+            Sized.prototype.getExactSizeIfKnown = function () { return 11; };
+            return Sized;
+        }(Split));
+        var Decorated = JavaProxy("com.tns.tests.defaults.DecoratedRuntimeSpliterator")(Sized);
+        var decorated = new Decorated();
+
+        expect(F.className(decorated)).toBe("com.tns.tests.defaults.DecoratedRuntimeSpliterator");
+        expect(F.isRuntimeGenerated(decorated)).toBe(true);
+        expect(F.spliteratorDefaults(decorated)).toBe("11|true|false");
+        expect(F.getComparator(decorated)).toBe("java.lang.IllegalStateException");
+    });
+
+    it("are called through a named class extended at runtime from a class implementing the interface", function () {
+        if (sdk < 24) {
+            return;
+        }
+        var drains = [];
+        var implementation = namedIterator(drains);
+        implementation.interfaces = [It];
+        var Named = java.lang.Object[ext]("com.tns.tests.defaults.NamedRuntimeObjectIterator", implementation);
+        var named = new Named();
+
+        expect(F.className(named)).toBe("com.tns.tests.defaults.NamedRuntimeObjectIterator");
+        expect(F.isRuntimeGenerated(named)).toBe(true);
+        expect(F.drain(named)).toBe("");
+        expect(drains).toEqual(["forEachRemaining"]);
+        expect(F.remove(named)).toBe("java.lang.UnsupportedOperationException");
+    });
+
+    it("are called through a named class the static binding generator prebuilt from a class implementing the interface", function () {
+        if (sdk < 24) {
+            return;
+        }
+        var drains = [];
+        var Named = java.lang.Object.extend("com.tns.tests.defaults.NamedPrebuiltObjectIterator", {
+            interfaces: [java.util.Iterator],
+            hasNext: function () { return false; },
+            next: function () { return null; },
+            forEachRemaining: function () { drains.push("forEachRemaining"); }
+        });
+        var named = new Named();
+
+        expect(F.className(named)).toBe("com.tns.tests.defaults.NamedPrebuiltObjectIterator");
+        expect(F.isRuntimeGenerated(named)).toBe(false);
+        expect(F.drain(named)).toBe("");
+        expect(drains).toEqual(["forEachRemaining"]);
+        expect(F.remove(named)).toBe("java.lang.UnsupportedOperationException");
+    });
+
     it("reach JS for an interface whose methods are all default methods, unless D8 desugared them", function () {
         if (sdk < 24) {
             return;

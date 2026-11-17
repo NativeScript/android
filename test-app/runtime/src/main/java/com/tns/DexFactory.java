@@ -90,10 +90,11 @@ public class DexFactory {
     public Class<?> resolveClass(String baseClassName, String name, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
         // The interface's class name plus this suffix asks for the class that also stubs its
         // default methods. A prebuilt class of the interface is used instead when there is one.
-        boolean overridesDefaults = isInterface && className.startsWith(COM_TNS_GEN_PREFIX) && className.endsWith(Dump.DEFAULT_OVERRIDING_SUFFIX);
+        // Only native asks for it, without a base class name; an extend() name the script
+        // chose always comes with the base class's.
+        boolean overridesDefaults = isInterface && baseClassName.isEmpty() && className.startsWith(COM_TNS_GEN_PREFIX) && className.endsWith(Dump.DEFAULT_OVERRIDING_SUFFIX);
         if (overridesDefaults) {
             className = className.substring(0, className.length() - Dump.DEFAULT_OVERRIDING_SUFFIX.length());
-            baseClassName = "";
         }
 
         String fullClassName = className.replace("$", "_");
@@ -401,9 +402,14 @@ public class DexFactory {
         List<Method> defaultMethods = null;
         if (overridesDefaults) {
             defaultMethods = DefaultMethods.collect(classToProxy);
-        } else if (!classToProxy.isInterface() && Build.VERSION.SDK_INT >= 24) {
+        } else if ((!classToProxy.isInterface() || proxyName.contains(".")) && Build.VERSION.SDK_INT >= 24) {
+            // A named interface implementation is one extend() call's class, so like a class
+            // it stubs only the default methods its implementation object names.
+            List<Method> inheritedDefaults = classToProxy.isInterface()
+                    ? DefaultMethods.collect(classToProxy)
+                    : DefaultMethods.collect(classToProxy, implementedInterfaceClasses);
             defaultMethods = new ArrayList<Method>();
-            for (Method inherited : DefaultMethods.collect(classToProxy, implementedInterfaceClasses)) {
+            for (Method inherited : inheritedDefaults) {
                 if (methodOverridesSet == null || methodOverridesSet.contains(inherited.getName())) {
                     defaultMethods.add(inherited);
                 }

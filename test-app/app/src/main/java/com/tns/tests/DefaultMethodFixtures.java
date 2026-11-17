@@ -105,6 +105,14 @@ public class DefaultMethodFixtures {
         return p.test(value) + "|" + p.negate().test(value);
     }
 
+    public static String getComparator(Spliterator<?> spliterator) {
+        try {
+            return java.util.Objects.toString(spliterator.getComparator());
+        } catch (Throwable t) {
+            return t.getClass().getName();
+        }
+    }
+
     public static String spliteratorDefaults(Spliterator<?> spliterator) {
         return spliterator.getExactSizeIfKnown() + "|" + spliterator.hasCharacteristics(Spliterator.SIZED)
                 + "|" + spliterator.hasCharacteristics(Spliterator.SORTED);

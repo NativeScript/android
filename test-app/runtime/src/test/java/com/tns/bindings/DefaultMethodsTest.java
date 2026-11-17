@@ -209,6 +209,22 @@ public class DefaultMethodsTest {
     }
 
     @Test
+    public void aNamedInterfaceImplementationStubsOnlyTheGivenDefaults() throws Exception {
+        org.ow2.asmdex.ApplicationWriter aw = new org.ow2.asmdex.ApplicationWriter();
+        aw.visit();
+        List<Method> named = new ArrayList<>();
+        named.add(Iterator.class.getMethod("forEachRemaining", java.util.function.Consumer.class));
+        new Dump().generateProxy(aw, "a.b.NamedIterator", new ClassInfo(Iterator.class), null, new HashSet<ClassDescriptor>(), null, named);
+        aw.visitEnd();
+        Shape shape = read(aw.toByteArray());
+
+        assertEquals("La/b/NamedIterator;", shape.className);
+        assertFalse(shape.fields.contains("defaultOverrides__ns:J"));
+        assertTrue(shape.methods.contains("forEachRemainingVLjava/util/function/Consumer;"));
+        assertFalse(shape.methods.contains("removeV"));
+    }
+
+    @Test
     public void generationIsByteStable() {
         assertArrayEquals(generate(Iterator.class, true), generate(Iterator.class, true));
         assertArrayEquals(generate(Iterator.class, false), generate(Iterator.class, false));
