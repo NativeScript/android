@@ -139,6 +139,11 @@ public class DexFactory {
 
         // strip the `com.tns.gen` off the base extended class name
         String desiredDexClassName = this.getClassToProxyName(fullClassName);
+        if (overridesDefaults) {
+            // The same file name ProxyGenerator writes the class under.
+            desiredDexClassName = this.getClassToProxyName(className.replace("$", "_"))
+                    + ProxyGenerator.defaultOverridingFileSuffix(DefaultMethods.collect(Class.forName(classToProxy)));
+        }
 
         // A named proxy (`Base.extend('a.b.C', {...})` / @JavaProxy) asks for
         // exactly that Java class name; the substitutions below are for the

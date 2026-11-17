@@ -264,6 +264,33 @@ public class DefaultMethodsTest {
     }
 
     @Test
+    public void theDefaultOverridingFileNameChangesWithTheDefaultMethodNames() throws Exception {
+        List<Method> iteratorDefaults = DefaultMethods.collect(Iterator.class);
+        List<Method> withoutRemove = new ArrayList<>(iteratorDefaults);
+        withoutRemove.remove(Iterator.class.getMethod("remove"));
+        List<Method> withAnother = new ArrayList<>(iteratorDefaults);
+        withAnother.add(Derived.class.getMethod("redefined"));
+
+        String suffix = ProxyGenerator.defaultOverridingFileSuffix(iteratorDefaults);
+        assertTrue(suffix.startsWith(Dump.DEFAULT_OVERRIDING_SUFFIX + "-"));
+        assertEquals(suffix, ProxyGenerator.defaultOverridingFileSuffix(new ArrayList<>(iteratorDefaults)));
+        assertFalse(suffix.equals(ProxyGenerator.defaultOverridingFileSuffix(withoutRemove)));
+        assertFalse(suffix.equals(ProxyGenerator.defaultOverridingFileSuffix(withAnother)));
+
+        java.io.File dir = java.nio.file.Files.createTempDirectory("proxies").toFile();
+        try {
+            String path = new ProxyGenerator(dir.getAbsolutePath()).generateProxy("", null, new ClassInfo(Iterator.class), null,
+                    new HashSet<ClassDescriptor>(), true, null, iteratorDefaults);
+            assertEquals("java.util.Iterator" + suffix + ".dex", new java.io.File(path).getName());
+        } finally {
+            for (java.io.File file : dir.listFiles()) {
+                file.delete();
+            }
+            dir.delete();
+        }
+    }
+
+    @Test
     public void generationIsByteStable() {
         assertArrayEquals(generate(Iterator.class, true), generate(Iterator.class, true));
         assertArrayEquals(generate(Iterator.class, false), generate(Iterator.class, false));

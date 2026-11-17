@@ -131,6 +131,24 @@ public final class DefaultMethods {
         return names.toArray(new String[0]);
     }
 
+    /** 8 hex digits of FNV-1a 32 over the sorted distinct names of the methods. */
+    public static String namesHash(List<Method> methods) {
+        TreeSet<String> names = new TreeSet<>();
+        for (Method method : methods) {
+            names.add(method.getName());
+        }
+        int hash = 0x811c9dc5;
+        for (String name : names) {
+            for (int i = 0; i < name.length(); i++) {
+                hash ^= name.charAt(i);
+                hash *= 0x01000193;
+            }
+            hash ^= ',';
+            hash *= 0x01000193;
+        }
+        return String.format("%08x", hash);
+    }
+
     /** The method of iface's hierarchy whose {@link #key} is key, or null. */
     public static Method find(Class<?> iface, String key) {
         Set<Class<?>> visited = new HashSet<>();

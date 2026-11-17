@@ -68,7 +68,7 @@ public class ProxyGenerator {
             if (!isInterface) {
                 proxyFileName += Dump.CLASS_NAME_LOCATION_SEPARATOR + proxyName;
             } else if (defaultMethods != null) {
-                proxyFileName += Dump.DEFAULT_OVERRIDING_SUFFIX;
+                proxyFileName += defaultOverridingFileSuffix(defaultMethods);
             }
             if (proxyThumb != null) {
                 proxyFileName += "-" + proxyThumb;
@@ -85,6 +85,16 @@ public class ProxyGenerator {
         String proxyPath = saveProxy(proxyFileName, generatedBytes);
 
         return proxyPath;
+    }
+
+    /*
+     * The dex file name part after the interface's name for its default-overriding class.
+     * The class's mask bits follow the order of the interface's default method names, so a
+     * dex cached for another list (a platform update that adds a default method) must not
+     * be loaded: the names' hash keeps it from matching.
+     */
+    public static String defaultOverridingFileSuffix(List<Method> defaultMethods) {
+        return Dump.DEFAULT_OVERRIDING_SUFFIX + "-" + DefaultMethods.namesHash(defaultMethods);
     }
 
     private String saveProxy(String proxyName, byte[] proxyBytes) throws IOException {
