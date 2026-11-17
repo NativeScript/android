@@ -4,7 +4,11 @@
 describe("Interface default methods implemented in JS", function () {
     var sdk = android.os.Build.VERSION.SDK_INT;
     var F = com.tns.tests.DefaultMethodFixtures;
+    // Names the class whose stubs run Java bodies with invoke-super, which every class
+    // asserted with it must be: a process whose probe failed names its classes
+    // RUNTIME_CALL_SUFFIX instead.
     var SUFFIX = "-defaults";
+    var RUNTIME_CALL_SUFFIX = "-defaults-jni";
 
     var It = java.util.Iterator;
     var Pred = java.util.function.Predicate;
@@ -149,6 +153,7 @@ describe("Interface default methods implemented in JS", function () {
 
         expect(F.className(predicate)).toBe("com.tns.gen.java.util.function.IntPredicate");
         expect(F.isClassLoaded("com.tns.gen.java.util.function.IntPredicate" + SUFFIX, predicate)).toBe(false);
+        expect(F.isClassLoaded("com.tns.gen.java.util.function.IntPredicate" + RUNTIME_CALL_SUFFIX, predicate)).toBe(false);
         expect(F.intNegate(predicate, 1)).toBe("true|false");
 
         var plain = new Pred({ test: function () { return true; } });
