@@ -168,10 +168,20 @@ public class ApplicationWriter extends ApplicationVisitor {
     private int classDataItemCount = 0; // Global count of the class_data_items in the data section.
     private int codeItemCount; // Count of the Code Items of this application.
 
+    /** The dex format version a writer uses unless it is given another. */
+    public static final int DEFAULT_DEX_VERSION = 35;
+
+    /**
+     * The first dex format version whose files may reference interface methods with
+     * invoke-super, as the code of default methods does. Android 7.0 (API 24) and later
+     * load it.
+     */
+    public static final int DEFAULT_METHODS_DEX_VERSION = 37;
+
     /**
      * The Dex_File_Magic number.
      */
-    private static final byte[] dexFileMagic = new byte[] {0x64, 0x65, 0x78, 0xa, 0x30, 0x33, 0x35, 0x00 };
+    private final byte[] dexFileMagic;
 
     private static final int ADLER_OFFSET = 8; // offset in bytes of the Adler32 Checksum.
     private static final int ADLER_SIZE = 4; // Size in bytes of the Adler32 Checksum.
@@ -198,7 +208,24 @@ public class ApplicationWriter extends ApplicationVisitor {
      * Constructs an new {@link ClassWriter}.
      */
     public ApplicationWriter() {
+        this(DEFAULT_DEX_VERSION);
+    }
+
+    /**
+     * Constructs a writer of dex files of the given format version (35, 37, ...). The
+     * writer emits whatever it is given; the version only states which runtimes may load it.
+     */
+    public ApplicationWriter(int dexVersion) {
         super(Opcodes.ASM4);
+        this.dexFileMagic = dexFileMagic(dexVersion);
+    }
+
+    private static byte[] dexFileMagic(int dexVersion) {
+        if (dexVersion < 0 || dexVersion > 999) {
+            throw new IllegalArgumentException("dex version " + dexVersion);
+        }
+        return new byte[] {0x64, 0x65, 0x78, 0xa,
+                           (byte) ('0' + dexVersion / 100), (byte) ('0' + dexVersion / 10 % 10), (byte) ('0' + dexVersion % 10), 0x00 };
     }
 
     /**
@@ -224,6 +251,7 @@ public class ApplicationWriter extends ApplicationVisitor {
      */
     public ApplicationWriter(final ApplicationReader applicationReader) {
         super(Opcodes.ASM4);
+        this.dexFileMagic = dexFileMagic(DEFAULT_DEX_VERSION);
         applicationReader.copyPool(this);
         this.applicationReader = applicationReader;
     }
