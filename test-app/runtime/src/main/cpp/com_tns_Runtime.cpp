@@ -3,7 +3,9 @@
 #include "NativeScriptException.h"
 #include "CallbackHandlers.h"
 #include "ArgConverter.h"
+#include <cstring>
 #include <sstream>
+#include <vector>
 #include <android/log.h>
 
 using namespace std;
@@ -385,4 +387,70 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_ResetDateTimeConfigurationCache(J
 
 extern "C" JNIEXPORT void Java_com_tns_Runtime_setAdmissionSpinMicros(JNIEnv* _env, jclass clazz, jint micros) {
     AdmissionGate::s_spinMicros.store(micros, std::memory_order_relaxed);
+}
+
+// Raw JNI throughout: an exception the method throws must stay pending, so that it reaches
+// the Java caller unchanged.
+extern "C" JNIEXPORT jobject Java_com_tns_Runtime_invokeNonvirtualNative(JNIEnv* env, jclass, jobject receiver, jobject method, jclass declaringClass, jstring shorty,
+                                                                          jlongArray primitiveArgs, jobjectArray args, jlongArray primitiveResult) {
+    jmethodID mid = env->FromReflectedMethod(method);
+
+    const char* chars = env->GetStringUTFChars(shorty, nullptr);
+    string types(chars);
+    env->ReleaseStringUTFChars(shorty, chars);
+
+    size_t argc = types.size() - 1;
+    vector<jvalue> values(argc > 0 ? argc : 1);
+    vector<jlong> bits(argc);
+    if (argc > 0 && primitiveArgs != nullptr) {
+        env->GetLongArrayRegion(primitiveArgs, 0, static_cast<jsize>(argc), bits.data());
+    }
+    for (size_t i = 0; i < argc; i++) {
+        jvalue& value = values[i];
+        switch (types[i + 1]) {
+            case 'Z': value.z = bits[i] != 0 ? JNI_TRUE : JNI_FALSE; break;
+            case 'B': value.b = static_cast<jbyte>(bits[i]); break;
+            case 'C': value.c = static_cast<jchar>(bits[i]); break;
+            case 'S': value.s = static_cast<jshort>(bits[i]); break;
+            case 'I': value.i = static_cast<jint>(bits[i]); break;
+            case 'J': value.j = bits[i]; break;
+            case 'F': {
+                auto raw = static_cast<int32_t>(bits[i]);
+                memcpy(&value.f, &raw, sizeof(value.f));
+                break;
+            }
+            case 'D': memcpy(&value.d, &bits[i], sizeof(value.d)); break;
+            default: value.l = env->GetObjectArrayElement(args, static_cast<jsize>(i)); break;
+        }
+    }
+
+    jlong result = 0;
+    jobject objectResult = nullptr;
+    switch (types[0]) {
+        case 'V': env->CallNonvirtualVoidMethodA(receiver, declaringClass, mid, values.data()); break;
+        case 'Z': result = env->CallNonvirtualBooleanMethodA(receiver, declaringClass, mid, values.data()); break;
+        case 'B': result = env->CallNonvirtualByteMethodA(receiver, declaringClass, mid, values.data()); break;
+        case 'C': result = env->CallNonvirtualCharMethodA(receiver, declaringClass, mid, values.data()); break;
+        case 'S': result = env->CallNonvirtualShortMethodA(receiver, declaringClass, mid, values.data()); break;
+        case 'I': result = env->CallNonvirtualIntMethodA(receiver, declaringClass, mid, values.data()); break;
+        case 'J': result = env->CallNonvirtualLongMethodA(receiver, declaringClass, mid, values.data()); break;
+        case 'F': {
+            jfloat f = env->CallNonvirtualFloatMethodA(receiver, declaringClass, mid, values.data());
+            int32_t raw;
+            memcpy(&raw, &f, sizeof(raw));
+            result = raw;
+            break;
+        }
+        case 'D': {
+            jdouble d = env->CallNonvirtualDoubleMethodA(receiver, declaringClass, mid, values.data());
+            memcpy(&result, &d, sizeof(result));
+            break;
+        }
+        default: objectResult = env->CallNonvirtualObjectMethodA(receiver, declaringClass, mid, values.data()); break;
+    }
+
+    if (primitiveResult != nullptr && !env->ExceptionCheck()) {
+        env->SetLongArrayRegion(primitiveResult, 0, 1, &result);
+    }
+    return objectResult;
 }

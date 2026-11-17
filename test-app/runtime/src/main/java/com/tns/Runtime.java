@@ -3,6 +3,7 @@ package com.tns;
 import android.os.Handler;
 import android.os.Looper;
 
+import com.tns.bindings.DefaultMethods;
 import com.tns.bindings.ProxyGenerator;
 import com.tns.system.classes.caching.impl.ClassCacheImpl;
 import com.tns.system.classes.loading.ClassStorageService;
@@ -976,6 +977,50 @@ public class Runtime {
         return javaObjectID;
     }
 
+    /*
+     * DefaultMethods.names of an interface, in which bit i of an instance's default-overrides
+     * mask names the i-th. Native asks once per interface per process. Never throws: an
+     * interface it cannot inspect is treated as having no default methods.
+     */
+    @RuntimeCallable
+    private static String[] getDefaultMethodNames(String interfaceName) {
+        if (android.os.Build.VERSION.SDK_INT < 24) {
+            return new String[0];
+        }
+        try {
+            Class<?> iface = classStorageService.retrieveClass(interfaceName.replace('/', '.'));
+            String[] names = DefaultMethods.names(iface);
+            if (names.length > DefaultMethods.MAX_DISPATCHED_NAMES) {
+                android.util.Log.w("JS", iface.getName() + " has " + names.length + " default method names; JS implementations of those after "
+                        + names[DefaultMethods.MAX_DISPATCHED_NAMES - 1] + " are not called from Java, which runs their Java bodies.");
+            }
+            return names;
+        } catch (Throwable e) {
+            android.util.Log.w("JS", "Could not list the default methods of " + interfaceName + ": " + e);
+            return new String[0];
+        }
+    }
+
+    private static final ConcurrentHashMap<String, Method> interfaceDefaultMethods = new ConcurrentHashMap<String, Method>();
+
+    /*
+     * Called by a RUNTIME_CALL (com.tns.bindings.DefaultMethodBodies) stub of a default method
+     * the instance's JS object does not implement: runs the interface's body on the calling
+     * thread. key is DefaultMethods.key of the method, declared by implementedInterface or
+     * one of its super-interfaces.
+     */
+    public static Object callInterfaceDefault(Object receiver, Class<?> implementedInterface, String key, Object[] args) {
+        Method method = interfaceDefaultMethods.get(key);
+        if (method == null || !method.getDeclaringClass().isAssignableFrom(implementedInterface)) {
+            method = DefaultMethods.find(implementedInterface, key);
+            if (method == null) {
+                throw new NoSuchMethodError(key);
+            }
+            interfaceDefaultMethods.put(key, method);
+        }
+        return invokeInterfaceDefault(receiver, method, args);
+    }
+
     @RuntimeCallable
     private static String[] getTypeMetadata(String className, int index) throws ClassNotFoundException {
         Class<?> clazz = classStorageService.retrieveClass(className);
@@ -1656,6 +1701,88 @@ public class Runtime {
         } else {
             return Double.longBitsToDouble(bits);
         }
+    }
+
+    // shorty: the JNI shorty of the method, return type first; primitive arguments travel as
+    // raw bits in primitiveArgs, references in args. A primitive result comes back in
+    // primitiveResult[0] as raw bits.
+    private static native Object invokeNonvirtualNative(Object receiver, Method method, Class<?> declaringClass, String shorty, long[] primitiveArgs, Object[] args, long[] primitiveResult);
+
+    /*
+     * Runs an interface's default method on an instance whose class does not override it,
+     * the way invokespecial would: a virtual call would come straight back to the proxy.
+     */
+    static Object invokeInterfaceDefault(Object receiver, Method method, Object[] args) {
+        Class<?>[] parameterTypes = method.getParameterTypes();
+        Class<?> returnType = method.getReturnType();
+        char[] shorty = new char[parameterTypes.length + 1];
+        shorty[0] = shortyChar(returnType);
+        long[] primitiveArgs = parameterTypes.length > 0 ? new long[parameterTypes.length] : null;
+        for (int i = 0; i < parameterTypes.length; i++) {
+            shorty[i + 1] = shortyChar(parameterTypes[i]);
+            if (parameterTypes[i].isPrimitive()) {
+                primitiveArgs[i] = rawBits(args[i]);
+            }
+        }
+        boolean primitiveReturn = returnType.isPrimitive() && returnType != void.class;
+        long[] primitiveResult = primitiveReturn ? new long[1] : null;
+        Object result = invokeNonvirtualNative(receiver, method, method.getDeclaringClass(), new String(shorty), primitiveArgs, args, primitiveResult);
+        return primitiveReturn ? fromRawBits(returnType, primitiveResult[0]) : result;
+    }
+
+    private static char shortyChar(Class<?> type) {
+        if (!type.isPrimitive()) {
+            return 'L';
+        } else if (type == boolean.class) {
+            return 'Z';
+        } else if (type == byte.class) {
+            return 'B';
+        } else if (type == char.class) {
+            return 'C';
+        } else if (type == short.class) {
+            return 'S';
+        } else if (type == int.class) {
+            return 'I';
+        } else if (type == long.class) {
+            return 'J';
+        } else if (type == float.class) {
+            return 'F';
+        } else if (type == double.class) {
+            return 'D';
+        }
+        return 'V';
+    }
+
+    private static long rawBits(Object boxed) {
+        if (boxed instanceof Boolean) {
+            return ((Boolean) boxed) ? 1 : 0;
+        } else if (boxed instanceof Character) {
+            return (Character) boxed;
+        } else if (boxed instanceof Float) {
+            return Float.floatToRawIntBits((Float) boxed);
+        } else if (boxed instanceof Double) {
+            return Double.doubleToRawLongBits((Double) boxed);
+        }
+        return ((Number) boxed).longValue();
+    }
+
+    private static Object fromRawBits(Class<?> type, long bits) {
+        if (type == boolean.class) {
+            return bits != 0;
+        } else if (type == byte.class) {
+            return (byte) bits;
+        } else if (type == char.class) {
+            return (char) bits;
+        } else if (type == short.class) {
+            return (short) bits;
+        } else if (type == int.class) {
+            return (int) bits;
+        } else if (type == long.class) {
+            return bits;
+        } else if (type == float.class) {
+            return Float.intBitsToFloat((int) bits);
+        }
+        return Double.longBitsToDouble(bits);
     }
 
     private static Object defaultPrimitiveValue(Class<?> type) {

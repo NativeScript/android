@@ -67,6 +67,10 @@ void CallbackHandlers::Init(Isolate *isolate) {
                                                   "(Ljava/lang/String;I)[Ljava/lang/String;");
         NS_CHECK(GET_TYPE_METADATA != nullptr);
 
+        GET_DEFAULT_METHOD_NAMES = env.GetStaticMethodID(RUNTIME_CLASS, "getDefaultMethodNames",
+                                                         "(Ljava/lang/String;)[Ljava/lang/String;");
+        NS_CHECK(GET_DEFAULT_METHOD_NAMES != nullptr);
+
         ENABLE_VERBOSE_LOGGING_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "enableVerboseLogging",
                                                            "()V");
         NS_CHECK(ENABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
@@ -136,12 +140,75 @@ private:
     Runtime::Construction _previous;
 };
 
+namespace {
+/*
+ * A prebuilt class of the interface, used instead of the default-overriding class when the
+ * app has one, lacks the field and keeps its own behaviour. The class cache hands out one
+ * global reference per class name for the life of the process, so it is a stable key.
+ */
+void SetDefaultOverrides(JNIEnv* env, jobject instance, jclass clazz, uint64_t defaultOverrides) {
+    thread_local robin_hood::unordered_map<jclass, jfieldID> fields;
+
+    jfieldID field;
+    auto found = fields.find(clazz);
+    if (found != fields.end()) {
+        field = found->second;
+    } else {
+        field = env->GetFieldID(clazz, "defaultOverrides__ns", "J");
+        if (field == nullptr) {
+            env->ExceptionClear();
+        }
+        fields.emplace(clazz, field);
+    }
+
+    if (field != nullptr) {
+        env->SetLongField(instance, field, static_cast<jlong>(defaultOverrides));
+    }
+}
+}  // namespace
+
+bool CallbackHandlers::HasImplementedInterfaces(Isolate *isolate, const Local<Object> &implementationObject) {
+    auto context = GetCreationContextOrCurrent(isolate, implementationObject);
+    Local<Value> prop;
+    if (!implementationObject->Get(context, String::NewFromUtf8Literal(isolate, "interfaces")).ToLocal(&prop) || !prop->IsArray()) {
+        return false;
+    }
+    auto interfaces = prop.As<Array>();
+    for (uint32_t i = 0, length = interfaces->Length(); i < length; i++) {
+        Local<Value> element;
+        if (interfaces->Get(context, i).ToLocal(&element) && element->IsFunction()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<std::string> CallbackHandlers::GetDefaultMethodNames(const std::string &interfaceName) {
+    JEnv env;
+
+    JniLocalRef className(env.NewStringUTF(Util::ConvertFromJniToCanonicalName(interfaceName).c_str()));
+    JniLocalRef names(env.CallStaticObjectMethod(RUNTIME_CLASS, GET_DEFAULT_METHOD_NAMES, (jstring) className));
+
+    std::vector<std::string> result;
+    if (names.IsNull()) {
+        return result;
+    }
+
+    jsize length = env.GetArrayLength(names);
+    for (jsize i = 0; i < length; i++) {
+        JniLocalRef name(env.GetObjectArrayElement(names, i));
+        result.push_back(ArgConverter::jstringToString((jstring) name));
+    }
+    return result;
+}
+
 bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &jsObject,
                                         const std::string &fullClassName,
                                         const ArgsWrapper &argWrapper,
                                         const Local<Object> &implementationObject,
                                         bool isInterface,
-                                        const std::string &baseClassName) {
+                                        const std::string &baseClassName,
+                                        uint64_t defaultOverrides) {
     bool success;
 
     DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
@@ -155,8 +222,10 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
     JEnv env;
 
+    // The default-overriding class does not depend on the implementation object, whose
+    // properties ResolveClass would otherwise read, getters included.
     jclass generatedJavaClass = ResolveClass(isolate, baseClassName, fullClassName,
-                                             implementationObject,
+                                             defaultOverrides != 0 ? Local<Object>() : implementationObject,
                                              isInterface);
 
     int javaObjectID = objectManager->GenerateNewObjectID();
@@ -180,6 +249,11 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
             instance = env.NewObjectA(generatedJavaClass, mi.mid, ctorArgs);
         }
+    }
+
+    // Before any Java code but the constructor's own can see the instance.
+    if (defaultOverrides != 0 && instance != nullptr) {
+        SetDefaultOverrides(env, instance, generatedJavaClass, defaultOverrides);
     }
 
     jlong usedJavaMemory = env.CallLongMethod(runtime->GetJavaRuntime(), REGISTER_CONSTRUCTED_INSTANCE_ID,
@@ -2016,6 +2090,7 @@ jfieldID CallbackHandlers::CURRENT_OBJECTCLASS_FIELD_ID = nullptr;
 jmethodID CallbackHandlers::RESOLVE_CLASS_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::REGISTER_CONSTRUCTED_INSTANCE_ID = nullptr;
 jmethodID CallbackHandlers::GET_TYPE_METADATA = nullptr;
+jmethodID CallbackHandlers::GET_DEFAULT_METHOD_NAMES = nullptr;
 jmethodID CallbackHandlers::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::DISABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 

@@ -3,7 +3,9 @@ package com.tns.bindings;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.HashSet;
+import java.util.List;
 
 import org.ow2.asmdex.ApplicationWriter;
 
@@ -37,10 +39,28 @@ public class ProxyGenerator {
      * loading the previous dex.
      */
     public String generateProxy(String proxyName, String cacheDigest, ClassDescriptor classToProxy, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, boolean isInterface, AnnotationDescriptor[] annotations) throws IOException {
-        ApplicationWriter aw = new ApplicationWriter();
+        return generateProxy(proxyName, cacheDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface, annotations, null);
+    }
+
+    /** defaultMethods: see Dump.generateProxy. */
+    public String generateProxy(String proxyName, String cacheDigest, ClassDescriptor classToProxy, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, boolean isInterface, AnnotationDescriptor[] annotations, List<Method> defaultMethods) throws IOException {
+        return generateProxy(proxyName, cacheDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface, annotations, defaultMethods, DefaultMethodBodies.INVOKE_SUPER);
+    }
+
+    /**
+     * bodies: see Dump.generateProxy. With INVOKE_SUPER, a default-overriding class's dex
+     * file also holds its DefaultSuperProbe class.
+     */
+    public String generateProxy(String proxyName, String cacheDigest, ClassDescriptor classToProxy, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, boolean isInterface, AnnotationDescriptor[] annotations, List<Method> defaultMethods,
+                                DefaultMethodBodies bodies) throws IOException {
+        boolean overridesDefaults = isInterface && defaultMethods != null && !proxyName.contains(".");
+        ApplicationWriter aw = new ApplicationWriter(overridesDefaults ? bodies.dexVersion : ApplicationWriter.DEFAULT_DEX_VERSION);
         aw.visit();
 
-        dump.generateProxy(aw, proxyName, classToProxy, methodOverrides, implementedInterfaces, annotations);
+        dump.generateProxy(aw, proxyName, classToProxy, methodOverrides, implementedInterfaces, annotations, defaultMethods, bodies);
+        if (overridesDefaults && bodies == DefaultMethodBodies.INVOKE_SUPER) {
+            DefaultSuperProbe.generate(aw, DefaultSuperProbe.descriptor(Dump.defaultOverridingDescriptor(classToProxy, bodies)));
+        }
 
         aw.visitEnd();
         byte[] generatedBytes = aw.toByteArray();
@@ -60,6 +80,8 @@ public class ProxyGenerator {
             proxyFileName = classToProxy.getName().replace('$', '_');
             if (!isInterface) {
                 proxyFileName += Dump.CLASS_NAME_LOCATION_SEPARATOR + proxyName;
+            } else if (defaultMethods != null) {
+                proxyFileName += defaultOverridingFileSuffix(defaultMethods, bodies);
             }
             if (proxyThumb != null) {
                 proxyFileName += "-" + proxyThumb;
@@ -76,6 +98,16 @@ public class ProxyGenerator {
         String proxyPath = saveProxy(proxyFileName, generatedBytes);
 
         return proxyPath;
+    }
+
+    /*
+     * The dex file name part after the interface's name for its default-overriding class.
+     * The class stubs exactly these methods, and its mask bits follow the order of their
+     * names, so a dex cached for another list (a platform update that adds a default method
+     * or an overload of one) must not be loaded: the methods' hash keeps it from matching.
+     */
+    public static String defaultOverridingFileSuffix(List<Method> defaultMethods, DefaultMethodBodies bodies) {
+        return bodies.classSuffix + "-" + DefaultMethods.signaturesHash(defaultMethods);
     }
 
     private String saveProxy(String proxyName, byte[] proxyBytes) throws IOException {

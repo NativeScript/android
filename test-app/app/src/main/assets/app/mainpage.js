@@ -40,6 +40,7 @@ require("./tests/testWorkerResourceLimits");
 require("./tests/testWorkerNestedConsole");
 require("./tests/testMessaging");
 require("./tests/testInterfaceDefaultMethods");
+require("./tests/testInterfaceDefaultMethodOverrides");
 require("./tests/testInterfaceStaticMethods");
 require("./tests/testMetadata");
 require("./tests/testAsserts");

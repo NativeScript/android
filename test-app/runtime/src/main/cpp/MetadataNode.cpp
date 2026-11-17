@@ -1401,7 +1401,7 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
         string fullClassName = extData->fullClassName;
 
-        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, implementationObject, false, extData->node->m_name);
+        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, implementationObject, false, extData->node->m_name, extData->defaultOverrides);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -1454,6 +1454,10 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
         }
 
         auto className = node->m_implType;
+        uint64_t defaultOverrides = node->GetDefaultOverrides(isolate, implementationObject);
+        if (defaultOverrides != 0) {
+            className += DEFAULT_OVERRIDING_SUFFIX;
+        }
         SetInstanceMetadata(isolate, thiz, node);
 
         //@@@ Refactor
@@ -1465,7 +1469,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 
         ArgsWrapper argWrapper(info, ArgType::Interface);
 
-        auto success = CallbackHandlers::RegisterInstance(isolate, thiz, className, argWrapper, implementationObject, true);
+        auto success = CallbackHandlers::RegisterInstance(isolate, thiz, className, argWrapper, implementationObject, true, std::string(), defaultOverrides);
 
         if (frame.check()) {
             frame.log("Interface constructor: " + node->m_name);
@@ -2020,9 +2024,23 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         //resolve class (pre-generated or generated runtime from dex generator)
         uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
         bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
-        auto clazz = CallbackHandlers::ResolveClass(isolate, baseClassName, fullClassName, implementationObject, isInterface);
+        // Every instance of the extend shares its implementation object, and so its mask.
+        uint64_t defaultOverrides = 0;
+        if (isInterface && !hasDot && !CallbackHandlers::HasImplementedInterfaces(isolate, implementationObject)) {
+            defaultOverrides = node->GetDefaultOverrides(isolate, implementationObject);
+        }
+        auto clazz = defaultOverrides != 0
+                     ? CallbackHandlers::ResolveClass(isolate, string(), node->m_implType + DEFAULT_OVERRIDING_SUFFIX, Local<Object>(), isInterface)
+                     : CallbackHandlers::ResolveClass(isolate, baseClassName, fullClassName, implementationObject, isInterface);
         auto fullExtendedName = CallbackHandlers::ResolveClassName(isolate, clazz);
         DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
+        if (defaultOverrides != 0) {
+            // The constructor resolves the class by its own name, which differs from the
+            // requested one for a nested interface ('$' became '_').
+            JEnv env;
+            auto localClass = static_cast<jclass>(env.NewLocalRef(clazz));
+            env.InsertClassIntoCache(fullExtendedName, localClass);
+        }
 
         auto cachedData = GetCachedExtendedClassData(isolate, fullExtendedName);
         if (cachedData.extendedCtorFunction != nullptr) {
@@ -2048,7 +2066,9 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
 
         auto cache = GetMetadataNodeCache(isolate);
         auto baseClassCtorFunc = node->GetConstructorFunction(isolate);
-        auto extendData = External::New(isolate, cache->Own<ExtendedClassCallbackData>(node, extendNameAndLocation, implementationObject, fullExtendedName), v8::kExternalPointerTypeTagDefault);
+        auto extendedClassCallbackData = cache->Own<ExtendedClassCallbackData>(node, extendNameAndLocation, implementationObject, fullExtendedName);
+        extendedClassCallbackData->defaultOverrides = defaultOverrides;
+        auto extendData = External::New(isolate, extendedClassCallbackData, v8::kExternalPointerTypeTagDefault);
         auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, extendData);
         extendFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
 
@@ -2565,6 +2585,82 @@ std::string MetadataNode::GetJniClassName(MetadataEntry& entry) {
     return fullClassName;
 }
 
+const MetadataNode::DefaultMethodNames* MetadataNode::LoadDefaultMethodNames() {
+    static const DefaultMethodNames none;
+
+    const DefaultMethodNames* loaded = &none;
+    auto names = CallbackHandlers::GetDefaultMethodNames(m_name);
+    if (!names.empty()) {
+        if (names.size() > 64) {
+            names.resize(64);
+        }
+        loaded = new DefaultMethodNames{std::move(names)};
+    }
+
+    const DefaultMethodNames* published = nullptr;
+    if (!m_defaultMethodNames.compare_exchange_strong(published, loaded, std::memory_order_acq_rel, std::memory_order_acquire)) {
+        if (loaded != &none) {
+            delete loaded;
+        }
+        return published;
+    }
+    return loaded;
+}
+
+uint64_t MetadataNode::GetDefaultOverrides(Isolate* isolate, const Local<Object>& implementationObject) {
+    auto defaults = m_defaultMethodNames.load(std::memory_order_acquire);
+    if (defaults == nullptr) {
+        defaults = LoadDefaultMethodNames();
+    }
+    if (defaults->names.empty()) {
+        return 0;
+    }
+
+    auto& keys = GetMetadataNodeCache(isolate)->DefaultMethodNameKeys[this];
+    if (keys.empty()) {
+        keys.reserve(defaults->names.size());
+        for (const auto& name : defaults->names) {
+            keys.emplace_back(isolate, String::NewFromUtf8(isolate, name.c_str(), NewStringType::kInternalized).ToLocalChecked());
+        }
+    }
+
+    auto context = isolate->GetCurrentContext();
+    TryCatch tc(isolate);
+    uint64_t mask = 0;
+    Local<String> getKey;
+    Local<String> setKey;
+    Local<String> valueKey;
+    for (size_t bit = 0; bit < keys.size(); bit++) {
+        auto key = keys[bit].Get(isolate);
+        if (!implementationObject->HasOwnProperty(context, key).FromMaybe(false)) {
+            continue;
+        }
+
+        Local<Value> descriptor;
+        if (!implementationObject->GetOwnPropertyDescriptor(context, key).ToLocal(&descriptor) || !descriptor->IsObject()) {
+            continue;
+        }
+        if (getKey.IsEmpty()) {
+            getKey = String::NewFromUtf8Literal(isolate, "get");
+            setKey = String::NewFromUtf8Literal(isolate, "set");
+            valueKey = String::NewFromUtf8Literal(isolate, "value");
+        }
+        auto fields = descriptor.As<Object>();
+        Local<Value> value;
+        bool isAccessor = fields->HasOwnProperty(context, getKey).FromMaybe(false) || fields->HasOwnProperty(context, setKey).FromMaybe(false);
+        if (isAccessor || (fields->Get(context, valueKey).ToLocal(&value) && value->IsFunction())) {
+            mask |= uint64_t{1} << bit;
+        }
+    }
+
+    // Only a Proxy implementation object can throw here, from one of its traps.
+    if (tc.HasCaught()) {
+        throw NativeScriptException(tc, "Could not read the properties of the implementation object");
+    }
+    return mask;
+}
+
+const char* const MetadataNode::DEFAULT_OVERRIDING_SUFFIX = "-defaults";
 string MetadataNode::TNS_PREFIX = "com/tns/gen/";
 MetadataReader MetadataNode::s_metadataReader;
 robin_hood::unordered_map<std::string, MetadataNode*> MetadataNode::s_name2NodeCache;

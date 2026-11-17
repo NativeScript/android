@@ -78,7 +78,26 @@ class MetadataNode {
         static MetadataReader* getMetadataReader() {
             return &s_metadataReader;
         }
+
+        /*
+         * The mask of an instance of this interface's DEFAULT_OVERRIDING_SUFFIX class: bit i
+         * is set when the implementation object has an own property named the i-th of the
+         * interface's default method names (com.tns.Runtime.getDefaultMethodNames) that a call
+         * would invoke, i.e. a data property holding a function, or an accessor, which is not
+         * run here. 0, after one atomic load, for an interface without default methods.
+         */
+        uint64_t GetDefaultOverrides(v8::Isolate* isolate, const v8::Local<v8::Object>& implementationObject);
+
+        // com.tns.bindings.Dump.DEFAULT_OVERRIDING_SUFFIX
+        static const char* const DEFAULT_OVERRIDING_SUFFIX;
     private:
+        // Index i is bit i of an instance's mask.
+        struct DefaultMethodNames {
+            std::vector<std::string> names;
+        };
+
+        const DefaultMethodNames* LoadDefaultMethodNames();
+
         struct MethodCallbackData;
 
         struct ExtendedClassCallbackData;
@@ -199,6 +218,8 @@ class MetadataNode {
         bool m_isArray;
         // Read on every Java method call; GetNodeType takes the reader's state lock.
         bool m_isInterface;
+        // Published once, never freed: nodes are shared by every isolate in the process.
+        std::atomic<const DefaultMethodNames*> m_defaultMethodNames{nullptr};
 
         static std::string TNS_PREFIX;
         static MetadataReader s_metadataReader;
@@ -260,6 +281,7 @@ class MetadataNode {
             v8::Persistent<v8::Object>* implementationObject;
 
             std::string fullClassName;
+            uint64_t defaultOverrides = 0;
         };
 
         struct TypeMetadata {
@@ -334,6 +356,9 @@ class MetadataNode {
             robin_hood::unordered_map<MetadataNode*, v8::Persistent<v8::Function>*> CtorFunctions;
 
             robin_hood::unordered_node_map<MetadataNode*, InstanceData> Instances;
+
+            // This runtime's strings for each interface's DefaultMethodNames, in bit order.
+            robin_hood::unordered_map<const MetadataNode*, std::vector<v8::Global<v8::String>>> DefaultMethodNameKeys;
 
             /*
              * Owns every callback payload this runtime hands to V8 as External

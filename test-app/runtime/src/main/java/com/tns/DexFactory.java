@@ -4,6 +4,9 @@ import android.os.Build;
 import android.util.Log;
 
 import com.tns.bindings.AnnotationDescriptor;
+import com.tns.bindings.DefaultMethodBodies;
+import com.tns.bindings.DefaultMethods;
+import com.tns.bindings.Dump;
 import com.tns.bindings.ProxyGenerator;
 import com.tns.bindings.desc.ClassDescriptor;
 import com.tns.bindings.desc.reflection.ClassInfo;
@@ -23,9 +26,12 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -45,6 +51,10 @@ public class DexFactory {
 
     private ProxyGenerator proxyGenerator;
     private HashMap<String, Class<?>> injectedDexClasses = new HashMap<String, Class<?>>();
+
+    // Process-wide: injection puts a generated class in the app's class loader, where every
+    // runtime's lookup of a prebuilt class by that name then finds it.
+    private static final Set<String> generatedClassNames = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 
     DexFactory(Logger logger, ClassLoader classLoader, File dexBaseDir, String dexThumb, ClassStorageService classStorageService) {
         this(logger, classLoader, dexBaseDir, dexThumb, classStorageService, false);
@@ -79,6 +89,16 @@ public class DexFactory {
     static long totalLoadDexTime = 0;
 
     public Class<?> resolveClass(String baseClassName, String name, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
+        // The interface's class name plus this suffix asks for the class that also stubs its
+        // default methods. A prebuilt class of the interface is used instead when there is one.
+        // Only native asks for it, without a base class name; an extend() name the script
+        // chose always comes with the base class's.
+        boolean overridesDefaults = isInterface && baseClassName.isEmpty() && className.startsWith(COM_TNS_GEN_PREFIX) && className.endsWith(Dump.DEFAULT_OVERRIDING_SUFFIX);
+        String requestedClassName = className;
+        if (overridesDefaults) {
+            className = className.substring(0, className.length() - Dump.DEFAULT_OVERRIDING_SUFFIX.length());
+        }
+
         String fullClassName = className.replace("$", "_");
         String originalFullClassName = fullClassName;
 
@@ -91,16 +111,31 @@ public class DexFactory {
         if (pregeneratedClass == null) {
             pregeneratedClass = loadPregeneratedClass(fullClassName.replace("-", "_"));
         }
+        // Once injected, the class generated for the interface loads by the same name.
+        if (overridesDefaults && pregeneratedClass != null && generatedClassNames.contains(pregeneratedClass.getName())) {
+            pregeneratedClass = null;
+        }
         if (pregeneratedClass != null) {
             return pregeneratedClass;
+        }
+
+        if (overridesDefaults) {
+            // Cached under the name native asks for, whichever class answers it.
+            originalFullClassName = fullClassName + Dump.DEFAULT_OVERRIDING_SUFFIX;
         }
 
         // new: com.tns.gen.android.widget.DatePicker_MyActivity_59_56_
         // old: com.tns.tests.Button1_fMyActivity_l56_c44__MyButton
         // ne1: com.tns.tests.Button1_MyActivity_58_44_MyButton_0
-        Class<?> existingClass = this.injectedDexClasses.get(fullClassName);
+        Class<?> existingClass = this.injectedDexClasses.get(originalFullClassName);
         if (existingClass != null) {
             return existingClass;
+        }
+
+        DefaultMethodBodies bodies = null;
+        if (overridesDefaults) {
+            bodies = DefaultSuperCalls.bodies(Class.forName(this.getClassToProxyName(className)));
+            fullClassName += bodies.classSuffix;
         }
 
         String classToProxy;
@@ -112,6 +147,11 @@ public class DexFactory {
 
         // strip the `com.tns.gen` off the base extended class name
         String desiredDexClassName = this.getClassToProxyName(fullClassName);
+        if (overridesDefaults) {
+            // The same file name ProxyGenerator writes the class under.
+            desiredDexClassName = this.getClassToProxyName(className.replace("$", "_"))
+                    + ProxyGenerator.defaultOverridingFileSuffix(DefaultMethods.collect(Class.forName(classToProxy)), bodies);
+        }
 
         // A named proxy (`Base.extend('a.b.C', {...})` / @JavaProxy) asks for
         // exactly that Java class name; the substitutions below are for the
@@ -141,9 +181,9 @@ public class DexFactory {
 
             String dexFilePath;
             if (isInterface && !isNamedProxy) {
-                dexFilePath = this.generateDex(name, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface);
+                dexFilePath = this.generateDex(name, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface, bodies);
             } else {
-                dexFilePath = this.generateDex(desiredDexClassName, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface);
+                dexFilePath = this.generateDex(desiredDexClassName, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface, null);
             }
             dexFile = new File(dexFilePath);
             long stopGenTime = System.nanoTime();
@@ -197,6 +237,11 @@ public class DexFactory {
             result = dexClassLoader.loadClass(classNameToLoad);
         }
 
+        if (bodies == DefaultMethodBodies.INVOKE_SUPER && !DefaultSuperCalls.verify(result)) {
+            return resolveClass(baseClassName, name, requestedClassName, methodOverrides, implementedInterfaces, isInterface);
+        }
+
+        generatedClassNames.add(result.getName());
         classStorageService.storeClass(result.getName(), result);
         this.injectedDexClasses.put(originalFullClassName, result);
 
@@ -344,11 +389,16 @@ public class DexFactory {
         return null;
     }
 
-    private String generateDex(String proxyName, String contentDigest, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
+    // defaultBodies: those of the default-overriding class of the interface className; null for
+    // any other class.
+    private String generateDex(String proxyName, String contentDigest, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface,
+                               DefaultMethodBodies defaultBodies) throws ClassNotFoundException, IOException {
+        boolean overridesDefaults = defaultBodies != null;
         Class<?> classToProxy = Class.forName(className);
 
         HashSet<String> methodOverridesSet = null;
         HashSet<ClassDescriptor> implementedInterfacesSet = new HashSet<ClassDescriptor>();
+        List<Class<?>> implementedInterfaceClasses = new ArrayList<Class<?>>();
 
         if (methodOverrides != null) {
             methodOverridesSet = new HashSet<String>();
@@ -362,13 +412,32 @@ public class DexFactory {
         if (implementedInterfaces.length > 0) {
             for (int j = 0; j < implementedInterfaces.length; j++) {
                 if (!implementedInterfaces[j].isEmpty()) {
-                    implementedInterfacesSet.add(new ClassInfo(Class.forName(implementedInterfaces[j])));
+                    Class<?> implementedInterface = Class.forName(implementedInterfaces[j]);
+                    implementedInterfacesSet.add(new ClassInfo(implementedInterface));
+                    implementedInterfaceClasses.add(implementedInterface);
                 }
             }
         }
 
         AnnotationDescriptor[] annotations = null;
-        return proxyGenerator.generateProxy(proxyName, contentDigest, new ClassInfo(classToProxy), methodOverridesSet, implementedInterfacesSet, isInterface, annotations);
+        List<Method> defaultMethods = null;
+        if (overridesDefaults) {
+            defaultMethods = DefaultMethods.collect(classToProxy);
+        } else if ((!classToProxy.isInterface() || proxyName.contains(".")) && Build.VERSION.SDK_INT >= 24) {
+            // A named interface implementation is one extend() call's class, so like a class
+            // it stubs only the default methods its implementation object names.
+            List<Method> inheritedDefaults = classToProxy.isInterface()
+                    ? DefaultMethods.collect(classToProxy)
+                    : DefaultMethods.collect(classToProxy, implementedInterfaceClasses);
+            defaultMethods = new ArrayList<Method>();
+            for (Method inherited : inheritedDefaults) {
+                if (methodOverridesSet == null || methodOverridesSet.contains(inherited.getName())) {
+                    defaultMethods.add(inherited);
+                }
+            }
+        }
+        return proxyGenerator.generateProxy(proxyName, contentDigest, new ClassInfo(classToProxy), methodOverridesSet, implementedInterfacesSet, isInterface, annotations, defaultMethods,
+                                            overridesDefaults ? defaultBodies : DefaultMethodBodies.INVOKE_SUPER);
     }
 
     private void updateDexThumbAndPurgeCache() {

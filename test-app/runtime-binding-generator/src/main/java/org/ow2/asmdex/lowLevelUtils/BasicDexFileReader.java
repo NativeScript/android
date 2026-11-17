@@ -57,6 +57,10 @@ public class BasicDexFileReader {
     private static final byte[] MAGIC_TEMPLATE =
     { 0x64,  0x65,  0x78,  0x0a,  0x30,  0x33,  0x35,  0x00 };
 
+    // 037 differs from 035 only in what the code may reference, not in the file's layout.
+    private static final byte[] MAGIC_TEMPLATE_037 =
+    { 0x64,  0x65,  0x78,  0x0a,  0x30,  0x33,  0x37,  0x00 };
+
     // Offset of the format version number in the sequence above.
     private static final int OFFSET_FORMAT_VERSION_NUMBER_IN_MAGIC_SEQUENCE = 4;
     private static final int LENGTH_FORMAT_VERSION_NUMBER_IN_MAGIC_SEQUENCE = 3;
@@ -193,7 +197,7 @@ public class BasicDexFileReader {
     protected void readHeader() throws IllegalArgumentException {
         // Checks the Magic sequence at offset 0.
         reader.bytes(magic);
-        if (!Arrays.equals(magic, MAGIC_TEMPLATE)) {
+        if (!Arrays.equals(magic, MAGIC_TEMPLATE) && !Arrays.equals(magic, MAGIC_TEMPLATE_037)) {
             throw new IllegalArgumentException("Unknown bytecode version");
         }
 
