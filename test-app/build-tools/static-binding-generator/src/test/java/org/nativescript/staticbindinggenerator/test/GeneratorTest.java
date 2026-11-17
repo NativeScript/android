@@ -19,6 +19,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 
 public class GeneratorTest {
@@ -151,6 +152,34 @@ public class GeneratorTest {
 
         Assert.assertNotNull(ComplexClass);
         Assert.assertEquals(4, ComplexClass.getInterfaces().length); // 2 + hashcodeprovider + runtimebound
+    }
+
+    @Test
+    public void testAnInterfaceImplementationWithExtraInterfacesGetsItsCallSiteClass() throws Exception {
+        Generator generator = new Generator(null, new ArrayList<DataRow>());
+        HashSet<String> interfaceNames = new HashSet<>();
+
+        Binding withExtras = generator.generateBinding(new DataRow("java.lang.Runnable*app_main*9*29**run,update***java.util.Observer"), interfaceNames);
+        Binding otherExtras = generator.generateBinding(new DataRow("java.lang.Runnable*app_main*12*4**run,formatTo***java.util.Formattable"), interfaceNames);
+        Binding shared = generator.generateBinding(new DataRow("java.lang.Runnable*app_main*15*4**run***"), interfaceNames);
+        Binding sharedAgain = generator.generateBinding(new DataRow("java.lang.Runnable*app_main*18*4**run***"), interfaceNames);
+
+        String withExtrasName = withExtras.getFile().getName();
+        Assert.assertTrue(withExtrasName, withExtrasName.startsWith("Runnable_app_main_"));
+        Assert.assertTrue(withExtrasName, withExtrasName.endsWith("_9_29_.java"));
+        Assert.assertTrue(otherExtras.getFile().getName().endsWith("_12_4_.java"));
+        Assert.assertEquals("Runnable.java", shared.getFile().getName());
+        Assert.assertNull(sharedAgain);
+
+        String className = "com.tns.gen.java.lang." + withExtrasName.substring(0, withExtrasName.length() - ".java".length());
+        Iterable<String> options = new ArrayList<String>(Arrays.asList("-cp", dependenciesDir));
+        Class<?> compiled = InMemoryJavaCompiler.compile(className, withExtras.getContent(), options);
+        List<Class<?>> interfaces = Arrays.asList(compiled.getInterfaces());
+        Assert.assertTrue(interfaces.contains(Runnable.class));
+        Assert.assertTrue(interfaces.contains(java.util.Observer.class));
+
+        Class<?> sharedClass = InMemoryJavaCompiler.compile("com.tns.gen.java.lang.Runnable", shared.getContent(), options);
+        Assert.assertFalse(Arrays.asList(sharedClass.getInterfaces()).contains(java.util.Observer.class));
     }
 
     @Test

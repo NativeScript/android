@@ -327,6 +327,27 @@ describe("Interface extends with extra interfaces", function () {
     }, 30000);
 
     // Named in full, so the static binding generator prebuilds their classes.
+    it("are prebuilt under the call-site class name, apart from the base's shared class", function () {
+        var Prebuilt = java.util.function.LongSupplier.extend({
+            interfaces: [java.util.function.IntSupplier],
+            getAsLong: function () { return 41; },
+            getAsInt: function () { return 42; }
+        });
+        var plain = new java.util.function.LongSupplier({
+            getAsLong: function () { return 43; }
+        });
+        var prebuilt = new Prebuilt();
+
+        expectCallSiteClass(prebuilt, "java.util.function.LongSupplier");
+        expect(F.isRuntimeGenerated(prebuilt)).toBe(false);
+        expect(F.isInstance(prebuilt, "java.util.function.IntSupplier")).toBe(true);
+        expect(String(F.call(prebuilt, "java.util.function.IntSupplier", "getAsInt"))).toBe("42");
+
+        expect(String(F.className(plain))).toBe("com.tns.gen.java.util.function.LongSupplier");
+        expect(F.isInstance(plain, "java.util.function.IntSupplier")).toBe(false);
+        expect(String(F.call(plain, "java.util.function.LongSupplier", "getAsLong"))).toBe("43");
+    });
+
     it("are prebuilt with the extra interfaces of a named extend", function () {
         var Named = java.util.function.DoubleSupplier.extend("com.tns.tests.extras.NamedPrebuiltExtras", {
             interfaces: [java.util.function.BooleanSupplier],
