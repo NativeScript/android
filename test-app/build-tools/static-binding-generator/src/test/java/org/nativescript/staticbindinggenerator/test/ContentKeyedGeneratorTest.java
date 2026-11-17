@@ -19,11 +19,13 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class ContentKeyedGeneratorTest {
 
@@ -150,6 +152,53 @@ public class ContentKeyedGeneratorTest {
         Assert.assertFalse(new File(outputDir, "com/tns/gen/ContentKeyedBindings.java").exists());
         Assert.assertTrue(generator.getWarnings().isEmpty());
         Assert.assertTrue(generator.getContentNameCollisions().isEmpty());
+    }
+
+    private void assertNoAccessorMarkers() throws IOException {
+        try (Stream<Path> paths = Files.walk(outputDir.toPath())) {
+            for (Path file : paths.filter(p -> p.toString().endsWith(".java")).collect(Collectors.toList())) {
+                String source = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+                Assert.assertFalse(file.toString(), source.contains(DataRow.ACCESSOR_PREFIX));
+            }
+        }
+    }
+
+    @Test
+    public void overridesAccessorsWithoutTheOptIn() throws Exception {
+        generate(false,
+                "com.example.View*tests_a*3*5**~createView,~init***",
+                "com.example.View*****toString,~createView*com.example.NamedView*app/f.js*",
+                "com.example.MyInterface*tests_a*12*5**~getTile***");
+        assertNoAccessorMarkers();
+
+        List<String> files = generatedFiles("com/tns/gen/com/example");
+        Assert.assertEquals(files.toString(), 2, files.size());
+        String anonymous = read("com/tns/gen/com/example/" + files.stream().filter(f -> f.startsWith("View_")).findFirst().get());
+        Assert.assertTrue(anonymous, anonymous.contains("createView("));
+        Assert.assertTrue(anonymous, anonymous.contains("\"init\""));
+
+        String named = read("com/example/NamedView.java");
+        Assert.assertTrue(named, named.contains("createView("));
+        Assert.assertTrue(read("com/tns/gen/com/example/MyInterface.java").contains("getTile("));
+    }
+
+    @Test
+    public void leavesAccessorsOutOfContentKeyedBindings() throws Exception {
+        generate(true,
+                "com.example.View*tests_a*3*5**~createView,~init,toString***",
+                "com.example.View*****toString,~createView*com.example.NamedView*app/f.js*",
+                "com.example.MyInterface*tests_a*12*5**~getTile***");
+        assertNoAccessorMarkers();
+
+        String name = "View_" + key("toString");
+        Assert.assertEquals(Arrays.asList("MyInterface.java", name + ".java"), generatedFiles("com/tns/gen/com/example"));
+        String anonymous = read("com/tns/gen/com/example/" + name + ".java");
+        Assert.assertFalse(anonymous, anonymous.contains("createView("));
+        Assert.assertFalse(anonymous, anonymous.contains("\"init\""));
+
+        Assert.assertFalse(read("com/example/NamedView.java").contains("createView("));
+        // An interface's abstract methods are implemented whatever the object defines.
+        Assert.assertTrue(read("com/tns/gen/com/example/MyInterface.java").contains("getTile("));
     }
 
     @Test

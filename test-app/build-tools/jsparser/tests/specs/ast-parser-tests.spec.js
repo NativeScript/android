@@ -327,8 +327,14 @@ describe("parser/js_parser tests", function () {
                     rows[parts[4]] = parts;
                 }
 
-                expect(rows["LiteralMembers"][5]).toBe("identifierMember,quotedMember,shorthandMember,dataMember,run");
+                expect(rows["LiteralMembers"][5]).toBe("identifierMember,quotedMember,shorthandMember,dataMember,~getterMember,~setterMember,run");
                 expect(rows["LiteralMembers"][8]).toBe("java.lang.Runnable");
+
+                // Accessors are marked with `~`; a redefined name keeps its first
+                // position and the kind of its last definition.
+                expect(rows["AccessorMembers"][5]).toBe("~getOnly,~setOnly,~pair,~quotedAccessor,accessorThenData,~dataThenAccessor,~toString");
+                expect(rows["AccessorInterface"][0]).toBe("java.lang.Runnable");
+                expect(rows["AccessorInterface"][5]).toBe("~run");
 
                 expect(rows["PrototypeMembers"][5]).toBe("toString,quotedPrototypeMember,chainedA,chainedB,sequenceA,sequenceB");
                 expect(rows["PrototypeMembers"][8]).toBe("java.lang.Runnable");

@@ -50,7 +50,8 @@ public final class ContentKey {
 
     /**
      * The members a binding is generated with, from the JS parser's member names:
-     * sorted, without duplicates and without the names extend() itself adds.
+     * sorted, without duplicates, without the names extend() itself adds, and
+     * without accessors, which the runtime leaves out of the key.
      */
     public static List<String> memberNames(String[] parsedNames) {
         TreeSet<String> result = new TreeSet<>(UTF8_ORDER);

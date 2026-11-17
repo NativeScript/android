@@ -565,18 +565,23 @@ var es5_visitors = (function() {
      *	HELPER METHODS
      */
 
-    // The member names the runtime can see as own data properties of an
+    // The member names the runtime can see as own properties of an
     // implementation object, which is what it names and generates a class from.
     var MEMBER_NAME_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
-    // Returns the name an object literal property defines as an own data
-    // property, or null for spreads, computed keys, getters and setters, and
-    // keys that cannot name a Java method.
+    // Prefixes a member an object literal defines as a getter or setter. The
+    // runtime finds method overrides behind getters but leaves accessors out of
+    // content keys, so the static binding generator decides per mode.
+    var ACCESSOR_PREFIX = "~";
+
+    function _isAccessor(property) {
+        return types.isObjectMethod(property) && (property.kind === "get" || property.kind === "set");
+    }
+
+    // Returns the name an object literal property defines as an own property,
+    // or null for spreads, computed keys, and keys that cannot name a Java method.
     function _getMemberKeyName(property) {
         if (!property || property.computed || !property.key) {
-            return null;
-        }
-        if (types.isObjectMethod(property) && property.kind !== "method") {
             return null;
         }
 
@@ -603,6 +608,21 @@ var es5_visitors = (function() {
         }
     }
 
+    // A redefined property keeps its first position and takes the kind of its
+    // last definition, as in the object the literal creates.
+    function _addLiteralMember(members, name, isAccessor) {
+        var index = members.indexOf(name);
+        if (index === -1) {
+            index = members.indexOf(ACCESSOR_PREFIX + name);
+        }
+        var entry = isAccessor ? ACCESSOR_PREFIX + name : name;
+        if (index === -1) {
+            members.push(entry);
+        } else {
+            members[index] = entry;
+        }
+    }
+
     function _getOverriddenMethods(node, config) {
         var overriddenMethodNames = [];
         if (types.isObjectExpression(node)) {
@@ -613,7 +633,7 @@ var es5_visitors = (function() {
                 if (keyName === null) {
                     continue;
                 }
-                _pushUnique(overriddenMethodNames, keyName);
+                _addLiteralMember(overriddenMethodNames, keyName, _isAccessor(objectProperties[index]));
             }
         }
 
@@ -667,7 +687,7 @@ var es5_visitors = (function() {
                         implementedInterfaces.push(interfaceName);
                     }
                 } else {
-                    _pushUnique(overriddenMethodNames, keyName);
+                    _addLiteralMember(overriddenMethodNames, keyName, _isAccessor(objectProperties[index]));
                 }
             }
         }

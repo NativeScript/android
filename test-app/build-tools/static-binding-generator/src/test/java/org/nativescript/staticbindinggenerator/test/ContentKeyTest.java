@@ -78,6 +78,7 @@ public class ContentKeyTest {
     public void selectsMemberNames() {
         assertEquals(list("$x", "_y", "a1", "onCreate", "toString"),
                 ContentKey.memberNames(new String[]{"toString", "onCreate", "constructor", "super", "__parent", "__child", "", "a1", "_y", "$x", "toString", "1a", "a-b"}));
+        assertEquals(list("onClick"), ContentKey.memberNames(new String[]{"~getter", "onClick", "~onClick"}));
         assertEquals(NONE, ContentKey.memberNames(new String[]{""}));
         assertEquals(NONE, ContentKey.memberNames(null));
     }

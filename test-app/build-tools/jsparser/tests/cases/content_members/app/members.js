@@ -18,6 +18,23 @@ var LiteralMembers = java.lang.Object.extend("LiteralMembers", {
     run: function () {}
 });
 
+var AccessorMembers = java.lang.Object.extend("AccessorMembers", {
+    get getOnly() { return 1; },
+    set setOnly(value) {},
+    get pair() { return 1; },
+    set pair(value) {},
+    get "quotedAccessor"() { return 1; },
+    get accessorThenData() { return 1; },
+    accessorThenData: function () {},
+    dataThenAccessor: function () {},
+    get dataThenAccessor() { return 1; },
+    get toString() { return function () { return "accessor"; }; }
+});
+
+var AccessorInterface = java.lang.Runnable.extend("AccessorInterface", {
+    get run() { return function () {}; }
+});
+
 var PrototypeMembers = /** @class */ (function (_super) {
     __extends(PrototypeMembers, _super);
     function PrototypeMembers() {
