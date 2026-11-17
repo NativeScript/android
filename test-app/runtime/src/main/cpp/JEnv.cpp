@@ -776,6 +776,11 @@ jclass JEnv::CheckForClassInCache(const string &className) {
 }
 
 jclass JEnv::InsertClassIntoCache(const string &className, jclass &tmp) {
+    // A class missing now can still be generated or injected later, so a miss is never cached.
+    if (tmp == nullptr) {
+        return nullptr;
+    }
+
     auto global_class = reinterpret_cast<jclass>(m_env->NewGlobalRef(tmp));
     m_env->DeleteLocalRef(tmp);
 
