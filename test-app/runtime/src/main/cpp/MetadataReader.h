@@ -239,6 +239,10 @@ namespace tns {
 
         MetadataTreeNode *GetOrCreateTreeNodeByName(const std::string &className);
 
+        // The node of a type in the build-time metadata, or null. Never resolves a type
+        // at run time; reads only the static tree, which needs no lock.
+        MetadataTreeNode *FindStaticTreeNodeByName(const std::string &className) const;
+
         MetadataTreeNode *GetBaseClassNode(MetadataTreeNode *treeNode);
 
         MetadataTreeNode *GetNodeById(uint32_t nodeId);

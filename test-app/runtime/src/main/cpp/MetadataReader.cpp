@@ -290,6 +290,28 @@ MetadataTreeNode *MetadataReader::GetRoot() const {
     return m_root;
 }
 
+MetadataTreeNode *MetadataReader::FindStaticTreeNodeByName(const string &className) const {
+    vector<string> names;
+    Util::SplitString(className, "/$", names);
+
+    MetadataTreeNode *treeNode = m_root;
+    for (const auto &name: names) {
+        if (treeNode == nullptr || treeNode->children == nullptr) {
+            return nullptr;
+        }
+        MetadataTreeNode *found = nullptr;
+        for (auto child: *treeNode->children) {
+            if (child->name == name) {
+                found = child;
+                break;
+            }
+        }
+        treeNode = found;
+    }
+
+    return names.empty() ? nullptr : treeNode;
+}
+
 uint8_t MetadataReader::GetNodeType(MetadataTreeNode *treeNode) {
     uint8_t memoized = treeNode->type.load(std::memory_order_relaxed);
     if (memoized != MetadataTreeNode::INVALID_TYPE) {
