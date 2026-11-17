@@ -381,8 +381,12 @@ describe("Interface extends with extra interfaces", function () {
         };
     }, 30000);
 
-    // Named in full, so the static binding generator prebuilds their classes.
+    // Named in full, so the static binding generator prebuilds their classes. The
+    // java.util.function interfaces need API 24.
     it("are prebuilt under the call-site class name, apart from the base's shared class", function () {
+        if (sdk < 24) {
+            return;
+        }
         var Prebuilt = java.util.function.LongSupplier.extend({
             interfaces: [java.util.function.IntSupplier],
             getAsLong: function () { return 41; },
@@ -404,6 +408,9 @@ describe("Interface extends with extra interfaces", function () {
     });
 
     it("are prebuilt with the extra interfaces of a named extend", function () {
+        if (sdk < 24) {
+            return;
+        }
         var Named = java.util.function.DoubleSupplier.extend("com.tns.tests.extras.NamedPrebuiltExtras", {
             interfaces: [java.util.function.BooleanSupplier],
             getAsDouble: function () { return 1.5; },
