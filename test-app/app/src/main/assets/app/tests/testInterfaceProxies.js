@@ -230,31 +230,40 @@ describe("Interface implementations without a prebuilt class", function () {
         expect(String(first.getClass().getMethod("name", []).invoke(first, []))).toBe("first");
     });
 
-    it("runs a platform default method's Java body, even when JS defines it", function () {
+    it("calls the JS implementations of platform default methods, and the Java bodies of the others", function () {
         if (sdk < 24) {
             return;
         }
         var D = com.tns.tests.InterfaceProxyDefaultMethodFixtures;
         var Iterator = hidden(java.util, "Iter" + "ator");
         var jsRemoveCalls = 0;
-        function iterator() {
+        function iterator(withRemove) {
             var items = ["a", "b", "c"];
             var index = 0;
-            return new Iterator({
+            var implementation = {
                 hasNext: function () { return index < items.length; },
-                next: function () { return items[index++]; },
-                remove: function () { jsRemoveCalls++; }
-            });
+                next: function () { return items[index++]; }
+            };
+            if (withRemove) {
+                implementation.remove = function () { jsRemoveCalls++; };
+            }
+            return new Iterator(implementation);
         }
 
-        var fromJava = iterator();
+        var fromJava = iterator(true);
         expectRuntimeClass(fromJava);
+        expect(String(D.remove(fromJava))).toBe("removed");
+        expect(jsRemoveCalls).toBe(1);
+        // forEachRemaining is not implemented in JS: its Java body calls hasNext and next.
         expect(String(D.drain(fromJava))).toBe("a,b,c");
-        expect(String(D.remove(fromJava))).toBe("java.lang.UnsupportedOperationException");
-        expect(jsRemoveCalls).toBe(0);
+
+        var withoutRemove = iterator(false);
+        expectRuntimeClass(withoutRemove);
+        expect(String(D.remove(withoutRemove))).toBe("java.lang.UnsupportedOperationException");
+        expect(jsRemoveCalls).toBe(1);
 
         // JS calling a default the implementation lacks gets the Java body too.
-        var fromJs = iterator();
+        var fromJs = iterator(true);
         var seen = [];
         fromJs.forEachRemaining(new java.util.function.Consumer({
             accept: function (item) { seen.push(item); }
@@ -262,43 +271,58 @@ describe("Interface implementations without a prebuilt class", function () {
         expect(seen).toEqual(["a", "b", "c"]);
 
         var Predicate = hidden(java.util["func" + "tion"], "Pred" + "icate");
+        var negations = 0;
         var predicate = new Predicate({
             test: function (value) { return value === "yes"; },
-            negate: function () { throw new Error("JS negate must not run"); }
+            negate: function () {
+                negations++;
+                return new Predicate({ test: function () { return true; } });
+            }
         });
-        expect(String(D.negate(predicate, "yes"))).toBe("true|false");
+        expect(String(D.negate(predicate, "yes"))).toBe("true|true");
+        expect(negations).toBe(1);
 
-        // Primitive arguments and results of a default method.
+        // Primitive arguments and results of default methods: getExactSizeIfKnown runs in JS,
+        // hasCharacteristics runs its Java body, which calls characteristics in JS.
         var Spliterator = hidden(java.util, "Split" + "erator");
         var spliterator = new Spliterator({
             tryAdvance: function () { return false; },
             trySplit: function () { return null; },
             estimateSize: function () { return 3; },
             characteristics: function () { return Spliterator.SIZED; },
-            getExactSizeIfKnown: function () { throw new Error("JS getExactSizeIfKnown must not run"); }
+            getExactSizeIfKnown: function () { return 42; }
         });
-        expect(String(D.spliteratorDefaults(spliterator))).toBe("3|true|false");
+        expect(String(D.spliteratorDefaults(spliterator))).toBe("42|true|false");
 
-        // OfInt.next() is a default overriding the abstract Iterator.next(), and its
+        // OfInt.next() is a default narrowing the abstract Iterator.next(), and its
         // forEachRemaining(Consumer) overrides Iterator's default.
         var OfInt = hidden(java.util.PrimitiveIterator, "Of" + "Int");
         var value = 0;
-        var ofInt = new OfInt({
+        var javaNext = new OfInt({
             hasNext: function () { return value < 3; },
-            nextInt: function () { return ++value; },
-            next: function () { throw new Error("JS next must not run"); }
+            nextInt: function () { return ++value; }
         });
-        expectRuntimeClass(ofInt);
-        expect(String(D.next(ofInt))).toBe("1");
-        expect(String(D.drain(ofInt))).toBe("2,3");
+        expectRuntimeClass(javaNext);
+        expect(String(D.next(javaNext))).toBe("1");
+        expect(String(D.drain(javaNext))).toBe("2,3");
+
+        var jsNext = new OfInt({
+            hasNext: function () { return false; },
+            nextInt: function () { throw new Error("JS nextInt must not run"); },
+            next: function () { return new java.lang.Integer(7); }
+        });
+        expectRuntimeClass(jsNext);
+        expect(String(D.next(jsNext))).toBe("7");
     });
 
-    it("sends a default method compiled for minSdk 21 to JS like an abstract one", function () {
-        // Desugared: at runtime Producer.produce() is abstract and its body lives elsewhere.
+    it("calls the JS implementation of an app's default method, which D8 may have made abstract", function () {
         var Producer = hidden(com.tns.tests.interfaces.defaultmethods.contract, "Pro" + "ducer");
+        // Below minSdk 24 D8 desugars the default: at runtime produce() is abstract and its body
+        // lives elsewhere, so an implementation that lacks it fails the call.
+        var desugared = sdk < 24 || !Producer.class.getMethod("produce", []).isDefault();
 
         expect(String(F.produce(new Producer({ produce: function () { return "from js"; } })))).toBe("from js");
-        expect(String(F.produce(new Producer({})))).toBe("com.tns.NativeScriptException");
+        expect(String(F.produce(new Producer({})))).toBe(desugared ? "com.tns.NativeScriptException" : "default produce in Producer");
     });
 
     it("generates a class for an interface a proxy cannot implement", function () {

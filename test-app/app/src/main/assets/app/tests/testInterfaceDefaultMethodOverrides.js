@@ -10,6 +10,18 @@ describe("Interface default methods implemented in JS", function () {
     var SUFFIX = "-defaults";
     var RUNTIME_CALL_SUFFIX = "-defaults-jni";
 
+    // With the interfaceProxies option an interface without a prebuilt class gets a
+    // java.lang.reflect.Proxy class instead of one generated at runtime.
+    var proxies = !!require("../package.json").android.interfaceProxies;
+
+    function expectRuntimeClass(instance, generatedName) {
+        if (proxies) {
+            expect(java.lang.reflect.Proxy.isProxyClass(instance.getClass())).toBe(true);
+        } else {
+            expect(F.className(instance)).toBe(generatedName);
+        }
+    }
+
     var It = java.util.Iterator;
     var Pred = java.util.function.Predicate;
     var Split = java.util.Spliterator;
@@ -38,8 +50,8 @@ describe("Interface default methods implemented in JS", function () {
             }
         }));
 
-        expect(F.isRuntimeGenerated(it)).toBe(true);
-        expect(F.className(it)).toBe("com.tns.gen.java.util.Iterator" + SUFFIX);
+        expect(F.isRuntimeGenerated(it)).toBe(!proxies);
+        expectRuntimeClass(it, "com.tns.gen.java.util.Iterator" + SUFFIX);
         expect(F.remove(it)).toBe("removed");
         expect(F.drain(it)).toBe("js");
         expect(calls).toEqual(["remove", "forEachRemaining"]);
@@ -101,7 +113,7 @@ describe("Interface default methods implemented in JS", function () {
             }
         });
 
-        expect(F.className(ofInt)).toBe("com.tns.gen.java.util.PrimitiveIterator_OfInt" + SUFFIX);
+        expectRuntimeClass(ofInt, "com.tns.gen.java.util.PrimitiveIterator_OfInt" + SUFFIX);
         expect(F.remove(ofInt)).toBe("removed");
         expect(F.drainInts(ofInt)).toBe("");
         expect(F.drain(ofInt)).toBe("");
@@ -118,7 +130,7 @@ describe("Interface default methods implemented in JS", function () {
             forEachRemaining: function () { drains++; }
         }));
 
-        expect(F.className(it)).toBe("com.tns.gen.java.util.Iterator" + SUFFIX);
+        expectRuntimeClass(it, "com.tns.gen.java.util.Iterator" + SUFFIX);
         // Iterator.remove() throws this itself, so it arrives with its own type.
         expect(F.remove(it)).toBe("java.lang.UnsupportedOperationException");
         F.drain(it);
@@ -151,7 +163,7 @@ describe("Interface default methods implemented in JS", function () {
         var IntPred = java.util.function.IntPredicate;
         var predicate = new IntPred({ test: function (value) { return value > 0; } });
 
-        expect(F.className(predicate)).toBe("com.tns.gen.java.util.function.IntPredicate");
+        expectRuntimeClass(predicate, "com.tns.gen.java.util.function.IntPredicate");
         expect(F.isClassLoaded("com.tns.gen.java.util.function.IntPredicate" + SUFFIX, predicate)).toBe(false);
         expect(F.isClassLoaded("com.tns.gen.java.util.function.IntPredicate" + RUNTIME_CALL_SUFFIX, predicate)).toBe(false);
         expect(F.intNegate(predicate, 1)).toBe("true|false");
@@ -161,8 +173,8 @@ describe("Interface default methods implemented in JS", function () {
             test: function () { return true; },
             negate: function () { return plain; }
         });
-        expect(F.className(plain)).toBe("com.tns.gen.java.util.function.Predicate");
-        expect(F.className(overriding)).toBe("com.tns.gen.java.util.function.Predicate" + SUFFIX);
+        expectRuntimeClass(plain, "com.tns.gen.java.util.function.Predicate");
+        expectRuntimeClass(overriding, "com.tns.gen.java.util.function.Predicate" + SUFFIX);
         expect(F.negate(plain, "x")).toBe("true|false");
         expect(F.negate(overriding, "x")).toBe("true|true");
     });
@@ -172,7 +184,7 @@ describe("Interface default methods implemented in JS", function () {
             return;
         }
         var notAFunction = new It(emptyIterator({ remove: 42 }));
-        expect(F.className(notAFunction)).toBe("com.tns.gen.java.util.Iterator");
+        expectRuntimeClass(notAFunction, "com.tns.gen.java.util.Iterator");
         expect(F.remove(notAFunction)).toBe("java.lang.UnsupportedOperationException");
 
         var getterCalls = 0;
@@ -186,7 +198,7 @@ describe("Interface default methods implemented in JS", function () {
         });
         var viaAccessor = new It(withAccessor);
         expect(getterCalls).toBe(0);
-        expect(F.className(viaAccessor)).toBe("com.tns.gen.java.util.Iterator" + SUFFIX);
+        expectRuntimeClass(viaAccessor, "com.tns.gen.java.util.Iterator" + SUFFIX);
         expect(F.remove(viaAccessor)).toBe("removed");
         expect(getterCalls).toBe(1);
         expect(removes).toBe(1);
@@ -216,7 +228,7 @@ describe("Interface default methods implemented in JS", function () {
         var first = new Positive();
         var second = new Positive();
 
-        expect(F.className(first)).toBe("com.tns.gen.java.util.function.LongPredicate" + SUFFIX);
+        expectRuntimeClass(first, "com.tns.gen.java.util.function.LongPredicate" + SUFFIX);
         expect(F.longNegate(first, 5)).toBe("true|true");
         expect(F.longNegate(second, -5)).toBe("false|true");
         expect(negations).toBe(2);
@@ -231,11 +243,11 @@ describe("Interface default methods implemented in JS", function () {
         worker.onmessage = function (msg) {
             worker.terminate();
             expect(msg.data.error).toBeUndefined();
-            expect(msg.data.newClassName).toBe("com.tns.gen.java.util.Iterator" + SUFFIX);
+            expect(msg.data.newClassName).toBe(proxies ? "proxy" : "com.tns.gen.java.util.Iterator" + SUFFIX);
             expect(msg.data.remove).toBe("removed");
             expect(msg.data.removes).toBe(1);
             expect(msg.data.missingDefault).toBe("java.lang.UnsupportedOperationException");
-            expect(msg.data.extendClassName).toBe("com.tns.gen.java.util.Spliterator" + SUFFIX);
+            expect(msg.data.extendClassName).toBe(proxies ? "proxy" : "com.tns.gen.java.util.Spliterator" + SUFFIX);
             expect(msg.data.spliterator).toBe("7|true|false");
             done();
         };
@@ -472,7 +484,7 @@ describe("Interface default methods implemented in JS", function () {
         var predicate = new DoublePred(implementation);
 
         expect(getterCalls).toBe(0);
-        expect(F.className(predicate)).toBe("com.tns.gen.java.util.function.DoublePredicate" + SUFFIX);
+        expectRuntimeClass(predicate, "com.tns.gen.java.util.function.DoublePredicate" + SUFFIX);
         expect(F.doubleNegate(predicate, 1)).toBe("true|true");
         expect(getterCalls).toBe(1);
     });
@@ -495,7 +507,7 @@ describe("Interface default methods implemented in JS", function () {
         var operator = new LongOperator(implementation);
 
         expect(getterCalls).toBe(0);
-        expect(F.className(operator)).toBe("com.tns.gen.java.util.function.LongUnaryOperator" + SUFFIX);
+        expectRuntimeClass(operator, "com.tns.gen.java.util.function.LongUnaryOperator" + SUFFIX);
     });
 
     it("are called through an extend whose implementation object lists no interfaces", function () {
@@ -512,7 +524,7 @@ describe("Interface default methods implemented in JS", function () {
         });
         var same = new Same();
 
-        expect(F.className(same)).toBe("com.tns.gen.java.util.function.BiPredicate" + SUFFIX);
+        expectRuntimeClass(same, "com.tns.gen.java.util.function.BiPredicate" + SUFFIX);
         expect(F.biNegate(same, "a", "a")).toBe("true|true");
     });
 
@@ -529,7 +541,7 @@ describe("Interface default methods implemented in JS", function () {
         });
         var removing = new Removing();
 
-        expect(F.className(removing)).toBe("com.tns.gen.java.util.PrimitiveIterator_OfDouble" + SUFFIX);
+        expectRuntimeClass(removing, "com.tns.gen.java.util.PrimitiveIterator_OfDouble" + SUFFIX);
         expect(F.remove(removing)).toBe("removed");
         expect(removes).toBe(1);
     });
@@ -592,7 +604,7 @@ describe("Interface default methods implemented in JS", function () {
             return;
         }
 
-        expect(F.className(listener)).toBe("com.tns.gen.com.tns.tests.interfaces.defaultmethods.contract.AllDefaultListener" + SUFFIX);
+        expectRuntimeClass(listener, "com.tns.gen.com.tns.tests.interfaces.defaultmethods.contract.AllDefaultListener" + SUFFIX);
         expect(F.fire(listener)).toBe("js describe");
         expect(calls).toEqual(["text:a"]);
 
@@ -618,7 +630,7 @@ describe("Interface default methods implemented in JS", function () {
             }
         });
 
-        expect(F.className(shapes)).toBe("com.tns.gen.com.tns.tests.interfaces.defaultshapes.Shapes" + SUFFIX);
+        expectRuntimeClass(shapes, "com.tns.gen.com.tns.tests.interfaces.defaultshapes.Shapes" + SUFFIX);
         expect(D.ShapesCaller.all(shapes)).toBe("7028|2.5|0.5|Q|false|-4|42|js:9223372036854775807:-0.25|v");
         expect(odd).toEqual([3]);
         expect(D.ShapesCaller.fail(shapes)).toBe("com.tns.tests.interfaces.defaultshapes.ShapesException: from java");
@@ -640,6 +652,18 @@ describe("Interface default methods run through the runtime", function () {
     var SUFFIX = "-defaults-jni";
     var DoubleOp = java.util.function.DoubleUnaryOperator;
 
+    // With the interfaceProxies option an interface without a prebuilt class gets a
+    // java.lang.reflect.Proxy class instead of one generated at runtime.
+    var proxies = !!require("../package.json").android.interfaceProxies;
+
+    function expectRuntimeClass(instance, generatedName) {
+        if (proxies) {
+            expect(java.lang.reflect.Proxy.isProxyClass(instance.getClass())).toBe(true);
+        } else {
+            expect(F.className(instance)).toBe(generatedName);
+        }
+    }
+
     it("run a default the JS object lacks on the calling thread, and one it implements in JS", function () {
         if (sdk < 24) {
             return;
@@ -654,7 +678,7 @@ describe("Interface default methods run through the runtime", function () {
             }
         });
 
-        expect(F.className(op)).toBe("com.tns.gen.java.util.function.DoubleUnaryOperator" + SUFFIX);
+        expectRuntimeClass(op, "com.tns.gen.java.util.function.DoubleUnaryOperator" + SUFFIX);
         // This thread waits inside the fixture, so a call that needed it would time out.
         expect(F.doubleAndThenOnBackgroundThread(op, 5000)).toBe(F.CALLER_THREAD + "|true");
         expect(F.doubleAndThenApply(op, 2)).toBe("6.0");
@@ -676,7 +700,7 @@ describe("Interface default methods run through the runtime", function () {
             }
         });
 
-        expect(F.className(temporal)).toBe("com.tns.gen.java.time.temporal.Temporal" + SUFFIX);
+        expectRuntimeClass(temporal, "com.tns.gen.java.time.temporal.Temporal" + SUFFIX);
         expect(com.tns.tests.TemporalDefaultFixtures.minusDays(temporal, 5)).toBe(true);
         expect(added).toEqual(["-5 Days"]);
     });
@@ -701,7 +725,7 @@ describe("Interface default methods run through the runtime", function () {
             }
         });
 
-        expect(F.className(shapes)).toBe("com.tns.gen.com.tns.tests.interfaces.runtimecalldefaults.RuntimeCallShapes" + SUFFIX);
+        expectRuntimeClass(shapes, "com.tns.gen.com.tns.tests.interfaces.runtimecalldefaults.RuntimeCallShapes" + SUFFIX);
         expect(R.RuntimeCallCaller.all(shapes)).toBe("7028|2.5|false|v");
         expect(odd).toEqual([3]);
         expect(R.RuntimeCallCaller.wideOnBackgroundThread(shapes, 5000)).toBe(F.CALLER_THREAD + "|9223372036854774996");
@@ -711,7 +735,7 @@ describe("Interface default methods run through the runtime", function () {
             name: function () { return "s"; },
             odd: function () { return true; }
         });
-        expect(F.className(strings)).toBe("com.tns.gen.com.tns.tests.interfaces.runtimecalldefaults.RuntimeCallStringShapes" + SUFFIX);
+        expectRuntimeClass(strings, "com.tns.gen.com.tns.tests.interfaces.runtimecalldefaults.RuntimeCallStringShapes" + SUFFIX);
         expect(R.RuntimeCallCaller.all(strings)).toBe("7028|2.5|true|string v");
     }, 15000);
 
@@ -729,7 +753,7 @@ describe("Interface default methods run through the runtime", function () {
             visible: function () { return "visible js"; }
         });
 
-        expect(F.className(visibleOnly)).toBe("com.tns.gen.com.tns.tests.interfaces.runtimecalldefaults.RuntimeCallVisible" + SUFFIX);
+        expectRuntimeClass(visibleOnly, "com.tns.gen.com.tns.tests.interfaces.runtimecalldefaults.RuntimeCallVisible" + SUFFIX);
         expect(R.RuntimeCallCaller.visible(visibleOnly)).toBe("visible js");
         expect(R.RuntimeCallCaller.hidden(visibleOnly)).toBe("hidden java");
     });

@@ -5,6 +5,10 @@ var It = java.util.Iterator;
 var Split = java.util.Spliterator;
 var result = {};
 
+function className(instance) {
+    return java.lang.reflect.Proxy.isProxyClass(instance.getClass()) ? "proxy" : String(F.className(instance));
+}
+
 try {
     var removes = 0;
     var withRemove = new It({
@@ -12,7 +16,7 @@ try {
         next: function () { return null; },
         remove: function () { removes++; }
     });
-    result.newClassName = String(F.className(withRemove));
+    result.newClassName = className(withRemove);
     result.remove = String(F.remove(withRemove));
     result.removes = removes;
 
@@ -31,7 +35,7 @@ try {
         getExactSizeIfKnown: function () { return 7; }
     });
     var sized = new Sized();
-    result.extendClassName = String(F.className(sized));
+    result.extendClassName = className(sized);
     result.spliterator = String(F.spliteratorDefaults(sized));
 } catch (e) {
     result.error = String(e && e.message || e);
