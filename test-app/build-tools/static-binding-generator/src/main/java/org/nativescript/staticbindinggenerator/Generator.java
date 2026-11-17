@@ -147,11 +147,15 @@ public class Generator {
 
         String name = "";
         Boolean isInterface = clazz.isInterface();
+        // An anonymous implementation of an interface that lists interfaces of its own is its
+        // call site's class, named like a class extend's, as the runtime asks for it; the
+        // interface's one shared class cannot implement them for a single call site.
+        boolean isSharedInterfaceClass = isInterface && !hasSpecifiedName && !hasImplementedInterfaces(dataRow);
 
         if (hasSpecifiedName) {
             name = getSimpleClassname(dataRow.getFilename());
         } else {
-            if (isInterface) {
+            if (isSharedInterfaceClass) {
                 name = getSimpleClassname(clazz.getClassName());
             } else {
                 name = getSimpleClassname(clazz.getClassName().replace("$", "_")) + "_";
@@ -162,9 +166,10 @@ public class Generator {
             }
         }
 
-        if (isInterface && interfaceNames.contains(name)) {
+        boolean isOneClassPerInterface = isInterface && (hasSpecifiedName || isSharedInterfaceClass);
+        if (isOneClassPerInterface && interfaceNames.contains(name)) {
             return null;
-        } else if (isInterface) {
+        } else if (isOneClassPerInterface) {
             interfaceNames.add(name);
         }
 
@@ -576,6 +581,18 @@ public class Generator {
         }
 
         return true;
+    }
+
+    private static boolean hasImplementedInterfaces(DataRow dataRow) {
+        if (dataRow.getInterfaces() == null) {
+            return false;
+        }
+        for (String interfaceName : dataRow.getInterfaces()) {
+            if (interfaceName != null && !interfaceName.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<JavaClass> getInterfacesFromCache(List<String> interfacesNames) {

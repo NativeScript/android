@@ -41,6 +41,7 @@ require("./tests/testWorkerNestedConsole");
 require("./tests/testMessaging");
 require("./tests/testInterfaceDefaultMethods");
 require("./tests/testInterfaceDefaultMethodOverrides");
+require("./tests/testInterfaceExtraInterfaces");
 require("./tests/testInterfaceStaticMethods");
 require("./tests/testMetadata");
 require("./tests/testAsserts");

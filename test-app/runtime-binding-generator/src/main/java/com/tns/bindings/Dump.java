@@ -181,9 +181,9 @@ public class Dump {
     /**
      * defaultMethods, for an anonymous interface implementation (a proxyName without '.'),
      * are the interface's DefaultMethods.collect: the class gets the DEFAULT_OVERRIDING_SUFFIX
-     * name and a stub for each of them as well. For a class or a named interface
-     * implementation, they are inherited default methods the JS object implements, stubbed
-     * like the class's other overrides. null adds neither.
+     * name and a stub for each of them as well. For a class, or an interface implementation
+     * with a dotted proxyName (one extend() call's class), they are inherited default methods
+     * the JS object implements, stubbed like the class's other overrides. null adds neither.
      */
     public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, AnnotationDescriptor[] annotations, List<java.lang.reflect.Method> defaultMethods) {
         generateProxy(aw, proxyName, classTo, methodOverrides, implementedInterfaces, annotations, defaultMethods, DefaultMethodBodies.INVOKE_SUPER);
@@ -250,13 +250,13 @@ public class Dump {
 
     private MethodDescriptor[] withInheritedDefaults(MethodDescriptor[] methods, List<java.lang.reflect.Method> defaultMethods) {
         List<MethodDescriptor> result = new ArrayList<MethodDescriptor>(Arrays.asList(methods));
-        Set<String> signatures = new HashSet<String>();
+        Set<String> stubs = new HashSet<String>();
         for (MethodDescriptor method : methods) {
-            signatures.add(method.getName() + "_" + getMethodOverloadDescriptor(method));
+            addStub(stubs, method, method.isInterfaceMethod());
         }
         for (java.lang.reflect.Method defaultMethod : defaultMethods) {
             MethodDescriptor method = new MethodInfo(defaultMethod);
-            if (signatures.add(method.getName() + "_" + getMethodOverloadDescriptor(method))) {
+            if (addStub(stubs, method, true)) {
                 result.add(method);
             }
         }
@@ -264,16 +264,16 @@ public class Dump {
     }
 
     private void generateDefaultMethodStubs(ClassVisitor cv, List<java.lang.reflect.Method> defaultMethods, MethodDescriptor[] generatedMethods, String classSignature, String tnsClassSignature, DefaultMethodBodies bodies) {
-        Set<String> generatedSignatures = new HashSet<String>();
+        Set<String> stubs = new HashSet<String>();
         for (MethodDescriptor generated : generatedMethods) {
-            generatedSignatures.add(generated.getName() + "_" + getMethodOverloadDescriptor(generated));
+            addStub(stubs, generated, generated.isInterfaceMethod());
         }
 
         List<String> names = new ArrayList<String>(new TreeSet<String>(namesOf(defaultMethods)));
         for (java.lang.reflect.Method defaultMethod : defaultMethods) {
             int bit = names.indexOf(defaultMethod.getName());
             MethodDescriptor method = new MethodInfo(defaultMethod);
-            if (bit >= DefaultMethods.MAX_DISPATCHED_NAMES || !generatedSignatures.add(method.getName() + "_" + getMethodOverloadDescriptor(method))) {
+            if (bit >= DefaultMethods.MAX_DISPATCHED_NAMES || !addStub(stubs, method, true)) {
                 continue;
             }
             generateDefaultMethodStub(cv, defaultMethod, method, bit, classSignature, tnsClassSignature, bodies);
@@ -356,17 +356,44 @@ public class Dump {
 
     private MethodDescriptor[] groupMethodsByNameAndSignature(MethodDescriptor[] methods) {
         HashMap<String, MethodDescriptor> result = new HashMap<String, MethodDescriptor>();
-        for (int i = 0; i < methods.length; i++) {
-            MethodDescriptor method = methods[i];
-            String methodName = method.getName();
-            String methodOverLoadDescriptor = getMethodOverloadDescriptor(method);
-            methodName +=  "_" + methodOverLoadDescriptor;
-            if (!result.containsKey(methodName)) {
-                result.put(methodName, method);
+        Set<String> descriptors = new HashSet<String>();
+        for (MethodDescriptor method : methods) {
+            String key = stubKey(method, method.isInterfaceMethod());
+            if (!result.containsKey(key) && descriptors.add(dexDescriptor(method))) {
+                result.put(key, method);
             }
         }
 
         return result.values().toArray(new MethodDescriptor[result.size()]);
+    }
+
+    /*
+     * Which methods of a generated class share one stub. Java calls a method an interface
+     * declares through its full descriptor, so a class whose interfaces declare it with several
+     * return types needs a stub for each. A class target's superclass chain keeps one stub per
+     * name and parameter types: javac's bridges dispatch its other return types to that stub.
+     */
+    private String stubKey(MethodDescriptor method, boolean declaredByInterface) {
+        return declaredByInterface
+                ? method.getName() + "(" + getDexMethodDescriptor(method)
+                : method.getName() + "_" + getMethodOverloadDescriptor(method);
+    }
+
+    // Without the separator, int read(int) and int readI() would both be "readII".
+    private String dexDescriptor(MethodDescriptor method) {
+        return method.getName() + ":" + getDexMethodDescriptor(method);
+    }
+
+    // A class cannot declare two methods of one descriptor, whatever their stub keys.
+    private boolean addStub(Set<String> stubs, MethodDescriptor method, boolean declaredByInterface) {
+        String descriptor = " " + dexDescriptor(method);
+        String key = stubKey(method, declaredByInterface);
+        if (stubs.contains(descriptor) || stubs.contains(key)) {
+            return false;
+        }
+        stubs.add(descriptor);
+        stubs.add(key);
+        return true;
     }
 
     private String getMethodSignature(MethodDescriptor m) {
@@ -378,13 +405,19 @@ public class Dump {
         return m.getName() + sig.substring(nameIdx, endSigIdx);
     }
 
+    // Abstract methods found from an interface are told apart by stubKey; those of a class
+    // target's own hierarchy keep the generic name and parameter list they were found by.
+    private String collectedKey(MethodDescriptor m, boolean fromInterface) {
+        return fromInterface ? stubKey(m, true) : getMethodSignature(m);
+    }
+
     private void collectAbstractMethods(final ClassDescriptor clazz, List<MethodDescriptor> result) {
         if (!clazz.isAbstract()) {
             return;
         }
         Set<String> alreadyAddedMethods = new HashSet<String>();
         for (MethodDescriptor md: result) {
-            String sig = getMethodSignature(md);
+            String sig = collectedKey(md, clazz.isInterface());
             alreadyAddedMethods.add(sig);
         }
 
@@ -394,7 +427,7 @@ public class Dump {
         ClassDescriptor startingConcreteClassDesc = isInterfaceClass ? new ClassInfo(Object.class) : clazz;
         for (MethodDescriptor objMethod: startingConcreteClassDesc.getDeclaredMethods()) {
             if (!objMethod.isStatic()) {
-                String sig = getMethodSignature(objMethod);
+                String sig = collectedKey(objMethod, isInterfaceClass);
                 concreteMethods.add(sig);
             }
         }
@@ -412,7 +445,7 @@ public class Dump {
                 if (m.isStatic()) {
                     continue;
                 }
-                String sig = getMethodSignature(m);
+                String sig = collectedKey(m, isInterfaceClass);
                 if (m.isAbstract()) {
                     if (!concreteMethods.contains(sig) && !alreadyAddedMethods.contains(sig)) {
                         if (isInterfaceClass) {
@@ -1008,6 +1041,15 @@ public class Dump {
         if (classTo.isInterface()) {
             if (!interfacesToImplement.contains(classSignature)) {
                 interfacesToImplement.add(classSignature);
+            }
+            if (implementedInterfaces != null) {
+                for (ClassDescriptor interfaceToImpl : implementedInterfaces) {
+                    // A class listed there cannot be implemented.
+                    String descriptor = getAsmDescriptor(interfaceToImpl);
+                    if (interfaceToImpl.isInterface() && !interfacesToImplement.contains(descriptor)) {
+                        interfacesToImplement.add(descriptor);
+                    }
+                }
             }
 
             classSignature = objectClass;

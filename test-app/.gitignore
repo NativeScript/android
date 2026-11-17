@@ -25,4 +25,5 @@ NativeScriptActivity.java
 NativeScriptApplication.java
 # named extend() classes the static binding generator writes for the specs
 app/src/main/java/com/tns/tests/defaults/
+app/src/main/java/com/tns/tests/extras/
 **/com/tns/gen

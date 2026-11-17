@@ -99,6 +99,13 @@ public class DexFactory {
             className = className.substring(0, className.length() - Dump.DEFAULT_OVERRIDING_SUFFIX.length());
         }
 
+        // Without a base class name, an interface's shared class is asked for (by
+        // `new Interface({...})` or for its default-overriding variant). It cannot depend on
+        // the interfaces one implementation object lists.
+        if (isInterface && baseClassName.isEmpty()) {
+            implementedInterfaces = new String[0];
+        }
+
         String fullClassName = className.replace("$", "_");
         String originalFullClassName = fullClassName;
 
@@ -158,9 +165,17 @@ public class DexFactory {
         // anonymous form only, where the name is derived from the base.
         boolean isNamedProxy = !fullClassName.startsWith(COM_TNS_GEN_PREFIX) && fullClassName.contains(".");
 
+        // An anonymous extend of an interface that lists interfaces of its own gets a class of
+        // its call site, under the name asked for, which is also the name a prebuilt class of
+        // the call site has: the interface's shared class cannot implement them for one call.
+        boolean isCallSiteInterfaceClass = isInterface && !baseClassName.isEmpty() && !isNamedProxy && implementedInterfaces.length > 0;
+        if (isCallSiteInterfaceClass) {
+            desiredDexClassName = fullClassName;
+        }
+
         // when interfaces are extended as classes, we still want to preserve
         // just the interface name without the extra file, line, column information
-        if (!baseClassName.isEmpty() && isInterface && !isNamedProxy) {
+        if (!baseClassName.isEmpty() && isInterface && !isNamedProxy && !isCallSiteInterfaceClass) {
             fullClassName = COM_TNS_GEN_PREFIX + classToProxy;
         }
 
@@ -180,7 +195,7 @@ public class DexFactory {
             }
 
             String dexFilePath;
-            if (isInterface && !isNamedProxy) {
+            if (isInterface && !isNamedProxy && !isCallSiteInterfaceClass) {
                 dexFilePath = this.generateDex(name, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface, bodies);
             } else {
                 dexFilePath = this.generateDex(desiredDexClassName, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface, null);
@@ -215,7 +230,7 @@ public class DexFactory {
         jarFile.setReadOnly();
 
         Class<?> result = null;
-        String classNameToLoad = isInterface ? fullClassName : desiredDexClassName;
+        String classNameToLoad = isInterface && !isCallSiteInterfaceClass ? fullClassName : desiredDexClassName;
 
         boolean injectIntoParent = injectIntoParentClassLoader && classLoader instanceof BaseDexClassLoader;
         if (injectIntoParent && ProxyRegistrationGc.isRequired()) {
@@ -424,11 +439,16 @@ public class DexFactory {
         if (overridesDefaults) {
             defaultMethods = DefaultMethods.collect(classToProxy);
         } else if ((!classToProxy.isInterface() || proxyName.contains(".")) && Build.VERSION.SDK_INT >= 24) {
-            // A named interface implementation is one extend() call's class, so like a class
-            // it stubs only the default methods its implementation object names.
-            List<Method> inheritedDefaults = classToProxy.isInterface()
-                    ? DefaultMethods.collect(classToProxy)
-                    : DefaultMethods.collect(classToProxy, implementedInterfaceClasses);
+            // An interface implementation with a dotted name is one extend() call's class, so
+            // like a class it stubs only the default methods its implementation object names.
+            List<Method> inheritedDefaults;
+            if (classToProxy.isInterface()) {
+                List<Class<?>> interfaces = new ArrayList<Class<?>>(implementedInterfaceClasses);
+                interfaces.add(classToProxy);
+                inheritedDefaults = DefaultMethods.collectWithConflicts(Object.class, interfaces);
+            } else {
+                inheritedDefaults = DefaultMethods.collectWithConflicts(classToProxy, implementedInterfaceClasses);
+            }
             defaultMethods = new ArrayList<Method>();
             for (Method inherited : inheritedDefaults) {
                 if (methodOverridesSet == null || methodOverridesSet.contains(inherited.getName())) {

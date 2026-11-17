@@ -184,6 +184,7 @@ public class DefaultMethodsTest {
 
     private static final class Shape {
         String className;
+        final List<String> interfaces = new ArrayList<>();
         final List<String> fields = new ArrayList<>();
         final List<String> methods = new ArrayList<>();
     }
@@ -194,6 +195,9 @@ public class DefaultMethodsTest {
             @Override
             public ClassVisitor visitClass(int access, String name, String[] signature, String superName, String[] interfaces) {
                 shape.className = name;
+                if (interfaces != null) {
+                    shape.interfaces.addAll(Arrays.asList(interfaces));
+                }
                 return new ClassVisitor(Opcodes.ASM4) {
                     @Override
                     public FieldVisitor visitField(int access, String name, String desc, String[] signature, Object value) {
@@ -249,6 +253,262 @@ public class DefaultMethodsTest {
         assertFalse(shape.fields.contains("defaultOverrides__ns:J"));
         assertTrue(shape.methods.contains("forEachRemainingVLjava/util/function/Consumer;"));
         assertFalse(shape.methods.contains("removeV"));
+    }
+
+    @Test
+    public void conflictingDefaultsAreCollectedOnlyWhenAskedFor() throws Exception {
+        List<Class<?>> interfaces = Arrays.<Class<?>>asList(Base.class, Other.class);
+        assertFalse(DefaultMethods.collect(Object.class, interfaces).contains(Base.class.getMethod("inherited")));
+
+        List<Method> withConflicts = DefaultMethods.collectWithConflicts(Object.class, interfaces);
+        assertTrue(withConflicts.contains(Base.class.getMethod("inherited")));
+        assertFalse(withConflicts.contains(Other.class.getMethod("inherited")));
+        assertTrue(withConflicts.containsAll(DefaultMethods.collect(Object.class, interfaces)));
+    }
+
+    interface ObjectSame {
+        default Object same(Object value) {
+            return "object " + value;
+        }
+    }
+
+    @Test
+    public void aConflictWithABridgedDefaultIsCollectedWhenAskedFor() throws Exception {
+        // Narrowing's bridge same(Object) and ObjectSame.same(Object) conflict in a class
+        // implementing both, which therefore has to override same(Object) itself.
+        List<Class<?>> interfaces = Arrays.<Class<?>>asList(Narrowing.class, ObjectSame.class);
+        Method erased = Generic.class.getMethod("same", Object.class);
+        Method other = ObjectSame.class.getMethod("same", Object.class);
+        Method narrowed = Narrowing.class.getMethod("same", String.class);
+
+        List<Method> withoutConflicts = DefaultMethods.collect(Object.class, interfaces);
+        assertEquals(Arrays.asList(narrowed), withoutConflicts);
+
+        List<Method> withConflicts = DefaultMethods.collectWithConflicts(Object.class, interfaces);
+        assertTrue(withConflicts.contains(narrowed));
+        assertEquals(1, (withConflicts.contains(erased) ? 1 : 0) + (withConflicts.contains(other) ? 1 : 0));
+        assertEquals(2, withConflicts.size());
+    }
+
+    interface NumberValue {
+        default Number value() {
+            return 1;
+        }
+    }
+
+    interface IntegerValue {
+        default Integer value() {
+            return 2;
+        }
+    }
+
+    interface AbstractNumberAmount {
+        Number amount();
+    }
+
+    interface AbstractIntegerAmount {
+        Integer amount();
+    }
+
+    @Test
+    public void conflictingDefaultsWithDifferentReturnTypesAreAllCollected() throws Exception {
+        List<Method> withConflicts = DefaultMethods.collectWithConflicts(Object.class,
+                Arrays.<Class<?>>asList(NumberValue.class, IntegerValue.class));
+        assertTrue(withConflicts.contains(NumberValue.class.getMethod("value")));
+        assertTrue(withConflicts.contains(IntegerValue.class.getMethod("value")));
+    }
+
+    private static Shape generateCallSiteClass(Class<?> base, Class<?> extra, List<Method> defaultMethods) {
+        HashSet<ClassDescriptor> extras = new HashSet<>();
+        extras.add(new ClassInfo(extra));
+        org.ow2.asmdex.ApplicationWriter aw = new org.ow2.asmdex.ApplicationWriter();
+        aw.visit();
+        new Dump().generateProxy(aw, "com.tns.gen.a.Base_site_1_2_", new ClassInfo(base), null, extras, null, defaultMethods);
+        aw.visitEnd();
+        return read(aw.toByteArray());
+    }
+
+    @Test
+    public void aCallSiteClassStubsEveryReturnTypeOfAMethodItsInterfacesDeclare() throws Exception {
+        Shape defaults = generateCallSiteClass(NumberValue.class, IntegerValue.class,
+                Arrays.asList(NumberValue.class.getMethod("value"), IntegerValue.class.getMethod("value")));
+        assertTrue(defaults.methods.contains("valueLjava/lang/Number;"));
+        assertTrue(defaults.methods.contains("valueLjava/lang/Integer;"));
+
+        Shape abstracts = generateCallSiteClass(AbstractNumberAmount.class, AbstractIntegerAmount.class, new ArrayList<Method>());
+        assertTrue(abstracts.methods.contains("amountLjava/lang/Number;"));
+        assertTrue(abstracts.methods.contains("amountLjava/lang/Integer;"));
+    }
+
+    // name + dex descriptor is "readII" for both methods
+    interface NameEndingLikeADescriptor {
+        int read(int value);
+
+        int readI();
+    }
+
+    public abstract static class AbstractNameEndingLikeADescriptor {
+        public abstract int read(int value);
+
+        public abstract int readI();
+    }
+
+    @Test
+    public void methodsWhoseNameAndDescriptorConcatenateAlikeEachGetAStub() {
+        Shape implementation = read(generate(NameEndingLikeADescriptor.class, false));
+        assertEquals(2, java.util.Collections.frequency(implementation.methods, "readII"));
+
+        Shape callSite = generateCallSiteClass(NameEndingLikeADescriptor.class, AbstractNumberAmount.class, new ArrayList<Method>());
+        assertEquals(2, java.util.Collections.frequency(callSite.methods, "readII"));
+
+        Shape extend = generateClassExtend(AbstractNameEndingLikeADescriptor.class, Arrays.asList("read", "readI"),
+                new ArrayList<Class<?>>(), new ArrayList<Method>());
+        assertEquals(2, java.util.Collections.frequency(extend.methods, "readII"));
+
+        Shape extendWithInterface = generateClassExtend(Object.class, Arrays.asList("read", "readI"),
+                Arrays.<Class<?>>asList(NameEndingLikeADescriptor.class), new ArrayList<Method>());
+        assertEquals(2, java.util.Collections.frequency(extendWithInterface.methods, "readII"));
+    }
+
+    public static class NumberSuper {
+        public Number value() {
+            return 1;
+        }
+    }
+
+    // javac adds the bridge Number value(), which calls Integer value().
+    public static class IntegerSub extends NumberSuper {
+        @Override
+        public Integer value() {
+            return 2;
+        }
+    }
+
+    public static class ObjectGetter {
+        public Object get() {
+            return null;
+        }
+    }
+
+    interface StringGetDefault {
+        default String get() {
+            return "default";
+        }
+    }
+
+    interface StringGetAbstract {
+        String get();
+    }
+
+    private static Shape generateClassExtend(Class<?> base, String override, List<Class<?>> interfaces, List<Method> defaultMethods) {
+        return generateClassExtend(base, Arrays.asList(override), interfaces, defaultMethods);
+    }
+
+    private static Shape generateClassExtend(Class<?> base, List<String> overridden, List<Class<?>> interfaces, List<Method> defaultMethods) {
+        HashSet<ClassDescriptor> extras = new HashSet<>();
+        for (Class<?> iface : interfaces) {
+            extras.add(new ClassInfo(iface));
+        }
+        HashSet<String> overrides = new HashSet<>(overridden);
+        org.ow2.asmdex.ApplicationWriter aw = new org.ow2.asmdex.ApplicationWriter();
+        aw.visit();
+        new Dump().generateProxy(aw, "a.Extend_site_1_2_", new ClassInfo(base), overrides, extras, null, defaultMethods);
+        aw.visitEnd();
+        return read(aw.toByteArray());
+    }
+
+    private static List<String> stubsNamed(Shape shape, String name) {
+        List<String> stubs = new ArrayList<>();
+        for (String method : shape.methods) {
+            // name + dex descriptor, which starts with the return type
+            if (method.startsWith(name) && method.length() > name.length() && "LVZBCSIJFD[".indexOf(method.charAt(name.length())) >= 0) {
+                stubs.add(method);
+            }
+        }
+        stubs.sort(null);
+        return stubs;
+    }
+
+    @Test
+    public void aClassExtendKeepsOneStubForASuperclassMethodASubclassNarrows() {
+        Shape shape = generateClassExtend(IntegerSub.class, "value", new ArrayList<Class<?>>(), new ArrayList<Method>());
+        assertEquals(Arrays.asList("valueLjava/lang/Integer;"), stubsNamed(shape, "value"));
+    }
+
+    @Test
+    public void aClassExtendStubsEveryReturnTypeItsExtraInterfacesDeclare() {
+        Shape shape = generateClassExtend(Object.class, "amount",
+                Arrays.<Class<?>>asList(AbstractNumberAmount.class, AbstractIntegerAmount.class), new ArrayList<Method>());
+        assertEquals(Arrays.asList("amountLjava/lang/Integer;", "amountLjava/lang/Number;"), stubsNamed(shape, "amount"));
+    }
+
+    @Test
+    public void aClassExtendStubsTheReturnTypeAnExtraInterfaceAddsToASuperclassMethod() throws Exception {
+        assertEquals(Arrays.asList("getLjava/lang/Object;"),
+                stubsNamed(generateClassExtend(ObjectGetter.class, "get", new ArrayList<Class<?>>(), new ArrayList<Method>()), "get"));
+
+        assertEquals(Arrays.asList("getLjava/lang/Object;", "getLjava/lang/String;"),
+                stubsNamed(generateClassExtend(ObjectGetter.class, "get", Arrays.<Class<?>>asList(StringGetAbstract.class), new ArrayList<Method>()), "get"));
+
+        List<Class<?>> withDefault = Arrays.<Class<?>>asList(StringGetDefault.class);
+        List<Method> defaults = DefaultMethods.collectWithConflicts(ObjectGetter.class, withDefault);
+        assertEquals(Arrays.asList(StringGetDefault.class.getMethod("get")), defaults);
+        assertEquals(Arrays.asList("getLjava/lang/Object;", "getLjava/lang/String;"),
+                stubsNamed(generateClassExtend(ObjectGetter.class, "get", withDefault, defaults), "get"));
+    }
+
+    interface ListedBase {
+        default String value() {
+            return "base";
+        }
+    }
+
+    abstract static class ListedImplementor implements ListedBase {
+        @Override
+        public String value() {
+            return "class";
+        }
+    }
+
+    @Test
+    public void aClassAmongTheInterfacesTakesNoPartInTheDefaults() throws Exception {
+        List<Method> collected = DefaultMethods.collectWithConflicts(Object.class,
+                Arrays.<Class<?>>asList(ListedBase.class, ListedImplementor.class));
+        assertEquals(Arrays.asList(ListedBase.class.getMethod("value")), collected);
+    }
+
+    abstract static class NotAnInterface {
+        public abstract String fromClass();
+    }
+
+    @Test
+    public void anInterfaceImplementationOfOneCallSiteImplementsItsOtherInterfacesOnce() throws Exception {
+        HashSet<ClassDescriptor> extras = new HashSet<>();
+        extras.add(new ClassInfo(Other.class));
+        extras.add(new ClassInfo(Iterator.class));
+        extras.add(new ClassInfo(Runnable.class));
+        extras.add(new ClassInfo(NotAnInterface.class));
+        List<Method> named = new ArrayList<>();
+        named.add(Other.class.getMethod("inherited"));
+
+        org.ow2.asmdex.ApplicationWriter aw = new org.ow2.asmdex.ApplicationWriter();
+        aw.visit();
+        new Dump().generateProxy(aw, "com.tns.gen.java.util.Iterator_site_1_2_", new ClassInfo(Iterator.class), null, extras, null, named);
+        aw.visitEnd();
+        Shape shape = read(aw.toByteArray());
+
+        assertEquals("Lcom/tns/gen/java/util/Iterator_site_1_2_;", shape.className);
+        List<String> interfaces = new ArrayList<>(shape.interfaces);
+        interfaces.sort(null);
+        assertEquals(Arrays.asList(
+                "Lcom/tns/NativeScriptHashCodeProvider;",
+                "Lcom/tns/NativeScriptRuntimeBound;",
+                "Lcom/tns/bindings/DefaultMethodsTest$Other;",
+                "Ljava/lang/Runnable;",
+                "Ljava/util/Iterator;"), interfaces);
+        assertTrue(shape.methods.contains("runV"));
+        assertTrue(shape.methods.contains("inheritedLjava/lang/String;"));
+        assertFalse(shape.fields.contains("defaultOverrides__ns:J"));
     }
 
     interface HiddenBase {

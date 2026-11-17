@@ -34,7 +34,7 @@ public final class DefaultMethods {
      * forward to the method they bridge.
      */
     public static List<Method> collect(Class<?> iface) {
-        return collect(Collections.<Class<?>>singletonList(iface), Collections.<String>emptySet());
+        return collect(Collections.<Class<?>>singletonList(iface), Collections.<String>emptySet(), false);
     }
 
     /**
@@ -42,24 +42,49 @@ public final class DefaultMethods {
      * inherits: as {@link #collect(Class)}, less those a class in the hierarchy declares.
      */
     public static List<Method> collect(Class<?> clazz, Collection<Class<?>> interfaces) {
-        List<Class<?>> roots = new ArrayList<>(interfaces);
-        Set<String> classSignatures = new HashSet<>();
+        return collect(clazz, interfaces, false);
+    }
+
+    /**
+     * As {@link #collect(Class, Collection)}, plus one of the default declarations of each
+     * signature that several unrelated interfaces declare. The subclass has to override such
+     * a method itself, so it is a candidate only for a class that implements it in JS.
+     */
+    public static List<Method> collectWithConflicts(Class<?> clazz, Collection<Class<?>> interfaces) {
+        return collect(clazz, interfaces, true);
+    }
+
+    private static List<Method> collect(Class<?> clazz, Collection<Class<?>> interfaces, boolean withConflicts) {
+        // A class listed among the interfaces is not implemented, so it overrides nothing.
+        List<Class<?>> roots = new ArrayList<>();
+        for (Class<?> iface : interfaces) {
+            if (iface.isInterface()) {
+                roots.add(iface);
+            }
+        }
+        // A class method overrides a default of the same return type only: Java calls one of
+        // another return type through a descriptor the class does not declare.
+        Set<String> classDescriptors = new HashSet<>();
         for (Class<?> current = clazz; current != null; current = current.getSuperclass()) {
             roots.addAll(Arrays.asList(current.getInterfaces()));
             for (Method method : current.getDeclaredMethods()) {
                 if (!Modifier.isStatic(method.getModifiers())) {
-                    classSignatures.add(signature(method));
+                    classDescriptors.add(descriptor(method));
                 }
             }
         }
-        return collect(roots, classSignatures);
+        return collect(roots, classDescriptors, withConflicts);
     }
 
     private static String signature(Method method) {
         return method.getName() + Arrays.toString(method.getParameterTypes());
     }
 
-    private static List<Method> collect(Collection<Class<?>> roots, Set<String> excludedSignatures) {
+    private static String descriptor(Method method) {
+        return signature(method) + method.getReturnType().getName();
+    }
+
+    private static List<Method> collect(Collection<Class<?>> roots, Set<String> excludedDescriptors, boolean withConflicts) {
         Map<String, List<Method>> declarationsBySignature = new LinkedHashMap<>();
         List<Method> bridges = new ArrayList<>();
         Set<Class<?>> visited = new HashSet<>();
@@ -81,10 +106,10 @@ public final class DefaultMethods {
                 if (method.isSynthetic()) {
                     continue;
                 }
-                String signature = signature(method);
-                if (excludedSignatures.contains(signature)) {
+                if (excludedDescriptors.contains(descriptor(method))) {
                     continue;
                 }
+                String signature = signature(method);
                 List<Method> declarations = declarationsBySignature.get(signature);
                 if (declarations == null) {
                     declarations = new ArrayList<>();
@@ -98,6 +123,7 @@ public final class DefaultMethods {
         List<Method> result = new ArrayList<>();
         for (List<Method> declarations : declarationsBySignature.values()) {
             Method mostSpecific = null;
+            List<Method> conflictingDefaults = new ArrayList<>();
             int maximal = 0;
             for (Method candidate : declarations) {
                 boolean overridden = false;
@@ -111,12 +137,20 @@ public final class DefaultMethods {
                 if (!overridden) {
                     mostSpecific = candidate;
                     maximal++;
+                    if (candidate.isDefault() && !hasReturnTypeOf(conflictingDefaults, candidate)) {
+                        conflictingDefaults.add(candidate);
+                    }
                 }
             }
             // Several maximal declarations conflict, and the class must override them
-            // itself; that case keeps whatever it does without this class.
+            // itself; unless asked for, that case keeps whatever it does without this class.
+            // A bridge covering one of them is itself one side of the conflict, so only an
+            // override resolves it, bridged or not. Java calls each return type's declaration
+            // by its own descriptor, so one declaration per return type is kept.
             if (maximal == 1 && mostSpecific.isDefault() && !isBridged(mostSpecific, bridges)) {
                 result.add(mostSpecific);
+            } else if (maximal > 1 && withConflicts) {
+                result.addAll(conflictingDefaults);
             }
         }
 
@@ -128,6 +162,15 @@ public final class DefaultMethods {
             }
         });
         return result;
+    }
+
+    private static boolean hasReturnTypeOf(List<Method> methods, Method method) {
+        for (Method other : methods) {
+            if (other.getReturnType() == method.getReturnType()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /*

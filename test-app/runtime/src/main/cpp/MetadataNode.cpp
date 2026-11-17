@@ -2026,7 +2026,9 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
         // Every instance of the extend shares its implementation object, and so its mask.
         uint64_t defaultOverrides = 0;
-        if (isInterface && !hasDot && !CallbackHandlers::HasImplementedInterfaces(isolate, implementationObject)) {
+        // Such an extend gets a class of its own call site rather than the interface's.
+        bool hasImplementedInterfaces = isInterface && !hasDot && CallbackHandlers::HasImplementedInterfaces(isolate, implementationObject);
+        if (isInterface && !hasDot && !hasImplementedInterfaces) {
             defaultOverrides = node->GetDefaultOverrides(isolate, implementationObject);
         }
         auto clazz = defaultOverrides != 0
@@ -2034,9 +2036,10 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
                      : CallbackHandlers::ResolveClass(isolate, baseClassName, fullClassName, implementationObject, isInterface);
         auto fullExtendedName = CallbackHandlers::ResolveClassName(isolate, clazz);
         DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
-        if (defaultOverrides != 0) {
-            // The constructor resolves the class by its own name, which differs from the
-            // requested one for a nested interface ('$' became '_').
+        if (defaultOverrides != 0 || hasImplementedInterfaces) {
+            // The constructor resolves the class by its own name, which can differ from the
+            // requested one ('$' became '_'), and must get this class, not another one the
+            // runtime would find or generate under that name.
             JEnv env;
             auto localClass = static_cast<jclass>(env.NewLocalRef(clazz));
             env.InsertClassIntoCache(fullExtendedName, localClass);
