@@ -61,7 +61,7 @@ require("./tests/testGC");
 require("./tests/testsMemoryManagement");
 require("./tests/testFieldGetSet");
 require("./tests/extendedClassesTests");
-//require("./tests/extendClassNameTests"); // as tests now run with SBG, this test fails the whole build process
+require("./tests/extendClassNameTests");
 require("./tests/testJniReferenceLeak");
 require("./tests/testNativeModules");
 require("./tests/requireExceptionTests");

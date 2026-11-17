@@ -1788,6 +1788,79 @@ void MetadataNode::PackageGetterCallback(Local<Name> property, const PropertyCal
     }
 }
 
+// SimpleNameChar of the dex 035 format the proxy generator writes. Later formats add only
+// space characters, which no Java identifier can contain either.
+static bool IsDexSimpleNameChar(uint32_t c) {
+    if (c < 0x80) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+               c == '$' || c == '-' || c == '_';
+    }
+    return (c >= 0xA1 && c <= 0x1FFF) || (c >= 0x2010 && c <= 0x2027) ||
+           (c >= 0x2030 && c <= 0xD7FF) || (c >= 0xE000 && c <= 0xFFEF) ||
+           (c >= 0x10000 && c <= 0x10FFFF);
+}
+
+// Rejects only names no class can have. A part that is a dex name but not a Java
+// identifier still generates at runtime; the static binding generator cannot compile it.
+static void ValidateDottedExtendName(const string& name) {
+    bool isJavaName = true;
+    size_t partStart = 0;
+    while (true) {
+        // ClassResolver reads '/' as '.'.
+        size_t partEnd = name.find_first_of("./", partStart);
+        if (partEnd == string::npos) {
+            partEnd = name.size();
+        }
+        if (partEnd == partStart) {
+            throw NativeScriptException("Invalid extend() name \"" + name + "\": a class name cannot have an empty part between dots.");
+        }
+
+        string part = name.substr(partStart, partEnd - partStart);
+        for (size_t i = 0; i < part.size();) {
+            unsigned char lead = part[i];
+            uint32_t c;
+            size_t length;
+            if (lead < 0x80) {
+                c = lead;
+                length = 1;
+            } else if ((lead & 0xE0) == 0xC0) {
+                c = lead & 0x1F;
+                length = 2;
+            } else if ((lead & 0xF0) == 0xE0) {
+                c = lead & 0x0F;
+                length = 3;
+            } else {
+                c = lead & 0x07;
+                length = 4;
+            }
+            for (size_t k = 1; k < length && i + k < part.size(); k++) {
+                c = (c << 6) | (static_cast<unsigned char>(part[i + k]) & 0x3F);
+            }
+            if (!IsDexSimpleNameChar(c)) {
+                char codePoint[16];
+                snprintf(codePoint, sizeof(codePoint), "U+%04X", c);
+                throw NativeScriptException("Invalid extend() name \"" + name + "\": \"" + part + "\" contains a character a class name cannot contain (" + codePoint + ").");
+            }
+            i += length;
+        }
+
+        if ((part[0] >= '0' && part[0] <= '9') || part.find('-') != string::npos) {
+            isJavaName = false;
+        }
+
+        if (partEnd == name.size()) {
+            break;
+        }
+        partStart = partEnd + 1;
+    }
+
+    if (!isJavaName) {
+        __android_log_print(ANDROID_LOG_WARN, "JS",
+                            "extend() name \"%s\" is not a Java class name (a part starts with a digit or contains '-'). The static binding generator cannot compile it, so the class is only ever generated at runtime.",
+                            name.c_str());
+    }
+}
+
 bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& info, bool extendLocationFound, string& extendLocation, v8::Local<v8::String>& extendName, Local<Object>& implementationObject, bool isTypeScriptExtend) {
     auto isolate = info.GetIsolate();
 
@@ -1908,6 +1981,9 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
             }
             string strName = ArgConverter::ConvertToString(info[0].As<String>());
             hasDot = strName.find('.') != string::npos;
+            if (hasDot) {
+                ValidateDottedExtendName(strName);
+            }
         } else if (info.Length() == 3) {
             auto context = isolate->GetCurrentContext();
             if (info[2]->IsBoolean() && info[2]->BooleanValue(isolate)) {
