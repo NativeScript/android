@@ -172,7 +172,8 @@ public class DefaultMethodsTest {
     }
 
     private static byte[] generate(Class<?> iface, boolean overrideDefaults) {
-        org.ow2.asmdex.ApplicationWriter aw = new org.ow2.asmdex.ApplicationWriter();
+        org.ow2.asmdex.ApplicationWriter aw = new org.ow2.asmdex.ApplicationWriter(
+                overrideDefaults ? DefaultMethodBodies.INVOKE_SUPER.dexVersion : org.ow2.asmdex.ApplicationWriter.DEFAULT_DEX_VERSION);
         aw.visit();
         ClassDescriptor descriptor = new ClassInfo(iface);
         new Dump().generateProxy(aw, "", descriptor, null, new HashSet<ClassDescriptor>(), null,
@@ -297,14 +298,14 @@ public class DefaultMethodsTest {
         List<Method> withAnother = new ArrayList<>(iteratorDefaults);
         withAnother.add(Derived.class.getMethod("redefined"));
 
-        String suffix = ProxyGenerator.defaultOverridingFileSuffix(iteratorDefaults);
+        String suffix = ProxyGenerator.defaultOverridingFileSuffix(iteratorDefaults, DefaultMethodBodies.INVOKE_SUPER);
         assertTrue(suffix.startsWith(Dump.DEFAULT_OVERRIDING_SUFFIX + "-"));
-        assertEquals(suffix, ProxyGenerator.defaultOverridingFileSuffix(new ArrayList<>(iteratorDefaults)));
-        assertFalse(suffix.equals(ProxyGenerator.defaultOverridingFileSuffix(withoutRemove)));
-        assertFalse(suffix.equals(ProxyGenerator.defaultOverridingFileSuffix(withAnother)));
+        assertEquals(suffix, ProxyGenerator.defaultOverridingFileSuffix(new ArrayList<>(iteratorDefaults), DefaultMethodBodies.INVOKE_SUPER));
+        assertFalse(suffix.equals(ProxyGenerator.defaultOverridingFileSuffix(withoutRemove, DefaultMethodBodies.INVOKE_SUPER)));
+        assertFalse(suffix.equals(ProxyGenerator.defaultOverridingFileSuffix(withAnother, DefaultMethodBodies.INVOKE_SUPER)));
         List<Method> withOverload = new ArrayList<>(iteratorDefaults);
         withOverload.add(java.util.PrimitiveIterator.OfInt.class.getMethod("forEachRemaining", java.util.function.IntConsumer.class));
-        assertFalse(suffix.equals(ProxyGenerator.defaultOverridingFileSuffix(withOverload)));
+        assertFalse(suffix.equals(ProxyGenerator.defaultOverridingFileSuffix(withOverload, DefaultMethodBodies.INVOKE_SUPER)));
 
         java.io.File dir = java.nio.file.Files.createTempDirectory("proxies").toFile();
         try {

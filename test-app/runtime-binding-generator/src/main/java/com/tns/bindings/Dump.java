@@ -186,6 +186,15 @@ public class Dump {
      * like the class's other overrides. null adds neither.
      */
     public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, AnnotationDescriptor[] annotations, List<java.lang.reflect.Method> defaultMethods) {
+        generateProxy(aw, proxyName, classTo, methodOverrides, implementedInterfaces, annotations, defaultMethods, DefaultMethodBodies.INVOKE_SUPER);
+    }
+
+    /**
+     * As above; a default-overriding class runs the Java bodies of the defaults its JS object
+     * does not implement as bodies says, and its name ends with bodies.classSuffix. aw has to
+     * write bodies.dexVersion.
+     */
+    public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, AnnotationDescriptor[] annotations, List<java.lang.reflect.Method> defaultMethods, DefaultMethodBodies bodies) {
         String classSignature = getAsmDescriptor(classTo);
         boolean overridesDefaults = defaultMethods != null && classTo.isInterface() && !proxyName.contains(".");
 
@@ -199,7 +208,7 @@ public class Dump {
             if (!classTo.isInterface()) {
                 tnsClassSignature += CLASS_NAME_LOCATION_SEPARATOR + proxyName;
             } else if (overridesDefaults) {
-                tnsClassSignature += DEFAULT_OVERRIDING_SUFFIX;
+                tnsClassSignature += bodies.classSuffix;
             }
 
             tnsClassSignature += ";";
@@ -227,10 +236,16 @@ public class Dump {
         generateMethods(cv, classTo, methods, classSignature, tnsClassSignature);
 
         if (overridesDefaults) {
-            generateDefaultMethodStubs(cv, defaultMethods, methods, classSignature, tnsClassSignature);
+            generateDefaultMethodStubs(cv, defaultMethods, methods, classSignature, tnsClassSignature, bodies);
         }
 
         cv.visitEnd();
+    }
+
+    /** The dex descriptor of the default-overriding class Dump generates for the interface. */
+    public static String defaultOverridingDescriptor(ClassDescriptor iface, DefaultMethodBodies bodies) {
+        String classSignature = getAsmDescriptor(iface);
+        return LCOM_TNS + classSignature.substring(1, classSignature.length() - 1).replace("$", "_") + bodies.classSuffix + ";";
     }
 
     private MethodDescriptor[] withInheritedDefaults(MethodDescriptor[] methods, List<java.lang.reflect.Method> defaultMethods) {
@@ -248,7 +263,7 @@ public class Dump {
         return result.toArray(new MethodDescriptor[result.size()]);
     }
 
-    private void generateDefaultMethodStubs(ClassVisitor cv, List<java.lang.reflect.Method> defaultMethods, MethodDescriptor[] generatedMethods, String classSignature, String tnsClassSignature) {
+    private void generateDefaultMethodStubs(ClassVisitor cv, List<java.lang.reflect.Method> defaultMethods, MethodDescriptor[] generatedMethods, String classSignature, String tnsClassSignature, DefaultMethodBodies bodies) {
         Set<String> generatedSignatures = new HashSet<String>();
         for (MethodDescriptor generated : generatedMethods) {
             generatedSignatures.add(generated.getName() + "_" + getMethodOverloadDescriptor(generated));
@@ -261,7 +276,7 @@ public class Dump {
             if (bit >= DefaultMethods.MAX_DISPATCHED_NAMES || !generatedSignatures.add(method.getName() + "_" + getMethodOverloadDescriptor(method))) {
                 continue;
             }
-            generateDefaultMethodStub(cv, defaultMethod, method, bit, classSignature, tnsClassSignature);
+            generateDefaultMethodStub(cv, defaultMethod, method, bit, classSignature, tnsClassSignature, bodies);
         }
     }
 
@@ -275,11 +290,11 @@ public class Dump {
 
     /*
      * Calls JS when the instance's mask has the bit of the method's name, and otherwise
-     * runs the interface's body through Runtime.callInterfaceDefault, on the calling thread.
-     * It names the interface the class implements, not the one declaring the method: that
-     * may be a super-interface this class cannot access.
+     * runs the interface's body, on the calling thread. Either way it names the interface the
+     * class implements, not the one declaring the method: that may be a super-interface this
+     * class cannot access.
      */
-    private void generateDefaultMethodStub(ClassVisitor cv, java.lang.reflect.Method defaultMethod, MethodDescriptor method, int bit, String classSignature, String tnsClassSignature) {
+    private void generateDefaultMethodStub(ClassVisitor cv, java.lang.reflect.Method defaultMethod, MethodDescriptor method, int bit, String classSignature, String tnsClassSignature, DefaultMethodBodies bodies) {
         MethodVisitor mv = cv.visitMethod(org.ow2.asmdex.Opcodes.ACC_PUBLIC, method.getName(), getDexMethodDescriptor(method), null, new String[0]);
         mv.visitCode();
 
@@ -298,6 +313,11 @@ public class Dump {
         generateReturnFromObject(mv, method.getReturnType(), thisRegister, 1);
 
         mv.visitLabel(javaBody);
+        if (bodies == DefaultMethodBodies.INVOKE_SUPER) {
+            generateSuperCall(mv, method, thisRegister, classSignature);
+            mv.visitEnd();
+            return;
+        }
         generateArrayForCallJsArguments(mv, method.getParameterTypes(), thisRegister, classSignature, tnsClassSignature);
         mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, DefaultMethods.key(defaultMethod));
         mv.visitTypeInsn(org.ow2.asmdex.Opcodes.INSN_CONST_CLASS, 2, 0, 0, classSignature);
@@ -305,6 +325,33 @@ public class Dump {
         generateReturnFromObject(mv, method.getReturnType(), thisRegister, 1);
 
         mv.visitEnd();
+    }
+
+    // The arguments are this method's own, in the contiguous registers from thisRegister on.
+    private void generateSuperCall(MethodVisitor mv, MethodDescriptor method, int thisRegister, String interfaceSignature) {
+        int words = 1;
+        for (ClassDescriptor parameterType : method.getParameterTypes()) {
+            words += parameterType.equals(ClassDescriptor.LONG) || parameterType.equals(ClassDescriptor.DOUBLE) ? 2 : 1;
+        }
+        int[] arguments = new int[words];
+        for (int i = 0; i < words; i++) {
+            arguments[i] = thisRegister + i;
+        }
+        mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_SUPER_RANGE, interfaceSignature, method.getName(), getDexMethodDescriptor(method), arguments);
+
+        ClassDescriptor returnType = method.getReturnType();
+        if (returnType.equals(ClassDescriptor.VOID)) {
+            mv.visitInsn(org.ow2.asmdex.Opcodes.INSN_RETURN_VOID);
+        } else if (returnType.equals(ClassDescriptor.LONG) || returnType.equals(ClassDescriptor.DOUBLE)) {
+            mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_MOVE_RESULT_WIDE, 0);
+            mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_RETURN_WIDE, 0);
+        } else if (returnType.isPrimitive()) {
+            mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_MOVE_RESULT, 0);
+            mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_RETURN, 0);
+        } else {
+            mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_MOVE_RESULT_OBJECT, 0);
+            mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_RETURN_OBJECT, 0);
+        }
     }
 
     private MethodDescriptor[] groupMethodsByNameAndSignature(MethodDescriptor[] methods) {

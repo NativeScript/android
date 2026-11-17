@@ -4,6 +4,7 @@ import android.os.Build;
 import android.util.Log;
 
 import com.tns.bindings.AnnotationDescriptor;
+import com.tns.bindings.DefaultMethodBodies;
 import com.tns.bindings.DefaultMethods;
 import com.tns.bindings.Dump;
 import com.tns.bindings.ProxyGenerator;
@@ -93,6 +94,7 @@ public class DexFactory {
         // Only native asks for it, without a base class name; an extend() name the script
         // chose always comes with the base class's.
         boolean overridesDefaults = isInterface && baseClassName.isEmpty() && className.startsWith(COM_TNS_GEN_PREFIX) && className.endsWith(Dump.DEFAULT_OVERRIDING_SUFFIX);
+        String requestedClassName = className;
         if (overridesDefaults) {
             className = className.substring(0, className.length() - Dump.DEFAULT_OVERRIDING_SUFFIX.length());
         }
@@ -118,16 +120,22 @@ public class DexFactory {
         }
 
         if (overridesDefaults) {
-            fullClassName += Dump.DEFAULT_OVERRIDING_SUFFIX;
-            originalFullClassName = fullClassName;
+            // Cached under the name native asks for, whichever class answers it.
+            originalFullClassName = fullClassName + Dump.DEFAULT_OVERRIDING_SUFFIX;
         }
 
         // new: com.tns.gen.android.widget.DatePicker_MyActivity_59_56_
         // old: com.tns.tests.Button1_fMyActivity_l56_c44__MyButton
         // ne1: com.tns.tests.Button1_MyActivity_58_44_MyButton_0
-        Class<?> existingClass = this.injectedDexClasses.get(fullClassName);
+        Class<?> existingClass = this.injectedDexClasses.get(originalFullClassName);
         if (existingClass != null) {
             return existingClass;
+        }
+
+        DefaultMethodBodies bodies = null;
+        if (overridesDefaults) {
+            bodies = DefaultSuperCalls.bodies(Class.forName(this.getClassToProxyName(className)));
+            fullClassName += bodies.classSuffix;
         }
 
         String classToProxy;
@@ -142,7 +150,7 @@ public class DexFactory {
         if (overridesDefaults) {
             // The same file name ProxyGenerator writes the class under.
             desiredDexClassName = this.getClassToProxyName(className.replace("$", "_"))
-                    + ProxyGenerator.defaultOverridingFileSuffix(DefaultMethods.collect(Class.forName(classToProxy)));
+                    + ProxyGenerator.defaultOverridingFileSuffix(DefaultMethods.collect(Class.forName(classToProxy)), bodies);
         }
 
         // A named proxy (`Base.extend('a.b.C', {...})` / @JavaProxy) asks for
@@ -173,9 +181,9 @@ public class DexFactory {
 
             String dexFilePath;
             if (isInterface && !isNamedProxy) {
-                dexFilePath = this.generateDex(name, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface, overridesDefaults);
+                dexFilePath = this.generateDex(name, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface, bodies);
             } else {
-                dexFilePath = this.generateDex(desiredDexClassName, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface, false);
+                dexFilePath = this.generateDex(desiredDexClassName, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface, null);
             }
             dexFile = new File(dexFilePath);
             long stopGenTime = System.nanoTime();
@@ -227,6 +235,10 @@ public class DexFactory {
         if (result == null) {
             DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexDir.getAbsolutePath(), null, classLoader);
             result = dexClassLoader.loadClass(classNameToLoad);
+        }
+
+        if (bodies == DefaultMethodBodies.INVOKE_SUPER && !DefaultSuperCalls.verify(result)) {
+            return resolveClass(baseClassName, name, requestedClassName, methodOverrides, implementedInterfaces, isInterface);
         }
 
         generatedClassNames.add(result.getName());
@@ -377,7 +389,11 @@ public class DexFactory {
         return null;
     }
 
-    private String generateDex(String proxyName, String contentDigest, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface, boolean overridesDefaults) throws ClassNotFoundException, IOException {
+    // defaultBodies: those of the default-overriding class of the interface className; null for
+    // any other class.
+    private String generateDex(String proxyName, String contentDigest, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface,
+                               DefaultMethodBodies defaultBodies) throws ClassNotFoundException, IOException {
+        boolean overridesDefaults = defaultBodies != null;
         Class<?> classToProxy = Class.forName(className);
 
         HashSet<String> methodOverridesSet = null;
@@ -420,7 +436,8 @@ public class DexFactory {
                 }
             }
         }
-        return proxyGenerator.generateProxy(proxyName, contentDigest, new ClassInfo(classToProxy), methodOverridesSet, implementedInterfacesSet, isInterface, annotations, defaultMethods);
+        return proxyGenerator.generateProxy(proxyName, contentDigest, new ClassInfo(classToProxy), methodOverridesSet, implementedInterfacesSet, isInterface, annotations, defaultMethods,
+                                            overridesDefaults ? defaultBodies : DefaultMethodBodies.INVOKE_SUPER);
     }
 
     private void updateDexThumbAndPurgeCache() {
