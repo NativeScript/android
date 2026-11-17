@@ -33,7 +33,7 @@ import dalvik.system.BaseDexClassLoader;
 import dalvik.system.DexClassLoader;
 
 public class DexFactory {
-    private static final String COM_TNS_GEN_PREFIX = "com.tns.gen.";
+    static final String COM_TNS_GEN_PREFIX = "com.tns.gen.";
 
     private final Logger logger;
     private final File dexDir;
