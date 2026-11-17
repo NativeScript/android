@@ -466,11 +466,15 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
 
                     getline(s, line);
                     stringstream baseClassLine(line);
-                    baseClassLine >> kind >> name;
+                    // Empty for an interface, which has no superclass.
+                    string baseClassName;
+                    baseClassLine >> kind >> baseClassName;
                     cKind = kind[0];
 
                     NS_DCHECK(cKind == 'B');
-                    baseClass = GetOrCreateTreeNodeByName(name);
+                    if (!baseClassName.empty()) {
+                        baseClass = GetOrCreateTreeNodeByName(baseClassName);
+                    }
                 }
 
                 // Resolving the base class can release the state lock, so another
