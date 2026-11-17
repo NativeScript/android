@@ -143,6 +143,10 @@ class MetadataNode {
                 std::vector<MethodCallbackData*>& instanceMethodsCallbackData,
                 const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData,
                 MetadataTreeNode* treeNode);
+        void SetInterfaceMethodsFromRuntimeMetadata(
+                v8::Isolate* isolate, PrototypeTemplateFiller& protoFiller,
+                const v8::Local<v8::FunctionTemplate>& baseFuncTemplate,
+                MetadataTreeNode* treeNode);
 
         void SetStaticMembers(v8::Isolate* isolate, v8::Local<v8::Function>& ctorFunction, MetadataTreeNode* treeNode, uint8_t* &curPtr);
         static void InnerTypeAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);

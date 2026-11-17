@@ -18,11 +18,13 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -1079,7 +1081,7 @@ public class Runtime {
         return result;
     }
 
-    private static String getTypeMetadata(Class<?> clazz) {
+    static String getTypeMetadata(Class<?> clazz) {
         StringBuilder sb = new StringBuilder();
 
         if (clazz.isInterface()) {
@@ -1096,6 +1098,16 @@ public class Runtime {
 
         Class<?> baseClass = clazz.getSuperclass();
         sb.append("B " + ((baseClass != null) ? baseClass.getName() : "").replace('.', '/') + "\n");
+
+        // Android 9 drops the members it hides from a boot class's reflection results,
+        // even public methods that implement a public interface; native installs the
+        // methods of those interfaces the build-time metadata has, under names the class
+        // chain does not already provide.
+        if (!clazz.isInterface() && isBootClass(clazz)) {
+            for (Class<?> implemented : publicInterfacesOf(clazz)) {
+                sb.append("N ").append(implemented.getName().replace('.', '/')).append('\n');
+            }
+        }
 
         Method[] methods = clazz.getDeclaredMethods();
         Arrays.sort(methods, methodComparator);
@@ -1132,6 +1144,57 @@ public class Runtime {
         String ret = sb.toString();
 
         return ret;
+    }
+
+    static boolean isBootClass(Class<?> clazz) {
+        ClassLoader loader = clazz.getClassLoader();
+        return loader == null || loader == Object.class.getClassLoader();
+    }
+
+    /**
+     * The public interfaces {@code clazz} itself implements, with their super-interfaces,
+     * each listed after every sub-interface of it in the set, so a name an interface and
+     * its sub-interface both declare comes from the sub-interface and keeps its overloads.
+     * Non-public interfaces are walked through but not listed.
+     */
+    static List<Class<?>> publicInterfacesOf(Class<?> clazz) {
+        ArrayList<Class<?>> all = new ArrayList<Class<?>>();
+        ArrayDeque<Class<?>> pending = new ArrayDeque<Class<?>>(Arrays.asList(clazz.getInterfaces()));
+        while (!pending.isEmpty()) {
+            Class<?> next = pending.removeFirst();
+            if (!all.contains(next)) {
+                all.add(next);
+                pending.addAll(Arrays.asList(next.getInterfaces()));
+            }
+        }
+
+        ArrayList<Class<?>> ordered = new ArrayList<Class<?>>(all.size());
+        while (!all.isEmpty()) {
+            int pick = 0;
+            for (int i = 0; i < all.size(); i++) {
+                Class<?> candidate = all.get(i);
+                boolean hasPendingSubInterface = false;
+                for (Class<?> other : all) {
+                    if (other != candidate && candidate.isAssignableFrom(other)) {
+                        hasPendingSubInterface = true;
+                        break;
+                    }
+                }
+                if (!hasPendingSubInterface) {
+                    pick = i;
+                    break;
+                }
+            }
+            ordered.add(all.remove(pick));
+        }
+
+        ArrayList<Class<?>> result = new ArrayList<Class<?>>(ordered.size());
+        for (Class<?> implemented : ordered) {
+            if (Modifier.isPublic(implemented.getModifiers())) {
+                result.add(implemented);
+            }
+        }
+        return result;
     }
 
     // One upcall for what native needs after constructing an object from JS.

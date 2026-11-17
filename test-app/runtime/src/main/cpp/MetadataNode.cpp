@@ -1009,6 +1009,11 @@ void MetadataNode::SetInstanceMembersFromRuntimeMetadata(
     auto cache = GetMetadataNodeCache(isolate);
 
     while (getline(s, line)) {
+        // Implemented interfaces; SetInterfaceMethodsFromRuntimeMetadata reads them.
+        if (!line.empty() && line[0] == 'N') {
+            continue;
+        }
+
         stringstream tmp(line);
         tmp >> kind >> name >> signature >> paramCount;
 
@@ -1045,6 +1050,89 @@ void MetadataNode::SetInstanceMembersFromRuntimeMetadata(
         } else if (chKind == 'F') {
             auto* fieldInfo = cache->Own<FieldCallbackData>(entry);
             protoFiller.FillPrototypeField(isolate, entry.name, fieldInfo);
+        }
+    }
+}
+
+/*
+ * Adds to a runtime-resolved class the methods of its public interfaces (the
+ * `N` lines, most specific first) under every name the class chain does not
+ * already have. The interface's own callback data is installed, so a call
+ * resolves the method on the interface, never on the class: Android 9 hides
+ * some boot classes' members from reflection and from JNI lookups made with app
+ * code on the stack, while the interface method is public API.
+ *
+ * Only interfaces in the build-time metadata count: the point is the public API
+ * the platform hides, not the members of non-SDK interfaces, and those are never
+ * resolved at run time for this. An interface that fails to materialize is
+ * skipped; the class's wrapper does not depend on it.
+ */
+void MetadataNode::SetInterfaceMethodsFromRuntimeMetadata(
+        Isolate* isolate, PrototypeTemplateFiller& protoFiller,
+        const Local<FunctionTemplate>& baseFuncTemplate, MetadataTreeNode* treeNode) {
+    NS_DCHECK(treeNode->metadata != nullptr);
+
+    vector<string> interfaceNames;
+    {
+        stringstream s(*treeNode->metadata);
+        string line;
+        while (getline(s, line)) {
+            if (line.size() > 2 && line[0] == 'N' && line[1] == ' ') {
+                interfaceNames.push_back(line.substr(2));
+            }
+        }
+    }
+    if (interfaceNames.empty()) {
+        return;
+    }
+
+    auto context = isolate->GetCurrentContext();
+
+    Local<Object> basePrototype;
+    if (!baseFuncTemplate.IsEmpty()) {
+        Local<Function> baseFunc;
+        Local<Value> prototype;
+        if (baseFuncTemplate->GetFunction(context).ToLocal(&baseFunc) &&
+            baseFunc->Get(context, V8StringConstants::GetPrototype(isolate)).ToLocal(&prototype) &&
+            prototype->IsObject()) {
+            basePrototype = prototype.As<Object>();
+        }
+    }
+
+    for (const auto& interfaceName : interfaceNames) {
+        auto interfaceTreeNode = s_metadataReader.FindStaticTreeNodeByName(interfaceName);
+        if (interfaceTreeNode == nullptr) {
+            continue;
+        }
+
+        vector<MethodCallbackData*> interfaceMethods;
+        try {
+            auto interfaceNode = GetOrCreateInternal(interfaceTreeNode);
+            if (!interfaceNode->IsNodeTypeInterface()) {
+                continue;
+            }
+            auto interfaceTemplate = interfaceNode->GetConstructorFunctionTemplate(
+                    isolate, interfaceNode->m_treeNode, interfaceMethods);
+            if (interfaceTemplate.IsEmpty()) {
+                continue;
+            }
+        } catch (NativeScriptException&) {
+            DEBUG_WRITE("Skipping interface %s of %s: it cannot be materialized",
+                        interfaceName.c_str(), m_name.c_str());
+            continue;
+        }
+
+        for (auto* methodData : interfaceMethods) {
+            if (methodData->candidates.empty()) {
+                continue;
+            }
+            const auto& methodName = methodData->candidates.front().name;
+            if (!basePrototype.IsEmpty() &&
+                basePrototype->Has(context, NewMemberName(isolate, methodName)).FromMaybe(true)) {
+                continue;
+            }
+            // A name the class itself declares, or an earlier interface added, is kept.
+            protoFiller.FillPrototypeMethod(isolate, methodName, methodData);
         }
     }
 }
@@ -1247,6 +1335,7 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
 
     Local<Function> baseCtorFunc;
+    Local<FunctionTemplate> baseFuncTemplate;
     std::vector<MethodCallbackData*> baseInstanceMethodsCallbackData;
     auto tmpTreeNode = treeNode;
     while (true) {
@@ -1256,7 +1345,7 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
             continue;
         }
         if ((baseTreeNode != treeNode) && (baseTreeNode != nullptr) && (baseTreeNode->offsetValue > 0)) {
-            auto baseFuncTemplate = GetConstructorFunctionTemplate(isolate, baseTreeNode, baseInstanceMethodsCallbackData);
+            baseFuncTemplate = GetConstructorFunctionTemplate(isolate, baseTreeNode, baseInstanceMethodsCallbackData);
             if (!baseFuncTemplate.IsEmpty()) {
                 ctorFuncTemplate->Inherit(baseFuncTemplate);
                 baseCtorFunc = Local<Function>::New(isolate, *GetOrCreateInternal(baseTreeNode)->GetPersistentConstructorFunction(isolate));
@@ -1272,6 +1361,10 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     node->SetInstanceMembers(
             isolate, ctorFuncTemplate, protoFiller, instanceMethodsCallbackData,
             baseInstanceMethodsCallbackData, treeNode, curPtr);
+
+    if (treeNode->metadata != nullptr && !isInterface) {
+        node->SetInterfaceMethodsFromRuntimeMetadata(isolate, protoFiller, baseFuncTemplate, treeNode);
+    }
 
     auto context = isolate->GetCurrentContext();
     auto ctorFunc = ctorFuncTemplate->GetFunction(context).ToLocalChecked();

@@ -290,6 +290,28 @@ MetadataTreeNode *MetadataReader::GetRoot() const {
     return m_root;
 }
 
+MetadataTreeNode *MetadataReader::FindStaticTreeNodeByName(const string &className) const {
+    vector<string> names;
+    Util::SplitString(className, "/$", names);
+
+    MetadataTreeNode *treeNode = m_root;
+    for (const auto &name: names) {
+        if (treeNode == nullptr || treeNode->children == nullptr) {
+            return nullptr;
+        }
+        MetadataTreeNode *found = nullptr;
+        for (auto child: *treeNode->children) {
+            if (child->name == name) {
+                found = child;
+                break;
+            }
+        }
+        treeNode = found;
+    }
+
+    return names.empty() ? nullptr : treeNode;
+}
+
 uint8_t MetadataReader::GetNodeType(MetadataTreeNode *treeNode) {
     uint8_t memoized = treeNode->type.load(std::memory_order_relaxed);
     if (memoized != MetadataTreeNode::INVALID_TYPE) {
@@ -466,11 +488,15 @@ MetadataTreeNode *MetadataReader::GetOrCreateTreeNodeByName(const string &classN
 
                     getline(s, line);
                     stringstream baseClassLine(line);
-                    baseClassLine >> kind >> name;
+                    // Empty for an interface, which has no superclass.
+                    string baseClassName;
+                    baseClassLine >> kind >> baseClassName;
                     cKind = kind[0];
 
                     NS_DCHECK(cKind == 'B');
-                    baseClass = GetOrCreateTreeNodeByName(name);
+                    if (!baseClassName.empty()) {
+                        baseClass = GetOrCreateTreeNodeByName(baseClassName);
+                    }
                 }
 
                 // Resolving the base class can release the state lock, so another

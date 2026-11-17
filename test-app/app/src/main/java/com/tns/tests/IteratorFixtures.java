@@ -40,6 +40,11 @@ public class IteratorFixtures {
         return () -> new PackagePrivateIterator(ITEMS);
     }
 
+    // Runs a JS callback with this app class, not the event loop, as its Java caller.
+    public static void run(Runnable callback) {
+        callback.run();
+    }
+
     public static Object[] privateNestedIteratorArray() {
         return new PrivateNestedIterator[] {
             new PrivateNestedIterator(ITEMS), new PrivateNestedIterator(ITEMS)
