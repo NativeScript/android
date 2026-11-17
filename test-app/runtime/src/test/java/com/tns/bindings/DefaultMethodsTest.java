@@ -340,6 +340,26 @@ public class DefaultMethodsTest {
         assertTrue(abstracts.methods.contains("amountLjava/lang/Integer;"));
     }
 
+    interface ListedBase {
+        default String value() {
+            return "base";
+        }
+    }
+
+    abstract static class ListedImplementor implements ListedBase {
+        @Override
+        public String value() {
+            return "class";
+        }
+    }
+
+    @Test
+    public void aClassAmongTheInterfacesTakesNoPartInTheDefaults() throws Exception {
+        List<Method> collected = DefaultMethods.collectWithConflicts(Object.class,
+                Arrays.<Class<?>>asList(ListedBase.class, ListedImplementor.class));
+        assertEquals(Arrays.asList(ListedBase.class.getMethod("value")), collected);
+    }
+
     abstract static class NotAnInterface {
         public abstract String fromClass();
     }

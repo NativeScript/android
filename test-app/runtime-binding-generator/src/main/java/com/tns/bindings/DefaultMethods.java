@@ -55,7 +55,13 @@ public final class DefaultMethods {
     }
 
     private static List<Method> collect(Class<?> clazz, Collection<Class<?>> interfaces, boolean withConflicts) {
-        List<Class<?>> roots = new ArrayList<>(interfaces);
+        // A class listed among the interfaces is not implemented, so it overrides nothing.
+        List<Class<?>> roots = new ArrayList<>();
+        for (Class<?> iface : interfaces) {
+            if (iface.isInterface()) {
+                roots.add(iface);
+            }
+        }
         Set<String> classSignatures = new HashSet<>();
         for (Class<?> current = clazz; current != null; current = current.getSuperclass()) {
             roots.addAll(Arrays.asList(current.getInterfaces()));

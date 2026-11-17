@@ -306,6 +306,18 @@ describe("Interface extends with extra interfaces", function () {
         expect(String(F.call(instance, PKG + "Covariant$AbstractIntegerExtra", "amount"))).toBe("42");
     });
 
+    it("leave a class listed as an extra interface out of the default methods to call", function () {
+        var B = X.ClassListed.Base;
+        var C = B.extend("com.tns.tests.extras.NamedClassListedExtras", {
+            interfaces: [X.ClassListed.Implementor],
+            value: function () { return "js value"; }
+        });
+        var instance = new C();
+
+        expect(F.isInstance(instance, PKG + "ClassListed$Implementor")).toBe(false);
+        expect(String(F.call(instance, PKG + "ClassListed$Base", "value"))).toBe("js value");
+    });
+
     it("cache their dex under the class's own name", function () {
         var B = X.CacheBase;
         var C = B.extend({
