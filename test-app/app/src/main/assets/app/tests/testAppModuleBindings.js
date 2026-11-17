@@ -67,6 +67,148 @@ describe("Bindings of app-module types", function () {
         });
     });
 
+    describe("App-module Kotlin types", function () {
+        function expectPrebuiltInterfaceClass(implemented, expectedName) {
+            expect(java.lang.reflect.Proxy.isProxyClass(implemented.getClass())).toBe(false);
+            expect(String(implemented.getClass().getName())).toBe(expectedName);
+            expect(reportEntriesFor(implemented.getClass().getName())).toEqual([]);
+        }
+
+        it("prebuilds an extend of a Kotlin class", function () {
+            var Extended = com.tns.tests.AppModuleKotlinBase.extend({
+                describe: function () {
+                    return "prebuilt kotlin extend";
+                }
+            });
+            var instance = new Extended();
+
+            expect(callFromJava(instance, "describe")).toBe("prebuilt kotlin extend");
+            expect(instance instanceof com.tns.tests.AppModuleKotlinBase).toBe(true);
+            expect(reportEntriesFor(instance.getClass().getName())).toEqual([]);
+        });
+
+        it("prebuilds new of a Kotlin interface", function () {
+            var implemented = new com.tns.tests.AppModuleKotlinBindingTarget({
+                describe: function () {
+                    return "prebuilt kotlin new";
+                }
+            });
+
+            expect(callFromJava(implemented, "describe")).toBe("prebuilt kotlin new");
+            expectPrebuiltInterfaceClass(implemented, "com.tns.gen.com.tns.tests.AppModuleKotlinBindingTarget");
+        });
+
+        it("prebuilds new of a nested Kotlin interface", function () {
+            var implemented = new com.tns.tests.AppModuleKotlinBindingTarget.Nested({
+                describe: function () {
+                    return "prebuilt kotlin nested";
+                }
+            });
+
+            expect(callFromJava(implemented, "describe")).toBe("prebuilt kotlin nested");
+            expectPrebuiltInterfaceClass(implemented, "com.tns.gen.com.tns.tests.AppModuleKotlinBindingTarget_Nested");
+        });
+
+        it("prebuilds new of a Kotlin interface built on a Java interface", function () {
+            var implemented = new com.tns.tests.AppModuleKotlinOnJava({
+                describe: function () {
+                    return "prebuilt kotlin on java";
+                }
+            });
+
+            expect(callFromJava(implemented, "describe")).toBe("prebuilt kotlin on java");
+            expect(implemented instanceof com.tns.tests.AppModuleBindingTarget).toBe(true);
+            expectPrebuiltInterfaceClass(implemented, "com.tns.gen.com.tns.tests.AppModuleKotlinOnJava");
+        });
+
+        it("prebuilds new of a Java interface built on a Kotlin interface", function () {
+            var implemented = new com.tns.tests.AppModuleJavaOnKotlin({
+                describe: function () {
+                    return "prebuilt java on kotlin";
+                },
+                extra: function () {
+                    return "extra";
+                }
+            });
+
+            expect(callFromJava(implemented, "describe")).toBe("prebuilt java on kotlin");
+            expect(callFromJava(implemented, "extra")).toBe("extra");
+            expectPrebuiltInterfaceClass(implemented, "com.tns.gen.com.tns.tests.AppModuleJavaOnKotlin");
+        });
+
+        it("prebuilds an extend of a Kotlin class with an open member Java cannot name", function () {
+            var Extended = com.tns.tests.AppModuleKotlinValueOpen.extend({
+                describe: function () {
+                    return "prebuilt kotlin value open";
+                }
+            });
+            var instance = new Extended();
+
+            expect(callFromJava(instance, "describe")).toBe("prebuilt kotlin value open");
+            expect(reportEntriesFor(instance.getClass().getName())).toEqual([]);
+            var declared = instance.getClass().getDeclaredMethods();
+            for (var i = 0; i < declared.length; i++) {
+                expect(String(declared[i].getName())).not.toContain("-");
+            }
+        });
+
+        it("generates an extend of a Kotlin class with an internal abstract member", function () {
+            var Extended = com.tns.tests.AppModuleKotlinAbstract.extend({
+                describe: function () {
+                    return "runtime kotlin abstract";
+                }
+            });
+            var instance = new Extended();
+
+            expect(callFromJava(instance, "describe")).toBe("runtime kotlin abstract");
+            var entries = reportEntriesFor(instance.getClass().getName());
+            expect(entries.length).toBe(1);
+            expect(entries[0].kind).toBe("class");
+        });
+
+        it("generates an extend of a Kotlin class with an abstract member Java cannot name", function () {
+            var Extended = com.tns.tests.AppModuleKotlinValueAbstract.extend({
+                describe: function () {
+                    return "runtime kotlin value abstract";
+                }
+            });
+            var instance = new Extended();
+
+            expect(callFromJava(instance, "describe")).toBe("runtime kotlin value abstract");
+            var entries = reportEntriesFor(instance.getClass().getName());
+            expect(entries.length).toBe(1);
+            expect(entries[0].kind).toBe("class");
+        });
+
+        it("generates new of a Kotlin interface with a member Java cannot name", function () {
+            var implemented = new com.tns.tests.AppModuleKotlinValueTarget({
+                describe: function () {
+                    return "runtime kotlin value new";
+                }
+            });
+
+            expect(callFromJava(implemented, "describe")).toBe("runtime kotlin value new");
+            expectRuntimeInterfaceClass(java.lang.reflect.Proxy.isProxyClass(implemented.getClass()), String(implemented.getClass().getName()), "com.tns.gen.com.tns.tests.AppModuleKotlinValueTarget");
+            var entries = reportEntriesFor(implemented.getClass().getName());
+            expect(entries.length).toBe(1);
+            expect(entries[0].kind).toBe("interface");
+        });
+
+        it("generates an extend of a Kotlin class that only compiles with the rest of the build", function () {
+            var Extended = com.tns.tests.AppModuleKotlinNeedsBuild.extend({
+                describe: function () {
+                    return "runtime kotlin extend";
+                }
+            });
+            var instance = new Extended();
+
+            expect(callFromJava(instance, "describe")).toBe("runtime kotlin extend");
+            var entries = reportEntriesFor(instance.getClass().getName());
+            expect(entries.length).toBe(1);
+            expect(entries[0].kind).toBe("class");
+        });
+    });
+
     describe("App-module types generated at runtime", function () {
         it("generates a hidden extend of an app-module class", function () {
             // A member no other extend has keeps a content-keyed name from matching
