@@ -431,10 +431,14 @@ describe("Runtime generation report under the interfaceProxies option", function
             return fields[0] !== "proxy" && fields[1] === "interface";
         });
         // Named extends (Interface.extend("a.b.C", {...})) keep their own class, and so does
-        // the interface the spec above makes incompatible on purpose.
+        // the interface the spec above makes incompatible on purpose. An extend that lists
+        // extra interfaces gets a class of its own call site, loaded under the name asked
+        // for, which no proxy of the one interface stands in for.
         var unexpected = generatedInterfaces.filter(function (line) {
-            var requested = line.split(" ")[3];
-            return requested.indexOf("com.tns.gen.") === 0 && requested.indexOf("InterfaceProxyFixtures$ProxyIncompatible") < 0;
+            var fields = line.split(" ");
+            var requested = fields[3];
+            var isCallSiteClass = fields[2] === requested.replace(/\$/g, "_");
+            return requested.indexOf("com.tns.gen.") === 0 && !isCallSiteClass && requested.indexOf("InterfaceProxyFixtures$ProxyIncompatible") < 0;
         });
         expect(unexpected).toEqual([]);
     });
