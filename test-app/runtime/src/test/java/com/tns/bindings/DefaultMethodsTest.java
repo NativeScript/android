@@ -340,6 +340,36 @@ public class DefaultMethodsTest {
         assertTrue(abstracts.methods.contains("amountLjava/lang/Integer;"));
     }
 
+    // name + dex descriptor is "readII" for both methods
+    interface NameEndingLikeADescriptor {
+        int read(int value);
+
+        int readI();
+    }
+
+    public abstract static class AbstractNameEndingLikeADescriptor {
+        public abstract int read(int value);
+
+        public abstract int readI();
+    }
+
+    @Test
+    public void methodsWhoseNameAndDescriptorConcatenateAlikeEachGetAStub() {
+        Shape implementation = read(generate(NameEndingLikeADescriptor.class, false));
+        assertEquals(2, java.util.Collections.frequency(implementation.methods, "readII"));
+
+        Shape callSite = generateCallSiteClass(NameEndingLikeADescriptor.class, AbstractNumberAmount.class, new ArrayList<Method>());
+        assertEquals(2, java.util.Collections.frequency(callSite.methods, "readII"));
+
+        Shape extend = generateClassExtend(AbstractNameEndingLikeADescriptor.class, Arrays.asList("read", "readI"),
+                new ArrayList<Class<?>>(), new ArrayList<Method>());
+        assertEquals(2, java.util.Collections.frequency(extend.methods, "readII"));
+
+        Shape extendWithInterface = generateClassExtend(Object.class, Arrays.asList("read", "readI"),
+                Arrays.<Class<?>>asList(NameEndingLikeADescriptor.class), new ArrayList<Method>());
+        assertEquals(2, java.util.Collections.frequency(extendWithInterface.methods, "readII"));
+    }
+
     public static class NumberSuper {
         public Number value() {
             return 1;
@@ -371,12 +401,15 @@ public class DefaultMethodsTest {
     }
 
     private static Shape generateClassExtend(Class<?> base, String override, List<Class<?>> interfaces, List<Method> defaultMethods) {
+        return generateClassExtend(base, Arrays.asList(override), interfaces, defaultMethods);
+    }
+
+    private static Shape generateClassExtend(Class<?> base, List<String> overridden, List<Class<?>> interfaces, List<Method> defaultMethods) {
         HashSet<ClassDescriptor> extras = new HashSet<>();
         for (Class<?> iface : interfaces) {
             extras.add(new ClassInfo(iface));
         }
-        HashSet<String> overrides = new HashSet<>();
-        overrides.add(override);
+        HashSet<String> overrides = new HashSet<>(overridden);
         org.ow2.asmdex.ApplicationWriter aw = new org.ow2.asmdex.ApplicationWriter();
         aw.visit();
         new Dump().generateProxy(aw, "a.Extend_site_1_2_", new ClassInfo(base), overrides, extras, null, defaultMethods);

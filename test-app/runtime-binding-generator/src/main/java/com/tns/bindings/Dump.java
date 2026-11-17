@@ -379,8 +379,9 @@ public class Dump {
                 : method.getName() + "_" + getMethodOverloadDescriptor(method);
     }
 
+    // Without the separator, int read(int) and int readI() would both be "readII".
     private String dexDescriptor(MethodDescriptor method) {
-        return method.getName() + getDexMethodDescriptor(method);
+        return method.getName() + ":" + getDexMethodDescriptor(method);
     }
 
     // A class cannot declare two methods of one descriptor, whatever their stub keys.
