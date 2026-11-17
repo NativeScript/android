@@ -200,7 +200,9 @@ public class Generator {
         // The class body must be a function of the content name alone, whichever
         // call site sharing the name it is generated for.
         boolean contentKeyed = usesContentKeyedName(dataRow, clazz);
-        String[] parsedMethods = getMemberNames(dataRow);
+        // The runtime leaves accessors out of a content-keyed class only; for every
+        // other class it still counts a getter that returns a function as an override.
+        String[] parsedMethods = dataRow.getMethods(!contentKeyed);
         List<String> methods = contentKeyed ? ContentKey.memberNames(parsedMethods) : Arrays.asList(parsedMethods);
         List<String> interfaces = contentKeyed ? ContentKey.interfaceNames(dataRow.getInterfaces()) : Arrays.asList(dataRow.getInterfaces());
 
@@ -243,12 +245,6 @@ public class Generator {
         }
     }
 
-    // With content keys on, accessors are never overrides, whichever way a
-    // row's class is named.
-    private String[] getMemberNames(DataRow dataRow) {
-        return dataRow.getMethods(!contentKeyedBindings);
-    }
-
     private boolean usesContentKeyedName(DataRow dataRow, JavaClass clazz) {
         return contentKeyedBindings && !clazz.isInterface() && dataRow.getFilename().isEmpty();
     }
@@ -263,7 +259,7 @@ public class Generator {
 
     private String getContentClassName(DataRow dataRow, JavaClass clazz) {
         List<String> interfaces = ContentKey.interfaceNames(dataRow.getInterfaces());
-        List<String> methods = ContentKey.memberNames(getMemberNames(dataRow));
+        List<String> methods = ContentKey.memberNames(dataRow.getMethods(false));
         return DEFAULT_PACKAGE_NAME + "." + clazz.getPackageName() + "." + getContentClassSimpleName(dataRow, clazz, interfaces, methods);
     }
 

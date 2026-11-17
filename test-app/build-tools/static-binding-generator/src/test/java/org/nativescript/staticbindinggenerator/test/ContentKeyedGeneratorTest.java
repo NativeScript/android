@@ -196,7 +196,8 @@ public class ContentKeyedGeneratorTest {
         Assert.assertFalse(anonymous, anonymous.contains("createView("));
         Assert.assertFalse(anonymous, anonymous.contains("\"init\""));
 
-        Assert.assertFalse(read("com/example/NamedView.java").contains("createView("));
+        // Only content-keyed classes leave accessors out.
+        Assert.assertTrue(read("com/example/NamedView.java").contains("createView("));
         // An interface's abstract methods are implemented whatever the object defines.
         Assert.assertTrue(read("com/tns/gen/com/example/MyInterface.java").contains("getTile("));
     }
