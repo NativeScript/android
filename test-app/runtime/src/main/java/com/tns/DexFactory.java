@@ -150,9 +150,12 @@ public class DexFactory {
                     ? NativeScriptRuntimeBound.class.getClassLoader()
                     : iface.getClassLoader();
             Class<?> proxyClass = Proxy.getProxyClass(loader, iface, NativeScriptRuntimeBound.class);
-            if (interfaceProxyConstructors.putIfAbsent(proxyClass, proxyClass.getConstructor(InvocationHandler.class)) == null) {
-                // A JS wrapper created for an instance by its class name uses the interface's metadata.
+            if (!interfaceProxyConstructors.containsKey(proxyClass)) {
+                Constructor<?> constructor = proxyClass.getConstructor(InvocationHandler.class);
+                // A JS wrapper created for an instance by its class name uses the interface's
+                // metadata, so the mapping is registered before any runtime can see the class.
                 Runtime.registerInterfaceProxyClass(proxyClass.getName().replace('.', '/'), iface.getName().replace('.', '/'));
+                interfaceProxyConstructors.putIfAbsent(proxyClass, constructor);
             }
             classStorageService.storeClass(proxyClass.getName(), proxyClass);
             recordRuntimeGeneratedClass(requestedName, proxyClass, true, "proxy");
