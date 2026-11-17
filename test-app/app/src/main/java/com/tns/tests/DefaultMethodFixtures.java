@@ -9,6 +9,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.PrimitiveIterator;
 import java.util.Spliterator;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.DoublePredicate;
 import java.util.function.IntConsumer;
@@ -108,6 +109,11 @@ public class DefaultMethodFixtures {
 
     public static String doubleNegate(DoublePredicate p, double value) {
         return p.test(value) + "|" + p.negate().test(value);
+    }
+
+    public static String biNegate(BiPredicate<?, ?> p, Object first, Object second) {
+        BiPredicate<Object, Object> predicate = (BiPredicate<Object, Object>) p;
+        return predicate.test(first, second) + "|" + predicate.negate().test(first, second);
     }
 
     public static String getComparator(Spliterator<?> spliterator) {

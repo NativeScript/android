@@ -493,6 +493,24 @@ describe("Interface default methods implemented in JS", function () {
         expect(F.className(operator)).toBe("com.tns.gen.java.util.function.LongUnaryOperator" + SUFFIX);
     });
 
+    it("are called through an extend whose implementation object lists no interfaces", function () {
+        if (sdk < 24) {
+            return;
+        }
+        var BiPred = java.util.function.BiPredicate;
+        var Same = BiPred[ext]({
+            interfaces: [],
+            test: function (first, second) { return first === second; },
+            negate: function () {
+                return new BiPred({ test: function () { return true; } });
+            }
+        });
+        var same = new Same();
+
+        expect(F.className(same)).toBe("com.tns.gen.java.util.function.BiPredicate" + SUFFIX);
+        expect(F.biNegate(same, "a", "a")).toBe("true|true");
+    });
+
     it("reach JS for an interface whose methods are all default methods, unless D8 desugared them", function () {
         if (sdk < 24) {
             return;

@@ -167,6 +167,22 @@ void SetDefaultOverrides(JNIEnv* env, jobject instance, jclass clazz, uint64_t d
 }
 }  // namespace
 
+bool CallbackHandlers::HasImplementedInterfaces(Isolate *isolate, const Local<Object> &implementationObject) {
+    auto context = GetCreationContextOrCurrent(isolate, implementationObject);
+    Local<Value> prop;
+    if (!implementationObject->Get(context, String::NewFromUtf8Literal(isolate, "interfaces")).ToLocal(&prop) || !prop->IsArray()) {
+        return false;
+    }
+    auto interfaces = prop.As<Array>();
+    for (uint32_t i = 0, length = interfaces->Length(); i < length; i++) {
+        Local<Value> element;
+        if (interfaces->Get(context, i).ToLocal(&element) && element->IsFunction()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::vector<std::string> CallbackHandlers::GetDefaultMethodNames(const std::string &interfaceName) {
     JEnv env;
 

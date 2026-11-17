@@ -43,6 +43,9 @@ namespace tns {
                                      const std::string &baseClassName = std::string(),
                                      uint64_t defaultOverrides = 0);
 
+        // Whether GetImplementedInterfaces would list any interface, without calling Java.
+        static bool HasImplementedInterfaces(v8::Isolate *isolate, const v8::Local<v8::Object> &implementationObject);
+
         // com.tns.Runtime.getDefaultMethodNames of the interface.
         static std::vector<std::string> GetDefaultMethodNames(const std::string &interfaceName);
 

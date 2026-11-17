@@ -2026,11 +2026,8 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
         // Every instance of the extend shares its implementation object, and so its mask.
         uint64_t defaultOverrides = 0;
-        if (isInterface && !hasDot) {
-            auto interfacesKey = String::NewFromUtf8Literal(isolate, "interfaces");
-            if (!implementationObject->Has(isolate->GetCurrentContext(), interfacesKey).FromMaybe(true)) {
-                defaultOverrides = node->GetDefaultOverrides(isolate, implementationObject);
-            }
+        if (isInterface && !hasDot && !CallbackHandlers::HasImplementedInterfaces(isolate, implementationObject)) {
+            defaultOverrides = node->GetDefaultOverrides(isolate, implementationObject);
         }
         auto clazz = defaultOverrides != 0
                      ? CallbackHandlers::ResolveClass(isolate, string(), node->m_implType + DEFAULT_OVERRIDING_SUFFIX, Local<Object>(), isInterface)
