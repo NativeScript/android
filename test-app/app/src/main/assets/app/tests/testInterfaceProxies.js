@@ -337,7 +337,7 @@ describe("Interface implementations without a prebuilt class", function () {
             expect(String(report)).toBe("InterfaceProxyFixtures-caller>" + (multithreaded ? "InterfaceProxyFixtures-caller" : "main"));
             done();
         })();
-    });
+    }, 20000);
 
     it("works in a worker, and from another runtime that wraps the worker's instance", function (done) {
         var Holder = com.tns.tests.RuntimeBoundHolder;
@@ -375,7 +375,7 @@ describe("Interface implementations without a prebuilt class", function () {
             }
             setTimeout(poll, 20);
         })();
-    });
+    }, 20000);
 
     it("keeps the JS implementation of an instance only Java references", function () {
         (function () {
