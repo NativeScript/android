@@ -2033,7 +2033,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
             }
         }
         auto clazz = defaultOverrides != 0
-                     ? CallbackHandlers::ResolveClass(isolate, string(), node->m_implType + DEFAULT_OVERRIDING_SUFFIX, implementationObject, isInterface)
+                     ? CallbackHandlers::ResolveClass(isolate, string(), node->m_implType + DEFAULT_OVERRIDING_SUFFIX, Local<Object>(), isInterface)
                      : CallbackHandlers::ResolveClass(isolate, baseClassName, fullClassName, implementationObject, isInterface);
         auto fullExtendedName = CallbackHandlers::ResolveClassName(isolate, clazz);
         DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());

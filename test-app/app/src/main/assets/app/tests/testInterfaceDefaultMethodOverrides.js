@@ -447,6 +447,52 @@ describe("Interface default methods implemented in JS", function () {
         expect(F.remove(named)).toBe("java.lang.UnsupportedOperationException");
     });
 
+    it("do not run an accessor's getter while the class is first resolved", function () {
+        if (sdk < 24) {
+            return;
+        }
+        // No other spec implements this interface, so its class is resolved here.
+        var DoublePred = java.util.function.DoublePredicate;
+        var getterCalls = 0;
+        var implementation = { test: function (value) { return value > 0; } };
+        Object.defineProperty(implementation, "negate", {
+            enumerable: true,
+            get: function () {
+                getterCalls++;
+                return function () {
+                    return new DoublePred({ test: function () { return true; } });
+                };
+            }
+        });
+        var predicate = new DoublePred(implementation);
+
+        expect(getterCalls).toBe(0);
+        expect(F.className(predicate)).toBe("com.tns.gen.java.util.function.DoublePredicate" + SUFFIX);
+        expect(F.doubleNegate(predicate, 1)).toBe("true|true");
+        expect(getterCalls).toBe(1);
+    });
+
+    it("construct an instance whose accessor's getter throws", function () {
+        if (sdk < 24) {
+            return;
+        }
+        // No other spec implements this interface, so its class is resolved here.
+        var LongOperator = java.util.function.LongUnaryOperator;
+        var getterCalls = 0;
+        var implementation = { applyAsLong: function (value) { return value; } };
+        Object.defineProperty(implementation, "andThen", {
+            enumerable: true,
+            get: function () {
+                getterCalls++;
+                throw new Error("getter must not run during construction");
+            }
+        });
+        var operator = new LongOperator(implementation);
+
+        expect(getterCalls).toBe(0);
+        expect(F.className(operator)).toBe("com.tns.gen.java.util.function.LongUnaryOperator" + SUFFIX);
+    });
+
     it("reach JS for an interface whose methods are all default methods, unless D8 desugared them", function () {
         if (sdk < 24) {
             return;

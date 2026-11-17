@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.PrimitiveIterator;
 import java.util.Spliterator;
 import java.util.function.Consumer;
+import java.util.function.DoublePredicate;
 import java.util.function.IntConsumer;
 import java.util.function.IntPredicate;
 import java.util.function.LongPredicate;
@@ -102,6 +103,10 @@ public class DefaultMethodFixtures {
     }
 
     public static String longNegate(LongPredicate p, long value) {
+        return p.test(value) + "|" + p.negate().test(value);
+    }
+
+    public static String doubleNegate(DoublePredicate p, double value) {
         return p.test(value) + "|" + p.negate().test(value);
     }
 

@@ -206,8 +206,10 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
     JEnv env;
 
+    // The default-overriding class does not depend on the implementation object, whose
+    // properties ResolveClass would otherwise read, getters included.
     jclass generatedJavaClass = ResolveClass(isolate, baseClassName, fullClassName,
-                                             implementationObject,
+                                             defaultOverrides != 0 ? Local<Object>() : implementationObject,
                                              isInterface);
 
     int javaObjectID = objectManager->GenerateNewObjectID();
