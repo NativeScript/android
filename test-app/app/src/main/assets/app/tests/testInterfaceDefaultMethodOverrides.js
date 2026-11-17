@@ -511,6 +511,24 @@ describe("Interface default methods implemented in JS", function () {
         expect(F.biNegate(same, "a", "a")).toBe("true|true");
     });
 
+    it("are called through an extend of a nested interface", function () {
+        if (sdk < 24) {
+            return;
+        }
+        var OfDouble = java.util.PrimitiveIterator.OfDouble;
+        var removes = 0;
+        var Removing = OfDouble[ext]({
+            hasNext: function () { return false; },
+            nextDouble: function () { return 0; },
+            remove: function () { removes++; }
+        });
+        var removing = new Removing();
+
+        expect(F.className(removing)).toBe("com.tns.gen.java.util.PrimitiveIterator_OfDouble" + SUFFIX);
+        expect(F.remove(removing)).toBe("removed");
+        expect(removes).toBe(1);
+    });
+
     it("run a default declared in a super-interface the generated class cannot access", function () {
         if (sdk < 24) {
             return;
