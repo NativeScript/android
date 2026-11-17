@@ -3,6 +3,7 @@ package com.tns;
 import android.os.Handler;
 import android.os.Looper;
 
+import com.tns.bindings.DefaultMethods;
 import com.tns.bindings.ProxyGenerator;
 import com.tns.system.classes.caching.impl.ClassCacheImpl;
 import com.tns.system.classes.loading.ClassStorageService;
@@ -974,6 +975,55 @@ public class Runtime {
         }
 
         return javaObjectID;
+    }
+
+    /*
+     * DefaultMethods.names of an interface, in which bit i of an instance's default-overrides
+     * mask names the i-th. Native asks once per interface per process. Never throws: an
+     * interface it cannot inspect is treated as having no default methods.
+     */
+    @RuntimeCallable
+    private static String[] getDefaultMethodNames(String interfaceName) {
+        if (android.os.Build.VERSION.SDK_INT < 24) {
+            return new String[0];
+        }
+        try {
+            Class<?> iface = classStorageService.retrieveClass(interfaceName.replace('/', '.'));
+            String[] names = DefaultMethods.names(iface);
+            if (names.length > DefaultMethods.MAX_DISPATCHED_NAMES) {
+                android.util.Log.w("JS", iface.getName() + " has " + names.length + " default method names; JS implementations of those after "
+                        + names[DefaultMethods.MAX_DISPATCHED_NAMES - 1] + " are not called from Java, which runs their Java bodies.");
+            }
+            return names;
+        } catch (Throwable e) {
+            android.util.Log.w("JS", "Could not list the default methods of " + interfaceName + ": " + e);
+            return new String[0];
+        }
+    }
+
+    private static final ConcurrentHashMap<String, Method> interfaceDefaultMethods = new ConcurrentHashMap<String, Method>();
+
+    /*
+     * Called by a generated class's stub of a default method the instance's JS object does
+     * not implement: runs the interface's body on the calling thread. key is
+     * DefaultMethods.key of the method, which declaringInterface declares.
+     */
+    public static Object callInterfaceDefault(Object receiver, Class<?> declaringInterface, String key, Object[] args) {
+        Method method = interfaceDefaultMethods.get(key);
+        if (method == null || method.getDeclaringClass() != declaringInterface) {
+            method = findInterfaceDefault(declaringInterface, key);
+            interfaceDefaultMethods.put(key, method);
+        }
+        return invokeInterfaceDefault(receiver, method, args);
+    }
+
+    private static Method findInterfaceDefault(Class<?> declaringInterface, String key) {
+        for (Method method : declaringInterface.getDeclaredMethods()) {
+            if (DefaultMethods.key(method).equals(key)) {
+                return method;
+            }
+        }
+        throw new NoSuchMethodError(key);
     }
 
     @RuntimeCallable

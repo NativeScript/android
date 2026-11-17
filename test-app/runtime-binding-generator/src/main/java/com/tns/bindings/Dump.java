@@ -26,6 +26,19 @@ public class Dump {
     static final String RUNTIME_TAG_FIELD_NAME = "runtimeTag__ns";
     static final String OBJECT_ID_FIELD_NAME = "objectId__ns";
 
+    /*
+     * Names the class of an interface implementation that also stubs the interface's
+     * default methods. A '-' cannot come from Java source, so no static binding generator
+     * class has it, and a nested interface's '$' becomes '_' instead. MetadataNode.cpp
+     * spells the same suffix.
+     */
+    public static final String DEFAULT_OVERRIDING_SUFFIX = "-defaults";
+    // Bit i: the JS object implements the i-th of DefaultMethods.names. Native writes it
+    // after the constructor returns; zero runs every default's Java body.
+    static final String DEFAULT_OVERRIDES_FIELD_NAME = "defaultOverrides__ns";
+    static final String callInterfaceDefaultMethodName = "callInterfaceDefault";
+    private static final String callInterfaceDefaultSignature = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/Object;";
+
     /**
      * Returns the dex descriptor corresponding to the given method.
      *
@@ -162,6 +175,15 @@ public class Dump {
     }
 
     public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, AnnotationDescriptor[] annotations) {
+        generateProxy(aw, proxyName, classTo, methodOverrides, implementedInterfaces, annotations, null);
+    }
+
+    /**
+     * defaultMethods, for an anonymous interface implementation, are the interface's
+     * DefaultMethods.collect: the class gets the DEFAULT_OVERRIDING_SUFFIX name and a stub
+     * for each of them as well. null generates the class without them.
+     */
+    public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, AnnotationDescriptor[] annotations, List<java.lang.reflect.Method> defaultMethods) {
         String classSignature = getAsmDescriptor(classTo);
 
         String tnsClassSignature;
@@ -173,6 +195,8 @@ public class Dump {
 
             if (!classTo.isInterface()) {
                 tnsClassSignature += CLASS_NAME_LOCATION_SEPARATOR + proxyName;
+            } else if (defaultMethods != null) {
+                tnsClassSignature += DEFAULT_OVERRIDING_SUFFIX;
             }
 
             tnsClassSignature += ";";
@@ -184,6 +208,10 @@ public class Dump {
         methods = groupMethodsByNameAndSignature(methods);
 
         generateFields(cv);
+        if (defaultMethods != null) {
+            FieldVisitor fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE | org.ow2.asmdex.Opcodes.ACC_VOLATILE, DEFAULT_OVERRIDES_FIELD_NAME, "J", null, null);
+            fv.visitEnd();
+        }
 
 
         MethodDescriptor[] ctors = classTo.getConstructors();
@@ -192,7 +220,68 @@ public class Dump {
 
         generateMethods(cv, classTo, methods, classSignature, tnsClassSignature);
 
+        if (defaultMethods != null) {
+            generateDefaultMethodStubs(cv, defaultMethods, methods, classSignature, tnsClassSignature);
+        }
+
         cv.visitEnd();
+    }
+
+    private void generateDefaultMethodStubs(ClassVisitor cv, List<java.lang.reflect.Method> defaultMethods, MethodDescriptor[] generatedMethods, String classSignature, String tnsClassSignature) {
+        Set<String> generatedSignatures = new HashSet<String>();
+        for (MethodDescriptor generated : generatedMethods) {
+            generatedSignatures.add(generated.getName() + "_" + getMethodOverloadDescriptor(generated));
+        }
+
+        List<String> names = new ArrayList<String>(new TreeSet<String>(namesOf(defaultMethods)));
+        for (java.lang.reflect.Method defaultMethod : defaultMethods) {
+            int bit = names.indexOf(defaultMethod.getName());
+            MethodDescriptor method = new MethodInfo(defaultMethod);
+            if (bit >= DefaultMethods.MAX_DISPATCHED_NAMES || !generatedSignatures.add(method.getName() + "_" + getMethodOverloadDescriptor(method))) {
+                continue;
+            }
+            generateDefaultMethodStub(cv, defaultMethod, method, bit, classSignature, tnsClassSignature);
+        }
+    }
+
+    private static List<String> namesOf(List<java.lang.reflect.Method> methods) {
+        List<String> names = new ArrayList<String>();
+        for (java.lang.reflect.Method method : methods) {
+            names.add(method.getName());
+        }
+        return names;
+    }
+
+    /*
+     * Calls JS when the instance's mask has the bit of the method's name, and otherwise
+     * runs the interface's body through Runtime.callInterfaceDefault, on the calling thread.
+     */
+    private void generateDefaultMethodStub(ClassVisitor cv, java.lang.reflect.Method defaultMethod, MethodDescriptor method, int bit, String classSignature, String tnsClassSignature) {
+        MethodVisitor mv = cv.visitMethod(org.ow2.asmdex.Opcodes.ACC_PUBLIC, method.getName(), getDexMethodDescriptor(method), null, new String[0]);
+        mv.visitCode();
+
+        int thisRegister = generateMaxStackSize(mv, method);
+
+        // v0-v1 hold the mask, v2 the shift
+        mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET_WIDE, tnsClassSignature, DEFAULT_OVERRIDES_FIELD_NAME, "J", 0, thisRegister);
+        mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_16, 2, bit);
+        mv.visitOperationInsn(org.ow2.asmdex.Opcodes.INSN_USHR_LONG, 0, 0, 2, 0);
+        mv.visitOperationInsn(org.ow2.asmdex.Opcodes.INSN_LONG_TO_INT, 0, 0, 0, 0);
+        mv.visitOperationInsn(org.ow2.asmdex.Opcodes.INSN_AND_INT_LIT8, 0, 0, 0, 1);
+        Label javaBody = new Label();
+        mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_EQZ, javaBody, 0, 0);
+
+        generateCallOverrideBlock(mv, method, thisRegister, classSignature, tnsClassSignature);
+        generateReturnFromObject(mv, method.getReturnType(), thisRegister, 1);
+
+        mv.visitLabel(javaBody);
+        generateArrayForCallJsArguments(mv, method.getParameterTypes(), thisRegister, classSignature, tnsClassSignature);
+        mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, DefaultMethods.key(defaultMethod));
+        mv.visitTypeInsn(org.ow2.asmdex.Opcodes.INSN_CONST_CLASS, 2, 0, 0, getAsmDescriptor(new ClassInfo(defaultMethod.getDeclaringClass())));
+        mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, callInterfaceDefaultMethodName, callInterfaceDefaultSignature, new int[] { thisRegister, 2, 1, 0 });
+        generateReturnFromObject(mv, method.getReturnType(), thisRegister, 1);
+
+        mv.visitEnd();
     }
 
     private MethodDescriptor[] groupMethodsByNameAndSignature(MethodDescriptor[] methods) {

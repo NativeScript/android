@@ -40,7 +40,11 @@ namespace tns {
                                      const ArgsWrapper &argWrapper,
                                      const v8::Local<v8::Object> &implementationObject,
                                      bool isInterface,
-                                     const std::string &baseClassName = std::string());
+                                     const std::string &baseClassName = std::string(),
+                                     uint64_t defaultOverrides = 0);
+
+        // com.tns.Runtime.getDefaultMethodNames of the interface.
+        static std::vector<std::string> GetDefaultMethodNames(const std::string &interfaceName);
 
         static jclass ResolveClass(v8::Isolate *isolate, const std::string &baseClassName,
                                    const std::string &fullClassName,
@@ -198,6 +202,8 @@ namespace tns {
         static jmethodID REGISTER_CONSTRUCTED_INSTANCE_ID;
 
         static jmethodID GET_TYPE_METADATA;
+
+        static jmethodID GET_DEFAULT_METHOD_NAMES;
 
         static jmethodID ENABLE_VERBOSE_LOGGING_METHOD_ID;
 

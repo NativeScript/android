@@ -4,6 +4,8 @@ import android.os.Build;
 import android.util.Log;
 
 import com.tns.bindings.AnnotationDescriptor;
+import com.tns.bindings.DefaultMethods;
+import com.tns.bindings.Dump;
 import com.tns.bindings.ProxyGenerator;
 import com.tns.bindings.desc.ClassDescriptor;
 import com.tns.bindings.desc.reflection.ClassInfo;
@@ -23,9 +25,12 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -45,6 +50,10 @@ public class DexFactory {
 
     private ProxyGenerator proxyGenerator;
     private HashMap<String, Class<?>> injectedDexClasses = new HashMap<String, Class<?>>();
+
+    // Process-wide: injection puts a generated class in the app's class loader, where every
+    // runtime's lookup of a prebuilt class by that name then finds it.
+    private static final Set<String> generatedClassNames = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 
     DexFactory(Logger logger, ClassLoader classLoader, File dexBaseDir, String dexThumb, ClassStorageService classStorageService) {
         this(logger, classLoader, dexBaseDir, dexThumb, classStorageService, false);
@@ -79,6 +88,14 @@ public class DexFactory {
     static long totalLoadDexTime = 0;
 
     public Class<?> resolveClass(String baseClassName, String name, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
+        // The interface's class name plus this suffix asks for the class that also stubs its
+        // default methods. A prebuilt class of the interface is used instead when there is one.
+        boolean overridesDefaults = isInterface && className.startsWith(COM_TNS_GEN_PREFIX) && className.endsWith(Dump.DEFAULT_OVERRIDING_SUFFIX);
+        if (overridesDefaults) {
+            className = className.substring(0, className.length() - Dump.DEFAULT_OVERRIDING_SUFFIX.length());
+            baseClassName = "";
+        }
+
         String fullClassName = className.replace("$", "_");
         String originalFullClassName = fullClassName;
 
@@ -91,8 +108,17 @@ public class DexFactory {
         if (pregeneratedClass == null) {
             pregeneratedClass = loadPregeneratedClass(fullClassName.replace("-", "_"));
         }
+        // Once injected, the class generated for the interface loads by the same name.
+        if (overridesDefaults && pregeneratedClass != null && generatedClassNames.contains(pregeneratedClass.getName())) {
+            pregeneratedClass = null;
+        }
         if (pregeneratedClass != null) {
             return pregeneratedClass;
+        }
+
+        if (overridesDefaults) {
+            fullClassName += Dump.DEFAULT_OVERRIDING_SUFFIX;
+            originalFullClassName = fullClassName;
         }
 
         // new: com.tns.gen.android.widget.DatePicker_MyActivity_59_56_
@@ -141,9 +167,9 @@ public class DexFactory {
 
             String dexFilePath;
             if (isInterface && !isNamedProxy) {
-                dexFilePath = this.generateDex(name, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface);
+                dexFilePath = this.generateDex(name, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface, overridesDefaults);
             } else {
-                dexFilePath = this.generateDex(desiredDexClassName, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface);
+                dexFilePath = this.generateDex(desiredDexClassName, contentDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface, false);
             }
             dexFile = new File(dexFilePath);
             long stopGenTime = System.nanoTime();
@@ -197,6 +223,7 @@ public class DexFactory {
             result = dexClassLoader.loadClass(classNameToLoad);
         }
 
+        generatedClassNames.add(result.getName());
         classStorageService.storeClass(result.getName(), result);
         this.injectedDexClasses.put(originalFullClassName, result);
 
@@ -344,7 +371,7 @@ public class DexFactory {
         return null;
     }
 
-    private String generateDex(String proxyName, String contentDigest, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
+    private String generateDex(String proxyName, String contentDigest, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface, boolean overridesDefaults) throws ClassNotFoundException, IOException {
         Class<?> classToProxy = Class.forName(className);
 
         HashSet<String> methodOverridesSet = null;
@@ -368,7 +395,8 @@ public class DexFactory {
         }
 
         AnnotationDescriptor[] annotations = null;
-        return proxyGenerator.generateProxy(proxyName, contentDigest, new ClassInfo(classToProxy), methodOverridesSet, implementedInterfacesSet, isInterface, annotations);
+        List<Method> defaultMethods = overridesDefaults ? DefaultMethods.collect(classToProxy) : null;
+        return proxyGenerator.generateProxy(proxyName, contentDigest, new ClassInfo(classToProxy), methodOverridesSet, implementedInterfacesSet, isInterface, annotations, defaultMethods);
     }
 
     private void updateDexThumbAndPurgeCache() {

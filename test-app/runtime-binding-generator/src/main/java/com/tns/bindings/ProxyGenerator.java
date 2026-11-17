@@ -3,7 +3,9 @@ package com.tns.bindings;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.HashSet;
+import java.util.List;
 
 import org.ow2.asmdex.ApplicationWriter;
 
@@ -37,10 +39,15 @@ public class ProxyGenerator {
      * loading the previous dex.
      */
     public String generateProxy(String proxyName, String cacheDigest, ClassDescriptor classToProxy, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, boolean isInterface, AnnotationDescriptor[] annotations) throws IOException {
+        return generateProxy(proxyName, cacheDigest, classToProxy, methodOverrides, implementedInterfaces, isInterface, annotations, null);
+    }
+
+    /** defaultMethods: see Dump.generateProxy. */
+    public String generateProxy(String proxyName, String cacheDigest, ClassDescriptor classToProxy, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, boolean isInterface, AnnotationDescriptor[] annotations, List<Method> defaultMethods) throws IOException {
         ApplicationWriter aw = new ApplicationWriter();
         aw.visit();
 
-        dump.generateProxy(aw, proxyName, classToProxy, methodOverrides, implementedInterfaces, annotations);
+        dump.generateProxy(aw, proxyName, classToProxy, methodOverrides, implementedInterfaces, annotations, defaultMethods);
 
         aw.visitEnd();
         byte[] generatedBytes = aw.toByteArray();
@@ -60,6 +67,8 @@ public class ProxyGenerator {
             proxyFileName = classToProxy.getName().replace('$', '_');
             if (!isInterface) {
                 proxyFileName += Dump.CLASS_NAME_LOCATION_SEPARATOR + proxyName;
+            } else if (defaultMethods != null) {
+                proxyFileName += Dump.DEFAULT_OVERRIDING_SUFFIX;
             }
             if (proxyThumb != null) {
                 proxyFileName += "-" + proxyThumb;
