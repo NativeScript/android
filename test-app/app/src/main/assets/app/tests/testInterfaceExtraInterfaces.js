@@ -306,6 +306,18 @@ describe("Interface extends with extra interfaces", function () {
         expect(String(F.call(instance, PKG + "Covariant$AbstractIntegerExtra", "amount"))).toBe("42");
     });
 
+    it("call the JS implementation of a class extend's abstract method its interfaces declare with different return types", function () {
+        var O = java.lang.Object;
+        var C = O.extend({
+            interfaces: [X.Covariant.AbstractNumberBase, X.Covariant.AbstractIntegerExtra],
+            amount: function () { return new java.lang.Integer(43); }
+        });
+        var instance = new C();
+
+        expect(String(F.call(instance, PKG + "Covariant$AbstractNumberBase", "amount"))).toBe("43");
+        expect(String(F.call(instance, PKG + "Covariant$AbstractIntegerExtra", "amount"))).toBe("43");
+    });
+
     it("leave a class listed as an extra interface out of the default methods to call", function () {
         var B = X.ClassListed.Base;
         var C = B.extend("com.tns.tests.extras.NamedClassListedExtras", {

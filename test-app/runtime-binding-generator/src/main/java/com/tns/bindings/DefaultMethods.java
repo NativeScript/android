@@ -62,23 +62,29 @@ public final class DefaultMethods {
                 roots.add(iface);
             }
         }
-        Set<String> classSignatures = new HashSet<>();
+        // A class method overrides a default of the same return type only: Java calls one of
+        // another return type through a descriptor the class does not declare.
+        Set<String> classDescriptors = new HashSet<>();
         for (Class<?> current = clazz; current != null; current = current.getSuperclass()) {
             roots.addAll(Arrays.asList(current.getInterfaces()));
             for (Method method : current.getDeclaredMethods()) {
                 if (!Modifier.isStatic(method.getModifiers())) {
-                    classSignatures.add(signature(method));
+                    classDescriptors.add(descriptor(method));
                 }
             }
         }
-        return collect(roots, classSignatures, withConflicts);
+        return collect(roots, classDescriptors, withConflicts);
     }
 
     private static String signature(Method method) {
         return method.getName() + Arrays.toString(method.getParameterTypes());
     }
 
-    private static List<Method> collect(Collection<Class<?>> roots, Set<String> excludedSignatures, boolean withConflicts) {
+    private static String descriptor(Method method) {
+        return signature(method) + method.getReturnType().getName();
+    }
+
+    private static List<Method> collect(Collection<Class<?>> roots, Set<String> excludedDescriptors, boolean withConflicts) {
         Map<String, List<Method>> declarationsBySignature = new LinkedHashMap<>();
         List<Method> bridges = new ArrayList<>();
         Set<Class<?>> visited = new HashSet<>();
@@ -100,10 +106,10 @@ public final class DefaultMethods {
                 if (method.isSynthetic()) {
                     continue;
                 }
-                String signature = signature(method);
-                if (excludedSignatures.contains(signature)) {
+                if (excludedDescriptors.contains(descriptor(method))) {
                     continue;
                 }
+                String signature = signature(method);
                 List<Method> declarations = declarationsBySignature.get(signature);
                 if (declarations == null) {
                     declarations = new ArrayList<>();

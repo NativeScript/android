@@ -340,6 +340,90 @@ public class DefaultMethodsTest {
         assertTrue(abstracts.methods.contains("amountLjava/lang/Integer;"));
     }
 
+    public static class NumberSuper {
+        public Number value() {
+            return 1;
+        }
+    }
+
+    // javac adds the bridge Number value(), which calls Integer value().
+    public static class IntegerSub extends NumberSuper {
+        @Override
+        public Integer value() {
+            return 2;
+        }
+    }
+
+    public static class ObjectGetter {
+        public Object get() {
+            return null;
+        }
+    }
+
+    interface StringGetDefault {
+        default String get() {
+            return "default";
+        }
+    }
+
+    interface StringGetAbstract {
+        String get();
+    }
+
+    private static Shape generateClassExtend(Class<?> base, String override, List<Class<?>> interfaces, List<Method> defaultMethods) {
+        HashSet<ClassDescriptor> extras = new HashSet<>();
+        for (Class<?> iface : interfaces) {
+            extras.add(new ClassInfo(iface));
+        }
+        HashSet<String> overrides = new HashSet<>();
+        overrides.add(override);
+        org.ow2.asmdex.ApplicationWriter aw = new org.ow2.asmdex.ApplicationWriter();
+        aw.visit();
+        new Dump().generateProxy(aw, "a.Extend_site_1_2_", new ClassInfo(base), overrides, extras, null, defaultMethods);
+        aw.visitEnd();
+        return read(aw.toByteArray());
+    }
+
+    private static List<String> stubsNamed(Shape shape, String name) {
+        List<String> stubs = new ArrayList<>();
+        for (String method : shape.methods) {
+            // name + dex descriptor, which starts with the return type
+            if (method.startsWith(name) && method.length() > name.length() && "LVZBCSIJFD[".indexOf(method.charAt(name.length())) >= 0) {
+                stubs.add(method);
+            }
+        }
+        stubs.sort(null);
+        return stubs;
+    }
+
+    @Test
+    public void aClassExtendKeepsOneStubForASuperclassMethodASubclassNarrows() {
+        Shape shape = generateClassExtend(IntegerSub.class, "value", new ArrayList<Class<?>>(), new ArrayList<Method>());
+        assertEquals(Arrays.asList("valueLjava/lang/Integer;"), stubsNamed(shape, "value"));
+    }
+
+    @Test
+    public void aClassExtendStubsEveryReturnTypeItsExtraInterfacesDeclare() {
+        Shape shape = generateClassExtend(Object.class, "amount",
+                Arrays.<Class<?>>asList(AbstractNumberAmount.class, AbstractIntegerAmount.class), new ArrayList<Method>());
+        assertEquals(Arrays.asList("amountLjava/lang/Integer;", "amountLjava/lang/Number;"), stubsNamed(shape, "amount"));
+    }
+
+    @Test
+    public void aClassExtendStubsTheReturnTypeAnExtraInterfaceAddsToASuperclassMethod() throws Exception {
+        assertEquals(Arrays.asList("getLjava/lang/Object;"),
+                stubsNamed(generateClassExtend(ObjectGetter.class, "get", new ArrayList<Class<?>>(), new ArrayList<Method>()), "get"));
+
+        assertEquals(Arrays.asList("getLjava/lang/Object;", "getLjava/lang/String;"),
+                stubsNamed(generateClassExtend(ObjectGetter.class, "get", Arrays.<Class<?>>asList(StringGetAbstract.class), new ArrayList<Method>()), "get"));
+
+        List<Class<?>> withDefault = Arrays.<Class<?>>asList(StringGetDefault.class);
+        List<Method> defaults = DefaultMethods.collectWithConflicts(ObjectGetter.class, withDefault);
+        assertEquals(Arrays.asList(StringGetDefault.class.getMethod("get")), defaults);
+        assertEquals(Arrays.asList("getLjava/lang/Object;", "getLjava/lang/String;"),
+                stubsNamed(generateClassExtend(ObjectGetter.class, "get", withDefault, defaults), "get"));
+    }
+
     interface ListedBase {
         default String value() {
             return "base";

@@ -250,13 +250,13 @@ public class Dump {
 
     private MethodDescriptor[] withInheritedDefaults(MethodDescriptor[] methods, List<java.lang.reflect.Method> defaultMethods) {
         List<MethodDescriptor> result = new ArrayList<MethodDescriptor>(Arrays.asList(methods));
-        Set<String> signatures = new HashSet<String>();
+        Set<String> stubs = new HashSet<String>();
         for (MethodDescriptor method : methods) {
-            signatures.add(methodKey(method));
+            addStub(stubs, method, method.isInterfaceMethod());
         }
         for (java.lang.reflect.Method defaultMethod : defaultMethods) {
             MethodDescriptor method = new MethodInfo(defaultMethod);
-            if (signatures.add(methodKey(method))) {
+            if (addStub(stubs, method, true)) {
                 result.add(method);
             }
         }
@@ -264,16 +264,16 @@ public class Dump {
     }
 
     private void generateDefaultMethodStubs(ClassVisitor cv, List<java.lang.reflect.Method> defaultMethods, MethodDescriptor[] generatedMethods, String classSignature, String tnsClassSignature, DefaultMethodBodies bodies) {
-        Set<String> generatedSignatures = new HashSet<String>();
+        Set<String> stubs = new HashSet<String>();
         for (MethodDescriptor generated : generatedMethods) {
-            generatedSignatures.add(methodKey(generated));
+            addStub(stubs, generated, generated.isInterfaceMethod());
         }
 
         List<String> names = new ArrayList<String>(new TreeSet<String>(namesOf(defaultMethods)));
         for (java.lang.reflect.Method defaultMethod : defaultMethods) {
             int bit = names.indexOf(defaultMethod.getName());
             MethodDescriptor method = new MethodInfo(defaultMethod);
-            if (bit >= DefaultMethods.MAX_DISPATCHED_NAMES || !generatedSignatures.add(methodKey(method))) {
+            if (bit >= DefaultMethods.MAX_DISPATCHED_NAMES || !addStub(stubs, method, true)) {
                 continue;
             }
             generateDefaultMethodStub(cv, defaultMethod, method, bit, classSignature, tnsClassSignature, bodies);
@@ -356,10 +356,10 @@ public class Dump {
 
     private MethodDescriptor[] groupMethodsByNameAndSignature(MethodDescriptor[] methods) {
         HashMap<String, MethodDescriptor> result = new HashMap<String, MethodDescriptor>();
-        for (int i = 0; i < methods.length; i++) {
-            MethodDescriptor method = methods[i];
-            String key = methodKey(method);
-            if (!result.containsKey(key)) {
+        Set<String> descriptors = new HashSet<String>();
+        for (MethodDescriptor method : methods) {
+            String key = stubKey(method, method.isInterfaceMethod());
+            if (!result.containsKey(key) && descriptors.add(dexDescriptor(method))) {
                 result.put(key, method);
             }
         }
@@ -368,11 +368,46 @@ public class Dump {
     }
 
     /*
-     * A method's identity in dex, return type included: a method narrowing another's return
-     * type is called through both descriptors, and each one needs its own implementation.
+     * Which methods of a generated class share one stub. Java calls a method an interface
+     * declares through its full descriptor, so a class whose interfaces declare it with several
+     * return types needs a stub for each. A class target's superclass chain keeps one stub per
+     * name and parameter types: javac's bridges dispatch its other return types to that stub.
      */
-    private String methodKey(MethodDescriptor m) {
-        return m.getName() + getDexMethodDescriptor(m);
+    private String stubKey(MethodDescriptor method, boolean declaredByInterface) {
+        return declaredByInterface
+                ? method.getName() + "(" + getDexMethodDescriptor(method)
+                : method.getName() + "_" + getMethodOverloadDescriptor(method);
+    }
+
+    private String dexDescriptor(MethodDescriptor method) {
+        return method.getName() + getDexMethodDescriptor(method);
+    }
+
+    // A class cannot declare two methods of one descriptor, whatever their stub keys.
+    private boolean addStub(Set<String> stubs, MethodDescriptor method, boolean declaredByInterface) {
+        String descriptor = " " + dexDescriptor(method);
+        String key = stubKey(method, declaredByInterface);
+        if (stubs.contains(descriptor) || stubs.contains(key)) {
+            return false;
+        }
+        stubs.add(descriptor);
+        stubs.add(key);
+        return true;
+    }
+
+    private String getMethodSignature(MethodDescriptor m) {
+        String sig = m.toGenericString();
+
+        int nameIdx = sig.indexOf("(");
+        int endSigIdx = sig.indexOf(")") + 1;
+
+        return m.getName() + sig.substring(nameIdx, endSigIdx);
+    }
+
+    // Abstract methods found from an interface are told apart by stubKey; those of a class
+    // target's own hierarchy keep the generic name and parameter list they were found by.
+    private String collectedKey(MethodDescriptor m, boolean fromInterface) {
+        return fromInterface ? stubKey(m, true) : getMethodSignature(m);
     }
 
     private void collectAbstractMethods(final ClassDescriptor clazz, List<MethodDescriptor> result) {
@@ -381,7 +416,7 @@ public class Dump {
         }
         Set<String> alreadyAddedMethods = new HashSet<String>();
         for (MethodDescriptor md: result) {
-            String sig = methodKey(md);
+            String sig = collectedKey(md, clazz.isInterface());
             alreadyAddedMethods.add(sig);
         }
 
@@ -391,7 +426,7 @@ public class Dump {
         ClassDescriptor startingConcreteClassDesc = isInterfaceClass ? new ClassInfo(Object.class) : clazz;
         for (MethodDescriptor objMethod: startingConcreteClassDesc.getDeclaredMethods()) {
             if (!objMethod.isStatic()) {
-                String sig = methodKey(objMethod);
+                String sig = collectedKey(objMethod, isInterfaceClass);
                 concreteMethods.add(sig);
             }
         }
@@ -409,7 +444,7 @@ public class Dump {
                 if (m.isStatic()) {
                     continue;
                 }
-                String sig = methodKey(m);
+                String sig = collectedKey(m, isInterfaceClass);
                 if (m.isAbstract()) {
                     if (!concreteMethods.contains(sig) && !alreadyAddedMethods.contains(sig)) {
                         if (isInterfaceClass) {
