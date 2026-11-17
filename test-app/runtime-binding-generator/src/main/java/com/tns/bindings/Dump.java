@@ -276,6 +276,8 @@ public class Dump {
     /*
      * Calls JS when the instance's mask has the bit of the method's name, and otherwise
      * runs the interface's body through Runtime.callInterfaceDefault, on the calling thread.
+     * It names the interface the class implements, not the one declaring the method: that
+     * may be a super-interface this class cannot access.
      */
     private void generateDefaultMethodStub(ClassVisitor cv, java.lang.reflect.Method defaultMethod, MethodDescriptor method, int bit, String classSignature, String tnsClassSignature) {
         MethodVisitor mv = cv.visitMethod(org.ow2.asmdex.Opcodes.ACC_PUBLIC, method.getName(), getDexMethodDescriptor(method), null, new String[0]);
@@ -298,7 +300,7 @@ public class Dump {
         mv.visitLabel(javaBody);
         generateArrayForCallJsArguments(mv, method.getParameterTypes(), thisRegister, classSignature, tnsClassSignature);
         mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, DefaultMethods.key(defaultMethod));
-        mv.visitTypeInsn(org.ow2.asmdex.Opcodes.INSN_CONST_CLASS, 2, 0, 0, getAsmDescriptor(new ClassInfo(defaultMethod.getDeclaringClass())));
+        mv.visitTypeInsn(org.ow2.asmdex.Opcodes.INSN_CONST_CLASS, 2, 0, 0, classSignature);
         mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, callInterfaceDefaultMethodName, callInterfaceDefaultSignature, new int[] { thisRegister, 2, 1, 0 });
         generateReturnFromObject(mv, method.getReturnType(), thisRegister, 1);
 

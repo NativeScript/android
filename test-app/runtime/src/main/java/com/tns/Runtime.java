@@ -1006,24 +1006,19 @@ public class Runtime {
     /*
      * Called by a generated class's stub of a default method the instance's JS object does
      * not implement: runs the interface's body on the calling thread. key is
-     * DefaultMethods.key of the method, which declaringInterface declares.
+     * DefaultMethods.key of the method, declared by implementedInterface or one of its
+     * super-interfaces.
      */
-    public static Object callInterfaceDefault(Object receiver, Class<?> declaringInterface, String key, Object[] args) {
+    public static Object callInterfaceDefault(Object receiver, Class<?> implementedInterface, String key, Object[] args) {
         Method method = interfaceDefaultMethods.get(key);
-        if (method == null || method.getDeclaringClass() != declaringInterface) {
-            method = findInterfaceDefault(declaringInterface, key);
+        if (method == null || !method.getDeclaringClass().isAssignableFrom(implementedInterface)) {
+            method = DefaultMethods.find(implementedInterface, key);
+            if (method == null) {
+                throw new NoSuchMethodError(key);
+            }
             interfaceDefaultMethods.put(key, method);
         }
         return invokeInterfaceDefault(receiver, method, args);
-    }
-
-    private static Method findInterfaceDefault(Class<?> declaringInterface, String key) {
-        for (Method method : declaringInterface.getDeclaredMethods()) {
-            if (DefaultMethods.key(method).equals(key)) {
-                return method;
-            }
-        }
-        throw new NoSuchMethodError(key);
     }
 
     @RuntimeCallable

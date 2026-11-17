@@ -511,6 +511,45 @@ describe("Interface default methods implemented in JS", function () {
         expect(F.biNegate(same, "a", "a")).toBe("true|true");
     });
 
+    it("run a default declared in a super-interface the generated class cannot access", function () {
+        if (sdk < 24) {
+            return;
+        }
+        var H = com.tns.tests.interfaces.hiddendefaults;
+        var Caller = H.VisibleDefaultsCaller;
+        var Visible = H.VisibleDefaults;
+        var calls = [];
+        var visibleOnly = new Visible({
+            name: function () { return "js"; },
+            visible: function () {
+                calls.push("visible");
+                return "visible js";
+            }
+        });
+        var hiddenOnly = new Visible({
+            name: function () { return "js"; },
+            hidden: function () {
+                calls.push("hidden");
+                return "hidden js";
+            }
+        });
+
+        if (Caller.isDesugared()) {
+            // Below minSdk 24 they are abstract on the device and always reach JS.
+            expect(Caller.visible(visibleOnly)).toBe("visible js");
+            expect(Caller.hidden(hiddenOnly)).toBe("hidden js");
+            expect(calls).toEqual(["visible", "hidden"]);
+            return;
+        }
+
+        expect(Caller.visible(visibleOnly)).toBe("visible js");
+        expect(Caller.hidden(visibleOnly)).toBe("hidden java");
+        expect(Caller.narrowed(visibleOnly)).toBe("visible narrowed");
+        expect(Caller.hidden(hiddenOnly)).toBe("hidden js");
+        expect(Caller.visible(hiddenOnly)).toBe("visible java");
+        expect(calls).toEqual(["visible", "hidden"]);
+    });
+
     it("reach JS for an interface whose methods are all default methods, unless D8 desugared them", function () {
         if (sdk < 24) {
             return;

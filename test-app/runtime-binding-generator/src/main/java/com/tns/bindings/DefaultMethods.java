@@ -131,6 +131,26 @@ public final class DefaultMethods {
         return names.toArray(new String[0]);
     }
 
+    /** The method of iface's hierarchy whose {@link #key} is key, or null. */
+    public static Method find(Class<?> iface, String key) {
+        Set<Class<?>> visited = new HashSet<>();
+        Deque<Class<?>> pending = new ArrayDeque<>();
+        pending.add(iface);
+        while (!pending.isEmpty()) {
+            Class<?> current = pending.poll();
+            if (!visited.add(current)) {
+                continue;
+            }
+            for (Method method : current.getDeclaredMethods()) {
+                if (key(method).equals(key)) {
+                    return method;
+                }
+            }
+            pending.addAll(Arrays.asList(current.getInterfaces()));
+        }
+        return null;
+    }
+
     /** Identifies a default method to com.tns.Runtime.callInterfaceDefault. */
     public static String key(Method method) {
         StringBuilder key = new StringBuilder(method.getDeclaringClass().getName()).append('.').append(method.getName()).append('(');

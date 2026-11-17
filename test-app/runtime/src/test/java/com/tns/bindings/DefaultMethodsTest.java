@@ -224,6 +224,45 @@ public class DefaultMethodsTest {
         assertFalse(shape.methods.contains("removeV"));
     }
 
+    interface HiddenBase {
+        default String hidden() {
+            return "hidden";
+        }
+
+        default Object narrowed() {
+            return "base";
+        }
+    }
+
+    public interface VisibleSub extends HiddenBase {
+        @Override
+        default String narrowed() {
+            return "sub";
+        }
+    }
+
+    private static Method declared(Class<?> clazz, String name, Class<?> returnType) {
+        for (Method method : clazz.getDeclaredMethods()) {
+            if (method.getName().equals(name) && method.getReturnType() == returnType && !method.isBridge()) {
+                return method;
+            }
+        }
+        throw new AssertionError(name);
+    }
+
+    @Test
+    public void findResolvesAKeyThroughTheImplementedInterfacesHierarchy() {
+        Method hidden = declared(HiddenBase.class, "hidden", String.class);
+        Method baseNarrowed = declared(HiddenBase.class, "narrowed", Object.class);
+        Method subNarrowed = declared(VisibleSub.class, "narrowed", String.class);
+
+        assertEquals(hidden, DefaultMethods.find(VisibleSub.class, DefaultMethods.key(hidden)));
+        assertEquals(baseNarrowed, DefaultMethods.find(VisibleSub.class, DefaultMethods.key(baseNarrowed)));
+        assertEquals(subNarrowed, DefaultMethods.find(VisibleSub.class, DefaultMethods.key(subNarrowed)));
+        assertEquals(null, DefaultMethods.find(Runnable.class, DefaultMethods.key(hidden)));
+        assertTrue(DefaultMethods.collect(VisibleSub.class).contains(hidden));
+    }
+
     @Test
     public void generationIsByteStable() {
         assertArrayEquals(generate(Iterator.class, true), generate(Iterator.class, true));
