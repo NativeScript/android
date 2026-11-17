@@ -107,6 +107,9 @@ public class DexFactory {
      * one line each: {@code <generated|cached|proxy> <interface|class> <loaded name> <requested name>}.
      * "cached" means the dex was reused from the on-disk dex cache, "proxy" that
      * the class is a java.lang.reflect.Proxy class (the interfaceProxies option).
+     * The requested name is the one native resolved, which for an interface whose JS
+     * implementation overrides default methods is the interface's class name with
+     * Dump.DEFAULT_OVERRIDING_SUFFIX, whatever the loaded class is named.
      */
     public static String[] getRuntimeGeneratedClasses() {
         synchronized (runtimeGeneratedClasses) {
@@ -256,7 +259,7 @@ public class DexFactory {
         }
 
         if (useInterfaceProxies && isInterface && !isNamedProxy && !hasImplementedInterfaces(implementedInterfaces)) {
-            Class<?> proxyClass = getInterfaceProxyClass(classToProxy, className);
+            Class<?> proxyClass = getInterfaceProxyClass(classToProxy, requestedClassName);
             if (proxyClass != null) {
                 this.injectedDexClasses.put(originalFullClassName, proxyClass);
                 return proxyClass;
@@ -360,7 +363,7 @@ public class DexFactory {
         generatedClassNames.add(result.getName());
         classStorageService.storeClass(result.getName(), result);
         this.injectedDexClasses.put(originalFullClassName, result);
-        recordRuntimeGeneratedClass(className, result, isInterface, generated ? "generated" : "cached");
+        recordRuntimeGeneratedClass(requestedClassName, result, isInterface, generated ? "generated" : "cached");
 
         return result;
     }

@@ -33,6 +33,39 @@ describe("Runtime class generation report", function () {
         expect(entries[0].requested).toMatch(/^com\.tns\.gen\.java\.lang\.Object_/);
     });
 
+    it("lists the class of an interface whose JS implementation overrides a default method", function () {
+        if (android.os.Build.VERSION.SDK_INT < 24) {
+            return;
+        }
+        // Reached through an alias, so no class of the interface is prebuilt, and implemented
+        // by no other spec.
+        var LongConsumer = java.util.function["Long" + "Consumer"];
+        var thens = 0;
+        var instance = new LongConsumer({
+            accept: function () {},
+            andThen: function (after) {
+                thens++;
+                return after;
+            }
+        });
+        // Called from Java: the class dispatches the default method to JS.
+        LongConsumer.class.getMethod("andThen", [LongConsumer.class]).invoke(instance, [instance]);
+        expect(thens).toBe(1);
+
+        var loaded = String(instance.getClass().getName());
+        var entries = reportEntriesFor(loaded).filter(function (entry) {
+            return entry.requested === "com.tns.gen.java.util.function.LongConsumer-defaults";
+        });
+        expect(entries.length).toBe(1);
+        expect(entries[0].kind).toBe("interface");
+        if (java.lang.reflect.Proxy.isProxyClass(instance.getClass())) {
+            expect(entries[0].source).toBe("proxy");
+        } else {
+            expect(["generated", "cached"]).toContain(entries[0].source);
+            expect(loaded).toMatch(/^com\.tns\.gen\.java\.util\.function\.LongConsumer-defaults(-jni)?$/);
+        }
+    });
+
     it("does not list a class loaded from the APK", function () {
         var UnreportedObject = java.lang.Object.extend({
             toString: function () {
