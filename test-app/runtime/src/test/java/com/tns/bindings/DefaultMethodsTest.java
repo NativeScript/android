@@ -111,6 +111,33 @@ public class DefaultMethodsTest {
         assertEquals(Integer.class, Covariant.class.getMethod("next").getReturnType());
     }
 
+    static class Implementor implements Derived {
+        @Override
+        public String reabstracted() {
+            return "class";
+        }
+
+        @Override
+        public String redefined() {
+            return "class";
+        }
+    }
+
+    @Test
+    public void aClassInheritsTheDefaultsNoClassInItsHierarchyDeclares() throws Exception {
+        assertEquals(Arrays.asList(
+                Base.class.getMethod("inherited"),
+                Derived.class.getMethod("overloaded", int.class),
+                Derived.class.getMethod("overloaded", String.class)),
+                DefaultMethods.collect(Implementor.class, new ArrayList<Class<?>>()));
+
+        // Base.inherited() and Other.inherited() conflict: neither is inherited.
+        assertEquals(Arrays.asList(
+                Derived.class.getMethod("overloaded", int.class),
+                Derived.class.getMethod("overloaded", String.class)),
+                DefaultMethods.collect(Implementor.class, Arrays.<Class<?>>asList(Other.class)));
+    }
+
     @Test
     public void keyNamesTheDeclaringInterfaceAndTheSignature() throws Exception {
         assertEquals("java.util.Iterator.remove()void", DefaultMethods.key(Iterator.class.getMethod("remove")));

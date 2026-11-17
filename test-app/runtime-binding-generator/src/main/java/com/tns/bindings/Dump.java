@@ -181,10 +181,12 @@ public class Dump {
     /**
      * defaultMethods, for an anonymous interface implementation, are the interface's
      * DefaultMethods.collect: the class gets the DEFAULT_OVERRIDING_SUFFIX name and a stub
-     * for each of them as well. null generates the class without them.
+     * for each of them as well. For a class, they are inherited default methods the JS
+     * object implements, stubbed like the class's other overrides. null adds neither.
      */
     public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, AnnotationDescriptor[] annotations, List<java.lang.reflect.Method> defaultMethods) {
         String classSignature = getAsmDescriptor(classTo);
+        boolean overridesDefaults = defaultMethods != null && classTo.isInterface();
 
         String tnsClassSignature;
         if (proxyName.contains(".")) {
@@ -195,7 +197,7 @@ public class Dump {
 
             if (!classTo.isInterface()) {
                 tnsClassSignature += CLASS_NAME_LOCATION_SEPARATOR + proxyName;
-            } else if (defaultMethods != null) {
+            } else if (overridesDefaults) {
                 tnsClassSignature += DEFAULT_OVERRIDING_SUFFIX;
             }
 
@@ -206,9 +208,12 @@ public class Dump {
         MethodDescriptor[] methods = getSupportedMethods(classTo, methodOverrides, implementedInterfaces);
 
         methods = groupMethodsByNameAndSignature(methods);
+        if (defaultMethods != null && !overridesDefaults) {
+            methods = withInheritedDefaults(methods, defaultMethods);
+        }
 
         generateFields(cv);
-        if (defaultMethods != null) {
+        if (overridesDefaults) {
             FieldVisitor fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE | org.ow2.asmdex.Opcodes.ACC_VOLATILE, DEFAULT_OVERRIDES_FIELD_NAME, "J", null, null);
             fv.visitEnd();
         }
@@ -220,11 +225,26 @@ public class Dump {
 
         generateMethods(cv, classTo, methods, classSignature, tnsClassSignature);
 
-        if (defaultMethods != null) {
+        if (overridesDefaults) {
             generateDefaultMethodStubs(cv, defaultMethods, methods, classSignature, tnsClassSignature);
         }
 
         cv.visitEnd();
+    }
+
+    private MethodDescriptor[] withInheritedDefaults(MethodDescriptor[] methods, List<java.lang.reflect.Method> defaultMethods) {
+        List<MethodDescriptor> result = new ArrayList<MethodDescriptor>(Arrays.asList(methods));
+        Set<String> signatures = new HashSet<String>();
+        for (MethodDescriptor method : methods) {
+            signatures.add(method.getName() + "_" + getMethodOverloadDescriptor(method));
+        }
+        for (java.lang.reflect.Method defaultMethod : defaultMethods) {
+            MethodDescriptor method = new MethodInfo(defaultMethod);
+            if (signatures.add(method.getName() + "_" + getMethodOverloadDescriptor(method))) {
+                result.add(method);
+            }
+        }
+        return result.toArray(new MethodDescriptor[result.size()]);
     }
 
     private void generateDefaultMethodStubs(ClassVisitor cv, List<java.lang.reflect.Method> defaultMethods, MethodDescriptor[] generatedMethods, String classSignature, String tnsClassSignature) {

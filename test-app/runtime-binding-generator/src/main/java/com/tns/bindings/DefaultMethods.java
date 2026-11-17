@@ -37,6 +37,24 @@ public final class DefaultMethods {
         return collect(Collections.<Class<?>>singletonList(iface), Collections.<String>emptySet());
     }
 
+    /**
+     * The default methods a subclass of the class that also implements the given interfaces
+     * inherits: as {@link #collect(Class)}, less those a class in the hierarchy declares.
+     */
+    public static List<Method> collect(Class<?> clazz, Collection<Class<?>> interfaces) {
+        List<Class<?>> roots = new ArrayList<>(interfaces);
+        Set<String> classSignatures = new HashSet<>();
+        for (Class<?> current = clazz; current != null; current = current.getSuperclass()) {
+            roots.addAll(Arrays.asList(current.getInterfaces()));
+            for (Method method : current.getDeclaredMethods()) {
+                if (!Modifier.isStatic(method.getModifiers())) {
+                    classSignatures.add(signature(method));
+                }
+            }
+        }
+        return collect(roots, classSignatures);
+    }
+
     private static String signature(Method method) {
         return method.getName() + Arrays.toString(method.getParameterTypes());
     }

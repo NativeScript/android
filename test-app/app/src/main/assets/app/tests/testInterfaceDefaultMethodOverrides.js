@@ -264,6 +264,80 @@ describe("Interface default methods implemented in JS", function () {
         expect(aliasedRemoves).toBe(1);
     });
 
+    it("are called through a class extend that implements the interface", function () {
+        if (sdk < 24) {
+            return;
+        }
+        var O = java.lang.Object;
+        var removes = 0;
+        var WithRemove = O.extend({
+            interfaces: [It],
+            hasNext: function () { return false; },
+            next: function () { return null; },
+            remove: function () { removes++; }
+        });
+        var withRemove = new WithRemove();
+        expect(F.isRuntimeGenerated(withRemove)).toBe(true);
+        expect(F.remove(withRemove)).toBe("removed");
+        expect(removes).toBe(1);
+
+        var WithoutRemove = O.extend({
+            interfaces: [It],
+            hasNext: function () { return false; },
+            next: function () { return null; }
+        });
+        expect(F.remove(new WithoutRemove())).toBe("java.lang.UnsupportedOperationException");
+    });
+
+    it("are called through a class extend whose base class inherits them", function () {
+        var hasAsIterator = false;
+        try {
+            java.util.Enumeration.class.getMethod("asIterator", []);
+            hasAsIterator = true;
+        } catch (e) {
+        }
+        if (!hasAsIterator) {
+            return;
+        }
+        var Tokenizer = java.util.StringTokenizer;
+        var asIteratorCalls = 0;
+        var Tokens = Tokenizer.extend({
+            asIterator: function () {
+                asIteratorCalls++;
+                return new java.util.ArrayList().iterator();
+            }
+        });
+        var tokens = new Tokens("a b");
+        expect(F.isRuntimeGenerated(tokens)).toBe(true);
+        expect(F.asIterator(tokens)).toBe("java.util.ArrayList$Itr");
+        expect(asIteratorCalls).toBe(1);
+    });
+
+    it("are called through a class extend of an app class, unless D8 desugared them", function () {
+        if (sdk < 24) {
+            return;
+        }
+        var CarProducer = com.tns.tests.interfaces.defaultmethods.impl.CarProducerImpl;
+        var produced = 0;
+        var Producing = CarProducer.extend({
+            produce: function () {
+                produced++;
+                return "js produce";
+            }
+        });
+        var producing = new Producing();
+
+        if (F.isDesugared()) {
+            // D8 gives CarProducerImpl a synthetic produce() forwarding to the moved
+            // body; generated classes do not override synthetic methods.
+            expect(F.produce(producing)).toBe("default produce in CarProducer");
+            expect(produced).toBe(0);
+            return;
+        }
+        expect(F.produce(producing)).toBe("js produce");
+        expect(produced).toBe(1);
+    });
+
     it("reach JS for an interface whose methods are all default methods, unless D8 desugared them", function () {
         if (sdk < 24) {
             return;

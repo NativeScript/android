@@ -1,8 +1,10 @@
 package com.tns.tests;
 
 import com.tns.tests.interfaces.defaultmethods.contract.AllDefaultListener;
+import com.tns.tests.interfaces.defaultmethods.contract.Producer;
 
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.PrimitiveIterator;
@@ -113,6 +115,24 @@ public class DefaultMethodFixtures {
             listener.onText("a");
             listener.onNumber(7);
             return listener.describe();
+        } catch (Throwable t) {
+            return t.getClass().getName();
+        }
+    }
+
+    public static String produce(Producer producer) {
+        try {
+            return producer.produce();
+        } catch (Throwable t) {
+            return t.getClass().getName();
+        }
+    }
+
+    // Only on API levels whose Enumeration has the asIterator() default method.
+    @SuppressWarnings("NewApi")
+    public static String asIterator(Enumeration<?> enumeration) {
+        try {
+            return enumeration.asIterator().getClass().getName();
         } catch (Throwable t) {
             return t.getClass().getName();
         }

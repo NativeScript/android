@@ -376,6 +376,7 @@ public class DexFactory {
 
         HashSet<String> methodOverridesSet = null;
         HashSet<ClassDescriptor> implementedInterfacesSet = new HashSet<ClassDescriptor>();
+        List<Class<?>> implementedInterfaceClasses = new ArrayList<Class<?>>();
 
         if (methodOverrides != null) {
             methodOverridesSet = new HashSet<String>();
@@ -389,13 +390,25 @@ public class DexFactory {
         if (implementedInterfaces.length > 0) {
             for (int j = 0; j < implementedInterfaces.length; j++) {
                 if (!implementedInterfaces[j].isEmpty()) {
-                    implementedInterfacesSet.add(new ClassInfo(Class.forName(implementedInterfaces[j])));
+                    Class<?> implementedInterface = Class.forName(implementedInterfaces[j]);
+                    implementedInterfacesSet.add(new ClassInfo(implementedInterface));
+                    implementedInterfaceClasses.add(implementedInterface);
                 }
             }
         }
 
         AnnotationDescriptor[] annotations = null;
-        List<Method> defaultMethods = overridesDefaults ? DefaultMethods.collect(classToProxy) : null;
+        List<Method> defaultMethods = null;
+        if (overridesDefaults) {
+            defaultMethods = DefaultMethods.collect(classToProxy);
+        } else if (!classToProxy.isInterface() && Build.VERSION.SDK_INT >= 24) {
+            defaultMethods = new ArrayList<Method>();
+            for (Method inherited : DefaultMethods.collect(classToProxy, implementedInterfaceClasses)) {
+                if (methodOverridesSet == null || methodOverridesSet.contains(inherited.getName())) {
+                    defaultMethods.add(inherited);
+                }
+            }
+        }
         return proxyGenerator.generateProxy(proxyName, contentDigest, new ClassInfo(classToProxy), methodOverridesSet, implementedInterfacesSet, isInterface, annotations, defaultMethods);
     }
 
