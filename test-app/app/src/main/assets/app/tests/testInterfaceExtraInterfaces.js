@@ -424,6 +424,13 @@ describe("Interface extends with extra interfaces", function () {
 
         expectCallSiteClass(prebuilt, "java.util.function.LongSupplier");
         expect(F.isRuntimeGenerated(prebuilt)).toBe(false);
+        // Also in a content-keyed build, which names only class extends after their content.
+        var prebuiltName = String(F.className(prebuilt));
+        var reported = Array.prototype.filter.call(com.tns.DexFactory.getRuntimeGeneratedClasses(), function (line) {
+            var fields = String(line).split(" ");
+            return fields[2] === prebuiltName || fields[3].replace(/\$/g, "_") === prebuiltName;
+        });
+        expect(reported).toEqual([]);
         expect(F.isInstance(prebuilt, "java.util.function.IntSupplier")).toBe(true);
         expect(String(F.call(prebuilt, "java.util.function.IntSupplier", "getAsInt"))).toBe("42");
 
