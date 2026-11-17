@@ -155,7 +155,7 @@ public class DexFactory {
         }
 
         // creates jar file from already generated dex file
-        String jarFilePath = dexFile.getPath().replace(".dex", ".jar");
+        String jarFilePath = dexFile.getPath().replaceFirst("\\.dex$", ".jar");
         File jarFile = new File(jarFilePath);
 
         if (!jarFile.exists()) {
