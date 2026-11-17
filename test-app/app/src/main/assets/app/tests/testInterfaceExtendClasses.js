@@ -64,6 +64,53 @@ describe("Anonymous extends of an interface", function () {
         expect(calls).toEqual(["second", "first"]);
     });
 
+    it("keep each call site's implementation when they both override a default method of the same interface", function () {
+        if (android.os.Build.VERSION.SDK_INT < 24) {
+            return;
+        }
+        // An alias: no class of the interface is prebuilt, and no other spec implements it.
+        var Operator = java.util.function["IntUnary" + "Operator"];
+        var calls = [];
+        var First = Operator[ext]({
+            applyAsInt: function (value) { return value + 1; },
+            andThen: function (after) {
+                calls.push("first andThen");
+                return after;
+            }
+        });
+        var Second = Operator[ext]({
+            applyAsInt: function (value) { return value * 10; },
+            andThen: function (after) {
+                calls.push("second andThen");
+                return after;
+            }
+        });
+        expect(Second).not.toBe(First);
+
+        // Reflection makes Java, not JS, call the implementations.
+        var applyAsInt = Operator.class.getMethod("applyAsInt", [java.lang.Integer.TYPE]);
+        var andThen = Operator.class.getMethod("andThen", [Operator.class]);
+        function apply(instance, value) {
+            return String(applyAsInt.invoke(instance, [new java.lang.Integer(value)]));
+        }
+
+        var second = new Second();
+        var first = new First();
+        expect(apply(first, 4)).toBe("5");
+        expect(apply(second, 4)).toBe("40");
+        andThen.invoke(second, [first]);
+        andThen.invoke(first, [second]);
+        expect(calls).toEqual(["second andThen", "first andThen"]);
+
+        var firstAgain = new First();
+        var secondAgain = new Second();
+        expect(apply(secondAgain, 2)).toBe("20");
+        expect(apply(firstAgain, 2)).toBe("3");
+        andThen.invoke(firstAgain, [secondAgain]);
+        expect(calls).toEqual(["second andThen", "first andThen", "first andThen"]);
+        expect(String(second.getClass().getName())).toBe(String(first.getClass().getName()));
+    });
+
     it("return the same constructor each time one call site runs", function () {
         function extendRunnable(implementation) {
             return java.lang.Runnable.extend(implementation);
