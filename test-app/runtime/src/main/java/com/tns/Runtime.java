@@ -549,9 +549,13 @@ public class Runtime {
             if (bound.getRuntimeTag__ns() == 0) {
                 // Before the tag: readers take the id only once they see a tag.
                 bound.setObjectId__ns(objectId);
-                bound.setRuntimeTag__ns(runtimeId + 1);
+                bound.setRuntimeTag__ns(runtimeTagOf(runtimeId));
             }
         }
+    }
+
+    static int runtimeTagOf(int runtimeId) {
+        return runtimeId + 1;
     }
 
     /*
@@ -784,7 +788,7 @@ public class Runtime {
             this.logger = logger;
 
             boolean isMainThread = this.workerId == 0;
-            this.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb, classStorageService, isMainThread);
+            this.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb, classStorageService, isMainThread, appConfig.getInterfaceProxies());
 
             if (logger.isEnabled()) {
                 logger.write("Initializing NativeScript JAVA");
@@ -1228,6 +1232,16 @@ public class Runtime {
         return result;
     }
 
+    /*
+     * Takes the place of the Java constructor call for a class DexFactory.resolveClass
+     * returned as an interface proxy. The owner and id are fixed in the handler here, so
+     * nothing goes through initInstance; registerConstructedInstance follows as usual.
+     */
+    @RuntimeCallable
+    private Object newInterfaceProxy(Class<?> proxyClass, int objectId) throws ReflectiveOperationException {
+        return DexFactory.newInterfaceProxy(proxyClass, new InterfaceProxyHandler(runtimeId, objectId));
+    }
+
     // One upcall for what native needs after constructing an object from JS.
     @RuntimeCallable
     private long registerConstructedInstance(Object instance, int objectId) {
@@ -1395,6 +1409,10 @@ public class Runtime {
                 objectIdHint = bound.getObjectId__ns();
             }
         }
+        return callJSMethodOfOwner(owningRuntimeId, objectIdHint, javaObject, methodName, retType, isConstructor, delay, args);
+    }
+
+    static Object callJSMethodOfOwner(int owningRuntimeId, int objectIdHint, Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object[] args) throws NativeScriptException {
         Runtime runtime;
 
         if (owningRuntimeId != NO_OWNING_RUNTIME) {
@@ -1535,6 +1553,8 @@ public class Runtime {
         return classStorageService.retrieveClass(className);
     }
 
+    private static final String INTERFACE_PROXY_CONSTRUCTOR_SIGNATURE = "(Ljava/lang/reflect/InvocationHandler;)V";
+
     @RuntimeCallable
     private String resolveConstructorSignature(Class<?> clazz, Object[] args) throws Exception {
         // Pete: cache stuff here, or in the cpp part
@@ -1543,7 +1563,13 @@ public class Runtime {
             logger.write("resolveConstructorSignature: Resolving constructor for class " + clazz.getName());
         }
 
-        String res = MethodResolver.resolveConstructorSignature(clazz, args);
+        String res;
+        if (DexFactory.isInterfaceProxyClass(clazz)) {
+            // Native reads this signature, for no arguments, as "construct with newInterfaceProxy".
+            res = (args == null || args.length == 0) ? INTERFACE_PROXY_CONSTRUCTOR_SIGNATURE : null;
+        } else {
+            res = MethodResolver.resolveConstructorSignature(clazz, args);
+        }
 
         if (res == null) {
             throw new Exception("Failed resolving constructor for class \'" + clazz.getName() + "\' with " + (args != null ? args.length : 0) + " parameters. " + FAILED_CTOR_RESOLUTION_MSG);
@@ -1796,6 +1822,8 @@ public class Runtime {
             return Double.longBitsToDouble(bits);
         }
     }
+
+    static native void registerInterfaceProxyClass(String proxyClassName, String interfaceName);
 
     // shorty: the JNI shorty of the method, return type first; primitive arguments travel as
     // raw bits in primitiveArgs, references in args. A primitive result comes back in

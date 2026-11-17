@@ -25,6 +25,7 @@ try {
         }
     });
     result.implementedClass = String(implemented.getClass().getName());
+    result.implementedIsProxy = java.lang.reflect.Proxy.isProxyClass(implemented.getClass());
     result.implementedCall = callFromJava(implemented, "describe");
 } catch (e) {
     result.error = String(e && e.message || e);

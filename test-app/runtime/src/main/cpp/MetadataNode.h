@@ -63,6 +63,10 @@ class MetadataNode {
 
         static MetadataNode* GetOrCreate(const std::string& className);
 
+        // GetOrCreate(proxyClassName) answers with the interface's node: a proxy class has a
+        // generated name the metadata cannot describe.
+        static void RegisterInterfaceProxyClass(const std::string& proxyClassName, const std::string& interfaceName);
+
         static std::string GetTypeMetadataName(v8::Isolate* isolate, v8::Local<v8::Value>& value);
 
         /*

@@ -138,5 +138,7 @@ require('./tests/testEsmHttpLoader');
 require('./tests/NapiTests');
 require('./tests/NapiCoverageTests');
 require("./tests/testConcurrentAccess");
+// Checks the runtime generation report, so it goes after every spec that implements an interface
+require("./tests/testInterfaceProxies");
 
 require("./tests/testESModules.mjs");

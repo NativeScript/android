@@ -258,6 +258,13 @@ MetadataNode* MetadataNode::GetOrCreate(const string& className) {
     return s_name2NodeCache.emplace(className, node).first->second;
 }
 
+void MetadataNode::RegisterInterfaceProxyClass(const string& proxyClassName, const string& interfaceName) {
+    MetadataNode* node = GetOrCreate(interfaceName);
+
+    std::lock_guard<std::mutex> lock(s_nodeCacheMutex);
+    s_name2NodeCache.emplace(proxyClassName, node);
+}
+
 MetadataNode* MetadataNode::GetOrCreateInternal(MetadataTreeNode* treeNode) {
     {
         std::lock_guard<std::mutex> lock(s_nodeCacheMutex);

@@ -1,5 +1,7 @@
 describe("Anonymous extends of an interface", function () {
     var ext = "ex" + "tend";
+    // With this option an interface without a prebuilt class gets a java.lang.reflect.Proxy class.
+    var proxies = !!require("../package.json").android.interfaceProxies;
 
     // Reflection makes Java, not JS, call the implementation.
     function callFromJava(instance, methodName) {
@@ -86,7 +88,7 @@ describe("Anonymous extends of an interface", function () {
         expect(String(callFromJava(implemented, "run"))).toBe("implemented");
         expect(String(callFromJava(extended, "run"))).toBe("extended");
         expect(String(extended.getClass().getName())).toBe(String(implemented.getClass().getName()));
-        expect(reportEntriesFor("com.tns.gen.java.security.PrivilegedAction").length).toBe(1);
+        expect(reportEntriesFor(String(implemented.getClass().getName())).length).toBe(1);
     });
 
     it("work with a generated class before new Interface({...}) of the same interface", function () {
@@ -108,7 +110,7 @@ describe("Anonymous extends of an interface", function () {
         callFromJava(implemented, "close");
         expect(calls).toEqual(["extended", "implemented"]);
         expect(String(implemented.getClass().getName())).toBe(String(extended.getClass().getName()));
-        expect(reportEntriesFor("com.tns.gen.java.lang.AutoCloseable").length).toBe(1);
+        expect(reportEntriesFor(String(implemented.getClass().getName())).length).toBe(1);
     });
 
     it("keep each implementation when new and extend of a prebuilt interface are mixed", function () {
@@ -160,7 +162,9 @@ describe("Anonymous extends of an interface", function () {
             expect(msg.data.error).toBeUndefined();
             expect(msg.data.extendedRun).toBe("worker extend");
             expect(msg.data.implementedRun).toBe("worker new");
-            expect(msg.data.extendedClass).toBe("com.tns.gen.java.security.PrivilegedExceptionAction");
+            if (!proxies) {
+                expect(msg.data.extendedClass).toBe("com.tns.gen.java.security.PrivilegedExceptionAction");
+            }
             expect(msg.data.implementedClass).toBe(msg.data.extendedClass);
             done();
         };
@@ -184,12 +188,13 @@ describe("Anonymous extends of an interface", function () {
                 }
             });
 
-            expect(String(callFromJava(new Extended(), "run"))).toBe("main extend");
-            var entries = reportEntriesFor("com.tns.gen.java.security.PrivilegedExceptionAction").filter(function (entry) {
+            var extended = new Extended();
+            expect(String(callFromJava(extended, "run"))).toBe("main extend");
+            var entries = reportEntriesFor(String(extended.getClass().getName())).filter(function (entry) {
                 return entry.requested.indexOf("_tests_testInterfaceExtendClasses_") > 0;
             });
             expect(entries.length).toBe(1);
-            expect(entries[0].source).toBe("cached");
+            expect(entries[0].source).toBe(proxies ? "proxy" : "cached");
             done();
         };
     });

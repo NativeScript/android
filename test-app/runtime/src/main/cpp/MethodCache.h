@@ -20,7 +20,7 @@ class MethodCache {
         struct CacheMethodInfo {
             CacheMethodInfo()
                 :
-                retType(MethodReturnType::Unknown), mid(nullptr), clazz(nullptr), isStatic(false) {
+                retType(MethodReturnType::Unknown), mid(nullptr), clazz(nullptr), isStatic(false), isInterfaceProxy(false) {
             }
             std::string signature;
             std::string returnType;
@@ -28,6 +28,9 @@ class MethodCache {
             jmethodID mid;
             jclass clazz;
             bool isStatic;
+            // A constructor entry for a java.lang.reflect.Proxy class implementing an interface:
+            // instances come from Runtime.newInterfaceProxy, not from mid.
+            bool isInterfaceProxy;
         };
 
         static void Init();

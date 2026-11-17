@@ -227,6 +227,8 @@ namespace tns {
 
         static jmethodID REGISTER_CONSTRUCTED_INSTANCE_ID;
 
+        static jmethodID NEW_INTERFACE_PROXY_ID;
+
         static jmethodID GET_TYPE_METADATA;
 
         static jmethodID GET_DEFAULT_METHOD_NAMES;

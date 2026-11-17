@@ -64,6 +64,10 @@ void CallbackHandlers::Init(Isolate *isolate) {
                                                            "(Ljava/lang/Object;I)J");
         NS_CHECK(REGISTER_CONSTRUCTED_INSTANCE_ID != nullptr);
 
+        NEW_INTERFACE_PROXY_ID = env.GetMethodID(RUNTIME_CLASS, "newInterfaceProxy",
+                                                 "(Ljava/lang/Class;I)Ljava/lang/Object;");
+        NS_CHECK(NEW_INTERFACE_PROXY_ID != nullptr);
+
         GET_TYPE_METADATA = env.GetStaticMethodID(RUNTIME_CLASS, "getTypeMetadata",
                                                   "(Ljava/lang/String;I)[Ljava/lang/String;");
         NS_CHECK(GET_TYPE_METADATA != nullptr);
@@ -239,7 +243,10 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
                                                        generatedJavaClass, isInterface);
 
     jobject instance;
-    {
+    if (mi.isInterfaceProxy) {
+        instance = env.CallObjectMethod(runtime->GetJavaRuntime(), NEW_INTERFACE_PROXY_ID,
+                                        generatedJavaClass, javaObjectID);
+    } else {
         ConstructionScope construction(runtime, javaObjectID, generatedJavaClass);
 
         if (argWrapper.type == ArgType::Interface) {
@@ -2164,6 +2171,7 @@ jfieldID CallbackHandlers::CURRENT_OBJECTID_FIELD_ID = nullptr;
 jfieldID CallbackHandlers::CURRENT_OBJECTCLASS_FIELD_ID = nullptr;
 jmethodID CallbackHandlers::RESOLVE_CLASS_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::REGISTER_CONSTRUCTED_INSTANCE_ID = nullptr;
+jmethodID CallbackHandlers::NEW_INTERFACE_PROXY_ID = nullptr;
 jmethodID CallbackHandlers::GET_TYPE_METADATA = nullptr;
 jmethodID CallbackHandlers::GET_DEFAULT_METHOD_NAMES = nullptr;
 jmethodID CallbackHandlers::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;

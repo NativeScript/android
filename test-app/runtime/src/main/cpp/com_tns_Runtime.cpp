@@ -403,6 +403,15 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_setAdmissionSpinMicros(JNIEnv* _e
     AdmissionGate::s_spinMicros.store(micros, std::memory_order_relaxed);
 }
 
+extern "C" JNIEXPORT void Java_com_tns_Runtime_registerInterfaceProxyClass(JNIEnv* env, jclass, jstring proxyClassName, jstring interfaceName) {
+    try {
+        MetadataNode::RegisterInterfaceProxyClass(ArgConverter::jstringToString(proxyClassName), ArgConverter::jstringToString(interfaceName));
+    } catch (NativeScriptException& e) {
+        __android_log_print(ANDROID_LOG_WARN, "JS", "No metadata for the interface of %s: %s",
+                            ArgConverter::jstringToString(proxyClassName).c_str(), e.GetErrorMessage().c_str());
+    }
+}
+
 // Raw JNI throughout: an exception the method throws must stay pending, so that it reaches
 // the Java caller unchanged.
 extern "C" JNIEXPORT jobject Java_com_tns_Runtime_invokeNonvirtualNative(JNIEnv* env, jclass, jobject receiver, jobject method, jclass declaringClass, jstring shorty,

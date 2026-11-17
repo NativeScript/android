@@ -1,6 +1,15 @@
 describe("Bindings of app-module types", function () {
     // A computed member hides an extend from the static binding generator.
     var ext = "ex" + "tend";
+    // With this option an interface without a prebuilt class gets a java.lang.reflect.Proxy class.
+    var proxies = !!require("../package.json").android.interfaceProxies;
+
+    function expectRuntimeInterfaceClass(isProxyClass, className, expectedGeneratedName) {
+        expect(isProxyClass).toBe(proxies);
+        if (!proxies) {
+            expect(className).toBe(expectedGeneratedName);
+        }
+    }
 
     // Reflection makes Java, not JS, call the implementation.
     function callFromJava(instance, methodName) {
@@ -87,7 +96,7 @@ describe("Bindings of app-module types", function () {
             });
 
             expect(callFromJava(implemented, "describe")).toBe("runtime new");
-            expect(String(implemented.getClass().getName())).toBe("com.tns.gen.com.tns.tests.AppModuleBindingTarget_RuntimeGenerated");
+            expectRuntimeInterfaceClass(java.lang.reflect.Proxy.isProxyClass(implemented.getClass()), String(implemented.getClass().getName()), "com.tns.gen.com.tns.tests.AppModuleBindingTarget_RuntimeGenerated");
             var entries = reportEntriesFor(implemented.getClass().getName());
             expect(entries.length).toBe(1);
             expect(entries[0].kind).toBe("interface");
@@ -103,7 +112,7 @@ describe("Bindings of app-module types", function () {
             var instance = new Extended();
 
             expect(callFromJava(instance, "describe")).toBe("runtime interface extend");
-            expect(String(instance.getClass().getName())).toBe("com.tns.gen.com.tns.tests.AppModuleBindingTarget_ExtendedAtRuntime");
+            expectRuntimeInterfaceClass(java.lang.reflect.Proxy.isProxyClass(instance.getClass()), String(instance.getClass().getName()), "com.tns.gen.com.tns.tests.AppModuleBindingTarget_ExtendedAtRuntime");
             var entries = reportEntriesFor(instance.getClass().getName());
             expect(entries.length).toBe(1);
             expect(entries[0].kind).toBe("interface");
@@ -116,7 +125,7 @@ describe("Bindings of app-module types", function () {
                 expect(msg.data.error).toBeUndefined();
                 expect(msg.data.extendedCall).toBe("worker extend");
                 expect(msg.data.implementedCall).toBe("worker new");
-                expect(msg.data.implementedClass).toBe("com.tns.gen.com.tns.tests.AppModuleBindingTarget_WorkerRuntimeGenerated");
+                expectRuntimeInterfaceClass(msg.data.implementedIsProxy, msg.data.implementedClass, "com.tns.gen.com.tns.tests.AppModuleBindingTarget_WorkerRuntimeGenerated");
                 expect(reportEntriesFor(msg.data.extendedClass).length).toBe(1);
                 expect(reportEntriesFor(msg.data.implementedClass).length).toBe(1);
                 done();
