@@ -125,6 +125,7 @@ require('./tests/testWorkerEsmEntry');
 require('./tests/testWorkerLifetime');
 // Java->JS calls route to the runtime that created the object
 require('./tests/testRuntimeBoundDispatch');
+require('./tests/testConcurrentProxyGeneration');
 // Fetches from the in-app loopback fixture server, so it goes last
 require('./tests/testEsmHttpLoader');
 // Node-API addon surface
