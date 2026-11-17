@@ -26,9 +26,6 @@ public class Dump {
     static final String RUNTIME_TAG_FIELD_NAME = "runtimeTag__ns";
     static final String OBJECT_ID_FIELD_NAME = "objectId__ns";
 
-    static final StringBuffer methodDescriptorBuilder = new StringBuffer();
-
-
     /**
      * Returns the dex descriptor corresponding to the given method.
      *
@@ -38,7 +35,7 @@ public class Dump {
      */
     public String getDexMethodDescriptor(final MethodDescriptor method) {
         ClassDescriptor[] parameters = method.getParameterTypes();
-        methodDescriptorBuilder.setLength(0);
+        StringBuffer methodDescriptorBuilder = new StringBuffer();
         getDexDescriptor(methodDescriptorBuilder, method.getReturnType());
         for (int i = 0; i < parameters.length; ++i) {
             getDexDescriptor(methodDescriptorBuilder, parameters[i]);
@@ -55,7 +52,7 @@ public class Dump {
      */
     public String getMethodOverloadDescriptor(final MethodDescriptor method) {
         ClassDescriptor[] parameters = method.getParameterTypes();
-        methodDescriptorBuilder.setLength(0);
+        StringBuffer methodDescriptorBuilder = new StringBuffer();
         for (int i = 0; i < parameters.length; ++i) {
             getDexDescriptor(methodDescriptorBuilder, parameters[i]);
         }
@@ -71,7 +68,7 @@ public class Dump {
      */
     public String getDexConstructorDescriptor(final MethodDescriptor constructor) {
         ClassDescriptor[] parameters = constructor.getParameterTypes();
-        methodDescriptorBuilder.setLength(0);
+        StringBuffer methodDescriptorBuilder = new StringBuffer();
         getDexDescriptor(methodDescriptorBuilder, ClassDescriptor.VOID);
         for (int i = 0; i < parameters.length; ++i) {
             getDexDescriptor(methodDescriptorBuilder, parameters[i]);
@@ -841,7 +838,6 @@ public class Dump {
     }
 
     static final String[] classImplentedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", "Lcom/tns/NativeScriptRuntimeBound;" };
-    static final String[] interfaceImplementedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", "Lcom/tns/NativeScriptRuntimeBound;", "" };
 
     private ClassVisitor generateClass(ApplicationWriter aw, ClassDescriptor classTo, String classSignature, String tnsClassSignature, HashSet<ClassDescriptor> implementedInterfaces, AnnotationDescriptor[] annotations) {
         ClassVisitor cv;
@@ -851,11 +847,8 @@ public class Dump {
         ArrayList<String> interfacesToImplement = new ArrayList(Arrays.asList(classImplentedInterfaces));
 
         if (classTo.isInterface()) {
-            interfaceImplementedInterfaces[interfaceImplementedInterfaces.length - 1] = classSignature;
-            for (String interfaceToImpl : interfaceImplementedInterfaces) {
-                if (!interfacesToImplement.contains(interfaceToImpl)) {
-                    interfacesToImplement.add(interfaceToImpl);
-                }
+            if (!interfacesToImplement.contains(classSignature)) {
+                interfacesToImplement.add(classSignature);
             }
 
             classSignature = objectClass;

@@ -33,7 +33,7 @@ import dalvik.system.BaseDexClassLoader;
 import dalvik.system.DexClassLoader;
 
 public class DexFactory {
-    private static final String COM_TNS_GEN_PREFIX = "com.tns.gen.";
+    static final String COM_TNS_GEN_PREFIX = "com.tns.gen.";
 
     private final Logger logger;
     private final File dexDir;
@@ -155,7 +155,7 @@ public class DexFactory {
         }
 
         // creates jar file from already generated dex file
-        String jarFilePath = dexFile.getPath().replace(".dex", ".jar");
+        String jarFilePath = dexFile.getPath().replaceFirst("\\.dex$", ".jar");
         File jarFile = new File(jarFilePath);
 
         if (!jarFile.exists()) {

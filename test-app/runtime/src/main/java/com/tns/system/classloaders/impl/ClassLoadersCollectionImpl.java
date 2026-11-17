@@ -4,14 +4,16 @@ import com.tns.system.classloaders.ClassLoadersCollection;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 public enum ClassLoadersCollectionImpl implements ClassLoadersCollection {
 
     INSTANCE;
 
-    private Set<ClassLoader> classLoaders = Collections.synchronizedSet(new HashSet<ClassLoader>());
+    // Iterated on every class lookup miss by any runtime's thread while another may be adding a
+    // loader; loaders are added rarely, so iteration works on a snapshot instead of a lock.
+    private final Set<ClassLoader> classLoaders = new CopyOnWriteArraySet<ClassLoader>();
 
     @Override
     public void addClassLoader(ClassLoader classLoader) {

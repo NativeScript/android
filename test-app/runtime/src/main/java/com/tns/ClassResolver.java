@@ -21,7 +21,7 @@ class ClassResolver {
         String className = canonicalClassName;
 
         Class<?> clazz = null;
-        boolean isBindingClass = canonicalClassName.startsWith("com.tns.gen") && !canonicalClassName.startsWith("com.tns.tests.");
+        boolean isBindingClass = canonicalClassName.startsWith(DexFactory.COM_TNS_GEN_PREFIX);
 
         // if binding generate proxy or load pregenerated
         if (isBindingClass) {
