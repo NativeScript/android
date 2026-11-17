@@ -663,9 +663,10 @@ task runSbg(type: BuildToolTask) {
         }
     }
     doLast {
-        // The generator's standard output only reaches runSbg.log.
+        // The generator's standard output only reaches runSbg.log, and the
+        // NativeScript CLI runs gradle with --quiet, which hides the warn level.
         if (sbgWarningsFile.isFile()) {
-            sbgWarningsFile.eachLine { logger.warn("runSbg: ${it}") }
+            sbgWarningsFile.eachLine { logger.quiet("runSbg: ${it}") }
         }
     }
 }
