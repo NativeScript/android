@@ -111,7 +111,7 @@ public final class DefaultMethods {
         List<Method> result = new ArrayList<>();
         for (List<Method> declarations : declarationsBySignature.values()) {
             Method mostSpecific = null;
-            Method conflictingDefault = null;
+            List<Method> conflictingDefaults = new ArrayList<>();
             int maximal = 0;
             for (Method candidate : declarations) {
                 boolean overridden = false;
@@ -125,19 +125,20 @@ public final class DefaultMethods {
                 if (!overridden) {
                     mostSpecific = candidate;
                     maximal++;
-                    if (conflictingDefault == null && candidate.isDefault()) {
-                        conflictingDefault = candidate;
+                    if (candidate.isDefault() && !hasReturnTypeOf(conflictingDefaults, candidate)) {
+                        conflictingDefaults.add(candidate);
                     }
                 }
             }
             // Several maximal declarations conflict, and the class must override them
             // itself; unless asked for, that case keeps whatever it does without this class.
             // A bridge covering one of them is itself one side of the conflict, so only an
-            // override resolves it, bridged or not.
+            // override resolves it, bridged or not. Java calls each return type's declaration
+            // by its own descriptor, so one declaration per return type is kept.
             if (maximal == 1 && mostSpecific.isDefault() && !isBridged(mostSpecific, bridges)) {
                 result.add(mostSpecific);
-            } else if (maximal > 1 && withConflicts && conflictingDefault != null) {
-                result.add(conflictingDefault);
+            } else if (maximal > 1 && withConflicts) {
+                result.addAll(conflictingDefaults);
             }
         }
 
@@ -149,6 +150,15 @@ public final class DefaultMethods {
             }
         });
         return result;
+    }
+
+    private static boolean hasReturnTypeOf(List<Method> methods, Method method) {
+        for (Method other : methods) {
+            if (other.getReturnType() == method.getReturnType()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /*

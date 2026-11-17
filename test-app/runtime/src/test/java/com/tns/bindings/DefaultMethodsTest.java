@@ -290,6 +290,56 @@ public class DefaultMethodsTest {
         assertEquals(2, withConflicts.size());
     }
 
+    interface NumberValue {
+        default Number value() {
+            return 1;
+        }
+    }
+
+    interface IntegerValue {
+        default Integer value() {
+            return 2;
+        }
+    }
+
+    interface AbstractNumberAmount {
+        Number amount();
+    }
+
+    interface AbstractIntegerAmount {
+        Integer amount();
+    }
+
+    @Test
+    public void conflictingDefaultsWithDifferentReturnTypesAreAllCollected() throws Exception {
+        List<Method> withConflicts = DefaultMethods.collectWithConflicts(Object.class,
+                Arrays.<Class<?>>asList(NumberValue.class, IntegerValue.class));
+        assertTrue(withConflicts.contains(NumberValue.class.getMethod("value")));
+        assertTrue(withConflicts.contains(IntegerValue.class.getMethod("value")));
+    }
+
+    private static Shape generateCallSiteClass(Class<?> base, Class<?> extra, List<Method> defaultMethods) {
+        HashSet<ClassDescriptor> extras = new HashSet<>();
+        extras.add(new ClassInfo(extra));
+        org.ow2.asmdex.ApplicationWriter aw = new org.ow2.asmdex.ApplicationWriter();
+        aw.visit();
+        new Dump().generateProxy(aw, "com.tns.gen.a.Base_site_1_2_", new ClassInfo(base), null, extras, null, defaultMethods);
+        aw.visitEnd();
+        return read(aw.toByteArray());
+    }
+
+    @Test
+    public void aCallSiteClassStubsEveryReturnTypeOfAMethodItsInterfacesDeclare() throws Exception {
+        Shape defaults = generateCallSiteClass(NumberValue.class, IntegerValue.class,
+                Arrays.asList(NumberValue.class.getMethod("value"), IntegerValue.class.getMethod("value")));
+        assertTrue(defaults.methods.contains("valueLjava/lang/Number;"));
+        assertTrue(defaults.methods.contains("valueLjava/lang/Integer;"));
+
+        Shape abstracts = generateCallSiteClass(AbstractNumberAmount.class, AbstractIntegerAmount.class, new ArrayList<Method>());
+        assertTrue(abstracts.methods.contains("amountLjava/lang/Number;"));
+        assertTrue(abstracts.methods.contains("amountLjava/lang/Integer;"));
+    }
+
     abstract static class NotAnInterface {
         public abstract String fromClass();
     }

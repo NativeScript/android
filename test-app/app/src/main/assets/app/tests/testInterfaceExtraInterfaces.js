@@ -263,6 +263,49 @@ describe("Interface extends with extra interfaces", function () {
         expect(String(F.call(instance, PKG + "TypeScriptBase", "base"))).toBe("ts base");
     });
 
+    // Java calls value() through the method of the type it holds, Number value() or
+    // Integer value(): each needs the JS implementation.
+    function expectValueThroughEitherType(instance, baseName) {
+        expect(String(F.call(instance, baseName, "value"))).toBe("41");
+        expect(String(F.call(instance, PKG + "Covariant$IntegerExtra", "value"))).toBe("41");
+    }
+
+    it("call the JS implementation of a default method declared with different return types", function () {
+        var B = X.Covariant.NumberBase;
+        var C = B.extend({
+            interfaces: [X.Covariant.IntegerExtra],
+            value: function () { return new java.lang.Integer(41); }
+        });
+        var instance = new C();
+
+        expect(F.isInstance(instance, PKG + "Covariant$IntegerExtra")).toBe(true);
+        expectValueThroughEitherType(instance, PKG + "Covariant$NumberBase");
+    });
+
+    it("call the JS implementation of a default method declared with different return types in a named extend", function () {
+        var B = X.Covariant.NamedNumberBase;
+        var C = B.extend("com.tns.tests.extras.NamedCovariantExtras", {
+            interfaces: [X.Covariant.IntegerExtra],
+            value: function () { return new java.lang.Integer(41); }
+        });
+        var instance = new C();
+
+        expect(F.isInstance(instance, PKG + "Covariant$IntegerExtra")).toBe(true);
+        expectValueThroughEitherType(instance, PKG + "Covariant$NamedNumberBase");
+    });
+
+    it("call the JS implementation of an abstract method declared with different return types", function () {
+        var B = X.Covariant.AbstractNumberBase;
+        var C = B.extend({
+            interfaces: [X.Covariant.AbstractIntegerExtra],
+            amount: function () { return new java.lang.Integer(42); }
+        });
+        var instance = new C();
+
+        expect(String(F.call(instance, PKG + "Covariant$AbstractNumberBase", "amount"))).toBe("42");
+        expect(String(F.call(instance, PKG + "Covariant$AbstractIntegerExtra", "amount"))).toBe("42");
+    });
+
     it("cache their dex under the class's own name", function () {
         var B = X.CacheBase;
         var C = B.extend({

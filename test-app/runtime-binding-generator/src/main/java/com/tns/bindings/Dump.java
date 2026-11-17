@@ -252,11 +252,11 @@ public class Dump {
         List<MethodDescriptor> result = new ArrayList<MethodDescriptor>(Arrays.asList(methods));
         Set<String> signatures = new HashSet<String>();
         for (MethodDescriptor method : methods) {
-            signatures.add(method.getName() + "_" + getMethodOverloadDescriptor(method));
+            signatures.add(methodKey(method));
         }
         for (java.lang.reflect.Method defaultMethod : defaultMethods) {
             MethodDescriptor method = new MethodInfo(defaultMethod);
-            if (signatures.add(method.getName() + "_" + getMethodOverloadDescriptor(method))) {
+            if (signatures.add(methodKey(method))) {
                 result.add(method);
             }
         }
@@ -266,14 +266,14 @@ public class Dump {
     private void generateDefaultMethodStubs(ClassVisitor cv, List<java.lang.reflect.Method> defaultMethods, MethodDescriptor[] generatedMethods, String classSignature, String tnsClassSignature, DefaultMethodBodies bodies) {
         Set<String> generatedSignatures = new HashSet<String>();
         for (MethodDescriptor generated : generatedMethods) {
-            generatedSignatures.add(generated.getName() + "_" + getMethodOverloadDescriptor(generated));
+            generatedSignatures.add(methodKey(generated));
         }
 
         List<String> names = new ArrayList<String>(new TreeSet<String>(namesOf(defaultMethods)));
         for (java.lang.reflect.Method defaultMethod : defaultMethods) {
             int bit = names.indexOf(defaultMethod.getName());
             MethodDescriptor method = new MethodInfo(defaultMethod);
-            if (bit >= DefaultMethods.MAX_DISPATCHED_NAMES || !generatedSignatures.add(method.getName() + "_" + getMethodOverloadDescriptor(method))) {
+            if (bit >= DefaultMethods.MAX_DISPATCHED_NAMES || !generatedSignatures.add(methodKey(method))) {
                 continue;
             }
             generateDefaultMethodStub(cv, defaultMethod, method, bit, classSignature, tnsClassSignature, bodies);
@@ -358,24 +358,21 @@ public class Dump {
         HashMap<String, MethodDescriptor> result = new HashMap<String, MethodDescriptor>();
         for (int i = 0; i < methods.length; i++) {
             MethodDescriptor method = methods[i];
-            String methodName = method.getName();
-            String methodOverLoadDescriptor = getMethodOverloadDescriptor(method);
-            methodName +=  "_" + methodOverLoadDescriptor;
-            if (!result.containsKey(methodName)) {
-                result.put(methodName, method);
+            String key = methodKey(method);
+            if (!result.containsKey(key)) {
+                result.put(key, method);
             }
         }
 
         return result.values().toArray(new MethodDescriptor[result.size()]);
     }
 
-    private String getMethodSignature(MethodDescriptor m) {
-        String sig = m.toGenericString();
-
-        int nameIdx = sig.indexOf("(");
-        int endSigIdx = sig.indexOf(")") + 1;
-
-        return m.getName() + sig.substring(nameIdx, endSigIdx);
+    /*
+     * A method's identity in dex, return type included: a method narrowing another's return
+     * type is called through both descriptors, and each one needs its own implementation.
+     */
+    private String methodKey(MethodDescriptor m) {
+        return m.getName() + getDexMethodDescriptor(m);
     }
 
     private void collectAbstractMethods(final ClassDescriptor clazz, List<MethodDescriptor> result) {
@@ -384,7 +381,7 @@ public class Dump {
         }
         Set<String> alreadyAddedMethods = new HashSet<String>();
         for (MethodDescriptor md: result) {
-            String sig = getMethodSignature(md);
+            String sig = methodKey(md);
             alreadyAddedMethods.add(sig);
         }
 
@@ -394,7 +391,7 @@ public class Dump {
         ClassDescriptor startingConcreteClassDesc = isInterfaceClass ? new ClassInfo(Object.class) : clazz;
         for (MethodDescriptor objMethod: startingConcreteClassDesc.getDeclaredMethods()) {
             if (!objMethod.isStatic()) {
-                String sig = getMethodSignature(objMethod);
+                String sig = methodKey(objMethod);
                 concreteMethods.add(sig);
             }
         }
@@ -412,7 +409,7 @@ public class Dump {
                 if (m.isStatic()) {
                     continue;
                 }
-                String sig = getMethodSignature(m);
+                String sig = methodKey(m);
                 if (m.isAbstract()) {
                     if (!concreteMethods.contains(sig) && !alreadyAddedMethods.contains(sig)) {
                         if (isInterfaceClass) {
