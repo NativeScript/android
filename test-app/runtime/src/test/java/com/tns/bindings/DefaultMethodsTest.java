@@ -111,6 +111,32 @@ public class DefaultMethodsTest {
         assertEquals(Integer.class, Covariant.class.getMethod("next").getReturnType());
     }
 
+    interface Generic<T> {
+        default T same(T value) {
+            return value;
+        }
+    }
+
+    // javac adds the bridge same(Object), which forwards to same(String).
+    interface Narrowing extends Generic<String> {
+        @Override
+        default String same(String value) {
+            return "narrowed " + value;
+        }
+    }
+
+    @Test
+    public void leavesADefaultAMoreSpecificBridgeOverridesToTheBridge() throws Exception {
+        Method erased = Generic.class.getMethod("same", Object.class);
+        assertTrue(Narrowing.class.getDeclaredMethod("same", Object.class).isBridge());
+
+        List<Method> narrowing = DefaultMethods.collect(Narrowing.class);
+        assertEquals(Arrays.asList(Narrowing.class.getMethod("same", String.class)), narrowing);
+        assertFalse(narrowing.contains(erased));
+        assertEquals(Arrays.asList(erased), DefaultMethods.collect(Generic.class));
+        assertArrayEquals(new String[]{"same"}, DefaultMethods.names(Narrowing.class));
+    }
+
     static class Implementor implements Derived {
         @Override
         public String reabstracted() {

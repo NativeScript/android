@@ -61,6 +61,7 @@ public final class DefaultMethods {
 
     private static List<Method> collect(Collection<Class<?>> roots, Set<String> excludedSignatures) {
         Map<String, List<Method>> declarationsBySignature = new LinkedHashMap<>();
+        List<Method> bridges = new ArrayList<>();
         Set<Class<?>> visited = new HashSet<>();
         Deque<Class<?>> pending = new ArrayDeque<>(roots);
         while (!pending.isEmpty()) {
@@ -70,7 +71,14 @@ public final class DefaultMethods {
             }
             for (Method method : current.getDeclaredMethods()) {
                 int modifiers = method.getModifiers();
-                if (Modifier.isStatic(modifiers) || !Modifier.isPublic(modifiers) || method.isSynthetic() || method.isBridge()) {
+                if (Modifier.isStatic(modifiers) || !Modifier.isPublic(modifiers)) {
+                    continue;
+                }
+                if (method.isBridge()) {
+                    bridges.add(method);
+                    continue;
+                }
+                if (method.isSynthetic()) {
                     continue;
                 }
                 String signature = signature(method);
@@ -107,7 +115,7 @@ public final class DefaultMethods {
             }
             // Several maximal declarations conflict, and the class must override them
             // itself; that case keeps whatever it does without this class.
-            if (maximal == 1 && mostSpecific.isDefault()) {
+            if (maximal == 1 && mostSpecific.isDefault() && !isBridged(mostSpecific, bridges)) {
                 result.add(mostSpecific);
             }
         }
@@ -120,6 +128,24 @@ public final class DefaultMethods {
             }
         });
         return result;
+    }
+
+    /*
+     * Whether a sub-interface of the method's declaring interface has a bridge of the same
+     * name, parameter and return types: a call of that signature runs the bridge, which forwards
+     * to the narrowed method the sub-interface declares, so the method itself must not be stubbed.
+     */
+    private static boolean isBridged(Method method, List<Method> bridges) {
+        for (Method bridge : bridges) {
+            if (bridge.getDeclaringClass() != method.getDeclaringClass()
+                    && method.getDeclaringClass().isAssignableFrom(bridge.getDeclaringClass())
+                    && bridge.getName().equals(method.getName())
+                    && bridge.getReturnType() == method.getReturnType()
+                    && Arrays.equals(bridge.getParameterTypes(), method.getParameterTypes())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Sorted distinct names of {@link #collect}; a name's index is its bit. */

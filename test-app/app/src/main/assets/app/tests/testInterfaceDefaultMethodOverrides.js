@@ -594,4 +594,35 @@ describe("Interface default methods implemented in JS", function () {
         var onlyText = new L({ onText: function () {} });
         expect(F.describeOnBackgroundThread(onlyText, 5000)).toBe("java default on " + F.CALLER_THREAD);
     }, 15000);
+
+    it("run the Java bodies of defaults of every argument and return kind", function () {
+        if (sdk < 24) {
+            return;
+        }
+        var D = com.tns.tests.interfaces.defaultshapes;
+        if (D.ShapesCaller.isDesugared()) {
+            // Below minSdk 24 every method is abstract on the device.
+            return;
+        }
+        var odd = [];
+        var shapes = new D.Shapes({
+            name: function () { return "js"; },
+            odd: function (value) {
+                odd.push(value);
+                return false;
+            }
+        });
+
+        expect(F.className(shapes)).toBe("com.tns.gen.com.tns.tests.interfaces.defaultshapes.Shapes" + SUFFIX);
+        expect(D.ShapesCaller.all(shapes)).toBe("7028|2.5|0.5|Q|false|-4|42|js:9223372036854775807:-0.25|v");
+        expect(odd).toEqual([3]);
+        expect(D.ShapesCaller.fail(shapes)).toBe("com.tns.tests.interfaces.defaultshapes.ShapesException: from java");
+
+        // same(Object), the bridge, reaches the narrowed default through the stub.
+        var strings = new D.StringShapes({
+            name: function () { return "s"; },
+            odd: function () { return true; }
+        });
+        expect(D.ShapesCaller.all(strings)).toBe("7028|2.5|0.5|Q|true|-4|42|s:9223372036854775807:-0.25|string v");
+    });
 });
