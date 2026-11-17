@@ -1658,6 +1658,88 @@ public class Runtime {
         }
     }
 
+    // shorty: the JNI shorty of the method, return type first; primitive arguments travel as
+    // raw bits in primitiveArgs, references in args. A primitive result comes back in
+    // primitiveResult[0] as raw bits.
+    private static native Object invokeNonvirtualNative(Object receiver, Method method, Class<?> declaringClass, String shorty, long[] primitiveArgs, Object[] args, long[] primitiveResult);
+
+    /*
+     * Runs an interface's default method on an instance whose class does not override it,
+     * the way invokespecial would: a virtual call would come straight back to the proxy.
+     */
+    static Object invokeInterfaceDefault(Object receiver, Method method, Object[] args) {
+        Class<?>[] parameterTypes = method.getParameterTypes();
+        Class<?> returnType = method.getReturnType();
+        char[] shorty = new char[parameterTypes.length + 1];
+        shorty[0] = shortyChar(returnType);
+        long[] primitiveArgs = parameterTypes.length > 0 ? new long[parameterTypes.length] : null;
+        for (int i = 0; i < parameterTypes.length; i++) {
+            shorty[i + 1] = shortyChar(parameterTypes[i]);
+            if (parameterTypes[i].isPrimitive()) {
+                primitiveArgs[i] = rawBits(args[i]);
+            }
+        }
+        boolean primitiveReturn = returnType.isPrimitive() && returnType != void.class;
+        long[] primitiveResult = primitiveReturn ? new long[1] : null;
+        Object result = invokeNonvirtualNative(receiver, method, method.getDeclaringClass(), new String(shorty), primitiveArgs, args, primitiveResult);
+        return primitiveReturn ? fromRawBits(returnType, primitiveResult[0]) : result;
+    }
+
+    private static char shortyChar(Class<?> type) {
+        if (!type.isPrimitive()) {
+            return 'L';
+        } else if (type == boolean.class) {
+            return 'Z';
+        } else if (type == byte.class) {
+            return 'B';
+        } else if (type == char.class) {
+            return 'C';
+        } else if (type == short.class) {
+            return 'S';
+        } else if (type == int.class) {
+            return 'I';
+        } else if (type == long.class) {
+            return 'J';
+        } else if (type == float.class) {
+            return 'F';
+        } else if (type == double.class) {
+            return 'D';
+        }
+        return 'V';
+    }
+
+    private static long rawBits(Object boxed) {
+        if (boxed instanceof Boolean) {
+            return ((Boolean) boxed) ? 1 : 0;
+        } else if (boxed instanceof Character) {
+            return (Character) boxed;
+        } else if (boxed instanceof Float) {
+            return Float.floatToRawIntBits((Float) boxed);
+        } else if (boxed instanceof Double) {
+            return Double.doubleToRawLongBits((Double) boxed);
+        }
+        return ((Number) boxed).longValue();
+    }
+
+    private static Object fromRawBits(Class<?> type, long bits) {
+        if (type == boolean.class) {
+            return bits != 0;
+        } else if (type == byte.class) {
+            return (byte) bits;
+        } else if (type == char.class) {
+            return (char) bits;
+        } else if (type == short.class) {
+            return (short) bits;
+        } else if (type == int.class) {
+            return (int) bits;
+        } else if (type == long.class) {
+            return bits;
+        } else if (type == float.class) {
+            return Float.intBitsToFloat((int) bits);
+        }
+        return Double.longBitsToDouble(bits);
+    }
+
     private static Object defaultPrimitiveValue(Class<?> type) {
         if (type == boolean.class) {
             return Boolean.FALSE;
