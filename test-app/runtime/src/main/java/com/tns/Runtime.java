@@ -1004,10 +1004,10 @@ public class Runtime {
     private static final ConcurrentHashMap<String, Method> interfaceDefaultMethods = new ConcurrentHashMap<String, Method>();
 
     /*
-     * Called by a generated class's stub of a default method the instance's JS object does
-     * not implement: runs the interface's body on the calling thread. key is
-     * DefaultMethods.key of the method, declared by implementedInterface or one of its
-     * super-interfaces.
+     * Called by a RUNTIME_CALL (com.tns.bindings.DefaultMethodBodies) stub of a default method
+     * the instance's JS object does not implement: runs the interface's body on the calling
+     * thread. key is DefaultMethods.key of the method, declared by implementedInterface or
+     * one of its super-interfaces.
      */
     public static Object callInterfaceDefault(Object receiver, Class<?> implementedInterface, String key, Object[] args) {
         Method method = interfaceDefaultMethods.get(key);
