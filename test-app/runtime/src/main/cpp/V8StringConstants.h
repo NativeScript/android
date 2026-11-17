@@ -53,6 +53,8 @@ class V8StringConstants {
 
         static v8::Local<v8::Private> GetCastMarkerPrivate(v8::Isolate* isolate);
 
+        static v8::Local<v8::Private> GetNullObjectPrivate(v8::Isolate* isolate);
+
         static const std::string CLASS_IMPLEMENTATION_OBJECT;
         static const std::string DEBUG_NAME;
         static const std::string EXTEND;
@@ -75,6 +77,7 @@ class V8StringConstants {
         static const std::string DISCARDED_ERROR;
         static const std::string IMPLEMENTATION_OBJECT;
         static const std::string CAST_MARKER;
+        static const std::string NULL_OBJECT_KEY;
 
         /*
          * The structure contains Persistent handles to the most commonly used v8 String values;
@@ -163,6 +166,8 @@ class V8StringConstants {
                 NULL_NODE_PRIVATE.Reset(isolate, Private::ForApi(isolate, Local<String>::New(isolate, *NULL_NODE_NAME_PERSISTENT)));
                 str = String::NewFromUtf8(isolate, CAST_MARKER.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 CAST_MARKER_PRIVATE.Reset(isolate, Private::ForApi(isolate, str));
+                str = String::NewFromUtf8(isolate, NULL_OBJECT_KEY.c_str(), NewStringType::kInternalized).ToLocalChecked();
+                NULL_OBJECT_PRIVATE.Reset(isolate, Private::ForApi(isolate, str));
             };
 
             ~PerIsolateV8Constants() {
@@ -226,6 +231,7 @@ class V8StringConstants {
             v8::Persistent<v8::String>* IMPLEMENTATION_OBJECT_PERSISTENT = nullptr;
             v8::Global<v8::Private> NULL_NODE_PRIVATE;
             v8::Global<v8::Private> CAST_MARKER_PRIVATE;
+            v8::Global<v8::Private> NULL_OBJECT_PRIVATE;
         };
 
     private:

@@ -168,3 +168,86 @@ describe("Test Constructor Resolution When Nulls are passed", function () {
 		expect(result).toMatch(/\S*.DummyClass and \S*.Object/);
 	});
 });
+
+// Each spec reads .null itself: the suites above read it at require time, and
+// these must hold whether or not anything else in this runtime has read it.
+describe("Typed null literals leave their class untouched", function () {
+	var dummyClass = new com.tns.tests.DummyClass();
+
+	it("keeps String.valueOf working after String.null is read", function () {
+		var Described = java.lang.Object.extend({
+			toString: function () {
+				return "described in JS";
+			}
+		});
+		void java.lang.String.null;
+
+		expect(java.lang.String.valueOf(new Described())).toBe("described in JS");
+		expect(java.lang.String.valueOf(new java.io.File("/typed-null"))).toBe("/typed-null");
+		expect(java.lang.String.valueOf(42)).toBe("42");
+		expect(java.lang.String.valueOf(true)).toBe("true");
+	});
+
+	it("keeps Integer.valueOf and an enum's valueOf working after their .null is read", function () {
+		void java.lang.Integer.null;
+		void java.util.concurrent.TimeUnit.null;
+
+		expect(java.lang.Integer.valueOf(5).intValue()).toBe(5);
+		expect(java.util.concurrent.TimeUnit.valueOf("SECONDS").name()).toBe("SECONDS");
+	});
+
+	it("does not accept the class itself as a typed null once its .null is read", function () {
+		void java.io.File.null;
+
+		expect(function () {
+			java.util.Objects.toString(java.io.File, "fallback");
+		}).toThrowError(/Cannot convert object/);
+	});
+
+	it("returns a cached object, distinct from the class, whose valueOf is null", function () {
+		var fileNull = java.io.File.null;
+
+		expect(fileNull).not.toBe(java.io.File);
+		expect(typeof fileNull).toBe("object");
+		expect(java.io.File.null).toBe(fileNull);
+		expect(fileNull.valueOf()).toBeNull();
+		expect(Object.keys(fileNull)).toEqual([]);
+	});
+
+	it("converts a typed null to a Java null", function () {
+		expect(java.util.Objects.isNull(java.io.File.null)).toBe(true);
+		expect(java.util.Objects.toString(java.lang.Object.null, "fallback")).toBe("fallback");
+		expect(java.lang.String.valueOf(java.lang.String.null)).toBe("null");
+	});
+
+	it("types a JS-extended class's .null as its Java base class", function () {
+		var Extended = com.tns.tests.DummyClass.extend({});
+		var extendedNull = Extended.null;
+
+		expect(extendedNull).not.toBe(com.tns.tests.DummyClass.null);
+		expect(Extended.null).toBe(extendedNull);
+		expect(extendedNull.valueOf()).toBeNull();
+		expect(dummyClass.methodWithOverloadsWithOneArgument(extendedNull)).toContain("DummyClass");
+	});
+
+	it("gives a worker typed nulls of its own that leave its classes untouched", function (done) {
+		var worker = new Worker("./typedNullWorker.js");
+		worker.onmessage = function (msg) {
+			expect(msg.data).toEqual({
+				valueOf: "7",
+				nullValueOf: null,
+				distinct: true,
+				overload: "java.io.File",
+				isNull: true
+			});
+			worker.terminate();
+			done();
+		};
+		worker.onerror = function (error) {
+			fail("worker failed: " + error.message);
+			worker.terminate();
+			done();
+		};
+		worker.postMessage("go");
+	});
+});
