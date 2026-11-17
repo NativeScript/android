@@ -163,7 +163,11 @@ public class DexFactory {
         }
     }
 
-    public Class<?> resolveClass(String baseClassName, String name, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
+    /**
+     * @param hasExplicitName className is the name the script passed to extend(), which
+     *                        may itself start with com.tns.gen.
+     */
+    public Class<?> resolveClass(String baseClassName, String name, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface, boolean hasExplicitName) throws ClassNotFoundException, IOException {
         // The interface's class name plus this suffix asks for the class that also stubs its
         // default methods. A prebuilt class of the interface is used instead when there is one.
         // Only native asks for it, without a base class name; an extend() name the script
@@ -202,10 +206,16 @@ public class DexFactory {
         // The static binding generator keeps a `$` from the script's file name in an
         // anonymous extend's class name; the runtime already replaced the base class's `$`.
         Class<?> pregeneratedClass = null;
-        if (!usesSharedInterfaceClass && !fullClassName.equals(className)) {
-            pregeneratedClass = loadPregeneratedClass(className.replace("-", "_"));
+        if (!usesSharedInterfaceClass || hasExplicitName) {
+            String requestedFullClassName = className.replace("$", "_");
+            if (!requestedFullClassName.equals(className)) {
+                pregeneratedClass = loadPregeneratedClass(className.replace("-", "_"));
+            }
+            if (pregeneratedClass == null) {
+                pregeneratedClass = loadPregeneratedClass(requestedFullClassName.replace("-", "_"));
+            }
         }
-        if (pregeneratedClass == null) {
+        if (pregeneratedClass == null && usesSharedInterfaceClass) {
             pregeneratedClass = loadPregeneratedClass(fullClassName.replace("-", "_"));
         }
         // Once injected, the class generated for the interface loads by the same name.
@@ -341,7 +351,7 @@ public class DexFactory {
         }
 
         if (bodies == DefaultMethodBodies.INVOKE_SUPER && !DefaultSuperCalls.verify(result)) {
-            return resolveClass(baseClassName, name, requestedClassName, methodOverrides, implementedInterfaces, isInterface);
+            return resolveClass(baseClassName, name, requestedClassName, methodOverrides, implementedInterfaces, isInterface, hasExplicitName);
         }
 
         generatedClassNames.add(result.getName());

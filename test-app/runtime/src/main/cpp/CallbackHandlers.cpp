@@ -51,7 +51,7 @@ void CallbackHandlers::Init(Isolate *isolate) {
         NS_CHECK(RUNTIME_CLASS != nullptr);
 
         RESOLVE_CLASS_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "resolveClass",
-                                                  "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;Z)Ljava/lang/Class;");
+                                                  "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;ZZ)Ljava/lang/Class;");
         NS_CHECK(RESOLVE_CLASS_METHOD_ID != nullptr);
 
         CURRENT_OBJECTID_FIELD_ID = env.GetFieldID(RUNTIME_CLASS, "currentObjectId", "I");
@@ -287,7 +287,8 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &baseClassName,
                                       const string &fullClassName,
                                       const Local<Object> &implementationObject, bool isInterface,
-                                      const vector<string> *contentMemberNames) {
+                                      const vector<string> *contentMemberNames,
+                                      bool hasExplicitName) {
     JEnv env;
     jclass globalRefToGeneratedClass = env.CheckForClassInCache(fullClassName);
 
@@ -314,7 +315,8 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &baseClassN
                                                               (jstring) javaFullClassName,
                                                               methodOverrides,
                                                               implementedInterfaces,
-                                                              isInterface);
+                                                              isInterface,
+                                                              hasExplicitName);
 
         globalRefToGeneratedClass = env.InsertClassIntoCache(fullClassName, generatedClass);
 

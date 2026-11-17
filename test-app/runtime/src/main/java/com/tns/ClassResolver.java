@@ -14,7 +14,7 @@ class ClassResolver {
         this.classStorageService = classStorageService;
     }
 
-    Class<?> resolveClass(String baseClassName, String fullClassName, DexFactory dexFactory, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
+    Class<?> resolveClass(String baseClassName, String fullClassName, DexFactory dexFactory, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface, boolean hasExplicitName) throws ClassNotFoundException, IOException {
         String canonicalClassName = fullClassName.replace('/', '.');
         String canonicalBaseClassName = baseClassName.replace('/', '.');
         String name = "";
@@ -25,7 +25,7 @@ class ClassResolver {
 
         // if binding generate proxy or load pregenerated
         if (isBindingClass) {
-            clazz = dexFactory.resolveClass(canonicalBaseClassName, name, className, methodOverrides, implementedInterfaces, isInterface);
+            clazz = dexFactory.resolveClass(canonicalBaseClassName, name, className, methodOverrides, implementedInterfaces, isInterface, hasExplicitName);
         }
 
         if (clazz == null) {
@@ -40,7 +40,7 @@ class ClassResolver {
                 // anonymous extends are supplied.
                 Log.w("JS", "Class " + className + " not precompiled; generating at runtime. Framework references resolve only if dex injection into the app class loader succeeds.");
                 try {
-                    clazz = dexFactory.resolveClass(canonicalBaseClassName, name, className, methodOverrides, implementedInterfaces, isInterface);
+                    clazz = dexFactory.resolveClass(canonicalBaseClassName, name, className, methodOverrides, implementedInterfaces, isInterface, hasExplicitName);
                 } catch (Throwable generationFailure) {
                     // The precise not-found is the actionable error; a failed
                     // generation attempt is its detail, not its replacement.

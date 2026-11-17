@@ -53,12 +53,14 @@ namespace tns {
         /*
          * contentMemberNames, when given, are the method overrides of a class generated
          * at runtime, instead of the implementation object's function-valued members.
+         * hasExplicitName: fullClassName is the name the script passed to extend().
          */
         static jclass ResolveClass(v8::Isolate *isolate, const std::string &baseClassName,
                                    const std::string &fullClassName,
                                    const v8::Local<v8::Object> &implementationObject,
                                    bool isInterface,
-                                   const std::vector<std::string> *contentMemberNames = nullptr);
+                                   const std::vector<std::string> *contentMemberNames = nullptr,
+                                   bool hasExplicitName = false);
 
         /*
          * The interface names the implementation object's `interfaces` array lists,

@@ -30,6 +30,21 @@ describe("Anonymous extends of an interface", function () {
         expect(reportEntriesFor("com.tns.gen.java.lang.Runnable")).toEqual([]);
     });
 
+    it("load the prebuilt class a name under com.tns.gen asks for", function () {
+        var calls = [];
+        var Extended = java.lang.Runnable.extend("com.tns.gen.tests.ExplicitlyNamedRunnable", {
+            run: function () {
+                calls.push("explicit");
+            }
+        });
+        var instance = new Extended();
+
+        callFromJava(instance, "run");
+        expect(calls).toEqual(["explicit"]);
+        expect(instance.getClass().getName()).toBe("com.tns.gen.tests.ExplicitlyNamedRunnable");
+        expect(reportEntriesFor("com.tns.gen.tests.ExplicitlyNamedRunnable")).toEqual([]);
+    });
+
     it("keep each call site's implementation when they extend the same interface", function () {
         var calls = [];
         var First = java.lang.Runnable.extend({
