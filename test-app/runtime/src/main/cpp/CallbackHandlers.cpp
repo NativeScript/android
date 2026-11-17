@@ -65,7 +65,7 @@ void CallbackHandlers::Init(Isolate *isolate) {
         NS_CHECK(REGISTER_CONSTRUCTED_INSTANCE_ID != nullptr);
 
         NEW_INTERFACE_PROXY_ID = env.GetMethodID(RUNTIME_CLASS, "newInterfaceProxy",
-                                                 "(Ljava/lang/Class;I)Ljava/lang/Object;");
+                                                 "(Ljava/lang/Class;IJ)Ljava/lang/Object;");
         NS_CHECK(NEW_INTERFACE_PROXY_ID != nullptr);
 
         GET_TYPE_METADATA = env.GetStaticMethodID(RUNTIME_CLASS, "getTypeMetadata",
@@ -245,7 +245,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     jobject instance;
     if (mi.isInterfaceProxy) {
         instance = env.CallObjectMethod(runtime->GetJavaRuntime(), NEW_INTERFACE_PROXY_ID,
-                                        generatedJavaClass, javaObjectID);
+                                        generatedJavaClass, javaObjectID, static_cast<jlong>(defaultOverrides));
     } else {
         ConstructionScope construction(runtime, javaObjectID, generatedJavaClass);
 
@@ -261,7 +261,8 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     }
 
     // Before any Java code but the constructor's own can see the instance.
-    if (defaultOverrides != 0 && instance != nullptr) {
+    // An interface proxy's handler received the mask with the instance.
+    if (defaultOverrides != 0 && instance != nullptr && !mi.isInterfaceProxy) {
         SetDefaultOverrides(env, instance, generatedJavaClass, defaultOverrides);
     }
 

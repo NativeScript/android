@@ -1236,10 +1236,12 @@ public class Runtime {
      * Takes the place of the Java constructor call for a class DexFactory.resolveClass
      * returned as an interface proxy. The owner and id are fixed in the handler here, so
      * nothing goes through initInstance; registerConstructedInstance follows as usual.
+     * defaultOverrides: the instance's mask, as the defaultOverrides__ns field of the
+     * interface's default-overriding class holds it.
      */
     @RuntimeCallable
-    private Object newInterfaceProxy(Class<?> proxyClass, int objectId) throws ReflectiveOperationException {
-        return DexFactory.newInterfaceProxy(proxyClass, new InterfaceProxyHandler(runtimeId, objectId));
+    private Object newInterfaceProxy(Class<?> proxyClass, int objectId, long defaultOverrides) throws ReflectiveOperationException {
+        return DexFactory.newInterfaceProxy(proxyClass, new InterfaceProxyHandler(runtimeId, objectId, defaultOverrides));
     }
 
     // One upcall for what native needs after constructing an object from JS.

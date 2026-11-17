@@ -2,22 +2,36 @@ package com.tns;
 
 import android.os.Build;
 
+import com.tns.bindings.DefaultMethods;
+
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Behaves like the class the runtime generates for an anonymous interface
- * implementation (see DexFactory.resolveClass): only the interface's abstract
- * methods reach JS. Object's methods keep identity semantics and a default method
- * runs its Java body, even when the JS implementation defines a function of that name.
+ * implementation (see DexFactory.resolveClass): the interface's abstract methods
+ * reach JS, and so does each default method whose name has its bit set in the
+ * instance's mask (MetadataNode::GetDefaultOverrides); any other default method runs
+ * its Java body. Object's methods keep identity semantics.
  */
 final class InterfaceProxyHandler implements InvocationHandler {
+    // Per proxy class: the bit of each default method the interface's default-overriding
+    // class stubs, by name, parameter and return types. Bits follow DefaultMethods.names.
+    private static final ConcurrentHashMap<Class<?>, Map<String, Integer>> defaultMethodBits = new ConcurrentHashMap<Class<?>, Map<String, Integer>>();
+
     private final int runtimeId;
     private final int objectId;
+    private final long defaultOverrides;
 
-    InterfaceProxyHandler(int runtimeId, int objectId) {
+    InterfaceProxyHandler(int runtimeId, int objectId, long defaultOverrides) {
         this.runtimeId = runtimeId;
         this.objectId = objectId;
+        this.defaultOverrides = defaultOverrides;
     }
 
     @Override
@@ -47,7 +61,7 @@ final class InterfaceProxyHandler implements InvocationHandler {
             return proxy == args[0];
         }
 
-        if (Build.VERSION.SDK_INT >= 24 && method.isDefault()) {
+        if (Build.VERSION.SDK_INT >= 24 && method.isDefault() && !isOverriddenInJs(proxy.getClass(), method)) {
             return Runtime.invokeInterfaceDefault(proxy, method, args);
         }
 
@@ -63,6 +77,42 @@ final class InterfaceProxyHandler implements InvocationHandler {
             }
         }
         return result;
+    }
+
+    private boolean isOverriddenInJs(Class<?> proxyClass, Method method) {
+        if (defaultOverrides == 0) {
+            return false;
+        }
+        Integer bit = defaultMethodBitsOf(proxyClass).get(descriptor(method));
+        return bit != null && (defaultOverrides & (1L << bit)) != 0;
+    }
+
+    private static Map<String, Integer> defaultMethodBitsOf(Class<?> proxyClass) {
+        Map<String, Integer> bits = defaultMethodBits.get(proxyClass);
+        if (bits != null) {
+            return bits;
+        }
+
+        bits = new HashMap<String, Integer>();
+        for (Class<?> iface : proxyClass.getInterfaces()) {
+            if (iface == NativeScriptRuntimeBound.class) {
+                continue;
+            }
+            String[] names = DefaultMethods.names(iface);
+            List<Method> methods = DefaultMethods.collect(iface);
+            for (Method defaultMethod : methods) {
+                int bit = Arrays.binarySearch(names, defaultMethod.getName());
+                if (bit >= 0 && bit < DefaultMethods.MAX_DISPATCHED_NAMES) {
+                    bits.put(descriptor(defaultMethod), bit);
+                }
+            }
+        }
+        Map<String, Integer> published = defaultMethodBits.putIfAbsent(proxyClass, bits);
+        return published != null ? published : bits;
+    }
+
+    private static String descriptor(Method method) {
+        return method.getName() + Arrays.toString(method.getParameterTypes()) + method.getReturnType().getName();
     }
 
     private static Class<?> boxOf(Class<?> primitive) {
