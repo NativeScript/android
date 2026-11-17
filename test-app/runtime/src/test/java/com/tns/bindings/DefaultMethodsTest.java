@@ -184,6 +184,7 @@ public class DefaultMethodsTest {
 
     private static final class Shape {
         String className;
+        final List<String> interfaces = new ArrayList<>();
         final List<String> fields = new ArrayList<>();
         final List<String> methods = new ArrayList<>();
     }
@@ -194,6 +195,9 @@ public class DefaultMethodsTest {
             @Override
             public ClassVisitor visitClass(int access, String name, String[] signature, String superName, String[] interfaces) {
                 shape.className = name;
+                if (interfaces != null) {
+                    shape.interfaces.addAll(Arrays.asList(interfaces));
+                }
                 return new ClassVisitor(Opcodes.ASM4) {
                     @Override
                     public FieldVisitor visitField(int access, String name, String desc, String[] signature, Object value) {
@@ -249,6 +253,75 @@ public class DefaultMethodsTest {
         assertFalse(shape.fields.contains("defaultOverrides__ns:J"));
         assertTrue(shape.methods.contains("forEachRemainingVLjava/util/function/Consumer;"));
         assertFalse(shape.methods.contains("removeV"));
+    }
+
+    @Test
+    public void conflictingDefaultsAreCollectedOnlyWhenAskedFor() throws Exception {
+        List<Class<?>> interfaces = Arrays.<Class<?>>asList(Base.class, Other.class);
+        assertFalse(DefaultMethods.collect(Object.class, interfaces).contains(Base.class.getMethod("inherited")));
+
+        List<Method> withConflicts = DefaultMethods.collectWithConflicts(Object.class, interfaces);
+        assertTrue(withConflicts.contains(Base.class.getMethod("inherited")));
+        assertFalse(withConflicts.contains(Other.class.getMethod("inherited")));
+        assertTrue(withConflicts.containsAll(DefaultMethods.collect(Object.class, interfaces)));
+    }
+
+    interface ObjectSame {
+        default Object same(Object value) {
+            return "object " + value;
+        }
+    }
+
+    @Test
+    public void aConflictWithABridgedDefaultIsCollectedWhenAskedFor() throws Exception {
+        // Narrowing's bridge same(Object) and ObjectSame.same(Object) conflict in a class
+        // implementing both, which therefore has to override same(Object) itself.
+        List<Class<?>> interfaces = Arrays.<Class<?>>asList(Narrowing.class, ObjectSame.class);
+        Method erased = Generic.class.getMethod("same", Object.class);
+        Method other = ObjectSame.class.getMethod("same", Object.class);
+        Method narrowed = Narrowing.class.getMethod("same", String.class);
+
+        List<Method> withoutConflicts = DefaultMethods.collect(Object.class, interfaces);
+        assertEquals(Arrays.asList(narrowed), withoutConflicts);
+
+        List<Method> withConflicts = DefaultMethods.collectWithConflicts(Object.class, interfaces);
+        assertTrue(withConflicts.contains(narrowed));
+        assertEquals(1, (withConflicts.contains(erased) ? 1 : 0) + (withConflicts.contains(other) ? 1 : 0));
+        assertEquals(2, withConflicts.size());
+    }
+
+    abstract static class NotAnInterface {
+        public abstract String fromClass();
+    }
+
+    @Test
+    public void anInterfaceImplementationOfOneCallSiteImplementsItsOtherInterfacesOnce() throws Exception {
+        HashSet<ClassDescriptor> extras = new HashSet<>();
+        extras.add(new ClassInfo(Other.class));
+        extras.add(new ClassInfo(Iterator.class));
+        extras.add(new ClassInfo(Runnable.class));
+        extras.add(new ClassInfo(NotAnInterface.class));
+        List<Method> named = new ArrayList<>();
+        named.add(Other.class.getMethod("inherited"));
+
+        org.ow2.asmdex.ApplicationWriter aw = new org.ow2.asmdex.ApplicationWriter();
+        aw.visit();
+        new Dump().generateProxy(aw, "com.tns.gen.java.util.Iterator_site_1_2_", new ClassInfo(Iterator.class), null, extras, null, named);
+        aw.visitEnd();
+        Shape shape = read(aw.toByteArray());
+
+        assertEquals("Lcom/tns/gen/java/util/Iterator_site_1_2_;", shape.className);
+        List<String> interfaces = new ArrayList<>(shape.interfaces);
+        interfaces.sort(null);
+        assertEquals(Arrays.asList(
+                "Lcom/tns/NativeScriptHashCodeProvider;",
+                "Lcom/tns/NativeScriptRuntimeBound;",
+                "Lcom/tns/bindings/DefaultMethodsTest$Other;",
+                "Ljava/lang/Runnable;",
+                "Ljava/util/Iterator;"), interfaces);
+        assertTrue(shape.methods.contains("runV"));
+        assertTrue(shape.methods.contains("inheritedLjava/lang/String;"));
+        assertFalse(shape.fields.contains("defaultOverrides__ns:J"));
     }
 
     interface HiddenBase {

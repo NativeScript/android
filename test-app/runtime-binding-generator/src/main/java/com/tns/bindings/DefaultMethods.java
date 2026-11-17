@@ -34,7 +34,7 @@ public final class DefaultMethods {
      * forward to the method they bridge.
      */
     public static List<Method> collect(Class<?> iface) {
-        return collect(Collections.<Class<?>>singletonList(iface), Collections.<String>emptySet());
+        return collect(Collections.<Class<?>>singletonList(iface), Collections.<String>emptySet(), false);
     }
 
     /**
@@ -42,6 +42,19 @@ public final class DefaultMethods {
      * inherits: as {@link #collect(Class)}, less those a class in the hierarchy declares.
      */
     public static List<Method> collect(Class<?> clazz, Collection<Class<?>> interfaces) {
+        return collect(clazz, interfaces, false);
+    }
+
+    /**
+     * As {@link #collect(Class, Collection)}, plus one of the default declarations of each
+     * signature that several unrelated interfaces declare. The subclass has to override such
+     * a method itself, so it is a candidate only for a class that implements it in JS.
+     */
+    public static List<Method> collectWithConflicts(Class<?> clazz, Collection<Class<?>> interfaces) {
+        return collect(clazz, interfaces, true);
+    }
+
+    private static List<Method> collect(Class<?> clazz, Collection<Class<?>> interfaces, boolean withConflicts) {
         List<Class<?>> roots = new ArrayList<>(interfaces);
         Set<String> classSignatures = new HashSet<>();
         for (Class<?> current = clazz; current != null; current = current.getSuperclass()) {
@@ -52,14 +65,14 @@ public final class DefaultMethods {
                 }
             }
         }
-        return collect(roots, classSignatures);
+        return collect(roots, classSignatures, withConflicts);
     }
 
     private static String signature(Method method) {
         return method.getName() + Arrays.toString(method.getParameterTypes());
     }
 
-    private static List<Method> collect(Collection<Class<?>> roots, Set<String> excludedSignatures) {
+    private static List<Method> collect(Collection<Class<?>> roots, Set<String> excludedSignatures, boolean withConflicts) {
         Map<String, List<Method>> declarationsBySignature = new LinkedHashMap<>();
         List<Method> bridges = new ArrayList<>();
         Set<Class<?>> visited = new HashSet<>();
@@ -98,6 +111,7 @@ public final class DefaultMethods {
         List<Method> result = new ArrayList<>();
         for (List<Method> declarations : declarationsBySignature.values()) {
             Method mostSpecific = null;
+            Method conflictingDefault = null;
             int maximal = 0;
             for (Method candidate : declarations) {
                 boolean overridden = false;
@@ -111,12 +125,19 @@ public final class DefaultMethods {
                 if (!overridden) {
                     mostSpecific = candidate;
                     maximal++;
+                    if (conflictingDefault == null && candidate.isDefault()) {
+                        conflictingDefault = candidate;
+                    }
                 }
             }
             // Several maximal declarations conflict, and the class must override them
-            // itself; that case keeps whatever it does without this class.
+            // itself; unless asked for, that case keeps whatever it does without this class.
+            // A bridge covering one of them is itself one side of the conflict, so only an
+            // override resolves it, bridged or not.
             if (maximal == 1 && mostSpecific.isDefault() && !isBridged(mostSpecific, bridges)) {
                 result.add(mostSpecific);
+            } else if (maximal > 1 && withConflicts && conflictingDefault != null) {
+                result.add(conflictingDefault);
             }
         }
 

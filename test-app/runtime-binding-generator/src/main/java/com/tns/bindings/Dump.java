@@ -181,9 +181,9 @@ public class Dump {
     /**
      * defaultMethods, for an anonymous interface implementation (a proxyName without '.'),
      * are the interface's DefaultMethods.collect: the class gets the DEFAULT_OVERRIDING_SUFFIX
-     * name and a stub for each of them as well. For a class or a named interface
-     * implementation, they are inherited default methods the JS object implements, stubbed
-     * like the class's other overrides. null adds neither.
+     * name and a stub for each of them as well. For a class, or an interface implementation
+     * with a dotted proxyName (one extend() call's class), they are inherited default methods
+     * the JS object implements, stubbed like the class's other overrides. null adds neither.
      */
     public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, AnnotationDescriptor[] annotations, List<java.lang.reflect.Method> defaultMethods) {
         generateProxy(aw, proxyName, classTo, methodOverrides, implementedInterfaces, annotations, defaultMethods, DefaultMethodBodies.INVOKE_SUPER);
@@ -1008,6 +1008,15 @@ public class Dump {
         if (classTo.isInterface()) {
             if (!interfacesToImplement.contains(classSignature)) {
                 interfacesToImplement.add(classSignature);
+            }
+            if (implementedInterfaces != null) {
+                for (ClassDescriptor interfaceToImpl : implementedInterfaces) {
+                    // A class listed there cannot be implemented.
+                    String descriptor = getAsmDescriptor(interfaceToImpl);
+                    if (interfaceToImpl.isInterface() && !interfacesToImplement.contains(descriptor)) {
+                        interfacesToImplement.add(descriptor);
+                    }
+                }
             }
 
             classSignature = objectClass;
