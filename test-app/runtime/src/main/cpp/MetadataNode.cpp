@@ -454,18 +454,31 @@ void MetadataNode::NullObjectAccessorGetterCallback(const FunctionCallbackInfo<V
         auto isolate = info.GetIsolate();
 
         auto thiz = ResolveProxyReceiver(isolate, info.This(), "read", "null", false);
-        Local<Value> hiddenVal;
-        V8GetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodePrivate(isolate), hiddenVal);
-        if (hiddenVal.IsEmpty()) {
+        auto context = isolate->GetCurrentContext();
+        auto nullObjectKey = V8StringConstants::GetNullObjectPrivate(isolate);
+
+        // A separate object, cached on the receiver so X.null is stable. Never tag
+        // or modify the constructor: anything carrying the null-node private
+        // converts to a Java null, and a constructor's valueOf may be a static
+        // Java method. Through the accessor a JS-extended class inherits, This is
+        // the subclass and Data the Java base class node, so that typed null is
+        // of the base class.
+        Local<Value> nullObject;
+        if (!thiz->GetPrivate(context, nullObjectKey).ToLocal(&nullObject) || !nullObject->IsObject()) {
             auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
-            V8SetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodePrivate(isolate), External::New(isolate, node, v8::kExternalPointerTypeTagDefault));
-            auto funcTemplate = NewNonConstructor(isolate, MetadataNode::NullValueOfCallback);
-            auto context = isolate->GetCurrentContext();
-            thiz->Delete(context, V8StringConstants::GetValueOf(isolate));
-            thiz->Set(context, V8StringConstants::GetValueOf(isolate), funcTemplate->GetFunction(context).ToLocalChecked());
+            auto sentinel = Object::New(isolate);
+            V8SetPrivateValue(isolate, sentinel, V8StringConstants::GetNullNodePrivate(isolate), External::New(isolate, node, v8::kExternalPointerTypeTagDefault));
+            // Function::New does not cache its template in the context, so the
+            // function lives only as long as the sentinel.
+            auto valueOf = Function::New(context, MetadataNode::NullValueOfCallback, Local<Value>(), 0,
+                                         ConstructorBehavior::kThrow).ToLocalChecked();
+            sentinel->DefineOwnProperty(context, V8StringConstants::GetValueOf(isolate), valueOf,
+                                        PropertyAttribute::DontEnum).Check();
+            thiz->SetPrivate(context, nullObjectKey, sentinel).Check();
+            nullObject = sentinel;
         }
 
-        info.GetReturnValue().Set(thiz);
+        info.GetReturnValue().Set(nullObject);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {

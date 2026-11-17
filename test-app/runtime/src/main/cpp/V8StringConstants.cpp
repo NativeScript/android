@@ -48,6 +48,10 @@ Local<Private> V8StringConstants::GetCastMarkerPrivate(Isolate* isolate) {
     return GetConstantsForIsolate(isolate)->CAST_MARKER_PRIVATE.Get(isolate);
 }
 
+Local<Private> V8StringConstants::GetNullObjectPrivate(Isolate* isolate) {
+    return GetConstantsForIsolate(isolate)->NULL_OBJECT_PRIVATE.Get(isolate);
+}
+
 Local<String> V8StringConstants::GetIsPrototypeImplementationObject(Isolate* isolate) {
     auto consts = GetConstantsForIsolate(isolate);
 
@@ -149,6 +153,7 @@ const string V8StringConstants::EXTEND = "extend";
 const string V8StringConstants::NULL_OBJECT = "null";
 const string V8StringConstants::NULL_NODE_NAME = "nullNode";
 const string V8StringConstants::CAST_MARKER = "t::cast";
+const string V8StringConstants::NULL_OBJECT_KEY = "t::nullObject";
 const string V8StringConstants::IS_PROTOTYPE_IMPLEMENTATION_OBJECT = "__isPrototypeImplementationObject";
 const string V8StringConstants::NATIVE_EXCEPTION = "nativeException";
 const string V8StringConstants::STACK_TRACE = "stackTrace";
