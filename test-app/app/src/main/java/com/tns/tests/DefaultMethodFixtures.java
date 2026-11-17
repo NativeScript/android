@@ -12,6 +12,7 @@ import java.util.Spliterator;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.DoublePredicate;
+import java.util.function.DoubleUnaryOperator;
 import java.util.function.IntConsumer;
 import java.util.function.IntPredicate;
 import java.util.function.LongPredicate;
@@ -188,6 +189,44 @@ public class DefaultMethodFixtures {
         caller.start();
         caller.join(timeoutMillis);
         return caller.isAlive() ? "timeout" : result[0];
+    }
+
+    /*
+     * Makes the runtime give iface's default-overriding class the stubs that run Java bodies
+     * through the runtime, which it otherwise uses only when its invoke-super probe fails. The
+     * runtime keeps this test switch package-private, so it is reached by reflection; it must
+     * come before the class is first resolved.
+     */
+    public static void useRuntimeCallStubs(Class<?> iface) throws ReflectiveOperationException {
+        java.lang.reflect.Method use = Class.forName("com.tns.DefaultSuperCalls").getDeclaredMethod("useRuntimeCallsFor", Class.class);
+        use.setAccessible(true);
+        use.invoke(null, iface);
+    }
+
+    // Calls op.andThen() on a new thread while the calling (JS) thread waits here.
+    public static String doubleAndThenOnBackgroundThread(final DoubleUnaryOperator op, long timeoutMillis) throws InterruptedException {
+        final String[] result = new String[1];
+        Thread caller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    result[0] = Thread.currentThread().getName() + "|" + (op.andThen(DoubleUnaryOperator.identity()) != null);
+                } catch (Throwable t) {
+                    result[0] = t.getClass().getName();
+                }
+            }
+        }, CALLER_THREAD);
+        caller.start();
+        caller.join(timeoutMillis);
+        return caller.isAlive() ? "timeout" : result[0];
+    }
+
+    public static String doubleAndThenApply(DoubleUnaryOperator op, double value) {
+        return Double.toString(op.andThen(DoubleUnaryOperator.identity()).applyAsDouble(value));
+    }
+
+    public static String doubleCompose(DoubleUnaryOperator op) {
+        return java.util.Objects.toString(op.compose(DoubleUnaryOperator.identity()));
     }
 
     public static String describeOnBackgroundThread(final AllDefaultListener listener, long timeoutMillis) throws InterruptedException {

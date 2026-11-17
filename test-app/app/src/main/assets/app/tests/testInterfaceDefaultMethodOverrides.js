@@ -618,11 +618,114 @@ describe("Interface default methods implemented in JS", function () {
         expect(odd).toEqual([3]);
         expect(D.ShapesCaller.fail(shapes)).toBe("com.tns.tests.interfaces.defaultshapes.ShapesException: from java");
 
-        // same(Object), the bridge, reaches the narrowed default through the stub.
+        // A call of the erased same(Object) runs javac's bridge, which reaches the narrowed default.
         var strings = new D.StringShapes({
             name: function () { return "s"; },
             odd: function () { return true; }
         });
         expect(D.ShapesCaller.all(strings)).toBe("7028|2.5|0.5|Q|true|-4|42|s:9223372036854775807:-0.25|string v");
+    });
+});
+
+// The class a process uses for every interface when its invoke-super probe fails, requested
+// here for interfaces no other spec uses, before their classes are first resolved.
+describe("Interface default methods run through the runtime", function () {
+    var sdk = android.os.Build.VERSION.SDK_INT;
+    var F = com.tns.tests.DefaultMethodFixtures;
+    var SUFFIX = "-defaults-jni";
+    var DoubleOp = java.util.function.DoubleUnaryOperator;
+
+    it("run a default the JS object lacks on the calling thread, and one it implements in JS", function () {
+        if (sdk < 24) {
+            return;
+        }
+        F.useRuntimeCallStubs(DoubleOp.class);
+        var composed = [];
+        var op = new DoubleOp({
+            applyAsDouble: function (value) { return value * 3; },
+            compose: function (before) {
+                composed.push(before !== null);
+                return null;
+            }
+        });
+
+        expect(F.className(op)).toBe("com.tns.gen.java.util.function.DoubleUnaryOperator" + SUFFIX);
+        // This thread waits inside the fixture, so a call that needed it would time out.
+        expect(F.doubleAndThenOnBackgroundThread(op, 5000)).toBe(F.CALLER_THREAD + "|true");
+        expect(F.doubleAndThenApply(op, 2)).toBe("6.0");
+        expect(F.doubleCompose(op)).toBe("null");
+        expect(composed).toEqual([true]);
+    }, 15000);
+
+    it("pass a wide argument from a default's Java body back to JS", function () {
+        if (sdk < 26) {
+            return;
+        }
+        var TemporalType = java.time.temporal.Temporal;
+        F.useRuntimeCallStubs(TemporalType.class);
+        var added = [];
+        var temporal = new TemporalType({
+            plus: function (amount, unit) {
+                added.push(amount + " " + unit);
+                return this;
+            }
+        });
+
+        expect(F.className(temporal)).toBe("com.tns.gen.java.time.temporal.Temporal" + SUFFIX);
+        expect(com.tns.tests.TemporalDefaultFixtures.minusDays(temporal, 5)).toBe(true);
+        expect(added).toEqual(["-5 Days"]);
+    });
+
+    it("run defaults of wide, generic and bridged signatures through the runtime", function () {
+        if (sdk < 24) {
+            return;
+        }
+        var R = com.tns.tests.interfaces.runtimecalldefaults;
+        if (R.RuntimeCallCaller.isDesugared()) {
+            // Below minSdk 24 every method is abstract on the device.
+            return;
+        }
+        F.useRuntimeCallStubs(R.RuntimeCallShapes.class);
+        F.useRuntimeCallStubs(R.RuntimeCallStringShapes.class);
+        var odd = [];
+        var shapes = new R.RuntimeCallShapes({
+            name: function () { return "js"; },
+            odd: function (value) {
+                odd.push(value);
+                return false;
+            }
+        });
+
+        expect(F.className(shapes)).toBe("com.tns.gen.com.tns.tests.interfaces.runtimecalldefaults.RuntimeCallShapes" + SUFFIX);
+        expect(R.RuntimeCallCaller.all(shapes)).toBe("7028|2.5|false|v");
+        expect(odd).toEqual([3]);
+        expect(R.RuntimeCallCaller.wideOnBackgroundThread(shapes, 5000)).toBe(F.CALLER_THREAD + "|9223372036854774996");
+
+        // A call of the erased same(Object) runs javac's bridge, which reaches the narrowed default.
+        var strings = new R.RuntimeCallStringShapes({
+            name: function () { return "s"; },
+            odd: function () { return true; }
+        });
+        expect(F.className(strings)).toBe("com.tns.gen.com.tns.tests.interfaces.runtimecalldefaults.RuntimeCallStringShapes" + SUFFIX);
+        expect(R.RuntimeCallCaller.all(strings)).toBe("7028|2.5|true|string v");
+    }, 15000);
+
+    it("run a default declared in a non-public super-interface through the runtime", function () {
+        if (sdk < 24) {
+            return;
+        }
+        var R = com.tns.tests.interfaces.runtimecalldefaults;
+        if (R.RuntimeCallCaller.isDesugared()) {
+            return;
+        }
+        F.useRuntimeCallStubs(R.RuntimeCallVisible.class);
+        var visibleOnly = new R.RuntimeCallVisible({
+            name: function () { return "js"; },
+            visible: function () { return "visible js"; }
+        });
+
+        expect(F.className(visibleOnly)).toBe("com.tns.gen.com.tns.tests.interfaces.runtimecalldefaults.RuntimeCallVisible" + SUFFIX);
+        expect(R.RuntimeCallCaller.visible(visibleOnly)).toBe("visible js");
+        expect(R.RuntimeCallCaller.hidden(visibleOnly)).toBe("hidden java");
     });
 });
