@@ -132,6 +132,46 @@ describe("Anonymous extends of an interface", function () {
         expect(calls).toEqual(["first"]);
     });
 
+    it("give call sites that pass the same implementation object the first one's constructor", function () {
+        // No other spec extends this interface, whose first extend in the process decides
+        // which constructor the call sites below share.
+        var Filter = java.io.FilenameFilter;
+        var calls = [];
+        var implementation = {
+            accept: function (dir, name) {
+                calls.push(String(name));
+                return true;
+            }
+        };
+        var First = Filter.extend(implementation);
+        var Second = Filter.extend(implementation);
+        var Named = Filter.extend("SharedImplementationFilter", implementation);
+
+        expect(Second).toBe(First);
+        expect(Named).toBe(First);
+        var accept = Filter.class.getMethod("accept", [java.io.File.class, java.lang.String.class]);
+        accept.invoke(new Second(), [null, "second"]);
+        accept.invoke(new Named(), [null, "named"]);
+        accept.invoke(new First(), [null, "first"]);
+        expect(calls).toEqual(["second", "named", "first"]);
+    });
+
+    it("refuse one implementation object for extends of two interfaces", function () {
+        var implementation = {
+            accept: function () {
+                return true;
+            },
+            newThread: function () {
+                return null;
+            }
+        };
+        java.io.FileFilter.extend(implementation);
+
+        expect(function () {
+            java.util.concurrent.ThreadFactory.extend(implementation);
+        }).toThrowError(/This object is used to extend another class/);
+    });
+
     it("work with a generated class after new Interface({...}) of the same interface", function () {
         // Computed members hide both uses from the static binding generator.
         var Action = java.security.PrivilegedAction;
