@@ -38,6 +38,7 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
 import javax.tools.Diagnostic
@@ -502,7 +503,11 @@ if (failOnCompilationWarningsEnabled()) {
 
 def SBG_APP_CLASSES_DIR = layout.buildDirectory.dir("nativescript/sbg-app-classes")
 def sbgAppClassesEnabled = { ->
-    !project.hasProperty("skipSbgAppClasses") || project.property("skipSbgAppClasses").toString() == "false"
+    if (!project.hasProperty("skipSbgAppClasses")) {
+        return true
+    }
+    def value = project.property("skipSbgAppClasses").toString()
+    return !(value.isEmpty() || value.toBoolean())
 }
 
 // The static binding generator runs before javac and kotlinc, so on its own it cannot see
@@ -855,23 +860,40 @@ def runKotlincRounds(FileCollection compilerClasspath, List<String> compilerArgu
     def leftOut = []
     def firstError = null
     def sourceByPath = kotlinFiles.collectEntries { [(it.canonicalPath): it] }
+    def quoteArgument = { String argument -> '"' + argument.replace('\\', '\\\\').replace('"', '\\"') + '"' }
     def argumentFile = new File(temporaryDir, "kotlinc-arguments.txt")
+    def jvmArgumentFile = new File(temporaryDir, "kotlinc-jvm-arguments.txt")
+    def outputFile = new File(temporaryDir, "kotlinc-output.txt")
+    jvmArgumentFile.withWriter("UTF-8") { out ->
+        ["-Dorg.jetbrains.kotlin.cliMessageRenderer=XML", "-cp", compilerClasspath.asPath].each { out.println(quoteArgument(it)) }
+    }
+    def javaExecutable = new File(System.getProperty("java.home"), System.getProperty("os.name").toLowerCase().contains("windows") ? "bin/java.exe" : "bin/java")
+    // A compiler that never finishes must not hang the build: all rounds share this budget.
+    def deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(10)
     for (int round = 0; round < 5 && !remaining.isEmpty(); round++) {
         classOutput.deleteDir()
         classOutput.mkdirs()
         def arguments = compilerArguments + ["-nowarn", "-no-stdlib", "-no-reflect",
                 "-classpath", dependencies.join(File.pathSeparator), "-d", classOutput.absolutePath] + remaining*.absolutePath
         argumentFile.withWriter("UTF-8") { out ->
-            arguments.each { out.println('"' + it.replace('\\', '\\\\').replace('"', '\\"') + '"') }
+            arguments.each { out.println(quoteArgument(it)) }
         }
-        def execution = providers.javaexec {
-            classpath(compilerClasspath)
-            mainClass.set("org.jetbrains.kotlin.cli.jvm.K2JVMCompiler")
-            systemProperty("org.jetbrains.kotlin.cliMessageRenderer", "XML")
-            args("@${argumentFile.absolutePath}")
-            ignoreExitValue = true
+        def process = new ProcessBuilder(javaExecutable.absolutePath, "@${jvmArgumentFile.absolutePath}", "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler", "@${argumentFile.absolutePath}")
+                .redirectErrorStream(true)
+                .redirectOutput(outputFile)
+                .start()
+        def finished = false
+        try {
+            finished = process.waitFor(Math.max(0L, deadline - System.nanoTime()), TimeUnit.NANOSECONDS)
+        } finally {
+            if (!finished) {
+                process.destroyForcibly()
+            }
         }
-        def exitValue = execution.result.get().exitValue
+        if (!finished) {
+            return fail("kotlinc did not finish within 10 minutes")
+        }
+        def exitValue = process.exitValue()
         if (exitValue == 0) {
             if (!leftOut.isEmpty()) {
                 def names = leftOut.collect { it.name }.sort()
@@ -880,7 +902,7 @@ def runKotlincRounds(FileCollection compilerClasspath, List<String> compilerArgu
             return true
         }
 
-        def output = execution.standardError.asText.get()
+        def output = outputFile.getText("UTF-8")
         def start = output.indexOf("<MESSAGES>")
         def end = output.lastIndexOf("</MESSAGES>")
         def errors = []

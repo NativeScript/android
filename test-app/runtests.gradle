@@ -77,6 +77,9 @@ def getBuildArguments = { ->
     if (project.hasProperty("useContentBindings")) {
         arguments.add("-PuseContentBindings=${project.property('useContentBindings')}")
     }
+    if (project.hasProperty("skipSbgAppClasses")) {
+        arguments.add("-PskipSbgAppClasses=${project.property('skipSbgAppClasses')}")
+    }
     // Ordinary apps get the narrowest metadata fields they can; the suite runs on the
     // wider ones, which nothing else would exercise. -PnarrowMetadataFields runs it on
     // the ones that ship.
