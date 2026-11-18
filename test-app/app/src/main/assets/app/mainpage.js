@@ -137,6 +137,7 @@ require('./tests/testEsmHttpLoader');
 // Node-API addon surface
 require('./tests/NapiTests');
 require('./tests/NapiCoverageTests');
+require('./tests/NapiFastCallsTests');
 require("./tests/testConcurrentAccess");
 // Checks the runtime generation report, so it goes after every spec that implements an interface
 require("./tests/testInterfaceProxies");
