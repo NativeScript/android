@@ -426,19 +426,57 @@ describe("Runtime generation report under the interfaceProxies option", function
             return;
         }
 
+        var prefix = "com.tns.gen.";
+        var defaultsSuffix = "-defaults";
+        var appClassLoader = com.tns.Runtime.class.getClassLoader();
+        function loadClass(name) {
+            try {
+                return java.lang.Class.forName(name, false, appClassLoader);
+            } catch (e) {
+                return null;
+            }
+        }
+        // The same proxy class DexFactory.getInterfaceProxyClass asks for.
+        var runtimeBound = loadClass("com.tns.NativeScriptRuntimeBound");
+        function canProxy(iface) {
+            var loader = iface.getClassLoader().equals(java.lang.Object.class.getClassLoader()) ? runtimeBound.getClassLoader() : iface.getClassLoader();
+            var types = Array.create(java.lang.Class, 2);
+            types[0] = iface;
+            types[1] = runtimeBound;
+            try {
+                java.lang.reflect.Proxy.getProxyClass(loader, types);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
         var generatedInterfaces = lines.filter(function (line) {
             var fields = line.split(" ");
             return fields[0] !== "proxy" && fields[1] === "interface";
         });
-        // Named extends (Interface.extend("a.b.C", {...})) keep their own class, and so does
-        // the interface the spec above makes incompatible on purpose. An extend that lists
-        // extra interfaces gets a class of its own call site, loaded under the name asked
-        // for, which no proxy of the one interface stands in for.
         var unexpected = generatedInterfaces.filter(function (line) {
             var fields = line.split(" ");
+            var loaded = fields[2];
             var requested = fields[3];
-            var isCallSiteClass = fields[2] === requested.replace(/\$/g, "_");
-            return requested.indexOf("com.tns.gen.") === 0 && !isCallSiteClass && requested.indexOf("InterfaceProxyFixtures$ProxyIncompatible") < 0;
+            // A named extend, Interface.extend("a.b.C", {...}), asks for the class it names.
+            if (requested.indexOf(prefix) !== 0) {
+                return false;
+            }
+            var name = requested.substring(prefix.length);
+            if (name.slice(-defaultsSuffix.length) === defaultsSuffix) {
+                name = name.slice(0, -defaultsSuffix.length);
+            }
+            var iface = loadClass(name);
+            // An extend that lists extra interfaces asks for, and loads, a class named after
+            // its call site, which no proxy of the one interface stands in for. The call-site
+            // name of an extend without them names no Java type either, but loads the
+            // interface's shared class, which a proxy replaces.
+            if (iface === null) {
+                return loaded !== requested.replace(/\$/g, "_");
+            }
+            // Requested by the interface's name: its shared or default-overriding class.
+            return canProxy(iface);
         });
         expect(unexpected).toEqual([]);
     });
