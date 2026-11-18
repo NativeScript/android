@@ -26,6 +26,11 @@ public class Main {
     public static final String SBG_JS_PARSED_FILES = "sbg-js-parsed-files.txt";
     public static final String SBG_INTERFACE_NAMES = "sbg-interface-names.txt";
     public static final String SBG_WARNINGS = "sbg-warnings.txt";
+    // The sbg-java-dependencies.txt entries that hold the app module's own classes, one per line.
+    public static final String SBG_APP_CLASSES = "sbg-app-classes.txt";
+    // The generated files whose bindings involve app classes, one absolute path per line;
+    // the build compiles them on their own and leaves the ones javac rejects to the runtime.
+    public static final String SBG_APP_BINDINGS = "sbg-app-bindings.txt";
 
     private static String jsCodeAbsolutePath;
     private static List<String> inputJsFiles;
@@ -42,6 +47,9 @@ public class Main {
         try {
             InputParameters.parseCommand(args);
 
+            File appBindingsFile = new File(System.getProperty("user.dir"), SBG_APP_BINDINGS);
+            Files.deleteIfExists(appBindingsFile.toPath());
+
             validateInput();
 
             getWorkerExcludeFile();
@@ -53,15 +61,32 @@ public class Main {
 
             // generate java bindings
             String inputBindingFilename = Paths.get(System.getProperty("user.dir"), SBG_BINDINGS_NAME).toString();
-            Generator generator = new Generator(outputDir, rows, isSuppressCallJSMethodExceptionsEnabled());
+            List<String> appClassDirs = readAppClassDirs(new File(System.getProperty("user.dir"), SBG_APP_CLASSES));
+            Generator generator = new Generator(outputDir, rows, isSuppressCallJSMethodExceptionsEnabled(), appClassDirs);
 
             generator.writeBindings(inputBindingFilename);
             writeWarnings(generator.getWarnings());
+            if (!generator.getAppBindingFiles().isEmpty()) {
+                Files.write(appBindingsFile.toPath(), generator.getAppBindingFiles(), StandardCharsets.UTF_8);
+            }
         } catch (Throwable ex) {
             System.err.println(String.format("Error executing Static Binding Generator: %s", ex.getMessage()));
             ex.printStackTrace(System.out);
             System.exit(1);
         }
+    }
+
+    static List<String> readAppClassDirs(File file) throws IOException {
+        List<String> dirs = new ArrayList<>();
+        if (!file.isFile()) {
+            return dirs;
+        }
+        for (String line : Files.readAllLines(file.toPath(), StandardCharsets.UTF_8)) {
+            if (!line.trim().isEmpty()) {
+                dirs.add(line.trim());
+            }
+        }
+        return dirs;
     }
 
     /*
