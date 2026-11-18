@@ -57,6 +57,10 @@ public class AppClassesGeneratorTest {
         app.put("app.Callback", "package app; public interface Callback { void call(); }");
         app.put("app.Widget", "package app; public abstract class Widget { public abstract void draw(); }");
         app.put("app.SelfTyped", "package app; public abstract class SelfTyped<T extends SelfTyped<T>> { public abstract T self(); }");
+        app.put("app.WithDefault", "package app; public interface WithDefault { void a(); default void b() { } }");
+        app.put("app.InheritsDefault", "package app; public interface InheritsDefault extends WithDefault { void c(); }");
+        app.put("app.InheritsLibraryDefault", "package app; public interface InheritsLibraryDefault extends java.util.Iterator<String> { }");
+        app.put("app.StaticAndPrivate", "package app; public interface StaticAndPrivate extends OkListener { static int s() { return 0; } private int p() { return 0; } }");
         appDir = compile("app-classes", app);
         delete(appDir, "app/Gone.class");
         delete(appDir, "app/GoneIface.class");
@@ -66,6 +70,7 @@ public class AppClassesGeneratorTest {
         lib.put("lib.Broken", "package lib; public abstract class Broken extends Gone { public abstract void run(); }");
         lib.put("lib.Callback", "package lib; public interface Callback { void call(); }");
         lib.put("lib.Holder", "package lib; public abstract class Holder implements app.OkListener { }");
+        lib.put("lib.LibWithDefault", "package lib; public interface LibWithDefault { void a(); default void b() { } }");
         libDir = compile("lib-classes", lib, appDir.getAbsolutePath());
         delete(libDir, "lib/Gone.class");
     }
@@ -193,6 +198,48 @@ public class AppClassesGeneratorTest {
         }
         Assert.assertTrue(onlyFile("com/tns/gen/com/example", "View_").isFile());
         Assert.assertFalse(generated("com/tns/gen/app").exists() && generated("com/tns/gen/app").list().length > 0);
+    }
+
+    @Test
+    public void leavesSharedClassesOfAppInterfacesWithDefaultMethodsToTheRuntime() throws Exception {
+        Generator generator = generate(
+                "app.WithDefault*tests_a*1*1**a,b***",
+                "app.WithDefault*tests_a*2*1**a***",
+                "app.InheritsDefault*tests_a*3*1**a,c***",
+                "app.InheritsLibraryDefault*tests_a*4*1**hasNext,next***",
+                "app.BrokenListener*tests_a*5*1**on***",
+                "app.StaticAndPrivate*tests_a*6*1**on***",
+                "app.OkListener*tests_a*7*1**on***",
+                "app.WithDefault*tests_a*8*1**a,b***java.lang.Runnable",
+                "app.WithDefault*****a,b*com.x.NamedDefaults*app/f.js*",
+                "lib.LibWithDefault*tests_a*9*1**a,b***");
+
+        Map<String, String> reasons = new LinkedHashMap<>();
+        reasons.put("tests_a:1:1", "app.WithDefault.b");
+        reasons.put("tests_a:2:1", "app.WithDefault.b");
+        reasons.put("tests_a:3:1", "app.WithDefault.b");
+        reasons.put("tests_a:4:1", "java.util.Iterator.");
+        reasons.put("tests_a:5:1", "app.GoneIface cannot be loaded");
+        for (Map.Entry<String, String> reason : reasons.entrySet()) {
+            List<String> lines = runtimeLines(reason.getKey() + " ");
+            Assert.assertEquals(output.toString(), 1, lines.size());
+            Assert.assertTrue(lines.get(0), lines.get(0).contains("default methods") && lines.get(0).contains(reason.getValue()));
+        }
+        for (String name : Arrays.asList("WithDefault", "InheritsDefault", "InheritsLibraryDefault", "BrokenListener")) {
+            Assert.assertFalse(name, generated("com/tns/gen/app/" + name + ".java").exists());
+        }
+
+        List<File> expected = Arrays.asList(
+                generated("com/tns/gen/app/StaticAndPrivate.java"),
+                generated("com/tns/gen/app/OkListener.java"),
+                onlyFile("com/tns/gen/app", "WithDefault_"),
+                generated("com/x/NamedDefaults.java"));
+        for (File file : expected) {
+            Assert.assertTrue(file.toString(), file.isFile());
+        }
+        Assert.assertTrue(generated("com/tns/gen/lib/LibWithDefault.java").isFile());
+        Assert.assertEquals(expected.stream().map(File::getAbsolutePath).sorted().collect(Collectors.toList()),
+                generator.getAppBindingFiles().stream().sorted().collect(Collectors.toList()));
     }
 
     @Test

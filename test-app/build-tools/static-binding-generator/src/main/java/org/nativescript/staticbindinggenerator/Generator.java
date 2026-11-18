@@ -102,6 +102,7 @@ public class Generator {
     private final Set<String> appClassDirs = new HashSet<>();
     private final Set<String> appClassNames = new HashSet<>();
     private final Map<String, Boolean> appClassInvolvement = new HashMap<>();
+    private final Map<String, String> defaultMethods = new HashMap<>();
     private final List<String> appBindingFiles = new ArrayList<>();
 
     public Generator(File outputDir, List<DataRow> libs) throws IOException {
@@ -264,10 +265,7 @@ public class Generator {
 
         String name = "";
         Boolean isInterface = clazz.isInterface();
-        // An anonymous implementation of an interface that lists interfaces of its own is its
-        // call site's class, named like a class extend's, as the runtime asks for it; the
-        // interface's one shared class cannot implement them for a single call site.
-        boolean isSharedInterfaceClass = isInterface && !hasSpecifiedName && !hasImplementedInterfaces(dataRow);
+        boolean isSharedInterfaceClass = isSharedInterfaceClass(dataRow, clazz);
 
         // The class body must be a function of the content name alone, whichever
         // call site sharing the name it is generated for.
@@ -323,6 +321,16 @@ public class Generator {
             }
             throw e;
         }
+    }
+
+    /**
+     * Whether the row's binding is the one class its interface shares between every anonymous
+     * implementation. An anonymous implementation of an interface that lists interfaces of its
+     * own is its call site's class, named like a class extend's, as the runtime asks for it;
+     * the interface's one shared class cannot implement them for a single call site.
+     */
+    private static boolean isSharedInterfaceClass(DataRow dataRow, JavaClass clazz) {
+        return clazz.isInterface() && dataRow.getFilename().isEmpty() && !hasImplementedInterfaces(dataRow);
     }
 
     private boolean usesContentKeyedName(DataRow dataRow, JavaClass clazz) {
@@ -501,6 +509,14 @@ public class Generator {
             }
 
             boolean involvesAppClasses = involvesAppClasses(dataRow);
+            if (involvesAppClasses) {
+                String defaultMethod = findSharedClassDefaultMethod(dataRow);
+                if (defaultMethod != null) {
+                    System.out.println("The binding for " + describeSite(dataRow) + " is generated at runtime: the class shared by every implementation of " + dataRow.getBaseClassname() + " cannot override its default methods for some of them only (" + defaultMethod + ").");
+                    continue;
+                }
+            }
+
             Binding binding;
             try {
                 binding = involvesAppClasses
@@ -527,6 +543,53 @@ public class Generator {
 
     private static String oneLine(String message) {
         return String.valueOf(message).replaceAll("\\s*\\R\\s*", " ");
+    }
+
+    /**
+     * For a row whose binding is its interface's shared class, describes a default method in
+     * the interface's hierarchy, or returns null when there is none. The runtime gives every
+     * set of default methods a call site overrides a class of its own, while a prebuilt shared
+     * class carries the overrides of the one call site it was generated for.
+     */
+    private String findSharedClassDefaultMethod(DataRow dataRow) {
+        JavaClass clazz = classes.get(dataRow.getBaseClassname());
+        if (clazz == null || !isSharedInterfaceClass(dataRow, clazz) || !canClassBeExtended(clazz)) {
+            return null;
+        }
+        return findDefaultMethod(clazz.getClassName());
+    }
+
+    /** An interface the generator cannot load counts as having default methods. */
+    private String findDefaultMethod(String interfaceName) {
+        String name = BcelNamingUtil.resolveClassName(interfaceName);
+        if (defaultMethods.containsKey(name)) {
+            return defaultMethods.get(name);
+        }
+        // Ends a cycle, which no loadable class path has.
+        defaultMethods.put(name, null);
+        String result = null;
+        try {
+            JavaClass clazz = findClass(name);
+            if (clazz == null) {
+                result = name + " cannot be loaded";
+            } else {
+                for (Method method : clazz.getMethods()) {
+                    if (!method.isAbstract() && !method.isStatic() && !method.isPrivate() && !method.getName().equals("<clinit>")) {
+                        result = "default method " + name + "." + method.getName();
+                        break;
+                    }
+                }
+                for (String superInterface : clazz.getInterfaceNames()) {
+                    if (result == null) {
+                        result = findDefaultMethod(superInterface);
+                    }
+                }
+            }
+        } catch (RuntimeException | LinkageError | StackOverflowError e) {
+            result = name + " cannot be loaded";
+        }
+        defaultMethods.put(name, result);
+        return result;
     }
 
     /** Whether the row's class, one of its interfaces or any of their supertypes is an app class. */
