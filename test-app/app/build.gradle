@@ -503,12 +503,30 @@ if (failOnCompilationWarningsEnabled()) {
 ////////////////////////////////////////////////////////////////////////////////////
 
 def SBG_APP_CLASSES_DIR = layout.buildDirectory.dir("nativescript/sbg-app-classes")
+// An annotation processor can change the shape of the classes it processes (add or remove
+// constructors and methods), which the step's compile without processors cannot see, so
+// declaring any for the app's main compile turns the step off. Read only once
+// configuration is over, from the declared dependencies, without resolving anything.
+def appAnnotationProcessorConfigurations = null
 def sbgAppClassesEnabled = { ->
-    if (!project.hasProperty("skipSbgAppClasses")) {
-        return true
+    if (project.hasProperty("skipSbgAppClasses")) {
+        def value = project.property("skipSbgAppClasses").toString()
+        if (value.isEmpty() || value.toBoolean()) {
+            return false
+        }
     }
-    def value = project.property("skipSbgAppClasses").toString()
-    return !(value.isEmpty() || value.toBoolean())
+    if (appAnnotationProcessorConfigurations == null) {
+        appAnnotationProcessorConfigurations = configurations.findAll { configuration ->
+            def name = configuration.name
+            def processors = name.toLowerCase().contains("annotationprocessor") || name.startsWith("kapt")
+            def forTests = name ==~ /^(test|androidTest|kaptTest|kaptAndroidTest).*|.*(UnitTest|AndroidTest).*/
+            return processors && !forTests && !configuration.dependencies.isEmpty()
+        }*.name.sort()
+        if (!appAnnotationProcessorConfigurations.isEmpty()) {
+            logger.info("compileAppClassesForSbg: skipped, as the app declares annotation processors (${appAnnotationProcessorConfigurations.join(', ')}), which can change classes in ways it cannot see")
+        }
+    }
+    return appAnnotationProcessorConfigurations.isEmpty()
 }
 
 // The static binding generator runs before javac and kotlinc, so on its own it cannot see
@@ -518,7 +536,7 @@ def sbgAppClassesEnabled = { ->
 // processors, generated code) are left out, and any failure leaves the generator exactly
 // as it would be without this task. The generator leaves the JS subclasses of these classes
 // it cannot write a binding for to the runtime, and runSbg drops the bindings javac rejects.
-// -PskipSbgAppClasses turns it off.
+// -PskipSbgAppClasses turns it off, as does an annotation processor of the app.
 //
 // The generator fails the build on a JS subclass of a class whose supertypes it cannot
 // load, so every class written here must compile against the others alone. Kotlin is
