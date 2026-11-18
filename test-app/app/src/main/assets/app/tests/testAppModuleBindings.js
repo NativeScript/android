@@ -45,7 +45,8 @@ describe("Bindings of app-module types", function () {
             return;
         }
         var entry = expectGeneratedAtRuntime(instance, "class");
-        expect(entry.requested).toMatch(new RegExp("^com\\.tns\\.gen\\." + baseClassName.replace(/\./g, "\\.") + "_"));
+        var requestedPrefix = "com.tns.gen." + baseClassName + "_";
+        expect(String(entry.requested).substring(0, requestedPrefix.length)).toBe(requestedPrefix);
     }
 
     function expectInterfaceGeneratedAtRuntime(implemented, generatedName) {

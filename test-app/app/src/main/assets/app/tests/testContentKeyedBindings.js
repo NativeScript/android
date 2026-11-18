@@ -260,7 +260,10 @@ describe("Content-keyed binding names", function () {
                     // the runtime generates the class, under the content name it would have had.
                     expect(runtimeGenerated(instance)).toBe(true);
                     if (contentKeyed) {
-                        expect(className(instance)).toMatch(new RegExp("^" + fixture.appModuleBase.replace(/\./g, "\\.") + "_h[0-9a-f]{16}$"));
+                        var generatedName = String(className(instance));
+                        var contentPrefix = fixture.appModuleBase + "_h";
+                        expect(generatedName.substring(0, contentPrefix.length)).toBe(contentPrefix);
+                        expect(generatedName.substring(contentPrefix.length)).toMatch(/^[0-9a-f]{16}$/);
                     }
                     return;
                 }
