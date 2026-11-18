@@ -2283,10 +2283,21 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         V8GetPrivateValue(isolate, implementationObject, implementationObjectPropertyName, hiddenVal);
         auto implementationObjectProperty = hiddenVal.As<String>();
         if (implementationObjectProperty.IsEmpty()) {
-            //mark the implementationObject as such and set a pointer to it's class node inside it for reuse validation later
-            V8SetPrivateValue(isolate, implementationObject, implementationObjectPropertyName, String::NewFromUtf8(isolate, fullExtendedName.c_str()).ToLocalChecked());
+            // Holds the key of the constructor created for this object, so another call site
+            // can find it again.
+            V8SetPrivateValue(isolate, implementationObject, implementationObjectPropertyName, String::NewFromUtf8(isolate, extendedCtorKey.c_str()).ToLocalChecked());
         } else {
-            string usedClassName = ArgConverter::ConvertToString(implementationObjectProperty);
+            string usedCtorKey = ArgConverter::ConvertToString(implementationObjectProperty);
+            auto used = GetCachedExtendedClassData(isolate, usedCtorKey);
+            string usedClassName = used.extendedCtorFunction != nullptr ? used.extendedName : usedCtorKey;
+            // An object passed to anonymous extends of one interface at several call sites
+            // gets the constructor its first call site created, as all of them share the class.
+            if (isInterface && !hasDot && used.extendedCtorFunction != nullptr && usedClassName == fullExtendedName) {
+                auto usedCtorFunc = Local<Function>::New(isolate, *used.extendedCtorFunction);
+                cache->ExtendedCtorFuncCache.emplace(extendedCtorKey, ExtendedClassCacheData(usedCtorFunc, Local<ObjectTemplate>::New(isolate, *used.instanceTemplate), used.extendedName, used.node));
+                info.GetReturnValue().Set(usedCtorFunc);
+                return;
+            }
             stringstream s;
             s << "This object is used to extend another class '" << usedClassName << "'";
             throw NativeScriptException(s.str());
