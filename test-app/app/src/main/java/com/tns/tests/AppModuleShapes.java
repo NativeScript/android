@@ -64,6 +64,10 @@ public class AppModuleShapes {
         String describe();
     }
 
+    public interface ObjectMethodsTarget {
+        String name();
+    }
+
     public interface TwoDefaults {
         String name();
 

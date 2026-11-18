@@ -463,6 +463,51 @@ describe("Bindings of app-module types", function () {
             expectGeneratedAtRuntime(instance, "class");
         });
 
+        it("generate the class of an interface a call site lists methods of java.lang.Object for", function () {
+            var calls = [];
+            var listing = new com.tns.tests.AppModuleShapes.ObjectMethodsTarget({
+                name: function () {
+                    return "listing";
+                },
+                toString: function () {
+                    calls.push("toString");
+                    return "js toString";
+                },
+                hashCode: function () {
+                    calls.push("hashCode");
+                    return 42;
+                },
+                equals: function () {
+                    calls.push("equals");
+                    return true;
+                }
+            });
+            var plain = new com.tns.tests.AppModuleShapes.ObjectMethodsTarget({
+                name: function () {
+                    return "plain";
+                }
+            });
+
+            // As for any interface class the runtime generates, Java's calls of these
+            // methods do not reach JS.
+            var objectClass = java.lang.Object.class;
+            var toString = objectClass.getMethod("toString", []);
+            var hashCode = objectClass.getMethod("hashCode", []);
+            var equals = objectClass.getMethod("equals", [objectClass]);
+            [listing, plain].forEach(function (instance) {
+                expect(String(toString.invoke(instance, []))).toMatch(/@[0-9a-f]+$/);
+                hashCode.invoke(instance, []);
+                expect(String(equals.invoke(instance, [instance]))).toBe("true");
+            });
+            expect(String(equals.invoke(listing, [plain]))).toBe("false");
+            expect(calls).toEqual([]);
+
+            expect(callFromJava(listing, "name")).toBe("listing");
+            expect(callFromJava(plain, "name")).toBe("plain");
+            expect(String(listing.getClass().getName())).toBe(String(plain.getClass().getName()));
+            expectInterfaceGeneratedAtRuntime(plain, "com.tns.gen.com.tns.tests.AppModuleShapes_ObjectMethodsTarget");
+        });
+
         function expectTwoDefaultsCallSites(first, second, caller, javaPrefix, interfaceName) {
             var interfaceClass = java.lang.Class.forName(interfaceName, false, Shapes.class.getClassLoader());
             var desugared = sdk < 24 || !interfaceClass.getMethod("first", []).isDefault();

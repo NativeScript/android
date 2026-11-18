@@ -60,6 +60,7 @@ public class AppClassesGeneratorTest {
         app.put("app.WithDefault", "package app; public interface WithDefault { void a(); default void b() { } }");
         app.put("app.InheritsDefault", "package app; public interface InheritsDefault extends WithDefault { void c(); }");
         app.put("app.InheritsLibraryDefault", "package app; public interface InheritsLibraryDefault extends java.util.Iterator<String> { }");
+        app.put("app.Plain", "package app; public interface Plain { String name(); }");
         app.put("app.StaticAndPrivate", "package app; public interface StaticAndPrivate extends OkListener { static int s() { return 0; } private int p() { return 0; } }");
         appDir = compile("app-classes", app);
         delete(appDir, "app/Gone.class");
@@ -240,6 +241,31 @@ public class AppClassesGeneratorTest {
         Assert.assertTrue(generated("com/tns/gen/lib/LibWithDefault.java").isFile());
         Assert.assertEquals(expected.stream().map(File::getAbsolutePath).sorted().collect(Collectors.toList()),
                 generator.getAppBindingFiles().stream().sorted().collect(Collectors.toList()));
+    }
+
+    @Test
+    public void leavesSharedClassesOfAppInterfacesThatWouldOverrideObjectMethodsToTheRuntime() throws Exception {
+        Generator generator = generate(
+                "app.Plain*tests_a*1*1**name***",
+                "app.Plain*tests_a*2*1**name,toString***",
+                "app.OkListener*tests_a*3*1**on***",
+                "app.OkListener*tests_a*4*1**on,notify,getClass***",
+                "app.Plain*tests_a*5*1**name,hashCode***java.lang.Runnable",
+                "app.Widget*tests_a*6*1**draw,equals***",
+                "lib.Callback*tests_a*7*1**call,toString***");
+
+        for (String site : Arrays.asList("tests_a:1:1", "tests_a:2:1")) {
+            List<String> lines = runtimeLines(site + " ");
+            Assert.assertEquals(output.toString(), 1, lines.size());
+            Assert.assertTrue(lines.get(0), lines.get(0).contains("java.lang.Object.toString (listed at tests_a:2:1)"));
+        }
+        Assert.assertFalse(generated("com/tns/gen/app/Plain.java").exists());
+
+        Assert.assertTrue(read("com/tns/gen/app/OkListener.java").contains("void on()"));
+        Assert.assertTrue(read("com/tns/gen/lib/Callback.java").contains("java.lang.String toString()"));
+        Assert.assertTrue(new String(Files.readAllBytes(onlyFile("com/tns/gen/app", "Plain_").toPath()), StandardCharsets.UTF_8).contains("int hashCode()"));
+        Assert.assertTrue(new String(Files.readAllBytes(onlyFile("com/tns/gen/app", "Widget_").toPath()), StandardCharsets.UTF_8).contains("boolean equals(java.lang.Object"));
+        Assert.assertEquals(3, generator.getAppBindingFiles().size());
     }
 
     @Test

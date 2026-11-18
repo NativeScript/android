@@ -501,6 +501,8 @@ public class Generator {
             }
         }
 
+        Map<String, String> objectMethodOverrides = findSharedClassObjectMethodOverrides(javaExtends);
+
         for (DataRow dataRow : javaExtends) {
             String missingInterface = findMissingInterface(dataRow);
             if (missingInterface != null) {
@@ -513,6 +515,11 @@ public class Generator {
                 String defaultMethod = findSharedClassDefaultMethod(dataRow);
                 if (defaultMethod != null) {
                     System.out.println("The binding for " + describeSite(dataRow) + " is generated at runtime: the class shared by every implementation of " + dataRow.getBaseClassname() + " cannot override its default methods for some of them only (" + defaultMethod + ").");
+                    continue;
+                }
+                String objectMethod = isSharedInterfaceClassRow(dataRow) ? objectMethodOverrides.get(dataRow.getBaseClassname()) : null;
+                if (objectMethod != null) {
+                    System.out.println("The binding for " + describeSite(dataRow) + " is generated at runtime: the class shared by every implementation of " + dataRow.getBaseClassname() + " would override " + objectMethod + " for all of them.");
                     continue;
                 }
             }
@@ -552,11 +559,62 @@ public class Generator {
      * class carries the overrides of the one call site it was generated for.
      */
     private String findSharedClassDefaultMethod(DataRow dataRow) {
-        JavaClass clazz = classes.get(dataRow.getBaseClassname());
-        if (clazz == null || !isSharedInterfaceClass(dataRow, clazz) || !canClassBeExtended(clazz)) {
+        if (!isSharedInterfaceClassRow(dataRow)) {
             return null;
         }
-        return findDefaultMethod(clazz.getClassName());
+        return findDefaultMethod(classes.get(dataRow.getBaseClassname()).getClassName());
+    }
+
+    private boolean isSharedInterfaceClassRow(DataRow dataRow) {
+        JavaClass clazz = classes.get(dataRow.getBaseClassname());
+        return clazz != null && isSharedInterfaceClass(dataRow, clazz) && canClassBeExtended(clazz);
+    }
+
+    /**
+     * The interfaces of app rows whose shared class would override a method of
+     * java.lang.Object, each with that method and the call site listing it. The class the
+     * runtime generates for an interface overrides none, while a prebuilt shared class
+     * overrides the ones its first call site lists for every call site. Any row counts, as
+     * the order of the rows is not fixed.
+     */
+    private Map<String, String> findSharedClassObjectMethodOverrides(List<DataRow> rows) {
+        Map<String, String> overrides = new HashMap<>();
+        Set<String> objectMethods = null;
+        for (DataRow dataRow : rows) {
+            if (overrides.containsKey(dataRow.getBaseClassname()) || !involvesAppClasses(dataRow) || !isSharedInterfaceClassRow(dataRow)) {
+                continue;
+            }
+            String[] methods = dataRow.getMethods(true);
+            if (methods == null) {
+                continue;
+            }
+            if (objectMethods == null) {
+                objectMethods = getOverridableObjectMethodNames();
+            }
+            for (String method : methods) {
+                if (objectMethods.contains(method)) {
+                    overrides.put(dataRow.getBaseClassname(), "java.lang.Object." + method + " (listed at " + describeSite(dataRow) + ")");
+                    break;
+                }
+            }
+        }
+        return overrides;
+    }
+
+    /** The methods of java.lang.Object a binding overrides when its JS object lists them. */
+    private Set<String> getOverridableObjectMethodNames() {
+        Set<String> names = new HashSet<>();
+        JavaClass object = findClass(JavaClassNames.BASE_JAVA_CLASS_NAME);
+        if (object == null) {
+            return new HashSet<>(Arrays.asList("clone", "equals", "finalize", "hashCode", "toString"));
+        }
+        for (Method method : object.getMethods()) {
+            if (!method.getName().startsWith("<") && !method.isPrivate() && !method.isStatic()
+                    && !method.isFinal() && !method.isAbstract() && !method.isSynthetic()) {
+                names.add(method.getName());
+            }
+        }
+        return names;
     }
 
     /** An interface the generator cannot load counts as having default methods. */
