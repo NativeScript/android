@@ -1,6 +1,7 @@
 package org.nativescript.staticbindinggenerator.files.impl;
 
 import org.apache.bcel.classfile.Attribute;
+import org.apache.bcel.classfile.ClassFormatException;
 import org.apache.bcel.classfile.ClassParser;
 import org.apache.bcel.classfile.InnerClass;
 import org.apache.bcel.classfile.InnerClasses;
@@ -113,6 +114,11 @@ public class FileSystemHelperImpl implements FileSystemHelper {
 
     @Override
     public ClassesCollection readClassesFromDirectory(String directoryPath) {
+        return readClassesFromDirectory(directoryPath, false);
+    }
+
+    @Override
+    public ClassesCollection readClassesFromDirectory(String directoryPath, boolean skipInvalidClassFiles) {
         Map<String, JavaClass> classes = new HashMap<String, JavaClass>();
         Set<String> nonPublicNestedClasses = new HashSet<>();
 
@@ -131,6 +137,12 @@ public class FileSystemHelperImpl implements FileSystemHelper {
                     JavaClass clazz = null;
                     try {
                         clazz = cp.parse();
+                    } catch (ClassFormatException e) {
+                        if (!skipInvalidClassFiles) {
+                            throw e;
+                        }
+                        System.out.println("Leaving out " + f.getAbsolutePath() + ": it is not a valid class file (" + e.getMessage() + ")");
+                        continue;
                     } catch (IOException e) {
                         if (shouldThrowOnError) {
                             throw new RuntimeException("Error while parsing class file!", e);

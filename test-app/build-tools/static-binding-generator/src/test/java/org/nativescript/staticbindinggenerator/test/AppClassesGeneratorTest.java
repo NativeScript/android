@@ -269,6 +269,20 @@ public class AppClassesGeneratorTest {
     }
 
     @Test
+    public void leavesOutFilesOfTheAppClassesThatAreNotClassFiles() throws Exception {
+        Files.write(new File(appDir, "app/NotAClass.class").toPath(), "not a class".getBytes(StandardCharsets.UTF_8));
+        generate("app.OkListener*tests_a*1*1**on***");
+        Assert.assertTrue(generated("com/tns/gen/app/OkListener.java").isFile());
+
+        Files.write(new File(libDir, "lib/NotAClass.class").toPath(), "not a class".getBytes(StandardCharsets.UTF_8));
+        try {
+            generate("app.OkListener*tests_a*1*1**on***");
+            Assert.fail("expected the generator to fail on a library file that is not a class file");
+        } catch (RuntimeException expected) {
+        }
+    }
+
+    @Test
     public void releasesTheNameOfARowItLeavesToTheRuntime() throws Exception {
         Generator generator = generate(
                 "app.BrokenListener*****on*com.x.Same*app/f.js*",

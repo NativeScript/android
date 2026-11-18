@@ -725,10 +725,11 @@ public class Generator {
             for (DataRow dr : libs) {
                 String lib = dr.getRow();
                 File f = new File(lib);
-                ClassesCollection classes = f.isFile() ? fileSystemHelper.readClassesFromJar(lib) : fileSystemHelper.readClassesFromDirectory(lib);
+                boolean isAppClassDir = !appClassDirs.isEmpty() && appClassDirs.contains(canonicalPath(lib));
+                ClassesCollection classes = f.isFile() ? fileSystemHelper.readClassesFromJar(lib) : fileSystemHelper.readClassesFromDirectory(lib, isAppClassDir);
                 map.putAll(classes.getRegularClasses());
                 nonPublicNestedClasses.addAll(classes.getNonPublicNestedClasses());
-                if (!appClassDirs.isEmpty() && appClassDirs.contains(canonicalPath(lib))) {
+                if (isAppClassDir) {
                     appClassNames.addAll(classes.getRegularClasses().keySet());
                 } else {
                     appClassNames.removeAll(classes.getRegularClasses().keySet());
