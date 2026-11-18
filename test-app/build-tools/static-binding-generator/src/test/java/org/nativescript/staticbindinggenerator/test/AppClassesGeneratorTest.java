@@ -56,6 +56,7 @@ public class AppClassesGeneratorTest {
         app.put("app.OkListener", "package app; public interface OkListener { void on(); }");
         app.put("app.Callback", "package app; public interface Callback { void call(); }");
         app.put("app.Widget", "package app; public abstract class Widget { public abstract void draw(); }");
+        app.put("app.SelfTyped", "package app; public abstract class SelfTyped<T extends SelfTyped<T>> { public abstract T self(); }");
         appDir = compile("app-classes", app);
         delete(appDir, "app/Gone.class");
         delete(appDir, "app/GoneIface.class");
@@ -174,6 +175,24 @@ public class AppClassesGeneratorTest {
         } catch (RuntimeException e) {
             Assert.assertTrue(e.getMessage(), e.getMessage().contains("app.Gone"));
         }
+    }
+
+    @Test(timeout = 20000)
+    public void leavesEveryRowWithUnresolvableTypeParametersToTheRuntime() throws Exception {
+        String boundCycles = "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.boundcycles.";
+        generate(
+                boundCycles + "SelfTyped*tests_a*1*1**self***",
+                boundCycles + "ComparableSource*tests_a*2*1**next***",
+                "app.SelfTyped*tests_a*3*1**self***",
+                "com.example.View*tests_a*4*1**createView***");
+
+        for (String site : Arrays.asList("tests_a:1:1", "tests_a:2:1", "tests_a:3:1")) {
+            List<String> lines = runtimeLines(site);
+            Assert.assertEquals(output.toString(), 1, lines.size());
+            Assert.assertTrue(lines.get(0), lines.get(0).contains("type parameters"));
+        }
+        Assert.assertTrue(onlyFile("com/tns/gen/com/example", "View_").isFile());
+        Assert.assertFalse(generated("com/tns/gen/app").exists() && generated("com/tns/gen/app").list().length > 0);
     }
 
     @Test

@@ -16,6 +16,7 @@ import org.nativescript.staticbindinggenerator.generating.parsing.checkers.impl.
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericHierarchyView;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericParameters;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericsAwareClassHierarchyParser;
+import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.UnresolvedTypeParametersException;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.GenericSignatureReader;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.GenericsAwareClassHierarchyParserImpl;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.InheritedMethodsCollector;
@@ -491,16 +492,21 @@ public class Generator {
                 continue;
             }
 
+            boolean involvesAppClasses = involvesAppClasses(dataRow);
             Binding binding;
-            if (involvesAppClasses(dataRow)) {
-                try {
-                    binding = generateBinding(dataRow, appInterfaceNames, interfaceNames);
-                } catch (Exception | LinkageError | StackOverflowError e) {
-                    System.out.println("The binding for " + describeSite(dataRow) + " is generated at runtime: the generator cannot generate it (" + oneLine(e) + ").");
-                    continue;
+            try {
+                binding = involvesAppClasses
+                        ? generateBinding(dataRow, appInterfaceNames, interfaceNames)
+                        : generateBinding(dataRow, interfaceNames, Collections.emptySet());
+            } catch (UnresolvedTypeParametersException e) {
+                System.out.println("The binding for " + describeSite(dataRow) + " is generated at runtime: " + oneLine(e.getMessage()) + ".");
+                continue;
+            } catch (Exception | LinkageError | StackOverflowError e) {
+                if (!involvesAppClasses) {
+                    throw e;
                 }
-            } else {
-                binding = generateBinding(dataRow, interfaceNames, Collections.emptySet());
+                System.out.println("The binding for " + describeSite(dataRow) + " is generated at runtime: the generator cannot generate it (" + oneLine(String.valueOf(e)) + ").");
+                continue;
             }
 
             if (binding != null) {
@@ -511,8 +517,8 @@ public class Generator {
         return bindings.toArray(new Binding[bindings.size()]);
     }
 
-    private static String oneLine(Throwable e) {
-        return String.valueOf(e).replaceAll("\\s*\\R\\s*", " ");
+    private static String oneLine(String message) {
+        return String.valueOf(message).replaceAll("\\s*\\R\\s*", " ");
     }
 
     /** Whether the row's class, one of its interfaces or any of their supertypes is an app class. */
