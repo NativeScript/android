@@ -747,7 +747,7 @@ def leaveOutAppBindingsJavacRejects(File appBindingsList, List<String> dependenc
         probe.setText("class SbgBindingClasspathProbe { com.tns.Runtime a; com.tns.NativeScriptHashCodeProvider b; com.tns.NativeScriptRuntimeBound c; com.tns.JavaScriptImplementation d; }", "UTF-8")
         def probed = compileJavaLeavingOutFailures([probe], classpath, new File(trialDir, "probe-classes"), levels, 1)
         if (!probed.compiled || !probed.leftOut.isEmpty()) {
-            skip("the runtime's classes do not compile against ${probed.error ?: 'the classpath'}")
+            skip("the runtime's classes are missing from the classpath: ${probed.error ?: 'javac failed'}")
             return
         }
 
