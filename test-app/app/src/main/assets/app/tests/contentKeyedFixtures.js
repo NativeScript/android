@@ -86,7 +86,7 @@ exports.fixtures = {
     ApplyFixture: { ctor: ApplyFixture, toString: "apply fixture" },
     NoConstructorFixture: { ctor: NoConstructorFixture, toString: "no constructor fixture" },
     QuotedKeysFixture: { ctor: QuotedKeysFixture, toString: "quoted keys fixture" },
-    NestedBaseFixture: { ctor: NestedBaseFixture, toString: "nested base fixture" }
+    NestedBaseFixture: { ctor: NestedBaseFixture, toString: "nested base fixture", appModuleBase: "com.tns.tests.DummyClass_DummyDerivedClass" }
 };
 exports.getterCalls = function () {
     return getterCalls;

@@ -247,6 +247,7 @@ describe("Content-keyed binding names", function () {
 
     describe("prebuilds the shapes bundlers emit", function () {
         var fixtures = require("./contentKeyedFixtures");
+        var appClassesShown = require("./appClassesShown").appClassesShown;
 
         Object.keys(fixtures.fixtures).forEach(function (name) {
             it("for " + name, function () {
@@ -254,6 +255,15 @@ describe("Content-keyed binding names", function () {
                 var instance = new fixture.ctor();
 
                 expect(javaToString(instance)).toBe(fixture.toString);
+                if (fixture.appModuleBase && !appClassesShown) {
+                    // The generator could not load the app-module base (-PskipSbgAppClasses):
+                    // the runtime generates the class, under the content name it would have had.
+                    expect(runtimeGenerated(instance)).toBe(true);
+                    if (contentKeyed) {
+                        expect(className(instance)).toMatch(new RegExp("^" + fixture.appModuleBase.replace(/\./g, "\\.") + "_h[0-9a-f]{16}$"));
+                    }
+                    return;
+                }
                 expect(runtimeGenerated(instance)).toBe(false);
                 if (contentKeyed) {
                     expect(className(instance)).toMatch(/_h[0-9a-f]{16}$/);

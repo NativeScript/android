@@ -28,6 +28,31 @@ describe("Bindings of app-module types", function () {
         return result;
     }
 
+    // With -PskipSbgAppClasses the generator cannot load app-module types, and every
+    // class it would prebuild for them is generated at runtime instead.
+    var appClassesShown = require("./appClassesShown").appClassesShown;
+
+    function expectGeneratedAtRuntime(instance, kind) {
+        var entries = reportEntriesFor(instance.getClass().getName());
+        expect(entries.length).toBe(1);
+        expect(entries.length > 0 && entries[0].kind).toBe(kind);
+        return entries[0] || {};
+    }
+
+    function expectExtendPrebuiltWhenShown(instance, baseClassName) {
+        if (appClassesShown) {
+            expect(reportEntriesFor(instance.getClass().getName())).toEqual([]);
+            return;
+        }
+        var entry = expectGeneratedAtRuntime(instance, "class");
+        expect(entry.requested).toMatch(new RegExp("^com\\.tns\\.gen\\." + baseClassName.replace(/\./g, "\\.") + "_"));
+    }
+
+    function expectInterfaceGeneratedAtRuntime(implemented, generatedName) {
+        expectRuntimeInterfaceClass(java.lang.reflect.Proxy.isProxyClass(implemented.getClass()), String(implemented.getClass().getName()), generatedName);
+        expectGeneratedAtRuntime(implemented, "interface");
+    }
+
     describe("App-module types prebuilt by the static binding generator", function () {
         it("prebuilds an extend of an app-module class", function () {
             var Extended = com.tns.tests.Button1.extend({
@@ -39,7 +64,7 @@ describe("Bindings of app-module types", function () {
 
             expect(callFromJava(instance, "toString")).toBe("prebuilt extend");
             expect(instance instanceof com.tns.tests.Button1).toBe(true);
-            expect(reportEntriesFor(instance.getClass().getName())).toEqual([]);
+            expectExtendPrebuiltWhenShown(instance, "com.tns.tests.Button1");
         });
 
         it("prebuilds new of an app-module interface", function () {
@@ -50,8 +75,12 @@ describe("Bindings of app-module types", function () {
             });
 
             expect(callFromJava(implemented, "describe")).toBe("prebuilt new");
-            expect(String(implemented.getClass().getName())).toBe("com.tns.gen.com.tns.tests.AppModuleBindingTarget");
-            expect(reportEntriesFor(implemented.getClass().getName())).toEqual([]);
+            if (appClassesShown) {
+                expect(String(implemented.getClass().getName())).toBe("com.tns.gen.com.tns.tests.AppModuleBindingTarget");
+                expect(reportEntriesFor(implemented.getClass().getName())).toEqual([]);
+            } else {
+                expectInterfaceGeneratedAtRuntime(implemented, "com.tns.gen.com.tns.tests.AppModuleBindingTarget");
+            }
         });
 
         it("prebuilds new of a nested app-module interface", function () {
@@ -62,13 +91,21 @@ describe("Bindings of app-module types", function () {
             });
 
             expect(callFromJava(implemented, "describe")).toBe("prebuilt nested");
-            expect(String(implemented.getClass().getName())).toBe("com.tns.gen.com.tns.tests.AppModuleBindingTarget_Nested");
-            expect(reportEntriesFor(implemented.getClass().getName())).toEqual([]);
+            if (appClassesShown) {
+                expect(String(implemented.getClass().getName())).toBe("com.tns.gen.com.tns.tests.AppModuleBindingTarget_Nested");
+                expect(reportEntriesFor(implemented.getClass().getName())).toEqual([]);
+            } else {
+                expectInterfaceGeneratedAtRuntime(implemented, "com.tns.gen.com.tns.tests.AppModuleBindingTarget_Nested");
+            }
         });
     });
 
     describe("App-module Kotlin types", function () {
         function expectPrebuiltInterfaceClass(implemented, expectedName) {
+            if (!appClassesShown) {
+                expectInterfaceGeneratedAtRuntime(implemented, expectedName);
+                return;
+            }
             expect(java.lang.reflect.Proxy.isProxyClass(implemented.getClass())).toBe(false);
             expect(String(implemented.getClass().getName())).toBe(expectedName);
             expect(reportEntriesFor(implemented.getClass().getName())).toEqual([]);
@@ -84,7 +121,7 @@ describe("Bindings of app-module types", function () {
 
             expect(callFromJava(instance, "describe")).toBe("prebuilt kotlin extend");
             expect(instance instanceof com.tns.tests.AppModuleKotlinBase).toBe(true);
-            expect(reportEntriesFor(instance.getClass().getName())).toEqual([]);
+            expectExtendPrebuiltWhenShown(instance, "com.tns.tests.AppModuleKotlinBase");
         });
 
         it("prebuilds new of a Kotlin interface", function () {
@@ -145,7 +182,7 @@ describe("Bindings of app-module types", function () {
             var instance = new Extended();
 
             expect(callFromJava(instance, "describe")).toBe("prebuilt kotlin value open");
-            expect(reportEntriesFor(instance.getClass().getName())).toEqual([]);
+            expectExtendPrebuiltWhenShown(instance, "com.tns.tests.AppModuleKotlinValueOpen");
             var declared = instance.getClass().getDeclaredMethods();
             for (var i = 0; i < declared.length; i++) {
                 expect(String(declared[i].getName())).not.toContain("-");
@@ -280,28 +317,6 @@ describe("Bindings of app-module types", function () {
     describe("App-module types the static binding generator cannot prebuild as they are", function () {
         var Shapes = com.tns.tests.AppModuleShapes;
         var sdk = android.os.Build.VERSION.SDK_INT;
-
-        if (false) {
-            new com.tns.tests.AppModuleShapes.StepProbe({
-                describe: function () {
-                    return "never runs";
-                }
-            });
-        }
-        var appClassesShown = (function () {
-            try {
-                java.lang.Class.forName("com.tns.gen.com.tns.tests.AppModuleShapes_StepProbe", false, Shapes.class.getClassLoader());
-                return true;
-            } catch (e) {
-                return false;
-            }
-        })();
-
-        function expectGeneratedAtRuntime(instance, kind) {
-            var entries = reportEntriesFor(instance.getClass().getName());
-            expect(entries.length).toBe(1);
-            expect(entries.length > 0 && entries[0].kind).toBe(kind);
-        }
 
         function expectPrebuiltWhenAppClassesShown(instance) {
             if (appClassesShown) {
