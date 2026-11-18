@@ -14,8 +14,10 @@ import org.nativescript.staticbindinggenerator.DataRow;
 import org.nativescript.staticbindinggenerator.Generator;
 import org.nativescript.staticbindinggenerator.InputParameters;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -200,6 +202,65 @@ public class ContentKeyedGeneratorTest {
         Assert.assertTrue(read("com/example/NamedView.java").contains("createView("));
         // An interface's abstract methods are implemented whatever the object defines.
         Assert.assertTrue(read("com/tns/gen/com/example/MyInterface.java").contains("getTile("));
+    }
+
+    private static final String[] ROWS_WITH_A_MISSING_INTERFACE = {
+            "com.example.View*tests_a*3*5**createView***com.example.MissingListener",
+            "com.example.MyInterface*tests_a*5*5**getTile***java.lang.Runnable,com.example.MissingListener",
+            "com.example.View*tests_a*7*5**createView***java.util.MissingListener",
+            "com.example.View*tests_c*1*1*Named*createView***com.example.MissingListener",
+            "com.example.View*tests_d*2*2*Named*createView***com.example.MissingListener",
+            "com.example.MyFragment*tests_e*2*3**onResume***com.example.MissingListener",
+            "com.example.MyInterface*****getTile*com.example.NamedMissing*app/f.js*com.example.MissingListener",
+    };
+
+    private List<String> generateCapturingOutput(boolean contentKeyed, Generator[] generator, String... rows) throws Exception {
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        System.setOut(new PrintStream(captured, true, "UTF-8"));
+        try {
+            generator[0] = generate(contentKeyed, rows);
+        } finally {
+            System.setOut(originalOut);
+        }
+        return Arrays.asList(new String(captured.toByteArray(), StandardCharsets.UTF_8).split("\\R"));
+    }
+
+    private void assertSkipsRowsWithAMissingInterface(boolean contentKeyed) throws Exception {
+        List<String> rows = new ArrayList<>(Arrays.asList(ROWS_WITH_A_MISSING_INTERFACE));
+        rows.add("com.example.View*tests_b*9*5**toString***java.lang.Runnable");
+        rows.add("com.example.View*tests_b*11*5**toString***");
+        Generator[] generator = new Generator[1];
+        List<String> output = generateCapturingOutput(contentKeyed, generator, rows.toArray(new String[0]));
+
+        List<String> files = generatedFiles("com/tns/gen/com/example");
+        Assert.assertEquals(files.toString(), 2, files.size());
+        Assert.assertTrue(files.toString(), files.stream().allMatch(f -> f.startsWith("View_")));
+        Assert.assertFalse(new File(outputDir, "com/example/NamedMissing.java").exists());
+        if (contentKeyed) {
+            Assert.assertTrue(files.contains("View_" + ContentKey.of("com.example.View", Collections.singletonList("java.lang.Runnable"), Collections.singletonList("toString")) + ".java"));
+            Assert.assertTrue(files.contains("View_" + key("toString") + ".java"));
+        }
+        Assert.assertTrue(generator[0].getWarnings().toString(), generator[0].getWarnings().isEmpty());
+        Assert.assertTrue(generator[0].getContentNameCollisions().isEmpty());
+
+        for (String row : ROWS_WITH_A_MISSING_INTERFACE) {
+            DataRow dataRow = new DataRow(row);
+            String site = dataRow.getFilename().isEmpty() ? dataRow.getFile() + ":" + dataRow.getLine() + ":" + dataRow.getColumn() : dataRow.getJsFilename();
+            String missing = dataRow.getInterfaces()[dataRow.getInterfaces().length - 1];
+            long lines = output.stream().filter(line -> line.contains(site + " ") && line.contains(missing)).count();
+            Assert.assertEquals(output + " should report " + site, 1, lines);
+        }
+    }
+
+    @Test
+    public void skipsRowsWithAnInterfaceItCannotLoad() throws Exception {
+        assertSkipsRowsWithAMissingInterface(false);
+    }
+
+    @Test
+    public void skipsContentKeyedRowsWithAnInterfaceItCannotLoad() throws Exception {
+        assertSkipsRowsWithAMissingInterface(true);
     }
 
     @Test

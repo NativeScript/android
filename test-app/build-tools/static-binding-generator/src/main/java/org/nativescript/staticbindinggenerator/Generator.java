@@ -386,26 +386,49 @@ public class Generator {
         ArrayList<Binding> bindings = new ArrayList<Binding>();
         HashSet<String> interfaceNames = new HashSet<String>();
 
+        List<DataRow> javaExtends = new ArrayList<>(rows.size());
+        for (DataRow dataRow : rows) {
+            if (!classes.containsKey(dataRow.getBaseClassname())) {
+                continue;
+            }
+            // The runtime generates the class of a row left out here, as it does for a
+            // base class that is not on the classpath.
+            String missingInterface = findMissingInterface(dataRow);
+            if (missingInterface != null) {
+                System.out.println("The binding for " + describeSite(dataRow) + " is generated at runtime: its interface " + missingInterface + " is not on the classpath.");
+                continue;
+            }
+            javaExtends.add(dataRow);
+        }
+
         if (contentKeyedBindings) {
-            planContentKeyedNames(rows);
+            planContentKeyedNames(javaExtends);
             for (String warning : warnings) {
                 System.out.println(warning);
             }
         }
 
-        for (DataRow dataRow : rows) {
-            String classname = dataRow.getBaseClassname();
-            boolean isJavaExtend = classes.containsKey(classname);
-            if (isJavaExtend) {
-                Binding binding = generateBinding(dataRow, interfaceNames);
+        for (DataRow dataRow : javaExtends) {
+            Binding binding = generateBinding(dataRow, interfaceNames);
 
-                if (binding != null) {
-                    bindings.add(binding);
-                }
+            if (binding != null) {
+                bindings.add(binding);
             }
         }
 
         return bindings.toArray(new Binding[bindings.size()]);
+    }
+
+    private String findMissingInterface(DataRow dataRow) {
+        if (dataRow.getInterfaces() == null) {
+            return null;
+        }
+        for (String interfaceName : dataRow.getInterfaces()) {
+            if (interfaceName != null && !interfaceName.isEmpty() && findClass(interfaceName) == null) {
+                return interfaceName;
+            }
+        }
+        return null;
     }
 
     private String getNormalizedName(String filename) {
@@ -770,14 +793,24 @@ public class Generator {
     }
 
     private JavaClass getClass(String className) {
-        JavaClass clazz = classes.get(BcelNamingUtil.resolveClassName(className));
+        JavaClass clazz = findClass(className);
 
         if (clazz == null) {
-            if (className.startsWith("java.")) {
-                return SystemClass.get(className);
-            }
-
             throw new RuntimeException("Class not found " + className);
+        }
+
+        return clazz;
+    }
+
+    private JavaClass findClass(String className) {
+        JavaClass clazz = classes.get(BcelNamingUtil.resolveClassName(className));
+
+        if (clazz == null && className.startsWith("java.")) {
+            try {
+                return SystemClass.get(className);
+            } catch (RuntimeException e) {
+                return null;
+            }
         }
 
         return clazz;
