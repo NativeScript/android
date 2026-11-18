@@ -661,8 +661,9 @@ tasks.register("compileAppClassesForSbg") {
 // javac writes no class files after its first error, so each failing round leaves out the
 // sources that reported errors and compiles the rest again. A round that cannot leave any
 // source out (stuck) or the last of maxRounds ends the loop. errors maps each left-out
-// source to its first error.
-def compileJavaLeavingOutFailures(List<File> files, List<String> classpath, File classOutput, Map levels, int maxRounds) {
+// source to its first error. With -Werror among extraOptions a warning counts as an error
+// of its source.
+def compileJavaLeavingOutFailures(List<File> files, List<String> classpath, File classOutput, Map levels, int maxRounds, List<String> extraOptions = []) {
     def remaining = new ArrayList<File>(files)
     def leftOut = []
     def errorsBySource = [:]
@@ -677,11 +678,12 @@ def compileJavaLeavingOutFailures(List<File> files, List<String> classpath, File
     def describe = { Diagnostic d -> d.getMessage(Locale.ROOT).readLines().take(2).join(" ").replaceAll(/\s+/, " ") }
     // Only the files passed are compiled: javac would otherwise compile a source it finds
     // on the classpath, such as one a dependency jar ships, into classOutput.
-    def options = ["-proc:none", "-nowarn", "-Xmaxerrs", "100000", "-implicit:none",
+    def warningsAreErrors = extraOptions.contains("-Werror")
+    def options = ["-proc:none", "-Xmaxerrs", "100000", "-Xmaxwarns", "100000", "-implicit:none",
                    "-source", levels.source, "-target", levels.target,
                    "-encoding", levels.encoding,
                    "-classpath", classpath.join(File.pathSeparator),
-                   "-d", classOutput.absolutePath]
+                   "-d", classOutput.absolutePath] + (warningsAreErrors ? [] : ["-nowarn"]) + extraOptions
     classOutput.mkdirs()
     for (int round = 0; round < maxRounds && !remaining.isEmpty() && !compiled; round++) {
         def diagnostics = new DiagnosticCollector()
@@ -692,7 +694,12 @@ def compileJavaLeavingOutFailures(List<File> files, List<String> classpath, File
             def sourceByUri = [units, remaining].transpose().collectEntries { unit, source -> [(unit.toUri()): source] }
             compiled = compiler.getTask(new StringWriter(), fileManager, diagnostics, options, null, units).call()
             if (!compiled) {
-                def errors = diagnostics.diagnostics.findAll { it.kind == Diagnostic.Kind.ERROR }
+                // javac adds an error of no source to the warnings -Werror turned into errors.
+                def errors = diagnostics.diagnostics.findAll {
+                    it.kind == Diagnostic.Kind.ERROR
+                            ? it.code != "compiler.err.warnings.and.werror" || !warningsAreErrors
+                            : warningsAreErrors && (it.kind == Diagnostic.Kind.WARNING || it.kind == Diagnostic.Kind.MANDATORY_WARNING)
+                }
                 errorDiagnostics.addAll(errors.collect { [code: it.code, message: it.getMessage(Locale.ROOT)] })
                 if (firstError == null && !errors.isEmpty()) {
                     firstError = describe(errors[0])
@@ -727,7 +734,9 @@ def compileJavaLeavingOutFailures(List<File> files, List<String> classpath, File
 // first: the class of a call site whose binding javac rejects is generated at runtime, as
 // without that task. Whatever keeps this check from telling a bad binding from an
 // incomplete classpath skips it, and the app's compile decides as it would without it.
-def leaveOutAppBindingsJavacRejects(File appBindingsList, List<String> dependencies, File appClassesDir, Map levels, File temporaryDir, Logger logger) {
+// compilerArgs are those the app's compile adds that make it reject more than javac does by
+// default; a binding only that compile would reject is left to the runtime too.
+def leaveOutAppBindingsJavacRejects(File appBindingsList, List<String> dependencies, File appClassesDir, Map levels, List<String> compilerArgs, File temporaryDir, Logger logger) {
     if (!appBindingsList.isFile()) {
         return
     }
@@ -755,7 +764,7 @@ def leaveOutAppBindingsJavacRejects(File appBindingsList, List<String> dependenc
             return
         }
 
-        def result = compileJavaLeavingOutFailures(bindings, classpath, new File(trialDir, "classes"), levels, 10)
+        def result = compileJavaLeavingOutFailures(bindings, classpath, new File(trialDir, "classes"), levels, 10, compilerArgs)
         if (result.stuck) {
             skip(result.error ?: "javac failed")
             return
@@ -1000,8 +1009,11 @@ task runSbg(type: BuildToolTask) {
     doLast {
         if (sbgAppBindingsFile.isFile()) {
             try {
+                // The lint options that only concern how javac is invoked are left out: this
+                // compile has another classpath and no Android boot classpath.
+                def compilerArgs = failOnCompilationWarningsEnabled() ? ["-Xlint:all,-options,-path", "-Werror"] : []
                 leaveOutAppBindingsJavacRejects(sbgAppBindingsFile, sbgDependenciesFile.readLines().findAll { it },
-                        SBG_APP_CLASSES_DIR.get().asFile, javaLevels.get(), temporaryDir, logger)
+                        SBG_APP_CLASSES_DIR.get().asFile, javaLevels.get(), compilerArgs, temporaryDir, logger)
             } catch (Exception | LinkageError e) {
                 logger.warn("runSbg: the prebuilt bindings of the app's own classes were not checked, so the app's compile checks them (${e})")
             }
