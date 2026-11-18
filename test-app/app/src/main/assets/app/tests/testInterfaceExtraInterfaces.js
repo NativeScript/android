@@ -16,6 +16,19 @@ describe("Interface extends with extra interfaces", function () {
         return "com.tns.gen." + baseName.replace(/\$/g, "_");
     }
 
+    // With the interfaceProxies option an interface without a prebuilt class gets a
+    // java.lang.reflect.Proxy class in place of its shared class; an extend with extra
+    // interfaces keeps a class of its own call site.
+    var proxies = !!require("../package.json").android.interfaceProxies;
+
+    function expectSharedClass(instance, sharedName) {
+        if (proxies) {
+            expect(java.lang.reflect.Proxy.isProxyClass(instance.getClass())).toBe(true);
+        } else {
+            expect(String(F.className(instance))).toBe(sharedName);
+        }
+    }
+
     function expectCallSiteClass(instance, baseName) {
         var className = String(F.className(instance));
         expect(className.indexOf(sharedClassName(baseName) + "_")).toBe(0);
@@ -75,7 +88,7 @@ describe("Interface extends with extra interfaces", function () {
         expectCallSiteClass(withExtra, PKG + "TwoSitesBase");
         expectCallSiteClass(withOther, PKG + "TwoSitesBase");
         expect(String(F.className(withExtra))).not.toBe(String(F.className(withOther)));
-        expect(String(F.className(without))).toBe(sharedClassName(PKG + "TwoSitesBase"));
+        expectSharedClass(without, sharedClassName(PKG + "TwoSitesBase"));
 
         expect(F.isInstance(withExtra, EXTRA)).toBe(true);
         expect(F.isInstance(withExtra, OTHER)).toBe(false);
@@ -99,7 +112,7 @@ describe("Interface extends with extra interfaces", function () {
         });
         var withExtras = new C();
 
-        expect(String(F.className(plain))).toBe(sharedClassName(PKG + "PlainFirstBase"));
+        expectSharedClass(plain, sharedClassName(PKG + "PlainFirstBase"));
         expect(F.isInstance(plain, EXTRA)).toBe(false);
         expectCallSiteClass(withExtras, PKG + "PlainFirstBase");
         expect(F.isInstance(withExtras, EXTRA)).toBe(true);
@@ -118,7 +131,7 @@ describe("Interface extends with extra interfaces", function () {
 
         expectCallSiteClass(withExtras, PKG + "ExtrasFirstBase");
         expect(F.isInstance(withExtras, EXTRA)).toBe(true);
-        expect(String(F.className(plain))).toBe(sharedClassName(PKG + "ExtrasFirstBase"));
+        expectSharedClass(plain, sharedClassName(PKG + "ExtrasFirstBase"));
         expect(F.isInstance(plain, EXTRA)).toBe(false);
         expect(String(F.call(plain, PKG + "ExtrasFirstBase", "base"))).toBe("plain");
     });
@@ -351,7 +364,7 @@ describe("Interface extends with extra interfaces", function () {
             extra: function () { return "e"; }
         });
 
-        expect(String(F.className(instance))).toBe(sharedClassName(PKG + "NewWithInterfacesBase"));
+        expectSharedClass(instance, sharedClassName(PKG + "NewWithInterfacesBase"));
         expect(F.isInstance(instance, EXTRA)).toBe(false);
         expect(String(F.call(instance, PKG + "NewWithInterfacesBase", "base"))).toBe("b");
     });
@@ -376,7 +389,7 @@ describe("Interface extends with extra interfaces", function () {
 
             // The last use of WorkerBase: the shared class still serves new WorkerBase({...}).
             var plain = new X.WorkerBase({ base: function () { return "main"; } });
-            expect(String(F.className(plain))).toBe(sharedClassName(PKG + "WorkerBase"));
+            expectSharedClass(plain, sharedClassName(PKG + "WorkerBase"));
             expect(F.isInstance(plain, EXTRA)).toBe(false);
             expect(String(F.call(plain, PKG + "WorkerBase", "base"))).toBe("main");
             done();
@@ -411,6 +424,13 @@ describe("Interface extends with extra interfaces", function () {
 
         expectCallSiteClass(prebuilt, "java.util.function.LongSupplier");
         expect(F.isRuntimeGenerated(prebuilt)).toBe(false);
+        // Also in a content-keyed build, which names only class extends after their content.
+        var prebuiltName = String(F.className(prebuilt));
+        var reported = Array.prototype.filter.call(com.tns.DexFactory.getRuntimeGeneratedClasses(), function (line) {
+            var fields = String(line).split(" ");
+            return fields[2] === prebuiltName || fields[3].replace(/\$/g, "_") === prebuiltName;
+        });
+        expect(reported).toEqual([]);
         expect(F.isInstance(prebuilt, "java.util.function.IntSupplier")).toBe(true);
         expect(String(F.call(prebuilt, "java.util.function.IntSupplier", "getAsInt"))).toBe("42");
 

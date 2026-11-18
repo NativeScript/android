@@ -228,16 +228,37 @@ var es5_visitors = (function() {
                 if possibleExpressionStatements[0].expression.right.left.callee.object.name === superVariableIdentifier
                 if the above is valid, then variableRHS = possibleVariableDeclarations[0].expression.right.left
              */
-            function getThisAssignmentSuperCallLineNode(nodes, superIdentifier) {
-                var matchingNodes = nodes.filter(
-                    (node) => {
-                        return types.isAssignmentExpression(node.expression) &&
-                            types.isLogicalExpression(node.expression.right) &&
-                            types.isCallExpression(node.expression.right.left) &&
-                            node.expression.right.left.callee.object.name === superIdentifier;
-                    });
+            function isSuperCall(node, superIdentifier) {
+                return types.isCallExpression(node) &&
+                    types.isMemberExpression(node.callee) &&
+                    node.callee.object.name === superIdentifier;
+            }
 
-                return matchingNodes.length > 0 ? matchingNodes[0].expression.right.left : null;
+            // `_super.call(this) || this` or `_super !== null && _super.apply(this, arguments) || this`
+            function getSuperCallFromLogicalExpression(node, superIdentifier) {
+                if (!types.isLogicalExpression(node)) {
+                    return null;
+                }
+                var left = node.left;
+                if (isSuperCall(left, superIdentifier)) {
+                    return left;
+                }
+                if (types.isLogicalExpression(left) && isSuperCall(left.right, superIdentifier)) {
+                    return left.right;
+                }
+                return null;
+            }
+
+            function getThisAssignmentSuperCallLineNode(nodes, superIdentifier) {
+                for (var i = 0; i < nodes.length; i++) {
+                    var expression = nodes[i].expression;
+                    var superCall = types.isAssignmentExpression(expression) &&
+                        getSuperCallFromLogicalExpression(expression.right, superIdentifier);
+                    if (superCall) {
+                        return superCall;
+                    }
+                }
+                return null;
             }
 
             /** Getting the super.call node from declaration
@@ -248,14 +269,13 @@ var es5_visitors = (function() {
                 if the above is valid, then variableRHS = possibleVariableDeclarations[0].declarations[0].init.left
              */
             function getThisDeclarationSuperCallLineNode(nodes, superIdentifier) {
-                var matchingNodes = nodes.filter(
-                    (node) => {
-                        return types.isLogicalExpression(node.declarations[0].init) &&
-                            types.isCallExpression(node.declarations[0].init.left) &&
-                            node.declarations[0].init.left.callee.object.name === superIdentifier;
-                    });
-
-                return matchingNodes.length > 0 ? matchingNodes[0].declarations[0].init.left : null;
+                for (var i = 0; i < nodes.length; i++) {
+                    var superCall = getSuperCallFromLogicalExpression(nodes[i].declarations[0].init, superIdentifier);
+                    if (superCall) {
+                        return superCall;
+                    }
+                }
+                return null;
             }
 
             /** Getting the super.apply node from the return of a class without a constructor
@@ -263,23 +283,10 @@ var es5_visitors = (function() {
                 return _super.apply(this, arguments) || this;
              */
             function getReturnSuperCallLineNode(nodes, superIdentifier) {
-                function isSuperCall(node) {
-                    return types.isCallExpression(node) &&
-                        types.isMemberExpression(node.callee) &&
-                        node.callee.object.name === superIdentifier;
-                }
-
                 for (var i = 0; i < nodes.length; i++) {
-                    var argument = nodes[i].argument;
-                    if (!types.isLogicalExpression(argument)) {
-                        continue;
-                    }
-                    var left = argument.left;
-                    if (isSuperCall(left)) {
-                        return left;
-                    }
-                    if (types.isLogicalExpression(left) && isSuperCall(left.right)) {
-                        return left.right;
+                    var superCall = getSuperCallFromLogicalExpression(nodes[i].argument, superIdentifier);
+                    if (superCall) {
+                        return superCall;
                     }
                 }
                 return null;
@@ -558,18 +565,62 @@ var es5_visitors = (function() {
      *	HELPER METHODS
      */
 
-    // Returns the Identifier name of a property's key, or null when the property
-    // is a SpreadElement, has a computed key, or uses a non-Identifier key
-    // (e.g. StringLiteral, NumericLiteral). Such properties cannot be mapped to
-    // a Java method binding, so callers should skip them.
-    function _getIdentifierKeyName(property) {
-        if (!property || property.computed) {
+    // The member names the runtime can see as own properties of an
+    // implementation object, which is what it names and generates a class from.
+    var MEMBER_NAME_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+    // Prefixes a member an object literal defines as a getter or setter. The
+    // runtime finds method overrides behind getters but leaves accessors out of
+    // content keys, so the static binding generator decides per mode.
+    var ACCESSOR_PREFIX = "~";
+
+    function _isAccessor(property) {
+        return types.isObjectMethod(property) && (property.kind === "get" || property.kind === "set");
+    }
+
+    // Returns the name an object literal property defines as an own property,
+    // or null for spreads, computed keys, and keys that cannot name a Java method.
+    function _getMemberKeyName(property) {
+        if (!property || property.computed || !property.key) {
             return null;
         }
-        if (!property.key || !types.isIdentifier(property.key)) {
+
+        var name;
+        if (types.isIdentifier(property.key)) {
+            name = property.key.name;
+        } else if (types.isStringLiteral(property.key)) {
+            name = property.key.value;
+        } else {
             return null;
         }
-        return property.key.name;
+
+        // `__proto__: value` sets the prototype instead of defining a property.
+        if (name === "__proto__" && types.isObjectProperty(property) && !property.shorthand) {
+            return null;
+        }
+
+        return MEMBER_NAME_PATTERN.test(name) ? name : null;
+    }
+
+    function _pushUnique(array, value) {
+        if (array.indexOf(value) === -1) {
+            array.push(value);
+        }
+    }
+
+    // A redefined property keeps its first position and takes the kind of its
+    // last definition, as in the object the literal creates.
+    function _addLiteralMember(members, name, isAccessor) {
+        var index = members.indexOf(name);
+        if (index === -1) {
+            index = members.indexOf(ACCESSOR_PREFIX + name);
+        }
+        var entry = isAccessor ? ACCESSOR_PREFIX + name : name;
+        if (index === -1) {
+            members.push(entry);
+        } else {
+            members[index] = entry;
+        }
     }
 
     function _getOverriddenMethods(node, config) {
@@ -578,11 +629,11 @@ var es5_visitors = (function() {
             var objectProperties = node.properties;
 
             for (var index in objectProperties) {
-                var keyName = _getIdentifierKeyName(objectProperties[index]);
+                var keyName = _getMemberKeyName(objectProperties[index]);
                 if (keyName === null) {
                     continue;
                 }
-                overriddenMethodNames.push(keyName);
+                _addLiteralMember(overriddenMethodNames, keyName, _isAccessor(objectProperties[index]));
             }
         }
 
@@ -617,11 +668,9 @@ var es5_visitors = (function() {
             	will get 'method1' and 'method3'
             */
             for (var index in objectProperties) {
-                var keyName = _getIdentifierKeyName(objectProperties[index]);
-                // Skip spreads, computed keys, and non-Identifier keys — they
-                // cannot be statically mapped to a Java binding. Without this
-                // guard, valid (non-NS) `.extend({ ...other, foo })` calls in
-                // bundled vendor code (e.g. Zod schemas) would crash the parser.
+                var keyName = _getMemberKeyName(objectProperties[index]);
+                // Without this guard, valid (non-NS) `.extend({ ...other, foo })`
+                // calls in bundled vendor code (e.g. Zod schemas) would crash the parser.
                 if (keyName === null) {
                     continue;
                 }
@@ -638,7 +687,7 @@ var es5_visitors = (function() {
                         implementedInterfaces.push(interfaceName);
                     }
                 } else {
-                    overriddenMethodNames.push(keyName)
+                    _addLiteralMember(overriddenMethodNames, keyName, _isAccessor(objectProperties[index]));
                 }
             }
         }
@@ -747,8 +796,50 @@ var es5_visitors = (function() {
         return undefined;
     }
 
+    // The prototype members of the class declared by `__extends(X, _super)`:
+    // `X.prototype.name = ...` statements, including chained and comma-joined
+    // ones. Statics, and accessors (`Object.defineProperty(X.prototype, ...)`),
+    // are not data properties of the prototype the runtime reads.
     function _getOverriddenMethodsTypescript(path, count) {
         var overriddenMethods = [];
+
+        var extendsCall = path.parentPath && path.parentPath.node;
+        var classIdentifier = types.isCallExpression(extendsCall) && extendsCall.arguments[0];
+        if (!types.isIdentifier(classIdentifier)) {
+            return overriddenMethods;
+        }
+        var className = classIdentifier.name;
+
+        function prototypeMemberName(left) {
+            if (!types.isMemberExpression(left)) {
+                return null;
+            }
+            var target = left.object;
+            if (!types.isMemberExpression(target) || target.computed ||
+                !types.isIdentifier(target.object, { name: className }) ||
+                !types.isIdentifier(target.property, { name: "prototype" })) {
+                return null;
+            }
+            var name = null;
+            if (!left.computed && types.isIdentifier(left.property)) {
+                name = left.property.name;
+            } else if (left.computed && types.isStringLiteral(left.property)) {
+                name = left.property.value;
+            }
+            return name !== null && MEMBER_NAME_PATTERN.test(name) ? name : null;
+        }
+
+        function collect(expression) {
+            if (types.isSequenceExpression(expression)) {
+                expression.expressions.forEach(collect);
+            } else if (types.isAssignmentExpression(expression) && expression.operator === "=") {
+                var name = prototypeMemberName(expression.left);
+                if (name !== null) {
+                    _pushUnique(overriddenMethods, name);
+                }
+                collect(expression.right);
+            }
+        }
 
         var cn = _getParent(path, count)
 
@@ -756,11 +847,7 @@ var es5_visitors = (function() {
         for (var item in cn.node.body) {
             var ci = cn.node.body[item];
             if (types.isExpressionStatement(ci)) {
-                if (types.isAssignmentExpression(ci.expression)) {
-                    if (ci.expression.left.property) {
-                        overriddenMethods.push(ci.expression.left.property.name)
-                    }
-                }
+                collect(ci.expression);
             }
         }
 

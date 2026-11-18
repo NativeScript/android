@@ -85,8 +85,11 @@ describe("Java object wrappers", function () {
 		expect(function () { return impl.super; }).not.toThrow();
 	});
 
+	// Java creates the extended instances in this spec and in "give a Java-created extended
+	// instance ..." by class name, so their extends need a member no other extend has: a
+	// content-keyed class shared with other call sites gets the first one's implementation.
 	it("leave an extended instance Java creates during a JS construction its own JS object", function () {
-		var Inner = java.lang.Object.extend({ toString: function () { return "inner"; } });
+		var Inner = java.lang.Object.extend({ toString: function () { return "inner"; }, nestedConstructionInner: true });
 		var Outer = com.tns.tests.NestedConstruction.extend({ toString: function () { return "outer"; } });
 		var outer = new Outer(new Inner().getClass(), null);
 
@@ -111,7 +114,7 @@ describe("Java object wrappers", function () {
 	});
 
 	it("give a Java-created extended instance its class's current prototype", function () {
-		var Created = java.lang.Object.extend({ toString: function () { return "created"; } });
+		var Created = java.lang.Object.extend({ toString: function () { return "created"; }, javaCreatedPrototype: true });
 		var createdClass = new Created().getClass();
 		com.tns.tests.JavaCreated.newInstance(createdClass);
 		var replacement = Object.create(Object.getPrototypeOf(Created.prototype));

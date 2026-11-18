@@ -6,15 +6,27 @@ public class InputParameters {
     private static final String SHOW_DEPRECATION_WARNINGS = "-show-deprecation-warnings";
     // if the flag is passed the generation will exit on error
     private static final String THROW_ON_ERROR = "-throw-on-error";
+    // name classes of anonymous and named class extends after their content, not their call site
+    private static final String CONTENT_KEYED_BINDINGS = "-content-keyed-bindings";
 
     private static InputParameters current = new InputParameters();
 
     private boolean showDeprecationWarnings;
     private boolean throwOnError;
+    private boolean contentKeyedBindings;
 
     public InputParameters() {
         this.showDeprecationWarnings = false;
         this.throwOnError = false;
+        this.contentKeyedBindings = false;
+    }
+
+    public void setContentKeyedBindings(boolean value) {
+        this.contentKeyedBindings = value;
+    }
+
+    public boolean getContentKeyedBindings() {
+        return contentKeyedBindings;
     }
 
     public void setShowDeprecationWarnings(boolean value) {
@@ -46,6 +58,10 @@ public class InputParameters {
 
                 if (commandArg.equals(THROW_ON_ERROR)) {
                     inputParameters.setThrowOnError(true);
+                }
+
+                if (commandArg.equals(CONTENT_KEYED_BINDINGS)) {
+                    inputParameters.setContentKeyedBindings(true);
                 }
             }
         }

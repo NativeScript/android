@@ -1,8 +1,12 @@
 package org.nativescript.staticbindinggenerator;
 
 import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 public class DataRow {
+    public static final String ACCESSOR_PREFIX = "~";
+
     private final String DELIMITER = "\\*";
     private final int ELEMENT_NUMBER = 9;
     private final String row;
@@ -51,8 +55,24 @@ public class DataRow {
         return newClassName;
     }
 
-    public String[] getMethods() {
-        return methods;
+    /**
+     * The implementation object's members. The JS parser prefixes those an
+     * object literal defines as accessors with {@link #ACCESSOR_PREFIX}; they are
+     * returned as plain names, or left out when {@code includeAccessors} is false.
+     */
+    public String[] getMethods(boolean includeAccessors) {
+        if (methods == null) {
+            return null;
+        }
+        Set<String> result = new LinkedHashSet<>(methods.length);
+        for (String method : methods) {
+            if (!method.startsWith(ACCESSOR_PREFIX)) {
+                result.add(method);
+            } else if (includeAccessors) {
+                result.add(method.substring(ACCESSOR_PREFIX.length()));
+            }
+        }
+        return result.toArray(new String[0]);
     }
 
     public String getFilename() {

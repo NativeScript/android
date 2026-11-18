@@ -75,6 +75,10 @@ require("./tests/testTypedArrayArgs");
 require("./tests/dex-interface-implementation");
 require("./tests/testClassForNameDiscovery");
 require("./tests/testPrebuiltExtendClasses");
+require("./tests/testRuntimeGenerationReport");
+require("./tests/testInterfaceExtendClasses");
+require("./tests/testAppModuleBindings");
+require("./tests/testContentKeyedBindings");
 require("./tests/testProxyRegistrationGc");
 require("./tests/testInterfaceImplementation");
 require("./tests/testPrimitiveCallbackReturns");
@@ -134,5 +138,7 @@ require('./tests/testEsmHttpLoader');
 require('./tests/NapiTests');
 require('./tests/NapiCoverageTests');
 require("./tests/testConcurrentAccess");
+// Checks the runtime generation report, so it goes after every spec that implements an interface
+require("./tests/testInterfaceProxies");
 
 require("./tests/testESModules.mjs");

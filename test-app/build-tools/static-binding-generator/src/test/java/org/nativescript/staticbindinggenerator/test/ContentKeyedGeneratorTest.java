@@ -1,0 +1,336 @@
+package org.nativescript.staticbindinggenerator.test;
+
+import com.example.View;
+
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+import org.mdkt.compiler.InMemoryJavaCompiler;
+import org.nativescript.staticbindinggenerator.ContentKey;
+import org.nativescript.staticbindinggenerator.DataRow;
+import org.nativescript.staticbindinggenerator.Generator;
+import org.nativescript.staticbindinggenerator.InputParameters;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+public class ContentKeyedGeneratorTest {
+
+    @Rule
+    public TemporaryFolder temp = new TemporaryFolder();
+
+    private String classesDir;
+    private File outputDir;
+
+    @Before
+    public void setUp() throws Exception {
+        URL u = View.class.getResource('/' + View.class.getName().replace('.', '/') + ".class");
+        classesDir = new File(u.toURI()).getParentFile().getParentFile().getParentFile().getAbsolutePath();
+        outputDir = temp.newFolder("out");
+    }
+
+    @After
+    public void tearDown() {
+        InputParameters.parseCommand(new String[0]);
+    }
+
+    private Generator generate(boolean contentKeyed, String... rows) throws Exception {
+        InputParameters.parseCommand(contentKeyed ? new String[]{"-content-keyed-bindings"} : new String[0]);
+        File rowsFile = temp.newFile();
+        Files.write(rowsFile.toPath(), Arrays.asList(rows), StandardCharsets.UTF_8);
+        List<DataRow> libs = new ArrayList<>();
+        libs.add(new DataRow(classesDir));
+        Generator generator = new Generator(outputDir, libs);
+        generator.writeBindings(rowsFile.getAbsolutePath());
+        return generator;
+    }
+
+    private List<String> generatedFiles(String packageDir) {
+        File[] files = new File(outputDir, packageDir).listFiles();
+        if (files == null) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(files).map(File::getName).sorted().collect(Collectors.toList());
+    }
+
+    private String read(String path) throws IOException {
+        return new String(Files.readAllBytes(new File(outputDir, path).toPath()), StandardCharsets.UTF_8);
+    }
+
+    private static String key(String... members) {
+        return ContentKey.of("com.example.View", Collections.emptyList(), Arrays.asList(members));
+    }
+
+    @Test
+    public void namesClassExtendsAfterTheirContent() throws Exception {
+        generate(true,
+                "com.example.View*tests_a*3*5**createView***",
+                "com.example.View*tests_a*9*5*Named*createView***",
+                "com.example.MyInterface*tests_a*12*5**getTile***");
+
+        List<String> expected = new ArrayList<>(Arrays.asList("MyInterface.java", "View_" + key("createView") + ".java", "View_Named_" + key("createView") + ".java"));
+        Collections.sort(expected);
+        Assert.assertEquals(expected, generatedFiles("com/tns/gen/com/example"));
+    }
+
+    @Test
+    public void sharesOneClassBetweenCallSitesWithTheSameContent() throws Exception {
+        generate(true,
+                "com.example.View*tests_a*3*5**createView,toString***",
+                "com.example.View*tests_b*7*9**toString,createView,toString,constructor***");
+
+        String name = "View_" + key("createView", "toString");
+        Assert.assertEquals(Collections.singletonList(name + ".java"), generatedFiles("com/tns/gen/com/example"));
+
+        String source = read("com/tns/gen/com/example/" + name + ".java");
+        Class<?> compiled = InMemoryJavaCompiler.compile("com.tns.gen.com.example." + name,
+                source, Arrays.asList("-cp", classesDir));
+        Assert.assertNotNull(compiled);
+    }
+
+    @Test
+    public void keepsCallSiteNamesForNamedExtendsThatCollide() throws Exception {
+        Generator generator = generate(true,
+                "com.example.View*tests_a*10*5*Named*createView***",
+                "com.example.View*tests_b*12*5*Named*createView***",
+                "com.example.View*tests_c*1*1*Unique*createView***",
+                "com.example.View*tests_d***NoLocation*createView***");
+
+        List<String> files = generatedFiles("com/tns/gen/com/example");
+        Assert.assertEquals(4, files.size());
+        Assert.assertTrue(files.toString(), files.stream().anyMatch(f -> f.startsWith("View_tests_a_") && f.endsWith("_10_5_Named.java")));
+        Assert.assertTrue(files.toString(), files.stream().anyMatch(f -> f.startsWith("View_tests_b_") && f.endsWith("_12_5_Named.java")));
+        Assert.assertTrue(files.contains("View_Unique_" + key("createView") + ".java"));
+        Assert.assertTrue(files.contains("View_NoLocation_" + key("createView") + ".java"));
+
+        String collision = "com.tns.gen.com.example.View_Named_" + key("createView");
+        Assert.assertEquals(Collections.singleton(collision), generator.getContentNameCollisions());
+        Assert.assertEquals(1, generator.getWarnings().size());
+        Assert.assertTrue(generator.getWarnings().get(0), generator.getWarnings().get(0).contains("NoLocation"));
+
+        String marker = read("com/tns/gen/ContentKeyedBindings.java");
+        Assert.assertTrue(marker.startsWith(Generator.AUTO_GENERATED_FILE_PROLOGUE));
+        Class<?> markerClass = InMemoryJavaCompiler.compile("com.tns.gen.ContentKeyedBindings", marker, Arrays.asList("-cp", classesDir));
+        Assert.assertArrayEquals(new String[]{collision}, (String[]) markerClass.getField("COLLISIONS").get(null));
+    }
+
+    @Test
+    public void warnsAboutFragmentsWithoutAJavaProxyName() throws Exception {
+        Generator generator = generate(true,
+                "com.example.MyFragment*tests_e*2*3**onResume***",
+                "com.example.MyFragment*****onResume*com.example.NamedFragment*app/f.js*",
+                "com.example.View*tests_e*5*3**createView***");
+
+        Assert.assertEquals(1, generator.getWarnings().size());
+        String warning = generator.getWarnings().get(0);
+        Assert.assertTrue(warning, warning.contains("tests_e:2:3") && warning.contains("@JavaProxy"));
+    }
+
+    @Test
+    public void keepsCallSiteNamesWithoutTheOptIn() throws Exception {
+        Generator generator = generate(false,
+                "com.example.View*tests_a*3*5**createView***",
+                "com.example.View*tests_a*9*5*Named*createView***",
+                "com.example.MyFragment*tests_e*2*3**onResume***");
+
+        List<String> files = generatedFiles("com/tns/gen/com/example");
+        Assert.assertEquals(3, files.size());
+        Assert.assertTrue(files.toString(), files.stream().noneMatch(f -> f.contains("_h")));
+        Assert.assertFalse(new File(outputDir, "com/tns/gen/ContentKeyedBindings.java").exists());
+        Assert.assertTrue(generator.getWarnings().isEmpty());
+        Assert.assertTrue(generator.getContentNameCollisions().isEmpty());
+    }
+
+    private void assertNoAccessorMarkers() throws IOException {
+        try (Stream<Path> paths = Files.walk(outputDir.toPath())) {
+            for (Path file : paths.filter(p -> p.toString().endsWith(".java")).collect(Collectors.toList())) {
+                String source = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+                Assert.assertFalse(file.toString(), source.contains(DataRow.ACCESSOR_PREFIX));
+            }
+        }
+    }
+
+    @Test
+    public void overridesAccessorsWithoutTheOptIn() throws Exception {
+        generate(false,
+                "com.example.View*tests_a*3*5**~createView,~init***",
+                "com.example.View*****toString,~createView*com.example.NamedView*app/f.js*",
+                "com.example.MyInterface*tests_a*12*5**~getTile***");
+        assertNoAccessorMarkers();
+
+        List<String> files = generatedFiles("com/tns/gen/com/example");
+        Assert.assertEquals(files.toString(), 2, files.size());
+        String anonymous = read("com/tns/gen/com/example/" + files.stream().filter(f -> f.startsWith("View_")).findFirst().get());
+        Assert.assertTrue(anonymous, anonymous.contains("createView("));
+        Assert.assertTrue(anonymous, anonymous.contains("\"init\""));
+
+        String named = read("com/example/NamedView.java");
+        Assert.assertTrue(named, named.contains("createView("));
+        Assert.assertTrue(read("com/tns/gen/com/example/MyInterface.java").contains("getTile("));
+    }
+
+    @Test
+    public void leavesAccessorsOutOfContentKeyedBindings() throws Exception {
+        generate(true,
+                "com.example.View*tests_a*3*5**~createView,~init,toString***",
+                "com.example.View*****toString,~createView*com.example.NamedView*app/f.js*",
+                "com.example.MyInterface*tests_a*12*5**~getTile***");
+        assertNoAccessorMarkers();
+
+        String name = "View_" + key("toString");
+        Assert.assertEquals(Arrays.asList("MyInterface.java", name + ".java"), generatedFiles("com/tns/gen/com/example"));
+        String anonymous = read("com/tns/gen/com/example/" + name + ".java");
+        Assert.assertFalse(anonymous, anonymous.contains("createView("));
+        Assert.assertFalse(anonymous, anonymous.contains("\"init\""));
+
+        // Only content-keyed classes leave accessors out.
+        Assert.assertTrue(read("com/example/NamedView.java").contains("createView("));
+        // An interface's abstract methods are implemented whatever the object defines.
+        Assert.assertTrue(read("com/tns/gen/com/example/MyInterface.java").contains("getTile("));
+    }
+
+    private static final String[] ROWS_WITH_A_MISSING_INTERFACE = {
+            "com.example.View*tests_a*3*5**createView***com.example.MissingListener",
+            "com.example.MyInterface*tests_a*5*5**getTile***java.lang.Runnable,com.example.MissingListener",
+            "com.example.View*tests_a*7*5**createView***java.util.MissingListener",
+            "com.example.View*tests_c*1*1*Named*createView***com.example.MissingListener",
+            "com.example.View*tests_d*2*2*Named*createView***com.example.MissingListener",
+            "com.example.MyFragment*tests_e*2*3**onResume***com.example.MissingListener",
+            "com.example.MyInterface*****getTile*com.example.NamedMissing*app/f.js*com.example.MissingListener",
+    };
+
+    private List<String> generateCapturingOutput(boolean contentKeyed, Generator[] generator, String... rows) throws Exception {
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        System.setOut(new PrintStream(captured, true, "UTF-8"));
+        try {
+            generator[0] = generate(contentKeyed, rows);
+        } finally {
+            System.setOut(originalOut);
+        }
+        return Arrays.asList(new String(captured.toByteArray(), StandardCharsets.UTF_8).split("\\R"));
+    }
+
+    private void assertSkipsRowsWithAMissingInterface(boolean contentKeyed) throws Exception {
+        List<String> rows = new ArrayList<>(Arrays.asList(ROWS_WITH_A_MISSING_INTERFACE));
+        rows.add("com.example.View*tests_b*9*5**toString***java.lang.Runnable");
+        rows.add("com.example.View*tests_b*11*5**toString***");
+        Generator[] generator = new Generator[1];
+        List<String> output = generateCapturingOutput(contentKeyed, generator, rows.toArray(new String[0]));
+
+        List<String> files = generatedFiles("com/tns/gen/com/example");
+        Assert.assertEquals(files.toString(), 2, files.size());
+        Assert.assertTrue(files.toString(), files.stream().allMatch(f -> f.startsWith("View_")));
+        Assert.assertFalse(new File(outputDir, "com/example/NamedMissing.java").exists());
+        if (contentKeyed) {
+            Assert.assertTrue(files.contains("View_" + ContentKey.of("com.example.View", Collections.singletonList("java.lang.Runnable"), Collections.singletonList("toString")) + ".java"));
+            Assert.assertTrue(files.contains("View_" + key("toString") + ".java"));
+        }
+        if (contentKeyed) {
+            String collision = "com.tns.gen.com.example.View_Named_" + ContentKey.of("com.example.View", Collections.singletonList("com.example.MissingListener"), Collections.singletonList("createView"));
+            Assert.assertEquals(Collections.singleton(collision), generator[0].getContentNameCollisions());
+            Assert.assertEquals(generator[0].getWarnings().toString(), 1, generator[0].getWarnings().size());
+            Assert.assertTrue(generator[0].getWarnings().get(0), generator[0].getWarnings().get(0).contains("tests_e:2:3") && generator[0].getWarnings().get(0).contains("@JavaProxy"));
+        } else {
+            Assert.assertTrue(generator[0].getWarnings().toString(), generator[0].getWarnings().isEmpty());
+            Assert.assertTrue(generator[0].getContentNameCollisions().isEmpty());
+        }
+
+        for (String row : ROWS_WITH_A_MISSING_INTERFACE) {
+            DataRow dataRow = new DataRow(row);
+            String site = dataRow.getFilename().isEmpty() ? dataRow.getFile() + ":" + dataRow.getLine() + ":" + dataRow.getColumn() : dataRow.getJsFilename();
+            String missing = dataRow.getInterfaces()[dataRow.getInterfaces().length - 1];
+            long lines = output.stream().filter(line -> line.contains(site + " ") && line.contains(missing)).count();
+            Assert.assertEquals(output + " should report " + site, 1, lines);
+        }
+    }
+
+    @Test
+    public void skipsRowsWithAnInterfaceItCannotLoad() throws Exception {
+        assertSkipsRowsWithAMissingInterface(false);
+    }
+
+    @Test
+    public void skipsContentKeyedRowsWithAnInterfaceItCannotLoad() throws Exception {
+        assertSkipsRowsWithAMissingInterface(true);
+    }
+
+    private String[] markerCollisions() throws Exception {
+        String marker = read("com/tns/gen/ContentKeyedBindings.java");
+        Class<?> markerClass = InMemoryJavaCompiler.compile("com.tns.gen.ContentKeyedBindings", marker, Arrays.asList("-cp", classesDir));
+        return (String[]) markerClass.getField("COLLISIONS").get(null);
+    }
+
+    @Test
+    public void listsTheCollisionOfNamedExtendsLeftToTheRuntime() throws Exception {
+        Generator generator = generate(true,
+                "com.example.View*tests_c*1*1*Named*createView***com.example.MissingListener",
+                "com.example.View*tests_d*2*2*Named*createView***com.example.MissingListener");
+
+        String collision = "com.tns.gen.com.example.View_Named_" + ContentKey.of("com.example.View", Collections.singletonList("com.example.MissingListener"), Collections.singletonList("createView"));
+        Assert.assertEquals(Collections.singleton(collision), generator.getContentNameCollisions());
+        Assert.assertArrayEquals(new String[]{collision}, markerCollisions());
+        Assert.assertEquals(Collections.emptyList(), generatedFiles("com/tns/gen/com/example"));
+    }
+
+    // Lookups in the generator's classpath ignore `$` against `.`, so only a java.* name,
+    // which falls back to the system class path, can resolve under one spelling and not
+    // under the other while both have the same content key.
+    @Test
+    public void listsTheCollisionOfANamedExtendLeftToTheRuntimeWithOneItPrebuilds() throws Exception {
+        Generator generator = generate(true,
+                "com.example.View*tests_c*1*1*Named*createView***java.lang.Thread.UncaughtExceptionHandler",
+                "com.example.View*tests_d*2*2*Named*createView***java.lang.Thread$UncaughtExceptionHandler");
+
+        String collision = "com.tns.gen.com.example.View_Named_" + ContentKey.of("com.example.View", Collections.singletonList("java.lang.Thread.UncaughtExceptionHandler"), Collections.singletonList("createView"));
+        Assert.assertEquals(Collections.singleton(collision), generator.getContentNameCollisions());
+        Assert.assertArrayEquals(new String[]{collision}, markerCollisions());
+        List<String> files = generatedFiles("com/tns/gen/com/example");
+        Assert.assertEquals(files.toString(), 1, files.size());
+        Assert.assertTrue(files.toString(), files.get(0).startsWith("View_tests_d_") && files.get(0).endsWith("_2_2_Named.java"));
+    }
+
+    @Test
+    public void sharesTheContentNameOfAnAnonymousExtendLeftToTheRuntime() throws Exception {
+        Generator generator = generate(true,
+                "com.example.View*tests_a*3*5**createView***java.lang.Thread.UncaughtExceptionHandler",
+                "com.example.View*tests_b*4*5**createView***java.lang.Thread$UncaughtExceptionHandler");
+
+        Assert.assertTrue(generator.getContentNameCollisions().isEmpty());
+        Assert.assertEquals(0, markerCollisions().length);
+        Assert.assertEquals(Collections.singletonList("View_" + ContentKey.of("com.example.View", Collections.singletonList("java.lang.Thread.UncaughtExceptionHandler"), Collections.singletonList("createView")) + ".java"),
+                generatedFiles("com/tns/gen/com/example"));
+    }
+
+    @Test
+    public void sharesIdenticalDuplicatesAndRejectsDifferentOnes() throws Exception {
+        generate(false,
+                "com.example.View*tests_a*3*5**createView***",
+                "com.example.View*tests_a*3*5**createView***");
+        Assert.assertEquals(1, generatedFiles("com/tns/gen/com/example").size());
+
+        try {
+            generate(false,
+                    "com.example.View*tests_a*3*5**createView***",
+                    "com.example.View*tests_a*3*5**createView,toString***");
+            Assert.fail("expected the generator to reject two different classes with one name");
+        } catch (IOException e) {
+            Assert.assertTrue(e.getMessage(), e.getMessage().contains("tests_a:3:5") && e.getMessage().contains("different contents"));
+        }
+    }
+}

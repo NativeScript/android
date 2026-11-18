@@ -307,6 +307,48 @@ describe("parser/js_parser tests", function () {
             });
         });
 
+        it("Generated metadata for bindings lists the own data properties the runtime sees", function (done) {
+            let input = path.normalize(path.join(prefix, "content_members", "app")),
+                generatedJavaClassesRoot = path.normalize(path.join(prefix, "content_members", "src", "main", "java"));
+
+            clearOutput();
+
+            execGradle(input, generatedJavaClassesRoot, function (error, stdout, stderr) {
+                if (error) {
+                    console.error(`exec error: ${error}`);
+                    return done.fail(error);
+                }
+                logExecResult(stdout, stderr)
+
+                // JavaClass*file*line*column*NewClass*methods*JavaProxyName*jsFile*interfaces
+                let rows = {};
+                for (let line of fs.readFileSync(sbgBindingOutoutFile, "utf-8").toString().trim().split('\n')) {
+                    let parts = line.trim().split("*");
+                    rows[parts[4]] = parts;
+                }
+
+                expect(rows["LiteralMembers"][5]).toBe("identifierMember,quotedMember,shorthandMember,dataMember,~getterMember,~setterMember,run");
+                expect(rows["LiteralMembers"][8]).toBe("java.lang.Runnable");
+
+                // Accessors are marked with `~`; a redefined name keeps its first
+                // position and the kind of its last definition.
+                expect(rows["AccessorMembers"][5]).toBe("~getOnly,~setOnly,~pair,~quotedAccessor,accessorThenData,~dataThenAccessor,~toString");
+                expect(rows["AccessorInterface"][0]).toBe("java.lang.Runnable");
+                expect(rows["AccessorInterface"][5]).toBe("~run");
+
+                expect(rows["PrototypeMembers"][5]).toBe("toString,quotedPrototypeMember,chainedA,chainedB,sequenceA,sequenceB");
+                expect(rows["PrototypeMembers"][8]).toBe("java.lang.Runnable");
+
+                let source = fs.readFileSync(path.join(input, "members.js"), "utf-8").split("\n");
+                let applyLine = source.findIndex(line => line.indexOf("_super.apply(this, arguments) || this;") > 0);
+                expect(rows["ApplyInDeclaration"][5]).toBe("toString");
+                expect(rows["ApplyInDeclaration"][2]).toBe(String(applyLine + 1));
+                expect(rows["ApplyInDeclaration"][3]).toBe(String(source[applyLine].indexOf("apply(") + 1));
+
+                done();
+            });
+        });
+
         it("Generate valid metadata for bindings where multiple interfaces are implemented using array", function (done) {
             let input = path.normalize(path.join(prefix, "extends_with_interfaces", "app"));
                 generatedJavaClassesRoot = path.normalize(path.join(prefix, "extends_with_interfaces", "src", "main", "java"));

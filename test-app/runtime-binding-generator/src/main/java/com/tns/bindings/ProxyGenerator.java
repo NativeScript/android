@@ -110,17 +110,44 @@ public class ProxyGenerator {
         return bodies.classSuffix + "-" + DefaultMethods.signaturesHash(defaultMethods);
     }
 
+    /**
+     * A new file in dir to write a cache file to before renaming it to its final name in
+     * the same directory. Unique, because several runtimes can write the same file at
+     * once. Its name holds the thumb, so DexFactory's purge of an old thumb also removes
+     * one a killed process left behind, and nothing of the final name, which may already
+     * be as long as the file system allows (Android's createTempFile does not shorten
+     * the prefix to fit). It never ends in .dex or .jar, the names the cache probes.
+     */
+    public static File createCacheTempFile(File dir, String thumb) throws IOException {
+        return File.createTempFile((thumb != null ? thumb : "proxy") + "-", ".tmp", dir);
+    }
+
+    /**
+     * The dex only appears under its final name once complete: DexFactory
+     * trusts any dex that exists, so a process killed mid-write must not leave
+     * a truncated one there.
+     */
     private String saveProxy(String proxyName, byte[] proxyBytes) throws IOException {
         File file = new File(path + File.separator + proxyName + ".dex");
         File parentDir = file.getParentFile();
         if (parentDir != null && !parentDir.exists()) {
             parentDir.mkdirs();
         }
-        file.createNewFile();
-        FileOutputStream stream = new FileOutputStream(file);
-        stream.write(proxyBytes);
-        stream.flush();
-        stream.close();
+        File tempFile = createCacheTempFile(parentDir, proxyThumb);
+        try {
+            FileOutputStream stream = new FileOutputStream(tempFile);
+            try {
+                stream.write(proxyBytes);
+                stream.flush();
+            } finally {
+                stream.close();
+            }
+            if (!tempFile.renameTo(file)) {
+                throw new IOException("Could not move " + tempFile + " to " + file);
+            }
+        } finally {
+            tempFile.delete();
+        }
 
         return file.getAbsolutePath();
     }

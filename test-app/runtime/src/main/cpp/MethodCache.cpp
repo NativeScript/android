@@ -108,6 +108,10 @@ const MethodCache::CacheMethodInfo& MethodCache::ResolveConstructorSignature(con
         constructor_info.clazz = javaClass;
         constructor_info.signature = signature;
         constructor_info.mid = env.GetMethodID(javaClass, "<init>", signature);
+        // Runtime.resolveConstructorSignature answers this for no Java arguments only for an
+        // interface proxy; any other class would need a one-argument call to resolve to it.
+        bool hasJavaArgs = !isInterface && args.Length() > 0;
+        constructor_info.isInterfaceProxy = !hasJavaArgs && signature == "(Ljava/lang/reflect/InvocationHandler;)V";
 
         std::unique_lock<std::shared_mutex> lock(signatureCacheMutex);
         return s_mthod_ctor_signature_cache.emplace(encoded_ctor_signature, constructor_info).first->second;

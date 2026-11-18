@@ -4,6 +4,7 @@ import org.apache.bcel.classfile.JavaClass;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericHierarchyView;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericParameters;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericsAwareClassHierarchyParser;
+import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.UnresolvedTypeParametersException;
 import org.nativescript.staticbindinggenerator.naming.BcelNamingUtil;
 import org.nativescript.staticbindinggenerator.naming.JavaClassNames;
 
@@ -44,7 +45,7 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
 
         if (hasGenericSignature(genericSignatureView)) {
             if (genericSignatureView.hasFormalTypeParameters()) {
-                GenericParameters erasedFormalParameters = getGenericParametersFromErasureOfOwnTypeParameters(genericSignatureView);
+                GenericParameters erasedFormalParameters = getGenericParametersFromErasureOfOwnTypeParameters(javaClass.getClassName(), genericSignatureView);
                 initialClassGenericParameters = erasedFormalParameters;
                 GenericSignatureView reifiedSignatureView = reifyGenericSignatureView(genericSignatureView, erasedFormalParameters);
                 genericSignatureView = reifiedSignatureView;
@@ -58,7 +59,7 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
         return genericHierarchyView;
     }
 
-    private GenericParameters getGenericParametersFromErasureOfOwnTypeParameters(GenericSignatureView genericSignatureView) {
+    private GenericParameters getGenericParametersFromErasureOfOwnTypeParameters(String className, GenericSignatureView genericSignatureView) {
         Map<String, String> resolvedParameters = new HashMap<>();
         List<String> formalTypeParameters = genericSignatureView.getFormalTypeParameterNames();
         Map<String, String> formalTypeParametersBounds = genericSignatureView.getFormalTypeParameterBounds();
@@ -89,6 +90,7 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
         }
 
         while (parametersToLookupLater.size() > 0) {
+            int unresolvedCount = parametersToLookupLater.size();
             ListIterator<Integer> iter = parametersToLookupLater.listIterator();
             while (iter.hasNext()) {
                 int index = iter.next();
@@ -108,6 +110,15 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
                 if (successfullyResolved) {
                     iter.remove();
                 }
+            }
+
+            if (parametersToLookupLater.size() == unresolvedCount) {
+                List<String> unresolved = new ArrayList<>();
+                for (int index : parametersToLookupLater) {
+                    String typeParameter = formalTypeParameters.get(index);
+                    unresolved.add(typeParameter + " extends " + formalTypeParametersBounds.get(typeParameter));
+                }
+                throw new UnresolvedTypeParametersException("the type parameters of " + className + " have bounds that refer back to them: " + String.join(", ", unresolved));
             }
         }
 
@@ -174,7 +185,7 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
             ClassGenericDefinition genericDefinitionFromPreviousSignature = getGenericDefinitionFromView(javaClass, previousGenericSignatureView);
 
             if (genericDefinitionFromPreviousSignature == null) {
-                return getGenericParametersFromErasureOfOwnTypeParameters(genericSignatureView);
+                return getGenericParametersFromErasureOfOwnTypeParameters(javaClass.getClassName(), genericSignatureView);
             }
 
             List<String> providedGenericArguments = genericDefinitionFromPreviousSignature.getGenericArguments();
@@ -189,7 +200,7 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
             return new GenericParameters(genericFormalParameters);
         }
 
-        return getGenericParametersFromErasureOfOwnTypeParameters(genericSignatureView);
+        return getGenericParametersFromErasureOfOwnTypeParameters(javaClass.getClassName(), genericSignatureView);
     }
 
     private List<String> mapValuesToList(Map<String, String> map) {

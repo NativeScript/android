@@ -116,6 +116,33 @@ public class Runtime {
 
     private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
+    private static native void initContentKeyedBindings(String[] collisions);
+
+    /**
+     * The static binding generator adds com.tns.gen.ContentKeyedBindings to an app
+     * whose bindings it names after their content, so the runtime names the classes
+     * it looks up the same way exactly when the generator did. Read once per process,
+     * before the first runtime runs JS.
+     */
+    private static final class ContentKeyedBindings {
+        static final boolean ENABLED = init();
+
+        private static boolean init() {
+            String[] collisions;
+            try {
+                Class<?> marker = Class.forName("com.tns.gen.ContentKeyedBindings", true, Runtime.class.getClassLoader());
+                collisions = (String[]) marker.getField("COLLISIONS").get(null);
+            } catch (ClassNotFoundException e) {
+                return false;
+            } catch (ReflectiveOperationException | ClassCastException e) {
+                android.util.Log.e("JS", "Could not read com.tns.gen.ContentKeyedBindings.COLLISIONS", e);
+                collisions = new String[0];
+            }
+            initContentKeyedBindings(collisions);
+            return true;
+        }
+    }
+
     /**
      * Reports an uncaught exception to JS (WHATWG `error` event, then the
      * `__onUncaughtError` hook). Returns true when an `error` event listener
@@ -522,9 +549,13 @@ public class Runtime {
             if (bound.getRuntimeTag__ns() == 0) {
                 // Before the tag: readers take the id only once they see a tag.
                 bound.setObjectId__ns(objectId);
-                bound.setRuntimeTag__ns(runtimeId + 1);
+                bound.setRuntimeTag__ns(runtimeTagOf(runtimeId));
             }
         }
+    }
+
+    static int runtimeTagOf(int runtimeId) {
+        return runtimeId + 1;
     }
 
     /*
@@ -757,7 +788,7 @@ public class Runtime {
             this.logger = logger;
 
             boolean isMainThread = this.workerId == 0;
-            this.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb, classStorageService, isMainThread);
+            this.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb, classStorageService, isMainThread, appConfig.getInterfaceProxies());
 
             if (logger.isEnabled()) {
                 logger.write("Initializing NativeScript JAVA");
@@ -770,6 +801,10 @@ public class Runtime {
             }
 
             boolean forceConsoleLog = appConfig.getForceLog() || "timeline".equalsIgnoreCase(appConfig.getProfilingMode());
+
+            if (ContentKeyedBindings.ENABLED && logger.isEnabled()) {
+                logger.write("Binding class names are content-keyed");
+            }
 
             initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName,
                     appConfig.getV8Flags(), appConfig.getCodeCache(), appConfig.getProfilerOutputDir(),
@@ -871,8 +906,8 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    private Class<?> resolveClass(String baseClassName, String fullClassName, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
-        Class<?> javaClass = classResolver.resolveClass(baseClassName, fullClassName, dexFactory, methodOverrides, implementedInterfaces, isInterface);
+    private Class<?> resolveClass(String baseClassName, String fullClassName, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface, boolean hasExplicitName) throws ClassNotFoundException, IOException {
+        Class<?> javaClass = classResolver.resolveClass(baseClassName, fullClassName, dexFactory, methodOverrides, implementedInterfaces, isInterface, hasExplicitName);
 
         return javaClass;
     }
@@ -1197,6 +1232,18 @@ public class Runtime {
         return result;
     }
 
+    /*
+     * Takes the place of the Java constructor call for a class DexFactory.resolveClass
+     * returned as an interface proxy. The owner and id are fixed in the handler here, so
+     * nothing goes through initInstance; registerConstructedInstance follows as usual.
+     * defaultOverrides: the instance's mask, as the defaultOverrides__ns field of the
+     * interface's default-overriding class holds it.
+     */
+    @RuntimeCallable
+    private Object newInterfaceProxy(Class<?> proxyClass, int objectId, long defaultOverrides) throws ReflectiveOperationException {
+        return DexFactory.newInterfaceProxy(proxyClass, new InterfaceProxyHandler(runtimeId, objectId, defaultOverrides));
+    }
+
     // One upcall for what native needs after constructing an object from JS.
     @RuntimeCallable
     private long registerConstructedInstance(Object instance, int objectId) {
@@ -1364,6 +1411,10 @@ public class Runtime {
                 objectIdHint = bound.getObjectId__ns();
             }
         }
+        return callJSMethodOfOwner(owningRuntimeId, objectIdHint, javaObject, methodName, retType, isConstructor, delay, args);
+    }
+
+    static Object callJSMethodOfOwner(int owningRuntimeId, int objectIdHint, Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object[] args) throws NativeScriptException {
         Runtime runtime;
 
         if (owningRuntimeId != NO_OWNING_RUNTIME) {
@@ -1504,6 +1555,8 @@ public class Runtime {
         return classStorageService.retrieveClass(className);
     }
 
+    private static final String INTERFACE_PROXY_CONSTRUCTOR_SIGNATURE = "(Ljava/lang/reflect/InvocationHandler;)V";
+
     @RuntimeCallable
     private String resolveConstructorSignature(Class<?> clazz, Object[] args) throws Exception {
         // Pete: cache stuff here, or in the cpp part
@@ -1512,7 +1565,13 @@ public class Runtime {
             logger.write("resolveConstructorSignature: Resolving constructor for class " + clazz.getName());
         }
 
-        String res = MethodResolver.resolveConstructorSignature(clazz, args);
+        String res;
+        if (DexFactory.isInterfaceProxyClass(clazz)) {
+            // Native reads this signature, for no arguments, as "construct with newInterfaceProxy".
+            res = (args == null || args.length == 0) ? INTERFACE_PROXY_CONSTRUCTOR_SIGNATURE : null;
+        } else {
+            res = MethodResolver.resolveConstructorSignature(clazz, args);
+        }
 
         if (res == null) {
             throw new Exception("Failed resolving constructor for class \'" + clazz.getName() + "\' with " + (args != null ? args.length : 0) + " parameters. " + FAILED_CTOR_RESOLUTION_MSG);
@@ -1765,6 +1824,8 @@ public class Runtime {
             return Double.longBitsToDouble(bits);
         }
     }
+
+    static native void registerInterfaceProxyClass(String proxyClassName, String interfaceName);
 
     // shorty: the JNI shorty of the method, return type first; primitive arguments travel as
     // raw bits in primitiveArgs, references in args. A primitive result comes back in

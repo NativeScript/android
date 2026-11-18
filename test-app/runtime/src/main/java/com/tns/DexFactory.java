@@ -14,6 +14,7 @@ import com.tns.system.classes.loading.ClassStorageService;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -23,12 +24,16 @@ import java.io.InputStreamReader;
 import java.io.InvalidClassException;
 import java.io.OutputStreamWriter;
 import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,23 +54,28 @@ public class DexFactory {
     private final ClassStorageService classStorageService;
     private final boolean injectIntoParentClassLoader;
 
+    private final boolean useInterfaceProxies;
+
     private ProxyGenerator proxyGenerator;
     private HashMap<String, Class<?>> injectedDexClasses = new HashMap<String, Class<?>>();
 
     // Process-wide: injection puts a generated class in the app's class loader, where every
     // runtime's lookup of a prebuilt class by that name then finds it.
     private static final Set<String> generatedClassNames = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
+    // Process-wide, like the native class cache that hands a resolved class to every runtime.
+    private static final ConcurrentHashMap<Class<?>, Constructor<?>> interfaceProxyConstructors = new ConcurrentHashMap<Class<?>, Constructor<?>>();
 
     DexFactory(Logger logger, ClassLoader classLoader, File dexBaseDir, String dexThumb, ClassStorageService classStorageService) {
-        this(logger, classLoader, dexBaseDir, dexThumb, classStorageService, false);
+        this(logger, classLoader, dexBaseDir, dexThumb, classStorageService, false, false);
     }
 
-    DexFactory(Logger logger, ClassLoader classLoader, File dexBaseDir, String dexThumb, ClassStorageService classStorageService, boolean injectIntoParentClassLoader) {
+    DexFactory(Logger logger, ClassLoader classLoader, File dexBaseDir, String dexThumb, ClassStorageService classStorageService, boolean injectIntoParentClassLoader, boolean useInterfaceProxies) {
         this.logger = logger;
         this.classLoader = classLoader;
         this.dexDir = dexBaseDir;
         this.dexThumb = dexThumb;
         this.injectIntoParentClassLoader = injectIntoParentClassLoader;
+        this.useInterfaceProxies = useInterfaceProxies;
 
         this.odexDir = new File(this.dexDir, "odex");
         this.proxyGenerator = new ProxyGenerator(this.dexDir.getAbsolutePath());
@@ -88,7 +98,82 @@ public class DexFactory {
     static long totalMultiDexTime = 0;
     static long totalLoadDexTime = 0;
 
-    public Class<?> resolveClass(String baseClassName, String name, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
+    // Process-wide: every runtime (main and workers) has its own DexFactory, and
+    // each one resolves the same classes again, so entries are kept unique.
+    private static final LinkedHashSet<String> runtimeGeneratedClasses = new LinkedHashSet<String>();
+
+    /**
+     * The classes this process resolved without a prebuilt class from the APK,
+     * one line each: {@code <generated|cached|proxy> <interface|class> <loaded name> <requested name>}.
+     * "cached" means the dex was reused from the on-disk dex cache, "proxy" that
+     * the class is a java.lang.reflect.Proxy class (the interfaceProxies option).
+     * The requested name is the one native resolved, which for an interface whose JS
+     * implementation overrides default methods is the interface's class name with
+     * Dump.DEFAULT_OVERRIDING_SUFFIX, whatever the loaded class is named.
+     */
+    public static String[] getRuntimeGeneratedClasses() {
+        synchronized (runtimeGeneratedClasses) {
+            return runtimeGeneratedClasses.toArray(new String[0]);
+        }
+    }
+
+    private static void recordRuntimeGeneratedClass(String requestedName, Class<?> loadedClass, boolean isInterface, String source) {
+        String entry = source + " " + (isInterface ? "interface" : "class") + " " + loadedClass.getName() + " " + requestedName;
+        boolean added;
+        synchronized (runtimeGeneratedClasses) {
+            added = runtimeGeneratedClasses.add(entry);
+        }
+        if (added && com.tns.Runtime.isDebuggable()) {
+            String what = source.equals("generated") ? "Generated class at runtime: "
+                    : source.equals("cached") ? "Loaded runtime-generated class from the dex cache: "
+                    : "Implemented interface with a java.lang.reflect.Proxy: ";
+            Log.i("JS", what + loadedClass.getName() + " (requested as " + requestedName + ")");
+        }
+    }
+
+    static boolean isInterfaceProxyClass(Class<?> clazz) {
+        return interfaceProxyConstructors.containsKey(clazz);
+    }
+
+    static Object newInterfaceProxy(Class<?> proxyClass, InvocationHandler handler) throws ReflectiveOperationException {
+        return interfaceProxyConstructors.get(proxyClass).newInstance(handler);
+    }
+
+    /**
+     * A proxy class for an anonymous implementation of the interface, or null when a
+     * proxy cannot behave like the class that would be generated for it, in which case
+     * the class is generated.
+     */
+    private Class<?> getInterfaceProxyClass(String interfaceName, String requestedName) {
+        try {
+            Class<?> iface = Class.forName(interfaceName, false, classLoader);
+            // The proxy class is defined in this loader, which must see both interfaces; the
+            // boot class loader of platform interfaces cannot see the runtime's.
+            ClassLoader loader = iface.getClassLoader() == Object.class.getClassLoader()
+                    ? NativeScriptRuntimeBound.class.getClassLoader()
+                    : iface.getClassLoader();
+            Class<?> proxyClass = Proxy.getProxyClass(loader, iface, NativeScriptRuntimeBound.class);
+            if (!interfaceProxyConstructors.containsKey(proxyClass)) {
+                Constructor<?> constructor = proxyClass.getConstructor(InvocationHandler.class);
+                // A JS wrapper created for an instance by its class name uses the interface's
+                // metadata, so the mapping is registered before any runtime can see the class.
+                Runtime.registerInterfaceProxyClass(proxyClass.getName().replace('.', '/'), iface.getName().replace('.', '/'));
+                interfaceProxyConstructors.putIfAbsent(proxyClass, constructor);
+            }
+            classStorageService.storeClass(proxyClass.getName(), proxyClass);
+            recordRuntimeGeneratedClass(requestedName, proxyClass, true, "proxy");
+            return proxyClass;
+        } catch (Throwable e) {
+            Log.d("JS", "Generating a class for " + interfaceName + ": a java.lang.reflect.Proxy cannot implement it (" + e + ")");
+            return null;
+        }
+    }
+
+    /**
+     * @param hasExplicitName className is the name the script passed to extend(), which
+     *                        may itself start with com.tns.gen.
+     */
+    public Class<?> resolveClass(String baseClassName, String name, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface, boolean hasExplicitName) throws ClassNotFoundException, IOException {
         // The interface's class name plus this suffix asks for the class that also stubs its
         // default methods. A prebuilt class of the interface is used instead when there is one.
         // Only native asks for it, without a base class name; an extend() name the script
@@ -107,16 +192,43 @@ public class DexFactory {
         }
 
         String fullClassName = className.replace("$", "_");
+
+        // A named proxy (`Base.extend('a.b.C', {...})` / @JavaProxy) asks for
+        // exactly that Java class name; the substitutions below are for the
+        // anonymous form only, where the name is derived from the base.
+        boolean isNamedProxy = !fullClassName.startsWith(COM_TNS_GEN_PREFIX) && fullClassName.contains(".");
+
+        // An anonymous extend of an interface asks for a per-call-site name, but
+        // it gets the class `new Interface({...})` uses, whose body depends only
+        // on the interface. Resolving it under that name lets the APK's prebuilt
+        // class and the dex cache serve every call site. Extra implemented
+        // interfaces add methods the shared class lacks.
+        boolean usesSharedInterfaceClass = !baseClassName.isEmpty() && isInterface && !isNamedProxy && !hasImplementedInterfaces(implementedInterfaces);
+        if (usesSharedInterfaceClass) {
+            fullClassName = COM_TNS_GEN_PREFIX + this.getClassToProxyName(baseClassName).replace("$", "_");
+        }
         String originalFullClassName = fullClassName;
 
         // The static binding generator keeps a `$` from the script's file name in an
         // anonymous extend's class name; the runtime already replaced the base class's `$`.
         Class<?> pregeneratedClass = null;
-        if (!fullClassName.equals(className)) {
-            pregeneratedClass = loadPregeneratedClass(className.replace("-", "_"));
+        if (!usesSharedInterfaceClass || hasExplicitName) {
+            String requestedFullClassName = className.replace("$", "_");
+            if (!requestedFullClassName.equals(className)) {
+                pregeneratedClass = loadPregeneratedClass(className.replace("-", "_"));
+            }
+            if (pregeneratedClass == null) {
+                pregeneratedClass = loadPregeneratedClass(requestedFullClassName.replace("-", "_"));
+            }
         }
-        if (pregeneratedClass == null) {
+        if (pregeneratedClass == null && usesSharedInterfaceClass) {
             pregeneratedClass = loadPregeneratedClass(fullClassName.replace("-", "_"));
+            // Once an extend of the interface has resolved, a later JS override of a default
+            // method gets the class generated for that, not the prebuilt one, which stubs
+            // only the defaults of the call site the generator saw first.
+            if (pregeneratedClass != null) {
+                generatedClassNames.add(pregeneratedClass.getName());
+            }
         }
         // Once injected, the class generated for the interface loads by the same name.
         if (overridesDefaults && pregeneratedClass != null && generatedClassNames.contains(pregeneratedClass.getName())) {
@@ -152,6 +264,14 @@ public class DexFactory {
             classToProxy = this.getClassToProxyName(className);
         }
 
+        if (useInterfaceProxies && isInterface && !isNamedProxy && !hasImplementedInterfaces(implementedInterfaces)) {
+            Class<?> proxyClass = getInterfaceProxyClass(classToProxy, requestedClassName);
+            if (proxyClass != null) {
+                this.injectedDexClasses.put(originalFullClassName, proxyClass);
+                return proxyClass;
+            }
+        }
+
         // strip the `com.tns.gen` off the base extended class name
         String desiredDexClassName = this.getClassToProxyName(fullClassName);
         if (overridesDefaults) {
@@ -159,11 +279,6 @@ public class DexFactory {
             desiredDexClassName = this.getClassToProxyName(className.replace("$", "_"))
                     + ProxyGenerator.defaultOverridingFileSuffix(DefaultMethods.collect(Class.forName(classToProxy)), bodies);
         }
-
-        // A named proxy (`Base.extend('a.b.C', {...})` / @JavaProxy) asks for
-        // exactly that Java class name; the substitutions below are for the
-        // anonymous form only, where the name is derived from the base.
-        boolean isNamedProxy = !fullClassName.startsWith(COM_TNS_GEN_PREFIX) && fullClassName.contains(".");
 
         // An anonymous extend of an interface that lists interfaces of its own gets a class of
         // its call site, under the name asked for, which is also the name a prebuilt class of
@@ -176,19 +291,25 @@ public class DexFactory {
         // when interfaces are extended as classes, we still want to preserve
         // just the interface name without the extra file, line, column information
         if (!baseClassName.isEmpty() && isInterface && !isNamedProxy && !isCallSiteInterfaceClass) {
-            fullClassName = COM_TNS_GEN_PREFIX + classToProxy;
+            fullClassName = COM_TNS_GEN_PREFIX + classToProxy.replace("$", "_");
         }
 
         // The thumb only changes on reinstall, so a cache key of name + thumb
         // cannot see an edit to the proxy's contents: under HMR a named
         // proxy's new method overrides would silently load the previous dex.
-        // The digest carries the contents into the file name.
-        String contentDigest = computeContentDigest(classToProxy, methodOverrides, implementedInterfaces, isInterface);
+        // The digest carries the contents into the file name. The interface's
+        // shared class gets every abstract method whatever the JS object
+        // defines, so its overrides stay out of the key and all its call sites
+        // share one cached dex. A call site's own class stubs the default
+        // methods its JS object names, so its overrides stay in.
+        String[] digestedOverrides = isInterface && !isNamedProxy && !isCallSiteInterfaceClass ? null : methodOverrides;
+        String contentDigest = computeContentDigest(classToProxy, digestedOverrides, implementedInterfaces, isInterface);
 
         File dexFile = this.getDexFile(desiredDexClassName, contentDigest);
+        boolean generated = dexFile == null;
 
         // generate dex file
-        if (dexFile == null) {
+        if (generated) {
             long startGenTime = System.nanoTime();
             if (logger.isEnabled()) {
                 logger.write("generating proxy in place");
@@ -214,18 +335,7 @@ public class DexFactory {
         File jarFile = new File(jarFilePath);
 
         if (!jarFile.exists()) {
-            FileOutputStream jarFileStream = new FileOutputStream(jarFile);
-            ZipOutputStream out = new ZipOutputStream(jarFileStream);
-
-            out.putNextEntry(new ZipEntry("classes.dex"));
-            byte[] dexData = new byte[(int) dexFile.length()];
-            FileInputStream fi = new FileInputStream(dexFile);
-            fi.read(dexData, 0, dexData.length);
-            fi.close();
-
-            out.write(dexData);
-            out.closeEntry();
-            out.close();
+            writeJar(dexFile, jarFile);
         }
         jarFile.setReadOnly();
 
@@ -253,12 +363,13 @@ public class DexFactory {
         }
 
         if (bodies == DefaultMethodBodies.INVOKE_SUPER && !DefaultSuperCalls.verify(result)) {
-            return resolveClass(baseClassName, name, requestedClassName, methodOverrides, implementedInterfaces, isInterface);
+            return resolveClass(baseClassName, name, requestedClassName, methodOverrides, implementedInterfaces, isInterface, hasExplicitName);
         }
 
         generatedClassNames.add(result.getName());
         classStorageService.storeClass(result.getName(), result);
         this.injectedDexClasses.put(originalFullClassName, result);
+        recordRuntimeGeneratedClass(requestedClassName, result, isInterface, generated ? "generated" : "cached");
 
         return result;
     }
@@ -305,6 +416,53 @@ public class DexFactory {
             sbStr.append(array[i]);
         }
         return sbStr.toString();
+    }
+
+    /**
+     * The jar only appears under its final name once complete and read-only:
+     * its existence is the cache hit, so a process killed mid-write must not
+     * leave a truncated one there.
+     */
+    private void writeJar(File dexFile, File jarFile) throws IOException {
+        byte[] dexData = new byte[(int) dexFile.length()];
+        DataInputStream in = new DataInputStream(new FileInputStream(dexFile));
+        try {
+            in.readFully(dexData);
+        } finally {
+            in.close();
+        }
+
+        File tempFile = ProxyGenerator.createCacheTempFile(jarFile.getParentFile(), dexThumb);
+        try {
+            ZipOutputStream out = new ZipOutputStream(new FileOutputStream(tempFile));
+            try {
+                out.putNextEntry(new ZipEntry("classes.dex"));
+                out.write(dexData);
+                out.closeEntry();
+            } finally {
+                out.close();
+            }
+            tempFile.setReadOnly();
+
+            // A runtime that finished first already published identical contents,
+            // and may have a class loader on that file.
+            if (!jarFile.exists() && !tempFile.renameTo(jarFile) && !jarFile.exists()) {
+                throw new IOException("Could not move " + tempFile + " to " + jarFile);
+            }
+        } finally {
+            tempFile.delete();
+        }
+    }
+
+    private static boolean hasImplementedInterfaces(String[] implementedInterfaces) {
+        if (implementedInterfaces != null) {
+            for (String implementedInterface : implementedInterfaces) {
+                if (implementedInterface != null && !implementedInterface.isEmpty()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private Class<?> loadPregeneratedClass(String name) {

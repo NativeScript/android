@@ -19,7 +19,7 @@ public class DataRowTest {
         Assert.assertEquals(row.getLine(), "54");
         Assert.assertEquals(row.getColumn(), "32");
         Assert.assertEquals(row.getNewClassName(), "AppClickListener");
-        Assert.assertEquals(row.getMethods()[0], "onClick");
+        Assert.assertEquals(row.getMethods(true)[0], "onClick");
         Assert.assertEquals(row.getFilename(), "");
         Assert.assertEquals(row.getJsFilename(), "");
         Assert.assertEquals(row.getInterfaces()[0], "");
@@ -36,10 +36,18 @@ public class DataRowTest {
         Assert.assertEquals(row.getLine(), "");
         Assert.assertEquals(row.getColumn(), "");
         Assert.assertEquals(row.getNewClassName(), "");
-        Assert.assertEquals(row.getMethods()[0], "toString");
+        Assert.assertEquals(row.getMethods(true)[0], "toString");
         Assert.assertEquals(row.getFilename(), "com.tns.NativeScriptActivity");
         Assert.assertEquals(row.getJsFilename(), "MyActivity.js");
         Assert.assertEquals(row.getInterfaces()[0], "");
+    }
+
+    @Test
+    public void readsAccessorMembers() {
+        DataRow row = new DataRow("com.example.View*tests_a*3*5**createView,~onClick,~createView,toString***");
+
+        Assert.assertArrayEquals(new String[]{"createView", "onClick", "toString"}, row.getMethods(true));
+        Assert.assertArrayEquals(new String[]{"createView", "toString"}, row.getMethods(false));
     }
 
     @Test
@@ -52,7 +60,7 @@ public class DataRowTest {
         Assert.assertEquals(row.getFilename(), "com.tns.ComplexClass");
         Assert.assertEquals(row.getJsFilename(), "app.js");
 
-        String[] methods = row.getMethods();
+        String[] methods = row.getMethods(true);
         Assert.assertEquals(6, methods.length);
 
         String[] interfaces = row.getInterfaces();

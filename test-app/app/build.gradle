@@ -18,19 +18,33 @@
 *            -PandroidXMaterial=[androidx_material_version]
 *            -PappPath=[app_path]
 *            -PappResourcesPath=[app_resources_path]
+*            -PskipSbgAppClasses  //don't show the app's own Java and Kotlin classes to the static binding generator
+*            -PuseContentBindings  //name the classes of JS subclasses of Java classes after their content
 */
 
 import groovy.json.JsonSlurper
 import groovy.xml.XmlSlurper
 import org.apache.commons.io.FileUtils
+import org.objectweb.asm.ClassReader
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
 
 import javax.inject.Inject
+import javax.lang.model.SourceVersion
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
+import javax.tools.Diagnostic
+import javax.tools.DiagnosticCollector
+import javax.tools.StandardLocation
+import javax.tools.ToolProvider
 
 import static org.gradle.internal.logging.text.StyledTextOutput.Style
 
@@ -488,8 +502,477 @@ if (failOnCompilationWarningsEnabled()) {
 ///////////////////////////// EXECUTION PHASE /////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
+def SBG_APP_CLASSES_DIR = layout.buildDirectory.dir("nativescript/sbg-app-classes")
+// An annotation processor can change the shape of the classes it processes (add or remove
+// constructors and methods), which the step's compile without processors cannot see, so
+// declaring any for the app's main compile turns the step off. Read only once
+// configuration is over, from the declared dependencies, without resolving anything.
+def appAnnotationProcessorConfigurations = null
+def sbgAppClassesEnabled = { ->
+    if (project.hasProperty("skipSbgAppClasses")) {
+        def value = project.property("skipSbgAppClasses").toString()
+        if (value.isEmpty() || value.toBoolean()) {
+            return false
+        }
+    }
+    if (appAnnotationProcessorConfigurations == null) {
+        appAnnotationProcessorConfigurations = configurations.findAll { configuration ->
+            def name = configuration.name
+            def processors = name.toLowerCase().contains("annotationprocessor") || name.startsWith("kapt")
+            def forTests = name ==~ /^(test|androidTest|kaptTest|kaptAndroidTest).*|.*(UnitTest|AndroidTest).*/
+            return processors && !forTests && !configuration.dependencies.isEmpty()
+        }*.name.sort()
+        if (!appAnnotationProcessorConfigurations.isEmpty()) {
+            logger.info("compileAppClassesForSbg: skipped, as the app declares annotation processors (${appAnnotationProcessorConfigurations.join(', ')}), which can change classes in ways it cannot see")
+        }
+    }
+    return appAnnotationProcessorConfigurations.isEmpty()
+}
+
+// The static binding generator runs before javac and kotlinc, so on its own it cannot see
+// the classes and interfaces declared in this module's sources (App_Resources) and leaves
+// every JS subclass of them to be generated on the device. This compiles them for it alone.
+// Best-effort: sources that only compile together with the rest of the build (annotation
+// processors, generated code) are left out, and any failure leaves the generator exactly
+// as it would be without this task. The generator leaves the JS subclasses of these classes
+// it cannot write a binding for to the runtime, and runSbg drops the bindings javac rejects.
+// -PskipSbgAppClasses turns it off, as does an annotation processor of the app.
+//
+// The generator fails the build on a JS subclass of a class whose supertypes it cannot
+// load, so every class written here must compile against the others alone. Kotlin is
+// therefore compiled against the Java classes that compiled on their own, never against
+// Java sources, and the Java sources that need Kotlin are compiled after it.
+tasks.register("compileAppClassesForSbg") {
+    dependsOn "collectAllJars"
+    onlyIf { sbgAppClassesEnabled() }
+
+    def classesDir = SBG_APP_CLASSES_DIR
+    def dependenciesFile = file("$BUILD_TOOLS_PATH/$SBG_JAVA_DEPENDENCIES")
+    // The first line of the static binding generator's Generator.AUTO_GENERATED_FILE_PROLOGUE.
+    // It writes named classes (`extend("a.b.C", ...)`, @JavaProxy) outside com/tns/gen too.
+    def sbgSourcePrefix = "/* AUTO-GENERATED FILE. DO NOT MODIFY.".getBytes(StandardCharsets.UTF_8)
+    def sources = fileTree(OUTPUT_JAVA_DIR) {
+        include "**/*.java"
+        exclude "com/tns/gen/**"
+    }.filter { File source ->
+        try {
+            !source.withInputStream { Arrays.equals(it.readNBytes(sbgSourcePrefix.length), sbgSourcePrefix) }
+        } catch (IOException ignored) {
+            true
+        }
+    }
+    def kotlinSources = fileTree(OUTPUT_JAVA_DIR) { include "**/*.kt" }
+    def sourceLevel = provider { android.compileOptions.sourceCompatibility.toString() }
+    def targetLevel = provider { android.compileOptions.targetCompatibility.toString() }
+    def sourceEncoding = provider { android.compileOptions.encoding ?: "UTF-8" }
+
+    // The bindings are compiled against compileKotlin's classes, so these must have the same
+    // shape: internal members are mangled with the module name, and compiler plugins and the
+    // jvm-default mode decide which methods exist and which are abstract.
+    // With product flavors several variants share the build type; the one the requested tasks
+    // name is preferred, as the bindings are generated once for all of them.
+    def kotlinCompileTaskName = { ->
+        def suffix = "${project.selectedBuildType.capitalize()}Kotlin"
+        def candidates = tasks.names.findAll { it.startsWith("compile") && it.endsWith(suffix) }.sort()
+        def requested = gradle.startParameter.taskNames.collect { it.toLowerCase() }
+        return candidates.find { name ->
+            def variant = name.substring("compile".length(), name.length() - "Kotlin".length()).toLowerCase()
+            requested.any { it.contains(variant) }
+        } ?: candidates[0]
+    }
+    def kotlinCompilation = provider {
+        if (kotlinSources.isEmpty()) {
+            return [:]
+        }
+        try {
+            def compileTask = tasks.getByName(kotlinCompileTaskName())
+            def options = compileTask.compilerOptions
+            def arguments = ["-module-name", options.moduleName.get(), "-jvm-target", options.jvmTarget.get().target]
+            if (options.languageVersion.isPresent()) {
+                arguments += ["-language-version", options.languageVersion.get().version]
+            }
+            if (options.apiVersion.isPresent()) {
+                arguments += ["-api-version", options.apiVersion.get().version]
+            }
+            if (options.hasProperty("jvmDefault") && options.jvmDefault.isPresent()) {
+                arguments += "-jvm-default=${options.jvmDefault.get().compilerArgument}"
+            }
+            if (options.noJdk.getOrElse(false)) {
+                arguments += "-no-jdk"
+            }
+            arguments += options.optIn.get().collect { "-opt-in=$it" }
+            arguments += options.freeCompilerArgs.get().findAll { it != "-Werror" }
+            arguments += compileTask.pluginClasspath.files.collect { "-Xplugin=${it.absolutePath}" }
+            return [version: org.jetbrains.kotlin.gradle.plugin.KotlinPluginWrapperKt.getKotlinPluginVersion(project), arguments: arguments]
+        } catch (Exception | LinkageError e) {
+            return [unavailable: e.toString()]
+        }
+    }
+
+    inputs.files(sources).skipWhenEmpty().withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("sources")
+    inputs.files(kotlinSources).skipWhenEmpty().ignoreEmptyDirectories().withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("kotlinSources")
+    inputs.files(provider {
+        dependenciesFile.exists() ? dependenciesFile.readLines().findAll { it } : []
+    }).withPropertyName("classpath")
+    inputs.property("sourceLevel", sourceLevel)
+    inputs.property("targetLevel", targetLevel)
+    inputs.property("sourceEncoding", sourceEncoding)
+    inputs.property("kotlinCompilation", kotlinCompilation)
+    outputs.dir(classesDir).withPropertyName("classes")
+
+    doLast {
+        def outDir = classesDir.get().asFile
+        outDir.deleteDir()
+        outDir.mkdirs()
+
+        def classpath = dependenciesFile.readLines().findAll { it }
+        def javaSources = sources.files.sort()
+        def kotlinFiles = kotlinSources.files.sort()
+
+        def compileJava = { List<File> files, List<String> compileClasspath, File classOutput ->
+            compileJavaLeavingOutFailures(files, compileClasspath, classOutput,
+                    [source: sourceLevel.get(), target: targetLevel.get(), encoding: sourceEncoding.get()], 20)
+        }
+
+        try {
+            def javaDir = new File(outDir, "java")
+            def java = javaSources.isEmpty() ? [compiled: true, leftOut: [], error: null] : compileJava(javaSources, classpath, javaDir)
+            if (!java.compiled) {
+                javaDir.deleteDir()
+            }
+
+            def javaLeftOut = java.leftOut
+            def javaError = java.error
+            if (!kotlinFiles.isEmpty()) {
+                def kotlinDir = new File(outDir, "kotlin")
+                def kotlinClasspath = java.compiled ? classpath + javaDir.absolutePath : classpath
+                def kotlinCompiled = compileKotlinForSbg(kotlinCompilation.get(), kotlinFiles, kotlinClasspath, kotlinDir, temporaryDir, logger)
+                if (kotlinCompiled) {
+                    leaveOutClassesBindingsCannotImplement(kotlinDir, logger)
+                }
+                if (kotlinCompiled && !javaLeftOut.isEmpty()) {
+                    def onKotlinDir = new File(outDir, "java-on-kotlin")
+                    def onKotlin = compileJava(javaLeftOut, kotlinClasspath + kotlinDir.absolutePath, onKotlinDir)
+                    if (onKotlin.compiled) {
+                        javaLeftOut = onKotlin.leftOut
+                        javaError = onKotlin.error
+                    } else {
+                        onKotlinDir.deleteDir()
+                    }
+                }
+            }
+
+            if (!java.compiled && javaLeftOut.size() == javaSources.size()) {
+                logger.warn("compileAppClassesForSbg: the app's Java sources did not compile on their own, so the app's own Java classes get no prebuilt bindings (${java.error})")
+            } else if (!javaLeftOut.isEmpty()) {
+                def names = javaLeftOut.collect { it.name }.sort()
+                logger.info("compileAppClassesForSbg: ${javaLeftOut.size()} of ${javaSources.size()} Java sources get no prebuilt bindings because they only compile with the rest of the build: ${names.take(5).join(', ')}${names.size() > 5 ? ', ...' : ''} (${javaError})")
+            }
+        } catch (Exception | LinkageError e) {
+            outDir.deleteDir()
+            outDir.mkdirs()
+            logger.warn("compileAppClassesForSbg: the app's own classes get no prebuilt bindings: ${e}")
+        }
+    }
+}
+
+// javac writes no class files after its first error, so each failing round leaves out the
+// sources that reported errors and compiles the rest again. A round that cannot leave any
+// source out (stuck) or the last of maxRounds ends the loop. errors maps each left-out
+// source to its first error. With -Werror among extraOptions a warning counts as an error
+// of its source.
+def compileJavaLeavingOutFailures(List<File> files, List<String> classpath, File classOutput, Map levels, int maxRounds, List<String> extraOptions = []) {
+    def remaining = new ArrayList<File>(files)
+    def leftOut = []
+    def errorsBySource = [:]
+    def errorDiagnostics = []
+    def firstError = null
+    def compiled = false
+    def stuck = false
+    def compiler = ToolProvider.getSystemJavaCompiler()
+    if (compiler == null) {
+        return [compiled: false, stuck: true, leftOut: files, errors: [:], diagnostics: [], error: "${System.getProperty('java.home')} has no Java compiler"]
+    }
+    def describe = { Diagnostic d -> d.getMessage(Locale.ROOT).readLines().take(2).join(" ").replaceAll(/\s+/, " ") }
+    // Only the files passed are compiled: javac would otherwise compile a source it finds
+    // on the classpath, such as one a dependency jar ships, into classOutput.
+    def warningsAreErrors = extraOptions.contains("-Werror")
+    def options = ["-proc:none", "-Xmaxerrs", "100000", "-Xmaxwarns", "100000", "-implicit:none",
+                   "-source", levels.source, "-target", levels.target,
+                   "-encoding", levels.encoding,
+                   "-classpath", classpath.join(File.pathSeparator),
+                   "-d", classOutput.absolutePath] + (warningsAreErrors ? [] : ["-nowarn"]) + extraOptions
+    classOutput.mkdirs()
+    for (int round = 0; round < maxRounds && !remaining.isEmpty() && !compiled; round++) {
+        def diagnostics = new DiagnosticCollector()
+        def fileManager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, Charset.forName(levels.encoding))
+        try {
+            fileManager.setLocation(StandardLocation.SOURCE_PATH, [])
+            def units = fileManager.getJavaFileObjectsFromFiles(remaining).toList()
+            def sourceByUri = [units, remaining].transpose().collectEntries { unit, source -> [(unit.toUri()): source] }
+            compiled = compiler.getTask(new StringWriter(), fileManager, diagnostics, options, null, units).call()
+            if (!compiled) {
+                // javac adds an error of no source to the warnings -Werror turned into errors.
+                def errors = diagnostics.diagnostics.findAll {
+                    it.kind == Diagnostic.Kind.ERROR
+                            ? it.code != "compiler.err.warnings.and.werror" || !warningsAreErrors
+                            : warningsAreErrors && (it.kind == Diagnostic.Kind.WARNING || it.kind == Diagnostic.Kind.MANDATORY_WARNING)
+                }
+                errorDiagnostics.addAll(errors.collect { [code: it.code, message: it.getMessage(Locale.ROOT)] })
+                if (firstError == null && !errors.isEmpty()) {
+                    firstError = describe(errors[0])
+                }
+                def failing = errors.collect { it.source == null ? null : sourceByUri[it.source.toUri()] }.toSet()
+                if (failing.isEmpty() || failing.contains(null)) {
+                    stuck = true
+                    break
+                }
+                errors.each { error ->
+                    errorsBySource.putIfAbsent(sourceByUri[error.source.toUri()], describe(error))
+                }
+                remaining.removeAll(failing)
+                leftOut.addAll(failing)
+            }
+        } finally {
+            fileManager.close()
+        }
+        if (!compiled) {
+            classOutput.deleteDir()
+            classOutput.mkdirs()
+        }
+    }
+    if (!compiled && !remaining.isEmpty()) {
+        return [compiled: false, stuck: stuck, leftOut: files, errors: errorsBySource, diagnostics: errorDiagnostics, error: firstError]
+    }
+    return [compiled: true, stuck: false, leftOut: leftOut, errors: errorsBySource, diagnostics: errorDiagnostics, error: firstError]
+}
+
+// Bindings written for call sites that involve the app's own classes, which only
+// compileAppClassesForSbg shows the static binding generator, are compiled on their own
+// first: the class of a call site whose binding javac rejects is generated at runtime, as
+// without that task. Whatever keeps this check from telling a bad binding from an
+// incomplete classpath skips it, and the app's compile decides as it would without it.
+// compilerArgs are those the app's compile adds that make it reject more than javac does by
+// default; a binding only that compile would reject is left to the runtime too.
+def leaveOutAppBindingsJavacRejects(File appBindingsList, List<String> dependencies, File appClassesDir, Map levels, List<String> compilerArgs, File temporaryDir, Logger logger) {
+    if (!appBindingsList.isFile()) {
+        return
+    }
+    def bindings = appBindingsList.readLines("UTF-8").findAll { it }.collect { new File(it) }.findAll { it.isFile() }.unique()
+    if (bindings.isEmpty()) {
+        return
+    }
+    def skip = { String reason ->
+        logger.warn("runSbg: the prebuilt bindings of the app's own classes were not checked, so the app's compile checks them (${reason})")
+    }
+    def trialDir = new File(temporaryDir, "sbg-app-bindings-trial")
+    try {
+        def appClassesPath = appClassesDir.canonicalPath
+        def classpath = dependencies.findAll { new File(it).canonicalPath != appClassesPath } +
+                ["java", "kotlin", "java-on-kotlin"].collect { new File(appClassesDir, it) }.findAll { it.isDirectory() }*.absolutePath
+
+        // The runtime library's classes are not app classes: without them every binding fails.
+        trialDir.deleteDir()
+        def probe = new File(trialDir, "probe/SbgBindingClasspathProbe.java")
+        probe.parentFile.mkdirs()
+        probe.setText("class SbgBindingClasspathProbe { com.tns.Runtime a; com.tns.NativeScriptHashCodeProvider b; com.tns.NativeScriptRuntimeBound c; com.tns.JavaScriptImplementation d; }", "UTF-8")
+        def probed = compileJavaLeavingOutFailures([probe], classpath, new File(trialDir, "probe-classes"), levels, 1)
+        if (!probed.compiled || !probed.leftOut.isEmpty()) {
+            skip("the runtime's classes are missing from the classpath: ${probed.error ?: 'javac failed'}")
+            return
+        }
+
+        def result = compileJavaLeavingOutFailures(bindings, classpath, new File(trialDir, "classes"), levels, 10, compilerArgs)
+        if (result.stuck) {
+            skip(result.error ?: "javac failed")
+            return
+        }
+        // The runtime classes bindings use: from the runtime library, and RuntimeHelper from
+        // the app's sources, which may not have compiled on their own.
+        def runtimeClasses = ["Runtime", "RuntimeHelper", "NativeScriptHashCodeProvider", "NativeScriptRuntimeBound", "JavaScriptImplementation"]
+        def runtimeClassMissing = result.diagnostics.find { error ->
+            def unresolved = error.code.startsWith("compiler.err.cant.resolve") || error.code == "compiler.err.doesnt.exist"
+            return unresolved && ((error.message =~ /(?m)location: package com\.tns\s*$|package com\.tns does not exist/).find() ||
+                    runtimeClasses.any { error.message.contains("com.tns.${it}") })
+        }
+        if (runtimeClassMissing) {
+            skip(runtimeClassMissing.message.readLines().take(3).join(" ").replaceAll(/\s+/, " "))
+            return
+        }
+        result.errors.each { File binding, String error ->
+            binding.delete()
+            logger.info("runSbg: ${binding.absolutePath} is left to be generated at runtime: javac rejects it (${error})")
+        }
+    } catch (Exception | LinkageError e) {
+        skip(e.toString())
+    } finally {
+        trialDir.deleteDir()
+    }
+}
+
+// A generated binding is Java source that every build variant compiles, so it cannot
+// implement an abstract method whose JVM name is not a Java identifier (Kotlin mangles
+// functions taking or returning value classes with a '-'), nor an internal one, whose name
+// carries the variant's module name. Classes with such abstract methods, and the classes
+// written here that extend them, are left to be generated on the device.
+def leaveOutClassesBindingsCannotImplement(File classDir, Logger logger) {
+    def supertypes = [:]
+    def files = [:]
+    def leftOut = [] as Set
+    classDir.eachFileRecurse(groovy.io.FileType.FILES) { File file ->
+        if (!file.name.endsWith(".class")) {
+            return
+        }
+        def reader = new ClassReader(file.bytes)
+        def unimplementable = [false]
+        reader.accept(new ClassVisitor(Opcodes.ASM9) {
+            @Override
+            MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                if ((access & Opcodes.ACC_ABSTRACT) != 0 && (name.contains('$') || !SourceVersion.isName(name))) {
+                    unimplementable[0] = true
+                }
+                return null
+            }
+        }, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES)
+        def name = reader.className
+        files[name] = file
+        supertypes[name] = ([reader.superName] + (reader.interfaces as List)).findAll { it }
+        if (unimplementable[0]) {
+            leftOut << name
+        }
+    }
+    def added = true
+    while (added) {
+        added = false
+        supertypes.each { name, types ->
+            if (!leftOut.contains(name) && types.any { leftOut.contains(it) }) {
+                leftOut << name
+                added = true
+            }
+        }
+    }
+    leftOut.each { files[it].delete() }
+    if (!leftOut.isEmpty()) {
+        def names = leftOut.collect { it.replace('/', '.') }.sort()
+        logger.info("compileAppClassesForSbg: ${names.size()} Kotlin classes get no prebuilt bindings because a binding cannot implement their internal or name-mangled abstract methods: ${names.take(5).join(', ')}${names.size() > 5 ? ', ...' : ''}")
+    }
+}
+
+// Compiles the app's Kotlin sources for compileAppClassesForSbg with the compiler of the
+// Kotlin Gradle plugin, in a separate JVM so the compiler's classes never stay loaded in the
+// Gradle daemon. Like javac, kotlinc writes nothing after an error, so each failing round
+// leaves out the sources that reported errors. Each round costs a compiler start and can
+// only expose the sources that used the ones just left out, so the rounds are capped.
+// Returns whether classes were written.
+def compileKotlinForSbg(Map compilation, List<File> kotlinFiles, List<String> dependencies, File classOutput, File temporaryDir, Logger logger) {
+    def fail = { String reason ->
+        classOutput.deleteDir()
+        logger.warn("compileAppClassesForSbg: the app's Kotlin classes get no prebuilt bindings (${reason})")
+        return false
+    }
+    if (!compilation.arguments) {
+        return fail(compilation.unavailable ?: "no Kotlin compile task")
+    }
+    def compilerClasspath = configurations.findByName("kotlinCompilerClasspath")
+    if (compilerClasspath == null) {
+        return fail("no kotlinCompilerClasspath configuration")
+    }
+
+    try {
+        return runKotlincRounds(compilerClasspath, compilation.arguments, kotlinFiles, dependencies, classOutput, temporaryDir, logger, fail)
+    } catch (Exception | LinkageError e) {
+        return fail(e.toString())
+    }
+}
+
+def runKotlincRounds(FileCollection compilerClasspath, List<String> compilerArguments, List<File> kotlinFiles, List<String> dependencies,
+                     File classOutput, File temporaryDir, Logger logger, Closure<Boolean> fail) {
+    def remaining = new ArrayList<File>(kotlinFiles)
+    def leftOut = []
+    def firstError = null
+    def sourceByPath = kotlinFiles.collectEntries { [(it.canonicalPath): it] }
+    def quoteArgument = { String argument -> '"' + argument.replace('\\', '\\\\').replace('"', '\\"') + '"' }
+    def argumentFile = new File(temporaryDir, "kotlinc-arguments.txt")
+    def jvmArgumentFile = new File(temporaryDir, "kotlinc-jvm-arguments.txt")
+    def outputFile = new File(temporaryDir, "kotlinc-output.txt")
+    jvmArgumentFile.withWriter("UTF-8") { out ->
+        ["-Dorg.jetbrains.kotlin.cliMessageRenderer=XML", "-cp", compilerClasspath.asPath].each { out.println(quoteArgument(it)) }
+    }
+    def javaExecutable = new File(System.getProperty("java.home"), System.getProperty("os.name").toLowerCase().contains("windows") ? "bin/java.exe" : "bin/java")
+    // A compiler that never finishes must not hang the build: all rounds share this budget.
+    def deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(10)
+    for (int round = 0; round < 5 && !remaining.isEmpty(); round++) {
+        classOutput.deleteDir()
+        classOutput.mkdirs()
+        def arguments = compilerArguments + ["-nowarn", "-no-stdlib", "-no-reflect",
+                "-classpath", dependencies.join(File.pathSeparator), "-d", classOutput.absolutePath] + remaining*.absolutePath
+        argumentFile.withWriter("UTF-8") { out ->
+            arguments.each { out.println(quoteArgument(it)) }
+        }
+        def process = new ProcessBuilder(javaExecutable.absolutePath, "@${jvmArgumentFile.absolutePath}", "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler", "@${argumentFile.absolutePath}")
+                .redirectErrorStream(true)
+                .redirectOutput(outputFile)
+                .start()
+        def finished = false
+        try {
+            finished = process.waitFor(Math.max(0L, deadline - System.nanoTime()), TimeUnit.NANOSECONDS)
+        } finally {
+            if (!finished) {
+                process.destroyForcibly()
+            }
+        }
+        if (!finished) {
+            return fail("kotlinc did not finish within 10 minutes")
+        }
+        def exitValue = process.exitValue()
+        if (exitValue == 0) {
+            if (!leftOut.isEmpty()) {
+                def names = leftOut.collect { it.name }.sort()
+                logger.info("compileAppClassesForSbg: ${leftOut.size()} of ${kotlinFiles.size()} Kotlin sources get no prebuilt bindings because they only compile with the rest of the build: ${names.take(5).join(', ')}${names.size() > 5 ? ', ...' : ''} (${firstError})")
+            }
+            return true
+        }
+
+        def output = outputFile.getText("UTF-8")
+        def start = output.indexOf("<MESSAGES>")
+        def end = output.lastIndexOf("</MESSAGES>")
+        def errors = []
+        if (start >= 0 && end > start) {
+            errors = new XmlSlurper().parseText(output.substring(start, end + "</MESSAGES>".length())).children()
+                    .findAll { it.name().equalsIgnoreCase("error") || it.name().equalsIgnoreCase("exception") }
+                    .collect { [path: it.@path.text(), message: it.text().readLines().take(2).join(" ").replaceAll(/\s+/, " ")] }
+        }
+        if (firstError == null && !errors.isEmpty()) {
+            firstError = errors[0].message
+        }
+        def failing = errors.collect { it.path ? sourceByPath[new File(it.path).canonicalPath] : null }.toSet()
+        if (exitValue != 1 || errors.isEmpty() || failing.contains(null)) {
+            return fail("kotlinc exited with ${exitValue}: ${firstError ?: output.readLines().find { it.trim() } ?: 'no message'}")
+        }
+        remaining.removeAll(failing)
+        leftOut.addAll(failing)
+    }
+    return fail("the sources did not compile on their own: ${firstError}")
+}
+
+// Name the Java classes of JS subclasses of Java classes after what they contain instead
+// of where their extend() call is. Off unless the app sets -PuseContentBindings or
+// `project.ext.useContentBindings = true` in App_Resources/Android/app.gradle or
+// before-plugins.gradle. The runtime follows the class the generator then adds to the app.
+def useContentBindings = { ->
+    if (!project.hasProperty("useContentBindings")) {
+        return false
+    }
+    def value = project.property("useContentBindings").toString()
+    return value.isEmpty() || value.toBoolean()
+}
+
 task runSbg(type: BuildToolTask) {
     dependsOn "collectAllJars"
+    dependsOn "compileAppClassesForSbg"
+    inputs.files(tasks.named("compileAppClassesForSbg")).withPropertyName("appClasses")
+    inputs.property("sbgAppClassesEnabled", provider { sbgAppClassesEnabled() })
+    inputs.property("useContentBindings", provider { useContentBindings() })
     def rootPath = ""
     if (!findProject(':static-binding-generator').is(null)) {
         rootPath = Paths.get(project(':static-binding-generator').projectDir.path, "build/libs").toString()
@@ -514,8 +997,52 @@ task runSbg(type: BuildToolTask) {
 
     args paramz
 
+    def sbgDependenciesFile = file("$BUILD_TOOLS_PATH/$SBG_JAVA_DEPENDENCIES")
+    def sbgWarningsFile = file("$BUILD_TOOLS_PATH/sbg-warnings.txt")
+    // Tells the generator which of its dependencies hold the app's own classes.
+    def sbgAppClassesFile = file("$BUILD_TOOLS_PATH/sbg-app-classes.txt")
+    // Written by the generator: the bindings of call sites that involve those classes.
+    def sbgAppBindingsFile = file("$BUILD_TOOLS_PATH/sbg-app-bindings.txt")
+    def javaLevels = provider {
+        [source: android.compileOptions.sourceCompatibility.toString(),
+         target: android.compileOptions.targetCompatibility.toString(),
+         encoding: android.compileOptions.encoding ?: "UTF-8"]
+    }
     doFirst {
         new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir()
+        sbgAppBindingsFile.delete()
+        sbgAppClassesFile.delete()
+
+        // Not written by collectAllJars: the metadata generator reads the real compiled classes.
+        def appClassesDir = SBG_APP_CLASSES_DIR.get().asFile
+        if (sbgAppClassesEnabled() && appClassesDir.isDirectory()) {
+            sbgDependenciesFile.withWriterAppend { it.println(appClassesDir.absolutePath) }
+            sbgAppClassesFile.withWriter("UTF-8") { it.println(appClassesDir.absolutePath) }
+        }
+
+        if (useContentBindings()) {
+            args("-content-keyed-bindings")
+        }
+    }
+    doLast {
+        if (sbgAppBindingsFile.isFile()) {
+            try {
+                // The lint options that only concern how javac is invoked are left out: this
+                // compile has another classpath and no Android boot classpath.
+                def compilerArgs = failOnCompilationWarningsEnabled() ? ["-Xlint:all,-options,-path", "-Werror"] : []
+                leaveOutAppBindingsJavacRejects(sbgAppBindingsFile, sbgDependenciesFile.readLines().findAll { it },
+                        SBG_APP_CLASSES_DIR.get().asFile, javaLevels.get(), compilerArgs, temporaryDir, logger)
+            } catch (Exception | LinkageError e) {
+                logger.warn("runSbg: the prebuilt bindings of the app's own classes were not checked, so the app's compile checks them (${e})")
+            }
+        }
+
+
+        // The generator's standard output only reaches runSbg.log, and the
+        // NativeScript CLI runs gradle with --quiet, which hides the warn level.
+        if (sbgWarningsFile.isFile()) {
+            sbgWarningsFile.eachLine { logger.quiet("runSbg: ${it}") }
+        }
     }
 }
 

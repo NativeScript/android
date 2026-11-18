@@ -3,6 +3,7 @@
 #include "NativeScriptException.h"
 #include "CallbackHandlers.h"
 #include "ArgConverter.h"
+#include "MetadataNode.h"
 #include <cstring>
 #include <sstream>
 #include <vector>
@@ -385,8 +386,30 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_ResetDateTimeConfigurationCache(J
     isolate->DateTimeConfigurationChangeNotification(Isolate::TimeZoneDetection::kRedetect);
 }
 
+extern "C" JNIEXPORT void Java_com_tns_Runtime_initContentKeyedBindings(JNIEnv* _env, jclass clazz, jobjectArray collisions) {
+    vector<string> names;
+    jsize length = collisions == nullptr ? 0 : _env->GetArrayLength(collisions);
+    for (jsize i = 0; i < length; i++) {
+        auto name = static_cast<jstring>(_env->GetObjectArrayElement(collisions, i));
+        if (name != nullptr) {
+            names.push_back(ArgConverter::jstringToString(name));
+            _env->DeleteLocalRef(name);
+        }
+    }
+    MetadataNode::InitContentKeyedBindings(names);
+}
+
 extern "C" JNIEXPORT void Java_com_tns_Runtime_setAdmissionSpinMicros(JNIEnv* _env, jclass clazz, jint micros) {
     AdmissionGate::s_spinMicros.store(micros, std::memory_order_relaxed);
+}
+
+extern "C" JNIEXPORT void Java_com_tns_Runtime_registerInterfaceProxyClass(JNIEnv* env, jclass, jstring proxyClassName, jstring interfaceName) {
+    try {
+        MetadataNode::RegisterInterfaceProxyClass(ArgConverter::jstringToString(proxyClassName), ArgConverter::jstringToString(interfaceName));
+    } catch (NativeScriptException& e) {
+        __android_log_print(ANDROID_LOG_WARN, "JS", "No metadata for the interface of %s: %s",
+                            ArgConverter::jstringToString(proxyClassName).c_str(), e.GetErrorMessage().c_str());
+    }
 }
 
 // Raw JNI throughout: an exception the method throws must stay pending, so that it reaches

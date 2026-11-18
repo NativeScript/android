@@ -1,6 +1,7 @@
 package org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl;
 
 import org.apache.bcel.classfile.JavaClass;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -8,6 +9,13 @@ import org.junit.rules.TestName;
 import org.nativescript.staticbindinggenerator.files.FileSystemHelper;
 import org.nativescript.staticbindinggenerator.files.impl.FileSystemHelperImpl;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericHierarchyView;
+import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.UnresolvedTypeParametersException;
+import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.boundcycles.ComparableSource;
+import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.boundcycles.DependentBound;
+import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.boundcycles.MutualBounds;
+import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.boundcycles.SelfTyped;
+
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class GenericsAwareClassHierarchyParserImplTest {
@@ -71,6 +79,45 @@ public class GenericsAwareClassHierarchyParserImplTest {
         GenericHierarchyView hierarchyView = hierarchyParser.getClassHierarchy(startingClass);
 
         genericHierarchyViewJsonExpectationComparer.assertMeetsExpectation(hierarchyView, getExpectationJsonPath(testName.getMethodName()));
+    }
+
+    private void assertUnresolvable(Class<?> type) {
+        resetHierarchyParserForTestCase("boundcycles");
+        JavaClass startingClass = hierarchyParser.getClassesCache().get(type.getName());
+        try {
+            hierarchyParser.getClassHierarchy(startingClass);
+            Assert.fail("expected the type parameters of " + type.getName() + " to stay unresolved");
+        } catch (UnresolvedTypeParametersException e) {
+            Assert.assertTrue(e.getMessage(), e.getMessage().contains(type.getName()));
+        }
+    }
+
+    @Test(timeout = 10000)
+    public void rejectsASelfReferencingBound() {
+        assertUnresolvable(SelfTyped.class);
+    }
+
+    @Test(timeout = 10000)
+    public void rejectsABoundReferringToItsParameterThroughAnotherType() {
+        assertUnresolvable(ComparableSource.class);
+    }
+
+    @Test(timeout = 10000)
+    public void rejectsBoundsReferringToEachOther() {
+        assertUnresolvable(MutualBounds.class);
+    }
+
+    @Test(timeout = 10000)
+    public void resolvesABoundReferringToAnotherParameter() {
+        resetHierarchyParserForTestCase("boundcycles");
+        JavaClass startingClass = hierarchyParser.getClassesCache().get(DependentBound.class.getName());
+
+        GenericHierarchyView hierarchyView = hierarchyParser.getClassHierarchy(startingClass);
+
+        Map<String, String> expected = new LinkedHashMap<>();
+        expected.put("T", "java.lang.Object");
+        expected.put("U", "java.util.List<java.lang.Object>");
+        Assert.assertEquals(expected, hierarchyView.getInitialClassGenericParameters().getGenericParameters());
     }
 
     private void resetHierarchyParserForTestCase(String testCase){

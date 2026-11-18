@@ -23,7 +23,8 @@ class AppConfig {
         DiscardUncaughtJsExceptions("discardUncaughtJsExceptions", false),
         EnableLineBreakpoins("enableLineBreakpoints", false),
         EnableMultithreadedJavascript("enableMultithreadedJavascript", false),
-        UncaughtErrorPolicy("uncaughtErrorPolicy", "report");
+        UncaughtErrorPolicy("uncaughtErrorPolicy", "report"),
+        InterfaceProxies("interfaceProxies", false);
 
         private final String name;
         private final Object defaultValue;
@@ -142,6 +143,9 @@ class AppConfig {
                     if (androidObject.has(KnownKeys.EnableMultithreadedJavascript.getName())) {
                         values[KnownKeys.EnableMultithreadedJavascript.ordinal()] = androidObject.getBoolean(KnownKeys.EnableMultithreadedJavascript.getName());
                     }
+                    if (androidObject.has(KnownKeys.InterfaceProxies.getName())) {
+                        values[KnownKeys.InterfaceProxies.ordinal()] = androidObject.getBoolean(KnownKeys.InterfaceProxies.getName());
+                    }
                 }
             }
         } catch (Exception e) {
@@ -214,6 +218,14 @@ class AppConfig {
 
     public boolean getEnableMultithreadedJavascript() {
         return (boolean)values[KnownKeys.EnableMultithreadedJavascript.ordinal()];
+    }
+
+    /**
+     * Implement an interface that has no class in the APK with a java.lang.reflect.Proxy
+     * instead of generating, writing and loading a dex for it.
+     */
+    public boolean getInterfaceProxies() {
+        return (boolean)values[KnownKeys.InterfaceProxies.ordinal()];
     }
 
     // Security conf
