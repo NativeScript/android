@@ -281,6 +281,41 @@ describe("Interface default methods implemented in JS", function () {
         expect(aliasedRemoves).toBe(1);
     });
 
+    it("are called through a class of their own once an extend resolved to the prebuilt class", function () {
+        if (sdk < 24) {
+            return;
+        }
+        // Full name: the static binding generator prebuilds this interface's class with the
+        // methods this call site lists, which leave out the default andThen. No other spec
+        // uses the interface: the class the first object overriding a default method gets
+        // serves every later one in the process.
+        var prebuilt = new java.util.function.DoubleConsumer({
+            accept: function () {}
+        });
+        expect(F.isRuntimeGenerated(prebuilt)).toBe(false);
+        expect(function () {
+            prebuilt.getClass().getDeclaredMethod("andThen", [java.util.function.DoubleConsumer.class]);
+        }).toThrow();
+
+        var Consumer = java.util.function.DoubleConsumer;
+        var Extended = Consumer.extend({
+            accept: function () {}
+        });
+        expect(F.className(new Extended())).toBe(F.className(prebuilt));
+
+        var calls = [];
+        var overriding = new Consumer({
+            accept: function () {},
+            andThen: function (after) {
+                calls.push("andThen");
+                return after;
+            }
+        });
+        expectRuntimeClass(overriding, "com.tns.gen.java.util.function.DoubleConsumer" + SUFFIX);
+        Consumer.class.getMethod("andThen", [Consumer.class]).invoke(overriding, [prebuilt]);
+        expect(calls).toEqual(["andThen"]);
+    });
+
     it("are called through a class extend that implements the interface", function () {
         if (sdk < 24) {
             return;
