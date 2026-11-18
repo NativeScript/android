@@ -388,19 +388,13 @@ public class Generator {
 
         List<DataRow> javaExtends = new ArrayList<>(rows.size());
         for (DataRow dataRow : rows) {
-            if (!classes.containsKey(dataRow.getBaseClassname())) {
-                continue;
+            if (classes.containsKey(dataRow.getBaseClassname())) {
+                javaExtends.add(dataRow);
             }
-            // The runtime generates the class of a row left out here, as it does for a
-            // base class that is not on the classpath.
-            String missingInterface = findMissingInterface(dataRow);
-            if (missingInterface != null) {
-                System.out.println("The binding for " + describeSite(dataRow) + " is generated at runtime: its interface " + missingInterface + " is not on the classpath.");
-                continue;
-            }
-            javaExtends.add(dataRow);
         }
 
+        // Rows left to the runtime are planned too: the runtime names their classes after
+        // the same content, and only learns of a collision from the generator's list.
         if (contentKeyedBindings) {
             planContentKeyedNames(javaExtends);
             for (String warning : warnings) {
@@ -409,6 +403,12 @@ public class Generator {
         }
 
         for (DataRow dataRow : javaExtends) {
+            String missingInterface = findMissingInterface(dataRow);
+            if (missingInterface != null) {
+                System.out.println("The binding for " + describeSite(dataRow) + " is generated at runtime: its interface " + missingInterface + " is not on the classpath.");
+                continue;
+            }
+
             Binding binding = generateBinding(dataRow, interfaceNames);
 
             if (binding != null) {

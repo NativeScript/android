@@ -241,8 +241,15 @@ public class ContentKeyedGeneratorTest {
             Assert.assertTrue(files.contains("View_" + ContentKey.of("com.example.View", Collections.singletonList("java.lang.Runnable"), Collections.singletonList("toString")) + ".java"));
             Assert.assertTrue(files.contains("View_" + key("toString") + ".java"));
         }
-        Assert.assertTrue(generator[0].getWarnings().toString(), generator[0].getWarnings().isEmpty());
-        Assert.assertTrue(generator[0].getContentNameCollisions().isEmpty());
+        if (contentKeyed) {
+            String collision = "com.tns.gen.com.example.View_Named_" + ContentKey.of("com.example.View", Collections.singletonList("com.example.MissingListener"), Collections.singletonList("createView"));
+            Assert.assertEquals(Collections.singleton(collision), generator[0].getContentNameCollisions());
+            Assert.assertEquals(generator[0].getWarnings().toString(), 1, generator[0].getWarnings().size());
+            Assert.assertTrue(generator[0].getWarnings().get(0), generator[0].getWarnings().get(0).contains("tests_e:2:3") && generator[0].getWarnings().get(0).contains("@JavaProxy"));
+        } else {
+            Assert.assertTrue(generator[0].getWarnings().toString(), generator[0].getWarnings().isEmpty());
+            Assert.assertTrue(generator[0].getContentNameCollisions().isEmpty());
+        }
 
         for (String row : ROWS_WITH_A_MISSING_INTERFACE) {
             DataRow dataRow = new DataRow(row);
@@ -261,6 +268,53 @@ public class ContentKeyedGeneratorTest {
     @Test
     public void skipsContentKeyedRowsWithAnInterfaceItCannotLoad() throws Exception {
         assertSkipsRowsWithAMissingInterface(true);
+    }
+
+    private String[] markerCollisions() throws Exception {
+        String marker = read("com/tns/gen/ContentKeyedBindings.java");
+        Class<?> markerClass = InMemoryJavaCompiler.compile("com.tns.gen.ContentKeyedBindings", marker, Arrays.asList("-cp", classesDir));
+        return (String[]) markerClass.getField("COLLISIONS").get(null);
+    }
+
+    @Test
+    public void listsTheCollisionOfNamedExtendsLeftToTheRuntime() throws Exception {
+        Generator generator = generate(true,
+                "com.example.View*tests_c*1*1*Named*createView***com.example.MissingListener",
+                "com.example.View*tests_d*2*2*Named*createView***com.example.MissingListener");
+
+        String collision = "com.tns.gen.com.example.View_Named_" + ContentKey.of("com.example.View", Collections.singletonList("com.example.MissingListener"), Collections.singletonList("createView"));
+        Assert.assertEquals(Collections.singleton(collision), generator.getContentNameCollisions());
+        Assert.assertArrayEquals(new String[]{collision}, markerCollisions());
+        Assert.assertEquals(Collections.emptyList(), generatedFiles("com/tns/gen/com/example"));
+    }
+
+    // Lookups in the generator's classpath ignore `$` against `.`, so only a java.* name,
+    // which falls back to the system class path, can resolve under one spelling and not
+    // under the other while both have the same content key.
+    @Test
+    public void listsTheCollisionOfANamedExtendLeftToTheRuntimeWithOneItPrebuilds() throws Exception {
+        Generator generator = generate(true,
+                "com.example.View*tests_c*1*1*Named*createView***java.lang.Thread.UncaughtExceptionHandler",
+                "com.example.View*tests_d*2*2*Named*createView***java.lang.Thread$UncaughtExceptionHandler");
+
+        String collision = "com.tns.gen.com.example.View_Named_" + ContentKey.of("com.example.View", Collections.singletonList("java.lang.Thread.UncaughtExceptionHandler"), Collections.singletonList("createView"));
+        Assert.assertEquals(Collections.singleton(collision), generator.getContentNameCollisions());
+        Assert.assertArrayEquals(new String[]{collision}, markerCollisions());
+        List<String> files = generatedFiles("com/tns/gen/com/example");
+        Assert.assertEquals(files.toString(), 1, files.size());
+        Assert.assertTrue(files.toString(), files.get(0).startsWith("View_tests_d_") && files.get(0).endsWith("_2_2_Named.java"));
+    }
+
+    @Test
+    public void sharesTheContentNameOfAnAnonymousExtendLeftToTheRuntime() throws Exception {
+        Generator generator = generate(true,
+                "com.example.View*tests_a*3*5**createView***java.lang.Thread.UncaughtExceptionHandler",
+                "com.example.View*tests_b*4*5**createView***java.lang.Thread$UncaughtExceptionHandler");
+
+        Assert.assertTrue(generator.getContentNameCollisions().isEmpty());
+        Assert.assertEquals(0, markerCollisions().length);
+        Assert.assertEquals(Collections.singletonList("View_" + ContentKey.of("com.example.View", Collections.singletonList("java.lang.Thread.UncaughtExceptionHandler"), Collections.singletonList("createView")) + ".java"),
+                generatedFiles("com/tns/gen/com/example"));
     }
 
     @Test

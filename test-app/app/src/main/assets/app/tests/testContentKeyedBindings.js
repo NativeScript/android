@@ -87,6 +87,20 @@ describe("Content-keyed binding names", function () {
         ownedNameMarker: 1
     });
 
+    // Visible to the static binding generator, but listing an interface it cannot load.
+    var UnseenFirst = java.lang.Object.extend("UnseenInterfaceName", {
+        interfaces: [com.tns.tests.ContentKeyedUnseenListener],
+        describe: function () {
+            return "unseen first";
+        }
+    });
+    var UnseenSecond = java.lang.Object.extend("UnseenInterfaceName", {
+        interfaces: [com.tns.tests.ContentKeyedUnseenListener],
+        describe: function () {
+            return "unseen second";
+        }
+    });
+
     it("names a class after its call site or after its content", function () {
         var Keyed = java.lang.Object.extend({
             toString: function () {
@@ -349,6 +363,24 @@ describe("Content-keyed binding names", function () {
                 expect(className(visible)).toMatch(/^com\.tns\.gen\.java\.lang\.Object_OwnedName_h[0-9a-f]{16}$/);
                 expect(className(hidden)).toMatch(/_tests_testContentKeyedBindings_[0-9a-f]{6}_\d+_\d+_OwnedName$/);
             }
+        });
+
+        it("with the same name and content whose interface the generator cannot load keep their call-site classes", function () {
+            var first = new UnseenFirst();
+            var second = new UnseenSecond();
+
+            function describeFromJava(instance) {
+                var created = createFromJava(instance);
+                return String(created.getClass().getMethod("describe", []).invoke(created, []));
+            }
+
+            expect(className(first)).not.toBe(className(second));
+            expect(className(first)).toMatch(/_tests_testContentKeyedBindings_[0-9a-f]{6}_\d+_\d+_UnseenInterfaceName$/);
+            expect(className(second)).toMatch(/_tests_testContentKeyedBindings_[0-9a-f]{6}_\d+_\d+_UnseenInterfaceName$/);
+            expect(runtimeGenerated(first)).toBe(true);
+            expect(runtimeGenerated(second)).toBe(true);
+            expect(describeFromJava(first)).toBe("unseen first");
+            expect(describeFromJava(second)).toBe("unseen second");
         });
     });
 
