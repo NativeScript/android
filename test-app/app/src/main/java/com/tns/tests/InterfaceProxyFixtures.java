@@ -69,6 +69,11 @@ public class InterfaceProxyFixtures {
         String describe();
     }
 
+    // Implemented only through an anonymous extend, so its shared class is always asked
+    // for under a call-site name.
+    public interface ProxyIncompatibleExtended extends ProxyIncompatible {
+    }
+
     public static String callAllValues(Values v) {
         StringBuilder sb = new StringBuilder();
         sb.append(v.booleanValue(true)).append('|');

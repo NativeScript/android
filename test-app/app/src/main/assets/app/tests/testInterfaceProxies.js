@@ -339,6 +339,21 @@ describe("Interface implementations without a prebuilt class", function () {
         expect(["generated", "cached"]).toContain(entries[0].source);
     });
 
+    it("generates the shared class for an anonymous extend of an interface a proxy cannot implement", function () {
+        var Incompatible = hidden(F, "ProxyIncompatible" + "Extended");
+        var Extended = Incompatible[ext]({
+            describe: function () { return "extended"; }
+        });
+        var instance = new Extended();
+
+        expect(String(F.describe(instance))).toBe("extended");
+        expect(java.lang.reflect.Proxy.isProxyClass(instance.getClass())).toBe(false);
+        expect(String(instance.getClass().getName())).toBe("com.tns.gen.com.tns.tests.InterfaceProxyFixtures_ProxyIncompatibleExtended");
+        var entries = reportEntriesFor(instance.getClass().getName());
+        expect(entries.length).toBe(1);
+        expect(entries[0].requested).not.toBe(entries[0].loaded);
+    });
+
     it("routes a call from another Java thread to the runtime that created the instance", function (done) {
         var Reporter = hidden(F, "Thread" + "Reporter");
         var reporter = new Reporter({
@@ -450,6 +465,28 @@ describe("Runtime generation report under the interfaceProxies option", function
                 return false;
             }
         }
+        // An interface's shared class is com.tns.gen. and its binary name with `$` as `_`. The
+        // class itself is not looked up: one a worker generated is in no loader JS can name.
+        function interfaceOfSharedClass(loaded) {
+            var name = loaded.substring(prefix.length);
+            var simpleStart = name.lastIndexOf(".") + 1;
+            var parts = name.substring(simpleStart).split("_");
+            var separators = parts.length - 1;
+            if (separators > 10) {
+                return null;
+            }
+            for (var mask = 0; mask < (1 << separators); mask++) {
+                var candidate = name.substring(0, simpleStart) + parts[0];
+                for (var i = 1; i < parts.length; i++) {
+                    candidate += ((mask >> (i - 1)) & 1 ? "$" : "_") + parts[i];
+                }
+                var iface = loadClass(candidate);
+                if (iface !== null && iface.isInterface()) {
+                    return iface;
+                }
+            }
+            return null;
+        }
 
         var generatedInterfaces = lines.filter(function (line) {
             var fields = line.split(" ");
@@ -471,9 +508,13 @@ describe("Runtime generation report under the interfaceProxies option", function
             // An extend that lists extra interfaces asks for, and loads, a class named after
             // its call site, which no proxy of the one interface stands in for. The call-site
             // name of an extend without them names no Java type either, but loads the
-            // interface's shared class, which a proxy replaces.
+            // interface's shared class, which a proxy replaces when it can.
             if (iface === null) {
-                return loaded !== requested.replace(/\$/g, "_");
+                if (loaded === requested.replace(/\$/g, "_")) {
+                    return false;
+                }
+                var shared = loaded.indexOf(prefix) === 0 ? interfaceOfSharedClass(loaded) : null;
+                return shared === null || canProxy(shared);
             }
             // Requested by the interface's name: its shared or default-overriding class.
             return canProxy(iface);
