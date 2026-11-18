@@ -429,15 +429,23 @@ public class Generator {
 
         nextMethod:
         for (Method method : javaClass.getMethods()) {
-            if (method.getName().equals("<init>")
-                    && !method.isStatic()
-                    && (method.isPublic() || method.isProtected())) {
+            if (isExtendableConstructor(method) && !method.isStatic()) {
 
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Synthetic constructors, such as the one Kotlin adds for default arguments
+     * ({@code (..., int, DefaultConstructorMarker)}), are invisible to javac.
+     */
+    private static boolean isExtendableConstructor(Method method) {
+        return method.getName().equals("<init>")
+                && (method.isPublic() || method.isProtected())
+                && !method.isSynthetic();
     }
 
     public Binding generateBinding(DataRow dataRow) throws ClassNotFoundException {
@@ -811,7 +819,7 @@ public class Generator {
         boolean hasInitMethod2 = !isApplicationClass && hasInitMethod;
 
         for (Method method : clazz.getMethods()) {
-            if (method.getName().equals("<init>") && (method.isPublic() || method.isProtected())) {
+            if (isExtendableConstructor(method)) {
                 JavaMethod javaMethod = new JavaMethodImpl(method, clazz);
                 ReifiedJavaMethod reifiedJavaMethod = methodSignatureReifier.transformJavaMethod(javaMethod);
                 methodsWriter.writeConstructor(generatedClassName, reifiedJavaMethod, hasInitMethod2);
