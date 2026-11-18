@@ -43,6 +43,7 @@ import java.util.jar.JarEntry
 import java.util.jar.JarFile
 import javax.tools.Diagnostic
 import javax.tools.DiagnosticCollector
+import javax.tools.StandardLocation
 import javax.tools.ToolProvider
 
 import static org.gradle.internal.logging.text.StyledTextOutput.Style
@@ -674,7 +675,9 @@ def compileJavaLeavingOutFailures(List<File> files, List<String> classpath, File
         return [compiled: false, stuck: true, leftOut: files, errors: [:], diagnostics: [], error: "${System.getProperty('java.home')} has no Java compiler"]
     }
     def describe = { Diagnostic d -> d.getMessage(Locale.ROOT).readLines().take(2).join(" ").replaceAll(/\s+/, " ") }
-    def options = ["-proc:none", "-nowarn", "-Xmaxerrs", "100000",
+    // Only the files passed are compiled: javac would otherwise compile a source it finds
+    // on the classpath, such as one a dependency jar ships, into classOutput.
+    def options = ["-proc:none", "-nowarn", "-Xmaxerrs", "100000", "-implicit:none",
                    "-source", levels.source, "-target", levels.target,
                    "-encoding", levels.encoding,
                    "-classpath", classpath.join(File.pathSeparator),
@@ -684,6 +687,7 @@ def compileJavaLeavingOutFailures(List<File> files, List<String> classpath, File
         def diagnostics = new DiagnosticCollector()
         def fileManager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, Charset.forName(levels.encoding))
         try {
+            fileManager.setLocation(StandardLocation.SOURCE_PATH, [])
             def units = fileManager.getJavaFileObjectsFromFiles(remaining).toList()
             def sourceByUri = [units, remaining].transpose().collectEntries { unit, source -> [(unit.toUri()): source] }
             compiled = compiler.getTask(new StringWriter(), fileManager, diagnostics, options, null, units).call()
