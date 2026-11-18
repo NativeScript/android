@@ -223,6 +223,12 @@ public class DexFactory {
         }
         if (pregeneratedClass == null && usesSharedInterfaceClass) {
             pregeneratedClass = loadPregeneratedClass(fullClassName.replace("-", "_"));
+            // Once an extend of the interface has resolved, a later JS override of a default
+            // method gets the class generated for that, not the prebuilt one, which stubs
+            // only the defaults of the call site the generator saw first.
+            if (pregeneratedClass != null) {
+                generatedClassNames.add(pregeneratedClass.getName());
+            }
         }
         // Once injected, the class generated for the interface loads by the same name.
         if (overridesDefaults && pregeneratedClass != null && generatedClassNames.contains(pregeneratedClass.getName())) {
