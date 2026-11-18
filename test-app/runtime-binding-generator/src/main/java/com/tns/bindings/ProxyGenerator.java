@@ -111,11 +111,21 @@ public class ProxyGenerator {
     }
 
     /**
+     * A new file in dir to write a cache file to before renaming it to its final name in
+     * the same directory. Unique, because several runtimes can write the same file at
+     * once. Its name holds the thumb, so DexFactory's purge of an old thumb also removes
+     * one a killed process left behind, and nothing of the final name, which may already
+     * be as long as the file system allows (Android's createTempFile does not shorten
+     * the prefix to fit). It never ends in .dex or .jar, the names the cache probes.
+     */
+    public static File createCacheTempFile(File dir, String thumb) throws IOException {
+        return File.createTempFile((thumb != null ? thumb : "proxy") + "-", ".tmp", dir);
+    }
+
+    /**
      * The dex only appears under its final name once complete: DexFactory
      * trusts any dex that exists, so a process killed mid-write must not leave
-     * a truncated one there. The temp name keeps the proxy's thumb so the
-     * thumb purge also removes orphans, and is unique because several runtimes
-     * can generate the same proxy at once.
+     * a truncated one there.
      */
     private String saveProxy(String proxyName, byte[] proxyBytes) throws IOException {
         File file = new File(path + File.separator + proxyName + ".dex");
@@ -123,7 +133,7 @@ public class ProxyGenerator {
         if (parentDir != null && !parentDir.exists()) {
             parentDir.mkdirs();
         }
-        File tempFile = File.createTempFile(file.getName() + ".", ".tmp", parentDir);
+        File tempFile = createCacheTempFile(parentDir, proxyThumb);
         try {
             FileOutputStream stream = new FileOutputStream(tempFile);
             try {

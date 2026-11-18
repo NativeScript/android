@@ -415,9 +415,7 @@ public class DexFactory {
     /**
      * The jar only appears under its final name once complete and read-only:
      * its existence is the cache hit, so a process killed mid-write must not
-     * leave a truncated one there. The temp name keeps the jar's thumb so
-     * purgeDexesByThumb also removes orphans, and is unique because several
-     * runtimes can resolve the same class at once.
+     * leave a truncated one there.
      */
     private void writeJar(File dexFile, File jarFile) throws IOException {
         byte[] dexData = new byte[(int) dexFile.length()];
@@ -428,7 +426,7 @@ public class DexFactory {
             in.close();
         }
 
-        File tempFile = File.createTempFile(jarFile.getName() + ".", ".tmp", jarFile.getParentFile());
+        File tempFile = ProxyGenerator.createCacheTempFile(jarFile.getParentFile(), dexThumb);
         try {
             ZipOutputStream out = new ZipOutputStream(new FileOutputStream(tempFile));
             try {
