@@ -445,9 +445,15 @@ class ObjectManager {
   int m_deathInboxRuntimeId = -1;
   v8::Persistent<v8::Private> m_instanceFieldTableKey;
   // The weak-collection key of a canary's Java object hangs off its state
-  // object, and names the object's id.
+  // object, and names the object's id. Once the canary's link is released,
+  // the canary holds the key and the key leads back to the canary.
   v8::Persistent<v8::Private> m_keyOfState;
   v8::Persistent<v8::Private> m_objectOfKey;
+  v8::Persistent<v8::Private> m_releasedOfKey;
+
+  // Moves id's weak-collection key from its state to its live canary, whose
+  // link is being released.
+  void KeepWeakCollectionKey(int javaObjectID);
 
   static void UnwrapForWeakCollection(const v8::FunctionCallbackInfo<v8::Value>& info);
   static void WrapForWeakCollection(const v8::FunctionCallbackInfo<v8::Value>& info);
