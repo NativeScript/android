@@ -198,6 +198,29 @@ describe("Wrapper lifetime modes", function () {
         expect(Holder.held.child.toString()).toBe("child");
     });
 
+    // Under scope "all" a plain wrapper is a canary too: its state is rebuilt onto a
+    // wrapper made the usual way, and it keeps what it references (#2126's over-release).
+    it("keeps the state of a Java-held plain object and the Java objects it references, under scope all", function () {
+        if (!canary || scope !== "all") {
+            return;
+        }
+        var states = stats().canaryStates;
+        (function () {
+            var holder = new java.lang.StringBuilder("holder");
+            holder.tag = "plain";
+            holder.child = new java.lang.StringBuilder("child");
+            Holder.held = holder;
+        })();
+        expect(stats().canaryStates).toBe(states + 1);
+        collectBoth();
+        collectJava();
+
+        var holder = Holder.held;
+        expect(holder.toString()).toBe("holder");
+        expect(holder.tag).toBe("plain");
+        expect(holder.child.toString()).toBe("child");
+    });
+
     it("hands back a property that shadows a prototype member on a new wrapper", function () {
         (function () {
             var runnable = new java.lang.Runnable({
