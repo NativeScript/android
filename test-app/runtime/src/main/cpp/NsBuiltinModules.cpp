@@ -163,11 +163,7 @@ void GetConfigCallback(const FunctionCallbackInfo<Value>& info) {
 
 void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
-    ObjectManager* objectManager = Runtime::GetObjectManager(isolate);
-    if (objectManager == nullptr) {
-        return;
-    }
-    const WrapperLifetimeStats& stats = objectManager->GetLifetimeStats();
+    const WrapperLifetimeStats& stats = Runtime::GetObjectManager(isolate)->GetLifetimeStats();
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> result = Object::New(isolate);
     auto set = [&](const char* name, uint64_t value) {

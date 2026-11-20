@@ -66,6 +66,12 @@ class AppConfig {
         try {
             rootObject = FileSystem.readJSONFile(packageInfo);
             if (rootObject != null) {
+                // First, and never throwing: a malformed key further down ends
+                // the whole read.
+                if (rootObject.has(WrapperLifetimeKey)) {
+                    readWrapperLifetime(rootObject.opt(WrapperLifetimeKey));
+                }
+
                 // Parse security configuration
                 if (rootObject.has(SecurityKey)) {
                     JSONObject securityObject = rootObject.getJSONObject(SecurityKey);
@@ -107,9 +113,6 @@ class AppConfig {
                     } else {
                         Log.w("JS", String.format("Unknown uncaughtErrorPolicy \"%s\" - expected \"report\" or \"throw\". The default \"report\" will be used.", policy));
                     }
-                }
-                if (rootObject.has(WrapperLifetimeKey)) {
-                    readWrapperLifetime(rootObject.opt(WrapperLifetimeKey));
                 }
                 if (rootObject.has(AndroidKey)) {
                     JSONObject androidObject = rootObject.getJSONObject(AndroidKey);
@@ -156,6 +159,7 @@ class AppConfig {
                 }
             }
         } catch (Exception e) {
+            Log.w("JS", "Could not read the app config past a malformed value; the keys read after it keep their defaults: " + e);
             if (com.tns.Runtime.isDebuggable()) {
                 e.printStackTrace();
             }
