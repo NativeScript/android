@@ -21,6 +21,7 @@ final class ObjectTable {
     static final long FRESH = 1L << 32;
 
     interface IdSource {
+        // NO_ID when there is no id to give.
         int newId();
     }
 
@@ -104,7 +105,8 @@ final class ObjectTable {
     /**
      * The id obj is registered under, registering it strongly under a new id from ids when
      * it has none; FRESH is set in the result when this call registered it. The lookup and
-     * the insert happen under one lock, so concurrent calls agree on one id.
+     * the insert happen under one lock, so concurrent calls agree on one id. NO_ID (with
+     * nothing registered) when obj has no id and ids gives none.
      */
     long findOrRegister(Object obj, IdSource ids) {
         synchronized (this) {
@@ -114,6 +116,9 @@ final class ObjectTable {
                 return id & 0xFFFFFFFFL;
             }
             id = ids.newId();
+            if (id == NO_ID) {
+                return NO_ID & 0xFFFFFFFFL;
+            }
             putStrongLocked(id, obj, hash);
             return (id & 0xFFFFFFFFL) | FRESH;
         }
