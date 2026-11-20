@@ -9,6 +9,7 @@
 #include "BuiltinLoader.h"
 #include "CallbackHandlers.h"
 #include "Interop.h"
+#include "LeakProbe.h"
 #include "Messaging.h"
 #include "ModuleInternalCallbacks.h"
 #include "NativeScriptAssert.h"
@@ -185,6 +186,13 @@ void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
     info.GetReturnValue().Set(result);
 }
 
+void FindLeakCyclesCallback(const FunctionCallbackInfo<Value>& info) {
+    Local<Object> report;
+    if (LeakProbe::FindLeakCycles(info.GetIsolate()).ToLocal(&report)) {
+        info.GetReturnValue().Set(report);
+    }
+}
+
 void GetWrapperClassCountsCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
@@ -278,13 +286,14 @@ MaybeLocal<Object> NsRuntimeBinding(Local<Context> context) {
     Isolate* isolate = v8::Isolate::GetCurrent();
     Local<Object> binding = Object::New(isolate);
     Local<v8::Function> setConfig, getConfig, escapeException, getWrapperLifetimeStats,
-            getWrapperClassCounts;
+            getWrapperClassCounts, findLeakCycles;
     if (!v8::Function::New(context, SetConfigCallback).ToLocal(&setConfig) ||
         !v8::Function::New(context, GetConfigCallback).ToLocal(&getConfig) ||
         !v8::Function::New(context, GetWrapperLifetimeStatsCallback)
                  .ToLocal(&getWrapperLifetimeStats) ||
         !v8::Function::New(context, GetWrapperClassCountsCallback)
                  .ToLocal(&getWrapperClassCounts) ||
+        !v8::Function::New(context, FindLeakCyclesCallback).ToLocal(&findLeakCycles) ||
         !Interop::CreateEscapeException(context).ToLocal(&escapeException) ||
         !binding->Set(context, ArgConverter::ConvertToV8String(isolate, "setConfig"), setConfig)
                  .FromMaybe(false) ||
@@ -298,6 +307,9 @@ MaybeLocal<Object> NsRuntimeBinding(Local<Context> context) {
                  .FromMaybe(false) ||
         !binding->Set(context, ArgConverter::ConvertToV8String(isolate, "getWrapperClassCounts"),
                       getWrapperClassCounts)
+                 .FromMaybe(false) ||
+        !binding->Set(context, ArgConverter::ConvertToV8String(isolate, "findLeakCycles"),
+                      findLeakCycles)
                  .FromMaybe(false)) {
         return MaybeLocal<Object>();
     }

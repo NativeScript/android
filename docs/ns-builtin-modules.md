@@ -105,6 +105,7 @@ wrapper.
 | `getConfig(key)` | Returns the current value of a config key. Throws `TypeError` on an unknown key. Readable from any isolate. |
 | `getWrapperLifetimeStats()` | Wrapper lifetime counters for the calling isolate (see [Wrapper lifetime](#wrapper-lifetime)). A fresh object on every call. |
 | `getWrapperClassCounts()` | Per Java class name (`<unknown>` for a link whose class was never recorded), the calling isolate's live `wrappers`, the `canaries` among them and the canary `states` (see [Wrapper lifetime](#wrapper-lifetime)). |
+| `findLeakCycles()` | Experimental and slow: joins a V8 heap snapshot and a Java heap dump to find the JS ↔ Java cycles canary mode keeps alive (see [Wrapper lifetime](#wrapper-lifetime)). |
 | `escapeException(x)` | Returns an `Error` branded so that, when it is thrown back across a native callback boundary, the native caller receives the original native exception `x` carries rather than the runtime's wrapper exception. Idempotent: a branded error is returned unchanged. Throws `TypeError` when called with no argument. The global `interop.escapeException` is this same function (see [Legacy globals](#legacy-globals)). |
 
 *Platform note (Android):* the original exception is the Java throwable `x`
@@ -273,6 +274,25 @@ because nothing kept the old one. `__releaseNativeCounterpart` drops the
 object's state with its link, and the released canary is a plain JS object
 from then on: what the weak collections keyed on its Java object stays keyed
 on it, and lives as long as it does.
+
+**Finding leaked cycles (experimental).** Each heap has its own collector,
+so neither sees a cycle that crosses into the other. `findLeakCycles()` joins
+them into one graph and asks what a single collector would keep: the JS heap
+from a V8 heap snapshot (its roots minus the runtime's handles to canary
+records), the Java heap from an HPROF dump (`android.os.Debug.dumpHprofData`;
+its GC roots minus the runtime's object table, `Reference` referents skipped),
+and the runtime's own edges between them (a live wrapper holds its Java object;
+a Java object holds its canary record: state, prototype and implementation
+object). A Java object the runtime holds for a live wrapper, and that nothing
+else reaches, is leaked. For each, the report gives the path from the Java
+object to its own wrapper through fields, properties and the runtime's edges,
+a `signature` (the path's node labels from their smallest rotation, free of
+ids), and the Java classes of the leaked objects on it (`members`).
+`leakedOutsideCycles` counts leaked objects held by a reported cycle rather
+than being on one. In `"resurrecting"` mode the report is always empty:
+resurrection breaks these cycles. The call suspends the process for a full
+heap dump and parses it, so it takes seconds and briefly needs memory of the
+order of the Java heap; it is a debugging tool, not for production.
 
 **Weak collections.** What could notice a new canary is whatever keys on the
 old one without keeping it, so in canary mode a builtin
