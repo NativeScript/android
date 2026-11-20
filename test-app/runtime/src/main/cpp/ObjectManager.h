@@ -547,12 +547,12 @@ class ObjectManager {
   std::vector<jint> m_pendingCanaryDeaths;
   bool m_copyingCanaryProperties = false;
   bool m_deathInboxOpen = false;
+  bool m_canaryEpilogueAdded = false;
   int m_deathInboxRuntimeId = -1;
   v8::Persistent<v8::Private> m_instanceFieldTableKey;
   // Cloned for each new state; never handed to JS.
   v8::Global<v8::Object> m_emptyState;
   v8::Local<v8::Object> NewEmptyState();
-  bool m_canaryEpilogueAdded = false;
   // The weak-collection key of a canary's Java object hangs off its state
   // object, and names the object's id.
   v8::Persistent<v8::Private> m_keyOfState;
