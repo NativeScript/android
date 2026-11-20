@@ -223,6 +223,151 @@ describe("Weak collections of Java objects", function () {
         expect(map instanceof WeakMap).toBe(true);
     });
 
+    it("keys the entries given to the WeakMap and WeakSet constructors by the Java object", function () {
+        var map;
+        var set;
+        (function () {
+            var runnable = heldRunnable();
+            map = new WeakMap([[runnable, "constructed"]]);
+            set = new WeakSet([runnable]);
+        })();
+        collectBoth();
+
+        expect(map.get(Holder.held)).toBe("constructed");
+        expect(set.has(Holder.held)).toBe(true);
+    });
+
+    it("keys a Java object in a subclass of WeakMap", function () {
+        class TaggedMap extends WeakMap {
+            set(key, value) {
+                return super.set(key, "tagged:" + value);
+            }
+        }
+        var map = new TaggedMap();
+        (function () {
+            map.set(heldRunnable(), "value");
+        })();
+        collectBoth();
+
+        expect(map.get(Holder.held)).toBe("tagged:value");
+        expect(map instanceof WeakMap).toBe(true);
+    });
+
+    it("does not run a FinalizationRegistry callback while Java holds the object", function (done) {
+        var cleaned = false;
+        var registry = new FinalizationRegistry(function () {
+            cleaned = true;
+        });
+        (function () {
+            registry.register(heldRunnable(), "held");
+        })();
+        var polls = 0;
+        (function poll() {
+            collectBoth();
+            if (cleaned) {
+                done.fail("the cleanup callback ran while Java held the object");
+                return;
+            }
+            if (++polls < 5) {
+                setTimeout(poll, 50);
+                return;
+            }
+            expect(Holder.held).not.toBe(null);
+            done();
+        })();
+    }, 20000);
+
+    // Released, the wrapper is a plain JS object: what was keyed on it lives exactly as long
+    // as it does. Only booleans reach expect(), which could otherwise keep the wrapper.
+    it("keeps what was keyed on a Java object after its link is released, while the wrapper lives", function (done) {
+        var map = new WeakMap();
+        var set = new WeakSet();
+        var cleaned = false;
+        var registry = new FinalizationRegistry(function (held) {
+            cleaned = held === "released";
+        });
+        var runnable = new java.lang.Runnable({ run: function () {} });
+        map.set(runnable, "value");
+        set.add(runnable);
+        var ref = new WeakRef(runnable);
+        registry.register(runnable, "released");
+        __releaseNativeCounterpart(runnable);
+
+        expect(map.get(runnable)).toBe("value");
+        expect(set.has(runnable)).toBe(true);
+        expect(ref.deref() === runnable).toBe(true);
+        setTimeout(function () {
+            collectBoth();
+            expect(map.get(runnable)).toBe("value");
+            expect(set.has(runnable)).toBe(true);
+            expect(ref.deref() === runnable).toBe(true);
+            expect(new WeakRef(runnable).deref() === runnable).toBe(true);
+            map.set(runnable, "again");
+            expect(map.get(runnable)).toBe("again");
+            expect(cleaned).toBe(false);
+            runnable = null;
+            setTimeout(function () {
+                eventually(function () {
+                    // A collected registry runs no callbacks.
+                    return cleaned && registry !== null;
+                }, done, "the cleanup callback did not run once the wrapper was collected");
+            }, 0);
+        }, 0);
+    }, 20000);
+
+    it("makes no key for a call the standard collection rejects", function () {
+        var runnable = new java.lang.Runnable({ run: function () {} });
+        var registry = new FinalizationRegistry(function () {});
+        var map = new WeakMap();
+        var states = runtime.getWrapperLifetimeStats().canaryStates;
+        expect(function () {
+            WeakMap.prototype.set.call({}, runnable, 1);
+        }).toThrowError(TypeError);
+        expect(function () {
+            WeakSet.prototype.add.call({}, runnable);
+        }).toThrowError(TypeError);
+        expect(function () {
+            registry.register(runnable, "held", 1);
+        }).toThrowError(TypeError);
+        expect(function () {
+            FinalizationRegistry.prototype.register.call({}, runnable, "held");
+        }).toThrowError(TypeError);
+        if (typeof map.getOrInsertComputed === "function") {
+            expect(function () {
+                WeakMap.prototype.getOrInsert.call({}, runnable, 1);
+            }).toThrowError(TypeError);
+            expect(function () {
+                map.getOrInsertComputed(runnable, function () {
+                    throw new Error("callback");
+                });
+            }).toThrowError("callback");
+        }
+        expect(runtime.getWrapperLifetimeStats().canaryStates).toBe(states);
+    });
+
+    it("hands getOrInsertComputed's callback the key it was given", function () {
+        var map = new WeakMap();
+        if (typeof map.getOrInsertComputed !== "function") {
+            return;
+        }
+        var runnable = new java.lang.Runnable({ run: function () {} });
+        var seen;
+        expect(map.getOrInsertComputed(runnable, function (key) {
+            seen = key;
+            return "computed";
+        })).toBe("computed");
+        expect(seen === runnable).toBe(true);
+        expect(map.get(runnable)).toBe("computed");
+    });
+
+    it("matches the standard FinalizationRegistry.prototype.register signature and errors", function () {
+        var registry = new FinalizationRegistry(function () {});
+        expect(FinalizationRegistry.prototype.register.length).toBe(2);
+        expect(function () {
+            registry.register(1, 1);
+        }).toThrowError(TypeError, /invalid target/);
+    });
+
     it("installs the canary collections only in canary mode", function () {
         var native = WeakMap.toString().indexOf("[native code]") !== -1;
         expect(native).toBe(!canary);
