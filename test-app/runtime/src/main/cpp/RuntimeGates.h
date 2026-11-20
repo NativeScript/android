@@ -14,12 +14,14 @@ class Runtime;
  * runtime and its isolate stay allocated. A missing gate reads as closed.
  */
 namespace RuntimeGates {
+struct Gate;
 // Before the runtime can be found by id.
 void Open(int id, Runtime* runtime);
-// The gate's runtime, pinned; null once the gate is closed, when the runtime
-// may already be freed.
-Runtime* TryPin(int id);
-void Unpin(int id);
+// The pinned gate, and its runtime in *runtime; null once the gate is closed,
+// when the runtime may already be freed.
+Gate* TryPin(int id, Runtime** runtime);
+// Lock-free unless it lets go of the last pin of a closed gate.
+void Unpin(Gate* gate);
 // A new object id from the runtime, or -1 once the gate is closed. Holds the
 // gates' lock rather than a pin: the runtime is freed only after its gate is
 // retired under that lock.
@@ -35,10 +37,10 @@ void WaitUntilUnpinnedAndRetire(int id);
 // Locker is released first.
 class RuntimePin {
  public:
-  explicit RuntimePin(int id) : m_id(id), m_runtime(RuntimeGates::TryPin(id)) {}
+  explicit RuntimePin(int id) : m_gate(RuntimeGates::TryPin(id, &m_runtime)) {}
   ~RuntimePin() {
-    if (m_runtime != nullptr) {
-      RuntimeGates::Unpin(m_id);
+    if (m_gate != nullptr) {
+      RuntimeGates::Unpin(m_gate);
     }
   }
   RuntimePin(const RuntimePin&) = delete;
@@ -47,8 +49,8 @@ class RuntimePin {
   Runtime* runtime() const { return m_runtime; }
 
  private:
-  int m_id;
-  Runtime* m_runtime;
+  Runtime* m_runtime = nullptr;
+  RuntimeGates::Gate* m_gate;
 };
 
 }  // namespace tns
