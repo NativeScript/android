@@ -427,7 +427,9 @@ void ObjectManager::ReleaseUnwrappedArgs(const JavaCallArgs& args) {
       continue;
     }
     auto javaObjectID = static_cast<jint>(values[i]);
-    if (HasJsObject(javaObjectID)) {
+    // A canary record means JS wrapped the id meanwhile (another thread, or
+    // the method lookup); its settle owns the Java entry, which may hold state.
+    if (HasJsObject(javaObjectID) || FindCanaryRecord(javaObjectID) != nullptr) {
       continue;
     }
     raw->CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,

@@ -36,7 +36,8 @@ final class WrapperLifetimeWatcher {
             try {
                 next = watched.remove();
             } catch (InterruptedException e) {
-                return;
+                // The only watcher: it outlives any interrupt.
+                continue;
             }
             try {
                 ids = drain(watched, next, ids);
@@ -52,26 +53,30 @@ final class WrapperLifetimeWatcher {
         // Every reference collected so far, grouped by consecutive runtime.
         int runtimeId = -1;
         int count = 0;
-        for (; next != null; next = watched.poll()) {
-            if (!(next instanceof ObjectTable.WatchedRef)) {
-                continue;
+        try {
+            for (; next != null; next = watched.poll()) {
+                if (!(next instanceof ObjectTable.WatchedRef)) {
+                    continue;
+                }
+                ObjectTable.WatchedRef ref = (ObjectTable.WatchedRef) next;
+                if (ref.runtimeId != runtimeId) {
+                    notify(runtimeId, ids, count);
+                    runtimeId = ref.runtimeId;
+                    count = 0;
+                }
+                Runtime runtime = Runtime.runtimeForId(ref.runtimeId);
+                if (runtime == null || !runtime.removeWatched(ref)) {
+                    continue;
+                }
+                if (count == ids.length) {
+                    ids = Arrays.copyOf(ids, count * 2);
+                }
+                ids[count++] = ref.id;
             }
-            ObjectTable.WatchedRef ref = (ObjectTable.WatchedRef) next;
-            if (ref.runtimeId != runtimeId) {
-                notify(runtimeId, ids, count);
-                runtimeId = ref.runtimeId;
-                count = 0;
-            }
-            Runtime runtime = Runtime.runtimeForId(ref.runtimeId);
-            if (runtime == null || !runtime.removeWatched(ref)) {
-                continue;
-            }
-            if (count == ids.length) {
-                ids = Arrays.copyOf(ids, count * 2);
-            }
-            ids[count++] = ref.id;
+        } finally {
+            // Ids already removed from their table are reported nowhere else.
+            notify(runtimeId, ids, count);
         }
-        notify(runtimeId, ids, count);
         return ids;
     }
 
