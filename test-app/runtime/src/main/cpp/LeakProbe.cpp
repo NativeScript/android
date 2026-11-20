@@ -673,14 +673,14 @@ std::string Signature(const std::vector<std::string>& labels) {
 
 void Set(Isolate* isolate, Local<Context> context, Local<Object> target, const char* name,
          Local<Value> value) {
-  (void) target->Set(context, ArgConverter::ConvertToV8String(isolate, name), value);
+  (void) target->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, name), value);
 }
 
 Local<Array> ToArray(Isolate* isolate, Local<Context> context,
                      const std::vector<std::string>& items) {
   Local<Array> array = Array::New(isolate, static_cast<int>(items.size()));
   for (uint32_t i = 0; i < items.size(); i++) {
-    (void) array->Set(context, i, ArgConverter::ConvertToV8String(isolate, items[i]));
+    (void) array->CreateDataProperty(context, i, ArgConverter::ConvertToV8String(isolate, items[i]));
   }
   return array;
 }
