@@ -118,6 +118,7 @@ void ObjectManager::Init(Isolate* isolate) {
         canaryTemplate, WrapperLifetimeCanary::TemplateKind::kExtended);
     m_canaryTemplate.Reset(isolate, canaryTemplate);
     isolate->AddGCEpilogueCallback(CanaryGCEpilogue, this);
+    m_canaryEpilogueAdded = true;
   }
 }
 
@@ -613,7 +614,9 @@ void ObjectManager::AdoptCanary(const Local<Object>& object, uint32_t javaObject
     m_canaryRecords.emplace(javaObjectID, std::move(created));
     return;
   }
-  EnsureJavaStrong(javaObjectID, record);
+  if (!EnsureJavaStrong(javaObjectID, record)) {
+    return;
+  }
   if (!record->state.IsEmpty()) {
     auto context = m_isolate->GetCurrentContext();
     if (context.IsEmpty()) {
@@ -796,10 +799,10 @@ bool ObjectManager::FlushCanaryDeaths() {
       // A new canary was built since: the Java side stays strong.
       continue;
     }
-    CanaryRecord* record = FindCanaryRecord(id);
-    if (record == nullptr) {
+    // Weakening is idempotent: an id a failed batch already weakened is sent again.
+    if (FindCanaryRecord(id) == nullptr) {
       release.push_back(id);
-    } else if (!record->javaWeak) {
+    } else {
       weaken.push_back(id);
     }
   }
@@ -835,6 +838,13 @@ bool ObjectManager::FlushCanaryDeaths() {
     if (raw->ExceptionCheck()) {
       raw->ExceptionDescribe();
       raw->ExceptionClear();
+    }
+    // Java may have weakened some of them before failing: a canary rebuilt
+    // meanwhile must make its object strong again.
+    for (jint id : weaken) {
+      if (CanaryRecord* record = FindCanaryRecord(id)) {
+        record->javaWeak = true;
+      }
     }
     m_pendingCanaryDeaths.insert(m_pendingCanaryDeaths.end(), deaths.begin(), deaths.end());
     return false;
@@ -1182,8 +1192,11 @@ void ObjectManager::ReleaseAllRegistered() {
   m_pendingWeaken.clear();
   m_pendingCheck.clear();
   m_pendingCanaryDeaths.clear();
-  if (WrapperLifetimeCanary::Enabled()) {
+  if (m_canaryEpilogueAdded) {
     m_isolate->RemoveGCEpilogueCallback(CanaryGCEpilogue, this);
+    m_canaryEpilogueAdded = false;
+  }
+  if (WrapperLifetimeCanary::Enabled()) {
     if (m_deathInboxOpen) {
       WrapperLifetimeCanary::CloseDeathInbox(m_deathInboxRuntimeId);
       m_deathInboxOpen = false;

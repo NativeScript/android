@@ -1,4 +1,5 @@
 #include "ArgConverter.h"
+#include "WrapperLifetimeCanary.h"
 #include "JniLocalRef.h"
 #include "ObjectManager.h"
 #include "Util.h"
@@ -150,7 +151,9 @@ void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const 
             // hint Java read without the isolate lock, or -1) and the class index above.
             auto hintedObjectID = static_cast<jint>(bits);
             auto classIndex = static_cast<int>((bits >> 32) & 0x7fffffff);
-            if ((bits & JavaCallArgs::FreshArg) != 0 &&
+            // In canary mode a settle may have released a fresh id whose canary another
+            // thread made and dropped before this call took the lock: resolve it again.
+            if ((bits & JavaCallArgs::FreshArg) != 0 && !WrapperLifetimeCanary::Enabled() &&
                 !objectManager->HasJsObject(hintedObjectID)) {
                 JniLocalRef arg(env->GetObjectArrayElement(args.refs, i));
                 jsArg = objectManager->CreateJSWrapper(hintedObjectID, classIndex, arg);

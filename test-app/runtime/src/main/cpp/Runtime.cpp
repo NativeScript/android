@@ -662,13 +662,6 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
     throw NativeScriptException(ss.str());
   }
 
-  if (isConstructor) {
-    DEBUG_WRITE(
-        "CallJSMethodNative: Updating linked instance with its real class");
-    jclass instanceClass = env.GetObjectClass(obj);
-    m_objectManager->SetJavaClass(jsObject, instanceClass);
-  }
-
   DEBUG_WRITE("CallJSMethodNative called jsObject=%d",
               jsObject->GetIdentityHash());
 

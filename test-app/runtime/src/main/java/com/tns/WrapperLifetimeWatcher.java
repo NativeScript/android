@@ -38,30 +38,41 @@ final class WrapperLifetimeWatcher {
             } catch (InterruptedException e) {
                 return;
             }
-            // Every reference collected so far, grouped by consecutive runtime.
-            int runtimeId = -1;
-            int count = 0;
-            for (; next != null; next = watched.poll()) {
-                if (!(next instanceof ObjectTable.WatchedRef)) {
-                    continue;
-                }
-                ObjectTable.WatchedRef ref = (ObjectTable.WatchedRef) next;
-                if (ref.runtimeId != runtimeId) {
-                    notify(runtimeId, ids, count);
-                    runtimeId = ref.runtimeId;
-                    count = 0;
-                }
-                Runtime runtime = Runtime.runtimeForId(ref.runtimeId);
-                if (runtime == null || !runtime.removeWatched(ref)) {
-                    continue;
-                }
-                if (count == ids.length) {
-                    ids = Arrays.copyOf(ids, count * 2);
-                }
-                ids[count++] = ref.id;
+            try {
+                ids = drain(watched, next, ids);
+            } catch (Throwable t) {
+                // The only watcher: losing it would leak every later collected object's state.
+                Log.w("JS", "Wrapper lifetime watcher failed to report collected objects", t);
             }
-            notify(runtimeId, ids, count);
         }
+    }
+
+    // Reports next and every reference already queued behind it; returns the id buffer to reuse.
+    private static int[] drain(ReferenceQueue<Object> watched, Reference<?> next, int[] ids) {
+        // Every reference collected so far, grouped by consecutive runtime.
+        int runtimeId = -1;
+        int count = 0;
+        for (; next != null; next = watched.poll()) {
+            if (!(next instanceof ObjectTable.WatchedRef)) {
+                continue;
+            }
+            ObjectTable.WatchedRef ref = (ObjectTable.WatchedRef) next;
+            if (ref.runtimeId != runtimeId) {
+                notify(runtimeId, ids, count);
+                runtimeId = ref.runtimeId;
+                count = 0;
+            }
+            Runtime runtime = Runtime.runtimeForId(ref.runtimeId);
+            if (runtime == null || !runtime.removeWatched(ref)) {
+                continue;
+            }
+            if (count == ids.length) {
+                ids = Arrays.copyOf(ids, count * 2);
+            }
+            ids[count++] = ref.id;
+        }
+        notify(runtimeId, ids, count);
+        return ids;
     }
 
     private static void notify(int runtimeId, int[] ids, int count) {
