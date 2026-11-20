@@ -47,8 +47,9 @@ Local<Object> OwnerOf(Local<Context> context, Local<Object> holder, Local<Name> 
   return object;
 }
 
+// Null rather than a throw: nothing would catch it on the way out of V8.
 ObjectManager* ObjectManagerOf(Isolate* isolate) {
-  Runtime* runtime = Runtime::GetRuntime(isolate);
+  Runtime* runtime = Runtime::TryGetRuntime(isolate);
   return runtime != nullptr ? runtime->GetObjectManager() : nullptr;
 }
 
