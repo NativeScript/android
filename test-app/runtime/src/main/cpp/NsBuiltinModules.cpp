@@ -193,13 +193,14 @@ void GetWrapperClassCountsCallback(const FunctionCallbackInfo<Value>& info) {
     for (const auto& [name, counts] : objectManager->GetWrapperClassCounts()) {
         Local<Object> entry = Object::New(isolate);
         auto set = [&](const char* key, uint64_t value) {
-            (void) entry->Set(context, ArgConverter::ConvertToV8String(isolate, key),
-                              Number::New(isolate, static_cast<double>(value)));
+            (void) entry->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, key),
+                                             Number::New(isolate, static_cast<double>(value)));
         };
         set("wrappers", counts.wrappers);
         set("canaries", counts.canaries);
         set("states", counts.states);
-        (void) result->Set(context, ArgConverter::ConvertToV8String(isolate, name), entry);
+        // A class name such as "__proto__" must stay an own property.
+        (void) result->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, name), entry);
     }
     info.GetReturnValue().Set(result);
 }
