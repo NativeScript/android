@@ -91,10 +91,11 @@ public final class RuntimeBoundHolder {
             }
         }
         comparers.clear();
-        int[] results = new int[compared.size()];
-        int i = 0;
-        for (int result : compared) {
-            results[i++] = result;
+        // A thread still running can add results while this copies them.
+        Integer[] snapshot = compared.toArray(new Integer[0]);
+        int[] results = new int[snapshot.length];
+        for (int i = 0; i < snapshot.length; i++) {
+            results[i] = snapshot[i];
         }
         return results;
     }

@@ -101,12 +101,14 @@ describe("Runtime-bound Java->JS dispatch", function () {
             return;
         }
 
+        var worker;
         function waitFor(condition, what, then) {
             var deadline = Date.now() + 10000;
             (function poll() {
                 if (condition()) {
                     then();
                 } else if (Date.now() > deadline) {
+                    worker.terminate();
                     Holder.stopComparing(10000);
                     fail("timed out waiting for " + what);
                     done();
@@ -116,7 +118,8 @@ describe("Runtime-bound Java->JS dispatch", function () {
             })();
         }
 
-        startWorker(function (worker) {
+        startWorker(function (started) {
+            worker = started;
             Holder.startComparing("comparable", 4);
             waitFor(function () {
                 return Holder.hasCompared(42);
