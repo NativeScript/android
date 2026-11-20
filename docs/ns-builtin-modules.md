@@ -245,13 +245,19 @@ its own object (a closure over `this`, `this.onTap = this.onTap.bind(this)`,
 a `WeakMap` value naming it) keeps the object alive, through Java, for as long
 as the cycle lasts; break such back references with a `WeakRef`.
 `getWrapperClassCounts()` shows which classes grow across a repeated journey.
-Java reports a watched object's collection through a `WeakReference`, which
-is cleared before finalization, so a JS-implemented method a `finalize()`
-reaches finds a new canary without the object's state. Other limits, as on
+Java clears a watched object's `WeakReference` before it finalizes the object,
+so a call a `finalize()` makes into a JS-implemented method has no object to
+run on: it is dropped with a warning in the log (a primitive return gets its
+type's default value), as is a Java call into an object whose link was
+released. Other limits, as on
 iOS: `Object.freeze`, `seal` and `preventExtensions` throw
 on any wrapper built from a template that carries the write handler
 (JS-extended instances, and every wrapper under `"all"`, released ones included); index-keyed properties are not mirrored and die with the canary;
-a write through an object whose prototype is a canary lands on that object.
+a write through an object whose prototype is a canary lands on that object;
+a prototype set later with `Object.setPrototypeOf` or `__proto__` is not
+state, and a rebuilt canary has the prototype it was built with (V8 reports
+no prototype change to the handler). Native `#private` fields are branded on
+the canary and do not carry over.
 A canary built after another died is a new JS object, which `===` cannot tell
 because nothing kept the old one, but which keys `WeakMap`, `WeakSet`,
 `WeakRef` and `FinalizationRegistry` entries separately.
