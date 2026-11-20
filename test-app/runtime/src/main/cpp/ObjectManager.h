@@ -258,6 +258,7 @@ class ObjectManager {
   // Per Java class name (dotted), for ns:runtime's getWrapperClassCounts().
   std::map<std::string, ClassCounts> GetWrapperClassCounts();
 
+#ifdef APPLICATION_IN_DEBUG
   // The runtime's cross-heap edges, for ns:runtime's findLeakCycles()
   // (LeakProbe). One entry per id with a live wrapper or a canary record.
   struct LeakProbeEntry {
@@ -276,6 +277,7 @@ class ObjectManager {
 
   // In the caller's HandleScope.
   std::vector<LeakProbeEntry> GetLeakProbeEntries();
+#endif
 
   jobject GetJavaRuntimeObject() const { return m_javaRuntimeObject; }
 

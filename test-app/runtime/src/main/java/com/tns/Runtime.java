@@ -1305,16 +1305,9 @@ public class Runtime {
     // ns:runtime findLeakCycles(): writes an HPROF dump with the objects of ids pinned in
     // LeakProbe.pinned, in order, so the native analysis can find them. Returns the dump's
     // path, or null if it could not be written.
-    // Returns "" when the probe is not enabled: only debuggable builds, or apps that set
-    // "wrapperLifetime": { "leakProbe": true }, since it suspends the process and writes the
-    // whole heap to disk.
+    // Called only by debug runtimes, which carry the native probe.
     @RuntimeCallable
     private String dumpHeapForLeakProbe(int[] ids) {
-        boolean enabled = isDebuggable() ||
-                (config != null && config.appConfig != null && config.appConfig.getWrapperLifetimeLeakProbe());
-        if (!enabled) {
-            return "";
-        }
         // One probe at a time in the process: LeakProbe.pinned is shared by every runtime.
         synchronized (LeakProbe.class) {
             LeakProbe.deleteStaleDumps();

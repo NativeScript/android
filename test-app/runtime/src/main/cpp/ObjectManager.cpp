@@ -1214,6 +1214,7 @@ jobject ObjectManager::JavaObjectOrNull(int javaObjectID) {
   return object;
 }
 
+#ifdef APPLICATION_IN_DEBUG
 std::vector<ObjectManager::LeakProbeEntry> ObjectManager::GetLeakProbeEntries() {
   auto isolate = m_isolate;
   std::unordered_map<jclass, std::string> names;
@@ -1267,6 +1268,7 @@ std::vector<ObjectManager::LeakProbeEntry> ObjectManager::GetLeakProbeEntries() 
   }
   return entries;
 }
+#endif
 
 void ObjectManager::ReleaseCollectedCanaryStates() {
   if (!m_deathInboxOpen) {

@@ -9,7 +9,9 @@
 #include "BuiltinLoader.h"
 #include "CallbackHandlers.h"
 #include "Interop.h"
+#ifdef APPLICATION_IN_DEBUG
 #include "LeakProbe.h"
+#endif
 #include "Messaging.h"
 #include "ModuleInternalCallbacks.h"
 #include "NativeScriptAssert.h"
@@ -187,6 +189,10 @@ void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
 
 void FindLeakCyclesCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
+#ifndef APPLICATION_IN_DEBUG
+    isolate->ThrowException(Exception::Error(ArgConverter::ConvertToV8String(
+            isolate, "findLeakCycles is available in debug builds only")));
+#else
     try {
         Local<Object> report;
         if (LeakProbe::FindLeakCycles(isolate).ToLocal(&report)) {
@@ -198,6 +204,7 @@ void FindLeakCyclesCallback(const FunctionCallbackInfo<Value>& info) {
         isolate->ThrowException(Exception::Error(ArgConverter::ConvertToV8String(
                 isolate, std::string("findLeakCycles: ") + e.what())));
     }
+#endif
 }
 
 void GetWrapperClassCountsCallback(const FunctionCallbackInfo<Value>& info) {

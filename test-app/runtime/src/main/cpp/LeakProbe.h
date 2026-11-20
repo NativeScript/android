@@ -22,7 +22,7 @@ namespace tns {
 // leaked group a cycle through it, with a signature free of ids.
 //
 // Slow by design: it suspends the process for a full heap dump and parses it.
-// A diagnostic, not something to run in production.
+// Built into debug runtimes only (APPLICATION_IN_DEBUG).
 class LeakProbe {
  public:
   // The report object, or empty with a JS exception pending.
