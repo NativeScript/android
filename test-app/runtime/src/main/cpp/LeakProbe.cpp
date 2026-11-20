@@ -159,6 +159,10 @@ bool ParseRecords(Reader& in, JavaHeap& heap, std::string& error) {
     const uint8_t* recordEnd = in.p + length;
     if (tag == 0x01) {  // STRING
       uint64_t id = in.Id();
+      if (!in.ok || in.p > recordEnd) {
+        error = "malformed HPROF string record";
+        return false;
+      }
       heap.strings.emplace(id, std::string(reinterpret_cast<const char*>(in.p),
                                            recordEnd - in.p));
     } else if (tag == 0x02) {  // LOAD CLASS
@@ -447,6 +451,38 @@ std::string ToUtf8(Isolate* isolate, Local<Value> value) {
   return std::string();
 }
 
+// V8 gives a WeakMap value two edges with the same name, one from its key and
+// one from the map's table ("<n> / part of key (...) -> value (...) pair in
+// WeakMap (table @<id>)"). Only the key keeps the value alive, so the table's
+// is not followed.
+constexpr char kEphemeronEdgePrefix[] = "/ part of key (";
+constexpr char kEphemeronTableMarker[] = "(table @";
+
+bool IsEphemeronEdge(const HeapGraphEdge* edge, std::string* name) {
+  if (edge->GetType() != HeapGraphEdge::kInternal) {
+    return false;
+  }
+  Local<Value> value = edge->GetName();
+  if (value.IsEmpty() || !value->IsString()) {
+    return false;
+  }
+  *name = ArgConverter::ConvertToString(value.As<v8::String>());
+  return name->find(kEphemeronEdgePrefix) != std::string::npos;
+}
+
+bool IsEphemeronTableEdge(const HeapGraphNode* from, const HeapGraphEdge* edge) {
+  std::string name;
+  if (!IsEphemeronEdge(edge, &name)) {
+    return false;
+  }
+  size_t marker = name.rfind(kEphemeronTableMarker);
+  if (marker == std::string::npos) {
+    return false;
+  }
+  return strtoull(name.c_str() + marker + sizeof(kEphemeronTableMarker) - 1, nullptr, 10) ==
+         from->GetId();
+}
+
 // One followed edge: a JS edge, a Java field or element (label index), or a
 // cross-heap edge of the runtime (neither).
 struct EdgeRef {
@@ -489,6 +525,9 @@ struct Graph {
         if (fromRoots && synthetic && runtimeHandleTargets.count(it->second) != 0) {
           continue;
         }
+        if (IsEphemeronTableEdge(js, edge)) {
+          continue;
+        }
         visit(it->second, EdgeRef{edge, kNone});
       }
       auto cross = wrapperToJava.find(node);
@@ -528,6 +567,10 @@ struct Graph {
 
   std::string EdgeLabel(uint32_t from, const EdgeRef& edge) const {
     if (edge.js != nullptr) {
+      std::string name;
+      if (IsEphemeronEdge(edge.js, &name)) {
+        return "WeakMap value";
+      }
       return ToUtf8(isolate, edge.js->GetName());
     }
     if (edge.javaLabel != kNone) {
@@ -655,18 +698,40 @@ MaybeLocal<Object> LeakProbe::FindLeakCycles(Isolate* isolate) {
     return MaybeLocal<Object>();
   };
 
+  // Resurrection breaks these cycles: nothing to look for.
+  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
+    Local<Object> report = Object::New(isolate);
+    Set(isolate, context, report, "mode",
+        ArgConverter::ConvertToV8String(isolate, WrapperLifetimeModeName(GetWrapperLifetimeMode())));
+    Set(isolate, context, report, "cycles", Array::New(isolate));
+    Set(isolate, context, report, "leaked", Number::New(isolate, 0));
+    Set(isolate, context, report, "leakedOutsideCycles", Number::New(isolate, 0));
+    return scope.Escape(report);
+  }
+
   // The snapshot first, before this call holds a handle to any wrapper or state:
   // a handle would root it.
   objectManager->FlushFinalizedBatchIfPending();
   HeapProfiler* profiler = isolate->GetHeapProfiler();
+  // A snapshot leaves V8 tracking object moves, at a cost on every scavenge,
+  // until its object ids are cleared. Cleared afterwards unless something else
+  // (DevTools) already holds snapshots and so relies on the ids.
+  bool clearIds = profiler->GetSnapshotCount() == 0;
   const HeapSnapshot* snapshot = profiler->TakeHeapSnapshot();
   if (snapshot == nullptr) {
     return fail("could not take a heap snapshot");
   }
   struct DeleteSnapshot {
+    HeapProfiler* profiler;
     const HeapSnapshot* snapshot;
-    ~DeleteSnapshot() { const_cast<HeapSnapshot*>(snapshot)->Delete(); }
-  } deleteSnapshot{snapshot};
+    bool clearIds;
+    ~DeleteSnapshot() {
+      const_cast<HeapSnapshot*>(snapshot)->Delete();
+      if (clearIds) {
+        profiler->ClearObjectIds();
+      }
+    }
+  } deleteSnapshot{profiler, snapshot, clearIds};
 
   std::vector<ObjectManager::LeakProbeEntry> entries = objectManager->GetLeakProbeEntries();
 
@@ -702,6 +767,11 @@ MaybeLocal<Object> LeakProbe::FindLeakCycles(Isolate* isolate) {
     return fail("the Java heap dump failed; see the log");
   }
   std::string path = ArgConverter::jstringToString((jstring) pathRef);
+  if (path.empty()) {
+    return fail(
+        "available in debuggable builds, or with \"wrapperLifetime\": { \"leakProbe\": true } "
+        "in the app config");
+  }
   struct RemoveFile {
     std::string path;
     ~RemoveFile() { unlink(path.c_str()); }
@@ -813,12 +883,21 @@ MaybeLocal<Object> LeakProbe::FindLeakCycles(Isolate* isolate) {
     }
   }
 
+  // Each search can visit most of both heaps; past this many, leaked objects are
+  // counted but not explained.
+  constexpr uint32_t kMaxCycleSearches = 256;
+  uint32_t searches = 0;
+  bool truncated = false;
   Local<Array> cycles = Array::New(isolate);
   std::unordered_set<size_t> covered;
   uint32_t cycleCount = 0;
   for (size_t i : leaked) {
     if (covered.count(i) != 0) {
       continue;
+    }
+    if (searches++ == kMaxCycleSearches) {
+      truncated = true;
+      break;
     }
     std::vector<std::string> pathLabels;
     std::vector<std::string> nodeLabels;
@@ -851,6 +930,7 @@ MaybeLocal<Object> LeakProbe::FindLeakCycles(Isolate* isolate) {
   Set(isolate, context, report, "leaked", Number::New(isolate, static_cast<double>(leaked.size())));
   Set(isolate, context, report, "leakedOutsideCycles",
       Number::New(isolate, static_cast<double>(leaked.size() - covered.size())));
+  Set(isolate, context, report, "truncated", v8::Boolean::New(isolate, truncated));
   Set(isolate, context, report, "probed", Number::New(isolate, static_cast<double>(entries.size())));
   Set(isolate, context, report, "jsNodes", Number::New(isolate, graph.jsCount));
   Set(isolate, context, report, "javaObjects",

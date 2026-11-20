@@ -5,6 +5,8 @@ describe("Wrapper lifetime leak probe", function () {
     var Holder = com.tns.tests.WrapperHolder;
     // WeakRefs, so the spec itself keeps nothing it planted alive.
     var planted = [];
+    // Alive for the whole suite: what leaks is the entry's value.
+    var probeMap = new WeakMap();
     var report;
 
     function cyclesThrough(edge) {
@@ -38,6 +40,12 @@ describe("Wrapper lifetime leak probe", function () {
             held.probeHeld = held;
             Holder.held = held;
             planted.push(new WeakRef(held));
+
+            // A WeakMap value referencing its own key: in canary mode the key is the
+            // object's lifetime key, which its state holds.
+            var mapped = new java.lang.Runnable({ run: function () {} });
+            probeMap.set(mapped, { probeMapped: mapped });
+            planted.push(new WeakRef(mapped));
 
             // A back reference through a WeakRef keeps nothing.
             var weak = new java.lang.Runnable({ run: function () {} });
@@ -77,9 +85,16 @@ describe("Wrapper lifetime leak probe", function () {
     it("reports the heaps it joined (" + mode + ")", function () {
         expect(report.mode).toBe(mode);
         expect(Array.isArray(report.cycles)).toBe(true);
+        if (!canary) {
+            // Nothing to look for: no dump is taken.
+            expect(report.leaked).toBe(0);
+            expect(report.javaObjects).toBeUndefined();
+            return;
+        }
         expect(report.javaObjects).toBeGreaterThan(0);
         expect(report.jsNodes).toBeGreaterThan(0);
         expect(report.probed).toBeGreaterThan(0);
+        expect(report.truncated).toBe(false);
         expect(report.durationMs).toBeGreaterThan(0);
     });
 
@@ -112,6 +127,16 @@ describe("Wrapper lifetime leak probe", function () {
         }
         expect(cycles.length).toBe(1);
         expect(cycles[0].path).toContain("--java.util.ArrayList.elementData-->");
+    });
+
+    it("finds a cycle through a WeakMap value that references its key", function () {
+        var cycles = cyclesThrough("probeMapped");
+        if (!canary) {
+            expect(cycles.length).toBe(0);
+            return;
+        }
+        expect(cycles.length).toBe(1);
+        expect(cycles[0].path).toContain("--WeakMap value-->");
     });
 
     it("does not report an object Java holds for a reason of its own", function () {

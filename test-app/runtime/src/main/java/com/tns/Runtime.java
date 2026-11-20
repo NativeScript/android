@@ -1305,26 +1305,43 @@ public class Runtime {
     // ns:runtime findLeakCycles(): writes an HPROF dump with the objects of ids pinned in
     // LeakProbe.pinned, in order, so the native analysis can find them. Returns the dump's
     // path, or null if it could not be written.
+    // Returns "" when the probe is not enabled: only debuggable builds, or apps that set
+    // "wrapperLifetime": { "leakProbe": true }, since it suspends the process and writes the
+    // whole heap to disk.
     @RuntimeCallable
     private String dumpHeapForLeakProbe(int[] ids) {
-        Object[] objects = new Object[ids.length];
-        for (int i = 0; i < ids.length; i++) {
-            objects[i] = objectTable.get(ids[i]);
+        boolean enabled = isDebuggable() ||
+                (config != null && config.appConfig != null && config.appConfig.getWrapperLifetimeLeakProbe());
+        if (!enabled) {
+            return "";
         }
-        java.io.File file = null;
-        try {
-            file = java.io.File.createTempFile("ns-leak-probe", ".hprof");
-            LeakProbe.pinned = objects;
-            android.os.Debug.dumpHprofData(file.getAbsolutePath());
-            return file.getAbsolutePath();
-        } catch (Throwable t) {
-            android.util.Log.w("JS", "findLeakCycles could not dump the Java heap", t);
-            if (file != null) {
-                file.delete();
+        // One probe at a time in the process: LeakProbe.pinned is shared by every runtime.
+        synchronized (LeakProbe.class) {
+            LeakProbe.deleteStaleDumps();
+            // Objects only weak entries hold would read as leaked until Java collects them.
+            for (int i = 0; i < 2; i++) {
+                java.lang.Runtime.getRuntime().gc();
+                System.runFinalization();
             }
-            return null;
-        } finally {
-            LeakProbe.pinned = null;
+            Object[] objects = new Object[ids.length];
+            for (int i = 0; i < ids.length; i++) {
+                objects[i] = objectTable.get(ids[i]);
+            }
+            java.io.File file = null;
+            try {
+                file = java.io.File.createTempFile(LeakProbe.DUMP_PREFIX, ".hprof");
+                LeakProbe.pinned = objects;
+                android.os.Debug.dumpHprofData(file.getAbsolutePath());
+                return file.getAbsolutePath();
+            } catch (Throwable t) {
+                android.util.Log.w("JS", "findLeakCycles could not dump the Java heap", t);
+                if (file != null) {
+                    file.delete();
+                }
+                return null;
+            } finally {
+                LeakProbe.pinned = null;
+            }
         }
     }
 

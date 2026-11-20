@@ -13,6 +13,7 @@
 #include "Messaging.h"
 #include "ModuleInternalCallbacks.h"
 #include "NativeScriptAssert.h"
+#include "NativeScriptException.h"
 #include "Runtime.h"
 #include "RuntimeState.h"
 #include "StructuredSerialization.h"
@@ -185,9 +186,17 @@ void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
 }
 
 void FindLeakCyclesCallback(const FunctionCallbackInfo<Value>& info) {
-    Local<Object> report;
-    if (LeakProbe::FindLeakCycles(info.GetIsolate()).ToLocal(&report)) {
-        info.GetReturnValue().Set(report);
+    Isolate* isolate = info.GetIsolate();
+    try {
+        Local<Object> report;
+        if (LeakProbe::FindLeakCycles(isolate).ToLocal(&report)) {
+            info.GetReturnValue().Set(report);
+        }
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    } catch (const std::exception& e) {
+        isolate->ThrowException(Exception::Error(ArgConverter::ConvertToV8String(
+                isolate, std::string("findLeakCycles: ") + e.what())));
     }
 }
 
