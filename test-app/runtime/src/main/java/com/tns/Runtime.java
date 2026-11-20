@@ -313,7 +313,7 @@ public class Runtime {
         runtimesById = index;
     }
 
-    private static Runtime runtimeForId(int runtimeId) {
+    static Runtime runtimeForId(int runtimeId) {
         Runtime[] index = runtimesById;
         if (runtimeId >= 0 && runtimeId < index.length) {
             return index[runtimeId];
@@ -1283,6 +1283,32 @@ public class Runtime {
             logger.write("processFinalizedBatch weakened=" + weakenCount + " checked=" + checkCount);
         }
     }
+
+    // The canary wrapper lifetime mode settles the canaries collected since the last batch:
+    // objects with JS state are held weakly and watched, the others are released. Overwrites
+    // the id of every object that is already gone with -1.
+    @RuntimeCallable
+    private void processCanaryBatch(int[] weaken, int weakenCount, int[] release, int releaseCount) {
+        objectTable.weakenWatched(weaken, weakenCount, runtimeId, WrapperLifetimeWatcher.queue());
+        objectTable.remove(release, releaseCount);
+        if (logger.isEnabled()) {
+            logger.write("processCanaryBatch weakened=" + weakenCount + " released=" + releaseCount);
+        }
+    }
+
+    // A canary is rebuilt for an object the canary mode held weakly.
+    @RuntimeCallable
+    private boolean strengthenInstance(int javaObjectID) {
+        return objectTable.strengthen(javaObjectID);
+    }
+
+    boolean removeWatched(ObjectTable.WatchedRef ref) {
+        return objectTable.removeWatched(ref);
+    }
+
+    // From WrapperLifetimeWatcher's thread: ids[0..count) of the runtime's watched objects
+    // were collected. Thread-safe; the runtime lets go of their JS state on its own thread.
+    static native void notifyCanaryObjectsCollected(int runtimeId, int[] ids, int count);
 
     @RuntimeCallable
     private Object getJavaObjectByID(int javaObjectID) throws Exception {

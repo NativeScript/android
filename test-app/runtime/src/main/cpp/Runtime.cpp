@@ -737,7 +737,8 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
               implementationObject->GetIdentityHash());
 
   jclass clazz = env.FindClass(jniName);
-  m_objectManager->Link(jsInstance, javaObjectID, clazz);
+  m_objectManager->Link(jsInstance, javaObjectID, clazz,
+                        ObjectManager::LinkKind::kExtended);
 }
 
 jint Runtime::GenerateNewObjectId(JNIEnv* env, jobject obj) {
