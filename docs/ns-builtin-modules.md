@@ -184,7 +184,7 @@ every build on cold paths only:
 | `weakened` | Java objects held weakly because their wrapper was collected |
 | `collected` | wrappers released because Java had collected their object |
 | `releasedExplicitly` | links released through `__releaseNativeCounterpart` |
-| `releasedAccesses` | times JS used a wrapper whose Java object Java had already collected |
+| `releasedAccesses` | times JS used a wrapper whose Java object Java had already collected, or called a method on a wrapper whose link was released |
 
 Remote-module security (`security.allowRemoteModules`,
 `security.remoteModuleAllowlist`) is **not** part of this surface. Those

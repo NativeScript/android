@@ -44,10 +44,15 @@ describe("Wrapper lifetime", function () {
         expect(runtime.getWrapperLifetimeStats()).not.toBe(stats);
     });
 
-    it("counts explicit releases", function () {
-        var before = runtime.getWrapperLifetimeStats().releasedExplicitly;
-        __releaseNativeCounterpart(new java.lang.Object());
-        expect(runtime.getWrapperLifetimeStats().releasedExplicitly).toBe(before + 1);
+    it("counts explicit releases, and calls on a released wrapper", function () {
+        var before = runtime.getWrapperLifetimeStats();
+        var released = new java.lang.Object();
+        __releaseNativeCounterpart(released);
+        expect(runtime.getWrapperLifetimeStats().releasedExplicitly).toBe(before.releasedExplicitly + 1);
+        expect(function () {
+            released.hashCode();
+        }).toThrowError(/no longer has available Java instance counterpart/);
+        expect(runtime.getWrapperLifetimeStats().releasedAccesses).toBe(before.releasedAccesses + 1);
     });
 
     if (mode !== "resurrecting") {

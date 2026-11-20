@@ -160,6 +160,9 @@ class ObjectManager {
 
   const WrapperLifetimeStats& GetLifetimeStats() const { return m_lifetimeStats; }
 
+  // JS called a method on a wrapper whose link is gone.
+  void CountReleasedAccess() { m_lifetimeStats.releasedAccesses++; }
+
  private:
   static void InitializeJNI();
 

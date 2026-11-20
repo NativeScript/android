@@ -528,6 +528,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                 ss << "No java object found on which to call \"" << methodName
                    << "\" method. It is possible your Javascript object is not linked with the corresponding Java class. Try passing context(this) to the constructor function.";
             } else {
+                objectManager->CountReleasedAccess();
                 ss << "Failed calling " << methodName << " on a " << className
                    << " instance. The JavaScript instance no longer has available Java instance counterpart.";
             }

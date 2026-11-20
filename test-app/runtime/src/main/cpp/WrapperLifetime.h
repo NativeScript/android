@@ -51,7 +51,8 @@ struct WrapperLifetimeStats {
   uint64_t collected = 0;
   // Links released through __releaseNativeCounterpart.
   uint64_t releasedExplicitly = 0;
-  // Times JS used a wrapper whose Java object was already collected.
+  // Times JS used a wrapper whose Java object was already collected, or
+  // called a method on one whose link was released.
   uint64_t releasedAccesses = 0;
 };
 
