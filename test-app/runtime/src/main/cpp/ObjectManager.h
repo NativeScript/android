@@ -258,6 +258,27 @@ class ObjectManager {
   // Per Java class name (dotted), for ns:runtime's getWrapperClassCounts().
   std::map<std::string, ClassCounts> GetWrapperClassCounts();
 
+  // The runtime's cross-heap edges, for ns:runtime's findLeakCycles()
+  // (LeakProbe). One entry per id with a live wrapper or a canary record.
+  struct LeakProbeEntry {
+    int id = -1;
+    // Dotted Java class name, or "<unknown>".
+    std::string className;
+    // The live wrapper, or empty.
+    v8::Local<v8::Object> wrapper;
+    // The Java object table holds the object strongly for the wrapper.
+    bool wrapperHoldsJava = false;
+    bool canary = false;
+    bool hasRecord = false;
+    // What the canary record keeps alive while Java holds the object.
+    std::vector<v8::Local<v8::Value>> recordValues;
+  };
+
+  // In the caller's HandleScope.
+  std::vector<LeakProbeEntry> GetLeakProbeEntries();
+
+  jobject GetJavaRuntimeObject() const { return m_javaRuntimeObject; }
+
   // Canary mode: adds `unwrap` (a canary -> its Java object's weak-collection
   // key) and `wrap` (key -> live or new canary, or undefined once Java
   // collected the object) to binding, for js/weak-collections.js.

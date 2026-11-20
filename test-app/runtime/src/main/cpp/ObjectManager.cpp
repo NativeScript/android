@@ -1214,6 +1214,60 @@ jobject ObjectManager::JavaObjectOrNull(int javaObjectID) {
   return object;
 }
 
+std::vector<ObjectManager::LeakProbeEntry> ObjectManager::GetLeakProbeEntries() {
+  auto isolate = m_isolate;
+  std::unordered_map<jclass, std::string> names;
+  auto nameOf = [&names](jclass clazz) -> std::string {
+    auto it = names.find(clazz);
+    if (it != names.end()) {
+      return it->second;
+    }
+    std::string name = clazz != nullptr ? GetClassName(clazz) : std::string("<unknown>");
+    std::replace(name.begin(), name.end(), '/', '.');
+    names.emplace(clazz, name);
+    return name;
+  };
+  std::unordered_map<int, size_t> byId;
+  std::vector<LeakProbeEntry> entries;
+  m_idToObject.ForEach([&](ObjectWeakCallbackState* state) {
+    if (!state->linked || state->target->IsEmpty()) {
+      return;
+    }
+    LeakProbeEntry entry;
+    entry.id = static_cast<int>(state->javaObjectID);
+    entry.className = nameOf(state->objectClazz);
+    entry.wrapper = state->target->Get(isolate);
+    entry.canary = state->canary;
+    // A resurrecting wrapper's object turns weak once its wrapper was first collected.
+    entry.wrapperHoldsJava = state->canary || !state->javaWeakened;
+    byId.emplace(entry.id, entries.size());
+    entries.push_back(std::move(entry));
+  });
+  for (const auto& [id, record] : m_canaryRecords) {
+    auto it = byId.find(id);
+    if (it == byId.end()) {
+      LeakProbeEntry entry;
+      entry.id = id;
+      entry.className = nameOf(record->clazz);
+      it = byId.emplace(id, entries.size()).first;
+      entries.push_back(std::move(entry));
+    }
+    LeakProbeEntry& entry = entries[it->second];
+    entry.hasRecord = true;
+    const Global<Value>* kept[] = {&record->prototype, &record->callSuper, &record->metadata,
+                                   &record->implementationObject};
+    for (const Global<Value>* value : kept) {
+      if (!value->IsEmpty()) {
+        entry.recordValues.push_back(value->Get(isolate));
+      }
+    }
+    if (!record->state.IsEmpty()) {
+      entry.recordValues.push_back(record->state.Get(isolate));
+    }
+  }
+  return entries;
+}
+
 void ObjectManager::ReleaseCollectedCanaryStates() {
   if (!m_deathInboxOpen) {
     return;
