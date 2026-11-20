@@ -184,7 +184,7 @@ every build on cold paths only:
 | `weakened` | Java objects held weakly because their wrapper was collected |
 | `collected` | wrappers released because Java had collected their object |
 | `releasedExplicitly` | links released through `__releaseNativeCounterpart` |
-| `releasedAccesses` | times JS used a wrapper whose Java object Java had already collected, or called a method on a wrapper whose link was released |
+| `releasedAccesses` | lookups of the Java object of a wrapper whose link was released or whose Java object Java had already collected: calling its methods, using its fields or passing it to Java. Resolving an overloaded method looks its arguments up too, so one call can count more than once |
 
 Remote-module security (`security.allowRemoteModules`,
 `security.remoteModuleAllowlist`) is **not** part of this surface. Those
