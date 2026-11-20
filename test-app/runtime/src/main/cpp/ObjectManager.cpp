@@ -1565,9 +1565,10 @@ std::vector<ObjectManager::LeakProbeEntry> ObjectManager::GetLeakProbeEntries() 
     entry.id = static_cast<int>(state->javaObjectID);
     entry.className = nameOf(state->objectClazz);
     entry.wrapper = state->target->Get(isolate);
-    entry.canary = state->canary;
-    // A resurrecting wrapper's object turns weak once its wrapper was first collected.
-    entry.wrapperHoldsJava = state->canary || !state->javaWeakened;
+    // A resurrecting wrapper's object turns weak once its wrapper was first collected;
+    // one still queued from its first collection is garbage the next flush settles.
+    entry.wrapperHoldsJava = state->canary || (!state->javaWeakened && !state->queued);
+    entry.javaKeepsWrapper = !state->canary && state->javaWeakened;
     byId.emplace(entry.id, entries.size());
     entries.push_back(std::move(entry));
   });
@@ -1582,7 +1583,6 @@ std::vector<ObjectManager::LeakProbeEntry> ObjectManager::GetLeakProbeEntries() 
       entries.push_back(std::move(entry));
     }
     LeakProbeEntry& entry = entries[it->second];
-    entry.hasRecord = true;
     if (const CanaryClass* cls = record->cls) {
       const Global<Value>* kept[] = {&cls->prototype, &cls->callSuper, &cls->metadata,
                                      &cls->implementationObject};
@@ -1597,6 +1597,28 @@ std::vector<ObjectManager::LeakProbeEntry> ObjectManager::GetLeakProbeEntries() 
     }
   });
   return entries;
+}
+
+jobjectArray ObjectManager::LeakProbeObjects(const std::vector<LeakProbeEntry>& entries) {
+  JEnv env;
+  JNIEnv* raw = env;
+  jclass objectClass = env.FindClass("java/lang/Object");
+  jobjectArray array =
+      objectClass != nullptr
+          ? raw->NewObjectArray(static_cast<jsize>(entries.size()), objectClass, nullptr)
+          : nullptr;
+  if (array == nullptr) {
+    raw->ExceptionClear();
+    return nullptr;
+  }
+  for (size_t i = 0; i < entries.size(); i++) {
+    // Released at once: a local reference to an element would root it in the dump.
+    JniLocalRef object(JavaObjectOrNull(entries[i].id));
+    if (!object.IsNull()) {
+      raw->SetObjectArrayElement(array, static_cast<jsize>(i), object);
+    }
+  }
+  return array;
 }
 #endif
 

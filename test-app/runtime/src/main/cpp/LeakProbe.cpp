@@ -16,6 +16,7 @@
 
 #include "ArgConverter.h"
 #include "JEnv.h"
+#include "JsV8InspectorClient.h"
 #include "JniLocalRef.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
@@ -154,7 +155,8 @@ bool ParseRecords(Reader& in, JavaHeap& heap, std::string& error) {
     in.U4();  // time
     uint32_t length = in.U4();
     if (!in.Has(length)) {
-      break;
+      error = "truncated HPROF record";
+      return false;
     }
     const uint8_t* recordEnd = in.p + length;
     if (tag == 0x01) {  // STRING
@@ -277,7 +279,9 @@ bool ParseRecords(Reader& in, JavaHeap& heap, std::string& error) {
             break;
           }
           default:
-            error = "unknown HPROF heap dump subrecord 0x" + std::to_string(subtag);
+            char hex[3];
+            snprintf(hex, sizeof(hex), "%02x", subtag);
+            error = std::string("unknown HPROF heap dump subrecord 0x") + hex;
             return false;
         }
       }
@@ -287,6 +291,9 @@ bool ParseRecords(Reader& in, JavaHeap& heap, std::string& error) {
       }
     }
     in.p = recordEnd;
+  }
+  if (!in.ok) {
+    error = "truncated HPROF record";
   }
   return in.ok;
 }
@@ -462,6 +469,8 @@ bool IsEphemeronEdge(const HeapGraphEdge* edge, std::string* name) {
   if (edge->GetType() != HeapGraphEdge::kInternal) {
     return false;
   }
+  // GetName makes a handle per call, and the walks call it once per internal edge.
+  HandleScope handles(Isolate::GetCurrent());
   Local<Value> value = edge->GetName();
   if (value.IsEmpty() || !value->IsString()) {
     return false;
@@ -497,12 +506,13 @@ struct Graph {
   uint32_t jsCount = 0;
   std::unordered_map<const HeapGraphNode*, uint32_t> jsIndex;
   std::vector<const HeapGraphNode*> jsNodes;
-  // JS root edges to these snapshot nodes are the runtime's handles to canary
-  // records, not real roots.
+  // "(Global handles)": its edges to runtimeHandleTargets are the runtime's handles
+  // to canary records and resurrected wrappers, not real roots.
+  uint32_t globalHandles = kNone;
   std::unordered_set<uint32_t> runtimeHandleTargets;
   // Cross-heap edges.
   std::unordered_map<uint32_t, std::vector<uint32_t>> wrapperToJava;
-  std::unordered_map<uint32_t, std::vector<uint32_t>> javaToRecord;
+  std::unordered_map<uint32_t, std::vector<uint32_t>> javaToJs;
 
   uint32_t JavaNode(uint32_t index) const { return jsCount + index; }
   bool IsJava(uint32_t node) const { return node >= jsCount; }
@@ -512,7 +522,6 @@ struct Graph {
   void ForEachEdge(uint32_t node, bool fromRoots, F&& visit) const {
     if (!IsJava(node)) {
       const HeapGraphNode* js = jsNodes[node];
-      bool synthetic = js->GetType() == HeapGraphNode::kSynthetic;
       for (int i = 0; i < js->GetChildrenCount(); i++) {
         const HeapGraphEdge* edge = js->GetChild(i);
         if (edge->GetType() == HeapGraphEdge::kWeak || edge->GetType() == HeapGraphEdge::kShortcut) {
@@ -522,7 +531,7 @@ struct Graph {
         if (it == jsIndex.end()) {
           continue;
         }
-        if (fromRoots && synthetic && runtimeHandleTargets.count(it->second) != 0) {
+        if (fromRoots && node == globalHandles && runtimeHandleTargets.count(it->second) != 0) {
           continue;
         }
         if (IsEphemeronTableEdge(js, edge)) {
@@ -542,8 +551,8 @@ struct Graph {
     for (uint32_t e = java.edgeStart[index]; e < java.edgeStart[index + 1]; e++) {
       visit(JavaNode(java.edgeTo[e]), EdgeRef{nullptr, java.edgeLabel[e]});
     }
-    auto cross = javaToRecord.find(node);
-    if (cross != javaToRecord.end()) {
+    auto cross = javaToJs.find(node);
+    if (cross != javaToJs.end()) {
       for (uint32_t target : cross->second) {
         visit(target, EdgeRef{});
       }
@@ -576,7 +585,7 @@ struct Graph {
     if (edge.javaLabel != kNone) {
       return java.labels[edge.javaLabel];
     }
-    return IsJava(from) ? "ns:record" : "ns:wrapper";
+    return IsJava(from) ? "ns:kept" : "ns:wrapper";
   }
 };
 
@@ -604,10 +613,11 @@ std::vector<uint8_t> Reach(const Graph& graph, uint32_t jsRoot,
 
 // A shortest path from `from` to `to` through unreached nodes, closed by the
 // runtime's edge from `to` (a wrapper) back to `from` (its Java object), as
-// alternating node and edge labels; empty when there is none within the limit.
+// alternating node and edge labels; empty when there is none, or none within the
+// limit, which sets *limited.
 std::vector<uint32_t> FindCycle(const Graph& graph, const std::vector<uint8_t>& reached,
                                 uint32_t from, uint32_t to, std::vector<std::string>* path,
-                                std::vector<std::string>* nodeLabels) {
+                                std::vector<std::string>* nodeLabels, bool* limited) {
   constexpr size_t kVisitLimit = 2'000'000;
   std::unordered_map<uint32_t, std::pair<uint32_t, EdgeRef>> parent;
   std::deque<uint32_t> queue;
@@ -629,6 +639,9 @@ std::vector<uint32_t> FindCycle(const Graph& graph, const std::vector<uint8_t>& 
     });
   }
   if (!found) {
+    if (!queue.empty()) {
+      *limited = true;
+    }
     return {};
   }
   std::vector<std::pair<uint32_t, EdgeRef>> steps;  // node, edge out of it
@@ -710,13 +723,16 @@ MaybeLocal<Object> LeakProbe::FindLeakCycles(Isolate* isolate) {
   }
 
   // The snapshot first, before this call holds a handle to any wrapper or state:
-  // a handle would root it.
+  // a handle would root it. Settled before it: a wrapper the snapshot's own
+  // collection finds dead would still read as holding its Java object.
+  isolate->LowMemoryNotification();
   objectManager->FlushFinalizedBatchIfPending();
   HeapProfiler* profiler = isolate->GetHeapProfiler();
   // A snapshot leaves V8 tracking object moves, at a cost on every scavenge,
-  // until its object ids are cleared. Cleared afterwards unless something else
-  // (DevTools) already holds snapshots and so relies on the ids.
-  bool clearIds = profiler->GetSnapshotCount() == 0;
+  // until its object ids are cleared. DevTools relies on those ids, and while it
+  // records allocations on the map behind them, so they are kept while it is
+  // connected.
+  bool clearIds = profiler->GetSnapshotCount() == 0 && !JsV8InspectorClient::IsConnected();
   const HeapSnapshot* snapshot = profiler->TakeHeapSnapshot();
   if (snapshot == nullptr) {
     return fail("could not take a heap snapshot");
@@ -736,29 +752,40 @@ MaybeLocal<Object> LeakProbe::FindLeakCycles(Isolate* isolate) {
   std::vector<ObjectManager::LeakProbeEntry> entries = objectManager->GetLeakProbeEntries();
 
   // The Java heap, with the entries' objects pinned in order.
+  struct ProbeMethods {
+    jclass clazz = nullptr;
+    jmethodID collectGarbage = nullptr;
+    jmethodID dump = nullptr;
+  };
+  static const ProbeMethods methods = [] {
+    JEnv env;
+    JNIEnv* raw = env;
+    ProbeMethods found;
+    found.clazz = env.FindClass("com/tns/LeakProbe");
+    if (found.clazz != nullptr) {
+      found.collectGarbage = raw->GetStaticMethodID(found.clazz, "collectGarbage", "()V");
+      found.dump = raw->GetStaticMethodID(found.clazz, "dump",
+                                          "([Ljava/lang/Object;)Ljava/lang/String;");
+    }
+    raw->ExceptionClear();
+    return found;
+  }();
+  if (methods.collectGarbage == nullptr || methods.dump == nullptr) {
+    return fail("this runtime has no com.tns.LeakProbe");
+  }
   JEnv env;
   JNIEnv* raw = env;
-  JniLocalRef ids(raw->NewIntArray(static_cast<jsize>(entries.size())));
-  if (ids.IsNull()) {
+  raw->CallStaticVoidMethod(methods.clazz, methods.collectGarbage);
+  if (raw->ExceptionCheck()) {
     raw->ExceptionClear();
+    return fail("the Java collection failed");
+  }
+  JniLocalRef objects(objectManager->LeakProbeObjects(entries));
+  if (objects.IsNull()) {
     return fail("out of memory");
   }
-  {
-    std::vector<jint> values;
-    values.reserve(entries.size());
-    for (const auto& entry : entries) {
-      values.push_back(entry.id);
-    }
-    raw->SetIntArrayRegion((jintArray) ids, 0, static_cast<jsize>(values.size()), values.data());
-  }
-  static jmethodID dumpMethod = nullptr;
-  if (dumpMethod == nullptr) {
-    JniLocalRef runtimeClass(raw->GetObjectClass(objectManager->GetJavaRuntimeObject()));
-    dumpMethod = raw->GetMethodID((jclass) runtimeClass, "dumpHeapForLeakProbe",
-                                  "([I)Ljava/lang/String;");
-  }
-  JniLocalRef pathRef(raw->CallObjectMethod(objectManager->GetJavaRuntimeObject(), dumpMethod,
-                                            (jintArray) ids));
+  JniLocalRef pathRef(
+      raw->CallStaticObjectMethod(methods.clazz, methods.dump, (jobjectArray) objects));
   if (raw->ExceptionCheck()) {
     raw->ExceptionClear();
     return fail("the Java heap dump failed");
@@ -792,6 +819,12 @@ MaybeLocal<Object> LeakProbe::FindLeakCycles(Isolate* isolate) {
     const HeapGraphNode* node = snapshot->GetNode(static_cast<int>(i));
     graph.jsNodes.push_back(node);
     graph.jsIndex.emplace(node, i);
+    if (graph.globalHandles == kNone && node->GetType() == HeapGraphNode::kSynthetic) {
+      HandleScope handles(isolate);
+      if (ToUtf8(isolate, node->GetName()) == "(Global handles)") {
+        graph.globalHandles = i;
+      }
+    }
   }
   auto jsNodeOf = [&](Local<Value> value) -> uint32_t {
     if (value.IsEmpty() || !value->IsObject()) {
@@ -820,22 +853,30 @@ MaybeLocal<Object> LeakProbe::FindLeakCycles(Isolate* isolate) {
 
   for (size_t i = 0; i < entries.size(); i++) {
     const auto& entry = entries[i];
+    // The runtime's handles are never roots, even to what an object the probe's own
+    // Java collection let go of kept: the next flush lets go of it too.
+    std::vector<uint32_t> kept;
+    for (Local<Value> value : entry.recordValues) {
+      uint32_t node = jsNodeOf(value);
+      if (node != kNone) {
+        kept.push_back(node);
+      }
+    }
+    uint32_t wrapperNode = entry.wrapper.IsEmpty() ? kNone : jsNodeOf(entry.wrapper);
+    if (wrapperNode != kNone && entry.javaKeepsWrapper) {
+      kept.push_back(wrapperNode);
+    }
+    graph.runtimeHandleTargets.insert(kept.begin(), kept.end());
     if (javaOf[i] == kNone) {
       continue;
     }
     uint32_t javaNode = graph.JavaNode(javaOf[i]);
-    if (!entry.wrapper.IsEmpty() && entry.wrapperHoldsJava) {
-      uint32_t wrapperNode = jsNodeOf(entry.wrapper);
-      if (wrapperNode != kNone) {
-        graph.wrapperToJava[wrapperNode].push_back(javaNode);
-      }
+    if (wrapperNode != kNone && entry.wrapperHoldsJava) {
+      graph.wrapperToJava[wrapperNode].push_back(javaNode);
     }
-    for (Local<Value> value : entry.recordValues) {
-      uint32_t node = jsNodeOf(value);
-      if (node != kNone) {
-        graph.javaToRecord[javaNode].push_back(node);
-        graph.runtimeHandleTargets.insert(node);
-      }
+    if (!kept.empty()) {
+      auto& edges = graph.javaToJs[javaNode];
+      edges.insert(edges.end(), kept.begin(), kept.end());
     }
   }
 
@@ -862,7 +903,6 @@ MaybeLocal<Object> LeakProbe::FindLeakCycles(Isolate* isolate) {
   std::vector<size_t> leaked;
   std::unordered_set<size_t> leakedSet;
   std::vector<uint32_t> wrapperOf(entries.size(), kNone);
-  bool canaryMode = GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary;
   for (size_t i = 0; i < entries.size(); i++) {
     if (javaOf[i] == kNone) {
       continue;
@@ -872,7 +912,7 @@ MaybeLocal<Object> LeakProbe::FindLeakCycles(Isolate* isolate) {
     if (!entries[i].wrapper.IsEmpty() && entries[i].wrapperHoldsJava) {
       wrapperOf[i] = jsNodeOf(entries[i].wrapper);
     }
-    if (canaryMode && !reached[javaNode] && wrapperOf[i] != kNone) {
+    if (!reached[javaNode] && wrapperOf[i] != kNone) {
       leaked.push_back(i);
       leakedSet.insert(i);
     }
@@ -896,8 +936,10 @@ MaybeLocal<Object> LeakProbe::FindLeakCycles(Isolate* isolate) {
     }
     std::vector<std::string> pathLabels;
     std::vector<std::string> nodeLabels;
+    bool limited = false;
     std::vector<uint32_t> nodes = FindCycle(graph, reached, graph.JavaNode(javaOf[i]),
-                                            wrapperOf[i], &pathLabels, &nodeLabels);
+                                            wrapperOf[i], &pathLabels, &nodeLabels, &limited);
+    truncated = truncated || limited;
     if (nodes.empty()) {
       continue;
     }
@@ -914,7 +956,7 @@ MaybeLocal<Object> LeakProbe::FindLeakCycles(Isolate* isolate) {
     Set(isolate, context, cycle, "signature", ArgConverter::ConvertToV8String(isolate, signature));
     Set(isolate, context, cycle, "path", ToArray(isolate, context, pathLabels));
     Set(isolate, context, cycle, "members", ToArray(isolate, context, members));
-    (void) cycles->Set(context, cycleCount++, cycle);
+    (void) cycles->CreateDataProperty(context, cycleCount++, cycle);
   }
 
   auto elapsed = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started);
