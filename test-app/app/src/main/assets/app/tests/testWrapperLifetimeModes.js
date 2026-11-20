@@ -309,6 +309,45 @@ describe("Wrapper lifetime modes", function () {
         }, done, "the Java object or its state stayed alive");
     }, 20000);
 
+    it("drops a call finalize() makes into a JS-implemented method", function (done) {
+        var Finalizable = com.tns.tests.FinalizeCallsOverride;
+        var Override = Finalizable.extend({
+            onFinalize: function () {
+                return 7;
+            }
+        });
+        Finalizable.failure = null;
+        var finalized = Finalizable.finalized;
+        (function () {
+            var instance = new Override();
+            instance.tag = "state";
+        })();
+        var deadline = Date.now() + 10000;
+        (function poll() {
+            // No runFinalization(): the finalizer needs the isolate this thread would hold.
+            gc();
+            crossIntoJava();
+            java.lang.Runtime.getRuntime().gc();
+            if (Finalizable.finalized > finalized) {
+                var failure = Finalizable.failure;
+                expect(failure === null ? null : String(failure)).toBe(null);
+                if (canary) {
+                    expect(Finalizable.lastResult).toBe(0);
+                } else {
+                    // The resurrected wrapper may still be linked when Java finalizes.
+                    expect([0, 7]).toContain(Finalizable.lastResult);
+                }
+                done();
+                return;
+            }
+            if (Date.now() > deadline) {
+                done.fail("Java did not finalize the object");
+                return;
+            }
+            setTimeout(poll, 50);
+        })();
+    }, 20000);
+
     // The contract: the state is rooted until Java collects the object, so state that
     // references its own object keeps it alive. Break such back references with a WeakRef.
     it("keeps an extended object whose JS state references it", function () {
