@@ -139,6 +139,10 @@ class ObjectManager {
     return LinkedIdOf(object) != -1;
   }
 
+  // Whether object, seen through any Proxy and the TypeScript layout, is a wrapper whose
+  // link was released or whose Java object was collected.
+  static bool IsReleasedWrapper(const v8::Local<v8::Object>& object);
+
   /*
    * The innermost target of a Proxy chain; any other value is returned as is.
    * A revoked Proxy anywhere in the chain yields null. Internal fields and
@@ -167,9 +171,6 @@ class ObjectManager {
   enum class MetadataNodeKeys { JsInfo, CallSuper, Metadata, END };
 
   const WrapperLifetimeStats& GetLifetimeStats() const { return m_lifetimeStats; }
-
-  // JS called a method on a wrapper whose link is gone.
-  void CountReleasedAccess() { m_lifetimeStats.releasedAccesses++; }
 
  private:
   static void InitializeJNI();
@@ -269,6 +270,9 @@ class ObjectManager {
   bool ScheduleFinalizedBatchFlush(double delayMs = 0);
 
   void ReleaseCollectedWrapper(int javaObjectID);
+
+  // A link that is gone leaves null in JsInfo; a link never made leaves undefined.
+  void MarkLinkReleased(const v8::Local<v8::Object>& object);
 
   // Drops id's registrations on both sides if Java has collected its object.
   bool ReleaseIfCollected(int javaObjectID);

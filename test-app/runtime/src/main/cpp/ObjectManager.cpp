@@ -107,6 +107,9 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(
     const Local<Object>& object) {
   JSInstanceInfo* jsInstanceInfo = GetJSInstanceInfo(object);
   if (jsInstanceInfo == nullptr) {
+    if (IsReleasedWrapper(object)) {
+      m_lifetimeStats.releasedAccesses++;
+    }
     return JniLocalRef();
   }
   try {
@@ -291,6 +294,25 @@ bool ObjectManager::IsJsRuntimeObject(const v8::Local<v8::Object>& object) {
   int internalFieldCount = object->InternalFieldCount();
   return internalFieldCount == static_cast<int>(MetadataNodeKeys::END) ||
          internalFieldCount == V8_ARRAY_BUFFER_INTERNAL_FIELD_COUNT;
+}
+
+void ObjectManager::MarkLinkReleased(const Local<Object>& object) {
+  object->SetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo), Null(m_isolate));
+}
+
+bool ObjectManager::IsReleasedWrapper(const Local<Object>& object) {
+  auto target = UnwrapProxy(object);
+  if (!target->IsObject() || !HasMetadataField(target.As<Object>())) {
+    return false;
+  }
+  auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+  auto field = target.As<Object>()->GetInternalField(jsInfoIdx).As<Value>();
+  if (!field->IsUndefined()) {
+    return field->IsNull();
+  }
+  auto prototype = target.As<Object>()->GetPrototype();
+  return prototype->IsObject() && HasMetadataField(prototype.As<Object>()) &&
+         prototype.As<Object>()->GetInternalField(jsInfoIdx).As<Value>()->IsNull();
 }
 
 jweak ObjectManager::GetJavaObjectByID(uint32_t javaObjectID, bool validate) {
@@ -772,8 +794,7 @@ void ObjectManager::ReleaseCollectedWrapper(int javaObjectID) {
   m_lifetimeStats.collected++;
   Persistent<Object>* po = state->target;
   if (state->linked) {
-    auto object = po->Get(m_isolate);
-    object->SetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo), Undefined(m_isolate));
+    MarkLinkReleased(po->Get(m_isolate));
   }
   m_idToObject.Erase(javaObjectID);
   po->Reset();
@@ -906,7 +927,6 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
     throw NativeScriptException("Trying to release a non native object!");
   }
 
-  auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
   auto javaObjectID = LinkedIdOf(owner);
 
   JEnv env;
@@ -923,7 +943,7 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
     state->linked = false;
   }
 
-  owner->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+  MarkLinkReleased(owner);
 
   // Every alias of the link is cleared with it.
   Local<Value> aliasesValue;
@@ -935,7 +955,7 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
       Local<Value> alias;
       if (aliases->Get(context, i).ToLocal(&alias) && alias->IsObject() &&
           IsJsRuntimeObject(alias.As<Object>())) {
-        alias.As<Object>()->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+        MarkLinkReleased(alias.As<Object>());
       }
     }
   }

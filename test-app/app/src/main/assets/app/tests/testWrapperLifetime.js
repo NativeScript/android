@@ -55,10 +55,29 @@ describe("Wrapper lifetime", function () {
         expect(runtime.getWrapperLifetimeStats().releasedAccesses).toBe(before.releasedAccesses + 1);
 
         // Not a wrapper at all: not a released access.
-        expect(function () {
-            new java.lang.Object().hashCode.call({});
-        }).toThrow();
+        var hashCode = new java.lang.Object().hashCode;
+        [{}, new ArrayBuffer(8), new Int8Array(8)].forEach(function (receiver) {
+            expect(function () {
+                hashCode.call(receiver);
+            }).toThrow();
+        });
         expect(runtime.getWrapperLifetimeStats().releasedAccesses).toBe(before.releasedAccesses + 1);
+    });
+
+    it("counts field accesses on, and arguments of, a released wrapper", function () {
+        var point = new android.graphics.Point(1, 2);
+        __releaseNativeCounterpart(point);
+        var before = runtime.getWrapperLifetimeStats().releasedAccesses;
+        expect(function () {
+            return point.x;
+        }).toThrowError(/no corresponding Java object/);
+        expect(runtime.getWrapperLifetimeStats().releasedAccesses).toBe(before + 1);
+
+        // Resolving an overload looks the argument up too, so one call can count more than once.
+        expect(function () {
+            java.lang.String.valueOf(point);
+        }).toThrow();
+        expect(runtime.getWrapperLifetimeStats().releasedAccesses).toBeGreaterThan(before + 1);
     });
 
     it("reports counters as own properties whatever Object.prototype defines", function () {
