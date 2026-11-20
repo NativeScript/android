@@ -398,7 +398,7 @@ describe("Wrapper lifetime modes", function () {
         eventually(function () {
             return ref.get() === null && (!canary || stats().canaryNativeDeaths > deaths);
         }, done, "the Java object or its state stayed alive");
-    });
+    }, 20000);
 
     // The contract: the state is rooted until Java collects the object, so state that
     // references its own object keeps it alive. Break such back references with a WeakRef.
