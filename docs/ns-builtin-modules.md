@@ -256,9 +256,24 @@ state, and a rebuilt canary has the prototype it was built with (V8 reports
 no prototype change to the handler). Native `#private` fields are branded on
 the canary and do not carry over.
 A canary built after another died is a new JS object, which `===` cannot tell
-because nothing kept the old one, but which keys `WeakMap`, `WeakSet`,
-`WeakRef` and `FinalizationRegistry` entries separately.
-`__releaseNativeCounterpart` drops the object's state with its link.
+because nothing kept the old one. `__releaseNativeCounterpart` drops the
+object's state with its link.
+
+**Weak collections.** What could notice a new canary is whatever keys on the
+old one without keeping it, so in canary mode a builtin
+(`js/weak-collections.js`) replaces `WeakMap`, `WeakSet`, `WeakRef` and
+`FinalizationRegistry` with subclasses that key a Java object whose wrapper is
+a canary by an opaque, frozen key its state holds. Entries and targets
+therefore live exactly as long as the Java object; `WeakRef.prototype.deref`
+(and the `get` alias) returns the live canary, a new one with the object's
+state, or `undefined` once Java collected the object. `set`, `add`,
+`getOrInsert`, `new WeakRef` and `register` create the key; lookups never do,
+so probing an object gives it no state. A Proxy around a Java object stays a
+key of its own, and every other value passes through to the standard
+collection. The cost is the other side of the same rooting: a `WeakMap` value
+that references its Java key keeps the key, its state and so the Java object
+alive for as long as the map lives. Each operation costs one native call in
+canary mode, whatever the key.
 
 Remote-module security (`security.allowRemoteModules`,
 `security.remoteModuleAllowlist`) is **not** part of this surface. Those
