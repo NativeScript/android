@@ -1,0 +1,195 @@
+// Holds in every wrapper lifetime mode: in "canary" the collections key a Java object by
+// its lifetime key, elsewhere the wrapper itself outlives the JS references.
+describe("Weak collections of Java objects", function () {
+    var runtime = require("ns:runtime");
+    var mode = runtime.getConfig("wrapperLifetimeMode");
+    var canary = mode === "canary";
+    var Holder = com.tns.tests.WrapperHolder;
+
+    function collectJava() {
+        for (var i = 0; i < 3; i++) {
+            java.lang.Runtime.getRuntime().gc();
+            java.lang.System.runFinalization();
+        }
+    }
+
+    function crossIntoJava() {
+        java.lang.System.nanoTime();
+    }
+
+    // Lets JS drop every wrapper nothing references.
+    function collectBoth() {
+        gc();
+        crossIntoJava();
+        collectJava();
+        gc();
+        crossIntoJava();
+    }
+
+    function eventually(predicate, done, message) {
+        var deadline = Date.now() + 10000;
+        (function poll() {
+            collectBoth();
+            collectJava();
+            if (predicate()) {
+                done();
+                return;
+            }
+            if (Date.now() > deadline) {
+                done.fail(message);
+                return;
+            }
+            setTimeout(poll, 50);
+        })();
+    }
+
+    // A JS-extended object, a canary in every canary scope; Java keeps it in Holder.
+    function heldRunnable() {
+        var runnable = new java.lang.Runnable({ run: function () {} });
+        Holder.held = runnable;
+        return runnable;
+    }
+
+    afterEach(function () {
+        Holder.held = null;
+    });
+
+    it("keeps a WeakMap entry for a Java object across a wrapper change (" + mode + ")", function () {
+        var map = new WeakMap();
+        (function () {
+            map.set(heldRunnable(), "value");
+        })();
+        collectBoth();
+
+        var again = Holder.held;
+        expect(map.has(again)).toBe(true);
+        expect(map.get(again)).toBe("value");
+        expect(map.delete(again)).toBe(true);
+        expect(map.has(again)).toBe(false);
+    });
+
+    it("keeps a WeakSet member for a Java object across a wrapper change", function () {
+        var set = new WeakSet();
+        (function () {
+            set.add(heldRunnable());
+        })();
+        collectBoth();
+
+        expect(set.has(Holder.held)).toBe(true);
+    });
+
+    it("keeps a getOrInsert entry for a Java object across a wrapper change", function () {
+        var map = new WeakMap();
+        if (typeof map.getOrInsert !== "function") {
+            return;
+        }
+        (function () {
+            map.getOrInsert(heldRunnable(), "first");
+        })();
+        collectBoth();
+
+        expect(map.getOrInsert(Holder.held, "second")).toBe("first");
+        var seen;
+        expect(map.getOrInsertComputed(Holder.held, function (key) {
+            seen = key;
+            return "computed";
+        })).toBe("first");
+        expect(seen).toBeUndefined();
+    });
+
+    it("dereferences a WeakRef to a Java-held object while the object lives", function () {
+        var ref = (function () {
+            var runnable = heldRunnable();
+            runnable.tag = "state";
+            return new WeakRef(runnable);
+        })();
+        collectBoth();
+
+        var target = ref.deref();
+        expect(target).toBeDefined();
+        expect(target.tag).toBe("state");
+        expect(ref.get()).toBe(target);
+        expect(target.equals(Holder.held)).toBe(true);
+    });
+
+    it("clears a WeakRef once Java collected the object", function (done) {
+        var ref = (function () {
+            return new WeakRef(new java.lang.Runnable({ run: function () {} }));
+        })();
+        eventually(function () {
+            return ref.deref() === undefined;
+        }, done, "the WeakRef still dereferences");
+    });
+
+    it("runs a FinalizationRegistry callback once Java collected the object", function (done) {
+        var cleaned = false;
+        var registry = new FinalizationRegistry(function (held) {
+            cleaned = held === "held";
+        });
+        (function () {
+            registry.register(new java.lang.Runnable({ run: function () {} }), "held");
+        })();
+        eventually(function () {
+            return cleaned;
+        }, done, "the cleanup callback did not run");
+    });
+
+    it("unregisters a FinalizationRegistry target through a later wrapper of its token", function () {
+        var registry = new FinalizationRegistry(function () {});
+        var target = {};
+        (function () {
+            var runnable = heldRunnable();
+            registry.register(target, "held", runnable);
+        })();
+        collectBoth();
+
+        expect(registry.unregister(Holder.held)).toBe(true);
+        expect(target).toBeDefined();
+    });
+
+    it("rejects a FinalizationRegistry registration whose target is its held value", function () {
+        var registry = new FinalizationRegistry(function () {});
+        var runnable = new java.lang.Runnable({ run: function () {} });
+        expect(function () {
+            registry.register(runnable, runnable);
+        }).toThrowError(TypeError);
+    });
+
+    it("keys a Proxy around a Java object by the Proxy", function () {
+        var runnable = new java.lang.Runnable({ run: function () {} });
+        var proxy = new Proxy(runnable, {});
+        var map = new WeakMap();
+        map.set(proxy, "proxy");
+        expect(map.get(proxy)).toBe("proxy");
+        expect(map.has(runnable)).toBe(false);
+    });
+
+    it("does not give state to a Java object a lookup only probes", function () {
+        var map = new WeakMap();
+        var set = new WeakSet();
+        var runnable = new java.lang.Runnable({ run: function () {} });
+        var states = runtime.getWrapperLifetimeStats().canaryStates;
+        expect(map.get(runnable)).toBeUndefined();
+        expect(map.has(runnable)).toBe(false);
+        expect(set.has(runnable)).toBe(false);
+        expect(map.delete(runnable)).toBe(false);
+        expect(runtime.getWrapperLifetimeStats().canaryStates).toBe(states);
+    });
+
+    it("keeps working as the standard collections for other keys", function () {
+        var map = new WeakMap([[Object, 1]]);
+        var key = {};
+        map.set(key, 2);
+        expect(map.get(Object)).toBe(1);
+        expect(map.get(key)).toBe(2);
+        var ref = new WeakRef(key);
+        expect(ref.deref()).toBe(key);
+        expect(new WeakSet([key]).has(key)).toBe(true);
+        expect(map instanceof WeakMap).toBe(true);
+    });
+
+    it("installs the canary collections only in canary mode", function () {
+        var native = WeakMap.toString().indexOf("[native code]") !== -1;
+        expect(native).toBe(!canary);
+    });
+});
