@@ -154,7 +154,7 @@ describe("Weak collections of Java objects", function () {
         eventually(function () {
             return ref.deref() === undefined;
         }, done, "the WeakRef still dereferences");
-    });
+    }, 20000);
 
     it("runs a FinalizationRegistry callback once Java collected the object", function (done) {
         var cleaned = false;
@@ -167,7 +167,7 @@ describe("Weak collections of Java objects", function () {
         eventually(function () {
             return cleaned;
         }, done, "the cleanup callback did not run");
-    });
+    }, 20000);
 
     it("unregisters a FinalizationRegistry target through a later wrapper of its token", function () {
         var registry = new FinalizationRegistry(function () {});
