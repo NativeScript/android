@@ -138,7 +138,7 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
   m_runtime = env->NewGlobalRef(runtime);
   m_objectManager = new ObjectManager(m_runtime);
   m_state = std::make_unique<RuntimeState>();
-  RuntimeGates::Open(id);
+  RuntimeGates::Open(id, this);
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_id2RuntimeCache.emplace(id, this);
@@ -167,16 +167,6 @@ Runtime* Runtime::GetRuntime(int runtimeId) {
   }
 
   return runtime;
-}
-
-Runtime* Runtime::FindRuntime(int runtimeId) {
-  auto& current = s_current;
-  if (runtimeId == current.id) {
-    return current.runtime;
-  }
-  std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
-  auto itFound = s_id2RuntimeCache.find(runtimeId);
-  return itFound != s_id2RuntimeCache.end() ? itFound->second : nullptr;
 }
 
 Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
@@ -306,10 +296,13 @@ Runtime::~Runtime() {
   }
 
   /*
-   * Idempotent backstop for the erase DestroyRuntime does: a bootstrap that
-   * failed before PrepareV8Runtime ran never reached it. The isolate entry is
-   * matched on value so it cannot evict a new runtime that reused the pointer.
+   * Idempotent backstops for the gate retirement and the erase the teardown
+   * does: a bootstrap that failed before PrepareV8Runtime ran never reached
+   * them. The gate goes first, while every member a pinned thread may read is
+   * still alive. The isolate entry is matched on value so it cannot evict a
+   * new runtime that reused the pointer.
    */
+  RuntimeGates::WaitUntilUnpinnedAndRetire(m_id);
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_id2RuntimeCache.erase(m_id);
@@ -907,11 +900,12 @@ void Runtime::UnwindFailedInit() {
   /*
    * Reuses the two teardown windows rather than adding a third cleanup path.
    * Every step DestroyRuntime takes is null-tolerant, which is what makes it
-   * usable on a runtime that never finished building; the Locker is reentrant,
-   * so it does not matter whether the failure unwound past the one
-   * PrepareV8Runtime holds.
+   * usable on a runtime that never finished building. The caller must not
+   * hold the isolate's Locker: the wait for pins below would deadlock against
+   * a pinned thread waiting for it.
    */
   if (m_isolate != nullptr) {
+    NS_DCHECK(!v8::Locker::IsLocked(m_isolate));
     {
       v8::Locker locker(m_isolate);
       Isolate::Scope isolateScope(m_isolate);
@@ -1292,6 +1286,10 @@ double Runtime::PerformanceNowMillis() {
 
 void Runtime::DestroyRuntime() {
   NS_CHECK(std::this_thread::get_id() == m_ownerThread);
+  NS_DCHECK(v8::Locker::IsLocked(m_isolate));
+  // A thread that pinned this runtime and then waited for the Locker drops
+  // its call when it finds this set.
+  m_destroyed = true;
   CrashBreadcrumbs::UnregisterRuntime(m_id);
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
@@ -1403,10 +1401,8 @@ void Runtime::DestroyRuntime() {
     m_state->Clear();
   }
 
-  // Under the Locker, after everything above: a thread that pinned the gate
-  // and waited for the Locker meanwhile finds the runtime unregistered once it
-  // gets it, and new pins are refused. The isolate is disposed only once those
-  // threads have let go.
+  // New pins are refused from here on; the isolate is disposed only once the
+  // threads already pinned have let go.
   RuntimeGates::Close(m_id);
 }
 

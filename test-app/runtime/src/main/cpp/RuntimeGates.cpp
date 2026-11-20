@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <mutex>
 
+#include "Runtime.h"
 #include "robin_hood.h"
 
 namespace tns {
@@ -12,6 +13,7 @@ namespace RuntimeGates {
 namespace {
 
 struct Gate {
+  Runtime* runtime = nullptr;
   uint32_t pins = 0;
   bool closed = false;
 };
@@ -35,19 +37,30 @@ robin_hood::unordered_map<int, Gate>& Gates() {
 
 }  // namespace
 
-void Open(int id) {
+void Open(int id, Runtime* runtime) {
   std::lock_guard<std::mutex> lock(GatesMutex());
-  Gates()[id] = Gate();
+  Gate gate;
+  gate.runtime = runtime;
+  Gates()[id] = gate;
 }
 
-bool TryPin(int id) {
+Runtime* TryPin(int id) {
   std::lock_guard<std::mutex> lock(GatesMutex());
   auto it = Gates().find(id);
   if (it == Gates().end() || it->second.closed) {
-    return false;
+    return nullptr;
   }
   it->second.pins++;
-  return true;
+  return it->second.runtime;
+}
+
+int TryGenerateObjectId(int id) {
+  std::lock_guard<std::mutex> lock(GatesMutex());
+  auto it = Gates().find(id);
+  if (it == Gates().end() || it->second.closed) {
+    return -1;
+  }
+  return it->second.runtime->GenerateNewObjectId(nullptr, nullptr);
 }
 
 void Unpin(int id) {

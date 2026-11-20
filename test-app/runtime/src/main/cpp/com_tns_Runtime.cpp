@@ -145,33 +145,32 @@ namespace {
  * when `admit`. Entering another thread's runtime pins it first (RuntimeGates,
  * as the iOS runtime's native callbacks do), so a runtime tearing down while
  * this thread waits for the Locker cannot dispose its isolate or free itself
- * before the wait is over, and is found unregistered once the Locker is
- * granted. Get() is null when the call is dropped: the runtime is gone or
- * shutting down.
+ * before the wait is over, and is found destroyed once the Locker is granted.
+ * Get() is null when the call is dropped: the runtime is gone or shutting
+ * down.
  */
 class RuntimeEntry {
 public:
     RuntimeEntry(jint runtimeId, bool admit) {
-        auto current = Runtime::GetCurrentRuntime();
+        auto runtime = Runtime::GetCurrentRuntime();
         // This thread's own runtime is torn down only on this thread.
-        bool own = current != nullptr && current->GetId() == runtimeId;
-        if (!own) {
+        if (runtime == nullptr || runtime->GetId() != runtimeId) {
             m_pin.emplace(runtimeId);
-            if (!*m_pin) {
+            runtime = m_pin->runtime();
+            if (runtime == nullptr) {
                 return;
             }
         }
-        auto runtime = own ? current : Runtime::FindRuntime(runtimeId);
-        if (runtime == nullptr) {
+        auto isolate = runtime->GetIsolate();
+        // A runtime whose bootstrap failed before it had an isolate.
+        if (isolate == nullptr) {
             return;
         }
-        auto isolate = runtime->GetIsolate();
         if (admit) {
             m_admission.emplace(runtime->GetAdmissionGate(), isolate);
         }
         m_locker.emplace(isolate);
-        // The teardown unregisters the runtime under this Locker.
-        if (!own && Runtime::FindRuntime(runtimeId) != runtime) {
+        if (runtime->IsDestroyed()) {
             return;
         }
         m_runtime = runtime;
@@ -186,6 +185,13 @@ private:
     std::optional<AdmissionScope> m_admission;
     std::optional<v8::Locker> m_locker;
 };
+
+// Same tag and wording as the Java side's dropped calls (Runtime.logDiscardedCall).
+void LogDropped(jint runtimeId, const std::string& what) {
+    __android_log_print(ANDROID_LOG_WARN, "Warning",
+                        "NativeScript discarding %s: runtime id=%d is shutting down",
+                        what.c_str(), runtimeId);
+}
 
 }  // namespace
 
@@ -257,6 +263,7 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _en
     RuntimeEntry entry(runtimeId, true);
     auto runtime = entry.Get();
     if (runtime == nullptr) {
+        LogDropped(runtimeId, "call to \"" + ArgConverter::jstringToString(methodName) + "\"");
         return result;
     }
 
@@ -293,6 +300,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv* _e
     RuntimeEntry entry(runtimeId, true);
     auto runtime = entry.Get();
     if (runtime == nullptr) {
+        LogDropped(runtimeId, "the JS instance of a " + ArgConverter::jstringToString(className));
         return;
     }
 
@@ -320,22 +328,14 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv* _e
 // @CriticalNative ABI: no JNIEnv* / jclass.
 static jint generateNewObjectIdCritical_impl(jint runtimeId) {
     try {
+        auto current = Runtime::GetCurrentRuntime();
+        if (current != nullptr && current->GetId() == runtimeId) {
+            return current->GenerateNewObjectId(nullptr, nullptr);
+        }
         // Java registers a call's arguments on the calling thread, without the
         // isolate lock, so this can run on any thread while the runtime tears
-        // down. The counter needs no lock, only the runtime kept allocated.
-        auto current = Runtime::GetCurrentRuntime();
-        std::optional<RuntimePin> pin;
-        if (current == nullptr || current->GetId() != runtimeId) {
-            pin.emplace(runtimeId);
-            if (!*pin) {
-                return 0;
-            }
-        }
-        auto runtime = Runtime::FindRuntime(runtimeId);
-        if (runtime == nullptr) {
-            return 0;
-        }
-        return runtime->GenerateNewObjectId(nullptr, nullptr);
+        // down. -1 is ObjectTable.NO_ID; Java drops the call it was for.
+        return RuntimeGates::TryGenerateObjectId(runtimeId);
     } catch (NativeScriptException& e) {
         e.ReThrowToJava();
     } catch (std::exception e) {
@@ -388,6 +388,7 @@ extern "C" JNIEXPORT jboolean Java_com_tns_Runtime_passExceptionToJsNative(JNIEn
     RuntimeEntry entry(runtimeId, false);
     auto runtime = entry.Get();
     if (runtime == nullptr) {
+        LogDropped(runtimeId, "an exception report");
         return JNI_FALSE;
     }
 
