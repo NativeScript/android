@@ -104,7 +104,7 @@ wrapper.
 | `setConfig(key, value)` | Sets a runtime config key. Throws `TypeError` on an unknown key, an invalid value, or (for process-wide keys) when called from a worker isolate. |
 | `getConfig(key)` | Returns the current value of a config key. Throws `TypeError` on an unknown key. Readable from any isolate. |
 | `getWrapperLifetimeStats()` | Wrapper lifetime counters for the calling isolate (see [Wrapper lifetime](#wrapper-lifetime)). A fresh object on every call. |
-| `getWrapperClassCounts()` | Per Java class name (`<unknown>` for a link whose class was never recorded), the calling isolate's live `wrappers`, the `canaries` among them and the canary `states` (see [Wrapper lifetime](#wrapper-lifetime)). |
+| `getWrapperClassCounts()` | Per Java class name (`<unknown>` for a link whose class was never recorded), the calling isolate's live `wrappers`, the `canaries` among them and the canary `states`, which include those made only for a weak-collection key (see [Wrapper lifetime](#wrapper-lifetime)). |
 | `escapeException(x)` | Returns an `Error` branded so that, when it is thrown back across a native callback boundary, the native caller receives the original native exception `x` carries rather than the runtime's wrapper exception. Idempotent: a branded error is returned unchanged. Throws `TypeError` when called with no argument. The global `interop.escapeException` is this same function (see [Legacy globals](#legacy-globals)). |
 
 *Platform note (Android):* the original exception is the Java throwable `x`
@@ -189,7 +189,7 @@ every build on cold paths only:
 | `collected` | wrappers released because Java had collected their object |
 | `releasedExplicitly` | links released through `__releaseNativeCounterpart` |
 | `releasedAccesses` | lookups of the Java object of a wrapper whose link was released or whose Java object Java had already collected: calling its methods, using its fields or passing it to Java. Resolving an overloaded method looks its arguments up too, so one call can count more than once |
-| `canaryStates` | `"canary"` only: state objects created to hold JS properties |
+| `canaryStates` | `"canary"` only: state objects created to hold JS properties, or to hold the key a weak collection made for the object, in which case no JS property was written |
 | `canaryNativeDeaths` | `"canary"` only: state objects let go of because Java collected their object |
 | `canaryInterceptedWrites` | `"canary"` only: writes to canaries the write handler saw. Canaries without state have no handler |
 | `canaryCachedWrites` | `"canary"` only: of those writes, rewrites of a name the handler knew to be a plain data property of the state, mirrored with one store |
@@ -266,7 +266,9 @@ built later for one of its objects has the Java class's prototype, not
 `X.prototype`, and none of the old canary's JS properties.
 A canary built after another died is a new JS object, which `===` cannot tell
 because nothing kept the old one. `__releaseNativeCounterpart` drops the
-object's state with its link.
+object's state with its link, and the released canary is a plain JS object
+from then on: what the weak collections keyed on its Java object stays keyed
+on it, and lives as long as it does.
 
 **Weak collections.** What could notice a new canary is whatever keys on the
 old one without keeping it, so in canary mode a builtin
@@ -281,8 +283,15 @@ so probing an object gives it no state. A Proxy around a Java object stays a
 key of its own, and every other value passes through to the standard
 collection. The cost is the other side of the same rooting: a `WeakMap` value
 that references its Java key keeps the key, its state and so the Java object
-alive for as long as the map lives. Each operation costs one native call in
-canary mode, whatever the key.
+alive for as long as the map lives. And `deref` builds a canary, which holds
+the Java object strongly until it dies again, so a `WeakRef` to a Java object
+that is dereferenced on every frame or event may keep the object from ever
+being collected. In canary mode, an operation on an object costs a native
+call, and one that can create the key also checks its receiver first so that
+a call that fails leaves no key behind; that check names `has` (or
+`unregister`) in its `TypeError`. The collections are subclasses of the
+standard ones, which shows: `Object.getPrototypeOf(WeakMap.prototype)` is the
+standard prototype, and `WeakMap.toString()` is not native code.
 
 Remote-module security (`security.allowRemoteModules`,
 `security.remoteModuleAllowlist`) is **not** part of this surface. Those
