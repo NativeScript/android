@@ -1,4 +1,5 @@
 #include "Runtime.h"
+#include "RuntimeGates.h"
 
 #include <console/Console.h>
 
@@ -137,6 +138,7 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
   m_runtime = env->NewGlobalRef(runtime);
   m_objectManager = new ObjectManager(m_runtime);
   m_state = std::make_unique<RuntimeState>();
+  RuntimeGates::Open(id);
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     s_id2RuntimeCache.emplace(id, this);
@@ -165,6 +167,16 @@ Runtime* Runtime::GetRuntime(int runtimeId) {
   }
 
   return runtime;
+}
+
+Runtime* Runtime::FindRuntime(int runtimeId) {
+  auto& current = s_current;
+  if (runtimeId == current.id) {
+    return current.runtime;
+  }
+  std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
+  auto itFound = s_id2RuntimeCache.find(runtimeId);
+  return itFound != s_id2RuntimeCache.end() ? itFound->second : nullptr;
 }
 
 Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
@@ -905,6 +917,7 @@ void Runtime::UnwindFailedInit() {
       Isolate::Scope isolateScope(m_isolate);
       DestroyRuntime();
     }
+    RuntimeGates::WaitUntilUnpinnedAndRetire(m_id);
     m_isolate->Dispose();
     m_isolate = nullptr;
   }
@@ -1389,6 +1402,12 @@ void Runtime::DestroyRuntime() {
   if (m_state != nullptr) {
     m_state->Clear();
   }
+
+  // Under the Locker, after everything above: a thread that pinned the gate
+  // and waited for the Locker meanwhile finds the runtime unregistered once it
+  // gets it, and new pins are refused. The isolate is disposed only once those
+  // threads have let go.
+  RuntimeGates::Close(m_id);
 }
 
 Local<Context> Runtime::GetContext() {

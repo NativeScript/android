@@ -92,6 +92,31 @@ describe("Runtime-bound Java->JS dispatch", function () {
         });
     });
 
+    // Callers on other threads take the worker's isolate while it terminates: each call is
+    // answered or dropped, never run against an isolate that is being torn down.
+    it("answers or drops calls other threads make while the worker terminates", function (done) {
+        if (!multithreaded) {
+            // Calls are posted to the worker's looper in this mode, not run under its lock.
+            done();
+            return;
+        }
+
+        startWorker(function (worker) {
+            Holder.startComparing("comparable", 4);
+            setTimeout(function () {
+                worker.terminate();
+                setTimeout(function () {
+                    var results = Array.prototype.slice.call(Holder.stopComparing());
+                    results.forEach(function (result) {
+                        expect([42, 0]).toContain(result);
+                    });
+                    expect(results).toContain(0);
+                    done();
+                }, 1000);
+            }, 50);
+        });
+    });
+
     it("releases a caller whose queued call is discarded when the worker closes", function (done) {
         if (multithreaded) {
             // Calls are never queued on the worker's looper in this mode.

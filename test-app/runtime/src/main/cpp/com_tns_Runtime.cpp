@@ -1,10 +1,12 @@
 #include "V8StringConstants.h"
 #include "Runtime.h"
+#include "RuntimeGates.h"
 #include "NativeScriptException.h"
 #include "CallbackHandlers.h"
 #include "ArgConverter.h"
 #include "MetadataNode.h"
 #include <cstring>
+#include <optional>
 #include <sstream>
 #include <vector>
 #include <android/log.h>
@@ -136,6 +138,57 @@ Runtime* TryGetRuntime(int runtimeId) {
     return runtime;
 }
 
+namespace {
+
+/*
+ * A Java->JS entry's hold on a runtime: its Locker, after the admission gate
+ * when `admit`. Entering another thread's runtime pins it first (RuntimeGates,
+ * as the iOS runtime's native callbacks do), so a runtime tearing down while
+ * this thread waits for the Locker cannot dispose its isolate or free itself
+ * before the wait is over, and is found unregistered once the Locker is
+ * granted. Get() is null when the call is dropped: the runtime is gone or
+ * shutting down.
+ */
+class RuntimeEntry {
+public:
+    RuntimeEntry(jint runtimeId, bool admit) {
+        auto current = Runtime::GetCurrentRuntime();
+        // This thread's own runtime is torn down only on this thread.
+        bool own = current != nullptr && current->GetId() == runtimeId;
+        if (!own) {
+            m_pin.emplace(runtimeId);
+            if (!*m_pin) {
+                return;
+            }
+        }
+        auto runtime = own ? current : Runtime::FindRuntime(runtimeId);
+        if (runtime == nullptr) {
+            return;
+        }
+        auto isolate = runtime->GetIsolate();
+        if (admit) {
+            m_admission.emplace(runtime->GetAdmissionGate(), isolate);
+        }
+        m_locker.emplace(isolate);
+        // The teardown unregisters the runtime under this Locker.
+        if (!own && Runtime::FindRuntime(runtimeId) != runtime) {
+            return;
+        }
+        m_runtime = runtime;
+    }
+
+    tns::Runtime* Get() const { return m_runtime; }
+
+private:
+    tns::Runtime* m_runtime = nullptr;
+    // Released in reverse: the Locker, the admission gate, then the pin.
+    std::optional<RuntimePin> m_pin;
+    std::optional<AdmissionScope> m_admission;
+    std::optional<v8::Locker> m_locker;
+};
+
+}  // namespace
+
 extern "C" JNIEXPORT void Java_com_tns_Runtime_runModule(JNIEnv* _env, jobject obj, jint runtimeId, jstring scriptFile) {
     JEnv::EntryScope envScope(_env);
     auto runtime = TryGetRuntime(runtimeId);
@@ -201,14 +254,13 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _en
     JEnv::EntryScope envScope(_env);
     jobject result = nullptr;
 
-    auto runtime = TryGetRuntime(runtimeId);
+    RuntimeEntry entry(runtimeId, true);
+    auto runtime = entry.Get();
     if (runtime == nullptr) {
         return result;
     }
 
     auto isolate = runtime->GetIsolate();
-    AdmissionScope admission(runtime->GetAdmissionGate(), isolate);
-    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
     auto context = runtime->GetContext();
@@ -238,14 +290,13 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _en
 
 extern "C" JNIEXPORT void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv* _env, jobject obj, jint runtimeId, jobject javaObject, jint javaObjectID, jstring className) {
     JEnv::EntryScope envScope(_env);
-    auto runtime = TryGetRuntime(runtimeId);
+    RuntimeEntry entry(runtimeId, true);
+    auto runtime = entry.Get();
     if (runtime == nullptr) {
         return;
     }
 
     auto isolate = runtime->GetIsolate();
-    AdmissionScope admission(runtime->GetAdmissionGate(), isolate);
-    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
     auto context = runtime->GetContext();
@@ -323,13 +374,13 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_unlock(JNIEnv* env, jobject obj, 
 }
 
 extern "C" JNIEXPORT jboolean Java_com_tns_Runtime_passExceptionToJsNative(JNIEnv* env, jobject obj, jint runtimeId, jthrowable exception, jstring message, jstring fullStackTrace, jstring jsStackTrace, jboolean isDiscarded) {
-    auto runtime = TryGetRuntime(runtimeId);
+    RuntimeEntry entry(runtimeId, false);
+    auto runtime = entry.Get();
     if (runtime == nullptr) {
         return JNI_FALSE;
     }
 
     auto isolate = runtime->GetIsolate();
-    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
     auto context = runtime->GetContext();

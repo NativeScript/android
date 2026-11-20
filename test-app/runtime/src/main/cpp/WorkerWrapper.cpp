@@ -1,4 +1,5 @@
 #include "WorkerWrapper.h"
+#include "RuntimeGates.h"
 
 #include <android/looper.h>
 #include <pthread.h>
@@ -784,6 +785,9 @@ void WorkerWrapper::BackgroundLooper(std::shared_ptr<WorkerWrapper> self) {
             isolate->RemoveNearHeapLimitCallback(WorkerWrapper::OnNearHeapLimit, 0);
             runtime_->DestroyRuntime();
         }
+        // Without the Locker: a thread pinned in a Java->JS call may be
+        // waiting for it, and lets go once it finds the runtime unregistered.
+        RuntimeGates::WaitUntilUnpinnedAndRetire(runtime_->GetId());
         isolate->Dispose();
         // Dispose freed the isolate's memory, so its address can be reused by
         // a concurrent Isolate::New - drop the platform's loop entry now, not

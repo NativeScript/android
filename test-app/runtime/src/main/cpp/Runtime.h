@@ -87,6 +87,9 @@ class Runtime {
 
         static Runtime* GetRuntime(int runtimeId);
 
+        // The runtime with this id, or null; never throws.
+        static Runtime* FindRuntime(int runtimeId);
+
         static Runtime* GetRuntime(v8::Isolate* isolate);
 
         static Runtime* GetRuntimeFromIsolateData(v8::Isolate* isolate);
