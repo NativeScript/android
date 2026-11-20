@@ -1,5 +1,16 @@
 describe("Test multithreaded javascript ", () => {
+    let multithreaded;
+    beforeAll(done => {
+        require("./multithreadedJavascript")().then(enabled => {
+            multithreaded = enabled;
+            done();
+        });
+    });
+
     it("Should execute callbacks on specified native thread", done => {
+        if (!multithreaded) {
+            pending("needs android.enableMultithreadedJavascript");
+        }
         const currentThreadId = java.lang.Thread.currentThread().getId();
         new java.lang.Thread(new java.lang.Runnable({
             run() {
