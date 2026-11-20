@@ -26,8 +26,7 @@ class AppConfig {
         UncaughtErrorPolicy("uncaughtErrorPolicy", "report"),
         InterfaceProxies("interfaceProxies", false),
         WrapperLifetimeMode("mode", "resurrecting"),
-        WrapperLifetimeScope("scope", "extended"),
-        WrapperLifetimeLeakProbe("leakProbe", false);
+        WrapperLifetimeScope("scope", "extended");
 
         private final String name;
         private final Object defaultValue;
@@ -183,12 +182,6 @@ class AppConfig {
                 Log.w("JS", String.format("Unknown wrapperLifetime mode %s; using \"resurrecting\".", JSONObject.quote(String.valueOf(mode))));
             }
         }
-        Object leakProbe = object.opt(KnownKeys.WrapperLifetimeLeakProbe.getName());
-        if (leakProbe instanceof Boolean) {
-            values[KnownKeys.WrapperLifetimeLeakProbe.ordinal()] = leakProbe;
-        } else if (leakProbe != null) {
-            Log.w("JS", "wrapperLifetime leakProbe must be a boolean; using false.");
-        }
         Object scope = object.opt(KnownKeys.WrapperLifetimeScope.getName());
         if (scope != null) {
             if ("extended".equals(scope) || "all".equals(scope)) {
@@ -201,10 +194,6 @@ class AppConfig {
 
     public String getWrapperLifetimeMode() {
         return (String)values[KnownKeys.WrapperLifetimeMode.ordinal()];
-    }
-
-    public boolean getWrapperLifetimeLeakProbe() {
-        return (boolean)values[KnownKeys.WrapperLifetimeLeakProbe.ordinal()];
     }
 
     public String getWrapperLifetimeScope() {

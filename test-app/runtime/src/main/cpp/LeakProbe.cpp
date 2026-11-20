@@ -767,11 +767,6 @@ MaybeLocal<Object> LeakProbe::FindLeakCycles(Isolate* isolate) {
     return fail("the Java heap dump failed; see the log");
   }
   std::string path = ArgConverter::jstringToString((jstring) pathRef);
-  if (path.empty()) {
-    return fail(
-        "available in debuggable builds, or with \"wrapperLifetime\": { \"leakProbe\": true } "
-        "in the app config");
-  }
   struct RemoveFile {
     std::string path;
     ~RemoveFile() { unlink(path.c_str()); }

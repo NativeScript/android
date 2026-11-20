@@ -105,7 +105,7 @@ wrapper.
 | `getConfig(key)` | Returns the current value of a config key. Throws `TypeError` on an unknown key. Readable from any isolate. |
 | `getWrapperLifetimeStats()` | Wrapper lifetime counters for the calling isolate (see [Wrapper lifetime](#wrapper-lifetime)). A fresh object on every call. |
 | `getWrapperClassCounts()` | Per Java class name (`<unknown>` for a link whose class was never recorded), the calling isolate's live `wrappers`, the `canaries` among them and the canary `states` (see [Wrapper lifetime](#wrapper-lifetime)). |
-| `findLeakCycles()` | Experimental and slow, debuggable builds or `"wrapperLifetime": { "leakProbe": true }` only: joins a V8 heap snapshot and a Java heap dump to find the JS ↔ Java cycles canary mode keeps alive (see [Wrapper lifetime](#wrapper-lifetime)). |
+| `findLeakCycles()` | Experimental and slow, debug builds only (release builds throw): joins a V8 heap snapshot and a Java heap dump to find the JS ↔ Java cycles canary mode keeps alive (see [Wrapper lifetime](#wrapper-lifetime)). |
 | `escapeException(x)` | Returns an `Error` branded so that, when it is thrown back across a native callback boundary, the native caller receives the original native exception `x` carries rather than the runtime's wrapper exception. Idempotent: a branded error is returned unchanged. Throws `TypeError` when called with no argument. The global `interop.escapeException` is this same function (see [Legacy globals](#legacy-globals)). |
 
 *Platform note (Android):* the original exception is the Java throwable `x`
@@ -294,9 +294,8 @@ twice before the dump, so objects only weak entries hold are gone and not
 counted. In `"resurrecting"` mode the report is empty and no dump is taken:
 resurrection breaks these cycles.
 
-The probe is available in debuggable builds, or with
-`"wrapperLifetime": { "leakProbe": true }` in the app config; elsewhere it
-throws. It suspends the whole process for the dump, writes the Java heap to
+The probe is built into debug runtimes only; in a release build the function
+exists but throws `findLeakCycles is available in debug builds only`. It suspends the whole process for the dump, writes the Java heap to
 the app's cache directory (deleted once parsed, and swept by the next probe if
 the process died first) and builds graphs of both heaps in native memory, so
 it takes seconds; on the main thread that can trip an ANR. The snapshot and
