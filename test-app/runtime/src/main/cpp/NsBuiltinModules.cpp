@@ -184,13 +184,9 @@ void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
 
 void GetWrapperClassCountsCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
-    ObjectManager* objectManager = Runtime::GetObjectManager(isolate);
-    if (objectManager == nullptr) {
-        return;
-    }
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> result = Object::New(isolate);
-    for (const auto& [name, counts] : objectManager->GetWrapperClassCounts()) {
+    for (const auto& [name, counts] : Runtime::GetObjectManager(isolate)->GetWrapperClassCounts()) {
         Local<Object> entry = Object::New(isolate);
         auto set = [&](const char* key, uint64_t value) {
             (void) entry->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, key),
