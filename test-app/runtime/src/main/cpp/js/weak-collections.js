@@ -6,57 +6,108 @@
 // references while the Java object lives on, and a later wrapper for the same
 // object is a new JS object; keyed by the wrapper, entries and targets would be
 // lost with it. Every other value passes through unchanged.
+//
+// They are subclasses of the native collections, so what subclassing shows is
+// left as it is: Object.getPrototypeOf(WeakMap.prototype) is the native
+// prototype, and WeakMap.toString() is not native code.
 
 const { unwrap, wrap } = binding;
-const { ObjectDefineProperty, TypeError } = primordials;
 const {
   FinalizationRegistry: NativeFinalizationRegistry,
+  FinalizationRegistryPrototypeRegister,
+  FinalizationRegistryPrototypeUnregister,
+  ObjectDefineProperty,
+  ObjectFreeze,
+  SymbolKeyFor,
   WeakMap: NativeWeakMap,
+  WeakMapPrototypeDelete,
+  WeakMapPrototypeGet,
+  WeakMapPrototypeGetOrInsert,
+  WeakMapPrototypeGetOrInsertComputed,
+  WeakMapPrototypeHas,
+  WeakMapPrototypeSet,
   WeakRef: NativeWeakRef,
+  WeakRefPrototypeDeref,
   WeakSet: NativeWeakSet,
-} = globalThis;
+  WeakSetPrototypeAdd,
+  WeakSetPrototypeDelete,
+  WeakSetPrototypeHas,
+} = primordials;
+
+// Only an object can be a canary; anything else goes to the native method as is.
+function isObject(value) {
+  return (typeof value === "object" && value !== null) || typeof value === "function";
+}
+
+// The values the native collections accept as keys and targets.
+function canBeHeldWeakly(value) {
+  return isObject(value) || (typeof value === "symbol" && SymbolKeyFor(value) === undefined);
+}
 
 // unwrap(value, true) makes the key on first use; lookups pass false so they
-// never create state for an object that was never a key.
+// never create state for an object that was never a key. A key is made only
+// once the native method can no longer reject the call, so a failed call leaves
+// no state behind: the receiver is checked first with a method that cannot
+// insert anything.
+function lookupKey(value) {
+  return isObject(value) ? unwrap(value, false) : value;
+}
+
+// Unregistering it finds nothing: it is never a token.
+const receiverProbe = ObjectFreeze({ __proto__: null });
+
 class WeakMap extends NativeWeakMap {
   get(key) {
-    return super.get(unwrap(key, false));
+    return WeakMapPrototypeGet(this, lookupKey(key));
   }
 
   set(key, value) {
-    super.set(unwrap(key, true), value);
+    if (isObject(key)) {
+      WeakMapPrototypeHas(this, undefined);
+      key = unwrap(key, true);
+    }
+    WeakMapPrototypeSet(this, key, value);
     return this;
   }
 
   has(key) {
-    return super.has(unwrap(key, false));
+    return WeakMapPrototypeHas(this, lookupKey(key));
   }
 
   delete(key) {
-    return super.delete(unwrap(key, false));
+    return WeakMapPrototypeDelete(this, lookupKey(key));
   }
 }
 
 // V8 ships the upsert proposal; inherited, these would key on the wrapper.
-if (typeof NativeWeakMap.prototype.getOrInsert === "function") {
+if (WeakMapPrototypeGetOrInsert !== undefined) {
   ObjectDefineProperty(WeakMap.prototype, "getOrInsert", {
     value: function getOrInsert(key, value) {
-      return NativeWeakMap.prototype.getOrInsert.call(this, unwrap(key, true), value);
+      if (isObject(key)) {
+        WeakMapPrototypeHas(this, undefined);
+        key = unwrap(key, true);
+      }
+      return WeakMapPrototypeGetOrInsert(this, key, value);
     },
     writable: true,
     configurable: true,
   });
 }
-if (typeof NativeWeakMap.prototype.getOrInsertComputed === "function") {
+if (WeakMapPrototypeGetOrInsertComputed !== undefined) {
   ObjectDefineProperty(WeakMap.prototype, "getOrInsertComputed", {
     value: function getOrInsertComputed(key, callbackfn) {
-      if (typeof callbackfn !== "function") {
-        throw new TypeError("WeakMap.prototype.getOrInsertComputed: callback is not a function");
+      if (!isObject(key) || typeof callbackfn !== "function") {
+        return WeakMapPrototypeGetOrInsertComputed(this, key, callbackfn);
       }
-      // The callback sees the key it was given, not the lifetime key.
-      return NativeWeakMap.prototype.getOrInsertComputed.call(this, unwrap(key, true), () =>
-        callbackfn(key),
-      );
+      const existing = unwrap(key, false);
+      if (WeakMapPrototypeHas(this, existing)) {
+        return WeakMapPrototypeGet(this, existing);
+      }
+      // Before the key exists, so a callback that throws leaves none; it sees
+      // the key it was given, not the lifetime key.
+      const value = callbackfn(key);
+      WeakMapPrototypeSet(this, unwrap(key, true), value);
+      return value;
     },
     writable: true,
     configurable: true,
@@ -65,22 +116,26 @@ if (typeof NativeWeakMap.prototype.getOrInsertComputed === "function") {
 
 class WeakSet extends NativeWeakSet {
   add(value) {
-    super.add(unwrap(value, true));
+    if (isObject(value)) {
+      WeakSetPrototypeHas(this, undefined);
+      value = unwrap(value, true);
+    }
+    WeakSetPrototypeAdd(this, value);
     return this;
   }
 
   has(value) {
-    return super.has(unwrap(value, false));
+    return WeakSetPrototypeHas(this, lookupKey(value));
   }
 
   delete(value) {
-    return super.delete(unwrap(value, false));
+    return WeakSetPrototypeDelete(this, lookupKey(value));
   }
 }
 
 class WeakRef extends NativeWeakRef {
   constructor(target) {
-    const key = unwrap(target, true);
+    const key = isObject(target) ? unwrap(target, true) : target;
     super(key);
     // The target itself, not only its key, stays alive until the job ends.
     if (key !== target) {
@@ -93,8 +148,13 @@ class WeakRef extends NativeWeakRef {
   // target, the wrapper it returns stays alive until the job ends, so a second
   // deref in the same job sees the same object.
   deref() {
-    const result = wrap(super.deref());
-    if (typeof result === "object" && result !== null) {
+    const target = WeakRefPrototypeDeref(this);
+    if (!isObject(target)) {
+      return target;
+    }
+    const result = wrap(target);
+    // The native deref already keeps a target it returns as is.
+    if (result !== target && result !== undefined) {
       new NativeWeakRef(result);
     }
     return result;
@@ -114,20 +174,25 @@ class FinalizationRegistry extends NativeFinalizationRegistry {
     super(cleanupCallback);
   }
 
-  register(target, heldValue, unregisterToken) {
-    // Checked on the original values: unwrapping would make them differ.
-    if (target === heldValue) {
-      throw new TypeError("FinalizationRegistry.prototype.register: target and holdings must not be same");
+  // The default keeps `length` at 2, as on the native method.
+  register(target, heldValue, unregisterToken = undefined) {
+    // Checked on the original values: unwrapping would make target and
+    // heldValue differ. A call the native method rejects gets its error.
+    if (!canBeHeldWeakly(target) || target === heldValue ||
+        (unregisterToken !== undefined && !canBeHeldWeakly(unregisterToken))) {
+      return FinalizationRegistryPrototypeRegister(this, target, heldValue, unregisterToken);
     }
-    super.register(
-      unwrap(target, true),
+    FinalizationRegistryPrototypeUnregister(this, receiverProbe);
+    FinalizationRegistryPrototypeRegister(
+      this,
+      isObject(target) ? unwrap(target, true) : target,
       heldValue,
-      unregisterToken === undefined ? undefined : unwrap(unregisterToken, true),
+      isObject(unregisterToken) ? unwrap(unregisterToken, true) : unregisterToken,
     );
   }
 
   unregister(unregisterToken) {
-    return super.unregister(unwrap(unregisterToken, false));
+    return FinalizationRegistryPrototypeUnregister(this, lookupKey(unregisterToken));
   }
 }
 
