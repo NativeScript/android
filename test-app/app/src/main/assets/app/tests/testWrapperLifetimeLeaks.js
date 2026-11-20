@@ -52,8 +52,6 @@ describe("Wrapper lifetime leak probe", function () {
             weak.probeWeak = new WeakRef(weak);
         })();
         setTimeout(function () {
-            gc();
-            java.lang.System.nanoTime();
             report = runtime.findLeakCycles();
             console.log("leak probe: " + JSON.stringify({
                 leaked: report.leaked,
@@ -106,7 +104,7 @@ describe("Wrapper lifetime leak probe", function () {
             return;
         }
         expect(cycles.length).toBe(2);
-        expect(cycles[0].path).toContain("--ns:record-->");
+        expect(cycles[0].path).toContain("--ns:kept-->");
         expect(cycles[0].path).toContain("--ns:wrapper-->");
         expect(cycles[0].members.length).toBe(1);
     });
@@ -146,4 +144,17 @@ describe("Wrapper lifetime leak probe", function () {
     it("does not report a back reference through a WeakRef", function () {
         expect(cyclesThrough("probeWeak").length).toBe(0);
     });
+
+    it("settles the wrappers that died since the last collection first", function () {
+        if (!canary) {
+            return;
+        }
+        (function () {
+            for (var i = 0; i < 50; i++) {
+                new java.lang.StringBuilder("probeGarbage");
+            }
+        })();
+        // Read as leaked if unsettled: their Java objects are still held for them.
+        expect(runtime.findLeakCycles().leaked).toBeLessThan(report.leaked + 50);
+    }, 20000);
 });

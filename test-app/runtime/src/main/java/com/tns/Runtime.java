@@ -1302,42 +1302,6 @@ public class Runtime {
         return objectTable.strengthen(javaObjectID);
     }
 
-    // ns:runtime findLeakCycles(): writes an HPROF dump with the objects of ids pinned in
-    // LeakProbe.pinned, in order, so the native analysis can find them. Returns the dump's
-    // path, or null if it could not be written.
-    // Called only by debug runtimes, which carry the native probe.
-    @RuntimeCallable
-    private String dumpHeapForLeakProbe(int[] ids) {
-        // One probe at a time in the process: LeakProbe.pinned is shared by every runtime.
-        synchronized (LeakProbe.class) {
-            LeakProbe.deleteStaleDumps();
-            // Objects only weak entries hold would read as leaked until Java collects them.
-            for (int i = 0; i < 2; i++) {
-                java.lang.Runtime.getRuntime().gc();
-                System.runFinalization();
-            }
-            Object[] objects = new Object[ids.length];
-            for (int i = 0; i < ids.length; i++) {
-                objects[i] = objectTable.get(ids[i]);
-            }
-            java.io.File file = null;
-            try {
-                file = java.io.File.createTempFile(LeakProbe.DUMP_PREFIX, ".hprof");
-                LeakProbe.pinned = objects;
-                android.os.Debug.dumpHprofData(file.getAbsolutePath());
-                return file.getAbsolutePath();
-            } catch (Throwable t) {
-                android.util.Log.w("JS", "findLeakCycles could not dump the Java heap", t);
-                if (file != null) {
-                    file.delete();
-                }
-                return null;
-            } finally {
-                LeakProbe.pinned = null;
-            }
-        }
-    }
-
     boolean removeWatched(ObjectTable.WatchedRef ref) {
         return objectTable.removeWatched(ref);
     }

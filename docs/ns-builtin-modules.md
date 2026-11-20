@@ -270,15 +270,18 @@ records), the Java heap from an HPROF dump (`android.os.Debug.dumpHprofData`;
 its GC roots minus the runtime's object table, `Reference` referents skipped),
 and the runtime's own edges between them (a live wrapper holds its Java object;
 a Java object holds its canary record: state, prototype and implementation
-object). A `WeakMap` value is followed from its key only. A Java object the
+object; a Java object held weakly for a resurrected wrapper holds that wrapper). A `WeakMap` value is followed from its key only. A Java object the
 runtime holds for a live wrapper, and that nothing else reaches, is leaked. For each, the report gives the path from the Java
 object to its own wrapper through fields, properties and the runtime's edges,
 a `signature` (the path's node labels from their smallest rotation, free of
 ids), and the Java classes of the leaked objects on it (`members`).
 `leakedOutsideCycles` counts leaked objects on no reported cycle: held by one,
-or past the search limit (`truncated`, after 256 searches). Java is collected
-twice before the dump, so objects only weak entries hold are gone and not
-counted. In `"resurrecting"` mode the report is empty and no dump is taken:
+or past the search limits (`truncated`: after 256 searches, or a search that
+visited 2,000,000 nodes). V8 collects and the runtime settles the wrappers that
+died before the snapshot, and Java is collected twice before the dump, so
+objects only weak entries hold are gone and not counted. The report also gives
+`mode`, `probed` (the Java objects modeled), `jsNodes`, `javaObjects`,
+`dumpBytes` and `durationMs`. In `"resurrecting"` mode the report is empty and no dump is taken:
 resurrection breaks these cycles.
 
 The probe is built into debug runtimes only; in a release build the function
@@ -291,7 +294,7 @@ runtime's wrappers are modeled: an object held only through another runtime's
 (a worker's) wrappers can read as leaked, and probes in several runtimes run
 one at a time. Cycles through JNI global references native code holds are
 missed, since those are roots. The V8 object ids the snapshot assigns are
-cleared afterwards unless something else (DevTools) holds heap snapshots.
+cleared afterwards, unless DevTools is connected and relies on them.
 
 **Weak collections.** What could notice a new canary is whatever keys on the
 old one without keeping it, so in canary mode a builtin

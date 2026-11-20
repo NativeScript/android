@@ -75,6 +75,12 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
             return JsV8InspectorClient::GetInstance()->isConnected_;
         }
 
+        // As inspectorIsConnected, without creating the client.
+        static bool IsConnected() {
+            JsV8InspectorClient* client = GetInstanceIfCreated();
+            return client != nullptr && client->isConnected_;
+        }
+
         static std::map<std::string, v8::Persistent<v8::Object>*> Domains;
 
     private:
