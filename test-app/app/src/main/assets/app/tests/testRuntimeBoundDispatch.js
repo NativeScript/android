@@ -18,11 +18,22 @@ describe("Runtime-bound Java->JS dispatch", function () {
     }
 
     var originalTimeout;
+    // Set by a spec whose comparer threads and polls must not outlive it, even
+    // when jasmine times it out.
+    var comparingWorker = null;
+    var specEnded = false;
     beforeEach(function () {
         originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
+        specEnded = false;
     });
     afterEach(function () {
+        specEnded = true;
+        if (comparingWorker !== null) {
+            comparingWorker.terminate();
+            comparingWorker = null;
+            Holder.stopComparing(5000);
+        }
         jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
         Holder.clear();
     });
@@ -97,19 +108,19 @@ describe("Runtime-bound Java->JS dispatch", function () {
     it("answers or drops calls other threads make while the worker terminates", function (done) {
         if (!multithreaded) {
             // Calls are posted to the worker's looper in this mode, not run under its lock.
-            done();
-            return;
+            pending("needs android.enableMultithreadedJavascript");
         }
 
-        var worker;
+        // Each wait well inside the spec timeout, so a hang fails with its cause.
         function waitFor(condition, what, then) {
-            var deadline = Date.now() + 10000;
+            var deadline = Date.now() + 5000;
             (function poll() {
+                if (specEnded) {
+                    return;
+                }
                 if (condition()) {
                     then();
                 } else if (Date.now() > deadline) {
-                    worker.terminate();
-                    Holder.stopComparing(10000);
                     fail("timed out waiting for " + what);
                     done();
                 } else {
@@ -118,17 +129,23 @@ describe("Runtime-bound Java->JS dispatch", function () {
             })();
         }
 
-        startWorker(function (started) {
-            worker = started;
-            Holder.startComparing("comparable", 4);
+        comparingWorker = startWorker(function (worker) {
+            if (specEnded) {
+                return;
+            }
+            // A comparer stops once it has had 20 dropped calls in a row: by then the worker
+            // has been torn down, and the calls it had in flight overlapped that teardown.
+            Holder.startComparing("comparable", 4, 20);
             waitFor(function () {
                 return Holder.hasCompared(42);
             }, "a call answered by the live worker", function () {
                 worker.terminate();
                 waitFor(function () {
-                    return Holder.hasCompared(0);
-                }, "a call dropped after terminate()", function () {
-                    var results = Array.prototype.slice.call(Holder.stopComparing(10000));
+                    return Holder.comparersFinished();
+                }, "every comparer to see its calls dropped", function () {
+                    comparingWorker = null;
+                    var results = Array.prototype.slice.call(Holder.stopComparing(5000));
+                    expect(results).toContain(0);
                     results.forEach(function (result) {
                         expect([42, 0]).toContain(result);
                     });
