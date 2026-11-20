@@ -14,6 +14,7 @@
 #include "LRUCache.h"
 #include "NativeScriptAssert.h"
 #include "ObjectIdIndex.h"
+#include "WrapperLifetime.h"
 #include "v8.h"
 
 namespace tns {
@@ -157,6 +158,8 @@ class ObjectManager {
 
   enum class MetadataNodeKeys { JsInfo, CallSuper, Metadata, END };
 
+  const WrapperLifetimeStats& GetLifetimeStats() const { return m_lifetimeStats; }
+
  private:
   static void InitializeJNI();
 
@@ -196,6 +199,11 @@ class ObjectManager {
 
   // The linked state of object, or null.
   JSInstanceInfo* GetJSInstanceInfo(const v8::Local<v8::Object>& object);
+
+  // The linked Java object of jsInstanceInfo; throws if Java has collected it.
+  JniLocalRef JavaObjectOf(JSInstanceInfo* jsInstanceInfo);
+
+  WrapperLifetimeStats m_lifetimeStats;
 
   JSInstanceInfo* GetJSInstanceInfoFromRuntimeObject(
       const v8::Local<v8::Object>& object);

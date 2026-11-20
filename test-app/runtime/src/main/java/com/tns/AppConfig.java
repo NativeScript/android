@@ -24,7 +24,9 @@ class AppConfig {
         EnableLineBreakpoins("enableLineBreakpoints", false),
         EnableMultithreadedJavascript("enableMultithreadedJavascript", false),
         UncaughtErrorPolicy("uncaughtErrorPolicy", "report"),
-        InterfaceProxies("interfaceProxies", false);
+        InterfaceProxies("interfaceProxies", false),
+        WrapperLifetimeMode("mode", "resurrecting"),
+        WrapperLifetimeScope("scope", "extended");
 
         private final String name;
         private final Object defaultValue;
@@ -44,6 +46,8 @@ class AppConfig {
 
     private final static String AndroidKey = "android";
     private final static String SecurityKey = "security";
+    // Top level, like iOS, so one app config selects the mode on both platforms.
+    private final static String WrapperLifetimeKey = "wrapperLifetime";
 
     private final Object[] values;
     
@@ -104,6 +108,9 @@ class AppConfig {
                         Log.w("JS", String.format("Unknown uncaughtErrorPolicy \"%s\" - expected \"report\" or \"throw\". The default \"report\" will be used.", policy));
                     }
                 }
+                if (rootObject.has(WrapperLifetimeKey)) {
+                    readWrapperLifetime(rootObject.opt(WrapperLifetimeKey));
+                }
                 if (rootObject.has(AndroidKey)) {
                     JSONObject androidObject = rootObject.getJSONObject(AndroidKey);
                     if (androidObject.has(KnownKeys.V8FlagsKey.getName())) {
@@ -153,6 +160,40 @@ class AppConfig {
                 e.printStackTrace();
             }
         }
+    }
+
+    private void readWrapperLifetime(Object config) {
+        if (!(config instanceof JSONObject)) {
+            Log.w("JS", "wrapperLifetime must be an object; using the defaults.");
+            return;
+        }
+        JSONObject object = (JSONObject) config;
+        Object mode = object.opt(KnownKeys.WrapperLifetimeMode.getName());
+        if (mode != null) {
+            if ("resurrecting".equals(mode)) {
+                values[KnownKeys.WrapperLifetimeMode.ordinal()] = mode;
+            } else if ("rooted".equals(mode)) {
+                Log.w("JS", "wrapperLifetime mode \"rooted\" reads native retain counts and is iOS-only; using \"resurrecting\".");
+            } else {
+                Log.w("JS", String.format("Unknown wrapperLifetime mode %s; using \"resurrecting\".", JSONObject.quote(String.valueOf(mode))));
+            }
+        }
+        Object scope = object.opt(KnownKeys.WrapperLifetimeScope.getName());
+        if (scope != null) {
+            if ("extended".equals(scope) || "all".equals(scope)) {
+                values[KnownKeys.WrapperLifetimeScope.ordinal()] = scope;
+            } else {
+                Log.w("JS", String.format("Unknown wrapperLifetime scope %s; using \"extended\".", JSONObject.quote(String.valueOf(scope))));
+            }
+        }
+    }
+
+    public String getWrapperLifetimeMode() {
+        return (String)values[KnownKeys.WrapperLifetimeMode.ordinal()];
+    }
+
+    public String getWrapperLifetimeScope() {
+        return (String)values[KnownKeys.WrapperLifetimeScope.ordinal()];
     }
 
     public String getV8Flags() {

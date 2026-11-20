@@ -60,6 +60,7 @@ require("./tests/dispatchCallbacksOnUiThreadTests");
 require("./tests/stringConversionTests");
 require("./tests/testsForTypescript");
 require("./tests/testGC");
+require("./tests/testWrapperLifetime");
 require("./tests/testsMemoryManagement");
 require("./tests/testFieldGetSet");
 require("./tests/extendedClassesTests");
