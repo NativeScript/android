@@ -44,9 +44,18 @@ public final class RuntimeBoundHolder {
         return ((Comparable<Object>) objects.get(key)).compareTo("");
     }
 
+    // Results stopComparing reports for a comparison that threw, and for a comparer
+    // thread still running at its deadline.
+    public static final int THREW = Integer.MIN_VALUE;
+    public static final int STUCK = Integer.MAX_VALUE;
+
     private static final List<Thread> comparers = new ArrayList<>();
     private static final Set<Integer> compared = ConcurrentHashMap.newKeySet();
     private static volatile boolean comparing;
+
+    public static boolean hasCompared(int result) {
+        return compared.contains(result);
+    }
 
     // Keeps calling compare(key) from `threads` new threads until stopComparing().
     public static synchronized void startComparing(final String key, int threads) {
@@ -60,7 +69,7 @@ public final class RuntimeBoundHolder {
                         try {
                             compared.add(compare(key));
                         } catch (Throwable t) {
-                            compared.add(Integer.MIN_VALUE);
+                            compared.add(THREW);
                         }
                     }
                 }
@@ -70,11 +79,16 @@ public final class RuntimeBoundHolder {
         }
     }
 
-    // Stops the comparing threads; returns every distinct result, MIN_VALUE for a throw.
-    public static synchronized int[] stopComparing() throws InterruptedException {
+    // Stops the comparing threads, waiting up to timeoutMillis for them; returns every
+    // distinct result, with THREW for a throw and STUCK if a thread is still running.
+    public static synchronized int[] stopComparing(long timeoutMillis) throws InterruptedException {
         comparing = false;
+        long deadline = System.currentTimeMillis() + timeoutMillis;
         for (Thread thread : comparers) {
-            thread.join();
+            thread.join(Math.max(1, deadline - System.currentTimeMillis()));
+            if (thread.isAlive()) {
+                compared.add(STUCK);
+            }
         }
         comparers.clear();
         int[] results = new int[compared.size()];

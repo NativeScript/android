@@ -320,7 +320,18 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv* _e
 // @CriticalNative ABI: no JNIEnv* / jclass.
 static jint generateNewObjectIdCritical_impl(jint runtimeId) {
     try {
-        auto runtime = TryGetRuntime(runtimeId);
+        // Java registers a call's arguments on the calling thread, without the
+        // isolate lock, so this can run on any thread while the runtime tears
+        // down. The counter needs no lock, only the runtime kept allocated.
+        auto current = Runtime::GetCurrentRuntime();
+        std::optional<RuntimePin> pin;
+        if (current == nullptr || current->GetId() != runtimeId) {
+            pin.emplace(runtimeId);
+            if (!*pin) {
+                return 0;
+            }
+        }
+        auto runtime = Runtime::FindRuntime(runtimeId);
         if (runtime == nullptr) {
             return 0;
         }

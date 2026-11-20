@@ -101,19 +101,37 @@ describe("Runtime-bound Java->JS dispatch", function () {
             return;
         }
 
+        function waitFor(condition, what, then) {
+            var deadline = Date.now() + 10000;
+            (function poll() {
+                if (condition()) {
+                    then();
+                } else if (Date.now() > deadline) {
+                    Holder.stopComparing(10000);
+                    fail("timed out waiting for " + what);
+                    done();
+                } else {
+                    setTimeout(poll, 20);
+                }
+            })();
+        }
+
         startWorker(function (worker) {
             Holder.startComparing("comparable", 4);
-            setTimeout(function () {
+            waitFor(function () {
+                return Holder.hasCompared(42);
+            }, "a call answered by the live worker", function () {
                 worker.terminate();
-                setTimeout(function () {
-                    var results = Array.prototype.slice.call(Holder.stopComparing());
+                waitFor(function () {
+                    return Holder.hasCompared(0);
+                }, "a call dropped after terminate()", function () {
+                    var results = Array.prototype.slice.call(Holder.stopComparing(10000));
                     results.forEach(function (result) {
                         expect([42, 0]).toContain(result);
                     });
-                    expect(results).toContain(0);
                     done();
-                }, 1000);
-            }, 50);
+                });
+            });
         });
     });
 
