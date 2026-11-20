@@ -165,7 +165,10 @@ iOS reads:
 
 A value that is not an object, or an unknown `mode` or `scope`, logs a warning
 and keeps the default. `"rooted"` is iOS-only: it reads native retain counts,
-which Java does not have.
+which Java does not have. `scope` chooses whose JS properties a mode other
+than `"resurrecting"` keeps while Java holds the object: `"extended"` those of
+instances of JS-extended classes, `"all"` those of every wrapper.
+`"resurrecting"` treats every wrapper alike whatever the scope.
 
 `"resurrecting"` (the default) keeps a collected wrapper while Java may still
 hold its object. The first collection resurrects it and makes the Java side
@@ -180,7 +183,7 @@ every build on cold paths only:
 
 | counter | counts |
 |---|---|
-| `resurrections` | finalizer callbacks that kept a collected wrapper until the Java side says whether its object is still alive |
+| `resurrections` | finalizer passes that kept a collected wrapper until the Java side says whether its object is still alive. Every pass counts, so a wrapper JS dropped counts at least twice (once to weaken the Java side, once more to check whether Java collected the object) and one whose object Java holds counts again on every major GC. Unlike iOS's counter of the same name, it is not a number of wrappers native code kept alive |
 | `weakened` | Java objects held weakly because their wrapper was collected |
 | `collected` | wrappers released because Java had collected their object |
 | `releasedExplicitly` | links released through `__releaseNativeCounterpart` |
