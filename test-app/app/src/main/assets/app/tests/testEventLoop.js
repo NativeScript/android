@@ -72,6 +72,14 @@ describe("event loop foreground tasks", function () {
 // The ordered lane rides the Java MessageQueue, so these callbacks must be
 // strict macrotasks: after the current turn's microtasks, FIFO with timers.
 describe("event loop ordered macrotasks", function () {
+    let multithreaded;
+    beforeAll(function (done) {
+        require("./multithreadedJavascript")().then(function (enabled) {
+            multithreaded = enabled;
+            done();
+        });
+    });
+
     it("__ns__queueMacrotask runs the callback asynchronously", function (done) {
         let ran = false;
         __ns__queueMacrotask(() => {
@@ -108,6 +116,9 @@ describe("event loop ordered macrotasks", function () {
     });
 
     it("runs on the main thread when posted from a background JS thread", function (done) {
+        if (!multithreaded) {
+            pending("needs android.enableMultithreadedJavascript");
+        }
         const mainThreadId = java.lang.Thread.currentThread().getId();
         new java.lang.Thread(new java.lang.Runnable({
             run() {
