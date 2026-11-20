@@ -97,19 +97,54 @@ describe("Weak collections of Java objects", function () {
         expect(seen).toBeUndefined();
     });
 
-    it("dereferences a WeakRef to a Java-held object while the object lives", function () {
+    // A WeakRef keeps its target alive until the job that made it ends, so the wrapper can
+    // only change on a later task.
+    it("dereferences a WeakRef to a Java-held object while the object lives", function (done) {
+        var rebuilds = runtime.getWrapperLifetimeStats().canaryRebuilds;
         var ref = (function () {
             var runnable = heldRunnable();
             runnable.tag = "state";
             return new WeakRef(runnable);
         })();
-        collectBoth();
+        setTimeout(function () {
+            collectBoth();
+            if (canary) {
+                // Rebuilt by deref below, not by anything this spec kept.
+                expect(runtime.getWrapperLifetimeStats().canaryRebuilds).toBe(rebuilds);
+            }
+            var target = ref.deref();
+            expect(target).toBeDefined();
+            expect(target.tag).toBe("state");
+            expect(ref.get()).toBe(target);
+            expect(target.equals(Holder.held)).toBe(true);
+            if (canary) {
+                expect(runtime.getWrapperLifetimeStats().canaryRebuilds).toBe(rebuilds + 1);
+            }
+            done();
+        }, 0);
+    });
 
-        var target = ref.deref();
-        expect(target).toBeDefined();
-        expect(target.tag).toBe("state");
-        expect(ref.get()).toBe(target);
-        expect(target.equals(Holder.held)).toBe(true);
+    // Under scope "all" a plain wrapper is a canary: its key hangs off its state, and deref
+    // makes a new wrapper the usual way, hydrated from the state.
+    it("keeps a WeakMap entry and a WeakRef target for a Java-held plain object across a wrapper change", function (done) {
+        var map = new WeakMap();
+        var ref = (function () {
+            var builder = new java.lang.StringBuilder("plain");
+            builder.tag = "state";
+            map.set(builder, "value");
+            Holder.held = builder;
+            return new WeakRef(builder);
+        })();
+        setTimeout(function () {
+            collectBoth();
+            var again = Holder.held;
+            expect(map.get(again)).toBe("value");
+            var target = ref.deref();
+            expect(target).toBeDefined();
+            expect(target.toString()).toBe("plain");
+            expect(target.tag).toBe("state");
+            done();
+        }, 0);
     });
 
     it("clears a WeakRef once Java collected the object", function (done) {
