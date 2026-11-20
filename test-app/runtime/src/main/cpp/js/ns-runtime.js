@@ -6,11 +6,13 @@
 // per-isolate) are defined and validated on the native side, so this file
 // stays a thin, frozen surface.
 
-const { setConfig, getConfig, escapeException, getWrapperLifetimeStats } = binding;
+const { setConfig, getConfig, escapeException, getWrapperLifetimeStats, getWrapperClassCounts } =
+  binding;
 const { ObjectFreeze } = primordials;
 
 exports.setConfig = setConfig;
 exports.getConfig = getConfig;
 exports.escapeException = escapeException;
 exports.getWrapperLifetimeStats = getWrapperLifetimeStats;
+exports.getWrapperClassCounts = getWrapperClassCounts;
 ObjectFreeze(exports);

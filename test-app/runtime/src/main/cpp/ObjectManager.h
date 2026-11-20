@@ -2,6 +2,7 @@
 #define OBJECTMANAGER_H_
 
 #include <map>
+#include <unordered_map>
 #include <memory>
 #include <set>
 #include <stack>
@@ -71,7 +72,8 @@ class ObjectManager {
   // rely on the delayed flush task.
   void FlushFinalizedBatchIfPending() {
     if (!m_flushBackingOff &&
-        (!m_pendingWeaken.empty() || !m_pendingCheck.empty())) {
+        (!m_pendingWeaken.empty() || !m_pendingCheck.empty() ||
+         !m_pendingCanaryDeaths.empty())) {
       FlushFinalizedBatch();
     }
   }
@@ -103,8 +105,12 @@ class ObjectManager {
   v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, int classIndex,
                                         jobject instance);
 
+  // What a link's object is: Java calls into JS through an extended one (a
+  // JS-extended class's or an interface implementation's instance).
+  enum class LinkKind { kPlain, kExtended };
+
   void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
-            jclass clazz);
+            jclass clazz, LinkKind kind = LinkKind::kPlain);
 
   void ReleaseNativeCounterpart(v8::Local<v8::Object>& object);
 
@@ -172,6 +178,30 @@ class ObjectManager {
 
   const WrapperLifetimeStats& GetLifetimeStats() const { return m_lifetimeStats; }
 
+  // Canary mode (WrapperLifetimeCanary), for its write handlers. holder is a
+  // live canary in scope: an object this manager linked as one, not yet
+  // released.
+  bool IsCanary(const v8::Local<v8::Object>& holder);
+  // The state object of a canary that has one.
+  bool ExistingCanaryState(const v8::Local<v8::Object>& holder, v8::Local<v8::Object>* out);
+  // The state object of a canary, created on its first write.
+  bool CanaryStateForWrite(const v8::Local<v8::Object>& holder, v8::Local<v8::Object>* out);
+  void CountCanaryWrite() { m_lifetimeStats.canaryInterceptedWrites++; }
+  // Lets go of the state of objects Java reported collected. Runtime thread.
+  void ReleaseCollectedCanaryStates();
+
+  struct ClassCounts {
+    // Linked wrappers, canaries included.
+    uint64_t wrappers = 0;
+    // Live canaries.
+    uint64_t canaries = 0;
+    // Canary state objects, alive until Java collects their object.
+    uint64_t states = 0;
+  };
+
+  // Per Java class name (dotted), for ns:runtime's getWrapperClassCounts().
+  std::map<std::string, ClassCounts> GetWrapperClassCounts();
+
  private:
   static void InitializeJNI();
 
@@ -206,6 +236,29 @@ class ObjectManager {
     // Handed back to JS while queued: the wrapper is reachable again, so the flush must
     // leave the Java side alone and let a later collection queue it anew.
     bool reacquired = false;
+    // A canary: a phantom handle, and no resurrection.
+    bool canary = false;
+    // A canary in scope: the write handlers mirror its JS properties. Its
+    // template can carry them while it is not, e.g. an interface proxy's.
+    bool keepsState = false;
+  };
+
+  // Canary mode: what outlives the canaries of one Java object id, until Java
+  // collects the object. Its handles are reset only on the runtime's thread.
+  struct CanaryRecord {
+    // The object's JS properties; empty until the first write.
+    v8::Global<v8::Object> state;
+    // JS-extended instances: what a canary built later starts from, as the
+    // first canary had it once registered.
+    bool extended = false;
+    v8::Global<v8::Value> prototype;
+    v8::Global<v8::Value> callSuper;
+    v8::Global<v8::Value> metadata;
+    v8::Global<v8::Value> implementationObject;
+    // The link's class, taken from the last canary (a global ref the class caches own).
+    jclass clazz = nullptr;
+    // The Java object table holds the object through a watched weak reference.
+    bool javaWeak = false;
   };
 
   using JSInstanceInfo = ObjectWeakCallbackState;
@@ -254,6 +307,45 @@ class ObjectManager {
 
   static void JSObjectFinalizerStatic(
       const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
+
+  // A canary died: first-pass phantom callback, C++ bookkeeping only.
+  static void CanaryDiedStatic(
+      const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
+
+  static void CanaryGCEpilogue(v8::Isolate* isolate, v8::GCType type,
+                               v8::GCCallbackFlags flags, void* data);
+
+  // Registers a new canary: creates an extended instance's record, and
+  // hydrates a canary for an object that already has state.
+  void AdoptCanary(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
+                   LinkKind kind);
+
+  // The live canary state of holder, or null.
+  ObjectWeakCallbackState* CanaryOf(const v8::Local<v8::Object>& holder);
+
+  CanaryRecord* FindCanaryRecord(int javaObjectID);
+
+  // A new canary for a JS-extended instance whose canary died; empty when id
+  // has no extended record or Java collected the object meanwhile.
+  v8::Local<v8::Object> RebuildCanary(int javaObjectID);
+
+  // Has the Java object table hold record's object strongly again; false (and
+  // the record dropped) when Java collected it.
+  bool EnsureJavaStrong(int javaObjectID, CanaryRecord* record);
+
+  void EraseCanaryRecord(int javaObjectID);
+
+  // Settles canaries collected since the last flush: Java holds the objects
+  // with records weakly and releases the others. False if the JNI call failed;
+  // the ids are queued again.
+  bool FlushCanaryDeaths();
+
+  std::unordered_map<int, std::unique_ptr<CanaryRecord>> m_canaryRecords;
+  std::vector<jint> m_pendingCanaryDeaths;
+  // Template of a canary rebuilt for a JS-extended instance.
+  v8::Persistent<v8::ObjectTemplate> m_canaryTemplate;
+  bool m_deathInboxOpen = false;
+  int m_deathInboxRuntimeId = -1;
 
   void JSObjectFinalizer(v8::Isolate* isolate,
                          ObjectWeakCallbackState* callbackState);
@@ -332,6 +424,8 @@ class ObjectManager {
 
   static jmethodID RELEASE_NATIVE_INSTANCE_METHOD_ID;
   static jmethodID RELEASE_IF_COLLECTED_METHOD_ID;
+  static jmethodID PROCESS_CANARY_BATCH_METHOD_ID;
+  static jmethodID STRENGTHEN_INSTANCE_METHOD_ID;
 
   v8::Persistent<v8::Function>* m_poJsWrapperFunc;
   v8::Persistent<v8::ObjectTemplate> m_jsWrapperTemplate;

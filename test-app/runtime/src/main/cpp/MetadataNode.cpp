@@ -1,4 +1,5 @@
 #include "MetadataNode.h"
+#include "WrapperLifetimeCanary.h"
 #include "RuntimeState.h"
 #include "NativeScriptAssert.h"
 #include "Constants.h"
@@ -171,6 +172,8 @@ Local<ObjectTemplate> MetadataNode::GetOrCreateArrayObjectTemplate(Isolate* isol
     arrayObjectTemplate->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
     arrayObjectTemplate->SetHandler(IndexedPropertyHandlerConfiguration(
             ArrayIndexedPropertyGetterCallback, ArrayIndexedPropertySetterCallback));
+    WrapperLifetimeCanary::ConfigureInstanceTemplate(
+            arrayObjectTemplate, WrapperLifetimeCanary::TemplateKind::kPlain);
 
     cache->ArrayObjectTemplate = new Persistent<ObjectTemplate>(isolate, arrayObjectTemplate);
 
@@ -1354,6 +1357,11 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     }
     ctorFuncTemplate->SetClassName(v8::String::NewFromUtf8(isolate, finalName.c_str()).ToLocalChecked());
     ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
+    // An interface's constructor builds implementations, which Java calls into.
+    WrapperLifetimeCanary::ConfigureInstanceTemplate(
+            ctorFuncTemplate->InstanceTemplate(),
+            isInterface ? WrapperLifetimeCanary::TemplateKind::kExtended
+                        : WrapperLifetimeCanary::TemplateKind::kPlain);
 
     Local<Function> baseCtorFunc;
     Local<FunctionTemplate> baseFuncTemplate;
@@ -2304,6 +2312,8 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         auto extendData = External::New(isolate, extendedClassCallbackData, v8::kExternalPointerTypeTagDefault);
         auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, extendData);
         extendFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
+        WrapperLifetimeCanary::ConfigureInstanceTemplate(
+                extendFuncTemplate->InstanceTemplate(), WrapperLifetimeCanary::TemplateKind::kExtended);
 
         auto context = isolate->GetCurrentContext();
         auto extendFunc = extendFuncTemplate->GetFunction(context).ToLocalChecked();

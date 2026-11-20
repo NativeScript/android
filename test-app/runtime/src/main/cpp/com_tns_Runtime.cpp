@@ -1,5 +1,6 @@
 #include "V8StringConstants.h"
 #include "Runtime.h"
+#include "WrapperLifetimeCanary.h"
 #include "RuntimeGates.h"
 #include "NativeScriptException.h"
 #include "CallbackHandlers.h"
@@ -541,4 +542,13 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_invokeNonvirtualNative(JNIEnv*
         env->SetLongArrayRegion(primitiveResult, 0, 1, &result);
     }
     return objectResult;
+}
+
+extern "C" JNIEXPORT void Java_com_tns_Runtime_notifyCanaryObjectsCollected(JNIEnv* env, jclass, jint runtimeId, jintArray ids, jint count) {
+    if (count <= 0) {
+        return;
+    }
+    std::vector<jint> values(count);
+    env->GetIntArrayRegion(ids, 0, count, values.data());
+    WrapperLifetimeCanary::NotifyCollected(runtimeId, values.data(), count);
 }

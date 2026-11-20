@@ -104,6 +104,7 @@ wrapper.
 | `setConfig(key, value)` | Sets a runtime config key. Throws `TypeError` on an unknown key, an invalid value, or (for process-wide keys) when called from a worker isolate. |
 | `getConfig(key)` | Returns the current value of a config key. Throws `TypeError` on an unknown key. Readable from any isolate. |
 | `getWrapperLifetimeStats()` | Wrapper lifetime counters for the calling isolate (see [Wrapper lifetime](#wrapper-lifetime)). A fresh object on every call. |
+| `getWrapperClassCounts()` | Per Java class name, the calling isolate's live `wrappers`, the `canaries` among them and the canary `states` (see [Wrapper lifetime](#wrapper-lifetime)). |
 | `escapeException(x)` | Returns an `Error` branded so that, when it is thrown back across a native callback boundary, the native caller receives the original native exception `x` carries rather than the runtime's wrapper exception. Idempotent: a branded error is returned unchanged. Throws `TypeError` when called with no argument. The global `interop.escapeException` is this same function (see [Legacy globals](#legacy-globals)). |
 
 *Platform note (Android):* the original exception is the Java throwable `x`
@@ -118,7 +119,7 @@ Config keys:
 | key | values | scope | default |
 |---|---|---|---|
 | `debug` | comma-separated category list, e.g. `"esm,fetch"` | process-wide (main-isolate writes only; read live by every isolate) | the `NS_DEBUG` environment variable, or `""` |
-| `wrapperLifetimeMode` | `"resurrecting"` | process-wide, read-only | the app config `"wrapperLifetime": { "mode": … }`, or `"resurrecting"` |
+| `wrapperLifetimeMode` | `"resurrecting"` \| `"canary"` | process-wide, read-only | the app config `"wrapperLifetime": { "mode": … }`, or `"resurrecting"` |
 | `wrapperLifetimeScope` | `"extended"` \| `"all"` | process-wide, read-only | the app config `"wrapperLifetime": { "scope": … }`, or `"extended"` |
 
 iOS additionally registers `releasedObjectPolicy`, which governs access to a
@@ -160,7 +161,7 @@ top-level `"wrapperLifetime"` object of the app's `package.json`, the same key
 iOS reads:
 
 ```json
-{ "wrapperLifetime": { "mode": "resurrecting", "scope": "extended" } }
+{ "wrapperLifetime": { "mode": "canary", "scope": "all" } }
 ```
 
 A value that is not an object, or an unknown `mode` or `scope`, logs a warning
@@ -188,6 +189,67 @@ every build on cold paths only:
 | `collected` | wrappers released because Java had collected their object |
 | `releasedExplicitly` | links released through `__releaseNativeCounterpart` |
 | `releasedAccesses` | lookups of the Java object of a wrapper whose link was released or whose Java object Java had already collected: calling its methods, using its fields or passing it to Java. Resolving an overloaded method looks its arguments up too, so one call can count more than once |
+| `canaryStates` | `"canary"` only: state objects created to hold JS properties |
+| `canaryNativeDeaths` | `"canary"` only: state objects let go of because Java collected their object |
+| `canaryInterceptedWrites` | `"canary"` only: writes to canaries the write handler saw. Canaries without state have no handler |
+| `canaryRebuilds` | `"canary"` only: canaries built anew for a JS-extended instance whose previous canary died while Java kept the object |
+
+In `"canary"` mode only array buffers backed by Java buffers resurrect;
+`weakened` counts objects held weakly because their
+canary died while they had JS state, and `collected` counts canaries whose
+object had none, which Java no longer holds for JS.
+
+`"canary"` is the resurrection-free model the iOS runtime and the Node-API
+runtimes share. Every wrapper of a Java object is a canary: a phantom-weak JS
+object that dies with its JS references. `scope` chooses which canaries keep
+their JS properties:
+
+| mode / scope | JS-extended instances | other wrappers |
+|---|---|---|
+| `"resurrecting"` (either scope) | resurrected | resurrected |
+| `"canary"` / `"extended"` (default) | canaries with state | canaries without state |
+| `"canary"` / `"all"` | canaries with state | canaries with state |
+
+- **State.** On a canary with state, a masking named interceptor (a setter, a
+  deleter and a definer, nothing that runs on reads) mirrors every JS property
+  written to the canary into a separate state object and lets V8 apply the
+  write to the canary too, so reads cost what they cost on a plain object. A
+  write that resolves to a Java field, another inherited accessor or a
+  read-only property is not state. The state lives until Java collects the
+  object; a canary built later for the same object gets its properties back,
+  attributes, accessors and symbol keys included.
+- **Java's side.** While a canary is alive, Java holds its object strongly.
+  When it dies, Java holds an object with state weakly and releases any other.
+  A thread watching those weak references tells the runtime when Java collects
+  an object, and its state is let go of on the runtime's thread.
+- **JS-extended instances** (`extend()`, interface implementations, Java
+  objects of those classes) keep a record from the moment they are registered,
+  whether or not JS wrote to them, so that Java can still call into JS after
+  their canary died: the runtime builds a new canary with the instance's
+  prototype, implementation object and state.
+- **Canaries without state.** Under `"extended"`, the wrapper of a Java
+  object that is not a JS-extended instance (Java arrays included) has no write
+  handler and no state. Once JS drops it, it dies and Java no longer holds the
+  object for JS; when Java hands the object back later, its wrapper is a new
+  object without the old one's JS properties. JS properties on plain native
+  objects are therefore not preserved under `"extended"`: keep such state on a
+  JS object of your own, or use `"all"`, which gives every wrapper state.
+  Array buffers backed by Java buffers keep the `"resurrecting"` lifetime under
+  either scope.
+
+What this trades: nothing JS references is released under it, and the state of
+an object Java holds keeps everything it references. So state that references
+its own object (a closure over `this`, `this.onTap = this.onTap.bind(this)`,
+a `WeakMap` value naming it) keeps the object alive, through Java, for as long
+as the cycle lasts; break such back references with a `WeakRef`.
+`getWrapperClassCounts()` shows which classes grow across a repeated journey.
+Other limits, as on iOS: `Object.freeze`, `seal` and `preventExtensions` throw
+on a canary; index-keyed properties are not mirrored and die with the canary;
+a write through an object whose prototype is a canary lands on that object.
+A canary built after another died is a new JS object, which `===` cannot tell
+because nothing kept the old one, but which keys `WeakMap`, `WeakSet`,
+`WeakRef` and `FinalizationRegistry` entries separately.
+`__releaseNativeCounterpart` drops the object's state with its link.
 
 Remote-module security (`security.allowRemoteModules`,
 `security.remoteModuleAllowlist`) is **not** part of this surface. Those

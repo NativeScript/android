@@ -174,7 +174,7 @@ class AppConfig {
         JSONObject object = (JSONObject) config;
         Object mode = object.opt(KnownKeys.WrapperLifetimeMode.getName());
         if (mode != null) {
-            if ("resurrecting".equals(mode)) {
+            if ("resurrecting".equals(mode) || "canary".equals(mode)) {
                 values[KnownKeys.WrapperLifetimeMode.ordinal()] = mode;
             } else if ("rooted".equals(mode)) {
                 Log.w("JS", "wrapperLifetime mode \"rooted\" reads native retain counts and is iOS-only; using \"resurrecting\".");
