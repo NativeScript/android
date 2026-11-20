@@ -1,4 +1,5 @@
 #include "Runtime.h"
+#include "WrapperLifetime.h"
 #include "RuntimeGates.h"
 
 #include <console/Console.h>
@@ -238,6 +239,7 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
   m_uncaughtErrorPolicy = options.uncaughtErrorPolicy == "throw"
                               ? UncaughtErrorPolicy::Throw
                               : UncaughtErrorPolicy::Report;
+  ConfigureWrapperLifetime(options.wrapperLifetimeMode, options.wrapperLifetimeScope);
 
   DEBUG_WRITE("Initializing Telerik NativeScript");
 
