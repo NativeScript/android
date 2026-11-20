@@ -625,8 +625,22 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
     jsObject = m_objectManager->GetLinkedJsObjectByJavaObject(javaObjectID);
   }
   if (jsObject.IsEmpty() && javaObject != nullptr) {
+    auto registeredAs = javaObjectID;
     javaObjectID = m_objectManager->FindObjectId(javaObject);
     if (javaObjectID == -1) {
+      if (registeredAs != -1) {
+        // Registered once, and Java has let go of it since (cleared its weak
+        // reference before finalizing it, or released its link). Dropped, not
+        // thrown: the caller is often a framework callback. Runtime.java
+        // defaults a primitive return.
+        __android_log_print(
+            ANDROID_LOG_WARN, "Warning",
+            "NativeScript discarding call to \"%s\": an instance of %s is no "
+            "longer registered with runtime id=%d",
+            ArgConverter::jstringToString(methodName).c_str(),
+            m_objectManager->GetClassName(javaObject).c_str(), m_id);
+        return nullptr;
+      }
       throw NativeScriptException("Cannot find object id for an instance of " +
                                   m_objectManager->GetClassName(javaObject));
     }

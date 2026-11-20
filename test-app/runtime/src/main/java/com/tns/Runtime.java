@@ -1726,6 +1726,7 @@ public class Runtime {
             final Object[] arr = new Object[3];
 
             final boolean isCtor = isConstructor;
+            final boolean wasRegistered = objectIdHint != ObjectTable.NO_ID;
 
             Runnable r = new Runnable() {
                 @Override
@@ -1736,7 +1737,14 @@ public class Runtime {
                             try {
                                 javaObjectID = resolveJavaObjectID(javaObject, methodName);
                             } catch (NativeScriptException e) {
-                                arr[2] = e;
+                                if (wasRegistered) {
+                                    // As in native CallJSMethodNative: Java let go of a
+                                    // registered object, so there is nothing to call.
+                                    logDiscardedCall(methodName, describeInstance(javaObject)
+                                            + " is no longer registered with runtime id=" + getRuntimeId());
+                                } else {
+                                    arr[2] = e;
+                                }
                                 return;
                             }
                             final PackagedArgs packagedArgs = packageArgs(tmpArgs);
