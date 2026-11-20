@@ -265,6 +265,7 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
                               ? UncaughtErrorPolicy::Throw
                               : UncaughtErrorPolicy::Report;
   ConfigureWrapperLifetime(options.wrapperLifetimeMode, options.wrapperLifetimeScope);
+  m_objectManager->SetMultithreadedJavascript(options.multithreadedJavascript);
 
   DEBUG_WRITE("Initializing Telerik NativeScript");
 
@@ -637,6 +638,7 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
   DEBUG_WRITE("CallJSMethodNative called javaObjectID=%d", javaObjectID);
 
   m_objectManager->FlushFinalizedBatchIfPending();
+  args.canaryReleasesAtStart = m_objectManager->CanaryReleaseCount();
 
   // javaObjectID may be a hint read without the isolate lock; resolve it exactly when it
   // does not name a linked wrapper.

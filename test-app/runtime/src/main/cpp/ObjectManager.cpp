@@ -827,6 +827,9 @@ bool ObjectManager::FlushCanaryDeaths() {
   JniLocalRef releaseArray(toJava(release));
   bool failed = (!weaken.empty() && weakenArray.IsNull()) ||
                 (!release.empty() && releaseArray.IsNull());
+  if (!release.empty()) {
+    m_canaryReleaseCount++;
+  }
   if (!failed) {
     AssertIsolateLocked();
     raw->CallVoidMethod(m_javaRuntimeObject, PROCESS_CANARY_BATCH_METHOD_ID,

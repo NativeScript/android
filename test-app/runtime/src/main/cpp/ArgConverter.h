@@ -26,6 +26,8 @@ struct JavaCallArgs {
     // Set once every argument has a JS value, so each object Java registered for this
     // call (FreshArg) has a wrapper and nothing is left to release if the call fails.
     mutable bool converted = false;
+    // ObjectManager::CanaryReleaseCount() once the call settled what was pending.
+    mutable uint64_t canaryReleasesAtStart = 0;
 
     // Set in an object argument's packed value when Java registered the object for this
     // call; the low half is then its exact id and the next 31 bits its class index.

@@ -74,6 +74,15 @@ class ObjectManager {
     }
   }
 
+  // enableMultithreadedJavascript: Java may call in from threads other than
+  // the runtime's own.
+  void SetMultithreadedJavascript(bool value) { m_multithreadedJavascript = value; }
+  bool MultithreadedJavascript() const { return m_multithreadedJavascript; }
+
+  // Canary settles that released Java ids. A Java object registered for a
+  // call keeps its id while this does not move, on a single JS thread.
+  uint64_t CanaryReleaseCount() const { return m_canaryReleaseCount; }
+
   // Whether a wrapper was ever created for this id and not yet collected.
   bool HasJsObject(int javaObjectID) const {
     return m_idToObject.Find(javaObjectID) != nullptr;
@@ -392,6 +401,10 @@ class ObjectManager {
   volatile int m_currentObjectId;
 
   bool m_useGlobalRefs;
+
+  bool m_multithreadedJavascript = false;
+
+  uint64_t m_canaryReleaseCount = 0;
 
   static jclass JAVA_LANG_CLASS;
 
