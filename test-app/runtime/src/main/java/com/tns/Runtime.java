@@ -1676,9 +1676,9 @@ public class Runtime {
                         objectIdHint != ObjectTable.NO_ID ? objectIdHint : objectTable.findId(javaObject), methodName, MethodNameIds.idOf(methodName), returnType, isConstructor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult);
                 ret = takePrimitiveResult(ret, returnType, primitiveResult);
             } catch (NativeScriptException e) {
-                // With multithreaded JS the owner can be terminated while the
-                // call runs on this thread, cutting its JS short; that is the
-                // same lifecycle race the other dead-owner paths drop.
+                // With multithreaded JS the owner can stop accepting work while
+                // the call runs on this thread; an exception from such a call is
+                // the same lifecycle race the other dead-owner paths drop.
                 if (!isAcceptingWork()) {
                     return discardCall(methodName, retType, "runtime id=" + getRuntimeId() + " (workerId=" + workerId
                             + ") terminated during the call");
