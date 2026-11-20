@@ -171,8 +171,8 @@ void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> result = Object::New(isolate);
     auto set = [&](const char* name, uint64_t value) {
-        (void) result->Set(context, ArgConverter::ConvertToV8String(isolate, name),
-                           Number::New(isolate, static_cast<double>(value)));
+        (void) result->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, name),
+                                          Number::New(isolate, static_cast<double>(value)));
     };
     set("resurrections", stats.resurrections);
     set("weakened", stats.weakened);

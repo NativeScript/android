@@ -53,6 +53,26 @@ describe("Wrapper lifetime", function () {
             released.hashCode();
         }).toThrowError(/no longer has available Java instance counterpart/);
         expect(runtime.getWrapperLifetimeStats().releasedAccesses).toBe(before.releasedAccesses + 1);
+
+        // Not a wrapper at all: not a released access.
+        expect(function () {
+            new java.lang.Object().hashCode.call({});
+        }).toThrow();
+        expect(runtime.getWrapperLifetimeStats().releasedAccesses).toBe(before.releasedAccesses + 1);
+    });
+
+    it("reports counters as own properties whatever Object.prototype defines", function () {
+        Object.defineProperty(Object.prototype, "collected", {
+            set: function () {},
+            configurable: true
+        });
+        try {
+            var stats = runtime.getWrapperLifetimeStats();
+            expect(Object.prototype.hasOwnProperty.call(stats, "collected")).toBe(true);
+            expect(typeof stats.collected).toBe("number");
+        } finally {
+            delete Object.prototype.collected;
+        }
     });
 
     if (mode !== "resurrecting") {
