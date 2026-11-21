@@ -75,11 +75,8 @@ __postFrameCallback((frameTimeNanos, performanceMillis) => { … });
   frames on the very clock the time origin is captured on, so the mapping is
   exact rather than an approximation resampled in JS.
 
-Two implementations sit behind that one surface: the NDK's `AChoreographer`
-(API 24+, resolved with `dlsym`) and `android.view.Choreographer` through
-`com.tns.FrameCallbacks` for API 21–23, where the NDK API does not exist.
-Scheduling is per calling thread, so a worker schedules against its own looper.
-Both paths produce the same two arguments with the same exactness.
+Frames come from the NDK's `AChoreographer`. Scheduling is per calling thread,
+so a worker schedules against its own looper.
 
 ## Deviations from the specs
 

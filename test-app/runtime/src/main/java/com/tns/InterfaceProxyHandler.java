@@ -1,7 +1,5 @@
 package com.tns;
 
-import android.os.Build;
-
 import com.tns.bindings.DefaultMethods;
 
 import java.lang.reflect.InvocationHandler;
@@ -61,7 +59,7 @@ final class InterfaceProxyHandler implements InvocationHandler {
             return proxy == args[0];
         }
 
-        if (Build.VERSION.SDK_INT >= 24 && method.isDefault() && !isOverriddenInJs(proxy.getClass(), method)) {
+        if (method.isDefault() && !isOverriddenInJs(proxy.getClass(), method)) {
             return Runtime.invokeInterfaceDefault(proxy, method, args);
         }
 

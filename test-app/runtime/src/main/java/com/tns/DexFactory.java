@@ -1,6 +1,5 @@
 package com.tns;
 
-import android.os.Build;
 import android.util.Log;
 
 import com.tns.bindings.AnnotationDescriptor;
@@ -23,9 +22,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.InvalidClassException;
 import java.io.OutputStreamWriter;
-import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -596,7 +593,7 @@ public class DexFactory {
         List<Method> defaultMethods = null;
         if (overridesDefaults) {
             defaultMethods = DefaultMethods.collect(classToProxy);
-        } else if ((!classToProxy.isInterface() || proxyName.contains(".")) && Build.VERSION.SDK_INT >= 24) {
+        } else if (!classToProxy.isInterface() || proxyName.contains(".")) {
             // An interface implementation with a dotted name is one extend() call's class, so
             // like a class it stubs only the default methods its implementation object names.
             List<Method> inheritedDefaults;
@@ -744,61 +741,13 @@ public class DexFactory {
      */
     private boolean injectDexIntoClassLoader(BaseDexClassLoader targetClassLoader, String jarFilePath) {
         try {
-            if (Build.VERSION.SDK_INT >= 24) {
-                // BaseDexClassLoader.addDexPath exists since API 24
-                Method addDexPath = BaseDexClassLoader.class.getDeclaredMethod("addDexPath", String.class);
-                addDexPath.setAccessible(true);
-                addDexPath.invoke(targetClassLoader, jarFilePath);
-            } else {
-                appendDexElements(targetClassLoader, jarFilePath);
-            }
+            Method addDexPath = BaseDexClassLoader.class.getDeclaredMethod("addDexPath", String.class);
+            addDexPath.setAccessible(true);
+            addDexPath.invoke(targetClassLoader, jarFilePath);
             return true;
         } catch (Exception e) {
             Log.w("JS", "Failed to inject dex into parent classloader: " + e);
             return false;
         }
-    }
-
-    /**
-     * Pre API 24 equivalent of BaseDexClassLoader.addDexPath: builds the dex elements
-     * through DexPathList's static factory methods (so no temporary class loader is
-     * involved) and splices them into the target loader's dexElements array. This is
-     * the same technique MultiDex used on these OS versions.
-     */
-    private void appendDexElements(BaseDexClassLoader targetClassLoader, String jarFilePath) throws Exception {
-        Field pathListField = BaseDexClassLoader.class.getDeclaredField("pathList");
-        pathListField.setAccessible(true);
-        Object pathList = pathListField.get(targetClassLoader);
-
-        ArrayList<File> files = new ArrayList<File>();
-        files.add(new File(jarFilePath));
-        ArrayList<IOException> suppressedExceptions = new ArrayList<IOException>();
-
-        Object newElements;
-        if (Build.VERSION.SDK_INT >= 23) {
-            Method makePathElements = pathList.getClass().getDeclaredMethod("makePathElements", List.class, File.class, List.class);
-            makePathElements.setAccessible(true);
-            newElements = makePathElements.invoke(null, files, this.odexDir, suppressedExceptions);
-        } else {
-            Method makeDexElements = pathList.getClass().getDeclaredMethod("makeDexElements", ArrayList.class, File.class, ArrayList.class);
-            makeDexElements.setAccessible(true);
-            newElements = makeDexElements.invoke(null, files, this.odexDir, suppressedExceptions);
-        }
-
-        if (!suppressedExceptions.isEmpty()) {
-            throw suppressedExceptions.get(0);
-        }
-
-        Field dexElementsField = pathList.getClass().getDeclaredField("dexElements");
-        dexElementsField.setAccessible(true);
-        Object oldElements = dexElementsField.get(pathList);
-
-        int oldLen = Array.getLength(oldElements);
-        int newLen = Array.getLength(newElements);
-        Object merged = Array.newInstance(oldElements.getClass().getComponentType(), oldLen + newLen);
-        System.arraycopy(oldElements, 0, merged, 0, oldLen);
-        System.arraycopy(newElements, 0, merged, oldLen, newLen);
-
-        dexElementsField.set(pathList, merged);
     }
 }
