@@ -1,8 +1,8 @@
 // Java->JS calls look the method up on the instance on every call, so an own
 // property of the instance or a method replaced after extend() is what runs. Debug
 // builds keep calling it but log a warning once per class and method, since the
-// iOS runtime binds the class's methods at extend time instead. Every spec extends
-// a class of its own: the warning names the class, and each is logged only once.
+// iOS runtime binds the class's methods at extend time instead. Every extend() spec
+// uses a class of its own: the warning names the class, and each is logged only once.
 // Interfaces are named in full so the static binding generator implements them.
 describe("Java->JS calls through a function other than the class's own", function () {
     var LogcatUtil = com.tns.tests.LogcatUtil;
@@ -118,6 +118,36 @@ describe("Java->JS calls through a function other than the class's own", functio
 
         expect(ownRuns).toBe(6);
         expect(warnings("DispatchWarnRepeated")).toBe(1);
+    });
+
+    // Every `new Runnable({...})` shares one Java class, so the spec without an override
+    // runs first and both count only the warnings their own calls add.
+    it("calls an interface implementation's method without a warning", function () {
+        var runs = 0;
+        var runnable = new java.lang.Runnable({ run: function () { runs++; } });
+        var className = String(runnable.getClass().getName());
+        var before = warnings(className);
+
+        runFromJava(runnable);
+
+        expect(runs).toBe(1);
+        expect(warnings(className)).toBe(before);
+    });
+
+    it("calls an own property of an interface implementation and warns once", function () {
+        var implementationRuns = 0;
+        var ownRuns = 0;
+        var runnable = new java.lang.Runnable({ run: function () { implementationRuns++; } });
+        var className = String(runnable.getClass().getName());
+        var before = warnings(className);
+        runnable.run = function () { ownRuns++; };
+
+        runFromJava(runnable);
+        runFromJava(runnable);
+
+        expect(ownRuns).toBe(2);
+        expect(implementationRuns).toBe(0);
+        expect(warnings(className)).toBe(before + 1);
     });
 
     it("calls an instance's own property on an instance Java created and warns", function () {

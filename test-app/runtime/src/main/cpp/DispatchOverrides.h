@@ -32,6 +32,16 @@ class DispatchOverrides {
   DispatchOverrides(const DispatchOverrides&) = delete;
   DispatchOverrides& operator=(const DispatchOverrides&) = delete;
 
+  /*
+   * For an instance whose class has no record: `new SomeInterface({...})` gives
+   * each instance its own implementation object, its prototype, so only an own
+   * property of the instance is reported. Same contract as Check.
+   */
+  static void CheckInstanceProperty(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                                    v8::Local<v8::Object> instance,
+                                    v8::Local<v8::String> methodName, int methodNameId,
+                                    v8::Local<v8::Function> method);
+
   // method is the function the call resolved to on instance. Never throws and
   // never runs JS: microtasks would drain before the dispatched method.
   void Check(v8::Isolate* isolate, v8::Local<v8::Context> context,
@@ -76,8 +86,8 @@ class DispatchOverrides {
   bool DefinedAfterExtend(v8::Isolate* isolate, v8::Local<v8::Context> context,
                           v8::Local<v8::Object> instance, v8::Local<v8::String> name);
 
-  void Warn(v8::Isolate* isolate, v8::Local<v8::String> methodName,
-            v8::Local<v8::Function> method);
+  static void Warn(const std::string& className, v8::Local<v8::String> methodName,
+                   v8::Local<v8::Function> method);
 
   std::string className_;
   v8::Global<v8::Object> implementationObject_;
