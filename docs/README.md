@@ -25,6 +25,10 @@
   the strong-until-closed port lifetime, HTML port enabling, and the
   transfer support matrix with its `DataCloneError` messages.
 - [Implementing additional Chrome DevTools protocol Domains](extending-inspector.md)
+- [Profile-guided optimization (PGO)](pgo.md) — experimental: training a
+  per-ABI profile of the runtime's C++ on the test suite and JNI benchmarks,
+  building with it, measuring the effect without fooling yourself, the spike's
+  results, and a proposed CI design.
 
 ## Knowledge
 
