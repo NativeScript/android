@@ -121,7 +121,9 @@ android {
                 }
 
                 cppFlags "-std=c++20"
-                arguments "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                // armeabi-v7a runtime code is built as A32 rather than the NDK's default
+                // Thumb-2: Thumb measured 10-20% slower on the JNI call paths.
+                arguments "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${NDK_PATH}", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON", "-DANDROID_ARM_MODE=arm"
             }
         }
 

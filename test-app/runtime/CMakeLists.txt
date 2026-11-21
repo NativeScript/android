@@ -19,13 +19,21 @@ endif (CCACHE_FOUND AND (USE_CCACHE))
 MESSAGE(STATUS "## ANDROID_NDK_ROOT: " ${ANDROID_NDK_ROOT})
 
 
-set(COMMON_CMAKE_ARGUMENTS "-std=c++20 -Werror -Wno-unused-result -mstackrealign -fexceptions -fno-builtin-stpcpy -fno-rtti -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_ENABLE_REGEXP_INTERPRETER_THREADED_DISPATCH -DV8_EMBEDDED_BUILTINS  -Wno-vla-extension -Wno-deprecated -Wno-vla-cxx-extension")
+# These are appended to CMAKE_CXX_FLAGS, never assigned over it: the NDK toolchain
+# puts its ABI flags there, among them -march=armv7-a and, for x86 below API 24,
+# -mstackrealign.
+set(COMMON_CMAKE_ARGUMENTS "-std=c++20 -Werror -Wno-unused-result -fexceptions -fno-builtin-stpcpy -fno-rtti -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_ENABLE_REGEXP_INTERPRETER_THREADED_DISPATCH -DV8_EMBEDDED_BUILTINS  -Wno-vla-extension -Wno-deprecated -Wno-vla-cxx-extension")
 
 
 if("${ANDROID_ABI}" MATCHES "arm64-v8a$" OR "${ANDROID_ABI}" MATCHES "x86_64$")
     # Enable pointer compression on 64 bit platforms
     set(COMMON_CMAKE_ARGUMENTS "${COMMON_CMAKE_ARGUMENTS} -DV8_COMPRESS_POINTERS")
 endif()
+
+# Opts out of the NDK's -fstack-protector-strong and -D_FORTIFY_SOURCE=2 defaults:
+# their checks cost code size and time on the runtime's hot paths. Must follow
+# the NDK flags, so the last -U/-f wins.
+string(APPEND COMMON_CMAKE_ARGUMENTS " -fno-stack-protector -U_FORTIFY_SOURCE")
 
 
 # AOSP has switched to using LLD by default and the NDK will use it by default in the next release.
@@ -118,14 +126,14 @@ add_custom_command(
 # nativescript-regular.aar and selected for apps that set useV8Symbols, so it
 # must carry the release flags. Only a local Debug build keeps plain -g.
 if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD OR NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections")
+    string(APPEND CMAKE_CXX_FLAGS " ${COMMON_CMAKE_ARGUMENTS} -O3 -fvisibility=hidden -ffunction-sections")
     # CMake appends CMAKE_CXX_FLAGS_<CONFIG> after CMAKE_CXX_FLAGS and clang honours the
     # last -O, so the -O3 above only survives in configs that carry no -O of their own
     # (Debug). AGP builds the release variant as RelWithDebInfo, whose default -O2 would
     # otherwise win.
     string(APPEND CMAKE_CXX_FLAGS_RELWITHDEBINFO " -O3")
 else ()
-    set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -g")
+    string(APPEND CMAKE_CXX_FLAGS " ${COMMON_CMAKE_ARGUMENTS} -g")
 endif ()
 
 if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
@@ -268,6 +276,9 @@ set(NATIVES_BLOB_INCLUDE_DIRECTORIES ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDRO
 # interposable so a plugin and the runtime never end up with two copies of one variable.
 set(NS_SYMBOLIC_FUNCTIONS "-Wl,-Bsymbolic-functions")
 
+# Lets lld merge string tails across SHF_MERGE sections.
+set(NS_RELEASE_LINK_OPTIMIZATION "-Wl,-O2")
+
 if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
     set_target_properties(
             NativeScript
@@ -276,7 +287,7 @@ if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
             # --icf=all folds identical functions even when their addresses are taken;
             # --icf=safe folds nothing here, as V8's objects carry no address-significance
             # tables.
-            PROPERTIES LINK_FLAGS "-Wl,--allow-multiple-definition -Wl,--gc-sections -Wl,--icf=all -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exported-symbols.map ${NS_SYMBOLIC_FUNCTIONS}"
+            PROPERTIES LINK_FLAGS "-Wl,--allow-multiple-definition -Wl,--gc-sections -Wl,--icf=all -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exported-symbols.map ${NS_SYMBOLIC_FUNCTIONS} ${NS_RELEASE_LINK_OPTIMIZATION}"
             INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
     )
 else ()
