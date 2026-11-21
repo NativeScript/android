@@ -21,14 +21,16 @@ describe("Runtime-bound Java->JS dispatch", function () {
     // Set by a spec whose comparer threads and polls must not outlive it, even
     // when jasmine times it out.
     var comparingWorker = null;
-    var specEnded = false;
+    // One per spec: a callback checks the token its spec captured, so a poll left
+    // pending by a timed-out spec stays cancelled once the next spec starts.
+    var currentSpec = null;
     beforeEach(function () {
         originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
-        specEnded = false;
+        currentSpec = { ended: false };
     });
     afterEach(function () {
-        specEnded = true;
+        currentSpec.ended = true;
         if (comparingWorker !== null) {
             comparingWorker.terminate();
             comparingWorker = null;
@@ -76,11 +78,15 @@ describe("Runtime-bound Java->JS dispatch", function () {
     });
 
     it("drops calls to an object whose worker has terminated", function (done) {
+        var spec = currentSpec;
         startWorker(function (worker) {
             worker.terminate();
 
             var deadline = Date.now() + 10000;
             (function poll() {
+                if (spec.ended) {
+                    return;
+                }
                 // Until teardown completes a call may still be answered.
                 var result;
                 try {
@@ -111,11 +117,12 @@ describe("Runtime-bound Java->JS dispatch", function () {
             pending("needs android.enableMultithreadedJavascript");
         }
 
+        var spec = currentSpec;
         // Each wait well inside the spec timeout, so a hang fails with its cause.
         function waitFor(condition, what, then) {
             var deadline = Date.now() + 5000;
             (function poll() {
-                if (specEnded) {
+                if (spec.ended) {
                     return;
                 }
                 if (condition()) {
@@ -130,7 +137,7 @@ describe("Runtime-bound Java->JS dispatch", function () {
         }
 
         comparingWorker = startWorker(function (worker) {
-            if (specEnded) {
+            if (spec.ended) {
                 return;
             }
             // A comparer stops once it has had 20 dropped calls in a row: by then the worker
