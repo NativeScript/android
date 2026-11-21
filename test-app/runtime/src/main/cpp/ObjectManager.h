@@ -215,7 +215,7 @@ class ObjectManager {
   void SetStateNotPlain(CanaryHandle* canary);
   // Before the handlers change the canary's state: a shell copied from an
   // earlier state can no longer stand in for it.
-  void StateChanging(CanaryHandle* canary);
+  inline void StateChanging(CanaryHandle* canary);
   // The canary's state object, created on its first write.
   v8::Local<v8::Object> StateForWrite(CanaryHandle* canary);
   // The canary's state when its plain state is known to have `property` as an
@@ -553,6 +553,12 @@ inline ObjectManager::CanaryHandle* ObjectManager::CanaryOfInstance(
     return nullptr;
   }
   return state;
+}
+
+inline void ObjectManager::StateChanging(CanaryHandle* canary) {
+  if (canary->record != nullptr && !canary->record->shell.IsEmpty()) {
+    canary->record->shell.Reset();
+  }
 }
 
 inline v8::Local<v8::Object> ObjectManager::CachedPlainState(

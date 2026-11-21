@@ -77,35 +77,14 @@ bool RewriteState(ObjectManager* objectManager, ObjectManager::CanaryHandle* can
   return true;
 }
 
-// The handlers mirror: each copies its write into the state and declines, so
-// V8 also applies it to the canary, where reads find a real own property and
-// never call into C++. There is no getter, query, enumerator or descriptor
-// callback for the same reason. The handlers are masking, so they also see
-// names the prototype chain has. After the setter declines, V8 adds a new name
-// to the canary without calling the definer, so the setter itself decides what
-// becomes state. V8 calls the setter only when the canary is the receiver.
-Intercepted Setter(Local<Name> property, Local<Value> value,
-                   const PropertyCallbackInfo<Boolean>& info) {
-  ObjectManager* objectManager = ObjectManagerOf(info.GetIsolate());
-  // v8::Object::DefineOwnProperty reaches the setter, not the definer.
-  if (V8_UNLIKELY(objectManager == nullptr || objectManager->CopyingCanaryProperties())) {
-    return Intercepted::kNo;
-  }
-  Local<Object> holder = info.Holder();
-  ObjectManager::CanaryHandle* canary = objectManager->CanaryOfInstance(holder);
-  if (canary == nullptr) {
-    return Intercepted::kNo;
-  }
-  objectManager->CountCanaryWrite();
-  Isolate* isolate = info.GetIsolate();
+// A write the name cache could not place: classifies it from the state and
+// the canary's prototype chain.
+[[gnu::noinline]] Intercepted MirrorUncachedWrite(ObjectManager* objectManager,
+                                                  ObjectManager::CanaryHandle* canary,
+                                                  Local<Object> holder, Local<Name> property,
+                                                  Local<Value> value, Isolate* isolate) {
   Local<Context> context = isolate->GetCurrentContext();
-  Local<Object> state = objectManager->CachedPlainState(canary, property);
-  if (!state.IsEmpty()) {
-    objectManager->StateChanging(canary);
-    (void)state->Set(context, property, value);
-    return Intercepted::kNo;
-  }
-  state = objectManager->StateOf(canary);
+  Local<Object> state = objectManager->StateOf(canary);
   // Own on the state means own on the canary: a rewrite of a JS property.
   if (!state.IsEmpty() &&
       RewriteState(objectManager, canary, context, state, property, value)) {
@@ -155,6 +134,36 @@ Intercepted Setter(Local<Name> property, Local<Value> value,
     (void)state->Set(context, property, value);
   }
   return Intercepted::kNo;
+}
+
+// The handlers mirror: each copies its write into the state and declines, so
+// V8 also applies it to the canary, where reads find a real own property and
+// never call into C++. There is no getter, query, enumerator or descriptor
+// callback for the same reason. The handlers are masking, so they also see
+// names the prototype chain has. After the setter declines, V8 adds a new name
+// to the canary without calling the definer, so the setter itself decides what
+// becomes state. V8 calls the setter only when the canary is the receiver.
+Intercepted Setter(Local<Name> property, Local<Value> value,
+                   const PropertyCallbackInfo<Boolean>& info) {
+  Isolate* isolate = info.GetIsolate();
+  ObjectManager* objectManager = ObjectManagerOf(isolate);
+  // v8::Object::DefineOwnProperty reaches the setter, not the definer.
+  if (V8_UNLIKELY(objectManager == nullptr || objectManager->CopyingCanaryProperties())) {
+    return Intercepted::kNo;
+  }
+  Local<Object> holder = info.Holder();
+  ObjectManager::CanaryHandle* canary = objectManager->CanaryOfInstance(holder);
+  if (V8_UNLIKELY(canary == nullptr)) {
+    return Intercepted::kNo;
+  }
+  objectManager->CountCanaryWrite();
+  Local<Object> state = objectManager->CachedPlainState(canary, property);
+  if (V8_LIKELY(!state.IsEmpty())) {
+    objectManager->StateChanging(canary);
+    (void)state->Set(isolate->GetCurrentContext(), property, value);
+    return Intercepted::kNo;
+  }
+  return MirrorUncachedWrite(objectManager, canary, holder, property, value, isolate);
 }
 
 Intercepted Deleter(Local<Name> property, const PropertyCallbackInfo<Boolean>& info) {
