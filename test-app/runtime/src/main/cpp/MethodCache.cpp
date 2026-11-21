@@ -41,23 +41,22 @@ void MethodCache::Init() {
     NS_CHECK(RESOLVE_CONSTRUCTOR_SIGNATURE_ID != nullptr);
 }
 
-// Reused for every lookup so a cache hit allocates nothing.
-static thread_local std::string s_signatureKey;
 static const MethodCache::CacheMethodInfo s_unresolved;
 
 const MethodCache::CacheMethodInfo& MethodCache::ResolveMethodSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic) {
     CacheMethodInfo method_info;
 
-    EncodeSignature(s_signatureKey, className, methodName, args, isStatic);
+    auto& signatureKey = Runtime::GetRuntime(args.GetIsolate())->GetSignatureKeyScratch();
+    EncodeSignature(signatureKey, className, methodName, args, isStatic);
     {
         std::shared_lock<std::shared_mutex> lock(signatureCacheMutex);
-        auto it = s_mthod_ctor_signature_cache.find(s_signatureKey);
+        auto it = s_mthod_ctor_signature_cache.find(signatureKey);
         if (it != s_mthod_ctor_signature_cache.end()) {
             return it->second;
         }
     }
-    // Resolving calls into Java, which may call back into JS and reuse s_signatureKey.
-    string encoded_method_signature = s_signatureKey;
+    // Resolving calls into Java, which may call back into JS and reuse the scratch key.
+    string encoded_method_signature = signatureKey;
 
     auto signature = ResolveJavaMethod(args, className, methodName);
 
@@ -89,15 +88,16 @@ const MethodCache::CacheMethodInfo& MethodCache::ResolveConstructorSignature(con
 
     auto& args = argWrapper.args;
     static const string kConstructorName = "<init>";
-    EncodeSignature(s_signatureKey, fullClassName, kConstructorName, args, false);
+    auto& signatureKey = Runtime::GetRuntime(args.GetIsolate())->GetSignatureKeyScratch();
+    EncodeSignature(signatureKey, fullClassName, kConstructorName, args, false);
     {
         std::shared_lock<std::shared_mutex> lock(signatureCacheMutex);
-        auto it = s_mthod_ctor_signature_cache.find(s_signatureKey);
+        auto it = s_mthod_ctor_signature_cache.find(signatureKey);
         if (it != s_mthod_ctor_signature_cache.end()) {
             return it->second;
         }
     }
-    string encoded_ctor_signature = s_signatureKey;
+    string encoded_ctor_signature = signatureKey;
 
     auto signature = ResolveConstructor(args, javaClass, isInterface);
 

@@ -169,6 +169,15 @@ class Runtime {
 
         ObjectManager* GetObjectManager() const;
 
+        /*
+         * Scratch for MethodCache's signature keys, so a cache hit allocates
+         * nothing. Only for the thread holding the isolate, and not across a
+         * call that can re-enter JS.
+         */
+        std::string& GetSignatureKeyScratch() {
+            return m_signatureKeyScratch;
+        }
+
         AdmissionGate& GetAdmissionGate() {
             return m_admissionGate;
         }
@@ -394,6 +403,8 @@ class Runtime {
 
         // Decided by ElectMainRuntime, before anything can read it.
         bool m_isMainThread = false;
+
+        std::string m_signatureKeyScratch;
 
         // This isolate's performance time origin, captured at isolate
         // creation: the monotonic clock reading now() is relative to, and the
