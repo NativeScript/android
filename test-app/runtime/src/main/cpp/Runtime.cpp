@@ -571,9 +571,10 @@ struct CallbackMethodNames {
   std::vector<v8::Global<v8::String>> byId;
 };
 
-Local<String> GetCallbackMethodName(Isolate* isolate, JNIEnv* env,
-                                    jstring methodName, jint methodNameId) {
-  auto* names = RuntimeState::For<CallbackMethodNames>(isolate);
+Local<String> GetCallbackMethodName(Runtime* runtime, Isolate* isolate,
+                                    JNIEnv* env, jstring methodName,
+                                    jint methodNameId) {
+  auto* names = RuntimeState::For<CallbackMethodNames>(runtime);
   if (names == nullptr || methodNameId < 0) {
     return ArgConverter::jstringToInternalizedV8String(isolate, env, methodName);
   }
@@ -635,7 +636,7 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
               jsObject->GetIdentityHash());
 
   auto jsMethodName =
-      GetCallbackMethodName(m_isolate, _env, methodName, methodNameId);
+      GetCallbackMethodName(this, m_isolate, _env, methodName, methodNameId);
   auto jsResult = CallbackHandlers::CallJSMethod(m_isolate, env, jsObject,
                                                  jsMethodName, args);
 
