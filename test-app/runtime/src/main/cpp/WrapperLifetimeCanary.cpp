@@ -5,6 +5,8 @@
 #include <vector>
 
 #include "EventLoop.h"
+#include "MetadataNode.h"
+#include "NativeScriptAssert.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
 
@@ -13,11 +15,6 @@ using namespace v8;
 namespace tns {
 
 namespace {
-
-// Set while this thread copies properties between a canary and its state, so
-// the handlers let those defines through. The copy runs no JS, so only its own
-// defines reach a handler on this thread meanwhile.
-thread_local bool copyingProperties_ = false;
 
 Local<Value> DescriptorField(Isolate* isolate, Local<Context> context, Local<Object> descriptor,
                              const char* name) {
@@ -47,10 +44,34 @@ Local<Object> OwnerOf(Local<Context> context, Local<Object> holder, Local<Name> 
   return object;
 }
 
-// Null rather than a throw: nothing would catch it on the way out of V8.
-ObjectManager* ObjectManagerOf(Isolate* isolate) {
-  Runtime* runtime = Runtime::TryGetRuntime(isolate);
-  return runtime != nullptr ? runtime->GetObjectManager() : nullptr;
+ObjectManager* ObjectManagerOf(Local<Value> data) {
+  return static_cast<ObjectManager*>(
+      data.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+}
+
+// Mirrors a write of a name the state already has; false if the state lacks it.
+bool RewriteState(ObjectManager* objectManager, ObjectManager::CanaryHandle* canary,
+                  Local<Context> context, Local<Object> state, Local<Name> property,
+                  Local<Value> value) {
+  if (!objectManager->StateIsPlain(canary)) {
+    if (!HasOwn(context, state, property)) {
+      return false;
+    }
+    if (!state->HasRealNamedCallbackProperty(context, property).FromMaybe(true)) {
+      (void)state->Set(context, property, value);
+    }
+    return true;
+  }
+  // A null-prototype object of data properties: one lookup answers both
+  // whether it is own and whether it is writable.
+  PropertyAttribute attributes;
+  if (!state->GetRealNamedPropertyAttributes(context, property).To(&attributes)) {
+    return false;
+  }
+  if ((attributes & ReadOnly) == 0) {
+    (void)state->Set(context, property, value);
+  }
+  return true;
 }
 
 // The handlers mirror: each copies its write into the state and declines, so
@@ -62,24 +83,23 @@ ObjectManager* ObjectManagerOf(Isolate* isolate) {
 // becomes state. V8 calls the setter only when the canary is the receiver.
 Intercepted Setter(Local<Name> property, Local<Value> value,
                    const PropertyCallbackInfo<Boolean>& info) {
+  ObjectManager* objectManager = ObjectManagerOf(info.Data());
   // v8::Object::DefineOwnProperty reaches the setter, not the definer.
-  if (copyingProperties_) {
+  if (objectManager->CopyingCanaryProperties()) {
     return Intercepted::kNo;
   }
-  Isolate* isolate = info.GetIsolate();
   Local<Object> holder = info.Holder();
-  ObjectManager* objectManager = ObjectManagerOf(isolate);
-  if (objectManager == nullptr || !objectManager->IsCanary(holder)) {
+  ObjectManager::CanaryHandle* canary = objectManager->CanaryOfInstance(holder);
+  if (canary == nullptr) {
     return Intercepted::kNo;
   }
   objectManager->CountCanaryWrite();
+  Isolate* isolate = info.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
-  Local<Object> state;
-  if (objectManager->ExistingCanaryState(holder, &state) && HasOwn(context, state, property)) {
-    // Own on the state means own on the canary: a rewrite of a JS property.
-    if (!state->HasRealNamedCallbackProperty(context, property).FromMaybe(true)) {
-      (void)state->Set(context, property, value);
-    }
+  Local<Object> state = objectManager->StateOf(canary);
+  // Own on the state means own on the canary: a rewrite of a JS property.
+  if (!state.IsEmpty() &&
+      RewriteState(objectManager, canary, context, state, property, value)) {
     return Intercepted::kNo;
   }
   // Searches the prototype chain too: absent there means a new name.
@@ -96,15 +116,27 @@ Intercepted Setter(Local<Name> property, Local<Value> value,
     if (owner.IsEmpty()) {
       return Intercepted::kNo;
     }
+    // A Java field's setter runs from here, sparing V8 a second lookup.
+    if (owner != holder &&
+        MetadataNode::TrySetInstanceField(isolate, context, objectManager->InstanceFieldTableKey(),
+                                          owner, holder, property, value)) {
+      return Intercepted::kYes;
+    }
     Maybe<bool> accessor = owner->HasRealNamedCallbackProperty(context, property);
     if (accessor.IsNothing() || accessor.FromJust()) {
       return Intercepted::kNo;
     }
   }
-  if (!objectManager->CanaryStateForWrite(holder, &state)) {
-    return Intercepted::kNo;
-  }
-  if (!HasOwn(context, state, property)) {
+  if (state.IsEmpty()) {
+    state = objectManager->StateForWrite(canary);
+    if (state.IsEmpty()) {
+      return Intercepted::kNo;
+    }
+    (void)state->CreateDataProperty(context, property, value);
+  } else if (objectManager->StateIsPlain(canary)) {
+    // RewriteState found the name absent from the state.
+    (void)state->CreateDataProperty(context, property, value);
+  } else if (!HasOwn(context, state, property)) {
     (void)state->CreateDataProperty(context, property, value);
   } else if (!state->HasRealNamedCallbackProperty(context, property).FromMaybe(true)) {
     (void)state->Set(context, property, value);
@@ -113,11 +145,14 @@ Intercepted Setter(Local<Name> property, Local<Value> value,
 }
 
 Intercepted Deleter(Local<Name> property, const PropertyCallbackInfo<Boolean>& info) {
-  Isolate* isolate = info.GetIsolate();
-  ObjectManager* objectManager = ObjectManagerOf(isolate);
-  Local<Object> state;
-  if (objectManager != nullptr && objectManager->ExistingCanaryState(info.Holder(), &state)) {
-    (void)state->Delete(isolate->GetCurrentContext(), property);
+  ObjectManager* objectManager = ObjectManagerOf(info.Data());
+  ObjectManager::CanaryHandle* canary = objectManager->CanaryOfInstance(info.Holder());
+  if (canary == nullptr) {
+    return Intercepted::kNo;
+  }
+  Local<Object> state = objectManager->StateOf(canary);
+  if (!state.IsEmpty()) {
+    (void)state->Delete(info.GetIsolate()->GetCurrentContext(), property);
   }
   return Intercepted::kNo;
 }
@@ -126,18 +161,24 @@ Intercepted Deleter(Local<Name> property, const PropertyCallbackInfo<Boolean>& i
 // receiver that lacks `x` reach here.
 Intercepted Definer(Local<Name> property, const PropertyDescriptor& descriptor,
                     const PropertyCallbackInfo<Boolean>& info) {
-  if (copyingProperties_) {
+  ObjectManager* objectManager = ObjectManagerOf(info.Data());
+  if (objectManager->CopyingCanaryProperties()) {
     return Intercepted::kNo;
   }
-  Isolate* isolate = info.GetIsolate();
-  ObjectManager* objectManager = ObjectManagerOf(isolate);
-  if (objectManager == nullptr || !objectManager->IsCanary(info.Holder())) {
+  ObjectManager::CanaryHandle* canary = objectManager->CanaryOfInstance(info.Holder());
+  if (canary == nullptr) {
     return Intercepted::kNo;
   }
   objectManager->CountCanaryWrite();
-  Local<Object> state;
-  if (objectManager->CanaryStateForWrite(info.Holder(), &state)) {
-    (void)state->DefineProperty(isolate->GetCurrentContext(), property,
+  Local<Object> state = objectManager->StateForWrite(canary);
+  if (!state.IsEmpty()) {
+    bool plain = descriptor.has_value() && descriptor.has_writable() && descriptor.writable() &&
+                 descriptor.has_enumerable() && descriptor.enumerable() &&
+                 descriptor.has_configurable() && descriptor.configurable();
+    if (!plain) {
+      objectManager->SetStateNotPlain(canary);
+    }
+    (void)state->DefineProperty(info.GetIsolate()->GetCurrentContext(), property,
                                 const_cast<PropertyDescriptor&>(descriptor));
   }
   return Intercepted::kNo;
@@ -168,21 +209,27 @@ void DrainOnRuntimeThread(int runtimeId) {
 }  // namespace
 
 void WrapperLifetimeCanary::ConfigureInstanceTemplate(Local<ObjectTemplate> instanceTemplate,
-                                                      TemplateKind kind) {
+                                                      TemplateKind kind,
+                                                      ObjectManager* objectManager) {
   if (!InScope(kind == TemplateKind::kExtended)) {
     return;
   }
+  NS_CHECK(objectManager != nullptr);
+  Isolate* isolate = Isolate::GetCurrent();
   instanceTemplate->SetHandler(NamedPropertyHandlerConfiguration(
-      nullptr, Setter, nullptr, Deleter, nullptr, Definer, nullptr, Local<Value>(),
+      nullptr, Setter, nullptr, Deleter, nullptr, Definer, nullptr,
+      External::New(isolate, objectManager, v8::kExternalPointerTypeTagDefault),
       PropertyHandlerFlags::kNone));
 }
 
-void WrapperLifetimeCanary::CopyOwnProperties(Isolate* isolate, Local<Context> context,
-                                              Local<Object> from, Local<Object> to) {
+void WrapperLifetimeCanary::CopyOwnProperties(ObjectManager* objectManager,
+                                              Local<Context> context, Local<Object> from,
+                                              Local<Object> to, bool plain) {
+  Isolate* isolate = Isolate::GetCurrent();
   HandleScope scope(isolate);
   TryCatch tc(isolate);
-  bool wasCopying = copyingProperties_;
-  copyingProperties_ = true;
+  bool wasCopying = objectManager->CopyingCanaryProperties();
+  objectManager->SetCopyingCanaryProperties(true);
   Local<Array> names;
   if (from->GetPropertyNames(context, KeyCollectionMode::kOwnOnly, PropertyFilter::ALL_PROPERTIES,
                              IndexFilter::kSkipIndices, KeyConversionMode::kConvertToString)
@@ -193,6 +240,13 @@ void WrapperLifetimeCanary::CopyOwnProperties(Isolate* isolate, Local<Context> c
         continue;
       }
       Local<Name> key = name.As<Name>();
+      if (plain) {
+        Local<Value> value;
+        if (from->Get(context, key).ToLocal(&value)) {
+          (void)to->CreateDataProperty(context, key, value);
+        }
+        continue;
+      }
       if (!from->HasRealNamedCallbackProperty(context, key).FromMaybe(true)) {
         PropertyAttribute attributes;
         Local<Value> value;
@@ -217,7 +271,7 @@ void WrapperLifetimeCanary::CopyOwnProperties(Isolate* isolate, Local<Context> c
       (void)to->DefineProperty(context, key, accessor);
     }
   }
-  copyingProperties_ = wasCopying;
+  objectManager->SetCopyingCanaryProperties(wasCopying);
 }
 
 void WrapperLifetimeCanary::OpenDeathInbox(int runtimeId, const std::shared_ptr<EventLoop>& loop) {

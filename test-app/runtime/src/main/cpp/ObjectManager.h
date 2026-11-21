@@ -187,6 +187,37 @@ class ObjectManager {
   // The state object of a canary, created on its first write.
   bool CanaryStateForWrite(const v8::Local<v8::Object>& holder, v8::Local<v8::Object>* out);
   void CountCanaryWrite() { m_lifetimeStats.canaryInterceptedWrites++; }
+
+  // What the write handlers need of one live canary.
+ private:
+  struct ObjectWeakCallbackState;
+
+ public:
+  using CanaryHandle = ObjectWeakCallbackState;
+  // holder's live canary registration, or null. holder must be an instance of
+  // a template with the canary handlers (it has the Metadata field).
+  CanaryHandle* CanaryOfInstance(const v8::Local<v8::Object>& holder);
+  // The canary's state object, empty if it has none yet.
+  v8::Local<v8::Object> StateOf(CanaryHandle* canary);
+  // Whether every property of the canary's state is a writable, enumerable,
+  // configurable data property: only a define can make one otherwise.
+  bool StateIsPlain(CanaryHandle* canary);
+  void SetStateNotPlain(CanaryHandle* canary);
+  // The canary's state object, created on its first write.
+  v8::Local<v8::Object> StateForWrite(CanaryHandle* canary);
+
+  // Set while the runtime copies properties between a canary and its state, so
+  // the handlers let those defines through. The copy runs no JS, and only the
+  // thread holding the isolate's lock touches this.
+  // Canary mode: the private key under which a class prototype keeps its
+  // instance field accessors' data (MetadataNode::TrySetInstanceField); empty
+  // in other modes.
+  v8::Local<v8::Private> InstanceFieldTableKey() {
+    return m_instanceFieldTableKey.Get(m_isolate);
+  }
+
+  bool CopyingCanaryProperties() const { return m_copyingCanaryProperties; }
+  void SetCopyingCanaryProperties(bool copying) { m_copyingCanaryProperties = copying; }
   // Lets go of the state of objects Java reported collected. Under the
   // isolate's Locker: the runtime's thread, or a thread calling in under
   // enableMultithreadedJavascript.
@@ -206,6 +237,8 @@ class ObjectManager {
 
  private:
   static void InitializeJNI();
+
+  struct CanaryRecord;
 
   // The registration of one linked Java object id, reached from the wrapper's JsInfo
   // field through m_idToObject.
@@ -239,6 +272,8 @@ class ObjectManager {
     bool reacquired = false;
     // A canary: a phantom handle, and no resurrection.
     bool canary = false;
+    // A canary's record, cached; EraseCanaryRecord clears it.
+    CanaryRecord* record = nullptr;
   };
 
   // Canary mode: what outlives the canaries of one Java object id, until Java
@@ -257,6 +292,8 @@ class ObjectManager {
     jclass clazz = nullptr;
     // The Java object table holds the object through a watched weak reference.
     bool javaWeak = false;
+    // A define reached the state with an accessor or non-default attributes.
+    bool stateNotPlain = false;
   };
 
   using JSInstanceInfo = ObjectWeakCallbackState;
@@ -342,9 +379,11 @@ class ObjectManager {
   std::vector<jint> m_pendingCanaryDeaths;
   // Template of a canary rebuilt for a JS-extended instance.
   v8::Persistent<v8::ObjectTemplate> m_canaryTemplate;
+  bool m_copyingCanaryProperties = false;
   bool m_deathInboxOpen = false;
   bool m_canaryEpilogueAdded = false;
   int m_deathInboxRuntimeId = -1;
+  v8::Persistent<v8::Private> m_instanceFieldTableKey;
 
   void JSObjectFinalizer(v8::Isolate* isolate,
                          ObjectWeakCallbackState* callbackState);

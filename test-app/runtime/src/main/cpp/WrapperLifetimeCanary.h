@@ -10,6 +10,7 @@
 namespace tns {
 
 class EventLoop;
+class ObjectManager;
 
 // The canary wrapper lifetime mode (WrapperLifetimeMode::kCanary).
 //
@@ -52,12 +53,15 @@ class WrapperLifetimeCanary {
   // Installs the write handlers on an instance template whose instances may be
   // canaries. No-op unless the mode is canary and kind is in scope.
   static void ConfigureInstanceTemplate(v8::Local<v8::ObjectTemplate> instanceTemplate,
-                                        TemplateKind kind);
+                                        TemplateKind kind, ObjectManager* objectManager);
 
   // Copies `from`'s own string- and symbol-keyed properties onto `to`, with
-  // their attributes, the handlers of both set aside.
-  static void CopyOwnProperties(v8::Isolate* isolate, v8::Local<v8::Context> context,
-                                v8::Local<v8::Object> from, v8::Local<v8::Object> to);
+  // their attributes, the handlers of both set aside. `plain` promises that
+  // every property of `from` is a writable, enumerable, configurable data
+  // property.
+  static void CopyOwnProperties(ObjectManager* objectManager, v8::Local<v8::Context> context,
+                                v8::Local<v8::Object> from, v8::Local<v8::Object> to,
+                                bool plain);
 
   // Routes Java's reports of collected watched objects to runtimeId's thread.
   // Registered by the runtime's thread, before its first watched object.
