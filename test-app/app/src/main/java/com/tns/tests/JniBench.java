@@ -19,6 +19,8 @@ public class JniBench {
         int intReturn(int a);
 
         void oneObject(Object o);
+
+        Object objectReturn();
     }
 
     public int intField = 7;
@@ -251,6 +253,12 @@ public class JniBench {
                 // The callback is itself a binding: the argument carries its object id.
                 for (int i = 0; i < n; i++) cb.oneObject(cb);
                 break;
+            case 8: {
+                Object sink = null;
+                for (int i = 0; i < n; i++) sink = cb.objectReturn();
+                if (sink == null) throw new IllegalStateException("objectReturn returned null");
+                break;
+            }
             default:
                 throw new IllegalArgumentException("kind " + kind);
         }
