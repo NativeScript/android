@@ -14,11 +14,19 @@ class JsArgToArrayConverter {
 
         JsArgToArrayConverter(v8::Isolate* isolate, v8::Local<v8::Context> context, const v8::Local<v8::Value>& arg, bool isImplementationObject, int classReturnType);
 
+        JsArgToArrayConverter(const JsArgToArrayConverter&) = delete;
+
+        JsArgToArrayConverter& operator=(const JsArgToArrayConverter&) = delete;
+
         ~JsArgToArrayConverter();
 
         jobjectArray ToJavaArray();
 
         jobject GetConvertedArg();
+
+        // The converted value as a local reference the caller deletes, or null. The
+        // converter no longer refers to it afterwards.
+        jobject ReleaseConvertedArg();
 
         int Length() const;
 
@@ -52,9 +60,15 @@ class JsArgToArrayConverter {
 
         Error m_error;
 
-        std::vector<int> m_storedIndexes;
+        struct ConvertedArg {
+            jobject obj = nullptr;
+            bool ownsLocalRef = false;
+        };
 
-        jobject* m_argsAsObject;
+        // The single-value constructor converts into m_inlineArg.
+        ConvertedArg m_inlineArg;
+
+        ConvertedArg* m_args;
 
         jobjectArray m_arr;
 
