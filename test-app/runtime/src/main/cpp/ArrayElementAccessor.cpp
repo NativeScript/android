@@ -177,13 +177,10 @@ Local<Value> ArrayElementAccessor::ConvertToJsValue(Isolate* isolate, ObjectMana
                 jsValue = objectManager->GetJsObjectByJavaObject(javaObjectID);
 
                 if (jsValue.IsEmpty()) {
-                    string className;
-                    if (elementSignature[0] == '[') {
-                        className = Util::JniClassPathToCanonicalName(elementSignature);
-                    } else {
-                        className = objectManager->GetClassName(*(jobject*) value);
-                    }
-
+                    // Named after the element's runtime class, as a method result is: the
+                    // wrapper's name must be a JNI class name, and it is later read back as
+                    // the array signature of the element itself.
+                    auto className = objectManager->GetClassName(*(jobject*) value);
                     jsValue = objectManager->CreateJSWrapper(javaObjectID, className);
                 }
             }
