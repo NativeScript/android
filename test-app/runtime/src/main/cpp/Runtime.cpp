@@ -145,14 +145,7 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
   }
 }
 
-Runtime* Runtime::GetRuntime(int runtimeId) {
-  // A runtime is only destroyed on its own thread, which is busy in this call,
-  // so the calling thread's own runtime needs neither the lock nor the map.
-  auto& current = s_current;
-  if (runtimeId == current.id) {
-    return current.runtime;
-  }
-
+Runtime* Runtime::GetRuntimeSlow(int runtimeId) {
   Runtime* runtime = nullptr;
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
@@ -169,35 +162,13 @@ Runtime* Runtime::GetRuntime(int runtimeId) {
   return runtime;
 }
 
-Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
-  /*
-   * Hot path, called from V8 callbacks on the isolate's own thread. The slot
-   * is written once in PrepareV8Runtime before the isolate runs any JS, so
-   * reading it requires no lock.
-   */
-  auto runtime = TryGetRuntime(isolate);
-  if (runtime != nullptr) {
-    return runtime;
-  }
-
-  // covers the window during isolate setup before SetData has run
+Runtime* Runtime::GetRuntimeSlow(v8::Isolate* isolate) {
+  Runtime* runtime;
   {
     std::lock_guard<std::mutex> lock(s_runtimeCacheMutex);
     auto it = s_isolate2RuntimesCache.find(isolate);
     runtime = (it != s_isolate2RuntimesCache.end()) ? it->second : nullptr;
   }
-
-  if (runtime == nullptr) {
-    stringstream ss;
-    ss << "Cannot find runtime for isolate: " << isolate;
-    throw NativeScriptException(ss.str());
-  }
-
-  return runtime;
-}
-
-Runtime* Runtime::GetRuntimeFromIsolateData(v8::Isolate* isolate) {
-  auto runtime = TryGetRuntime(isolate);
 
   if (runtime == nullptr) {
     stringstream ss;
@@ -1410,7 +1381,7 @@ v8::Platform* Runtime::platform = nullptr;
 int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
 std::shared_ptr<EventLoop> Runtime::s_mainEventLoop;
 
-thread_local Runtime::CurrentRuntime Runtime::s_current;
+constinit thread_local Runtime::CurrentRuntime Runtime::s_current;
 thread_local PendingIsolateSetup Runtime::s_pendingIsolateSetup;
 
 void Runtime::SetPendingIsolateSetup(PendingIsolateSetup setup) {
