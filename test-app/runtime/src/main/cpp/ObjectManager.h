@@ -14,6 +14,7 @@
 #include "LRUCache.h"
 #include "NativeScriptAssert.h"
 #include "ObjectIdIndex.h"
+#include "WrapperLifetime.h"
 #include "v8.h"
 
 namespace tns {
@@ -130,6 +131,10 @@ class ObjectManager {
     return LinkedIdOf(object) != -1;
   }
 
+  // Whether object, seen through any Proxy and the TypeScript layout, is a wrapper whose
+  // link was released or whose Java object was collected.
+  static bool IsReleasedWrapper(const v8::Local<v8::Object>& object);
+
   /*
    * The innermost target of a Proxy chain; any other value is returned as is.
    * A revoked Proxy anywhere in the chain yields null. Internal fields and
@@ -156,6 +161,8 @@ class ObjectManager {
   v8::Local<v8::Object> GetEmptyObject(v8::Isolate* isolate);
 
   enum class MetadataNodeKeys { JsInfo, CallSuper, Metadata, END };
+
+  const WrapperLifetimeStats& GetLifetimeStats() const { return m_lifetimeStats; }
 
  private:
   static void InitializeJNI();
@@ -196,6 +203,11 @@ class ObjectManager {
 
   // The linked state of object, or null.
   JSInstanceInfo* GetJSInstanceInfo(const v8::Local<v8::Object>& object);
+
+  // The linked Java object of jsInstanceInfo; throws if Java has collected it.
+  JniLocalRef JavaObjectOf(JSInstanceInfo* jsInstanceInfo);
+
+  WrapperLifetimeStats m_lifetimeStats;
 
   JSInstanceInfo* GetJSInstanceInfoFromRuntimeObject(
       const v8::Local<v8::Object>& object);
@@ -249,6 +261,9 @@ class ObjectManager {
   bool ScheduleFinalizedBatchFlush(double delayMs = 0);
 
   void ReleaseCollectedWrapper(int javaObjectID);
+
+  // A link that is gone leaves null in JsInfo; a link never made leaves undefined.
+  void MarkLinkReleased(const v8::Local<v8::Object>& object);
 
   // Drops id's registrations on both sides if Java has collected its object.
   bool ReleaseIfCollected(int javaObjectID);

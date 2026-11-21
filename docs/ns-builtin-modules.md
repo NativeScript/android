@@ -103,6 +103,7 @@ wrapper.
 |---|---|
 | `setConfig(key, value)` | Sets a runtime config key. Throws `TypeError` on an unknown key, an invalid value, or (for process-wide keys) when called from a worker isolate. |
 | `getConfig(key)` | Returns the current value of a config key. Throws `TypeError` on an unknown key. Readable from any isolate. |
+| `getWrapperLifetimeStats()` | Wrapper lifetime counters for the calling isolate (see [Wrapper lifetime](#wrapper-lifetime)). A fresh object on every call. |
 | `escapeException(x)` | Returns an `Error` branded so that, when it is thrown back across a native callback boundary, the native caller receives the original native exception `x` carries rather than the runtime's wrapper exception. Idempotent: a branded error is returned unchanged. Throws `TypeError` when called with no argument. The global `interop.escapeException` is this same function (see [Legacy globals](#legacy-globals)). |
 
 *Platform note (Android):* the original exception is the Java throwable `x`
@@ -117,6 +118,8 @@ Config keys:
 | key | values | scope | default |
 |---|---|---|---|
 | `debug` | comma-separated category list, e.g. `"esm,fetch"` | process-wide (main-isolate writes only; read live by every isolate) | the `NS_DEBUG` environment variable, or `""` |
+| `wrapperLifetimeMode` | `"resurrecting"` | process-wide, read-only | the app config `"wrapperLifetime": { "mode": … }`, or `"resurrecting"` |
+| `wrapperLifetimeScope` | `"extended"` \| `"all"` | process-wide, read-only | the app config `"wrapperLifetime": { "scope": … }`, or `"extended"` |
 
 iOS additionally registers `releasedObjectPolicy`, which governs access to a
 wrapper whose native counterpart has already been released. Android does not
@@ -145,9 +148,46 @@ The `TypeError` messages are part of the contract:
 | bad `getConfig` arity or non-string key | `getConfig expects (key: string)` |
 | process-wide key written from a worker | `'<key>' is process-wide and can only be set from the main isolate` |
 | non-string `debug` value | `'debug' must be a comma-separated category string (<categories>), or '' to disable tracing` |
+| `setConfig` of `wrapperLifetimeMode` or `wrapperLifetimeScope` | `'<key>' is read-only; set "wrapperLifetime" in the app config` |
 
 `<categories>` is the runtime's own list of valid category names, which on
 Android expands to `esm,fetch,registry`.
+
+#### Wrapper lifetime
+
+How the JS wrappers of Java objects live is chosen once per process by the
+top-level `"wrapperLifetime"` object of the app's `package.json`, the same key
+iOS reads:
+
+```json
+{ "wrapperLifetime": { "mode": "resurrecting", "scope": "extended" } }
+```
+
+A value that is not an object, or an unknown `mode` or `scope`, logs a warning
+and keeps the default. `"rooted"` is iOS-only: it reads native retain counts,
+which Java does not have. `scope` chooses which wrappers a mode other than
+`"resurrecting"` applies to, `"extended"` the instances of JS-extended classes
+and `"all"` every wrapper; `"resurrecting"` applies to every wrapper whatever
+the scope.
+
+`"resurrecting"` (the default) keeps a collected wrapper while Java may still
+hold its object. The first collection resurrects it and makes the Java side
+weak; a later collection releases the wrapper only once Java has collected the
+object. The JS properties of a wrapper whose object Java holds therefore
+survive, but the Java objects those properties reference were made weak in
+the same collection, and Java may collect them under the wrapper: touching one
+then throws `Attempt to use cleared object reference`.
+
+`getWrapperLifetimeStats()` returns counters for the calling isolate, kept in
+every build on cold paths only:
+
+| counter | counts |
+|---|---|
+| `resurrections` | finalizer passes that kept a collected wrapper until the Java side says whether its object is still alive. Every pass counts, so a wrapper JS dropped counts at least twice (once to weaken the Java side, once more to check whether Java collected the object) and one whose object Java holds counts again on every major GC. Unlike iOS's counter of the same name, it is not a number of wrappers native code kept alive |
+| `weakened` | Java objects held weakly because their wrapper was collected |
+| `collected` | wrappers released because Java had collected their object |
+| `releasedExplicitly` | links released through `__releaseNativeCounterpart` |
+| `releasedAccesses` | lookups of the Java object of a wrapper whose link was released or whose Java object Java had already collected: calling its methods, using its fields or passing it to Java. Resolving an overloaded method looks its arguments up too, so one call can count more than once |
 
 Remote-module security (`security.allowRemoteModules`,
 `security.remoteModuleAllowlist`) is **not** part of this surface. Those
