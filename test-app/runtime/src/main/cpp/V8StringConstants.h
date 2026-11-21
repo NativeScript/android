@@ -55,6 +55,12 @@ class V8StringConstants {
 
         static v8::Local<v8::Private> GetNullObjectPrivate(v8::Isolate* isolate);
 
+        static v8::Local<v8::Private> GetImplementationObjectPrivate(v8::Isolate* isolate);
+
+        static v8::Local<v8::Private> GetSuperValuePrivate(v8::Isolate* isolate);
+
+        static v8::Local<v8::Private> GetTypeMetadataPrivate(v8::Isolate* isolate);
+
         static const std::string CLASS_IMPLEMENTATION_OBJECT;
         static const std::string DEBUG_NAME;
         static const std::string EXTEND;
@@ -168,6 +174,11 @@ class V8StringConstants {
                 CAST_MARKER_PRIVATE.Reset(isolate, Private::ForApi(isolate, str));
                 str = String::NewFromUtf8(isolate, NULL_OBJECT_KEY.c_str(), NewStringType::kInternalized).ToLocalChecked();
                 NULL_OBJECT_PRIVATE.Reset(isolate, Private::ForApi(isolate, str));
+                IMPLEMENTATION_OBJECT_PRIVATE.Reset(isolate, Private::ForApi(isolate, Local<String>::New(isolate, *IMPLEMENTATION_OBJECT_PERSISTENT)));
+                str = String::NewFromUtf8(isolate, "supervalue", NewStringType::kInternalized).ToLocalChecked();
+                SUPER_VALUE_PRIVATE.Reset(isolate, Private::ForApi(isolate, str));
+                str = String::NewFromUtf8(isolate, "typemetadata", NewStringType::kInternalized).ToLocalChecked();
+                TYPE_METADATA_PRIVATE.Reset(isolate, Private::ForApi(isolate, str));
             };
 
             ~PerIsolateV8Constants() {
@@ -232,6 +243,9 @@ class V8StringConstants {
             v8::Global<v8::Private> NULL_NODE_PRIVATE;
             v8::Global<v8::Private> CAST_MARKER_PRIVATE;
             v8::Global<v8::Private> NULL_OBJECT_PRIVATE;
+            v8::Global<v8::Private> IMPLEMENTATION_OBJECT_PRIVATE;
+            v8::Global<v8::Private> SUPER_VALUE_PRIVATE;
+            v8::Global<v8::Private> TYPE_METADATA_PRIVATE;
         };
 
     private:
