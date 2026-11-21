@@ -212,12 +212,6 @@ ObjectManager* Runtime::GetObjectManager(v8::Isolate* isolate) {
   return GetRuntime(isolate)->GetObjectManager();
 }
 
-Isolate* Runtime::GetIsolate() const { return m_isolate; }
-
-jobject Runtime::GetJavaRuntime() const { return m_runtime; }
-
-ObjectManager* Runtime::GetObjectManager() const { return m_objectManager; }
-
 void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath,
                    jstring nativeLibDir, jboolean verboseLoggingEnabled,
                    jboolean isDebuggable, jstring packageName,
@@ -1405,12 +1399,6 @@ void Runtime::DestroyRuntime() {
   // threads already pinned have let go.
   RuntimeGates::Close(m_id);
 }
-
-Local<Context> Runtime::GetContext() {
-  return this->m_context->Get(this->m_isolate);
-}
-
-int Runtime::GetId() { return this->m_id; }
 
 
 JavaVM* Runtime::s_jvm = nullptr;

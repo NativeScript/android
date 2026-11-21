@@ -478,6 +478,26 @@ class Runtime {
         std::mutex m_fileWriteMutex;
 #endif
 };
+
+inline v8::Isolate* Runtime::GetIsolate() const {
+    return m_isolate;
+}
+
+inline jobject Runtime::GetJavaRuntime() const {
+    return m_runtime;
+}
+
+inline ObjectManager* Runtime::GetObjectManager() const {
+    return m_objectManager;
+}
+
+inline int Runtime::GetId() {
+    return m_id;
+}
+
+inline v8::Local<v8::Context> Runtime::GetContext() {
+    return m_context->Get(m_isolate);
+}
 }
 
 #endif /*#ifndef RUNTIME_H_*/
