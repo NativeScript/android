@@ -852,12 +852,6 @@ bool ObjectManager::StateIsPlain(CanaryHandle* canary) {
   return canary->record == nullptr || !canary->record->stateNotPlain;
 }
 
-void ObjectManager::StateChanging(CanaryHandle* canary) {
-  if (canary->record != nullptr && !canary->record->shell.IsEmpty()) {
-    canary->record->shell.Reset();
-  }
-}
-
 void ObjectManager::SetStateNotPlain(CanaryHandle* canary) {
   if (canary->record != nullptr) {
     canary->record->stateNotPlain = true;
