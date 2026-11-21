@@ -49,8 +49,18 @@ function canBeHeldWeakly(value) {
 // once the native method can no longer reject the call, so a failed call leaves
 // no state behind: the receiver is checked first with a method that cannot
 // insert anything.
-function lookupKey(value) {
-  return isObject(value) ? unwrap(value, false) : value;
+//
+// A canary is never stored as a key itself (its lifetime key is), so every
+// method first tries the value as is and unwraps it only when that misses:
+// plain JS keys never reach native code.
+
+// The lifetime key value stands for, or undefined when that is value itself.
+function otherKey(value) {
+  if (!isObject(value)) {
+    return undefined;
+  }
+  const key = unwrap(value, false);
+  return key !== value ? key : undefined;
 }
 
 // Unregistering it finds nothing: it is never a token.
@@ -58,12 +68,17 @@ const receiverProbe = ObjectFreeze({ __proto__: null });
 
 class WeakMap extends NativeWeakMap {
   get(key) {
-    return WeakMapPrototypeGet(this, lookupKey(key));
+    const direct = WeakMapPrototypeGet(this, key);
+    if (direct !== undefined) {
+      return direct;
+    }
+    const other = otherKey(key);
+    return other === undefined ? undefined : WeakMapPrototypeGet(this, other);
   }
 
   set(key, value) {
-    if (isObject(key)) {
-      WeakMapPrototypeHas(this, undefined);
+    // Also checks the receiver before a key is made.
+    if (isObject(key) && !WeakMapPrototypeHas(this, key)) {
       key = unwrap(key, true);
     }
     WeakMapPrototypeSet(this, key, value);
@@ -71,11 +86,19 @@ class WeakMap extends NativeWeakMap {
   }
 
   has(key) {
-    return WeakMapPrototypeHas(this, lookupKey(key));
+    if (WeakMapPrototypeHas(this, key)) {
+      return true;
+    }
+    const other = otherKey(key);
+    return other !== undefined && WeakMapPrototypeHas(this, other);
   }
 
   delete(key) {
-    return WeakMapPrototypeDelete(this, lookupKey(key));
+    if (WeakMapPrototypeDelete(this, key)) {
+      return true;
+    }
+    const other = otherKey(key);
+    return other !== undefined && WeakMapPrototypeDelete(this, other);
   }
 }
 
@@ -83,8 +106,7 @@ class WeakMap extends NativeWeakMap {
 if (WeakMapPrototypeGetOrInsert !== undefined) {
   ObjectDefineProperty(WeakMap.prototype, "getOrInsert", {
     value: function getOrInsert(key, value) {
-      if (isObject(key)) {
-        WeakMapPrototypeHas(this, undefined);
+      if (isObject(key) && !WeakMapPrototypeHas(this, key)) {
         key = unwrap(key, true);
       }
       return WeakMapPrototypeGetOrInsert(this, key, value);
@@ -99,8 +121,11 @@ if (WeakMapPrototypeGetOrInsertComputed !== undefined) {
       if (!isObject(key) || typeof callbackfn !== "function") {
         return WeakMapPrototypeGetOrInsertComputed(this, key, callbackfn);
       }
-      const existing = unwrap(key, false);
-      if (WeakMapPrototypeHas(this, existing)) {
+      if (WeakMapPrototypeHas(this, key)) {
+        return WeakMapPrototypeGet(this, key);
+      }
+      const existing = otherKey(key);
+      if (existing !== undefined && WeakMapPrototypeHas(this, existing)) {
         return WeakMapPrototypeGet(this, existing);
       }
       // Before the key exists, so a callback that throws leaves none; it sees
@@ -116,8 +141,8 @@ if (WeakMapPrototypeGetOrInsertComputed !== undefined) {
 
 class WeakSet extends NativeWeakSet {
   add(value) {
-    if (isObject(value)) {
-      WeakSetPrototypeHas(this, undefined);
+    // Also checks the receiver before a key is made.
+    if (isObject(value) && !WeakSetPrototypeHas(this, value)) {
       value = unwrap(value, true);
     }
     WeakSetPrototypeAdd(this, value);
@@ -125,11 +150,19 @@ class WeakSet extends NativeWeakSet {
   }
 
   has(value) {
-    return WeakSetPrototypeHas(this, lookupKey(value));
+    if (WeakSetPrototypeHas(this, value)) {
+      return true;
+    }
+    const other = otherKey(value);
+    return other !== undefined && WeakSetPrototypeHas(this, other);
   }
 
   delete(value) {
-    return WeakSetPrototypeDelete(this, lookupKey(value));
+    if (WeakSetPrototypeDelete(this, value)) {
+      return true;
+    }
+    const other = otherKey(value);
+    return other !== undefined && WeakSetPrototypeDelete(this, other);
   }
 }
 
@@ -192,7 +225,11 @@ class FinalizationRegistry extends NativeFinalizationRegistry {
   }
 
   unregister(unregisterToken) {
-    return FinalizationRegistryPrototypeUnregister(this, lookupKey(unregisterToken));
+    if (FinalizationRegistryPrototypeUnregister(this, unregisterToken)) {
+      return true;
+    }
+    const other = otherKey(unregisterToken);
+    return other !== undefined && FinalizationRegistryPrototypeUnregister(this, other);
   }
 }
 
