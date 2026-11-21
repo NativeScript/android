@@ -319,6 +319,9 @@ class MetadataNode {
             std::string fullClassName;
             uint64_t defaultOverrides = 0;
             std::optional<std::vector<std::string>> contentMemberNames;
+            // The class cache's global ref for fullClassName once resolved; that cache never
+            // drops or replaces an entry.
+            jclass resolvedClass = nullptr;
         };
 
         struct TypeMetadata {

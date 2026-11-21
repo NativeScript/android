@@ -1527,7 +1527,8 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
         ArgsWrapper argWrapper(info, ArgType::Class);
 
         bool success = CallbackHandlers::RegisterInstance(isolate, thiz, extData->fullClassName, argWrapper, implementationObject, false, extData->node->m_name, extData->defaultOverrides,
-                                                          extData->contentMemberNames ? &*extData->contentMemberNames : nullptr);
+                                                          extData->contentMemberNames ? &*extData->contentMemberNames : nullptr,
+                                                          &extData->resolvedClass);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {

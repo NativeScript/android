@@ -214,7 +214,8 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
                                         bool isInterface,
                                         const std::string &baseClassName,
                                         uint64_t defaultOverrides,
-                                        const vector<string> *contentMemberNames) {
+                                        const vector<string> *contentMemberNames,
+                                        jclass *resolvedClass) {
     bool success;
 
     DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
@@ -230,9 +231,15 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
     // The default-overriding class does not depend on the implementation object, whose
     // properties ResolveClass would otherwise read, getters included.
-    jclass generatedJavaClass = ResolveClass(isolate, baseClassName, fullClassName,
-                                             defaultOverrides != 0 ? Local<Object>() : implementationObject,
-                                             isInterface, contentMemberNames);
+    jclass generatedJavaClass = resolvedClass != nullptr ? *resolvedClass : nullptr;
+    if (generatedJavaClass == nullptr) {
+        generatedJavaClass = ResolveClass(isolate, baseClassName, fullClassName,
+                                          defaultOverrides != 0 ? Local<Object>() : implementationObject,
+                                          isInterface, contentMemberNames);
+        if (resolvedClass != nullptr) {
+            *resolvedClass = generatedJavaClass;
+        }
+    }
 
     int javaObjectID = objectManager->GenerateNewObjectID();
 

@@ -84,4 +84,32 @@ describe("Object arguments and cached call signatures", function () {
 			expect(plain.getClass().getName()).toBe("java.lang.Object");
 		}
 	});
+
+	it("constructs extended classes repeatedly, interleaved and with arguments", function () {
+		var Counting = java.util.ArrayList.extend({
+			size: function () {
+				return this.super.size() + 100;
+			}
+		});
+		var Named = java.lang.Object.extend({
+			toString: function () {
+				return "named";
+			}
+		});
+		var source = new java.util.ArrayList();
+		source.add("a");
+
+		var seen = [];
+		for (var i = 0; i < 20; i++) {
+			var empty = new Counting();
+			empty.add("x");
+			expect(empty.size()).toBe(101);
+			expect(new Counting(10).size()).toBe(100);
+			expect(new Counting(source).size()).toBe(101);
+			var named = new Named();
+			expect(named.toString()).toBe("named");
+			expect(seen.indexOf(empty)).toBe(-1);
+			seen.push(empty);
+		}
+	});
 });
