@@ -179,7 +179,7 @@ usual.
   spreads that drift over every variant. The spike ran 6 rounds.
 - **Run an A/A.** Run `ab.sh` with the same APK under two labels to get the
   noise floor. On the SM-G780G, single-call rows (static, instance and field
-  access) moved by about ±1% between identical APKs. The construction,
+  access) moved by about ±1% between identical APKs, 1.6% at most. The construction,
   callback and contention rows are bimodal and moved by up to ±9%. Do not read
   effects into those rows.
 - **Keep the host and device quiet.** Do not build on the host while
