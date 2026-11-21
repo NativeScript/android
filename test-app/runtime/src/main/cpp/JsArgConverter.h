@@ -88,6 +88,8 @@ namespace tns {
 
         v8::Isolate* m_isolate;
 
+        ObjectManager* m_objectManager = nullptr;
+
         int m_argsLen;
 
         bool m_isValid;
