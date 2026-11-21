@@ -214,7 +214,8 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
                                         bool isInterface,
                                         const std::string &baseClassName,
                                         uint64_t defaultOverrides,
-                                        const vector<string> *contentMemberNames) {
+                                        const vector<string> *contentMemberNames,
+                                        const Persistent<ObjectTemplate> *instanceTemplate) {
     bool success;
 
     DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
@@ -236,7 +237,13 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
     int javaObjectID = objectManager->GenerateNewObjectID();
 
-    objectManager->Link(jsObject, javaObjectID, nullptr);
+    // Java calls into JS through an extended class's or an interface implementation's
+    // instance; a plain class constructed from JS is a plain wrapper.
+    objectManager->Link(jsObject, javaObjectID, nullptr,
+                        !implementationObject.IsEmpty() || isInterface
+                            ? ObjectManager::LinkKind::kExtended
+                            : ObjectManager::LinkKind::kPlain,
+                        instanceTemplate);
 
     // resolve constructor
     const auto &mi = MethodCache::ResolveConstructorSignature(argWrapper, fullClassName,

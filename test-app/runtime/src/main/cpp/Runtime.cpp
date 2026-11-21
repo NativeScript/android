@@ -265,6 +265,7 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
                               ? UncaughtErrorPolicy::Throw
                               : UncaughtErrorPolicy::Report;
   ConfigureWrapperLifetime(options.wrapperLifetimeMode, options.wrapperLifetimeScope);
+  m_objectManager->SetMultithreadedJavascript(options.multithreadedJavascript);
 
   DEBUG_WRITE("Initializing Telerik NativeScript");
 
@@ -637,16 +638,31 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
   DEBUG_WRITE("CallJSMethodNative called javaObjectID=%d", javaObjectID);
 
   m_objectManager->FlushFinalizedBatchIfPending();
+  args.canaryReleasesAtStart = m_objectManager->CanaryReleaseCount();
 
   // javaObjectID may be a hint read without the isolate lock; resolve it exactly when it
-  // does not name a linked wrapper.
+  // names neither a linked wrapper nor a canary that can be rebuilt.
   Local<Object> jsObject;
   if (javaObjectID != -1) {
     jsObject = m_objectManager->GetLinkedJsObjectByJavaObject(javaObjectID);
   }
   if (jsObject.IsEmpty() && javaObject != nullptr) {
+    auto registeredAs = javaObjectID;
     javaObjectID = m_objectManager->FindObjectId(javaObject);
     if (javaObjectID == -1) {
+      if (registeredAs != -1) {
+        // Registered once, and Java has let go of it since (cleared its weak
+        // reference before finalizing it, or released its link). Dropped, not
+        // thrown: the caller is often a framework callback. Runtime.java
+        // defaults a primitive return.
+        __android_log_print(
+            ANDROID_LOG_WARN, "Warning",
+            "NativeScript discarding call to \"%s\": an instance of %s is no "
+            "longer registered with runtime id=%d",
+            ArgConverter::jstringToString(methodName).c_str(),
+            m_objectManager->GetClassName(javaObject).c_str(), m_id);
+        return nullptr;
+      }
       throw NativeScriptException("Cannot find object id for an instance of " +
                                   m_objectManager->GetClassName(javaObject));
     }
@@ -711,8 +727,9 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
 
   auto proxyClassName = m_objectManager->GetClassName(javaObject);
   DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
+  const Persistent<ObjectTemplate>* instanceTemplate = nullptr;
   jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager,
-                                                     proxyClassName);
+                                                     proxyClassName, &instanceTemplate);
 
   if (jsInstance.IsEmpty()) {
     throw NativeScriptException(
@@ -730,7 +747,8 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
               implementationObject->GetIdentityHash());
 
   jclass clazz = env.FindClass(jniName);
-  m_objectManager->Link(jsInstance, javaObjectID, clazz);
+  m_objectManager->Link(jsInstance, javaObjectID, clazz,
+                        ObjectManager::LinkKind::kExtended, instanceTemplate);
 }
 
 jint Runtime::GenerateNewObjectId(JNIEnv* env, jobject obj) {
@@ -984,6 +1002,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   auto consts = new V8StringConstants::PerIsolateV8Constants(isolate);
   isolate->SetData((uint32_t)Runtime::IsolateData::RUNTIME, this);
   isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, consts);
+  isolate->SetData((uint32_t)Runtime::IsolateData::OBJECT_MANAGER, m_objectManager);
 
   isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100,
                                                      StackTrace::kOverview);

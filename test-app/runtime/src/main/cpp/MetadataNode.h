@@ -37,6 +37,18 @@
 namespace tns {
 class MetadataNode {
     public:
+        /*
+         * Canary mode: runs the Java instance field setter the class prototype
+         * `owner` carries for `property`, as a write through `receiver` would.
+         * False, and nothing done, when owner carries no runtime-installed field
+         * accessor for property. Field accessors are non-configurable, so one
+         * found on owner is still the runtime's.
+         */
+        static bool TrySetInstanceField(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                                        v8::Local<v8::Private> fieldTableKey,
+                                        v8::Local<v8::Object> owner, v8::Local<v8::Object> receiver,
+                                        v8::Local<v8::Name> property, v8::Local<v8::Value> value);
+
         static void Init(v8::Isolate* isolate);
 
         static void BuildMetadata(const std::string& filesPath);
@@ -55,7 +67,10 @@ class MetadataNode {
 
         static MetadataNode* GetNodeFromHandle(const v8::Local<v8::Object>& value);
 
-        static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate* isolate, ObjectManager* objectManager, const std::string& proxyClassName);
+        // instanceTemplate receives the template the wrapper was made from, which
+        // lives as long as this runtime's metadata cache.
+        static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate* isolate, ObjectManager* objectManager, const std::string& proxyClassName,
+                                                             const v8::Persistent<v8::ObjectTemplate>** instanceTemplate);
 
         static v8::Local<v8::Object> GetImplementationObject(v8::Isolate* isolate, const v8::Local<v8::Object>& object);
 
@@ -188,6 +203,11 @@ class MetadataNode {
         // This runtime's per-instance data for this node, created on first use.
         InstanceData& GetInstanceData(v8::Isolate* isolate);
 
+        // The instance template of a class's or interface's constructor, alive as
+        // long as this runtime's metadata cache; throws for a class missing at
+        // runtime. data is GetInstanceData(isolate).
+        v8::Persistent<v8::ObjectTemplate>* GetInstanceTemplate(v8::Isolate* isolate, InstanceData& data);
+
         static void SetInstanceMetadata(v8::Isolate* isolate, v8::Local<v8::Object> value, MetadataNode* node);
 
         static TypeMetadata* GetTypeMetadata(v8::Isolate* isolate, const v8::Local<v8::Function>& value);
@@ -207,6 +227,9 @@ class MetadataNode {
 
         static void FieldAccessorGetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void FieldAccessorSetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+        // Throws NativeScriptException.
+        static void SetInstanceField(v8::Isolate* isolate, const v8::Local<v8::Object>& thiz,
+                                     const v8::Local<v8::Value>& value, FieldCallbackData* fieldData);
 
         static void StaticFieldGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
@@ -304,11 +327,13 @@ class MetadataNode {
             ~ExtendedClassCallbackData() {
                 implementationObject->Reset();
                 delete implementationObject;
+                instanceTemplate.Reset();
             }
 
             MetadataNode* node;
             std::string extendedName;
             v8::Persistent<v8::Object>* implementationObject;
+            v8::Persistent<v8::ObjectTemplate> instanceTemplate;
 
             std::string fullClassName;
             uint64_t defaultOverrides = 0;

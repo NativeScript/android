@@ -14,9 +14,17 @@ enum class WrapperLifetimeMode {
   // its object: the Java side is made weak, and the wrapper is released only
   // once a later collection finds the Java object gone (ObjectManager).
   kResurrecting,
+  // Phantom callbacks, no resurrection: a wrapper in scope is a canary that
+  // dies with its JS references. Its JS properties are mirrored into a state
+  // object that lives until Java collects the object, and a canary built later
+  // for the same object gets them back (WrapperLifetimeCanary).
+  kCanary,
 };
 
 enum class WrapperLifetimeScope {
+  // Canaries are instances Java can call into JS through: JS-extended
+  // classes and interface implementations. Other wrappers keep the
+  // resurrecting lifetime.
   kExtended,
   kAll,
 };
@@ -54,6 +62,17 @@ struct WrapperLifetimeStats {
   // Times JS used a wrapper whose Java object was already collected, or
   // called a method on one whose link was released.
   uint64_t releasedAccesses = 0;
+  // "canary" only: state objects created to hold JS properties.
+  uint64_t canaryStates = 0;
+  // "canary" only: state objects let go of because Java collected the object.
+  uint64_t canaryNativeDeaths = 0;
+  // "canary" only: writes to canaries the write handler saw.
+  uint64_t canaryInterceptedWrites = 0;
+  // "canary" only: of those, writes mirrored through the state name cache.
+  uint64_t canaryCachedWrites = 0;
+  // "canary" only: canaries built anew for a JS-extended instance whose
+  // previous canary died while Java kept the object.
+  uint64_t canaryRebuilds = 0;
 };
 
 }  // namespace tns

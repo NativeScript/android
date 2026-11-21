@@ -1,4 +1,5 @@
 #include "ArgConverter.h"
+#include "WrapperLifetimeCanary.h"
 #include "JniLocalRef.h"
 #include "ObjectManager.h"
 #include "Util.h"
@@ -150,8 +151,15 @@ void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const 
             // hint Java read without the isolate lock, or -1) and the class index above.
             auto hintedObjectID = static_cast<jint>(bits);
             auto classIndex = static_cast<int>((bits >> 32) & 0x7fffffff);
-            if ((bits & JavaCallArgs::FreshArg) != 0 &&
-                !objectManager->HasJsObject(hintedObjectID)) {
+            // In canary mode a settle may have released a fresh id whose canary JS made
+            // and dropped meanwhile: another thread's before this call took the lock
+            // (multithreaded JS), or one on this thread since the call started (JS run
+            // by the method lookup). Such an id is resolved again.
+            bool freshIdExact = (bits & JavaCallArgs::FreshArg) != 0 &&
+                                (!WrapperLifetimeCanary::Enabled() ||
+                                 (!objectManager->MultithreadedJavascript() &&
+                                  objectManager->CanaryReleaseCount() == args.canaryReleasesAtStart));
+            if (freshIdExact && !objectManager->HasJsObject(hintedObjectID)) {
                 JniLocalRef arg(env->GetObjectArrayElement(args.refs, i));
                 jsArg = objectManager->CreateJSWrapper(hintedObjectID, classIndex, arg);
             } else if (hintedObjectID != -1) {
@@ -160,10 +168,7 @@ void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const 
             if (jsArg.IsEmpty()) {
                 JniLocalRef arg(env->GetObjectArrayElement(args.refs, i));
                 auto javaObjectID = objectManager->GetOrCreateObjectId(arg);
-                jsArg = objectManager->GetJsObjectByJavaObject(javaObjectID);
-                if (jsArg.IsEmpty()) {
-                    jsArg = objectManager->CreateJSWrapper(javaObjectID, classIndex, arg);
-                }
+                jsArg = objectManager->GetOrCreateJSWrapper(javaObjectID, classIndex, arg);
             }
             break;
         }

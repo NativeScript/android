@@ -2,6 +2,8 @@
 #define OBJECTMANAGER_H_
 
 #include <map>
+#include <optional>
+#include <unordered_map>
 #include <memory>
 #include <set>
 #include <stack>
@@ -67,10 +69,20 @@ class ObjectManager {
   // rely on the delayed flush task.
   void FlushFinalizedBatchIfPending() {
     if (!m_flushBackingOff &&
-        (!m_pendingWeaken.empty() || !m_pendingCheck.empty())) {
+        (!m_pendingWeaken.empty() || !m_pendingCheck.empty() ||
+         !m_pendingCanaryDeaths.empty())) {
       FlushFinalizedBatch();
     }
   }
+
+  // enableMultithreadedJavascript: Java may call in from threads other than
+  // the runtime's own.
+  void SetMultithreadedJavascript(bool value) { m_multithreadedJavascript = value; }
+  bool MultithreadedJavascript() const { return m_multithreadedJavascript; }
+
+  // Canary settles that released Java ids. A Java object registered for a
+  // call keeps its id while this does not move, on a single JS thread.
+  uint64_t CanaryReleaseCount() const { return m_canaryReleaseCount; }
 
   // Whether a wrapper was ever created for this id and not yet collected.
   bool HasJsObject(int javaObjectID) const {
@@ -82,7 +94,8 @@ class ObjectManager {
   void ReleaseUnwrappedArgs(const JavaCallArgs& args);
 
   // As GetJsObjectByJavaObject, but empty once the wrapper's link to the Java object was
-  // released.
+  // released. Ids are never reused, so an id read without the isolate lock that names a
+  // dead canary's record still names that record's object.
   v8::Local<v8::Object> GetLinkedJsObjectByJavaObject(int javaObjectID);
 
   v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID,
@@ -91,12 +104,24 @@ class ObjectManager {
   // The wrapper of object, registering it and creating the wrapper if needed.
   v8::Local<v8::Object> GetOrCreateJSWrapper(jobject object);
 
+  // GetJsObjectByJavaObject, or CreateJSWrapper when that is empty.
+  v8::Local<v8::Object> GetOrCreateJSWrapper(jint javaObjectID, int classIndex,
+                                             jobject instance);
+
   // classIndex is Runtime.classIndexOf(instance's class), or 0 when unknown.
   v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, int classIndex,
                                         jobject instance);
 
+  // What a link's object is: Java calls into JS through an extended one (a
+  // JS-extended class's or an interface implementation's instance).
+  enum class LinkKind { kPlain, kExtended };
+
+  // instanceTemplate is the template object was made from, alive as long as
+  // the runtime's metadata cache. Canary mode needs it for an extended link:
+  // a canary rebuilt later is an instance of it.
   void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
-            jclass clazz);
+            jclass clazz, LinkKind kind = LinkKind::kPlain,
+            const v8::Persistent<v8::ObjectTemplate>* instanceTemplate = nullptr);
 
   void ReleaseNativeCounterpart(v8::Local<v8::Object>& object);
 
@@ -164,8 +189,79 @@ class ObjectManager {
 
   const WrapperLifetimeStats& GetLifetimeStats() const { return m_lifetimeStats; }
 
+  // Canary mode (WrapperLifetimeCanary), for its write handlers. holder is a
+  // live canary: an object this manager linked as one, not yet released.
+  bool IsCanary(const v8::Local<v8::Object>& holder);
+  // The state object of a canary that has one.
+  bool ExistingCanaryState(const v8::Local<v8::Object>& holder, v8::Local<v8::Object>* out);
+  // The state object of a canary, created on its first write.
+  bool CanaryStateForWrite(const v8::Local<v8::Object>& holder, v8::Local<v8::Object>* out);
+  void CountCanaryWrite() { m_lifetimeStats.canaryInterceptedWrites++; }
+
+  // What the write handlers need of one live canary.
+ private:
+  struct ObjectWeakCallbackState;
+
+ public:
+  using CanaryHandle = ObjectWeakCallbackState;
+  // holder's live canary registration, or null. holder must be an instance of
+  // a template with the canary handlers (it has the Metadata field).
+  inline CanaryHandle* CanaryOfInstance(const v8::Local<v8::Object>& holder);
+  // The canary's state object, empty if it has none yet.
+  v8::Local<v8::Object> StateOf(CanaryHandle* canary);
+  // Whether every property of the canary's state is a writable, enumerable,
+  // configurable data property: only a define can make one otherwise.
+  bool StateIsPlain(CanaryHandle* canary);
+  void SetStateNotPlain(CanaryHandle* canary);
+  // Before the handlers change the canary's state: a shell copied from an
+  // earlier state can no longer stand in for it.
+  inline void StateChanging(CanaryHandle* canary);
+  // The canary's state object, created on its first write.
+  v8::Local<v8::Object> StateForWrite(CanaryHandle* canary);
+  // The canary's state when its plain state is known to have `property` as an
+  // own data property; empty when that is not known.
+  inline v8::Local<v8::Object> CachedPlainState(CanaryHandle* canary,
+                                                const v8::Local<v8::Name>& property);
+  // After the handlers rewrote `property`, an own data property of the canary's
+  // plain state. An entry holds a global handle, so a name added to the state
+  // waits for its first rewrite.
+  void CacheStateName(CanaryHandle* canary, const v8::Local<v8::Name>& property);
+  // Before the handlers delete or redefine `property` on the canary's state.
+  void ForgetStateName(CanaryHandle* canary, const v8::Local<v8::Name>& property);
+
+  // Set while the runtime copies properties between a canary and its state, so
+  // the handlers let those defines through. The copy runs no JS, and only the
+  // thread holding the isolate's lock touches this.
+  // Canary mode: the private key under which a class prototype keeps its
+  // instance field accessors' data (MetadataNode::TrySetInstanceField); empty
+  // in other modes.
+  v8::Local<v8::Private> InstanceFieldTableKey() {
+    return m_instanceFieldTableKey.Get(m_isolate);
+  }
+
+  bool CopyingCanaryProperties() const { return m_copyingCanaryProperties; }
+  void SetCopyingCanaryProperties(bool copying) { m_copyingCanaryProperties = copying; }
+  // Lets go of the state of objects Java reported collected. Under the
+  // isolate's Locker: the runtime's thread, or a thread calling in under
+  // enableMultithreadedJavascript.
+  void ReleaseCollectedCanaryStates();
+
+  struct ClassCounts {
+    // Linked wrappers, canaries included.
+    uint64_t wrappers = 0;
+    // Live canaries.
+    uint64_t canaries = 0;
+    // Canary state objects, alive until Java collects their object.
+    uint64_t states = 0;
+  };
+
+  // Per Java class name (dotted), for ns:runtime's getWrapperClassCounts().
+  std::map<std::string, ClassCounts> GetWrapperClassCounts();
+
  private:
   static void InitializeJNI();
+
+  struct CanaryRecord;
 
   // The registration of one linked Java object id, reached from the wrapper's JsInfo
   // field through m_idToObject.
@@ -197,6 +293,35 @@ class ObjectManager {
     // Handed back to JS while queued: the wrapper is reachable again, so the flush must
     // leave the Java side alone and let a later collection queue it anew.
     bool reacquired = false;
+    // A canary: a phantom handle, and no resurrection.
+    bool canary = false;
+    // A canary's record, cached; EraseCanaryRecord clears it.
+    CanaryRecord* record = nullptr;
+  };
+
+  // Canary mode: what outlives the canaries of one Java object id, until Java
+  // collects the object. Its handles are reset only on the runtime's thread.
+  struct CanaryRecord {
+    // The object's JS properties; empty until the first write.
+    v8::Global<v8::Object> state;
+    // JS-extended instances: what a canary built later starts from, as the
+    // first canary had it once registered.
+    bool extended = false;
+    v8::Global<v8::Value> prototype;
+    v8::Global<v8::Value> callSuper;
+    v8::Global<v8::Value> metadata;
+    v8::Global<v8::Value> implementationObject;
+    const v8::Persistent<v8::ObjectTemplate>* instanceTemplate = nullptr;
+    // A copy of the last rebuilt canary, taken once it was hydrated and before
+    // JS saw it, unlinked; a later rebuild clones it instead of hydrating.
+    // Present only while it matches the state.
+    v8::Global<v8::Object> shell;
+    // The link's class, taken from the last canary (a global ref the class caches own).
+    jclass clazz = nullptr;
+    // The Java object table holds the object through a watched weak reference.
+    bool javaWeak = false;
+    // A define reached the state with an accessor or non-default attributes.
+    bool stateNotPlain = false;
   };
 
   using JSInstanceInfo = ObjectWeakCallbackState;
@@ -245,6 +370,74 @@ class ObjectManager {
 
   static void JSObjectFinalizerStatic(
       const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
+
+  // A canary died: first-pass phantom callback, C++ bookkeeping only.
+  static void CanaryDiedStatic(
+      const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
+
+  static void CanaryGCEpilogue(v8::Isolate* isolate, v8::GCType type,
+                               v8::GCCallbackFlags flags, void* data);
+
+  // record is FindCanaryRecord(javaObjectID), or nullopt to look it up.
+  // hydrate false: object already carries the state's properties.
+  void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID, jclass clazz,
+            LinkKind kind, const v8::Persistent<v8::ObjectTemplate>* instanceTemplate,
+            std::optional<CanaryRecord*> record, bool hydrate = true);
+
+  // Registers a new canary: creates an extended instance's record, and
+  // hydrates a canary for an object that already has state. record is
+  // FindCanaryRecord(javaObjectID); returns the canary's record, or null.
+  CanaryRecord* AdoptCanary(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
+                            LinkKind kind,
+                            const v8::Persistent<v8::ObjectTemplate>* instanceTemplate,
+                            CanaryRecord* record, bool hydrate);
+
+  // The live canary state of holder, or null.
+  ObjectWeakCallbackState* CanaryOf(const v8::Local<v8::Object>& holder);
+
+  CanaryRecord* FindCanaryRecord(int javaObjectID);
+
+  // A new canary for a JS-extended instance whose canary died; empty when id
+  // has no extended record or Java collected the object meanwhile.
+  v8::Local<v8::Object> RebuildCanary(int javaObjectID);
+  // record is FindCanaryRecord(javaObjectID).
+  v8::Local<v8::Object> RebuildCanary(int javaObjectID, CanaryRecord* record);
+
+  // Has the Java object table hold record's object strongly again; false (and
+  // the record dropped) when Java collected it.
+  bool EnsureJavaStrong(int javaObjectID, CanaryRecord* record);
+
+  void EraseCanaryRecord(int javaObjectID);
+
+  // Names that are own data properties of a plain state, the record's set
+  // chosen by its address: an entry is cleared before its name leaves the
+  // state and before its record is freed.
+  struct StateName {
+    CanaryRecord* record = nullptr;
+    v8::Global<v8::Name> name;
+  };
+  static constexpr size_t kStateNameSets = 64;
+  static constexpr size_t kStateNameWays = 4;
+  static size_t StateNameSet(const CanaryRecord* record) {
+    auto address = reinterpret_cast<uintptr_t>(record);
+    return ((address >> 4) ^ (address >> 10)) & (kStateNameSets - 1);
+  }
+  StateName m_stateNames[kStateNameSets][kStateNameWays];
+  uint8_t m_stateNameVictims[kStateNameSets] = {};
+  void ForgetStateNames(CanaryRecord* record);
+
+  // Settles canaries collected since the last flush: Java holds the objects
+  // with records weakly and releases the others. False if the JNI call failed;
+  // the ids are queued again.
+  bool FlushCanaryDeaths();
+
+  std::unordered_map<int, std::unique_ptr<CanaryRecord>> m_canaryRecords;
+  std::vector<jint> m_pendingCanaryDeaths;
+  bool m_copyingCanaryProperties = false;
+  bool m_deathInboxOpen = false;
+  bool m_canaryEpilogueAdded = false;
+  int m_deathInboxRuntimeId = -1;
+  v8::Persistent<v8::Private> m_instanceFieldTableKey;
 
   void JSObjectFinalizer(v8::Isolate* isolate,
                          ObjectWeakCallbackState* callbackState);
@@ -302,6 +495,10 @@ class ObjectManager {
 
   bool m_useGlobalRefs;
 
+  bool m_multithreadedJavascript = false;
+
+  uint64_t m_canaryReleaseCount = 0;
+
   static jclass JAVA_LANG_CLASS;
 
   static jmethodID GET_NAME_METHOD_ID;
@@ -320,10 +517,65 @@ class ObjectManager {
 
   static jmethodID RELEASE_NATIVE_INSTANCE_METHOD_ID;
   static jmethodID RELEASE_IF_COLLECTED_METHOD_ID;
+  static jmethodID PROCESS_CANARY_BATCH_METHOD_ID;
+  static jmethodID STRENGTHEN_INSTANCE_METHOD_ID;
 
   v8::Persistent<v8::Function>* m_poJsWrapperFunc;
   v8::Persistent<v8::ObjectTemplate> m_jsWrapperTemplate;
 };
+
+inline ObjectManager::CanaryHandle* ObjectManager::CanaryOfInstance(
+    const v8::Local<v8::Object>& holder) {
+  // The JsInfo field read as Object::GetInternalField does, without the handle
+  // and the current-isolate lookup it costs; an id past the Smi range takes
+  // LinkedIdOf.
+  using A = v8::internal::Address;
+  using I = v8::internal::Internals;
+  A object = v8::internal::ValueHelper::ValueAsAddress(*holder);
+  int id = -1;
+  if (V8_LIKELY(I::CanHaveInternalField(I::GetInstanceType(object)))) {
+    A field = I::ReadRawField<A>(object, I::kJSAPIObjectWithEmbedderSlotsHeaderSize +
+                                             I::kEmbedderDataSlotSize *
+                                                 static_cast<int>(MetadataNodeKeys::JsInfo));
+#ifdef V8_COMPRESS_POINTERS
+    field = static_cast<uint32_t>(field);
+#endif
+    if (V8_LIKELY(!I::HasHeapObjectTag(field))) {
+      id = I::SmiValue(field) - 1;
+    }
+  }
+  if (V8_UNLIKELY(id == -1)) {
+    id = LinkedIdOf(holder);
+  }
+  auto state = m_idToObject.Find(id);
+  // A `super` object shares its owner's id but is not the canary.
+  if (state == nullptr || !state->canary || !state->linked || *state->target != holder) {
+    return nullptr;
+  }
+  return state;
+}
+
+inline void ObjectManager::StateChanging(CanaryHandle* canary) {
+  if (canary->record != nullptr && !canary->record->shell.IsEmpty()) {
+    canary->record->shell.Reset();
+  }
+}
+
+inline v8::Local<v8::Object> ObjectManager::CachedPlainState(
+    CanaryHandle* canary, const v8::Local<v8::Name>& property) {
+  CanaryRecord* record = canary->record;
+  if (record == nullptr || record->stateNotPlain) {
+    return v8::Local<v8::Object>();
+  }
+  const StateName* set = m_stateNames[StateNameSet(record)];
+  for (size_t way = 0; way < kStateNameWays; way++) {
+    if (set[way].record == record && set[way].name == property) {
+      m_lifetimeStats.canaryCachedWrites++;
+      return record->state.Get(m_isolate);
+    }
+  }
+  return v8::Local<v8::Object>();
+}
 }  // namespace tns
 
 #endif /* OBJECTMANAGER_H_ */
