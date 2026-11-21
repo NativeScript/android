@@ -68,6 +68,40 @@ describe("Weak collections of Java objects", function () {
         expect(map.has(again)).toBe(false);
     });
 
+    // A canary rebuilt more than once is a copy of an earlier rebuilt one: the key lives
+    // with the object's state, not on any canary, until the link is released.
+    it("keys canaries rebuilt from a copy of an earlier one by their Java object, through a release", function () {
+        var map = new WeakMap();
+        var set = new WeakSet();
+        (function () {
+            heldRunnable();
+        })();
+        collectBoth();
+        (function () {
+            map.set(Holder.held, "first");
+        })();
+        collectBoth();
+        (function () {
+            var second = Holder.held;
+            expect(map.get(second)).toBe("first");
+            expect(map.delete(second)).toBe(true);
+            set.add(second);
+        })();
+        collectBoth();
+
+        var third = Holder.held;
+        expect(map.has(third)).toBe(false);
+        expect(set.has(third)).toBe(true);
+        map.set(third, "third");
+        __releaseNativeCounterpart(third);
+        expect(map.get(third)).toBe("third");
+        expect(set.has(third)).toBe(true);
+        var after = Holder.held;
+        expect(after === third).toBe(false);
+        expect(map.has(after)).toBe(false);
+        expect(set.has(after)).toBe(false);
+    });
+
     it("keeps a WeakSet member for a Java object across a wrapper change", function () {
         var set = new WeakSet();
         (function () {
