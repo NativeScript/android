@@ -121,12 +121,12 @@ class ObjectManager {
   // JS-extended class's or an interface implementation's instance).
   enum class LinkKind { kPlain, kExtended };
 
-  // instanceTemplate is the template object was made from. Canary mode needs
-  // it for an extended link: the canaries built after the first one are
-  // copies of a fresh instance of it.
+  // instanceTemplate is the template object was made from, alive as long as
+  // the runtime's metadata cache. Canary mode needs it for an extended link:
+  // a canary rebuilt later is an instance of it.
   void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
             jclass clazz, LinkKind kind = LinkKind::kPlain,
-            v8::Local<v8::ObjectTemplate> instanceTemplate = v8::Local<v8::ObjectTemplate>());
+            const v8::Persistent<v8::ObjectTemplate>* instanceTemplate = nullptr);
 
   void ReleaseNativeCounterpart(v8::Local<v8::Object>& object);
 
@@ -219,6 +219,9 @@ class ObjectManager {
   // configurable data property: only a define can make one otherwise.
   bool StateIsPlain(CanaryHandle* canary);
   void SetStateNotPlain(CanaryHandle* canary);
+  // Before the handlers change the canary's state: a shell copied from an
+  // earlier state can no longer stand in for it.
+  void StateChanging(CanaryHandle* canary);
   // The canary's state object, created on its first write.
   v8::Local<v8::Object> StateForWrite(CanaryHandle* canary);
 
@@ -301,9 +304,17 @@ class ObjectManager {
   struct CanaryRecord {
     // The object's JS properties; empty until the first write.
     v8::Global<v8::Object> state;
-    // JS-extended instances: a canary built later is a clone of this, with
-    // the first canary's prototype, internal fields and implementation object.
-    // Never linked, never handed to JS, and so never written.
+    // JS-extended instances: what a canary built later starts from, as the
+    // first canary had it once registered.
+    bool extended = false;
+    v8::Global<v8::Value> prototype;
+    v8::Global<v8::Value> callSuper;
+    v8::Global<v8::Value> metadata;
+    v8::Global<v8::Value> implementationObject;
+    const v8::Persistent<v8::ObjectTemplate>* instanceTemplate = nullptr;
+    // A copy of the last rebuilt canary, taken once it was hydrated and before
+    // JS saw it, unlinked; a later rebuild clones it instead of hydrating.
+    // Present only while it matches the state.
     v8::Global<v8::Object> shell;
     // The link's class, taken from the last canary (a global ref the class caches own).
     jclass clazz = nullptr;
@@ -368,21 +379,18 @@ class ObjectManager {
                                v8::GCCallbackFlags flags, void* data);
 
   // record is FindCanaryRecord(javaObjectID), or nullopt to look it up.
+  // hydrate false: object already carries the state's properties.
   void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID, jclass clazz,
-            LinkKind kind, v8::Local<v8::ObjectTemplate> instanceTemplate,
-            std::optional<CanaryRecord*> record);
+            LinkKind kind, const v8::Persistent<v8::ObjectTemplate>* instanceTemplate,
+            std::optional<CanaryRecord*> record, bool hydrate = true);
 
   // Registers a new canary: creates an extended instance's record, and
   // hydrates a canary for an object that already has state. record is
   // FindCanaryRecord(javaObjectID); returns the canary's record, or null.
   CanaryRecord* AdoptCanary(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
-                            LinkKind kind, v8::Local<v8::ObjectTemplate> instanceTemplate,
-                            CanaryRecord* record);
-
-  // An unlinked instance of instanceTemplate with what object, a canary
-  // being registered, carries from its construction; empty on failure.
-  v8::Local<v8::Object> NewCanaryShell(const v8::Local<v8::Object>& object,
-                                       v8::Local<v8::ObjectTemplate> instanceTemplate);
+                            LinkKind kind,
+                            const v8::Persistent<v8::ObjectTemplate>* instanceTemplate,
+                            CanaryRecord* record, bool hydrate);
 
   // The live canary state of holder, or null.
   ObjectWeakCallbackState* CanaryOf(const v8::Local<v8::Object>& holder);

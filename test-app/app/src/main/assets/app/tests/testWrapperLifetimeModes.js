@@ -256,6 +256,146 @@ describe("Wrapper lifetime modes", function () {
         expect(java.lang.String.valueOf(described)).toBe("described:second");
     });
 
+    // Each rebuild here comes from a Java call while no canary is alive. What the object's
+    // methods close over must not hold it, or it would never die.
+    function describeOwn(object, symbol) {
+        var names = Object.getOwnPropertyNames(object).sort();
+        var described = {};
+        names.forEach(function (name) {
+            var descriptor = Object.getOwnPropertyDescriptor(object, name);
+            described[name] = descriptor.get ? { get: true, enumerable: descriptor.enumerable, configurable: descriptor.configurable } : descriptor;
+        });
+        described.symbol = object[symbol];
+        return described;
+    }
+
+    function plantDescribed(symbol) {
+        var runnable = new java.lang.Runnable({
+            run: function () {
+                this.runs = (this.runs || 0) + 1;
+            }
+        });
+        runnable.plain = 1;
+        Object.defineProperty(runnable, "fixed", { value: 2, writable: false, enumerable: true, configurable: false });
+        Object.defineProperty(runnable, "hidden", { value: 3, writable: true, enumerable: false, configurable: true });
+        Object.defineProperty(runnable, "doubled", {
+            get: function () {
+                return this.plain * 2;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        runnable[symbol] = "symbol";
+        Holder.held = runnable;
+        return new java.lang.Thread(runnable);
+    }
+
+    it("rebuilds a canary twice with no write in between, keeping its properties as defined", function () {
+        var symbol = Symbol("rebuilt");
+        var rebuilds = stats().canaryRebuilds;
+        var thread = plantDescribed(symbol);
+        // Reads only, each in a function of its own so no stale register keeps a canary
+        // alive across the next collection.
+        function read() {
+            var runnable = Holder.held;
+            return {
+                own: describeOwn(runnable, symbol),
+                doubled: runnable.doubled,
+                keys: Object.keys(runnable).sort(),
+                symbols: Object.getOwnPropertySymbols(runnable).length
+            };
+        }
+        var seen = [];
+        for (var i = 0; i < 3; i++) {
+            collectBoth();
+            collectJava();
+            seen.push(read());
+        }
+        expect(seen[0].own.plain).toEqual({ value: 1, writable: true, enumerable: true, configurable: true });
+        expect(seen[0].own.fixed).toEqual({ value: 2, writable: false, enumerable: true, configurable: false });
+        expect(seen[0].own.hidden).toEqual({ value: 3, writable: true, enumerable: false, configurable: true });
+        expect(seen[0].own.doubled).toEqual({ get: true, enumerable: true, configurable: true });
+        expect(seen[0].own.symbol).toBe("symbol");
+        expect(seen[0].doubled).toBe(2);
+        expect(seen[0].keys).toEqual(["doubled", "fixed", "plain"]);
+        expect(seen[0].symbols).toBe(1);
+        expect(seen[1]).toEqual(seen[0]);
+        expect(seen[2]).toEqual(seen[0]);
+        if (canary) {
+            expect(stats().canaryRebuilds).toBe(rebuilds + 3);
+        }
+        collectBoth();
+        collectJava();
+
+        thread.run();
+        var runnable = Holder.held;
+        expect(runnable.runs).toBe(1);
+        expect(runnable.plain).toBe(1);
+        expect(function () {
+            "use strict";
+            runnable.fixed = 5;
+        }).toThrow();
+        expect(runnable.fixed).toBe(2);
+    });
+
+    it("rebuilds a canary written since its last rebuild with the written state", function () {
+        var symbol = Symbol("rewritten");
+        var thread = plantDescribed(symbol);
+        collectBoth();
+        collectJava();
+        (function () {
+            var runnable = Holder.held;
+            runnable.plain = 10;
+            runnable.added = "added";
+            delete runnable.hidden;
+            Object.defineProperty(runnable, "doubled", {
+                get: function () {
+                    return this.plain * 3;
+                },
+                enumerable: false,
+                configurable: true
+            });
+            runnable[symbol] = "rewritten";
+        })();
+        collectBoth();
+        collectJava();
+
+        thread.run();
+        var runnable = Holder.held;
+        expect(runnable.runs).toBe(1);
+        expect(runnable.plain).toBe(10);
+        expect(runnable.added).toBe("added");
+        expect("hidden" in runnable).toBe(false);
+        expect(runnable.doubled).toBe(30);
+        expect(Object.getOwnPropertyDescriptor(runnable, "doubled").enumerable).toBe(false);
+        expect(runnable[symbol]).toBe("rewritten");
+        expect(Object.getOwnPropertyDescriptor(runnable, "fixed")).toEqual({ value: 2, writable: false, enumerable: true, configurable: false });
+    });
+
+    it("keeps what a Java call writes into the canary rebuilt for it", function () {
+        var thread = (function () {
+            var runnable = new java.lang.Runnable({
+                run: function () {
+                    this.runs = (this.runs || 0) + 1;
+                    this["run" + this.runs] = true;
+                }
+            });
+            Holder.held = runnable;
+            return new java.lang.Thread(runnable);
+        })();
+        for (var i = 0; i < 3; i++) {
+            collectBoth();
+            collectJava();
+            thread.run();
+        }
+        collectBoth();
+        collectJava();
+
+        var runnable = Holder.held;
+        expect(runnable.runs).toBe(3);
+        expect(Object.keys(runnable).sort()).toEqual(["run1", "run2", "run3", "runs"]);
+    });
+
     it("rebuilds an extended object Java constructed with its class", function () {
         var Made = java.lang.Object.extend({
             toString: function () {

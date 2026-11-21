@@ -199,7 +199,7 @@ MetadataNode::MetadataNode(MetadataTreeNode* treeNode) :
 }
 
 Local<Object> MetadataNode::CreateExtendedJSWrapper(Isolate* isolate, ObjectManager* objectManager, const string& proxyClassName,
-                                                    Local<ObjectTemplate>* instanceTemplate) {
+                                                    const Persistent<ObjectTemplate>** instanceTemplate) {
     Local<Object> extInstance;
 
     auto cacheData = GetCachedExtendedClassData(isolate, proxyClassName);
@@ -218,8 +218,8 @@ Local<Object> MetadataNode::CreateExtendedJSWrapper(Isolate* isolate, ObjectMana
         // Starts on the extended class's initial map, with its prototype, and without
         // running its constructor callback.
         auto context = Runtime::GetRuntime(isolate)->GetContext();
-        *instanceTemplate = cacheData.instanceTemplate->Get(isolate);
-        if ((*instanceTemplate)->NewInstance(context).ToLocal(&extInstance)) {
+        *instanceTemplate = cacheData.instanceTemplate;
+        if (cacheData.instanceTemplate->Get(isolate)->NewInstance(context).ToLocal(&extInstance)) {
             // V8 may copy instances from a cached instantiation of the template, which keeps the
             // prototype the class had then. This only matters if code reassigns the extended
             // class's `prototype` property, which nothing in the runtime or core does; consider
@@ -349,7 +349,7 @@ Local<Object> MetadataNode::CreateWrapper(Isolate* isolate) {
     return handle_scope.Escape(obj);
 }
 
-Local<ObjectTemplate> MetadataNode::GetInstanceTemplate(Isolate* isolate, InstanceData& data) {
+Persistent<ObjectTemplate>* MetadataNode::GetInstanceTemplate(Isolate* isolate, InstanceData& data) {
     if (data.instanceTemplate == nullptr) {
         // Throws for a class missing at runtime, which has no template.
         GetConstructorFunction(isolate);
@@ -357,7 +357,7 @@ Local<ObjectTemplate> MetadataNode::GetInstanceTemplate(Isolate* isolate, Instan
         auto ft = Local<FunctionTemplate>::New(isolate, *cache->CtorFuncCache.at(m_treeNode).ft);
         data.instanceTemplate = new Persistent<ObjectTemplate>(isolate, ft->InstanceTemplate());
     }
-    return data.instanceTemplate->Get(isolate);
+    return data.instanceTemplate;
 }
 
 Local<Object> MetadataNode::CreateJSWrapper(Isolate* isolate, ObjectManager* objectManager) {
@@ -367,7 +367,7 @@ Local<Object> MetadataNode::CreateJSWrapper(Isolate* isolate, ObjectManager* obj
         obj = CreateArrayWrapper(isolate);
     } else {
         auto& data = GetInstanceData(isolate);
-        auto instanceTemplate = GetInstanceTemplate(isolate, data);
+        auto instanceTemplate = GetInstanceTemplate(isolate, data)->Get(isolate);
         // Starts on the class's initial map, with the constructor's prototype, and
         // without running the constructor callback.
         auto context = isolate->GetCurrentContext();
@@ -1603,7 +1603,7 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
         bool success = CallbackHandlers::RegisterInstance(isolate, thiz, extData->fullClassName, argWrapper, implementationObject, false, extData->node->m_name, extData->defaultOverrides,
                                                           extData->contentMemberNames ? &*extData->contentMemberNames : nullptr,
                                                           &extData->resolvedClass,
-                                                          extData->instanceTemplate.Get(isolate));
+                                                          &extData->instanceTemplate);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -1676,7 +1676,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
                                                           nullptr, nullptr,
                                                           WrapperLifetimeCanary::Enabled()
                                                               ? node->GetInstanceTemplate(isolate, node->GetInstanceData(isolate))
-                                                              : Local<ObjectTemplate>());
+                                                              : nullptr);
 
         if (frame.check()) {
             frame.log("Interface constructor: " + node->m_name);

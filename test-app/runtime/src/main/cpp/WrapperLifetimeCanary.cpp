@@ -58,6 +58,7 @@ bool RewriteState(ObjectManager* objectManager, ObjectManager::CanaryHandle* can
       return false;
     }
     if (!state->HasRealNamedCallbackProperty(context, property).FromMaybe(true)) {
+      objectManager->StateChanging(canary);
       (void)state->Set(context, property, value);
     }
     return true;
@@ -69,6 +70,7 @@ bool RewriteState(ObjectManager* objectManager, ObjectManager::CanaryHandle* can
     return false;
   }
   if ((attributes & ReadOnly) == 0) {
+    objectManager->StateChanging(canary);
     (void)state->Set(context, property, value);
   }
   return true;
@@ -132,13 +134,17 @@ Intercepted Setter(Local<Name> property, Local<Value> value,
     if (state.IsEmpty()) {
       return Intercepted::kNo;
     }
+    objectManager->StateChanging(canary);
     (void)state->CreateDataProperty(context, property, value);
   } else if (objectManager->StateIsPlain(canary)) {
     // RewriteState found the name absent from the state.
+    objectManager->StateChanging(canary);
     (void)state->CreateDataProperty(context, property, value);
   } else if (!HasOwn(context, state, property)) {
+    objectManager->StateChanging(canary);
     (void)state->CreateDataProperty(context, property, value);
   } else if (!state->HasRealNamedCallbackProperty(context, property).FromMaybe(true)) {
+    objectManager->StateChanging(canary);
     (void)state->Set(context, property, value);
   }
   return Intercepted::kNo;
@@ -152,6 +158,7 @@ Intercepted Deleter(Local<Name> property, const PropertyCallbackInfo<Boolean>& i
   }
   Local<Object> state = objectManager->StateOf(canary);
   if (!state.IsEmpty()) {
+    objectManager->StateChanging(canary);
     (void)state->Delete(info.GetIsolate()->GetCurrentContext(), property);
   }
   return Intercepted::kNo;
@@ -178,6 +185,7 @@ Intercepted Definer(Local<Name> property, const PropertyDescriptor& descriptor,
     if (!plain) {
       objectManager->SetStateNotPlain(canary);
     }
+    objectManager->StateChanging(canary);
     (void)state->DefineProperty(info.GetIsolate()->GetCurrentContext(), property,
                                 const_cast<PropertyDescriptor&>(descriptor));
   }

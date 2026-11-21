@@ -707,7 +707,7 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
   Local<Object> implementationObject;
 
   DEBUG_WRITE("createJSInstanceNative class %s", jniName.c_str());
-  Local<ObjectTemplate> instanceTemplate;
+  const Persistent<ObjectTemplate>* instanceTemplate = nullptr;
   jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager,
                                                      jniName, &instanceTemplate);
 

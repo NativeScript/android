@@ -216,7 +216,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
                                         uint64_t defaultOverrides,
                                         const vector<string> *contentMemberNames,
                                         jclass *resolvedClass,
-                                        Local<ObjectTemplate> instanceTemplate) {
+                                        const Persistent<ObjectTemplate> *instanceTemplate) {
     bool success;
 
     DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
