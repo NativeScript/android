@@ -151,8 +151,8 @@ namespace {
  * app has one, lacks the field and keeps its own behaviour. The class cache hands out one
  * global reference per class name for the life of the process, so it is a stable key.
  */
-void SetDefaultOverrides(JNIEnv* env, jobject instance, jclass clazz, uint64_t defaultOverrides) {
-    thread_local robin_hood::unordered_map<jclass, jfieldID> fields;
+void SetDefaultOverrides(Runtime* runtime, JNIEnv* env, jobject instance, jclass clazz, uint64_t defaultOverrides) {
+    auto& fields = runtime->GetDefaultOverridesFields();
 
     jfieldID field;
     auto found = fields.find(clazz);
@@ -263,7 +263,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     // Before any Java code but the constructor's own can see the instance.
     // An interface proxy's handler received the mask with the instance.
     if (defaultOverrides != 0 && instance != nullptr && !mi.isInterfaceProxy) {
-        SetDefaultOverrides(env, instance, generatedJavaClass, defaultOverrides);
+        SetDefaultOverrides(runtime, env, instance, generatedJavaClass, defaultOverrides);
     }
 
     jlong usedJavaMemory = env.CallLongMethod(runtime->GetJavaRuntime(), REGISTER_CONSTRUCTED_INSTANCE_ID,

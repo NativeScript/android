@@ -178,6 +178,12 @@ class Runtime {
             return m_signatureKeyScratch;
         }
 
+        // Each default-overriding class's defaultOverrides__ns field, or null
+        // when the class has none. Only for the thread holding the isolate.
+        robin_hood::unordered_map<jclass, jfieldID>& GetDefaultOverridesFields() {
+            return m_defaultOverridesFields;
+        }
+
         AdmissionGate& GetAdmissionGate() {
             return m_admissionGate;
         }
@@ -405,6 +411,8 @@ class Runtime {
         bool m_isMainThread = false;
 
         std::string m_signatureKeyScratch;
+
+        robin_hood::unordered_map<jclass, jfieldID> m_defaultOverridesFields;
 
         // This isolate's performance time origin, captured at isolate
         // creation: the monotonic clock reading now() is relative to, and the
