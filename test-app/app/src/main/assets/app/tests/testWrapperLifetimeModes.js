@@ -158,6 +158,107 @@ describe("Wrapper lifetime modes", function () {
         expect(java.lang.String.valueOf(Holder.held)).toBe("made:7");
     });
 
+    it("rebuilds an interface implementation with its prototype, Java methods and state", function () {
+        var rebuilds = stats().canaryRebuilds;
+        // Nothing the methods' closures reach may hold the object: that would keep it alive.
+        var planted = (function () {
+            var runnable = new java.lang.Runnable({
+                run: function () {
+                    this.ran = (this.ran || 0) + 1;
+                }
+            });
+            runnable.tag = "kept";
+            runnable.dropped = true;
+            delete runnable.dropped;
+            Holder.held = runnable;
+            return { prototype: Object.getPrototypeOf(runnable), thread: new java.lang.Thread(runnable) };
+        })();
+        collectBoth();
+        collectJava();
+
+        // Java calls into the object while no canary is alive.
+        planted.thread.run();
+        var runnable = Holder.held;
+        if (canary) {
+            expect(stats().canaryRebuilds).toBeGreaterThan(rebuilds);
+        }
+        expect(Object.getPrototypeOf(runnable)).toBe(planted.prototype);
+        expect(runnable instanceof java.lang.Runnable).toBe(true);
+        expect(Object.keys(runnable).sort()).toEqual(["ran", "tag"]);
+        expect(runnable.ran).toBe(1);
+        expect(typeof runnable.hashCode()).toBe("number");
+        expect(runnable.equals(Holder.held)).toBe(true);
+        runnable.run();
+        expect(runnable.ran).toBe(2);
+    });
+
+    it("rebuilds an extend() instance with its class, super calls and state, more than once", function () {
+        var Described = java.lang.Object.extend({
+            toString: function () {
+                return "described:" + this.label;
+            },
+            superString: function () {
+                return this.super.toString();
+            }
+        });
+        var rebuilds = stats().canaryRebuilds;
+        var prototype = (function () {
+            var described = new Described();
+            described.label = "first";
+            Holder.held = described;
+            return Object.getPrototypeOf(described);
+        })();
+        collectBoth();
+        collectJava();
+
+        var described = Holder.held;
+        expect(Object.getPrototypeOf(described)).toBe(prototype);
+        expect(described instanceof Described).toBe(true);
+        expect(described.toString()).toBe("described:first");
+        expect(described.superString()).toContain("@");
+        expect(described.superString()).not.toContain("described:");
+        described.label = "second";
+        described.extra = 1;
+        delete described.extra;
+        described = null;
+        collectBoth();
+        collectJava();
+
+        described = Holder.held;
+        if (canary) {
+            expect(stats().canaryRebuilds).toBeGreaterThan(rebuilds + 1);
+        }
+        expect(Object.getPrototypeOf(described)).toBe(prototype);
+        expect(Object.keys(described)).toEqual(["label"]);
+        expect(java.lang.String.valueOf(described)).toBe("described:second");
+    });
+
+    it("rebuilds an extended object Java constructed with its class", function () {
+        var Made = java.lang.Object.extend({
+            toString: function () {
+                return "made:" + this.value;
+            }
+        });
+        var rebuilds = stats().canaryRebuilds;
+        var prototype = (function () {
+            var made = new Made().getClass().newInstance();
+            made.value = 7;
+            Holder.held = made;
+            return Object.getPrototypeOf(made);
+        })();
+        collectBoth();
+        collectJava();
+
+        var made = Holder.held;
+        if (canary) {
+            expect(stats().canaryRebuilds).toBeGreaterThan(rebuilds);
+        }
+        expect(Object.getPrototypeOf(made)).toBe(prototype);
+        expect(made instanceof Made).toBe(true);
+        expect(made.toString()).toBe("made:7");
+        expect(typeof made.hashCode()).toBe("number");
+    });
+
     it("keeps the state a TypeScript-style subclass sets in its constructor", function () {
         var Greeter = (function (_super) {
             __extends(Greeter, _super);

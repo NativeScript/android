@@ -115,8 +115,12 @@ class ObjectManager {
   // JS-extended class's or an interface implementation's instance).
   enum class LinkKind { kPlain, kExtended };
 
+  // instanceTemplate is the template object was made from. Canary mode needs
+  // it for an extended link: the canaries built after the first one are
+  // copies of a fresh instance of it.
   void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
-            jclass clazz, LinkKind kind = LinkKind::kPlain);
+            jclass clazz, LinkKind kind = LinkKind::kPlain,
+            v8::Local<v8::ObjectTemplate> instanceTemplate = v8::Local<v8::ObjectTemplate>());
 
   void ReleaseNativeCounterpart(v8::Local<v8::Object>& object);
 
@@ -291,13 +295,10 @@ class ObjectManager {
   struct CanaryRecord {
     // The object's JS properties; empty until the first write.
     v8::Global<v8::Object> state;
-    // JS-extended instances: what a canary built later starts from, as the
-    // first canary had it once registered.
-    bool extended = false;
-    v8::Global<v8::Value> prototype;
-    v8::Global<v8::Value> callSuper;
-    v8::Global<v8::Value> metadata;
-    v8::Global<v8::Value> implementationObject;
+    // JS-extended instances: a canary built later is a clone of this, with
+    // the first canary's prototype, internal fields and implementation object.
+    // Never linked, never handed to JS, and so never written.
+    v8::Global<v8::Object> shell;
     // The link's class, taken from the last canary (a global ref the class caches own).
     jclass clazz = nullptr;
     // The Java object table holds the object through a watched weak reference.
@@ -363,7 +364,12 @@ class ObjectManager {
   // Registers a new canary: creates an extended instance's record, and
   // hydrates a canary for an object that already has state.
   void AdoptCanary(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
-                   LinkKind kind);
+                   LinkKind kind, v8::Local<v8::ObjectTemplate> instanceTemplate);
+
+  // An unlinked instance of instanceTemplate with what object, a canary
+  // being registered, carries from its construction; empty on failure.
+  v8::Local<v8::Object> NewCanaryShell(const v8::Local<v8::Object>& object,
+                                       v8::Local<v8::ObjectTemplate> instanceTemplate);
 
   // The live canary state of holder, or null.
   ObjectWeakCallbackState* CanaryOf(const v8::Local<v8::Object>& holder);
@@ -387,8 +393,6 @@ class ObjectManager {
 
   std::unordered_map<int, std::unique_ptr<CanaryRecord>> m_canaryRecords;
   std::vector<jint> m_pendingCanaryDeaths;
-  // Template of a canary rebuilt for a JS-extended instance.
-  v8::Persistent<v8::ObjectTemplate> m_canaryTemplate;
   bool m_copyingCanaryProperties = false;
   bool m_deathInboxOpen = false;
   bool m_canaryEpilogueAdded = false;

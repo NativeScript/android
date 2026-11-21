@@ -215,7 +215,8 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
                                         const std::string &baseClassName,
                                         uint64_t defaultOverrides,
                                         const vector<string> *contentMemberNames,
-                                        jclass *resolvedClass) {
+                                        jclass *resolvedClass,
+                                        Local<ObjectTemplate> instanceTemplate) {
     bool success;
 
     DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
@@ -248,7 +249,8 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     objectManager->Link(jsObject, javaObjectID, nullptr,
                         !implementationObject.IsEmpty() || isInterface
                             ? ObjectManager::LinkKind::kExtended
-                            : ObjectManager::LinkKind::kPlain);
+                            : ObjectManager::LinkKind::kPlain,
+                        instanceTemplate);
 
     // resolve constructor
     const auto &mi = MethodCache::ResolveConstructorSignature(argWrapper, fullClassName,

@@ -707,8 +707,9 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
   Local<Object> implementationObject;
 
   DEBUG_WRITE("createJSInstanceNative class %s", jniName.c_str());
+  Local<ObjectTemplate> instanceTemplate;
   jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager,
-                                                     jniName);
+                                                     jniName, &instanceTemplate);
 
   if (jsInstance.IsEmpty()) {
     throw NativeScriptException(
@@ -727,7 +728,7 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
 
   jclass clazz = env.FindClass(jniName);
   m_objectManager->Link(jsInstance, javaObjectID, clazz,
-                        ObjectManager::LinkKind::kExtended);
+                        ObjectManager::LinkKind::kExtended, instanceTemplate);
 }
 
 jint Runtime::GenerateNewObjectId(JNIEnv* env, jobject obj) {

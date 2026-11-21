@@ -67,7 +67,9 @@ class MetadataNode {
 
         static MetadataNode* GetNodeFromHandle(v8::Isolate* isolate, const v8::Local<v8::Object>& value);
 
-        static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate* isolate, ObjectManager* objectManager, const std::string& proxyClassName);
+        // instanceTemplate receives the template the wrapper was made from.
+        static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate* isolate, ObjectManager* objectManager, const std::string& proxyClassName,
+                                                             v8::Local<v8::ObjectTemplate>* instanceTemplate);
 
         static v8::Local<v8::Object> GetImplementationObject(v8::Isolate* isolate, const v8::Local<v8::Object>& object);
 
@@ -200,6 +202,10 @@ class MetadataNode {
         // This runtime's per-instance data for this node, created on first use.
         InstanceData& GetInstanceData(v8::Isolate* isolate);
 
+        // The instance template of a class's or interface's constructor; throws
+        // for a class missing at runtime. data is GetInstanceData(isolate).
+        v8::Local<v8::ObjectTemplate> GetInstanceTemplate(v8::Isolate* isolate, InstanceData& data);
+
         static void SetInstanceMetadata(v8::Isolate* isolate, v8::Local<v8::Object> value, MetadataNode* node);
 
         static TypeMetadata* GetTypeMetadata(v8::Isolate* isolate, const v8::Local<v8::Function>& value);
@@ -325,11 +331,13 @@ class MetadataNode {
             ~ExtendedClassCallbackData() {
                 implementationObject->Reset();
                 delete implementationObject;
+                instanceTemplate.Reset();
             }
 
             MetadataNode* node;
             std::string extendedName;
             v8::Persistent<v8::Object>* implementationObject;
+            v8::Persistent<v8::ObjectTemplate> instanceTemplate;
 
             std::string fullClassName;
             uint64_t defaultOverrides = 0;
