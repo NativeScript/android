@@ -246,7 +246,8 @@ JniLocalRef JsArgConverter::GetOrLinkJavaBuffer(ObjectManager *objectManager, co
 bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
     bool success = false;
 
-    char buff[1024] = "";
+    char buff[1024];
+    buff[0] = '\0';
 
     const auto &typeSignature = m_tokens->at(index);
 
@@ -324,11 +325,6 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
 
         Local<Value> castValue;
         JniLocalRef obj;
-
-        auto runtime = Runtime::GetRuntime(m_isolate);
-        auto objectManager = runtime->GetObjectManager();
-
-        JEnv env;
 
         switch (castType) {
             case CastType::Char:
@@ -416,9 +412,12 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
                     break;
                 }
 
+                if (m_objectManager == nullptr) {
+                    m_objectManager = Runtime::GetRuntime(m_isolate)->GetObjectManager();
+                }
                 obj = IsArrayBufferLike(jsObject)
-                      ? GetOrLinkJavaBuffer(objectManager, jsObject)
-                      : objectManager->GetJavaObjectByJsObject(jsObject);
+                      ? GetOrLinkJavaBuffer(m_objectManager, jsObject)
+                      : m_objectManager->GetJavaObjectByJsObject(jsObject);
 
                 V8GetPrivateValue(m_isolate, jsObject, V8StringConstants::GetNullNodePrivate(m_isolate),
                                   castValue);
@@ -898,7 +897,7 @@ JsArgConverter::Error JsArgConverter::GetError() const {
 }
 
 JsArgConverter::~JsArgConverter() {
-    if (m_argsLen > 0) {
+    if (m_args_refs_size > 0) {
         JEnv env;
         for (int i = 0; i < m_args_refs_size; i++) {
             int index = m_args_refs[i];

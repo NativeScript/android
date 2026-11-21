@@ -1529,9 +1529,7 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
         ArgsWrapper argWrapper(info, ArgType::Class);
 
-        string fullClassName = extData->fullClassName;
-
-        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, implementationObject, false, extData->node->m_name, extData->defaultOverrides,
+        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, extData->fullClassName, argWrapper, implementationObject, false, extData->node->m_name, extData->defaultOverrides,
                                                           extData->contentMemberNames ? &*extData->contentMemberNames : nullptr);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -1584,11 +1582,12 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
             throw NativeScriptException(string("Invalid number of arguments"));
         }
 
-        auto className = node->m_implType;
         uint64_t defaultOverrides = node->GetDefaultOverrides(isolate, implementationObject);
+        std::string overridingClassName;
         if (defaultOverrides != 0) {
-            className += DEFAULT_OVERRIDING_SUFFIX;
+            overridingClassName = node->m_implType + DEFAULT_OVERRIDING_SUFFIX;
         }
+        const auto& className = defaultOverrides != 0 ? overridingClassName : node->m_implType;
         SetInstanceMetadata(isolate, thiz, node);
 
         //@@@ Refactor
@@ -1628,15 +1627,12 @@ void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::V
         auto isolate = info.GetIsolate();
         auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
-        string extendName;
-        auto className = node->m_name;
-
         SetInstanceMetadata(isolate, thiz, node);
 
         ArgsWrapper argWrapper(info, ArgType::Class);
 
-        string fullClassName = CreateFullClassName(className, extendName);
-        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, Local<Object>(), false, className);
+        const auto& className = node->m_name;
+        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, className, argWrapper, Local<Object>(), false, className);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
