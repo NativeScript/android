@@ -984,6 +984,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   auto consts = new V8StringConstants::PerIsolateV8Constants(isolate);
   isolate->SetData((uint32_t)Runtime::IsolateData::RUNTIME, this);
   isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, consts);
+  isolate->SetData((uint32_t)Runtime::IsolateData::OBJECT_MANAGER, m_objectManager);
 
   isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100,
                                                      StackTrace::kOverview);

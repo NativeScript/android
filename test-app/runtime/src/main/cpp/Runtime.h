@@ -61,7 +61,9 @@ class Runtime {
         enum IsolateData {
             RUNTIME = 0,
             CONSTANTS = 1,
-            WORKER_WRAPPER = 2
+            WORKER_WRAPPER = 2,
+            // The isolate's ObjectManager, for the canary write handlers.
+            OBJECT_MANAGER = 3
         };
 
         /*

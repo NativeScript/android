@@ -212,7 +212,7 @@ class ObjectManager {
   using CanaryHandle = ObjectWeakCallbackState;
   // holder's live canary registration, or null. holder must be an instance of
   // a template with the canary handlers (it has the Metadata field).
-  CanaryHandle* CanaryOfInstance(const v8::Local<v8::Object>& holder);
+  inline CanaryHandle* CanaryOfInstance(const v8::Local<v8::Object>& holder);
   // The canary's state object, empty if it has none yet.
   v8::Local<v8::Object> StateOf(CanaryHandle* canary);
   // Whether every property of the canary's state is a writable, enumerable,
@@ -534,6 +534,37 @@ class ObjectManager {
   v8::Persistent<v8::Function>* m_poJsWrapperFunc;
   v8::Persistent<v8::ObjectTemplate> m_jsWrapperTemplate;
 };
+
+inline ObjectManager::CanaryHandle* ObjectManager::CanaryOfInstance(
+    const v8::Local<v8::Object>& holder) {
+  // The JsInfo field read as Object::GetInternalField does, without the handle
+  // and the current-isolate lookup it costs; an id past the Smi range takes
+  // LinkedIdOf.
+  using A = v8::internal::Address;
+  using I = v8::internal::Internals;
+  A object = v8::internal::ValueHelper::ValueAsAddress(*holder);
+  int id = -1;
+  if (V8_LIKELY(I::CanHaveInternalField(I::GetInstanceType(object)))) {
+    A field = I::ReadRawField<A>(object, I::kJSAPIObjectWithEmbedderSlotsHeaderSize +
+                                             I::kEmbedderDataSlotSize *
+                                                 static_cast<int>(MetadataNodeKeys::JsInfo));
+#ifdef V8_COMPRESS_POINTERS
+    field = static_cast<uint32_t>(field);
+#endif
+    if (V8_LIKELY(!I::HasHeapObjectTag(field))) {
+      id = I::SmiValue(field) - 1;
+    }
+  }
+  if (V8_UNLIKELY(id == -1)) {
+    id = LinkedIdOf(holder);
+  }
+  auto state = m_idToObject.Find(id);
+  // A `super` object shares its owner's id but is not the canary.
+  if (state == nullptr || !state->keepsState || !state->linked || *state->target != holder) {
+    return nullptr;
+  }
+  return state;
+}
 
 inline v8::Local<v8::Object> ObjectManager::CachedPlainState(
     CanaryHandle* canary, const v8::Local<v8::Name>& property) {
