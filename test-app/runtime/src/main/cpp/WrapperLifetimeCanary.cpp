@@ -44,9 +44,9 @@ Local<Object> OwnerOf(Local<Context> context, Local<Object> holder, Local<Name> 
   return object;
 }
 
-ObjectManager* ObjectManagerOf(Local<Value> data) {
+ObjectManager* ObjectManagerOf(Isolate* isolate) {
   return static_cast<ObjectManager*>(
-      data.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+      isolate->GetData(static_cast<uint32_t>(Runtime::IsolateData::OBJECT_MANAGER)));
 }
 
 // Mirrors a write of a name the state already has; false if the state lacks it.
@@ -86,9 +86,9 @@ bool RewriteState(ObjectManager* objectManager, ObjectManager::CanaryHandle* can
 // becomes state. V8 calls the setter only when the canary is the receiver.
 Intercepted Setter(Local<Name> property, Local<Value> value,
                    const PropertyCallbackInfo<Boolean>& info) {
-  ObjectManager* objectManager = ObjectManagerOf(info.Data());
+  ObjectManager* objectManager = ObjectManagerOf(info.GetIsolate());
   // v8::Object::DefineOwnProperty reaches the setter, not the definer.
-  if (objectManager->CopyingCanaryProperties()) {
+  if (V8_UNLIKELY(objectManager == nullptr || objectManager->CopyingCanaryProperties())) {
     return Intercepted::kNo;
   }
   Local<Object> holder = info.Holder();
@@ -158,7 +158,10 @@ Intercepted Setter(Local<Name> property, Local<Value> value,
 }
 
 Intercepted Deleter(Local<Name> property, const PropertyCallbackInfo<Boolean>& info) {
-  ObjectManager* objectManager = ObjectManagerOf(info.Data());
+  ObjectManager* objectManager = ObjectManagerOf(info.GetIsolate());
+  if (objectManager == nullptr) {
+    return Intercepted::kNo;
+  }
   ObjectManager::CanaryHandle* canary = objectManager->CanaryOfInstance(info.Holder());
   if (canary == nullptr) {
     return Intercepted::kNo;
@@ -176,8 +179,8 @@ Intercepted Deleter(Local<Name> property, const PropertyCallbackInfo<Boolean>& i
 // receiver that lacks `x` reach here.
 Intercepted Definer(Local<Name> property, const PropertyDescriptor& descriptor,
                     const PropertyCallbackInfo<Boolean>& info) {
-  ObjectManager* objectManager = ObjectManagerOf(info.Data());
-  if (objectManager->CopyingCanaryProperties()) {
+  ObjectManager* objectManager = ObjectManagerOf(info.GetIsolate());
+  if (objectManager == nullptr || objectManager->CopyingCanaryProperties()) {
     return Intercepted::kNo;
   }
   ObjectManager::CanaryHandle* canary = objectManager->CanaryOfInstance(info.Holder());
@@ -232,10 +235,9 @@ void WrapperLifetimeCanary::ConfigureInstanceTemplate(Local<ObjectTemplate> inst
     return;
   }
   NS_CHECK(objectManager != nullptr);
-  Isolate* isolate = Isolate::GetCurrent();
   instanceTemplate->SetHandler(NamedPropertyHandlerConfiguration(
       nullptr, Setter, nullptr, Deleter, nullptr, Definer, nullptr,
-      External::New(isolate, objectManager, v8::kExternalPointerTypeTagDefault),
+      Local<Value>(),
       PropertyHandlerFlags::kNone));
 }
 

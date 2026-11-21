@@ -839,19 +839,6 @@ bool ObjectManager::CanaryStateForWrite(const Local<Object>& holder, Local<Objec
   return true;
 }
 
-ObjectManager::CanaryHandle* ObjectManager::CanaryOfInstance(const Local<Object>& holder) {
-  int id = LinkedIdOf(holder);
-  if (id == -1) {
-    return nullptr;
-  }
-  auto state = m_idToObject.Find(id);
-  // A `super` object shares its owner's id but is not the canary.
-  if (state == nullptr || !state->canary || !state->linked || *state->target != holder) {
-    return nullptr;
-  }
-  return state;
-}
-
 Local<Object> ObjectManager::StateOf(CanaryHandle* canary) {
   CanaryRecord* record = canary->record;
   return record != nullptr && !record->state.IsEmpty() ? record->state.Get(m_isolate)
