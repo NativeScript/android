@@ -443,7 +443,10 @@ void ObjectManager::ReleaseUnwrappedArgs(const JavaCallArgs& args) {
 
 Local<Object> ObjectManager::GetLinkedJsObjectByJavaObject(int javaObjectID) {
   auto state = m_idToObject.Find(javaObjectID);
-  if (state == nullptr || !state->linked) {
+  if (state == nullptr) {
+    return RebuildCanary(javaObjectID);
+  }
+  if (!state->linked) {
     return Local<Object>();
   }
   return JsObjectFor(state);
