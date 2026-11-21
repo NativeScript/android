@@ -142,7 +142,9 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
     } else if (arg->IsObject()) {
         auto jsObj = arg->ToObject(context).ToLocalChecked();
 
-        auto castType = NumericCasts::GetCastType(isolate, jsObj);
+        // Cast markers and the null sentinel are never put on a Java wrapper.
+        bool isWrapper = ObjectManager::HasMetadataField(jsObj);
+        auto castType = isWrapper ? CastType::None : NumericCasts::GetCastType(isolate, jsObj);
 
         Local<Value> castValue;
         jchar charValue;
@@ -252,8 +254,10 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                       ? JsArgConverter::GetOrLinkJavaBuffer(objectManager, jsObj)
                       : objectManager->GetJavaObjectByJsObject(jsObj);
 
-                V8GetPrivateValue(isolate, jsObj, V8StringConstants::GetNullNodePrivate(isolate),
-                                  castValue);
+                if (!isWrapper) {
+                    V8GetPrivateValue(isolate, jsObj, V8StringConstants::GetNullNodePrivate(isolate),
+                                      castValue);
+                }
 
                 if (!castValue.IsEmpty()) {
                     auto node = reinterpret_cast<MetadataNode *>(castValue.As<External>()->Value(v8::kExternalPointerTypeTagDefault));

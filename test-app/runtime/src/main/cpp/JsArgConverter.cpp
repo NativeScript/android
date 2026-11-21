@@ -321,7 +321,10 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
         auto context = m_isolate->GetCurrentContext();
         auto jsObject = arg->ToObject(context).ToLocalChecked();
 
-        auto castType = NumericCasts::GetCastType(m_isolate, jsObject);
+        // Cast markers and the null sentinel are only put on plain objects, never on a
+        // Java wrapper (an object with the runtime's internal fields).
+        bool isWrapper = ObjectManager::HasMetadataField(jsObject);
+        auto castType = isWrapper ? CastType::None : NumericCasts::GetCastType(m_isolate, jsObject);
 
         Local<Value> castValue;
         JniLocalRef obj;
@@ -419,8 +422,10 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
                       ? GetOrLinkJavaBuffer(m_objectManager, jsObject)
                       : m_objectManager->GetJavaObjectByJsObject(jsObject);
 
-                V8GetPrivateValue(m_isolate, jsObject, V8StringConstants::GetNullNodePrivate(m_isolate),
-                                  castValue);
+                if (!isWrapper) {
+                    V8GetPrivateValue(m_isolate, jsObject, V8StringConstants::GetNullNodePrivate(m_isolate),
+                                      castValue);
+                }
 
                 if (!castValue.IsEmpty()) {
                     SetConvertedObject(index, nullptr);

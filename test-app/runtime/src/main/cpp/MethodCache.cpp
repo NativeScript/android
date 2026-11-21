@@ -140,7 +140,10 @@ void MethodCache::AppendType(string& type, Isolate* isolate, const v8::Local<v8:
     // Overloads resolve against what a Proxy wraps.
     auto value = ObjectManager::UnwrapProxy(jsValue);
 
-    if (value->IsObject()) {
+    // Cast markers and the null sentinel are never put on a Java wrapper.
+    bool isWrapper = value->IsObject() && ObjectManager::HasMetadataField(value.As<Object>());
+
+    if (value->IsObject() && !isWrapper) {
         auto context = isolate->GetCurrentContext();
         auto objVal = value->ToObject(context).ToLocalChecked();
         Local<Value> nullNode; //out
@@ -199,7 +202,7 @@ void MethodCache::AppendType(string& type, Isolate* isolate, const v8::Local<v8:
     } else if (value->IsObject()) {
         auto context = isolate->GetCurrentContext();
         auto object = value->ToObject(context).ToLocalChecked();
-        auto castType = NumericCasts::GetCastType(isolate, object);
+        auto castType = isWrapper ? CastType::None : NumericCasts::GetCastType(isolate, object);
         MetadataNode* node;
 
         switch (castType) {

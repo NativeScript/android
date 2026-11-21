@@ -27,6 +27,8 @@ class NumericCasts {
 
         static v8::Local<v8::Value> GetCastValue(v8::Isolate* isolate, const v8::Local<v8::Object>& object);
 
+        // object must have no internal fields: argument conversion never reads a cast
+        // marker from a Java wrapper.
         static void MarkAsLong(v8::Isolate* isolate, const v8::Local<v8::Object>& object, const v8::Local<v8::Value>& value);
 
     private:

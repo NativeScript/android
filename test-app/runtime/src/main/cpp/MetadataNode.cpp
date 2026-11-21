@@ -491,6 +491,8 @@ void MetadataNode::NullObjectAccessorGetterCallback(const FunctionCallbackInfo<V
         Local<Value> nullObject;
         if (!thiz->GetPrivate(context, nullObjectKey).ToLocal(&nullObject) || !nullObject->IsObject()) {
             auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+            // A plain object: argument conversion never reads the null-node private
+            // from a Java wrapper.
             auto sentinel = Object::New(isolate);
             V8SetPrivateValue(isolate, sentinel, V8StringConstants::GetNullNodePrivate(isolate), External::New(isolate, node, v8::kExternalPointerTypeTagDefault));
             // Function::New does not cache its template in the context, so the

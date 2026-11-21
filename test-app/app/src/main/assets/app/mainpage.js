@@ -86,6 +86,7 @@ require("./tests/testRuntimeImplementedAPIs");
 require("./tests/testsInstanceOfOperator");
 require("./tests/testProxyReceivers");
 require("./tests/testReleaseNativeCounterpart");
+require("./tests/testObjectArgumentPath");
 require("./tests/testJSONObjects");
 require("./tests/kotlin/companions/testCompanionObjectsSupport");
 require("./tests/kotlin/properties/testPropertiesSupport");
