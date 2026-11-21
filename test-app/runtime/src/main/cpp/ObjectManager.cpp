@@ -115,8 +115,9 @@ void ObjectManager::Init(Isolate* isolate) {
     auto canaryTemplate = ObjectTemplate::New(isolate);
     canaryTemplate->SetInternalFieldCount(static_cast<int>(MetadataNodeKeys::END));
     WrapperLifetimeCanary::ConfigureInstanceTemplate(
-        canaryTemplate, WrapperLifetimeCanary::TemplateKind::kExtended);
+        canaryTemplate, WrapperLifetimeCanary::TemplateKind::kExtended, this);
     m_canaryTemplate.Reset(isolate, canaryTemplate);
+    m_instanceFieldTableKey.Reset(isolate, Private::New(isolate));
     isolate->AddGCEpilogueCallback(CanaryGCEpilogue, this);
     m_canaryEpilogueAdded = true;
   }
@@ -586,6 +587,7 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
 
   if (state->canary) {
     AdoptCanary(object, javaObjectID, kind);
+    state->record = FindCanaryRecord(javaObjectID);
   }
 }
 
@@ -624,8 +626,8 @@ void ObjectManager::AdoptCanary(const Local<Object>& object, uint32_t javaObject
     if (context.IsEmpty()) {
       context = Runtime::GetRuntime(m_isolate)->GetContext();
     }
-    WrapperLifetimeCanary::CopyOwnProperties(m_isolate, context,
-                                             record->state.Get(m_isolate), object);
+    WrapperLifetimeCanary::CopyOwnProperties(this, context, record->state.Get(m_isolate), object,
+                                             !record->stateNotPlain);
   }
 }
 
@@ -638,6 +640,9 @@ ObjectManager::CanaryRecord* ObjectManager::FindCanaryRecord(int javaObjectID) {
 }
 
 void ObjectManager::EraseCanaryRecord(int javaObjectID) {
+  if (auto live = m_idToObject.Find(javaObjectID)) {
+    live->record = nullptr;
+  }
   m_canaryRecords.erase(javaObjectID);
 }
 
@@ -742,10 +747,50 @@ bool ObjectManager::CanaryStateForWrite(const Local<Object>& holder, Local<Objec
     record = created.get();
     m_canaryRecords.emplace(id, std::move(created));
   }
+  state->record = record;
   record->state.Reset(m_isolate, fresh);
   m_lifetimeStats.canaryStates++;
   *out = fresh;
   return true;
+}
+
+ObjectManager::CanaryHandle* ObjectManager::CanaryOfInstance(const Local<Object>& holder) {
+  int id = LinkedIdOf(holder);
+  if (id == -1) {
+    return nullptr;
+  }
+  auto state = m_idToObject.Find(id);
+  // A `super` object shares its owner's id but is not the canary.
+  if (state == nullptr || !state->keepsState || !state->linked || *state->target != holder) {
+    return nullptr;
+  }
+  return state;
+}
+
+Local<Object> ObjectManager::StateOf(CanaryHandle* canary) {
+  CanaryRecord* record = canary->record;
+  return record != nullptr && !record->state.IsEmpty() ? record->state.Get(m_isolate)
+                                                       : Local<Object>();
+}
+
+bool ObjectManager::StateIsPlain(CanaryHandle* canary) {
+  return canary->record == nullptr || !canary->record->stateNotPlain;
+}
+
+void ObjectManager::SetStateNotPlain(CanaryHandle* canary) {
+  if (canary->record != nullptr) {
+    canary->record->stateNotPlain = true;
+  }
+}
+
+Local<Object> ObjectManager::StateForWrite(CanaryHandle* canary) {
+  Local<Object> existing = StateOf(canary);
+  if (!existing.IsEmpty()) {
+    return existing;
+  }
+  Local<Object> state;
+  return CanaryStateForWrite(Local<Object>::New(m_isolate, *canary->target), &state) ? state
+                                                                                     : Local<Object>();
 }
 
 void ObjectManager::CanaryDiedStatic(
@@ -1212,8 +1257,10 @@ void ObjectManager::ReleaseAllRegistered() {
       m_deathInboxOpen = false;
     }
   }
+  m_idToObject.ForEach([](ObjectWeakCallbackState* state) { state->record = nullptr; });
   m_canaryRecords.clear();
   m_canaryTemplate.Reset();
+  m_instanceFieldTableKey.Reset();
 
   auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
 

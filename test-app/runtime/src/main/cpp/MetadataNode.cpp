@@ -173,7 +173,8 @@ Local<ObjectTemplate> MetadataNode::GetOrCreateArrayObjectTemplate(Isolate* isol
     arrayObjectTemplate->SetHandler(IndexedPropertyHandlerConfiguration(
             ArrayIndexedPropertyGetterCallback, ArrayIndexedPropertySetterCallback));
     WrapperLifetimeCanary::ConfigureInstanceTemplate(
-            arrayObjectTemplate, WrapperLifetimeCanary::TemplateKind::kPlain);
+            arrayObjectTemplate, WrapperLifetimeCanary::TemplateKind::kPlain,
+            Runtime::GetObjectManager(isolate));
 
     cache->ArrayObjectTemplate = new Persistent<ObjectTemplate>(isolate, arrayObjectTemplate);
 
@@ -615,6 +616,17 @@ void MetadataNode::StaticFieldSetterCallback(Local<Name> property, Local<Value> 
     }
 }
 
+void MetadataNode::SetInstanceField(Isolate* isolate, const Local<Object>& thiz,
+                                    const Local<Value>& value, FieldCallbackData* fieldData) {
+    auto &fieldCallbackMetadata = fieldData->metadata;
+    if (fieldCallbackMetadata.getIsFinal()) {
+        stringstream ss;
+        ss << "You are trying to set \"" << fieldCallbackMetadata.getName() << "\" which is a final field! Final fields can only be read.";
+        throw NativeScriptException(ss.str());
+    }
+    CallbackHandlers::SetJavaField(isolate, thiz, value, fieldData);
+}
+
 void MetadataNode::FieldAccessorSetterCallback(const FunctionCallbackInfo<Value>& info) {
     auto value = info[0];
     try {
@@ -631,17 +643,8 @@ void MetadataNode::FieldAccessorSetterCallback(const FunctionCallbackInfo<Value>
             return;
         }
 
-        if (fieldCallbackMetadata.getIsFinal()) {
-            stringstream ss;
-            ss << "You are trying to set \"" << fieldCallbackMetadata.getName() << "\" which is a final field! Final fields can only be read.";
-            string exceptionMessage = ss.str();
-
-            throw NativeScriptException(exceptionMessage);
-        } else {
-            auto isolate = info.GetIsolate();
-            CallbackHandlers::SetJavaField(isolate, thiz, value, fieldCallbackData);
-            info.GetReturnValue().Set(value);
-        }
+        SetInstanceField(info.GetIsolate(), thiz, value, fieldCallbackData);
+        info.GetReturnValue().Set(value);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -653,6 +656,37 @@ void MetadataNode::FieldAccessorSetterCallback(const FunctionCallbackInfo<Value>
         NativeScriptException nsEx(std::string("Error: c++ exception!"));
         nsEx.ReThrowToV8();
     }
+}
+
+bool MetadataNode::TrySetInstanceField(Isolate* isolate, Local<Context> context,
+                                       Local<Private> fieldTableKey, Local<Object> owner,
+                                       Local<Object> receiver, Local<Name> property,
+                                       Local<Value> value) {
+    Local<Value> table;
+    if (!owner->GetPrivate(context, fieldTableKey).ToLocal(&table) || !table->IsObject()) {
+        return false;
+    }
+    Local<Value> entry;
+    if (!table.As<Object>()->GetRealNamedProperty(context, property).ToLocal(&entry) ||
+        !entry->IsExternal()) {
+        return false;
+    }
+    auto fieldData = static_cast<FieldCallbackData*>(
+            entry.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+    try {
+        SetInstanceField(isolate, receiver, value, fieldData);
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToV8();
+    }
+    return true;
 }
 
 void MetadataNode::PropertyAccessorGetterCallback(const FunctionCallbackInfo<Value>& info) {
@@ -804,6 +838,12 @@ public:
                 NewNonConstructor(isolate, MetadataNode::FieldAccessorSetterCallback, fieldData),
                 PropertyAttribute::DontDelete);
         m_addedNames.insert(name);
+        m_fields.emplace_back(name, fieldInfo);
+    }
+
+    // The instance fields installed, in order.
+    const std::vector<std::pair<std::string, FieldCallbackData*>>& Fields() const {
+        return m_fields;
     }
 
     void FillPrototypeProperty(Isolate* isolate, const std::string& name,
@@ -826,6 +866,7 @@ public:
 private:
     Local<ObjectTemplate> m_protoTemplate;
     std::unordered_set<std::string> m_addedNames;
+    std::vector<std::pair<std::string, FieldCallbackData*>> m_fields;
 };
 
 void MetadataNode::SetInstanceMembers(
@@ -1361,7 +1402,8 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     WrapperLifetimeCanary::ConfigureInstanceTemplate(
             ctorFuncTemplate->InstanceTemplate(),
             isInterface ? WrapperLifetimeCanary::TemplateKind::kExtended
-                        : WrapperLifetimeCanary::TemplateKind::kPlain);
+                        : WrapperLifetimeCanary::TemplateKind::kPlain,
+            Runtime::GetObjectManager(isolate));
 
     Local<Function> baseCtorFunc;
     Local<FunctionTemplate> baseFuncTemplate;
@@ -1397,6 +1439,23 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
 
     auto context = isolate->GetCurrentContext();
     auto ctorFunc = ctorFuncTemplate->GetFunction(context).ToLocalChecked();
+
+    if (WrapperLifetimeCanary::Enabled() && !protoFiller.Fields().empty()) {
+        // For the canary write handler, which runs a field's setter itself.
+        auto fieldTableKey = Runtime::GetObjectManager(isolate)->InstanceFieldTableKey();
+        Local<Value> prototype;
+        if (!fieldTableKey.IsEmpty() &&
+            ctorFunc->Get(context, V8StringConstants::GetPrototype(isolate)).ToLocal(&prototype) &&
+            prototype->IsObject()) {
+            auto table = Object::New(isolate, Null(isolate), nullptr, nullptr, 0);
+            for (const auto& [name, fieldData] : protoFiller.Fields()) {
+                (void) table->CreateDataProperty(
+                        context, NewMemberName(isolate, name),
+                        External::New(isolate, fieldData, v8::kExternalPointerTypeTagDefault));
+            }
+            (void) prototype.As<Object>()->SetPrivate(context, fieldTableKey, table);
+        }
+    }
 
     auto origin = Constants::APP_ROOT_FOLDER_PATH + node->m_name;
 
@@ -2313,7 +2372,8 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, extendData);
         extendFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
         WrapperLifetimeCanary::ConfigureInstanceTemplate(
-                extendFuncTemplate->InstanceTemplate(), WrapperLifetimeCanary::TemplateKind::kExtended);
+                extendFuncTemplate->InstanceTemplate(), WrapperLifetimeCanary::TemplateKind::kExtended,
+                Runtime::GetObjectManager(isolate));
 
         auto context = isolate->GetCurrentContext();
         auto extendFunc = extendFuncTemplate->GetFunction(context).ToLocalChecked();

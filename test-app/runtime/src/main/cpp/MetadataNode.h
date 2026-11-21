@@ -37,6 +37,18 @@
 namespace tns {
 class MetadataNode {
     public:
+        /*
+         * Canary mode: runs the Java instance field setter the class prototype
+         * `owner` carries for `property`, as a write through `receiver` would.
+         * False, and nothing done, when owner carries no runtime-installed field
+         * accessor for property. Field accessors are non-configurable, so one
+         * found on owner is still the runtime's.
+         */
+        static bool TrySetInstanceField(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                                        v8::Local<v8::Private> fieldTableKey,
+                                        v8::Local<v8::Object> owner, v8::Local<v8::Object> receiver,
+                                        v8::Local<v8::Name> property, v8::Local<v8::Value> value);
+
         static void Init(v8::Isolate* isolate);
 
         static void BuildMetadata(const std::string& filesPath);
@@ -207,6 +219,9 @@ class MetadataNode {
 
         static void FieldAccessorGetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void FieldAccessorSetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+        // Throws NativeScriptException.
+        static void SetInstanceField(v8::Isolate* isolate, const v8::Local<v8::Object>& thiz,
+                                     const v8::Local<v8::Value>& value, FieldCallbackData* fieldData);
 
         static void StaticFieldGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
