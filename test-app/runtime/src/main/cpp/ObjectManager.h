@@ -218,6 +218,16 @@ class ObjectManager {
   void StateChanging(CanaryHandle* canary);
   // The canary's state object, created on its first write.
   v8::Local<v8::Object> StateForWrite(CanaryHandle* canary);
+  // The canary's state when its plain state is known to have `property` as an
+  // own data property; empty when that is not known.
+  inline v8::Local<v8::Object> CachedPlainState(CanaryHandle* canary,
+                                                const v8::Local<v8::Name>& property);
+  // After the handlers rewrote `property`, an own data property of the canary's
+  // plain state. An entry holds a global handle, so a name added to the state
+  // waits for its first rewrite.
+  void CacheStateName(CanaryHandle* canary, const v8::Local<v8::Name>& property);
+  // Before the handlers delete or redefine `property` on the canary's state.
+  void ForgetStateName(CanaryHandle* canary, const v8::Local<v8::Name>& property);
 
   // Set while the runtime copies properties between a canary and its state, so
   // the handlers let those defines through. The copy runs no JS, and only the
@@ -399,6 +409,23 @@ class ObjectManager {
 
   void EraseCanaryRecord(int javaObjectID);
 
+  // Names that are own data properties of a plain state, the record's set
+  // chosen by its address: an entry is cleared before its name leaves the
+  // state and before its record is freed.
+  struct StateName {
+    CanaryRecord* record = nullptr;
+    v8::Global<v8::Name> name;
+  };
+  static constexpr size_t kStateNameSets = 64;
+  static constexpr size_t kStateNameWays = 4;
+  static size_t StateNameSet(const CanaryRecord* record) {
+    auto address = reinterpret_cast<uintptr_t>(record);
+    return ((address >> 4) ^ (address >> 10)) & (kStateNameSets - 1);
+  }
+  StateName m_stateNames[kStateNameSets][kStateNameWays];
+  uint8_t m_stateNameVictims[kStateNameSets] = {};
+  void ForgetStateNames(CanaryRecord* record);
+
   // Settles canaries collected since the last flush: Java holds the objects
   // with records weakly and releases the others. False if the JNI call failed;
   // the ids are queued again.
@@ -496,6 +523,22 @@ class ObjectManager {
   v8::Persistent<v8::Function>* m_poJsWrapperFunc;
   v8::Persistent<v8::ObjectTemplate> m_jsWrapperTemplate;
 };
+
+inline v8::Local<v8::Object> ObjectManager::CachedPlainState(
+    CanaryHandle* canary, const v8::Local<v8::Name>& property) {
+  CanaryRecord* record = canary->record;
+  if (record == nullptr || record->stateNotPlain) {
+    return v8::Local<v8::Object>();
+  }
+  const StateName* set = m_stateNames[StateNameSet(record)];
+  for (size_t way = 0; way < kStateNameWays; way++) {
+    if (set[way].record == record && set[way].name == property) {
+      m_lifetimeStats.canaryCachedWrites++;
+      return record->state.Get(m_isolate);
+    }
+  }
+  return v8::Local<v8::Object>();
+}
 }  // namespace tns
 
 #endif /* OBJECTMANAGER_H_ */

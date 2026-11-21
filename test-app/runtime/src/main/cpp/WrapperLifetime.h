@@ -68,6 +68,8 @@ struct WrapperLifetimeStats {
   uint64_t canaryNativeDeaths = 0;
   // "canary" only: writes to canaries the write handler saw.
   uint64_t canaryInterceptedWrites = 0;
+  // "canary" only: of those, writes mirrored through the state name cache.
+  uint64_t canaryCachedWrites = 0;
   // "canary" only: canaries built anew for a JS-extended instance whose
   // previous canary died while Java kept the object.
   uint64_t canaryRebuilds = 0;

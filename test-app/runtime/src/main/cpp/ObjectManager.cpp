@@ -663,7 +663,53 @@ void ObjectManager::EraseCanaryRecord(int javaObjectID) {
   if (auto live = m_idToObject.Find(javaObjectID)) {
     live->record = nullptr;
   }
-  m_canaryRecords.erase(javaObjectID);
+  auto it = m_canaryRecords.find(javaObjectID);
+  if (it != m_canaryRecords.end()) {
+    ForgetStateNames(it->second.get());
+    m_canaryRecords.erase(it);
+  }
+}
+
+void ObjectManager::CacheStateName(CanaryHandle* canary, const Local<Name>& property) {
+  CanaryRecord* record = canary->record;
+  if (record == nullptr || record->stateNotPlain || record->state.IsEmpty()) {
+    return;
+  }
+  size_t index = StateNameSet(record);
+  StateName* set = m_stateNames[index];
+  for (size_t way = 0; way < kStateNameWays; way++) {
+    if (set[way].record == record && set[way].name == property) {
+      return;
+    }
+  }
+  StateName& entry = set[m_stateNameVictims[index]];
+  m_stateNameVictims[index] = (m_stateNameVictims[index] + 1) % kStateNameWays;
+  entry.record = record;
+  entry.name.Reset(m_isolate, property);
+}
+
+void ObjectManager::ForgetStateName(CanaryHandle* canary, const Local<Name>& property) {
+  CanaryRecord* record = canary->record;
+  if (record == nullptr) {
+    return;
+  }
+  StateName* set = m_stateNames[StateNameSet(record)];
+  for (size_t way = 0; way < kStateNameWays; way++) {
+    if (set[way].record == record && set[way].name == property) {
+      set[way].record = nullptr;
+      set[way].name.Reset();
+    }
+  }
+}
+
+void ObjectManager::ForgetStateNames(CanaryRecord* record) {
+  StateName* set = m_stateNames[StateNameSet(record)];
+  for (size_t way = 0; way < kStateNameWays; way++) {
+    if (set[way].record == record) {
+      set[way].record = nullptr;
+      set[way].name.Reset();
+    }
+  }
 }
 
 bool ObjectManager::EnsureJavaStrong(int javaObjectID, CanaryRecord* record) {
@@ -1299,6 +1345,12 @@ void ObjectManager::ReleaseAllRegistered() {
     }
   }
   m_idToObject.ForEach([](ObjectWeakCallbackState* state) { state->record = nullptr; });
+  for (auto& set : m_stateNames) {
+    for (StateName& entry : set) {
+      entry.record = nullptr;
+      entry.name.Reset();
+    }
+  }
   m_canaryRecords.clear();
   m_instanceFieldTableKey.Reset();
 
