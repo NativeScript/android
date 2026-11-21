@@ -18,66 +18,89 @@ describe("Wrapper lifetime leak probe", function () {
     // Each probe dumps the Java heap, so every shape is planted once and probed once, on a
     // later task: a WeakRef keeps its target alive until the job that made it ends.
     beforeAll(function (done) {
+        // A cycle through Java whose object's canary was rebuilt since: the record also
+        // keeps a copy of the rebuilt canary, which must not read as a root.
         (function () {
-            // A JS property referencing its own object.
-            var selfReferencing = new java.lang.Runnable({ run: function () {} });
-            selfReferencing.probeSelf = selfReferencing;
-            planted.push(new WeakRef(selfReferencing));
-
-            var twin = new java.lang.Runnable({ run: function () {} });
-            twin.probeSelf = twin;
-            planted.push(new WeakRef(twin));
-
-            // A cycle through Java: the object's state holds a list that holds the object.
-            var listed = new java.lang.Runnable({ run: function () {} });
+            var rebuilt = new java.lang.Runnable({ run: function () {} });
             var list = new java.util.ArrayList();
-            list.add(listed);
-            listed.probeList = list;
-            planted.push(new WeakRef(listed));
-
-            // Held by a Java static: alive for a reason of its own, not a leak.
-            var held = new java.lang.Runnable({ run: function () {} });
-            held.probeHeld = held;
-            Holder.held = held;
-            planted.push(new WeakRef(held));
-
-            // A WeakMap value referencing its own key: in canary mode the key is the
-            // object's lifetime key, which its state holds.
-            var mapped = new java.lang.Runnable({ run: function () {} });
-            probeMap.set(mapped, { probeMapped: mapped });
-            planted.push(new WeakRef(mapped));
-
-            // A back reference through a WeakRef keeps nothing.
-            var weak = new java.lang.Runnable({ run: function () {} });
-            weak.probeWeak = new WeakRef(weak);
+            list.add(rebuilt);
+            rebuilt.probeRebuiltList = list;
+            planted.push(new WeakRef(rebuilt));
+            Holder.held = list;
         })();
-        (function () {
-            // A method closing over its own object: the cycle runs through the object's
-            // prototype, its implementation object. In a function of its own, so no other
-            // planted closure shares the context that holds it.
-            var probeClosed = new java.lang.Runnable({
-                run: function () {
-                    return probeClosed;
-                }
-            });
-            planted.push(new WeakRef(probeClosed));
-        })();
+        // The canary dies on a later job: a WeakRef keeps its target until the job ends.
         setTimeout(function () {
-            report = runtime.findLeakCycles();
-            console.log("leak probe: " + JSON.stringify({
-                leaked: report.leaked,
-                leakedOutsideCycles: report.leakedOutsideCycles,
-                probed: report.probed,
-                cycles: report.cycles.length,
-                durationMs: report.durationMs,
-                dumpBytes: report.dumpBytes
-            }));
-            report.cycles.forEach(function (cycle) {
-                console.log("leak probe cycle: " + cycle.signature);
-            });
-            done();
+            gc();
+            java.lang.System.nanoTime();
+            java.lang.Runtime.getRuntime().gc();
+            gc();
+            java.lang.System.nanoTime();
+            (function () {
+                // A read: the rebuilt canary's copy stays current.
+                Holder.held.get(0).probeRebuiltList.size();
+            })();
+            Holder.held = null;
+            (function () {
+                // A JS property referencing its own object.
+                var selfReferencing = new java.lang.Runnable({ run: function () {} });
+                selfReferencing.probeSelf = selfReferencing;
+                planted.push(new WeakRef(selfReferencing));
+
+                var twin = new java.lang.Runnable({ run: function () {} });
+                twin.probeSelf = twin;
+                planted.push(new WeakRef(twin));
+
+                // A cycle through Java: the object's state holds a list that holds the object.
+                var listed = new java.lang.Runnable({ run: function () {} });
+                var list = new java.util.ArrayList();
+                list.add(listed);
+                listed.probeList = list;
+                planted.push(new WeakRef(listed));
+
+                // Held by a Java static: alive for a reason of its own, not a leak.
+                var held = new java.lang.Runnable({ run: function () {} });
+                held.probeHeld = held;
+                Holder.held = held;
+                planted.push(new WeakRef(held));
+
+                // A WeakMap value referencing its own key: in canary mode the key is the
+                // object's lifetime key, which its state holds.
+                var mapped = new java.lang.Runnable({ run: function () {} });
+                probeMap.set(mapped, { probeMapped: mapped });
+                planted.push(new WeakRef(mapped));
+
+                // A back reference through a WeakRef keeps nothing.
+                var weak = new java.lang.Runnable({ run: function () {} });
+                weak.probeWeak = new WeakRef(weak);
+            })();
+            (function () {
+                // A method closing over its own object: the cycle runs through the object's
+                // prototype, its implementation object. In a function of its own, so no other
+                // planted closure shares the context that holds it.
+                var probeClosed = new java.lang.Runnable({
+                    run: function () {
+                        return probeClosed;
+                    }
+                });
+                planted.push(new WeakRef(probeClosed));
+            })();
+            setTimeout(function () {
+                report = runtime.findLeakCycles();
+                console.log("leak probe: " + JSON.stringify({
+                    leaked: report.leaked,
+                    leakedOutsideCycles: report.leakedOutsideCycles,
+                    probed: report.probed,
+                    cycles: report.cycles.length,
+                    durationMs: report.durationMs,
+                    dumpBytes: report.dumpBytes
+                }));
+                report.cycles.forEach(function (cycle) {
+                    console.log("leak probe cycle: " + cycle.signature);
+                });
+                done();
+            }, 0);
         }, 0);
-    });
+    }, 20000);
 
     afterAll(function () {
         Holder.held = null;
@@ -157,6 +180,15 @@ describe("Wrapper lifetime leak probe", function () {
         expect(cycles.length).toBe(1);
         expect(cycles[0].path).toContain("--ns:kept-->");
         expect(cycles[0].path).toContain("--ns:wrapper-->");
+    });
+
+    it("finds a cycle through Java after the object's canary was rebuilt", function () {
+        var cycles = cyclesThrough("probeRebuiltList");
+        if (!canary) {
+            expect(cycles.length).toBe(0);
+            return;
+        }
+        expect(cycles.length).toBe(1);
     });
 
     it("does not report an object Java holds for a reason of its own", function () {

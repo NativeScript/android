@@ -1255,6 +1255,13 @@ std::vector<ObjectManager::LeakProbeEntry> ObjectManager::GetLeakProbeEntries() 
       entries.push_back(std::move(entry));
     }
     LeakProbeEntry& entry = entries[it->second];
+    const Global<Value>* kept[] = {&record->prototype, &record->callSuper, &record->metadata,
+                                   &record->implementationObject};
+    for (const Global<Value>* value : kept) {
+      if (!value->IsEmpty()) {
+        entry.recordValues.push_back(value->Get(isolate));
+      }
+    }
     if (!record->shell.IsEmpty()) {
       entry.recordValues.push_back(record->shell.Get(isolate));
     }
