@@ -328,7 +328,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
 
         switch (castType) {
             case CastType::Char:
-                castValue = NumericCasts::GetCastValue(jsObject);
+                castValue = NumericCasts::GetCastValue(m_isolate, jsObject);
                 if (castValue->IsString()) {
                     m_args[index].c = ArgConverter::ToJavaChar(m_isolate, castValue.As<String>());
                     success = true;
@@ -336,7 +336,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
                 break;
 
             case CastType::Byte:
-                castValue = NumericCasts::GetCastValue(jsObject);
+                castValue = NumericCasts::GetCastValue(m_isolate, jsObject);
                 if (castValue->IsString()) {
                     string strValue = ArgConverter::ConvertToString(
                             castValue->ToString(context).ToLocalChecked());
@@ -351,7 +351,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
                 break;
 
             case CastType::Short:
-                castValue = NumericCasts::GetCastValue(jsObject);
+                castValue = NumericCasts::GetCastValue(m_isolate, jsObject);
                 if (castValue->IsString()) {
                     string strValue = ArgConverter::ConvertToString(
                             castValue->ToString(context).ToLocalChecked());
@@ -366,7 +366,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
                 break;
 
             case CastType::Long:
-                castValue = NumericCasts::GetCastValue(jsObject);
+                castValue = NumericCasts::GetCastValue(m_isolate, jsObject);
                 if (castValue->IsString()) {
                     string strValue = ArgConverter::ConvertToString(
                             castValue->ToString(context).ToLocalChecked());
@@ -381,7 +381,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
                 break;
 
             case CastType::Float:
-                castValue = NumericCasts::GetCastValue(jsObject);
+                castValue = NumericCasts::GetCastValue(m_isolate, jsObject);
                 if (castValue->IsNumber()) {
                     double floatArg = castValue->ToNumber(context).ToLocalChecked()->NumberValue(
                             context).ToChecked();
@@ -391,7 +391,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
                 break;
 
             case CastType::Double:
-                castValue = NumericCasts::GetCastValue(jsObject);
+                castValue = NumericCasts::GetCastValue(m_isolate, jsObject);
                 if (castValue->IsNumber()) {
                     double doubleArg = castValue->ToNumber(context).ToLocalChecked()->NumberValue(
                             context).ToChecked();
@@ -564,7 +564,7 @@ bool JsArgConverter::ConvertJavaScriptString(const Local<Value> &jsValue, int in
         return true;
     }
 
-    jstring stringObject = ArgConverter::ConvertToJavaString(jsValue);
+    jstring stringObject = ArgConverter::ConvertToJavaString(m_isolate, jsValue);
     SetConvertedObject(index, stringObject);
 
     return true;
@@ -709,7 +709,7 @@ bool JsArgConverter::ConvertJavaScriptArray(const Local<Object> &source, size_t 
                 if (!elementAt(i, element)) {
                     return false;
                 }
-                JsArgToArrayConverter c(context, element, false, (int) Type::Null);
+                JsArgToArrayConverter c(m_isolate, context, element, false, (int) Type::Null);
                 env.SetObjectArrayElement((jobjectArray) objects, i, c.GetConvertedArg());
             }
             arr = (jarray) objects.Move();

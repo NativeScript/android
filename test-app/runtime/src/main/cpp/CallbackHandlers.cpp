@@ -336,16 +336,17 @@ string CallbackHandlers::ResolveClassName(Isolate *isolate, jclass &clazz) {
     return className;
 }
 
-Local<Value> CallbackHandlers::GetArrayElement(Local<Context> context, const Local<Object> &array,
+Local<Value> CallbackHandlers::GetArrayElement(Isolate *isolate, Local<Context> context,
+                                               const Local<Object> &array,
                                                uint32_t index, const string &arraySignature) {
-    return arrayElementAccessor.GetArrayElement(context, array, index, arraySignature);
+    return arrayElementAccessor.GetArrayElement(isolate, context, array, index, arraySignature);
 }
 
-void CallbackHandlers::SetArrayElement(Local<Context> context, const Local<Object> &array,
-                                       uint32_t index,
+void CallbackHandlers::SetArrayElement(Isolate *isolate, Local<Context> context,
+                                       const Local<Object> &array, uint32_t index,
                                        const string &arraySignature, Local<Value> &value) {
 
-    arrayElementAccessor.SetArrayElement(context, array, index, arraySignature, value);
+    arrayElementAccessor.SetArrayElement(isolate, context, array, index, arraySignature, value);
 }
 
 Local<Value> CallbackHandlers::GetJavaField(Isolate *isolate, const Local<Object> &caller,
@@ -386,10 +387,11 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
     const MethodCache::CacheMethodInfo *mi = nullptr;
 
     auto isolate = args.GetIsolate();
+    auto runtime = Runtime::GetRuntime(isolate);
 
     // The Java method may synchronously call back into JS (an overridden
     // method on the receiver) - that whole window is a JS-initiated chain.
-    JavaCallScope javaCallScope(Runtime::GetRuntime(isolate));
+    JavaCallScope javaCallScope(runtime);
 
     if ((entry != nullptr) && entry->getIsResolved()) {
         auto &entrySignature = entry->getSig();
@@ -399,7 +401,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             clazz = env.FindClass(className);
 
             if (clazz == nullptr) {
-                MetadataNode *callerNode = MetadataNode::GetNodeFromHandle(caller);
+                MetadataNode *callerNode = MetadataNode::GetNodeFromHandle(isolate, caller);
                 const string callerClassName = callerNode->GetName();
 
                 DEBUG_WRITE("Cannot resolve class: %s while calling method: %s callerClassName: %s",
@@ -473,7 +475,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                 return;
             }
         } else {
-            MetadataNode *callerNode = MetadataNode::GetNodeFromHandle(caller);
+            MetadataNode *callerNode = MetadataNode::GetNodeFromHandle(isolate, caller);
             const string callerClassName = callerNode->GetName();
             DEBUG_WRITE("Resolving method on caller class: %s.%s on className %s",
                         callerClassName.c_str(), methodName.c_str(), className.c_str());
@@ -517,7 +519,6 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 
     jvalue *javaArgs = argConverter.ToArgs();
 
-    auto runtime = Runtime::GetRuntimeFromIsolateData(isolate);
     auto objectManager = runtime->GetObjectManager();
 
     if (!isStatic) {

@@ -541,10 +541,8 @@ void MetadataNode::FieldAccessorGetterCallback(const FunctionCallbackInfo<Value>
                                          "read Java field", fieldCallbackMetadata.getName(),
                                          !fieldCallbackMetadata.isStatic);
 
-        auto objectManager =
-            Runtime::GetRuntime(info.GetIsolate())->GetObjectManager();
         if ((!fieldCallbackMetadata.isStatic &&
-             !objectManager->IsJsRuntimeObject(thiz))
+             !ObjectManager::IsJsRuntimeObject(thiz))
                 // check whether there's a declaring type to get the class from it
                 || (fieldCallbackMetadata.getDeclaringType() == "")) {
             info.GetReturnValue().SetUndefined();
@@ -620,10 +618,8 @@ void MetadataNode::FieldAccessorSetterCallback(const FunctionCallbackInfo<Value>
                                          "write Java field", fieldCallbackMetadata.getName(),
                                          !fieldCallbackMetadata.isStatic);
 
-        auto objectManager =
-            Runtime::GetRuntime(info.GetIsolate())->GetObjectManager();
         if (!fieldCallbackMetadata.isStatic &&
-            !objectManager->IsJsRuntimeObject(thiz)) {
+            !ObjectManager::IsJsRuntimeObject(thiz)) {
             auto isolate = info.GetIsolate();
             info.GetReturnValue().Set(v8::Undefined(isolate));
             return;
@@ -1724,9 +1720,9 @@ Intercepted MetadataNode::ArrayIndexedPropertyGetterCallback(uint32_t index, con
         auto isolate = info.GetIsolate();
         auto context = isolate->GetCurrentContext();
 
-        auto node = GetNodeFromHandle(thiz);
+        auto node = GetNodeFromHandle(isolate, thiz);
 
-        auto element = CallbackHandlers::GetArrayElement(context, thiz, index, node->m_name);
+        auto element = CallbackHandlers::GetArrayElement(isolate, context, thiz, index, node->m_name);
 
         info.GetReturnValue().Set(element);
     } catch (NativeScriptException& e) {
@@ -1749,9 +1745,9 @@ Intercepted MetadataNode::ArrayIndexedPropertySetterCallback(uint32_t index, Loc
         auto isolate = info.GetIsolate();
         auto context = isolate->GetCurrentContext();
 
-        auto node = GetNodeFromHandle(thiz);
+        auto node = GetNodeFromHandle(isolate, thiz);
 
-        CallbackHandlers::SetArrayElement(context, thiz, index, node->m_name, value);
+        CallbackHandlers::SetArrayElement(isolate, context, thiz, index, node->m_name, value);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -2492,12 +2488,12 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
     return true;
 }
 
-MetadataNode* MetadataNode::GetNodeFromHandle(const Local<Object>& value) {
+MetadataNode* MetadataNode::GetNodeFromHandle(Isolate* isolate, const Local<Object>& value) {
     auto target = ObjectManager::UnwrapProxy(value);
     if (!target->IsObject()) {
         return nullptr;
     }
-    auto node = GetInstanceMetadata(Isolate::GetCurrent(), target.As<Object>());
+    auto node = GetInstanceMetadata(isolate, target.As<Object>());
     return node;
 }
 

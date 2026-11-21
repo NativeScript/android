@@ -154,9 +154,8 @@ class ArgConverter {
 
     static std::u16string ConvertToUtf16String(const v8::Local<v8::String>& s);
 
-        inline static jstring ConvertToJavaString(const v8::Local<v8::Value>& jsValue) {
+        inline static jstring ConvertToJavaString(v8::Isolate* isolate, const v8::Local<v8::Value>& jsValue) {
                 JEnv env;
-                auto isolate = v8::Isolate::GetCurrent();
                 v8::Local<v8::String> str;
                 if (jsValue->IsString()) {
                         str = jsValue.As<v8::String>();

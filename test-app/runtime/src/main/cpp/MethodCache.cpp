@@ -228,7 +228,7 @@ void MethodCache::AppendType(string& type, Isolate* isolate, const v8::Local<v8:
             break;
 
         case CastType::None:
-            node = MetadataNode::GetNodeFromHandle(object);
+            node = MetadataNode::GetNodeFromHandle(isolate, object);
             if (node != nullptr) {
                 type += node->GetName();
             } else {
