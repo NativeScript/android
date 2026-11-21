@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "ArgsWrapper.h"
+#include "DispatchOverrides.h"
 #include "JEnv.h"
 #include "JniLocalRef.h"
 #include "LRUCache.h"
@@ -67,7 +68,10 @@ class ObjectManager {
 
   void RegisterStrong(jobject object, int javaObjectID);
 
-  v8::Local<v8::Object> GetJsObjectByJavaObject(int javaObjectID);
+  // dispatchOverrides, when given, receives the wrapper's DispatchOverrides (null in
+  // release builds).
+  v8::Local<v8::Object> GetJsObjectByJavaObject(
+      int javaObjectID, DispatchOverrides** dispatchOverrides = nullptr);
 
   // Settles the wrappers collected since the last flush. Called on JS<->Java calls and
   // constructions; field and array-element reads that hand JS a Java object skip it and
@@ -102,7 +106,8 @@ class ObjectManager {
   // As GetJsObjectByJavaObject, but empty once the wrapper's link to the Java object was
   // released. Ids are never reused, so an id read without the isolate lock that names a
   // dead canary's record still names that record's object.
-  v8::Local<v8::Object> GetLinkedJsObjectByJavaObject(int javaObjectID);
+  v8::Local<v8::Object> GetLinkedJsObjectByJavaObject(
+      int javaObjectID, DispatchOverrides** dispatchOverrides = nullptr);
 
   v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID,
                                         const std::string& typeName);
@@ -124,10 +129,12 @@ class ObjectManager {
 
   // instanceTemplate is the template object was made from, alive as long as
   // the runtime's metadata cache. Canary mode needs it for an extended link:
-  // a canary rebuilt later is an instance of it.
+  // a canary rebuilt later is an instance of it. dispatchOverrides belongs to
+  // the same cache.
   void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
             jclass clazz, LinkKind kind = LinkKind::kPlain,
-            const v8::Persistent<v8::ObjectTemplate>* instanceTemplate = nullptr);
+            const v8::Persistent<v8::ObjectTemplate>* instanceTemplate = nullptr,
+            DispatchOverrides* dispatchOverrides = nullptr);
 
   void ReleaseNativeCounterpart(v8::Local<v8::Object>& object);
 
@@ -367,6 +374,9 @@ class ObjectManager {
     CanaryRecord* record = nullptr;
     // A canary of a keyed object that takeRekeys has not returned yet.
     bool rekeyPending = false;
+#ifdef APPLICATION_IN_DEBUG
+    DispatchOverrides* dispatchOverrides = nullptr;
+#endif
   };
 
   // Canary mode: what a canary built later for a JS-extended instance starts
@@ -378,6 +388,8 @@ class ObjectManager {
     v8::Global<v8::Value> metadata;
     v8::Global<v8::Value> implementationObject;
     const v8::Persistent<v8::ObjectTemplate>* instanceTemplate = nullptr;
+    // What a rebuilt canary's link checks Java's calls against; null in release builds.
+    DispatchOverrides* dispatchOverrides = nullptr;
     uint32_t records = 0;
     // The m_canaryClasses slot offering it to new records, or null.
     CanaryClass** slot = nullptr;
@@ -474,7 +486,8 @@ class ObjectManager {
   // hydrate false: object already carries the state's properties.
   void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID, jclass clazz,
             LinkKind kind, const v8::Persistent<v8::ObjectTemplate>* instanceTemplate,
-            std::optional<CanaryRecord*> record, bool hydrate = true);
+            DispatchOverrides* dispatchOverrides, std::optional<CanaryRecord*> record,
+            bool hydrate = true);
 
   // Registers a new canary: creates an extended instance's record, and
   // hydrates a canary for an object that already has state. record is
@@ -482,7 +495,8 @@ class ObjectManager {
   CanaryRecord* AdoptCanary(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
                             LinkKind kind,
                             const v8::Persistent<v8::ObjectTemplate>* instanceTemplate,
-                            CanaryRecord* record, bool hydrate);
+                            DispatchOverrides* dispatchOverrides, CanaryRecord* record,
+                            bool hydrate);
 
   // The live canary state of holder, or null.
   ObjectWeakCallbackState* CanaryOf(const v8::Local<v8::Object>& holder);
@@ -577,7 +591,8 @@ class ObjectManager {
                               const v8::Local<v8::Value>& prototype,
                               const v8::Local<v8::Value>& callSuper,
                               const v8::Local<v8::Value>& metadata,
-                              const v8::Local<v8::Value>& implementationObject);
+                              const v8::Local<v8::Value>& implementationObject,
+                              DispatchOverrides* dispatchOverrides);
   // Owns the records.
   ObjectIdIndex<CanaryRecord> m_canaryRecords;
   size_t m_canaryRecordCount = 0;
