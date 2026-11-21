@@ -20,8 +20,8 @@ MESSAGE(STATUS "## ANDROID_NDK_ROOT: " ${ANDROID_NDK_ROOT})
 
 
 # These are appended to CMAKE_CXX_FLAGS, never assigned over it: the NDK toolchain
-# puts its ABI flags there, among them -march=armv7-a -mthumb and, for x86 below
-# API 24, -mstackrealign.
+# puts its ABI flags there, among them -march=armv7-a and, for x86 below API 24,
+# -mstackrealign.
 set(COMMON_CMAKE_ARGUMENTS "-std=c++20 -Werror -Wno-unused-result -fexceptions -fno-builtin-stpcpy -fno-rtti -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_31BIT_SMIS_ON_64BIT_ARCH -DV8_ENABLE_REGEXP_INTERPRETER_THREADED_DISPATCH -DV8_EMBEDDED_BUILTINS  -Wno-vla-extension -Wno-deprecated -Wno-vla-cxx-extension")
 
 
