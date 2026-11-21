@@ -358,9 +358,7 @@ jclass ObjectManager::GetJavaClass(const Local<Object>& instance) {
   DEBUG_WRITE("GetClass called");
 
   JSInstanceInfo* jsInfo = GetJSInstanceInfo(instance);
-  jclass clazz = jsInfo->objectClazz;
-
-  return clazz;
+  return jsInfo != nullptr ? jsInfo->objectClazz : nullptr;
 }
 
 void ObjectManager::SetJavaClass(const Local<Object>& instance, jclass clazz) {

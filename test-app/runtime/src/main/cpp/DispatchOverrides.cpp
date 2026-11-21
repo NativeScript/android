@@ -4,9 +4,14 @@
 
 #include <android/log.h>
 
+#include <algorithm>
+#include <set>
 #include <sstream>
+#include <utility>
 
 #include "ArgConverter.h"
+#include "ObjectManager.h"
+#include "RuntimeState.h"
 
 using namespace v8;
 
@@ -88,7 +93,7 @@ void DispatchOverrides::CheckSlow(Isolate* isolate, Local<Context> context,
   }
 
   entry.quiet = true;
-  Warn(isolate, methodName, method);
+  Warn(className_, methodName, method);
 }
 
 bool DispatchOverrides::DefinedAfterExtend(Isolate* isolate, Local<Context> context,
@@ -107,9 +112,45 @@ bool DispatchOverrides::DefinedAfterExtend(Isolate* isolate, Local<Context> cont
   return implementationObject_.Get(isolate)->HasRealNamedProperty(context, name).FromMaybe(false);
 }
 
-void DispatchOverrides::Warn(Isolate* isolate, Local<String> methodName, Local<Function> method) {
+namespace {
+// Keyed by jclass: an instance holds its class's global ref from the class cache,
+// which has one per class.
+struct InstancePropertyWarnings {
+  std::set<std::pair<jclass, int>> warned;
+};
+}  // namespace
+
+void DispatchOverrides::CheckInstanceProperty(Isolate* isolate, Local<Context> context,
+                                              Local<Object> instance, Local<String> methodName,
+                                              int methodNameId, Local<Function> method) {
+  if (methodNameId < 0 ||
+      !instance->HasRealNamedProperty(context, methodName).FromMaybe(false)) {
+    return;
+  }
+
+  auto* runtime = Runtime::TryGetRuntime(isolate);
+  if (runtime == nullptr) {
+    return;
+  }
+  auto* warnings = RuntimeState::For<InstancePropertyWarnings>(runtime);
+  if (warnings == nullptr) {
+    return;
+  }
+
+  jclass clazz = runtime->GetObjectManager()->GetJavaClass(instance);
+  if (!warnings->warned.emplace(clazz, methodNameId).second) {
+    return;
+  }
+
+  std::string className = clazz != nullptr ? ObjectManager::GetClassName(clazz) : "a Java object";
+  std::replace(className.begin(), className.end(), '/', '.');
+  Warn(className, methodName, method);
+}
+
+void DispatchOverrides::Warn(const std::string& className, Local<String> methodName,
+                             Local<Function> method) {
   std::stringstream ss;
-  ss << "Java called \"" << ArgConverter::ConvertToString(methodName) << "\" on " << className_
+  ss << "Java called \"" << ArgConverter::ConvertToString(methodName) << "\" on " << className
      << " through a function other than the class's own implementation (an instance property "
         "or a method replaced after extend)";
 

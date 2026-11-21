@@ -1273,6 +1273,8 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
 #ifdef APPLICATION_IN_DEBUG
         if (dispatchOverrides != nullptr) {
             dispatchOverrides->Check(isolate, context, jsObject, methodName, methodNameId, jsMethod);
+        } else {
+            DispatchOverrides::CheckInstanceProperty(isolate, context, jsObject, methodName, methodNameId, jsMethod);
         }
 #endif
         int argc = args.count;
