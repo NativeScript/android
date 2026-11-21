@@ -65,21 +65,37 @@ namespace tns {
             return *this;
         }
 
-        std::string &getName();
+        std::string &getName() {
+            return !name.empty() ? name : readName();
+        }
 
-        std::string &getSig();
+        std::string &getSig() {
+            return !sig.empty() ? sig : readSig();
+        }
 
-        std::string &getReturnType();
+        std::string &getReturnType() {
+            return !returnType.empty() ? returnType : readReturnType();
+        }
 
-        MethodReturnType getRetType();
+        MethodReturnType getRetType() {
+            return retTypeParsed ? retType : readRetType();
+        }
 
-        std::string &getDeclaringType();
+        std::string &getDeclaringType() {
+            return !declaringType.empty() ? declaringType : readDeclaringType();
+        }
 
-        int getParamCount();
+        int getParamCount() {
+            return paramCount != -1 ? paramCount : readParamCount();
+        }
 
-        bool getIsFinal();
+        bool getIsFinal() {
+            return isFinalSet ? isFinal : readIsFinal();
+        }
 
-        bool getIsResolved();
+        bool getIsResolved() {
+            return isResolvedSet ? isResolved : readIsResolved();
+        }
 
         MetadataTreeNode *treeNode;
         NodeType type;
@@ -104,6 +120,22 @@ namespace tns {
         bool isResolved;
 
     private:
+
+        std::string &readName();
+
+        std::string &readSig();
+
+        std::string &readReturnType();
+
+        MethodReturnType readRetType();
+
+        std::string &readDeclaringType();
+
+        int readParamCount();
+
+        bool readIsFinal();
+
+        bool readIsResolved();
 
         bool retTypeParsed;
         bool isFinalSet;

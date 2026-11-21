@@ -42,10 +42,6 @@ void JEnv::UnpinThreadEnv() {
     s_thread.pinned = false;
 }
 
-JEnv::operator JNIEnv* () const {
-    return m_env;
-}
-
 jmethodID JEnv::GetMethodID(jclass clazz, const string &name, const string &sig) {
     jmethodID mid = m_env->GetMethodID(clazz, name.c_str(), sig.c_str());
     CheckForJavaException();

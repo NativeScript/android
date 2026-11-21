@@ -12,9 +12,7 @@ MetadataEntry::MetadataEntry(MetadataTreeNode *m_treeNode, NodeType nodeType) :
         paramCount(-1), isFinal(false), isResolved(false), retTypeParsed(false),
         isFinalSet(false), isResolvedSet(false) {}
 
-std::string &MetadataEntry::getName() {
-    if (!name.empty()) return name;
-
+std::string &MetadataEntry::readName() {
     auto reader = MetadataNode::getMetadataReader();
 
     if (type == NodeType::Field || type == NodeType::StaticField) {
@@ -26,9 +24,7 @@ std::string &MetadataEntry::getName() {
     return name;
 }
 
-std::string &MetadataEntry::getSig() {
-    if (!sig.empty()) return sig;
-
+std::string &MetadataEntry::readSig() {
     auto reader = MetadataNode::getMetadataReader();
 
     if (type == NodeType::Field || type == NodeType::StaticField) {
@@ -43,9 +39,7 @@ std::string &MetadataEntry::getSig() {
     return sig;
 }
 
-std::string &MetadataEntry::getReturnType() {
-    if (!returnType.empty()) return returnType;
-
+std::string &MetadataEntry::readReturnType() {
     auto reader = MetadataNode::getMetadataReader();
 
     if (type == NodeType::Method) {
@@ -59,8 +53,7 @@ std::string &MetadataEntry::getReturnType() {
     return returnType;
 }
 
-MethodReturnType MetadataEntry::getRetType() {
-    if (retTypeParsed) return retType;
+MethodReturnType MetadataEntry::readRetType() {
     auto reader = MetadataNode::getMetadataReader();
 
     if (type == NodeType::Method && !this->getReturnType().empty()) {
@@ -72,9 +65,7 @@ MethodReturnType MetadataEntry::getRetType() {
     return retType;
 }
 
-std::string &MetadataEntry::getDeclaringType() {
-    if (!declaringType.empty()) return declaringType;
-
+std::string &MetadataEntry::readDeclaringType() {
     auto reader = MetadataNode::getMetadataReader();
 
     if (type == NodeType::StaticField) {
@@ -88,9 +79,7 @@ std::string &MetadataEntry::getDeclaringType() {
     return declaringType;
 }
 
-int MetadataEntry::getParamCount() {
-    if (paramCount != -1) return paramCount;
-
+int MetadataEntry::readParamCount() {
     auto reader = MetadataNode::getMetadataReader();
 
     if (type == NodeType::Method) {
@@ -105,9 +94,7 @@ int MetadataEntry::getParamCount() {
     return paramCount;
 }
 
-bool MetadataEntry::getIsFinal() {
-    if (isFinalSet) return isFinal;
-
+bool MetadataEntry::readIsFinal() {
     if (type == NodeType::Field || type == NodeType::StaticField) {
         auto reader = MetadataNode::getMetadataReader();
         isFinal = (reader->FieldFlags(field) & FieldInfo::FINAL) != 0;
@@ -118,9 +105,7 @@ bool MetadataEntry::getIsFinal() {
     return isFinal;
 }
 
-bool MetadataEntry::getIsResolved() {
-    if (isResolvedSet) return isResolved;
-
+bool MetadataEntry::readIsResolved() {
     auto reader = MetadataNode::getMetadataReader();
     if (type == NodeType::Method) {
         isResolved = mi.CheckIsResolved() == 1;

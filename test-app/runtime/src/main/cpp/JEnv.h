@@ -16,7 +16,9 @@ class JEnv {
 
         ~JEnv() = default;
 
-        operator JNIEnv* () const;
+        operator JNIEnv* () const {
+            return m_env;
+        }
 
         jclass GetObjectClass(jobject obj);
 
