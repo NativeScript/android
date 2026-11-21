@@ -275,6 +275,9 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
     jlong usedJavaMemory = env.CallLongMethod(runtime->GetJavaRuntime(), REGISTER_CONSTRUCTED_INSTANCE_ID,
                                               instance, javaObjectID);
+    // While the constructor ran, an instance of the same class that Java created could take
+    // this id until the registration above replaced it; a jweak cached then names that one.
+    objectManager->ForgetCachedJavaObject(javaObjectID);
 
     AdjustAmountOfExternalAllocatedMemory(isolate, usedJavaMemory);
 

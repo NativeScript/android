@@ -110,7 +110,8 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(
   if (jsInstanceInfo != nullptr) {
     jweak existingObject;
     try {
-      existingObject = GetJavaObjectByID(jsInstanceInfo->javaObjectID);
+      existingObject = GetJavaObjectByID(jsInstanceInfo->javaObjectID,
+                                         jsInstanceInfo->javaWeakened);
     } catch (const NativeScriptException& e) {
       // this captures usually the error
       auto className = GetClassName(jsInstanceInfo->objectClazz);
@@ -286,10 +287,8 @@ bool ObjectManager::IsJsRuntimeObject(const v8::Local<v8::Object>& object) {
          internalFieldCount == V8_ARRAY_BUFFER_INTERNAL_FIELD_COUNT;
 }
 
-jweak ObjectManager::GetJavaObjectByID(uint32_t javaObjectID) {
-  jweak obj = m_cache(javaObjectID);
-
-  return obj;
+jweak ObjectManager::GetJavaObjectByID(uint32_t javaObjectID, bool validate) {
+  return m_cache(javaObjectID, validate);
 }
 
 jobject ObjectManager::GetJavaObjectByIDImpl(uint32_t javaObjectID) {
@@ -682,6 +681,11 @@ void ObjectManager::FlushFinalizedBatch() {
     return;
   }
 
+  // Before the call: one that fails part way may already have weakened some of them.
+  for (jint id : weaken) {
+    m_idToObject.Find(id)->javaWeakened = true;
+  }
+
   JEnv env;
   JNIEnv* raw = env;
   auto toJava = [raw](const std::vector<jint>& ids) -> jintArray {
@@ -726,8 +730,7 @@ void ObjectManager::FlushFinalizedBatch() {
     return;
   }
 
-  auto settle = [this, raw](const std::vector<jint>& ids, jintArray array,
-                            bool weakened) {
+  auto settle = [this, raw](const std::vector<jint>& ids, jintArray array) {
     if (ids.empty()) {
       return;
     }
@@ -744,13 +747,10 @@ void ObjectManager::FlushFinalizedBatch() {
         continue;
       }
       state->queued = false;
-      if (weakened) {
-        state->javaWeakened = true;
-      }
     }
   };
-  settle(weaken, (jintArray) weakenArray, true);
-  settle(check, (jintArray) checkArray, false);
+  settle(weaken, (jintArray) weakenArray);
+  settle(check, (jintArray) checkArray);
 }
 
 void ObjectManager::ReleaseCollectedWrapper(int javaObjectID) {

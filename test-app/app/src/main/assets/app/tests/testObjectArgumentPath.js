@@ -112,4 +112,66 @@ describe("Object arguments and cached call signatures", function () {
 			seen.push(empty);
 		}
 	});
+
+	describe("cached Java objects of linked wrappers", function () {
+		var Holder = com.tns.tests.WrapperHolder;
+
+		function collectJava() {
+			for (var i = 0; i < 3; i++) {
+				java.lang.Runtime.getRuntime().gc();
+				java.lang.System.runFinalization();
+			}
+		}
+
+		afterEach(function () {
+			Holder.held = null;
+		});
+
+		it("never pass null for a wrapper whose Java object was collected after Java weakened it", function () {
+			(function () {
+				Holder.held = new java.lang.StringBuilder("weakened");
+			})();
+			gc();
+			// Any Java call flushes the collected wrapper, weakening its Java object.
+			collectJava();
+			var again = Holder.held;
+			Holder.held = null;
+			collectJava();
+
+			var passed;
+			try {
+				passed = java.util.Collections.singletonList(again).get(0);
+			} catch (e) {
+				passed = "threw";
+			}
+			expect(passed === again || passed === "threw").toBe(true);
+		});
+
+		it("resolve a reachable wrapper after warm instance calls and a collection", function () {
+			var sb = new java.lang.StringBuilder("warm");
+			for (var i = 0; i < 50; i++) {
+				expect(sb.length()).toBe(4);
+			}
+			for (var j = 0; j < 2000; j++) {
+				new java.lang.Object();
+			}
+			gc();
+			collectJava();
+			expect(sb.toString()).toBe("warm");
+			expect(java.util.Collections.singletonList(sb).get(0)).toBe(sb);
+		});
+
+		it("resolve a constructed instance after Java made another of its class during the constructor", function () {
+			var Outer = com.tns.tests.SelfNesting.extend({
+				touch: function () {
+					this.super.touch();
+				},
+				selfNestingSpec: true
+			});
+			var outer = new Outer(true);
+			expect(outer.getTag()).toBe(2);
+			collectJava();
+			expect(outer.getTag()).toBe(2);
+		});
+	});
 });
