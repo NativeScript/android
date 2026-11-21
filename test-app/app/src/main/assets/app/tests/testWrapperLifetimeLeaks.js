@@ -51,6 +51,17 @@ describe("Wrapper lifetime leak probe", function () {
             var weak = new java.lang.Runnable({ run: function () {} });
             weak.probeWeak = new WeakRef(weak);
         })();
+        (function () {
+            // A method closing over its own object: the cycle runs through the object's
+            // prototype, its implementation object. In a function of its own, so no other
+            // planted closure shares the context that holds it.
+            var probeClosed = new java.lang.Runnable({
+                run: function () {
+                    return probeClosed;
+                }
+            });
+            planted.push(new WeakRef(probeClosed));
+        })();
         setTimeout(function () {
             report = runtime.findLeakCycles();
             console.log("leak probe: " + JSON.stringify({
@@ -135,6 +146,17 @@ describe("Wrapper lifetime leak probe", function () {
         }
         expect(cycles.length).toBe(1);
         expect(cycles[0].path).toContain("--WeakMap value-->");
+    });
+
+    it("finds a cycle through a method that closes over its object", function () {
+        var cycles = cyclesThrough("probeClosed");
+        if (!canary) {
+            expect(cycles.length).toBe(0);
+            return;
+        }
+        expect(cycles.length).toBe(1);
+        expect(cycles[0].path).toContain("--ns:kept-->");
+        expect(cycles[0].path).toContain("--ns:wrapper-->");
     });
 
     it("does not report an object Java holds for a reason of its own", function () {
