@@ -167,10 +167,7 @@ void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const 
             if (jsArg.IsEmpty()) {
                 JniLocalRef arg(env->GetObjectArrayElement(args.refs, i));
                 auto javaObjectID = objectManager->GetOrCreateObjectId(arg);
-                jsArg = objectManager->GetJsObjectByJavaObject(javaObjectID);
-                if (jsArg.IsEmpty()) {
-                    jsArg = objectManager->CreateJSWrapper(javaObjectID, classIndex, arg);
-                }
+                jsArg = objectManager->GetOrCreateJSWrapper(javaObjectID, classIndex, arg);
             }
             break;
         }

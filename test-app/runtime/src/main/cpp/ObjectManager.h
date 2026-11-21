@@ -2,6 +2,7 @@
 #define OBJECTMANAGER_H_
 
 #include <map>
+#include <optional>
 #include <unordered_map>
 #include <memory>
 #include <set>
@@ -107,6 +108,10 @@ class ObjectManager {
 
   // The wrapper of object, registering it and creating the wrapper if needed.
   v8::Local<v8::Object> GetOrCreateJSWrapper(jobject object);
+
+  // GetJsObjectByJavaObject, or CreateJSWrapper when that is empty.
+  v8::Local<v8::Object> GetOrCreateJSWrapper(jint javaObjectID, int classIndex,
+                                             jobject instance);
 
   // classIndex is Runtime.classIndexOf(instance's class), or 0 when unknown.
   v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, int classIndex,
@@ -362,10 +367,17 @@ class ObjectManager {
   static void CanaryGCEpilogue(v8::Isolate* isolate, v8::GCType type,
                                v8::GCCallbackFlags flags, void* data);
 
+  // record is FindCanaryRecord(javaObjectID), or nullopt to look it up.
+  void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID, jclass clazz,
+            LinkKind kind, v8::Local<v8::ObjectTemplate> instanceTemplate,
+            std::optional<CanaryRecord*> record);
+
   // Registers a new canary: creates an extended instance's record, and
-  // hydrates a canary for an object that already has state.
-  void AdoptCanary(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
-                   LinkKind kind, v8::Local<v8::ObjectTemplate> instanceTemplate);
+  // hydrates a canary for an object that already has state. record is
+  // FindCanaryRecord(javaObjectID); returns the canary's record, or null.
+  CanaryRecord* AdoptCanary(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
+                            LinkKind kind, v8::Local<v8::ObjectTemplate> instanceTemplate,
+                            CanaryRecord* record);
 
   // An unlinked instance of instanceTemplate with what object, a canary
   // being registered, carries from its construction; empty on failure.
@@ -380,6 +392,8 @@ class ObjectManager {
   // A new canary for a JS-extended instance whose canary died; empty when id
   // has no extended record or Java collected the object meanwhile.
   v8::Local<v8::Object> RebuildCanary(int javaObjectID);
+  // record is FindCanaryRecord(javaObjectID).
+  v8::Local<v8::Object> RebuildCanary(int javaObjectID, CanaryRecord* record);
 
   // Has the Java object table hold record's object strongly again; false (and
   // the record dropped) when Java collected it.
