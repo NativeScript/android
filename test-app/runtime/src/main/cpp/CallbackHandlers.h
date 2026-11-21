@@ -43,7 +43,7 @@ namespace tns {
                                      const std::string &baseClassName = std::string(),
                                      uint64_t defaultOverrides = 0,
                                      const std::vector<std::string> *contentMemberNames = nullptr,
-                                     v8::Local<v8::ObjectTemplate> instanceTemplate = v8::Local<v8::ObjectTemplate>());
+                                     const v8::Persistent<v8::ObjectTemplate> *instanceTemplate = nullptr);
 
         // Whether GetImplementedInterfaces would list any interface, without calling Java.
         static bool HasImplementedInterfaces(v8::Isolate *isolate, const v8::Local<v8::Object> &implementationObject);

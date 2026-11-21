@@ -215,7 +215,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
                                         const std::string &baseClassName,
                                         uint64_t defaultOverrides,
                                         const vector<string> *contentMemberNames,
-                                        Local<ObjectTemplate> instanceTemplate) {
+                                        const Persistent<ObjectTemplate> *instanceTemplate) {
     bool success;
 
     DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());

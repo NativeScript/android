@@ -67,9 +67,10 @@ class MetadataNode {
 
         static MetadataNode* GetNodeFromHandle(const v8::Local<v8::Object>& value);
 
-        // instanceTemplate receives the template the wrapper was made from.
+        // instanceTemplate receives the template the wrapper was made from, which
+        // lives as long as this runtime's metadata cache.
         static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate* isolate, ObjectManager* objectManager, const std::string& proxyClassName,
-                                                             v8::Local<v8::ObjectTemplate>* instanceTemplate);
+                                                             const v8::Persistent<v8::ObjectTemplate>** instanceTemplate);
 
         static v8::Local<v8::Object> GetImplementationObject(v8::Isolate* isolate, const v8::Local<v8::Object>& object);
 
@@ -202,9 +203,10 @@ class MetadataNode {
         // This runtime's per-instance data for this node, created on first use.
         InstanceData& GetInstanceData(v8::Isolate* isolate);
 
-        // The instance template of a class's or interface's constructor; throws
-        // for a class missing at runtime. data is GetInstanceData(isolate).
-        v8::Local<v8::ObjectTemplate> GetInstanceTemplate(v8::Isolate* isolate, InstanceData& data);
+        // The instance template of a class's or interface's constructor, alive as
+        // long as this runtime's metadata cache; throws for a class missing at
+        // runtime. data is GetInstanceData(isolate).
+        v8::Persistent<v8::ObjectTemplate>* GetInstanceTemplate(v8::Isolate* isolate, InstanceData& data);
 
         static void SetInstanceMetadata(v8::Isolate* isolate, v8::Local<v8::Object> value, MetadataNode* node);
 

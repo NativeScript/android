@@ -727,7 +727,7 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
 
   auto proxyClassName = m_objectManager->GetClassName(javaObject);
   DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
-  Local<ObjectTemplate> instanceTemplate;
+  const Persistent<ObjectTemplate>* instanceTemplate = nullptr;
   jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager,
                                                      proxyClassName, &instanceTemplate);
 

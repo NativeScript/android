@@ -23,9 +23,9 @@ class ObjectManager;
 // built later for the same object gets the state's properties copied back.
 // The state object is the source of truth.
 //
-// ObjectManager owns the records (state, and for JS-extended instances a shell
-// a new canary is cloned from: prototype, internal fields, implementation
-// object). A record lives until Java collects its object, which
+// ObjectManager owns the records (state, and for JS-extended instances what a
+// new canary needs: prototype, internal fields, implementation object, and a
+// copy of the last rebuilt canary while it matches the state). A record lives until Java collects its object, which
 // com.tns.WrapperLifetimeWatcher reports from its own thread. It cannot be
 // rooted only once the canary dies instead: a state reachable only through the
 // canary is garbage in the same collection. The cost is that state referencing

@@ -532,7 +532,7 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
   // Nothing from here to the link runs JS or settles canaries, so the record
   // stays valid.
   CanaryRecord* record = FindCanaryRecord(javaObjectID);
-  if (record != nullptr && !record->shell.IsEmpty()) {
+  if (record != nullptr && record->extended) {
     // A JS-extended instance's canary starts from its record, not from its class.
     auto rebuilt = RebuildCanary(javaObjectID, record);
     if (!rebuilt.IsEmpty()) {
@@ -552,7 +552,7 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
       JEnv env;
       clazz = env.FindClass(className);
     }
-    Link(jsWrapper, javaObjectID, clazz, LinkKind::kPlain, Local<ObjectTemplate>(), record);
+    Link(jsWrapper, javaObjectID, clazz, LinkKind::kPlain, nullptr, record);
   }
   return jsWrapper;
 }
@@ -561,13 +561,14 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
  * Link the JavaScript object and it's java counterpart with an ID
  */
 void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
-                         jclass clazz, LinkKind kind, Local<ObjectTemplate> instanceTemplate) {
+                         jclass clazz, LinkKind kind,
+                         const Persistent<ObjectTemplate>* instanceTemplate) {
   Link(object, javaObjectID, clazz, kind, instanceTemplate, std::nullopt);
 }
 
 void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jclass clazz,
-                         LinkKind kind, Local<ObjectTemplate> instanceTemplate,
-                         std::optional<CanaryRecord*> record) {
+                         LinkKind kind, const Persistent<ObjectTemplate>* instanceTemplate,
+                         std::optional<CanaryRecord*> record, bool hydrate) {
   if (!IsJsRuntimeObject(object)) {
     string errMsg("Trying to link invalid 'this' to a Java object");
     throw NativeScriptException(errMsg);
@@ -601,26 +602,36 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
 
   if (state->canary) {
     state->record = AdoptCanary(object, javaObjectID, kind, instanceTemplate,
-                                record.has_value() ? *record : FindCanaryRecord(javaObjectID));
+                                record.has_value() ? *record : FindCanaryRecord(javaObjectID),
+                                hydrate);
   }
 }
 
-ObjectManager::CanaryRecord* ObjectManager::AdoptCanary(const Local<Object>& object,
-                                                        uint32_t javaObjectID, LinkKind kind,
-                                                        Local<ObjectTemplate> instanceTemplate,
-                                                        CanaryRecord* record) {
+ObjectManager::CanaryRecord* ObjectManager::AdoptCanary(
+    const Local<Object>& object, uint32_t javaObjectID, LinkKind kind,
+    const Persistent<ObjectTemplate>* instanceTemplate, CanaryRecord* record, bool hydrate) {
   if (record == nullptr) {
     if (kind != LinkKind::kExtended) {
       return nullptr;
     }
     // Java calls into JS through this object for as long as it lives, so the
     // record is made now, not at the first write: a canary built later needs
-    // the prototype and fields this one was registered with. Allocated before
-    // the record exists: a collection it starts runs the canary callbacks.
-    Local<Object> shell = NewCanaryShell(object, instanceTemplate);
+    // the prototype and fields this one was registered with.
+    NS_DCHECK(instanceTemplate != nullptr);
+    auto isolate = m_isolate;
     auto created = std::make_unique<CanaryRecord>();
-    if (!shell.IsEmpty()) {
-      created->shell.Reset(m_isolate, shell);
+    created->extended = true;
+    created->instanceTemplate = instanceTemplate;
+    created->prototype.Reset(isolate, object->GetPrototype());
+    created->callSuper.Reset(
+        isolate, object->GetInternalField(static_cast<int>(MetadataNodeKeys::CallSuper)).As<Value>());
+    created->metadata.Reset(
+        isolate, object->GetInternalField(static_cast<int>(MetadataNodeKeys::Metadata)).As<Value>());
+    Local<Value> implementationObject;
+    if (V8GetPrivateValue(isolate, object, V8StringConstants::GetImplementationObject(isolate),
+                          implementationObject) &&
+        !implementationObject.IsEmpty()) {
+      created->implementationObject.Reset(isolate, implementationObject);
     }
     record = created.get();
     m_canaryRecords.emplace(javaObjectID, std::move(created));
@@ -629,7 +640,7 @@ ObjectManager::CanaryRecord* ObjectManager::AdoptCanary(const Local<Object>& obj
   if (!EnsureJavaStrong(javaObjectID, record)) {
     return nullptr;
   }
-  if (!record->state.IsEmpty()) {
+  if (hydrate && !record->state.IsEmpty()) {
     auto context = m_isolate->GetCurrentContext();
     if (context.IsEmpty()) {
       context = Runtime::GetRuntime(m_isolate)->GetContext();
@@ -638,45 +649,6 @@ ObjectManager::CanaryRecord* ObjectManager::AdoptCanary(const Local<Object>& obj
                                              !record->stateNotPlain);
   }
   return record;
-}
-
-Local<Object> ObjectManager::NewCanaryShell(const Local<Object>& object,
-                                            Local<ObjectTemplate> instanceTemplate) {
-  auto isolate = m_isolate;
-  // Every extended link names its template; a record without a shell only
-  // loses the rebuild.
-  NS_DCHECK(!instanceTemplate.IsEmpty());
-  if (instanceTemplate.IsEmpty()) {
-    return Local<Object>();
-  }
-  EscapableHandleScope handleScope(isolate);
-  auto context = isolate->GetCurrentContext();
-  if (context.IsEmpty()) {
-    context = Runtime::GetRuntime(isolate)->GetContext();
-  }
-  Local<Object> shell;
-  if (!instanceTemplate->NewInstance(context).ToLocal(&shell)) {
-    return handleScope.Escape(Local<Object>());
-  }
-  // An extend() instance already has its class's prototype; an interface
-  // implementation's is its own implementation object.
-  Local<Value> prototype = object->GetPrototype();
-  if (!prototype->StrictEquals(shell->GetPrototype()) &&
-      !shell->SetPrototype(context, prototype).FromMaybe(false)) {
-    return handleScope.Escape(Local<Object>());
-  }
-  for (auto key : {MetadataNodeKeys::CallSuper, MetadataNodeKeys::Metadata}) {
-    shell->SetInternalField(static_cast<int>(key),
-                            object->GetInternalField(static_cast<int>(key)));
-  }
-  Local<Value> implementationObject;
-  if (V8GetPrivateValue(isolate, object, V8StringConstants::GetImplementationObject(isolate),
-                        implementationObject) &&
-      !implementationObject.IsEmpty()) {
-    V8SetPrivateValue(isolate, shell, V8StringConstants::GetImplementationObject(isolate),
-                      implementationObject);
-  }
-  return handleScope.Escape(shell);
 }
 
 ObjectManager::CanaryRecord* ObjectManager::FindCanaryRecord(int javaObjectID) {
@@ -716,7 +688,7 @@ Local<Object> ObjectManager::RebuildCanary(int javaObjectID) {
 }
 
 Local<Object> ObjectManager::RebuildCanary(int javaObjectID, CanaryRecord* record) {
-  if (record == nullptr || record->shell.IsEmpty()) {
+  if (record == nullptr || !record->extended) {
     return Local<Object>();
   }
   auto isolate = m_isolate;
@@ -724,10 +696,42 @@ Local<Object> ObjectManager::RebuildCanary(int javaObjectID, CanaryRecord* recor
   if (!EnsureJavaStrong(javaObjectID, record)) {
     return handleScope.Escape(Local<Object>());
   }
-  // Never a clone of a canary: that would copy its #private brands and JsInfo.
-  Local<Object> canary = record->shell.Get(isolate)->Clone(isolate);
+  if (!record->shell.IsEmpty()) {
+    Local<Object> canary = record->shell.Get(isolate)->Clone(isolate);
+    m_lifetimeStats.canaryRebuilds++;
+    Link(canary, javaObjectID, record->clazz, LinkKind::kExtended, nullptr, record, false);
+    return handleScope.Escape(canary);
+  }
+
+  NS_DCHECK(record->instanceTemplate != nullptr);
+  if (record->instanceTemplate == nullptr) {
+    return handleScope.Escape(Local<Object>());
+  }
+  auto context = isolate->GetCurrentContext();
+  Local<Object> canary;
+  if (!record->instanceTemplate->Get(isolate)->NewInstance(context).ToLocal(&canary)) {
+    return handleScope.Escape(Local<Object>());
+  }
+  Local<Value> prototype = record->prototype.Get(isolate);
+  if (!prototype.IsEmpty() && (prototype->IsObject() || prototype->IsNull()) &&
+      !prototype->StrictEquals(canary->GetPrototype())) {
+    (void) canary->SetPrototype(context, prototype);
+  }
+  canary->SetInternalField(static_cast<int>(MetadataNodeKeys::CallSuper),
+                           record->callSuper.Get(isolate));
+  canary->SetInternalField(static_cast<int>(MetadataNodeKeys::Metadata),
+                           record->metadata.Get(isolate));
+  if (!record->implementationObject.IsEmpty()) {
+    V8SetPrivateValue(isolate, canary, V8StringConstants::GetImplementationObject(isolate),
+                      record->implementationObject.Get(isolate));
+  }
   m_lifetimeStats.canaryRebuilds++;
-  Link(canary, javaObjectID, record->clazz, LinkKind::kExtended, Local<ObjectTemplate>(), record);
+  Link(canary, javaObjectID, record->clazz, LinkKind::kExtended, nullptr, record);
+  // Taken before JS can reach the canary, so it holds nothing JS adds later
+  // (#private brands, weak-collection keys); Link sets each clone's JsInfo.
+  Local<Object> shell = canary->Clone(isolate);
+  shell->SetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo), Undefined(isolate));
+  record->shell.Reset(isolate, shell);
   return handleScope.Escape(canary);
 }
 
@@ -810,6 +814,12 @@ Local<Object> ObjectManager::StateOf(CanaryHandle* canary) {
 
 bool ObjectManager::StateIsPlain(CanaryHandle* canary) {
   return canary->record == nullptr || !canary->record->stateNotPlain;
+}
+
+void ObjectManager::StateChanging(CanaryHandle* canary) {
+  if (canary->record != nullptr && !canary->record->shell.IsEmpty()) {
+    canary->record->shell.Reset();
+  }
 }
 
 void ObjectManager::SetStateNotPlain(CanaryHandle* canary) {
