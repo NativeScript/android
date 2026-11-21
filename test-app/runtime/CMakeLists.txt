@@ -128,6 +128,12 @@ else ()
     set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -g")
 endif ()
 
+# CMake also passes CMAKE_CXX_FLAGS to the link step, which is what links the profile
+# runtime for -fprofile-generate without a matching NS_EXTRA_LINK_FLAGS.
+if (NS_EXTRA_CXX_FLAGS)
+    string(APPEND CMAKE_CXX_FLAGS " ${NS_EXTRA_CXX_FLAGS}")
+endif ()
+
 if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
     # Debug builds will include the V8 inspector sources
     add_definitions(-DAPPLICATION_IN_DEBUG)
@@ -285,6 +291,11 @@ else ()
             PROPERTIES LINK_FLAGS "-Wl,--allow-multiple-definition ${NS_SYMBOLIC_FUNCTIONS}"
             INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
     )
+endif ()
+
+if (NS_EXTRA_LINK_FLAGS)
+    get_target_property(NS_LINK_FLAGS NativeScript LINK_FLAGS)
+    set_target_properties(NativeScript PROPERTIES LINK_FLAGS "${NS_LINK_FLAGS} ${NS_EXTRA_LINK_FLAGS}")
 endif ()
 
 
