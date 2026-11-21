@@ -463,12 +463,16 @@ Local<Object> ObjectManager::GetOrCreateJSWrapper(jobject object) {
   jlong packed = env.CallLongMethod(
       m_javaRuntimeObject, GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID,
       object);
-  auto javaObjectID = static_cast<jint>(packed);
-  auto wrapper = GetJsObjectByJavaObject(javaObjectID);
-  if (!wrapper.IsEmpty()) {
-    return wrapper;
+  return GetOrCreateJSWrapper(static_cast<jint>(packed), static_cast<int>(packed >> 32), object);
+}
+
+Local<Object> ObjectManager::GetOrCreateJSWrapper(jint javaObjectID, int classIndex,
+                                                  jobject instance) {
+  // As GetJsObjectByJavaObject, then CreateJSWrapper, which rebuilds a canary itself.
+  if (auto state = m_idToObject.Find(javaObjectID)) {
+    return JsObjectFor(state);
   }
-  return CreateJSWrapper(javaObjectID, static_cast<int>(packed >> 32), object);
+  return CreateJSWrapper(javaObjectID, classIndex, instance);
 }
 
 Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, int classIndex,
@@ -525,10 +529,16 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
                                                    MetadataNode* node) {
   auto isolate = m_isolate;
 
-  // A JS-extended instance's canary starts from its record, not from its class.
-  auto rebuilt = RebuildCanary(javaObjectID);
-  if (!rebuilt.IsEmpty()) {
-    return rebuilt;
+  // Nothing from here to the link runs JS or settles canaries, so the record
+  // stays valid.
+  CanaryRecord* record = FindCanaryRecord(javaObjectID);
+  if (record != nullptr && !record->shell.IsEmpty()) {
+    // A JS-extended instance's canary starts from its record, not from its class.
+    auto rebuilt = RebuildCanary(javaObjectID, record);
+    if (!rebuilt.IsEmpty()) {
+      return rebuilt;
+    }
+    record = FindCanaryRecord(javaObjectID);
   }
 
   if (node == nullptr) {
@@ -542,7 +552,7 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
       JEnv env;
       clazz = env.FindClass(className);
     }
-    Link(jsWrapper, javaObjectID, clazz);
+    Link(jsWrapper, javaObjectID, clazz, LinkKind::kPlain, Local<ObjectTemplate>(), record);
   }
   return jsWrapper;
 }
@@ -552,6 +562,12 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
  */
 void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
                          jclass clazz, LinkKind kind, Local<ObjectTemplate> instanceTemplate) {
+  Link(object, javaObjectID, clazz, kind, instanceTemplate, std::nullopt);
+}
+
+void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jclass clazz,
+                         LinkKind kind, Local<ObjectTemplate> instanceTemplate,
+                         std::optional<CanaryRecord*> record) {
   if (!IsJsRuntimeObject(object)) {
     string errMsg("Trying to link invalid 'this' to a Java object");
     throw NativeScriptException(errMsg);
@@ -584,17 +600,18 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
   (void) inserted;
 
   if (state->canary) {
-    AdoptCanary(object, javaObjectID, kind, instanceTemplate);
-    state->record = FindCanaryRecord(javaObjectID);
+    state->record = AdoptCanary(object, javaObjectID, kind, instanceTemplate,
+                                record.has_value() ? *record : FindCanaryRecord(javaObjectID));
   }
 }
 
-void ObjectManager::AdoptCanary(const Local<Object>& object, uint32_t javaObjectID,
-                                LinkKind kind, Local<ObjectTemplate> instanceTemplate) {
-  CanaryRecord* record = FindCanaryRecord(javaObjectID);
+ObjectManager::CanaryRecord* ObjectManager::AdoptCanary(const Local<Object>& object,
+                                                        uint32_t javaObjectID, LinkKind kind,
+                                                        Local<ObjectTemplate> instanceTemplate,
+                                                        CanaryRecord* record) {
   if (record == nullptr) {
     if (kind != LinkKind::kExtended) {
-      return;
+      return nullptr;
     }
     // Java calls into JS through this object for as long as it lives, so the
     // record is made now, not at the first write: a canary built later needs
@@ -605,11 +622,12 @@ void ObjectManager::AdoptCanary(const Local<Object>& object, uint32_t javaObject
     if (!shell.IsEmpty()) {
       created->shell.Reset(m_isolate, shell);
     }
+    record = created.get();
     m_canaryRecords.emplace(javaObjectID, std::move(created));
-    return;
+    return record;
   }
   if (!EnsureJavaStrong(javaObjectID, record)) {
-    return;
+    return nullptr;
   }
   if (!record->state.IsEmpty()) {
     auto context = m_isolate->GetCurrentContext();
@@ -619,6 +637,7 @@ void ObjectManager::AdoptCanary(const Local<Object>& object, uint32_t javaObject
     WrapperLifetimeCanary::CopyOwnProperties(this, context, record->state.Get(m_isolate), object,
                                              !record->stateNotPlain);
   }
+  return record;
 }
 
 Local<Object> ObjectManager::NewCanaryShell(const Local<Object>& object,
@@ -693,7 +712,10 @@ bool ObjectManager::EnsureJavaStrong(int javaObjectID, CanaryRecord* record) {
 }
 
 Local<Object> ObjectManager::RebuildCanary(int javaObjectID) {
-  CanaryRecord* record = FindCanaryRecord(javaObjectID);
+  return RebuildCanary(javaObjectID, FindCanaryRecord(javaObjectID));
+}
+
+Local<Object> ObjectManager::RebuildCanary(int javaObjectID, CanaryRecord* record) {
   if (record == nullptr || record->shell.IsEmpty()) {
     return Local<Object>();
   }
@@ -705,7 +727,7 @@ Local<Object> ObjectManager::RebuildCanary(int javaObjectID) {
   // Never a clone of a canary: that would copy its #private brands and JsInfo.
   Local<Object> canary = record->shell.Get(isolate)->Clone(isolate);
   m_lifetimeStats.canaryRebuilds++;
-  Link(canary, javaObjectID, record->clazz, LinkKind::kExtended);
+  Link(canary, javaObjectID, record->clazz, LinkKind::kExtended, Local<ObjectTemplate>(), record);
   return handleScope.Escape(canary);
 }
 
