@@ -21,4 +21,20 @@ public final class LogcatUtil {
 
         return output.contains(str);
     }
+
+    // Lines this app logged under the JS tag at warning level or above that contain both
+    // strings. Leaves the log in place, so earlier lines count too.
+    public static int countJsWarnings(String needle, String otherNeedle) throws Exception {
+        Process process = Runtime.getRuntime().exec(new String[]{"logcat", "-d", "-v", "raw", "-s", "JS:W"});
+        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        int count = 0;
+        String line;
+        while ((line = bufferedReader.readLine()) != null) {
+            if (line.contains(needle) && line.contains(otherNeedle)) {
+                count++;
+            }
+        }
+        process.waitFor();
+        return count;
+    }
 }

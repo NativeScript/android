@@ -71,6 +71,7 @@ require("./tests/testWrapperLifetimeLeaks");
 require("./tests/testsMemoryManagement");
 require("./tests/testFieldGetSet");
 require("./tests/extendedClassesTests");
+require("./tests/testDispatchOverrideWarnings");
 require("./tests/extendClassNameTests");
 require("./tests/testJniReferenceLeak");
 require("./tests/testNativeModules");
