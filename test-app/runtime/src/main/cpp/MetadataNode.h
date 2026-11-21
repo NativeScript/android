@@ -55,7 +55,7 @@ class MetadataNode {
 
         static MetadataNode* GetNodeFromHandle(const v8::Local<v8::Object>& value);
 
-        static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate* isolate, ObjectManager* objectManager, const std::string& proxyClassName);
+        static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate* isolate, ObjectManager* objectManager, const std::string& proxyClassName, DispatchOverrides** dispatchOverrides = nullptr);
 
         static v8::Local<v8::Object> GetImplementationObject(v8::Isolate* isolate, const v8::Local<v8::Object>& object);
 
@@ -313,6 +313,8 @@ class MetadataNode {
             std::string fullClassName;
             uint64_t defaultOverrides = 0;
             std::optional<std::vector<std::string>> contentMemberNames;
+            // Owned by the MetadataNodeCache; null in release builds.
+            DispatchOverrides* dispatchOverrides = nullptr;
         };
 
         struct TypeMetadata {
@@ -356,6 +358,7 @@ class MetadataNode {
             v8::Persistent<v8::ObjectTemplate>* instanceTemplate;
             std::string extendedName;
             MetadataNode* node;
+            DispatchOverrides* dispatchOverrides = nullptr;
         };
 
         /*

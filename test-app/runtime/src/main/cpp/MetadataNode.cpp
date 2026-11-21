@@ -194,7 +194,7 @@ MetadataNode::MetadataNode(MetadataTreeNode* treeNode) :
     }
 }
 
-Local<Object> MetadataNode::CreateExtendedJSWrapper(Isolate* isolate, ObjectManager* objectManager, const string& proxyClassName) {
+Local<Object> MetadataNode::CreateExtendedJSWrapper(Isolate* isolate, ObjectManager* objectManager, const string& proxyClassName, DispatchOverrides** dispatchOverrides) {
     Local<Object> extInstance;
 
     auto cacheData = GetCachedExtendedClassData(isolate, proxyClassName);
@@ -226,6 +226,9 @@ Local<Object> MetadataNode::CreateExtendedJSWrapper(Isolate* isolate, ObjectMana
             }
             extInstance->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
             SetInstanceMetadata(isolate, extInstance, cacheData.node);
+            if (dispatchOverrides != nullptr) {
+                *dispatchOverrides = cacheData.dispatchOverrides;
+            }
         }
     }
 
@@ -1532,7 +1535,7 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
         string fullClassName = extData->fullClassName;
 
         bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, implementationObject, false, extData->node->m_name, extData->defaultOverrides,
-                                                          extData->contentMemberNames ? &*extData->contentMemberNames : nullptr);
+                                                          extData->contentMemberNames ? &*extData->contentMemberNames : nullptr, extData->dispatchOverrides);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -2294,7 +2297,9 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
             // gets the constructor its first call site created, as all of them share the class.
             if (isInterface && !hasDot && used.extendedCtorFunction != nullptr && usedClassName == fullExtendedName) {
                 auto usedCtorFunc = Local<Function>::New(isolate, *used.extendedCtorFunction);
-                cache->ExtendedCtorFuncCache.emplace(extendedCtorKey, ExtendedClassCacheData(usedCtorFunc, Local<ObjectTemplate>::New(isolate, *used.instanceTemplate), used.extendedName, used.node));
+                ExtendedClassCacheData usedData(usedCtorFunc, Local<ObjectTemplate>::New(isolate, *used.instanceTemplate), used.extendedName, used.node);
+                usedData.dispatchOverrides = used.dispatchOverrides;
+                cache->ExtendedCtorFuncCache.emplace(extendedCtorKey, usedData);
                 info.GetReturnValue().Set(usedCtorFunc);
                 return;
             }
@@ -2307,6 +2312,9 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         auto extendedClassCallbackData = cache->Own<ExtendedClassCallbackData>(node, extendNameAndLocation, implementationObject, fullExtendedName);
         extendedClassCallbackData->defaultOverrides = defaultOverrides;
         extendedClassCallbackData->contentMemberNames = std::move(contentMemberNames);
+#ifdef APPLICATION_IN_DEBUG
+        extendedClassCallbackData->dispatchOverrides = cache->Own<DispatchOverrides>(isolate, implementationObject, DottedClassName(fullExtendedName));
+#endif
         auto extendData = External::New(isolate, extendedClassCallbackData, v8::kExternalPointerTypeTagDefault);
         auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, extendData);
         extendFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
@@ -2335,6 +2343,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         }
 
         ExtendedClassCacheData cacheData(extendFunc, extendFuncTemplate->InstanceTemplate(), fullExtendedName, node);
+        cacheData.dispatchOverrides = extendedClassCallbackData->dispatchOverrides;
         cache->ExtendedCtorFuncCache.emplace(extendedCtorKey, cacheData);
         // CreateExtendedJSWrapper looks instances created from Java up by their
         // class name; the first extend of the class keeps serving those. Each
@@ -2342,7 +2351,9 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         bool usesContentClassName = contentKeyed && fullClassName == contentClassName;
         if (extendedCtorKey != fullExtendedName) {
             if (cache->ExtendedCtorFuncCache.find(fullExtendedName) == cache->ExtendedCtorFuncCache.end()) {
-                cache->ExtendedCtorFuncCache.emplace(fullExtendedName, ExtendedClassCacheData(extendFunc, extendFuncTemplate->InstanceTemplate(), fullExtendedName, node));
+                ExtendedClassCacheData classData(extendFunc, extendFuncTemplate->InstanceTemplate(), fullExtendedName, node);
+                classData.dispatchOverrides = extendedClassCallbackData->dispatchOverrides;
+                cache->ExtendedCtorFuncCache.emplace(fullExtendedName, classData);
             } else if (usesContentClassName) {
                 cache->SharedExtendedClasses.emplace(fullExtendedName, false);
             }

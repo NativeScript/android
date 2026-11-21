@@ -214,7 +214,8 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
                                         bool isInterface,
                                         const std::string &baseClassName,
                                         uint64_t defaultOverrides,
-                                        const vector<string> *contentMemberNames) {
+                                        const vector<string> *contentMemberNames,
+                                        DispatchOverrides *dispatchOverrides) {
     bool success;
 
     DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
@@ -236,7 +237,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
     int javaObjectID = objectManager->GenerateNewObjectID();
 
-    objectManager->Link(jsObject, javaObjectID, nullptr);
+    objectManager->Link(jsObject, javaObjectID, nullptr, dispatchOverrides);
 
     // resolve constructor
     const auto &mi = MethodCache::ResolveConstructorSignature(argWrapper, fullClassName,
@@ -1228,7 +1229,8 @@ vector<string> CallbackHandlers::GetTypeMetadata(const string &name, int index) 
 
 Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
                                             const Local<Object> &jsObject, const Local<String> &methodName,
-                                            const JavaCallArgs &args) {
+                                            const JavaCallArgs &args, DispatchOverrides *dispatchOverrides,
+                                            int methodNameId) {
     SET_PROFILER_FRAME();
 
     JEnv env(_env);
@@ -1249,6 +1251,13 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
         EscapableHandleScope handleScope(isolate);
 
         auto jsMethod = method.As<Function>();
+#ifdef APPLICATION_IN_DEBUG
+        if (dispatchOverrides != nullptr) {
+            dispatchOverrides->Check(isolate, context, jsObject, methodName, methodNameId, jsMethod);
+        } else {
+            DispatchOverrides::CheckInstanceProperty(isolate, context, jsObject, methodName, methodNameId, jsMethod);
+        }
+#endif
         int argc = args.count;
 
         constexpr int kInlineArgs = 16;

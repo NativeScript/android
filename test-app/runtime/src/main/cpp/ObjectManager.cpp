@@ -308,9 +308,7 @@ jclass ObjectManager::GetJavaClass(const Local<Object>& instance) {
   DEBUG_WRITE("GetClass called");
 
   JSInstanceInfo* jsInfo = GetJSInstanceInfo(instance);
-  jclass clazz = jsInfo->objectClazz;
-
-  return clazz;
+  return jsInfo != nullptr ? jsInfo->objectClazz : nullptr;
 }
 
 void ObjectManager::SetJavaClass(const Local<Object>& instance, jclass clazz) {
@@ -341,7 +339,8 @@ void ObjectManager::RegisterStrong(jobject object, int javaObjectID) {
                      object, javaObjectID);
 }
 
-Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID) {
+Local<Object> ObjectManager::GetJsObjectByJavaObject(
+    int javaObjectID, DispatchOverrides** dispatchOverrides) {
   auto isolate = m_isolate;
   EscapableHandleScope handleScope(isolate);
 
@@ -349,6 +348,11 @@ Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID) {
   if (state == nullptr) {
     return handleScope.Escape(Local<Object>());
   }
+#ifdef APPLICATION_IN_DEBUG
+  if (dispatchOverrides != nullptr) {
+    *dispatchOverrides = state->dispatchOverrides;
+  }
+#endif
 
   return handleScope.Escape(JsObjectFor(state));
 }
@@ -396,11 +400,17 @@ void ObjectManager::ReleaseUnwrappedArgs(const JavaCallArgs& args) {
   }
 }
 
-Local<Object> ObjectManager::GetLinkedJsObjectByJavaObject(int javaObjectID) {
+Local<Object> ObjectManager::GetLinkedJsObjectByJavaObject(
+    int javaObjectID, DispatchOverrides** dispatchOverrides) {
   auto state = m_idToObject.Find(javaObjectID);
   if (state == nullptr || !state->linked) {
     return Local<Object>();
   }
+#ifdef APPLICATION_IN_DEBUG
+  if (dispatchOverrides != nullptr) {
+    *dispatchOverrides = state->dispatchOverrides;
+  }
+#endif
   return JsObjectFor(state);
 }
 
@@ -497,7 +507,7 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
  * Link the JavaScript object and it's java counterpart with an ID
  */
 void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
-                         jclass clazz) {
+                         jclass clazz, DispatchOverrides* dispatchOverrides) {
   if (!IsJsRuntimeObject(object)) {
     string errMsg("Trying to link invalid 'this' to a Java object");
     throw NativeScriptException(errMsg);
@@ -509,6 +519,9 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
               object->GetIdentityHash(), javaObjectID);
 
   auto state = new ObjectWeakCallbackState(this, javaObjectID, clazz, isolate, object);
+#ifdef APPLICATION_IN_DEBUG
+  state->dispatchOverrides = dispatchOverrides;
+#endif
 
   // subscribe for JS GC event
   state->target->SetWeak(state, JSObjectFinalizerStatic,

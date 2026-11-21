@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "ArgsWrapper.h"
+#include "DispatchOverrides.h"
 #include "JEnv.h"
 #include "JniLocalRef.h"
 #include "LRUCache.h"
@@ -59,7 +60,10 @@ class ObjectManager {
 
   void RegisterStrong(jobject object, int javaObjectID);
 
-  v8::Local<v8::Object> GetJsObjectByJavaObject(int javaObjectID);
+  // dispatchOverrides, when given, receives the wrapper's DispatchOverrides (null in
+  // release builds).
+  v8::Local<v8::Object> GetJsObjectByJavaObject(
+      int javaObjectID, DispatchOverrides** dispatchOverrides = nullptr);
 
   // Settles the wrappers collected since the last flush. Called on JS<->Java calls and
   // constructions; field and array-element reads that hand JS a Java object skip it and
@@ -82,7 +86,8 @@ class ObjectManager {
 
   // As GetJsObjectByJavaObject, but empty once the wrapper's link to the Java object was
   // released.
-  v8::Local<v8::Object> GetLinkedJsObjectByJavaObject(int javaObjectID);
+  v8::Local<v8::Object> GetLinkedJsObjectByJavaObject(
+      int javaObjectID, DispatchOverrides** dispatchOverrides = nullptr);
 
   v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID,
                                         const std::string& typeName);
@@ -94,8 +99,10 @@ class ObjectManager {
   v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, int classIndex,
                                         jobject instance);
 
+  // dispatchOverrides belongs to the runtime's metadata cache, which outlives
+  // every link.
   void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID,
-            jclass clazz);
+            jclass clazz, DispatchOverrides* dispatchOverrides = nullptr);
 
   void ReleaseNativeCounterpart(v8::Local<v8::Object>& object);
 
@@ -190,6 +197,9 @@ class ObjectManager {
     // Handed back to JS while queued: the wrapper is reachable again, so the flush must
     // leave the Java side alone and let a later collection queue it anew.
     bool reacquired = false;
+#ifdef APPLICATION_IN_DEBUG
+    DispatchOverrides* dispatchOverrides = nullptr;
+#endif
   };
 
   using JSInstanceInfo = ObjectWeakCallbackState;
