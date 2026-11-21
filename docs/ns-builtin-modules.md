@@ -192,6 +192,7 @@ every build on cold paths only:
 | `canaryStates` | `"canary"` only: state objects created to hold JS properties |
 | `canaryNativeDeaths` | `"canary"` only: state objects let go of because Java collected their object |
 | `canaryInterceptedWrites` | `"canary"` only: writes to canaries the write handler saw. Canaries without state have no handler |
+| `canaryCachedWrites` | `"canary"` only: of those writes, rewrites of a name the handler knew to be a plain data property of the state, mirrored with one store |
 | `canaryRebuilds` | `"canary"` only: canaries built anew for a JS-extended instance whose previous canary died while Java kept the object |
 
 In `"canary"` mode only array buffers backed by Java buffers resurrect;
