@@ -15,10 +15,12 @@ namespace instrumentation {
 class Frame {
     public:
         inline Frame() : Frame("") { }
-        inline Frame(std::string name) : name(name), start(disabled ? disabled_time : std::chrono::system_clock::now()) {}
+        // The name is not copied, so it has to outlive the frame: a literal or __func__.
+        inline Frame(const char* name) : start(disabled ? disabled_time : std::chrono::system_clock::now()), name(name) {}
+        inline Frame(std::string name) : start(disabled ? disabled_time : std::chrono::system_clock::now()), ownedName(std::move(name)), name(ownedName.c_str()) {}
 
         inline ~Frame() {
-            if (!name.empty() && check()) {
+            if (name[0] != '\0' && check()) {
                 log(name);
             }
         }
@@ -59,7 +61,8 @@ class Frame {
         static const std::chrono::system_clock::time_point disabled_time; // Couldn't find reasonable constant
 
         const std::chrono::system_clock::time_point start;
-        const std::string name;
+        const std::string ownedName;
+        const char* const name;
 
         Frame(const Frame&) = delete;
         Frame& operator=(const Frame&) = delete;

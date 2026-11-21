@@ -212,12 +212,6 @@ ObjectManager* Runtime::GetObjectManager(v8::Isolate* isolate) {
   return GetRuntime(isolate)->GetObjectManager();
 }
 
-Isolate* Runtime::GetIsolate() const { return m_isolate; }
-
-jobject Runtime::GetJavaRuntime() const { return m_runtime; }
-
-ObjectManager* Runtime::GetObjectManager() const { return m_objectManager; }
-
 void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath,
                    jstring nativeLibDir, jboolean verboseLoggingEnabled,
                    jboolean isDebuggable, jstring packageName,
@@ -707,20 +701,21 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
   m_objectManager->FlushFinalizedBatchIfPending();
   m_objectManager->RegisterStrong(javaObject, javaObjectID);
 
-  string existingClassName = ArgConverter::jstringToString(className);
-  string jniName = Util::ConvertFromCanonicalToJniName(existingClassName);
+  // Java passes javaObject.getClass().getName(), the name
+  // ObjectManager::GetClassName(javaObject) would read back through JNI.
+  string jniName = Util::ConvertFromCanonicalToJniName(
+      ArgConverter::jstringToString(className));
   Local<Object> jsInstance;
   Local<Object> implementationObject;
 
-  auto proxyClassName = m_objectManager->GetClassName(javaObject);
-  DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
+  DEBUG_WRITE("createJSInstanceNative class %s", jniName.c_str());
   jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager,
-                                                     proxyClassName);
+                                                     jniName);
 
   if (jsInstance.IsEmpty()) {
     throw NativeScriptException(
         string("Failed to create JavaScript extend wrapper for class '" +
-               proxyClassName + "'"));
+               jniName + "'"));
   }
 
   implementationObject =
@@ -1262,14 +1257,8 @@ jobject Runtime::ConvertJsValueToJavaObject(JEnv& env,
                                             int classReturnType) {
   auto context = this->GetContext();
   JsArgToArrayConverter argConverter(
-      context, value, false /*is implementation object*/, classReturnType);
-  jobject jr = argConverter.GetConvertedArg();
-  jobject javaResult = nullptr;
-  if (jr != nullptr) {
-    javaResult = env.NewLocalRef(jr);
-  }
-
-  return javaResult;
+      m_isolate, context, value, false /*is implementation object*/, classReturnType);
+  return argConverter.ReleaseConvertedArg();
 }
 
 void Runtime::SetManualInstrumentationMode(jstring mode) {
@@ -1405,12 +1394,6 @@ void Runtime::DestroyRuntime() {
   // threads already pinned have let go.
   RuntimeGates::Close(m_id);
 }
-
-Local<Context> Runtime::GetContext() {
-  return this->m_context->Get(this->m_isolate);
-}
-
-int Runtime::GetId() { return this->m_id; }
 
 
 JavaVM* Runtime::s_jvm = nullptr;

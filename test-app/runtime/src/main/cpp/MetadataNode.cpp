@@ -389,7 +389,8 @@ void MetadataNode::ArrayLengthGetterCallack(Local<Name> property, const Property
 }
 
 Local<Object> MetadataNode::CreateArrayWrapper(Isolate* isolate) {
-    auto node = GetOrCreate("java/lang/Object");
+    // Nodes are shared by every runtime and never freed.
+    static MetadataNode* const node = GetOrCreate("java/lang/Object");
     auto ctorFunc = node->GetConstructorFunction(isolate);
 
     auto arrayObjectTemplate = GetOrCreateArrayObjectTemplate(isolate);
@@ -541,10 +542,8 @@ void MetadataNode::FieldAccessorGetterCallback(const FunctionCallbackInfo<Value>
                                          "read Java field", fieldCallbackMetadata.getName(),
                                          !fieldCallbackMetadata.isStatic);
 
-        auto objectManager =
-            Runtime::GetRuntime(info.GetIsolate())->GetObjectManager();
         if ((!fieldCallbackMetadata.isStatic &&
-             !objectManager->IsJsRuntimeObject(thiz))
+             !ObjectManager::IsJsRuntimeObject(thiz))
                 // check whether there's a declaring type to get the class from it
                 || (fieldCallbackMetadata.getDeclaringType() == "")) {
             info.GetReturnValue().SetUndefined();
@@ -620,10 +619,8 @@ void MetadataNode::FieldAccessorSetterCallback(const FunctionCallbackInfo<Value>
                                          "write Java field", fieldCallbackMetadata.getName(),
                                          !fieldCallbackMetadata.isStatic);
 
-        auto objectManager =
-            Runtime::GetRuntime(info.GetIsolate())->GetObjectManager();
         if (!fieldCallbackMetadata.isStatic &&
-            !objectManager->IsJsRuntimeObject(thiz)) {
+            !ObjectManager::IsJsRuntimeObject(thiz)) {
             auto isolate = info.GetIsolate();
             info.GetReturnValue().Set(v8::Undefined(isolate));
             return;
@@ -660,12 +657,11 @@ void MetadataNode::PropertyAccessorGetterCallback(const FunctionCallbackInfo<Val
         auto thiz = info.This();
         auto propertyCallbackData = reinterpret_cast<PropertyCallbackData*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
-        std::string getterMethodName = propertyCallbackData->getterMethodName;
-        if(getterMethodName == ""){
+        if (propertyCallbackData->getterName.IsEmpty()) {
             throw NativeScriptException("Missing getter method for property: " + propertyCallbackData->propertyName);
         }
 
-        auto getter = thiz->Get(context, v8::String::NewFromUtf8(isolate, getterMethodName.c_str()).ToLocalChecked()).ToLocalChecked();
+        auto getter = thiz->Get(context, propertyCallbackData->getterName.Get(isolate)).ToLocalChecked();
         auto value = getter.As<Function>()->Call(context, thiz, 0, nullptr).ToLocalChecked();
         info.GetReturnValue().Set(value);
     } catch (NativeScriptException& e) {
@@ -688,12 +684,11 @@ void MetadataNode::PropertyAccessorSetterCallback(const FunctionCallbackInfo<Val
         auto thiz = info.This();
         auto propertyCallbackData = reinterpret_cast<PropertyCallbackData*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
-        std::string setterMethodName = propertyCallbackData->setterMethodName;
-        if(setterMethodName == ""){
+        if (propertyCallbackData->setterName.IsEmpty()) {
             throw NativeScriptException("Missing setter method for property: " + propertyCallbackData->propertyName);
         }
 
-        auto setter = thiz->Get(context, v8::String::NewFromUtf8(isolate, setterMethodName.c_str()).ToLocalChecked()).ToLocalChecked();
+        auto setter = thiz->Get(context, propertyCallbackData->setterName.Get(isolate)).ToLocalChecked();
         setter.As<Function>()->Call(context, thiz, 1, &value).ToLocalChecked();
         info.GetReturnValue().Set(value);
     } catch (NativeScriptException& e) {
@@ -713,7 +708,7 @@ void MetadataNode::SuperAccessorGetterCallback(const FunctionCallbackInfo<Value>
     try {
         auto isolate = info.GetIsolate();
         auto thiz = ResolveProxyReceiver(isolate, info.This(), "read", "super", true);
-        auto key = ArgConverter::ConvertToV8String(isolate, "supervalue");
+        auto key = V8StringConstants::GetSuperValuePrivate(isolate);
         Local<Value> hidenVal;
         V8GetPrivateValue(isolate, thiz, key, hidenVal);
         auto superValue = hidenVal.As<Object>();
@@ -984,7 +979,7 @@ void MetadataNode::SetInstanceMethodsFromStaticMetadata(
             setterMethodName = entry.getName();
         }
 
-        auto propertyInfo = cache->Own<PropertyCallbackData>(propertyName, getterMethodName, setterMethodName);
+        auto propertyInfo = cache->Own<PropertyCallbackData>(isolate, propertyName, getterMethodName, setterMethodName);
         protoFiller.FillPrototypeProperty(isolate, propertyName, propertyInfo);
     }
 }
@@ -1448,7 +1443,7 @@ Persistent<Function>* MetadataNode::GetPersistentConstructorFunction(Isolate* is
 
 MetadataNode::TypeMetadata* MetadataNode::GetTypeMetadata(Isolate* isolate, const Local<Function>& value) {
     Local<Value> hiddenVal;
-    V8GetPrivateValue(isolate, value, String::NewFromUtf8(isolate, "typemetadata").ToLocalChecked(), hiddenVal);
+    V8GetPrivateValue(isolate, value, V8StringConstants::GetTypeMetadataPrivate(isolate), hiddenVal);
     if (hiddenVal.IsEmpty() || !hiddenVal->IsExternal()) {
         return nullptr;
     }
@@ -1458,7 +1453,7 @@ MetadataNode::TypeMetadata* MetadataNode::GetTypeMetadata(Isolate* isolate, cons
 }
 
 void MetadataNode::SetTypeMetadata(Isolate* isolate, Local<Function> value, TypeMetadata* data) {
-    V8SetPrivateValue(isolate, value, String::NewFromUtf8(isolate, "typemetadata").ToLocalChecked(),  External::New(isolate, data, v8::kExternalPointerTypeTagDefault));
+    V8SetPrivateValue(isolate, value, V8StringConstants::GetTypeMetadataPrivate(isolate), External::New(isolate, data, v8::kExternalPointerTypeTagDefault));
 }
 
 MetadataNode::InstanceData& MetadataNode::GetInstanceData(Isolate* isolate) {
@@ -1525,13 +1520,11 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
         SetInstanceMetadata(isolate, thiz, extData->node);
         thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
-        V8SetPrivateValue(isolate, thiz, V8StringConstants::GetImplementationObject(isolate), implementationObject);
+        V8SetPrivateValue(isolate, thiz, V8StringConstants::GetImplementationObjectPrivate(isolate), implementationObject);
 
         ArgsWrapper argWrapper(info, ArgType::Class);
 
-        string fullClassName = extData->fullClassName;
-
-        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, implementationObject, false, extData->node->m_name, extData->defaultOverrides,
+        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, extData->fullClassName, argWrapper, implementationObject, false, extData->node->m_name, extData->defaultOverrides,
                                                           extData->contentMemberNames ? &*extData->contentMemberNames : nullptr);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -1584,11 +1577,12 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
             throw NativeScriptException(string("Invalid number of arguments"));
         }
 
-        auto className = node->m_implType;
         uint64_t defaultOverrides = node->GetDefaultOverrides(isolate, implementationObject);
+        std::string overridingClassName;
         if (defaultOverrides != 0) {
-            className += DEFAULT_OVERRIDING_SUFFIX;
+            overridingClassName = node->m_implType + DEFAULT_OVERRIDING_SUFFIX;
         }
+        const auto& className = defaultOverrides != 0 ? overridingClassName : node->m_implType;
         SetInstanceMetadata(isolate, thiz, node);
 
         //@@@ Refactor
@@ -1596,7 +1590,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 
         implementationObject->SetPrototype(context, thiz->GetPrototype());
         thiz->SetPrototype(context, implementationObject);
-        V8SetPrivateValue(isolate, thiz, V8StringConstants::GetImplementationObject(isolate), implementationObject);
+        V8SetPrivateValue(isolate, thiz, V8StringConstants::GetImplementationObjectPrivate(isolate), implementationObject);
 
         ArgsWrapper argWrapper(info, ArgType::Interface);
 
@@ -1628,15 +1622,12 @@ void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::V
         auto isolate = info.GetIsolate();
         auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
-        string extendName;
-        auto className = node->m_name;
-
         SetInstanceMetadata(isolate, thiz, node);
 
         ArgsWrapper argWrapper(info, ArgType::Class);
 
-        string fullClassName = CreateFullClassName(className, extendName);
-        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, Local<Object>(), false, className);
+        const auto& className = node->m_name;
+        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, className, argWrapper, Local<Object>(), false, className);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -1656,8 +1647,8 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 
         auto e = info.Data().As<External>();
 
-        auto callbackData = reinterpret_cast<MethodCallbackData*>(e->Value(v8::kExternalPointerTypeTagDefault));
         auto initialCallbackData = reinterpret_cast<MethodCallbackData*>(e->Value(v8::kExternalPointerTypeTagDefault));
+        auto callbackData = initialCallbackData;
 
         // Number of arguments the method is invoked with
         int argLength = info.Length();
@@ -1728,9 +1719,9 @@ Intercepted MetadataNode::ArrayIndexedPropertyGetterCallback(uint32_t index, con
         auto isolate = info.GetIsolate();
         auto context = isolate->GetCurrentContext();
 
-        auto node = GetNodeFromHandle(thiz);
+        auto node = GetNodeFromHandle(isolate, thiz);
 
-        auto element = CallbackHandlers::GetArrayElement(context, thiz, index, node->m_name);
+        auto element = CallbackHandlers::GetArrayElement(isolate, context, thiz, index, node->m_name);
 
         info.GetReturnValue().Set(element);
     } catch (NativeScriptException& e) {
@@ -1753,9 +1744,9 @@ Intercepted MetadataNode::ArrayIndexedPropertySetterCallback(uint32_t index, Loc
         auto isolate = info.GetIsolate();
         auto context = isolate->GetCurrentContext();
 
-        auto node = GetNodeFromHandle(thiz);
+        auto node = GetNodeFromHandle(isolate, thiz);
 
-        CallbackHandlers::SetArrayElement(context, thiz, index, node->m_name, value);
+        CallbackHandlers::SetArrayElement(isolate, context, thiz, index, node->m_name, value);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -1780,7 +1771,7 @@ Local<Object> MetadataNode::GetImplementationObject(Isolate* isolate, const Loca
     Local<Object> implementationObject;
 
     Local<Value> hiddenVal;
-    V8GetPrivateValue(isolate, object, V8StringConstants::GetImplementationObject(isolate), hiddenVal);
+    V8GetPrivateValue(isolate, object, V8StringConstants::GetImplementationObjectPrivate(isolate), hiddenVal);
     implementationObject = hiddenVal.As<Object>();
 
     if (!implementationObject.IsEmpty()) {
@@ -2496,12 +2487,12 @@ bool MetadataNode::GetExtendLocation(v8::Isolate* isolate, string& extendLocatio
     return true;
 }
 
-MetadataNode* MetadataNode::GetNodeFromHandle(const Local<Object>& value) {
+MetadataNode* MetadataNode::GetNodeFromHandle(Isolate* isolate, const Local<Object>& value) {
     auto target = ObjectManager::UnwrapProxy(value);
     if (!target->IsObject()) {
         return nullptr;
     }
-    auto node = GetInstanceMetadata(Isolate::GetCurrent(), target.As<Object>());
+    auto node = GetInstanceMetadata(isolate, target.As<Object>());
     return node;
 }
 

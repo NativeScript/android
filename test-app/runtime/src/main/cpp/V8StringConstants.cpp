@@ -52,6 +52,18 @@ Local<Private> V8StringConstants::GetNullObjectPrivate(Isolate* isolate) {
     return GetConstantsForIsolate(isolate)->NULL_OBJECT_PRIVATE.Get(isolate);
 }
 
+Local<Private> V8StringConstants::GetImplementationObjectPrivate(Isolate* isolate) {
+    return GetConstantsForIsolate(isolate)->IMPLEMENTATION_OBJECT_PRIVATE.Get(isolate);
+}
+
+Local<Private> V8StringConstants::GetSuperValuePrivate(Isolate* isolate) {
+    return GetConstantsForIsolate(isolate)->SUPER_VALUE_PRIVATE.Get(isolate);
+}
+
+Local<Private> V8StringConstants::GetTypeMetadataPrivate(Isolate* isolate) {
+    return GetConstantsForIsolate(isolate)->TYPE_METADATA_PRIVATE.Get(isolate);
+}
+
 Local<String> V8StringConstants::GetIsPrototypeImplementationObject(Isolate* isolate) {
     auto consts = GetConstantsForIsolate(isolate);
 

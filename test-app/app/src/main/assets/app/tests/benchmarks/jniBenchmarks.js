@@ -177,8 +177,15 @@ function buildBenchmarks() {
         twoInts: function (a, b) { },
         oneString: function (s) { },
         intReturn: function (a) { return a + 1; },
-        oneObject: function (o) { }
+        oneObject: function (o) { },
+        objectReturn: function () { return other; }
     });
+    var ints = Array.create("int", 16);
+    var objects = Array.create(java.lang.Object, 16);
+    for (var k = 0; k < 16; k++) {
+        ints[k] = k;
+        objects[k] = new java.lang.Object();
+    }
 
     return [
         function () {
@@ -408,6 +415,26 @@ function buildBenchmarks() {
             });
         },
         function () {
+            return measureJs("array get int[i]", 50000, function (n) {
+                var s = 0;
+                for (var i = 0; i < n; i++) s += ints[i & 15];
+                return s;
+            });
+        },
+        function () {
+            return measureJs("array set int[i]", 50000, function (n) {
+                for (var i = 0; i < n; i++) ints[i & 15] = i;
+                return n;
+            });
+        },
+        function () {
+            return measureJs("array get Object[i]", 50000, function (n) {
+                var s;
+                for (var i = 0; i < n; i++) s = objects[i & 15];
+                return s;
+            });
+        },
+        function () {
             return measureLifecycle("lifecycle new java.lang.Object()", 20000, function () {
                 return new java.lang.Object();
             });
@@ -470,6 +497,9 @@ function buildBenchmarks() {
         },
         function () {
             return measureCallback("callback.oneObject(binding)", callback, 7, 20000);
+        },
+        function () {
+            return measureCallback("callback.objectReturn() -> Object", callback, 8, 20000);
         }
     ];
 }

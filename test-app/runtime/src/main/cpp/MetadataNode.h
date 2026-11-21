@@ -53,7 +53,7 @@ class MetadataNode {
 
         v8::Local<v8::Object> CreateArrayWrapper(v8::Isolate* isolate);
 
-        static MetadataNode* GetNodeFromHandle(const v8::Local<v8::Object>& value);
+        static MetadataNode* GetNodeFromHandle(v8::Isolate* isolate, const v8::Local<v8::Object>& value);
 
         static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate* isolate, ObjectManager* objectManager, const std::string& proxyClassName);
 
@@ -278,14 +278,20 @@ class MetadataNode {
         };
 
         struct PropertyCallbackData {
-            PropertyCallbackData(std::string _propertyName, std::string _getterMethodName, std::string _setterMethodName)
+            PropertyCallbackData(v8::Isolate* isolate, const std::string& _propertyName, const std::string& getterMethodName, const std::string& setterMethodName)
                 :
-                    propertyName(_propertyName), getterMethodName(_getterMethodName), setterMethodName(_setterMethodName) {
-
+                    propertyName(_propertyName) {
+                if (!getterMethodName.empty()) {
+                    getterName.Reset(isolate, v8::String::NewFromUtf8(isolate, getterMethodName.c_str(), v8::NewStringType::kInternalized).ToLocalChecked());
+                }
+                if (!setterMethodName.empty()) {
+                    setterName.Reset(isolate, v8::String::NewFromUtf8(isolate, setterMethodName.c_str(), v8::NewStringType::kInternalized).ToLocalChecked());
+                }
             }
             std::string propertyName;
-            std::string getterMethodName;
-            std::string setterMethodName;
+            // Empty when the property has no such accessor.
+            v8::Global<v8::String> getterName;
+            v8::Global<v8::String> setterName;
         };
 
         struct ExtendedClassCallbackData {

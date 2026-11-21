@@ -9,10 +9,16 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-Local<Value> ArrayElementAccessor::GetArrayElement(Local<Context> context, const Local<Object>& array, uint32_t index, const string& arraySignature) {
+namespace {
+    // The element type of a primitive array's signature ("[I" -> 'I'), else '\0'.
+    char PrimitiveElementType(const string& arraySignature) {
+        return arraySignature.size() == 2 ? arraySignature[1] : '\0';
+    }
+}
+
+Local<Value> ArrayElementAccessor::GetArrayElement(Isolate* isolate, Local<Context> context, const Local<Object>& array, uint32_t index, const string& arraySignature) {
     JEnv env;
 
-    Isolate* isolate = v8::Isolate::GetCurrent();
     EscapableHandleScope handleScope(isolate);
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
@@ -25,61 +31,75 @@ Local<Value> ArrayElementAccessor::GetArrayElement(Local<Context> context, const
     jsize startIndex = index;
     const jsize length = 1;
 
-    const string elementSignature = arraySignature.substr(1);
-
-    if (elementSignature == "Z") {
-        jbooleanArray boolArr = static_cast<jbooleanArray>(arr);
-        jboolean boolArrValue;
-        env.GetBooleanArrayRegion(boolArr, startIndex, length, &boolArrValue);
-        value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &boolArrValue);
-    } else if (elementSignature == "B") {
-        jbyteArray byteArr = static_cast<jbyteArray>(arr);
-        jbyte byteArrValue;
-        env.GetByteArrayRegion(byteArr, startIndex, length, &byteArrValue);
-        value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &byteArrValue);
-    } else if (elementSignature == "C") {
-        jcharArray charArr = static_cast<jcharArray>(arr);
-        jchar charArrValue;
-        env.GetCharArrayRegion(charArr, startIndex, length, &charArrValue);
-        value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &charArrValue);
-    } else if (elementSignature == "S") {
-        jshortArray shortArr = static_cast<jshortArray>(arr);
-        jshort shortArrValue;
-        env.GetShortArrayRegion(shortArr, startIndex, length, &shortArrValue);
-        value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &shortArrValue);
-    } else if (elementSignature == "I") {
-        jintArray intArr = static_cast<jintArray>(arr);
-        jint intArrValue;
-        env.GetIntArrayRegion(intArr, startIndex, length, &intArrValue);
-        value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &intArrValue);
-    } else if (elementSignature == "J") {
-        jlongArray longArr = static_cast<jlongArray>(arr);
-        jlong longArrValue;
-        env.GetLongArrayRegion(longArr, startIndex, length, &longArrValue);
-        value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &longArrValue);
-    } else if (elementSignature == "F") {
-        jfloatArray floatArr = static_cast<jfloatArray>(arr);
-        jfloat floatArrValue;
-        env.GetFloatArrayRegion(floatArr, startIndex, length, &floatArrValue);
-        value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &floatArrValue);
-    } else if (elementSignature == "D") {
-        jdoubleArray doubleArr = static_cast<jdoubleArray>(arr);
-        jdouble doubleArrValue;
-        env.GetDoubleArrayRegion(doubleArr, startIndex, length, &doubleArrValue);
-        value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &doubleArrValue);
-    } else {
-        jobject result = env.GetObjectArrayElement(static_cast<jobjectArray>(arr), index);
-        value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &result);
-        env.DeleteLocalRef(result);
+    switch (PrimitiveElementType(arraySignature)) {
+        case 'Z': {
+            jboolean boolArrValue;
+            env.GetBooleanArrayRegion(static_cast<jbooleanArray>(arr), startIndex, length, &boolArrValue);
+            value = Boolean::New(isolate, boolArrValue);
+            break;
+        }
+        case 'B': {
+            jbyte byteArrValue;
+            env.GetByteArrayRegion(static_cast<jbyteArray>(arr), startIndex, length, &byteArrValue);
+            value = Integer::New(isolate, byteArrValue);
+            break;
+        }
+        case 'C': {
+            jchar charArrValue;
+            env.GetCharArrayRegion(static_cast<jcharArray>(arr), startIndex, length, &charArrValue);
+            value = ArgConverter::jcharToV8String(isolate, charArrValue);
+            break;
+        }
+        case 'S': {
+            jshort shortArrValue;
+            env.GetShortArrayRegion(static_cast<jshortArray>(arr), startIndex, length, &shortArrValue);
+            value = Integer::New(isolate, shortArrValue);
+            break;
+        }
+        case 'I': {
+            jint intArrValue;
+            env.GetIntArrayRegion(static_cast<jintArray>(arr), startIndex, length, &intArrValue);
+            value = Integer::New(isolate, intArrValue);
+            break;
+        }
+        case 'J': {
+            jlong longArrValue;
+            env.GetLongArrayRegion(static_cast<jlongArray>(arr), startIndex, length, &longArrValue);
+            value = ArgConverter::ConvertFromJavaLong(isolate, longArrValue);
+            break;
+        }
+        case 'F': {
+            jfloat floatArrValue;
+            env.GetFloatArrayRegion(static_cast<jfloatArray>(arr), startIndex, length, &floatArrValue);
+            value = Number::New(isolate, floatArrValue);
+            break;
+        }
+        case 'D': {
+            jdouble doubleArrValue;
+            env.GetDoubleArrayRegion(static_cast<jdoubleArray>(arr), startIndex, length, &doubleArrValue);
+            value = Number::New(isolate, doubleArrValue);
+            break;
+        }
+        default: {
+            jobject result = env.GetObjectArrayElement(static_cast<jobjectArray>(arr), index);
+            if (result == nullptr) {
+                value = Null(isolate);
+            } else if (arraySignature.compare(1, string::npos, "Ljava/lang/String;") == 0) {
+                value = ArgConverter::jstringToV8String(isolate, static_cast<jstring>(result));
+            } else {
+                value = objectManager->GetOrCreateJSWrapper(result);
+            }
+            env.DeleteLocalRef(result);
+            break;
+        }
     }
 
     return handleScope.Escape(value);
 }
 
-void ArrayElementAccessor::SetArrayElement(Local<Context> context, const Local<Object>& array, uint32_t index, const string& arraySignature, Local<Value>& value) {
+void ArrayElementAccessor::SetArrayElement(Isolate* isolate, Local<Context> context, const Local<Object>& array, uint32_t index, const string& arraySignature, Local<Value>& value) {
     JEnv env;
 
-    Isolate* isolate = v8::Isolate::GetCurrent();
     HandleScope handleScope(isolate);
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
@@ -88,29 +108,29 @@ void ArrayElementAccessor::SetArrayElement(Local<Context> context, const Local<O
 
     assertNonNullNativeArray(arr);
 
-    const string elementSignature = arraySignature.substr(1);
+    const char elementType = PrimitiveElementType(arraySignature);
 
-    if (elementSignature == "Z") { //bool
+    if (elementType == 'Z') { //bool
         jboolean boolElementValue = (jboolean) value->BooleanValue(isolate);
         jbooleanArray boolArr = static_cast<jbooleanArray>(arr);
         env.SetBooleanArrayRegion(boolArr, index, 1, &boolElementValue);
-    } else if (elementSignature == "B") { //byte
+    } else if (elementType == 'B') { //byte
         jbyte byteElementValue = (jbyte) value->Int32Value(context).ToChecked();
         jbyteArray byteArr = static_cast<jbyteArray>(arr);
         env.SetByteArrayRegion(byteArr, index, 1, &byteElementValue);
-    } else if (elementSignature == "C") { //char
+    } else if (elementType == 'C') { //char
         jchar charElementValue = ArgConverter::ToJavaChar(isolate, value->ToString(context).ToLocalChecked());
         jcharArray charArr = static_cast<jcharArray>(arr);
         env.SetCharArrayRegion(charArr, index, 1, &charElementValue);
-    } else if (elementSignature == "S") { //short
+    } else if (elementType == 'S') { //short
         jshort shortElementValue = (jshort) value->Int32Value(context).ToChecked();
         jshortArray shortArr = static_cast<jshortArray>(arr);
         env.SetShortArrayRegion(shortArr, index, 1, &shortElementValue);
-    } else if (elementSignature == "I") { //int
+    } else if (elementType == 'I') { //int
         jint intElementValue = value->Int32Value(context).ToChecked();
         jintArray intArr = static_cast<jintArray>(arr);
         env.SetIntArrayRegion(intArr, index, 1, &intElementValue);
-    } else if (elementSignature == "J") { //long
+    } else if (elementType == 'J') { //long
         jlong longElementValue;
         if (value->IsObject()) {
             longElementValue = (jlong) ArgConverter::ConvertToJavaLong(isolate, value);
@@ -119,11 +139,11 @@ void ArrayElementAccessor::SetArrayElement(Local<Context> context, const Local<O
         }
         jlongArray longArr = static_cast<jlongArray>(arr);
         env.SetLongArrayRegion(longArr, index, 1, &longElementValue);
-    } else if (elementSignature == "F") { //float
+    } else if (elementType == 'F') { //float
         jfloat floatElementValue = (jfloat) value->NumberValue(context).ToChecked();
         jfloatArray floatArr = static_cast<jfloatArray>(arr);
         env.SetFloatArrayRegion(floatArr, index, 1, &floatElementValue);
-    } else if (elementSignature == "D") { //double
+    } else if (elementType == 'D') { //double
         jdouble doubleElementValue = (jdouble) value->NumberValue(context).ToChecked();
         jdoubleArray doubleArr = static_cast<jdoubleArray>(arr);
         env.SetDoubleArrayRegion(doubleArr, index, 1, &doubleElementValue);
@@ -132,7 +152,7 @@ void ArrayElementAccessor::SetArrayElement(Local<Context> context, const Local<O
         if (isReferenceType) {
             auto object = value.As<Object>();
 
-            JsArgToArrayConverter argConverter(context, value, false, (int) Type::Null);
+            JsArgToArrayConverter argConverter(isolate, context, value, false, (int) Type::Null);
             if (argConverter.IsValid()) {
                 jobjectArray objArr = static_cast<jobjectArray>(arr);
                 jobject objectElementValue = argConverter.GetConvertedArg();
@@ -145,51 +165,6 @@ void ArrayElementAccessor::SetArrayElement(Local<Context> context, const Local<O
             throw NativeScriptException(string("Cannot assign primitive value to array of objects."));
         }
     }
-}
-
-Local<Value> ArrayElementAccessor::ConvertToJsValue(Isolate* isolate, ObjectManager* objectManager, JEnv& env, const string& elementSignature, const void* value) {
-    Local<Value> jsValue;
-
-    if (elementSignature == "Z") {
-        jsValue = Boolean::New(isolate, *(jboolean*) value);
-    } else if (elementSignature == "B") {
-        jsValue = Integer::New(isolate, *(jbyte*) value);
-    } else if (elementSignature == "C") {
-        jsValue = ArgConverter::jcharToV8String(isolate, *(jchar*) value);
-    } else if (elementSignature == "S") {
-        jsValue = Integer::New(isolate, *(jshort*) value);
-    } else if (elementSignature == "I") {
-        jsValue = Integer::New(isolate, *(jint*) value);
-    } else if (elementSignature == "J") {
-        jsValue = ArgConverter::ConvertFromJavaLong(isolate, *(jlong*) value);
-    } else if (elementSignature == "F") {
-        jsValue = Number::New(isolate, *(jfloat*) value);
-    } else if (elementSignature == "D") {
-        jsValue = Number::New(isolate, *(jdouble*) value);
-    } else {
-        if (nullptr != (*(jobject*) value)) {
-            bool isString = elementSignature == "Ljava/lang/String;";
-
-            if (isString) {
-                jsValue = ArgConverter::jstringToV8String(isolate, *(jstring*) value);
-            } else {
-                jint javaObjectID = objectManager->GetOrCreateObjectId(*(jobject*) value);
-                jsValue = objectManager->GetJsObjectByJavaObject(javaObjectID);
-
-                if (jsValue.IsEmpty()) {
-                    // Named after the element's runtime class, as a method result is: the
-                    // wrapper's name must be a JNI class name, and it is later read back as
-                    // the array signature of the element itself.
-                    auto className = objectManager->GetClassName(*(jobject*) value);
-                    jsValue = objectManager->CreateJSWrapper(javaObjectID, className);
-                }
-            }
-        } else {
-            jsValue = Null(isolate);
-        }
-    }
-
-    return jsValue;
 }
 
 void ArrayElementAccessor::assertNonNullNativeArray(tns::JniLocalRef& arrayReference) {
