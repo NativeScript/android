@@ -62,13 +62,18 @@ cd "$TEST_APP"
 # buildMetadata only registers its inputs when this dir exists at configuration
 # time, so a leftover one makes a release build reuse stale metadata.
 rm -rf app/build app/src/main/assets/metadata
+# Each flag set links into its own cxx/<config>/<hash>/ dir; removing the old
+# unstripped libraries leaves this build's as the only one to copy.
+if [ -d runtime/build/intermediates/cxx ]; then
+  find runtime/build/intermediates/cxx -path "*/obj/$ABI/libNativeScript.so" -delete
+fi
 nice -n 19 ./gradlew "${GRADLE_ARGS[@]}" "$@"
 
 APK=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
 [ -n "$APK" ] || die "no release APK was produced"
 cp "$APK" "$OUT/app.apk"
-SO=$(find runtime/build/intermediates/cxx -path "*/obj/$ABI/libNativeScript.so" -exec ls -t {} + | head -1)
-[ -n "$SO" ] || die "no unstripped libNativeScript.so for $ABI"
+SO=$(find runtime/build/intermediates/cxx -path "*/obj/$ABI/libNativeScript.so")
+[ -n "$SO" ] && [ "$(printf '%s\n' "$SO" | wc -l)" -eq 1 ] || die "expected one unstripped libNativeScript.so for $ABI, found: $SO"
 cp "$SO" "$OUT/libNativeScript.so"
 {
   printf 'commit=%s\n' "$(git -C "$REPO_ROOT" rev-parse HEAD)"
