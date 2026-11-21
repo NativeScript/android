@@ -1,7 +1,9 @@
 package com.tns;
 
+import android.app.ActivityManager;
 import android.app.Application;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -24,6 +26,8 @@ public final class RuntimeHelper {
     }
 
     private static AndroidJsV8Inspector v8Inspector;
+
+    private static final String ERROR_REPORT_ACTIVITY = "com.tns.ErrorReportActivity";
 
     // hasErrorIntent tells you if there was an event (with an uncaught
     // exception) raised from ErrorReport
@@ -48,7 +52,7 @@ public final class RuntimeHelper {
 
                 if (errFile.exists()) {
                     errFile.delete();
-                    hasErrorIntent = true;
+                    hasErrorIntent = isErrorActivityStarting(context);
                 }
             }
         } catch (Exception e) {
@@ -56,6 +60,35 @@ public final class RuntimeHelper {
         }
 
         return hasErrorIntent;
+    }
+
+    // The marker outlives a crash whose error activity never started (Android
+    // can block that start from the background), so it only counts when this
+    // process is starting for the error activity. Skipping runtime init for
+    // any other activity leaves it without a runtime.
+    private static boolean isErrorActivityStarting(Context context) {
+        try {
+            ActivityManager activityManager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+            if (activityManager == null) {
+                return true;
+            }
+            for (ActivityManager.AppTask task : activityManager.getAppTasks()) {
+                ActivityManager.RecentTaskInfo info = task.getTaskInfo();
+                ComponentName top;
+                if (Build.VERSION.SDK_INT >= 23) {
+                    top = info.topActivity;
+                } else {
+                    top = info.baseIntent != null ? info.baseIntent.getComponent() : null;
+                }
+                if (top != null && ERROR_REPORT_ACTIVITY.equals(top.getClassName())) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (Exception e) {
+            Log.d(logTag, "Could not tell which activity is starting: " + e.getMessage());
+            return true;
+        }
     }
 
     public static Runtime initRuntime(Context context) {
