@@ -98,7 +98,8 @@ class ObjectManager {
   void ReleaseUnwrappedArgs(const JavaCallArgs& args);
 
   // As GetJsObjectByJavaObject, but empty once the wrapper's link to the Java object was
-  // released.
+  // released. Ids are never reused, so an id read without the isolate lock that names a
+  // dead canary's record still names that record's object.
   v8::Local<v8::Object> GetLinkedJsObjectByJavaObject(int javaObjectID);
 
   v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID,

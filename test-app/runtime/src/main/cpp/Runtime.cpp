@@ -620,7 +620,7 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
   args.releasesAtStart = m_objectManager->ReleaseCount();
 
   // javaObjectID may be a hint read without the isolate lock; resolve it exactly when it
-  // does not name a linked wrapper.
+  // names neither a linked wrapper nor a canary that can be rebuilt.
   Local<Object> jsObject;
   if (javaObjectID != -1) {
     jsObject = m_objectManager->GetLinkedJsObjectByJavaObject(javaObjectID);

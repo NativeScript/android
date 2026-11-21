@@ -192,6 +192,29 @@ describe("Wrapper lifetime modes", function () {
         expect(runnable.ran).toBe(2);
     });
 
+    it("hands Java-held extended objects whose canaries died to a JS callback", function () {
+        var list = (function () {
+            var list = new java.util.ArrayList();
+            var ranks = [3, 1, 2];
+            for (var i = 0; i < ranks.length; i++) {
+                var runnable = new java.lang.Runnable({ run: function () {} });
+                runnable.rank = ranks[i];
+                list.add(runnable);
+            }
+            return list;
+        })();
+        collectBoth();
+        collectJava();
+
+        var comparator = new java.util.Comparator({
+            compare: function (a, b) {
+                return a.rank - b.rank;
+            }
+        });
+        java.util.Collections.sort(list, comparator);
+        expect([list.get(0).rank, list.get(1).rank, list.get(2).rank]).toEqual([1, 2, 3]);
+    });
+
     it("rebuilds an extend() instance with its class, super calls and state, more than once", function () {
         var Described = java.lang.Object.extend({
             toString: function () {
