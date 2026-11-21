@@ -70,6 +70,17 @@ class ArgConverter {
                 return v8String;
         }
 
+        // The Java char for a JS string: its first UTF-16 code unit, or U+0000 for an
+        // empty string. A character outside the BMP yields its high surrogate.
+        inline static jchar ToJavaChar(v8::Isolate* isolate, const v8::Local<v8::String>& value) {
+                if (value->Length() == 0) {
+                        return 0;
+                }
+                uint16_t unit;
+                value->WriteV2(isolate, 0, 1, &unit);
+                return static_cast<jchar>(unit);
+        }
+
         // For property keys: an internalized key skips the string-table insert a
         // fresh key costs on every property lookup.
         static v8::Local<v8::String> jstringToInternalizedV8String(v8::Isolate* isolate, JNIEnv* env, jstring value) {

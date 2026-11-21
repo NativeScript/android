@@ -26,7 +26,6 @@ Local<Value> ArrayElementAccessor::GetArrayElement(Local<Context> context, const
     const jsize length = 1;
 
     const string elementSignature = arraySignature.substr(1);
-    jboolean isCopy = false;
 
     if (elementSignature == "Z") {
         jbooleanArray boolArr = static_cast<jbooleanArray>(arr);
@@ -42,10 +41,7 @@ Local<Value> ArrayElementAccessor::GetArrayElement(Local<Context> context, const
         jcharArray charArr = static_cast<jcharArray>(arr);
         jchar charArrValue;
         env.GetCharArrayRegion(charArr, startIndex, length, &charArrValue);
-        JniLocalRef s(env.NewString(&charArrValue, 1));
-        const char* singleChar = env.GetStringUTFChars(s, &isCopy);
-        value = ConvertToJsValue(isolate, objectManager, env, elementSignature, singleChar);
-        env.ReleaseStringUTFChars(s, singleChar);
+        value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &charArrValue);
     } else if (elementSignature == "S") {
         jshortArray shortArr = static_cast<jshortArray>(arr);
         jshort shortArrValue;
@@ -93,7 +89,6 @@ void ArrayElementAccessor::SetArrayElement(Local<Context> context, const Local<O
     assertNonNullNativeArray(arr);
 
     const string elementSignature = arraySignature.substr(1);
-    jboolean isCopy = false;
 
     if (elementSignature == "Z") { //bool
         jboolean boolElementValue = (jboolean) value->BooleanValue(isolate);
@@ -104,11 +99,7 @@ void ArrayElementAccessor::SetArrayElement(Local<Context> context, const Local<O
         jbyteArray byteArr = static_cast<jbyteArray>(arr);
         env.SetByteArrayRegion(byteArr, index, 1, &byteElementValue);
     } else if (elementSignature == "C") { //char
-        String::Utf8Value utf8(isolate, value->ToString(context).ToLocalChecked());
-        JniLocalRef s(env.NewString((jchar*) *utf8, 1));
-        const char* singleChar = env.GetStringUTFChars(s, &isCopy);
-        jchar charElementValue = *singleChar;
-        env.ReleaseStringUTFChars(s, singleChar);
+        jchar charElementValue = ArgConverter::ToJavaChar(isolate, value->ToString(context).ToLocalChecked());
         jcharArray charArr = static_cast<jcharArray>(arr);
         env.SetCharArrayRegion(charArr, index, 1, &charElementValue);
     } else if (elementSignature == "S") { //short
@@ -164,7 +155,7 @@ Local<Value> ArrayElementAccessor::ConvertToJsValue(Isolate* isolate, ObjectMana
     } else if (elementSignature == "B") {
         jsValue = Integer::New(isolate, *(jbyte*) value);
     } else if (elementSignature == "C") {
-        jsValue = ArgConverter::ConvertToV8String(isolate, (const char*) value, 1);
+        jsValue = ArgConverter::jcharToV8String(isolate, *(jchar*) value);
     } else if (elementSignature == "S") {
         jsValue = Integer::New(isolate, *(jshort*) value);
     } else if (elementSignature == "I") {
