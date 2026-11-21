@@ -53,7 +53,7 @@ class MetadataNode {
 
         v8::Local<v8::Object> CreateArrayWrapper(v8::Isolate* isolate);
 
-        static MetadataNode* GetNodeFromHandle(const v8::Local<v8::Object>& value);
+        static MetadataNode* GetNodeFromHandle(v8::Isolate* isolate, const v8::Local<v8::Object>& value);
 
         static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate* isolate, ObjectManager* objectManager, const std::string& proxyClassName);
 

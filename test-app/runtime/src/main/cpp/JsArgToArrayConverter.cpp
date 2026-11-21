@@ -17,9 +17,10 @@ using namespace tns;
 /*
  * Converts a single JavaScript (V8) object to its respective Java representation
  */
-JsArgToArrayConverter::JsArgToArrayConverter(Local<Context> context, const v8::Local<Value> &arg,
+JsArgToArrayConverter::JsArgToArrayConverter(Isolate *isolate, Local<Context> context,
+                                             const v8::Local<Value> &arg,
                                              bool isImplementationObject, int classReturnType)
-        : m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()),
+        : m_isolate(isolate), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()),
           m_return_type(classReturnType) {
     if (!isImplementationObject) {
         m_argsLen = 1;
@@ -35,7 +36,7 @@ JsArgToArrayConverter::JsArgToArrayConverter(Local<Context> context, const v8::L
  */
 JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value> &args,
                                              bool hasImplementationObject)
-        : m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()),
+        : m_isolate(args.GetIsolate()), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()),
           m_return_type(static_cast<int>(Type::Null)) {
     m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 2;
 
@@ -45,7 +46,7 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Valu
         m_argsAsObject = new jobject[m_argsLen];
         memset(m_argsAsObject, 0, m_argsLen * sizeof(jobject));
 
-        auto context = args.GetIsolate()->GetCurrentContext();
+        auto context = m_isolate->GetCurrentContext();
         for (int i = 0; i < m_argsLen; i++) {
             success = ConvertArg(context, args[i], i);
 
@@ -65,7 +66,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
     JEnv env;
 
     Type returnType = JType::getClassType(m_return_type);
-    auto isolate = v8::Isolate::GetCurrent();
+    auto isolate = m_isolate;
 
     // A Proxy's target is what holds the Java link.
     auto arg = jsArg.IsEmpty() ? jsArg : ObjectManager::UnwrapProxy(jsArg);
@@ -136,7 +137,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
 
         success = true;
     } else if (arg->IsString() || arg->IsStringObject()) {
-        auto stringObject = ArgConverter::ConvertToJavaString(arg);
+        auto stringObject = ArgConverter::ConvertToJavaString(isolate, arg);
         SetConvertedObject(env, index, stringObject);
 
         success = true;
@@ -160,7 +161,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
 
         switch (castType) {
             case CastType::Char:
-                castValue = NumericCasts::GetCastValue(jsObj);
+                castValue = NumericCasts::GetCastValue(isolate, jsObj);
                 charValue = '\0';
                 if (castValue->IsString()) {
                     string str = ArgConverter::ConvertToString(
@@ -173,7 +174,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                 break;
 
             case CastType::Byte:
-                castValue = NumericCasts::GetCastValue(jsObj);
+                castValue = NumericCasts::GetCastValue(isolate, jsObj);
                 byteValue = 0;
                 if (castValue->IsString()) {
                     string value = ArgConverter::ConvertToString(
@@ -191,7 +192,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                 break;
 
             case CastType::Short:
-                castValue = NumericCasts::GetCastValue(jsObj);
+                castValue = NumericCasts::GetCastValue(isolate, jsObj);
                 shortValue = 0;
                 if (castValue->IsString()) {
                     string value = ArgConverter::ConvertToString(
@@ -209,7 +210,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                 break;
 
             case CastType::Long:
-                castValue = NumericCasts::GetCastValue(jsObj);
+                castValue = NumericCasts::GetCastValue(isolate, jsObj);
                 longValue = 0;
                 if (castValue->IsString()) {
                     auto strValue = ArgConverter::ConvertToString(
@@ -225,7 +226,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                 break;
 
             case CastType::Float:
-                castValue = NumericCasts::GetCastValue(jsObj);
+                castValue = NumericCasts::GetCastValue(isolate, jsObj);
                 floatValue = 0;
                 if (castValue->IsNumber()) {
                     double floatArg = castValue->ToNumber(context).ToLocalChecked()->NumberValue(
@@ -238,7 +239,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                 break;
 
             case CastType::Double:
-                castValue = NumericCasts::GetCastValue(jsObj);
+                castValue = NumericCasts::GetCastValue(isolate, jsObj);
                 doubleValue = 0;
                 if (castValue->IsNumber()) {
                     double doubleArg = castValue->ToNumber(context).ToLocalChecked()->NumberValue(

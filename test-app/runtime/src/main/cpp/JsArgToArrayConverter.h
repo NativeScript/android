@@ -12,7 +12,7 @@ class JsArgToArrayConverter {
     public:
         JsArgToArrayConverter(const v8::FunctionCallbackInfo<v8::Value>& args, bool hasImplementationObject);
 
-        JsArgToArrayConverter(v8::Local<v8::Context> context, const v8::Local<v8::Value>& arg, bool isImplementationObject, int classReturnType);
+        JsArgToArrayConverter(v8::Isolate* isolate, v8::Local<v8::Context> context, const v8::Local<v8::Value>& arg, bool isImplementationObject, int classReturnType);
 
         ~JsArgToArrayConverter();
 
@@ -41,6 +41,8 @@ class JsArgToArrayConverter {
         bool ConvertArg(v8::Local<v8::Context> context, const v8::Local<v8::Value>& jsArg, int index);
 
         void SetConvertedObject(JEnv& env, int index, jobject obj, bool isGlobal = false);
+
+        v8::Isolate* m_isolate;
 
         int m_argsLen;
 

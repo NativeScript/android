@@ -1262,7 +1262,7 @@ jobject Runtime::ConvertJsValueToJavaObject(JEnv& env,
                                             int classReturnType) {
   auto context = this->GetContext();
   JsArgToArrayConverter argConverter(
-      context, value, false /*is implementation object*/, classReturnType);
+      m_isolate, context, value, false /*is implementation object*/, classReturnType);
   jobject jr = argConverter.GetConvertedArg();
   jobject javaResult = nullptr;
   if (jr != nullptr) {
