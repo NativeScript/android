@@ -334,9 +334,7 @@ bool JsArgConverter::ConvertArg(const Local<Value> &jsArg, int index) {
             case CastType::Char:
                 castValue = NumericCasts::GetCastValue(jsObject);
                 if (castValue->IsString()) {
-                    string value = ArgConverter::ConvertToString(
-                            castValue->ToString(context).ToLocalChecked());
-                    m_args[index].c = (jchar) value[0];
+                    m_args[index].c = ArgConverter::ToJavaChar(m_isolate, castValue.As<String>());
                     success = true;
                 }
                 break;
@@ -559,6 +557,14 @@ bool JsArgConverter::ConvertJavaScriptBoolean(const Local<Value> &jsValue, int i
 }
 
 bool JsArgConverter::ConvertJavaScriptString(const Local<Value> &jsValue, int index) {
+    if (m_tokens->at(index) == "C") {
+        Local<String> str = jsValue->IsStringObject()
+                ? jsValue.As<StringObject>()->ValueOf()
+                : jsValue.As<String>();
+        m_args[index].c = ArgConverter::ToJavaChar(m_isolate, str);
+        return true;
+    }
+
     jstring stringObject = ArgConverter::ConvertToJavaString(jsValue);
     SetConvertedObject(index, stringObject);
 
@@ -627,11 +633,7 @@ bool JsArgConverter::ConvertJavaScriptArray(const Local<Object> &source, size_t 
                 if (!elementAt(i, element) || !element->ToString(context).ToLocal(&str)) {
                     return false;
                 }
-                String::Utf8Value utf8(m_isolate, str);
-                JniLocalRef s(env.NewString((jchar *) *utf8, 1));
-                const char *singleChar = env.GetStringUTFChars(s, nullptr);
-                chars[i] = *singleChar;
-                env.ReleaseStringUTFChars(s, singleChar);
+                chars[i] = ArgConverter::ToJavaChar(m_isolate, str);
             }
             arr = env.NewCharArray(arrLength);
             env.SetCharArrayRegion((jcharArray) arr, 0, arrLength, chars.data());

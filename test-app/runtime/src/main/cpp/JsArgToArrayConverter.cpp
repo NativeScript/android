@@ -163,9 +163,7 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
                 castValue = NumericCasts::GetCastValue(jsObj);
                 charValue = '\0';
                 if (castValue->IsString()) {
-                    string str = ArgConverter::ConvertToString(
-                            castValue->ToString(context).ToLocalChecked());
-                    charValue = (jchar) str[0];
+                    charValue = ArgConverter::ToJavaChar(isolate, castValue.As<String>());
                 }
                 javaObject = JType::NewChar(env, charValue);
                 SetConvertedObject(env, index, javaObject);

@@ -252,17 +252,12 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
             break;
         }
         case 'C': { //char
-            //TODO: validate value is a single char
-            String::Utf8Value stringValue(isolate, value->ToString(context).ToLocalChecked());
-            JniLocalRef strValue(env.NewStringUTF(*stringValue));
-            const char* chars = env.GetStringUTFChars(strValue, 0);
-
+            jchar charValue = ArgConverter::ToJavaChar(isolate, value->ToString(context).ToLocalChecked());
             if (isStatic) {
-                env.SetStaticCharField(clazz, fieldId, chars[0]);
+                env.SetStaticCharField(clazz, fieldId, charValue);
             } else {
-                env.SetCharField(targetJavaObject, fieldId, chars[0]);
+                env.SetCharField(targetJavaObject, fieldId, charValue);
             }
-            env.ReleaseStringUTFChars(strValue, chars);
             break;
         }
         case 'S': { //short
