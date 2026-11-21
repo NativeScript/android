@@ -150,4 +150,26 @@ describe("Tests instancing java arrays", function () {
 		var expectedArrayClassName = Array(count+2).join("[") + typename;
 		expect(arr.getClass().getName()).toBe(expectedArrayClassName);
 	});
+
+	it("should read and write elements of nested arrays", function () {
+		var strings = java.lang.reflect.Array.newInstance(java.lang.String.class, [2, 3]);
+		var row = strings[1];
+		expect(row.length).toBe(3);
+		expect(row[2]).toBe(null);
+		row[2] = "x";
+		expect(strings[1][2]).toBe("x");
+		expect(strings[1]).toBe(row);
+
+		var ints = java.lang.reflect.Array.newInstance(java.lang.Integer.TYPE, [2, 3]);
+		ints[0][1] = 7;
+		expect(ints[0][1]).toBe(7);
+		expect(ints[1].getClass().getName()).toBe("[I");
+	});
+
+	it("should read Java class and null elements of an Object array", function () {
+		var arr = Array.create(java.lang.Object, 2);
+		arr[0] = java.lang.String.class;
+		expect(arr[0].getName()).toBe("java.lang.String");
+		expect(arr[1]).toBe(null);
+	});
 });

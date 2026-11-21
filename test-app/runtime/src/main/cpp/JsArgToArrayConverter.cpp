@@ -20,12 +20,11 @@ using namespace tns;
 JsArgToArrayConverter::JsArgToArrayConverter(Isolate *isolate, Local<Context> context,
                                              const v8::Local<Value> &arg,
                                              bool isImplementationObject, int classReturnType)
-        : m_isolate(isolate), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()),
+        : m_isolate(isolate), m_arr(nullptr), m_args(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()),
           m_return_type(classReturnType) {
     if (!isImplementationObject) {
         m_argsLen = 1;
-        m_argsAsObject = new jobject[m_argsLen];
-        memset(m_argsAsObject, 0, m_argsLen * sizeof(jobject));
+        m_args = &m_inlineArg;
 
         m_isValid = ConvertArg(context, arg, 0);
     }
@@ -36,15 +35,14 @@ JsArgToArrayConverter::JsArgToArrayConverter(Isolate *isolate, Local<Context> co
  */
 JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value> &args,
                                              bool hasImplementationObject)
-        : m_isolate(args.GetIsolate()), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()),
+        : m_isolate(args.GetIsolate()), m_arr(nullptr), m_args(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()),
           m_return_type(static_cast<int>(Type::Null)) {
     m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 2;
 
     bool success = true;
 
     if (m_argsLen > 0) {
-        m_argsAsObject = new jobject[m_argsLen];
-        memset(m_argsAsObject, 0, m_argsLen * sizeof(jobject));
+        m_args = new ConvertedArg[m_argsLen]();
 
         auto context = m_isolate->GetCurrentContext();
         for (int i = 0; i < m_argsLen; i++) {
@@ -318,14 +316,29 @@ bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value
 }
 
 jobject JsArgToArrayConverter::GetConvertedArg() {
-    return (m_argsLen > 0) ? m_argsAsObject[0] : nullptr;
+    return (m_argsLen > 0) ? m_args[0].obj : nullptr;
+}
+
+jobject JsArgToArrayConverter::ReleaseConvertedArg() {
+    if (m_argsLen <= 0 || m_args[0].obj == nullptr) {
+        return nullptr;
+    }
+
+    auto &arg = m_args[0];
+    if (arg.ownsLocalRef) {
+        arg.ownsLocalRef = false;
+        auto obj = arg.obj;
+        arg.obj = nullptr;
+        return obj;
+    }
+
+    JEnv env;
+    return env.NewLocalRef(arg.obj);
 }
 
 void JsArgToArrayConverter::SetConvertedObject(JEnv &env, int index, jobject obj, bool isGlobal) {
-    m_argsAsObject[index] = obj;
-    if ((obj != nullptr) && !isGlobal) {
-        m_storedIndexes.push_back(index);
-    }
+    m_args[index].obj = obj;
+    m_args[index].ownsLocalRef = (obj != nullptr) && !isGlobal;
 }
 
 int JsArgToArrayConverter::Length() const {
@@ -361,7 +374,7 @@ jobjectArray JsArgToArrayConverter::ToJavaArray() {
         m_arr = (jobjectArray) env.NewGlobalRef(tmpArr);
 
         for (int i = 0; i < m_argsLen; i++) {
-            env.SetObjectArrayElement(m_arr, i, m_argsAsObject[i]);
+            env.SetObjectArrayElement(m_arr, i, m_args[i].obj);
         }
     }
 
@@ -372,15 +385,19 @@ JsArgToArrayConverter::~JsArgToArrayConverter() {
     if (m_argsLen > 0) {
         JEnv env;
 
-        env.DeleteGlobalRef(m_arr);
-
-        int length = m_storedIndexes.size();
-        for (int i = 0; i < length; i++) {
-            int index = m_storedIndexes[i];
-            env.DeleteLocalRef(m_argsAsObject[index]);
+        if (m_arr != nullptr) {
+            env.DeleteGlobalRef(m_arr);
         }
 
-        delete[] m_argsAsObject;
+        for (int i = 0; i < m_argsLen; i++) {
+            if (m_args[i].ownsLocalRef) {
+                env.DeleteLocalRef(m_args[i].obj);
+            }
+        }
+
+        if (m_args != &m_inlineArg) {
+            delete[] m_args;
+        }
     }
 }
 

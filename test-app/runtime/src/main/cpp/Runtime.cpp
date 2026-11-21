@@ -701,20 +701,21 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
   m_objectManager->FlushFinalizedBatchIfPending();
   m_objectManager->RegisterStrong(javaObject, javaObjectID);
 
-  string existingClassName = ArgConverter::jstringToString(className);
-  string jniName = Util::ConvertFromCanonicalToJniName(existingClassName);
+  // Java passes javaObject.getClass().getName(), the name
+  // ObjectManager::GetClassName(javaObject) would read back through JNI.
+  string jniName = Util::ConvertFromCanonicalToJniName(
+      ArgConverter::jstringToString(className));
   Local<Object> jsInstance;
   Local<Object> implementationObject;
 
-  auto proxyClassName = m_objectManager->GetClassName(javaObject);
-  DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
+  DEBUG_WRITE("createJSInstanceNative class %s", jniName.c_str());
   jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager,
-                                                     proxyClassName);
+                                                     jniName);
 
   if (jsInstance.IsEmpty()) {
     throw NativeScriptException(
         string("Failed to create JavaScript extend wrapper for class '" +
-               proxyClassName + "'"));
+               jniName + "'"));
   }
 
   implementationObject =
@@ -1257,13 +1258,7 @@ jobject Runtime::ConvertJsValueToJavaObject(JEnv& env,
   auto context = this->GetContext();
   JsArgToArrayConverter argConverter(
       m_isolate, context, value, false /*is implementation object*/, classReturnType);
-  jobject jr = argConverter.GetConvertedArg();
-  jobject javaResult = nullptr;
-  if (jr != nullptr) {
-    javaResult = env.NewLocalRef(jr);
-  }
-
-  return javaResult;
+  return argConverter.ReleaseConvertedArg();
 }
 
 void Runtime::SetManualInstrumentationMode(jstring mode) {
