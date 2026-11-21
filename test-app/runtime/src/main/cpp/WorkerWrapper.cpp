@@ -264,7 +264,9 @@ void WorkerWrapper::Terminate() {
     {
         // A worker paused at a breakpoint sits in the inspector's nested pause
         // loop, not in Looper.loop() - kick it loose so TerminateExecution and
-        // the looper quit below can take effect.
+        // the looper quit below can take effect. A pause entered while
+        // ConsoleLog holds inspectorMutex_ has already left on isTerminating_,
+        // set above: this lock is only granted once that ConsoleLog returns.
         std::lock_guard<std::recursive_mutex> lock(inspectorMutex_);
         if (inspector_ != nullptr) {
             inspector_->NotifyTerminating();
@@ -962,7 +964,8 @@ void WorkerWrapper::CreateInspector(Isolate* isolate) {
                               ? workerPath_
                               : "file://" + workerPath_;
 
-    auto* client = new WorkerInspectorClient(workerId_, isolate, ALooper_forThread(), url);
+    auto* client = new WorkerInspectorClient(workerId_, isolate, ALooper_forThread(), url,
+                                             isTerminating_);
     {
         std::lock_guard<std::recursive_mutex> lock(inspectorMutex_);
         inspector_ = client;
