@@ -553,6 +553,9 @@ exports.run = function () {
     var contentionIndex = 0;
     function runContention() {
         if (contentionIndex >= contention.length) {
+            if (typeof global.__nsPgoDump === "function") {
+                global.__nsPgoDump("bench");
+            }
             console.log("JNIBENCH_DONE " + JSON.stringify(results));
             return;
         }

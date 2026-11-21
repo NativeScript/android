@@ -13,7 +13,19 @@ global.__onUncaughtError = function(error){
 	return true;
 }
 
+// Release APKs are not debuggable, so `run-as` cannot read the app's data
+// directory; the external files dir is readable with a plain `adb pull`.
+global.__nsPgoDump = function (tag) {
+	if (typeof __pgoDump !== "function") {
+		return;
+	}
+	var dir = com.tns.NativeScriptApplication.getInstance().getExternalFilesDir(null).getAbsolutePath();
+	var rc = __pgoDump(dir + "/ns-" + tag + ".profraw");
+	console.log("PGO_DUMP " + tag + " rc=" + rc + " " + dir);
+};
+
 global.__JUnitSaveResults = function (unitTestResults) {
+	global.__nsPgoDump("suite");
 	var pathToApp = '/data/data/com.tns.testapplication';
 	var unitTestFileName = 'android_unit_test_results.xml';
 	try {

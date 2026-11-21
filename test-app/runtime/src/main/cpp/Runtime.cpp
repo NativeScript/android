@@ -34,6 +34,7 @@
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
 #include "NativeScriptPlatform.h"
+#include "PgoHooks.h"
 #include "RuntimeState.h"
 #include "napi/NapiEnv.h"
 #include "Performance.h"
@@ -1042,6 +1043,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   globalTemplate->Set(
       ArgConverter::ConvertToV8String(isolate, "__time"),
       FunctionTemplate::New(isolate, CallbackHandlers::TimeCallback));
+  InstallPgoHooks(isolate, globalTemplate);
 
   // queueMicrotask(callback) per spec:
   // https://developer.mozilla.org/en-US/docs/Web/API/Window/queueMicrotask

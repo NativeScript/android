@@ -224,6 +224,7 @@ add_library(
         src/main/cpp/NumericCasts.cpp
         src/main/cpp/ObjectManager.cpp
         src/main/cpp/Performance.cpp
+        src/main/cpp/PgoHooks.cpp
         src/main/cpp/Profiler.cpp
         src/main/cpp/ReadWriteLock.cpp
         src/main/cpp/Runtime.cpp
