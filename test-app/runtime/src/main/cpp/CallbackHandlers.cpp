@@ -253,7 +253,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
             instance = env.NewObject(generatedJavaClass, mi.mid);
         } else {
             // resolve arguments before passing them on to the constructor
-            JsArgConverter argConverter(argWrapper.args, mi.signature);
+            JsArgConverter argConverter(argWrapper.args, mi.parsedSig);
             auto ctorArgs = argConverter.ToArgs();
 
             instance = env.NewObjectA(generatedJavaClass, mi.mid, ctorArgs);
@@ -505,9 +505,10 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                     methodName.c_str());
     }
 
+    const std::vector<std::string> *parsedSig = mi != nullptr ? &mi->parsedSig : nullptr;
     JsArgConverter argConverter = (entry != nullptr && entry->isExtensionFunction)
-                                        ? JsArgConverter(caller, args, *sig, entry)
-                                        : JsArgConverter(args, false, *sig, entry);
+                                        ? JsArgConverter(caller, args, *sig, entry, parsedSig)
+                                        : JsArgConverter(args, false, *sig, entry, parsedSig);
 
 
     if (!argConverter.IsValid()) {

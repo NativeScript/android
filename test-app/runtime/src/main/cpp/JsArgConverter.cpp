@@ -89,25 +89,33 @@ namespace {
     }
 }
 
+void JsArgConverter::SetTokens(const string &methodSignature, MetadataEntry *entry,
+                               const std::vector<std::string> *parsedSignature) {
+    if (parsedSignature != nullptr) {
+        m_tokens = parsedSignature;
+    } else if ((entry != nullptr) && (entry->getIsResolved())) {
+        if (entry->parsedSig.empty()) {
+            JniSignatureParser parser(methodSignature);
+            entry->parsedSig = parser.Parse();
+        }
+        m_tokens = &entry->parsedSig;
+    } else {
+        JniSignatureParser parser(methodSignature);
+        m_ownedTokens = parser.Parse();
+    }
+}
+
 JsArgConverter::JsArgConverter(const Local<Object> &caller,
                                const v8::FunctionCallbackInfo<Value> &args,
-                               const string &methodSignature, MetadataEntry *entry)
+                               const string &methodSignature, MetadataEntry *entry,
+                               const std::vector<std::string> *parsedSignature)
         : m_isolate(args.GetIsolate()), m_isValid(true),
           m_error(Error()) {
     int v8ProvidedArgumentsLength = args.Length();
     m_argsLen = 1 + v8ProvidedArgumentsLength;
 
     if (m_argsLen > 0) {
-        if ((entry != nullptr) && (entry->getIsResolved())) {
-            if (entry->parsedSig.empty()) {
-                JniSignatureParser parser(methodSignature);
-                entry->parsedSig = parser.Parse();
-            }
-            m_tokens = &entry->parsedSig;
-        } else {
-            JniSignatureParser parser(methodSignature);
-            m_ownedTokens = parser.Parse();
-        }
+        SetTokens(methodSignature, entry, parsedSignature);
 
         m_isValid = ConvertArg(caller, 0);
 
@@ -127,22 +135,14 @@ JsArgConverter::JsArgConverter(const Local<Object> &caller,
 
 JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
                                bool hasImplementationObject, const string &methodSignature,
-                               MetadataEntry *entry)
+                               MetadataEntry *entry,
+                               const std::vector<std::string> *parsedSignature)
         : m_isolate(args.GetIsolate()), m_isValid(true),
           m_error(Error()) {
     m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 1;
 
     if (m_argsLen > 0) {
-        if ((entry != nullptr) && (entry->getIsResolved())) {
-            if (entry->parsedSig.empty()) {
-                JniSignatureParser parser(methodSignature);
-                entry->parsedSig = parser.Parse();
-            }
-            m_tokens = &entry->parsedSig;
-        } else {
-            JniSignatureParser parser(methodSignature);
-            m_ownedTokens = parser.Parse();
-        }
+        SetTokens(methodSignature, entry, parsedSignature);
 
         for (int i = 0; i < m_argsLen; i++) {
             m_isValid = ConvertArg(args[i], i);
@@ -155,15 +155,10 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
 }
 
 JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value> &args,
-                               const string &methodSignature)
+                               const std::vector<std::string> &parsedSignature)
         : m_isolate(args.GetIsolate()), m_isValid(true),
-          m_error(Error()) {
+          m_tokens(&parsedSignature), m_error(Error()) {
     m_argsLen = args.Length();
-
-    if (m_argsLen > 0) {
-        JniSignatureParser parser(methodSignature);
-        m_ownedTokens = parser.Parse();
-    }
 
     for (int i = 0; i < m_argsLen; i++) {
         m_isValid = ConvertArg(args[i], i);

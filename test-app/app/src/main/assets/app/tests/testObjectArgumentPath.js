@@ -74,4 +74,14 @@ describe("Object arguments and cached call signatures", function () {
 			expect(java.lang.Long.toHexString(long("4294967296"))).toBe("100000000");
 		}
 	});
+
+	it("constructs through each overload on a warm constructor cache", function () {
+		for (var i = 0; i < 3; i++) {
+			expect(new java.lang.StringBuilder("ab").toString()).toBe("ab");
+			expect(new java.lang.StringBuilder(32).capacity()).toBe(32);
+			expect(new java.lang.StringBuilder(new java.lang.StringBuilder("cs")).toString()).toBe("cs");
+			var plain = new java.lang.Object();
+			expect(plain.getClass().getName()).toBe("java.lang.Object");
+		}
+	});
 });

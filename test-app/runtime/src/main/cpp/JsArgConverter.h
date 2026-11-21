@@ -24,11 +24,14 @@ namespace tns {
     class JsArgConverter {
     public:
 
-        JsArgConverter(const v8::Local<v8::Object>& caller, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& methodSignature, MetadataEntry* entry);
+        // parsedSignature, when given, is methodSignature already parsed and must outlive the
+        // converter.
+        JsArgConverter(const v8::Local<v8::Object>& caller, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& methodSignature, MetadataEntry* entry, const std::vector<std::string>* parsedSignature = nullptr);
 
-        JsArgConverter(const v8::FunctionCallbackInfo<v8::Value>& args, bool hasImplementationObject, const std::string& methodSignature, MetadataEntry* entry);
+        JsArgConverter(const v8::FunctionCallbackInfo<v8::Value>& args, bool hasImplementationObject, const std::string& methodSignature, MetadataEntry* entry, const std::vector<std::string>* parsedSignature = nullptr);
 
-        JsArgConverter(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& methodSignature);
+        // parsedSignature must outlive the converter.
+        JsArgConverter(const v8::FunctionCallbackInfo<v8::Value>& args, const std::vector<std::string>& parsedSignature);
 
         JsArgConverter(const JsArgConverter&) = delete;
 
@@ -68,6 +71,8 @@ namespace tns {
         static JniLocalRef GetOrLinkJavaBuffer(ObjectManager* objectManager, const v8::Local<v8::Object>& object);
 
     private:
+
+        void SetTokens(const std::string& methodSignature, MetadataEntry* entry, const std::vector<std::string>* parsedSignature);
 
         bool ConvertArg(const v8::Local<v8::Value>& jsArg, int index);
 
