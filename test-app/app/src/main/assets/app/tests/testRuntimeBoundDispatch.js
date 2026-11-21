@@ -18,11 +18,24 @@ describe("Runtime-bound Java->JS dispatch", function () {
     }
 
     var originalTimeout;
+    // Set by a spec whose comparer threads and polls must not outlive it, even
+    // when jasmine times it out.
+    var comparingWorker = null;
+    // One per spec: a callback checks the token its spec captured, so a poll left
+    // pending by a timed-out spec stays cancelled once the next spec starts.
+    var currentSpec = null;
     beforeEach(function () {
         originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
+        currentSpec = { ended: false };
     });
     afterEach(function () {
+        currentSpec.ended = true;
+        if (comparingWorker !== null) {
+            comparingWorker.terminate();
+            comparingWorker = null;
+            Holder.stopComparing(5000);
+        }
         jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
         Holder.clear();
     });
@@ -65,11 +78,15 @@ describe("Runtime-bound Java->JS dispatch", function () {
     });
 
     it("drops calls to an object whose worker has terminated", function (done) {
+        var spec = currentSpec;
         startWorker(function (worker) {
             worker.terminate();
 
             var deadline = Date.now() + 10000;
             (function poll() {
+                if (spec.ended) {
+                    return;
+                }
                 // Until teardown completes a call may still be answered.
                 var result;
                 try {
@@ -89,6 +106,59 @@ describe("Runtime-bound Java->JS dispatch", function () {
                     setTimeout(poll, 50);
                 }
             })();
+        });
+    });
+
+    // Callers on other threads take the worker's isolate while it terminates: each call is
+    // answered or dropped, never run against an isolate that is being torn down.
+    it("answers or drops calls other threads make while the worker terminates", function (done) {
+        if (!multithreaded) {
+            // Calls are posted to the worker's looper in this mode, not run under its lock.
+            pending("needs android.enableMultithreadedJavascript");
+        }
+
+        var spec = currentSpec;
+        // Each wait well inside the spec timeout, so a hang fails with its cause.
+        function waitFor(condition, what, then) {
+            var deadline = Date.now() + 5000;
+            (function poll() {
+                if (spec.ended) {
+                    return;
+                }
+                if (condition()) {
+                    then();
+                } else if (Date.now() > deadline) {
+                    fail("timed out waiting for " + what);
+                    done();
+                } else {
+                    setTimeout(poll, 20);
+                }
+            })();
+        }
+
+        comparingWorker = startWorker(function (worker) {
+            if (spec.ended) {
+                return;
+            }
+            // A comparer stops once it has had 20 dropped calls in a row: by then the worker
+            // has been torn down, and the calls it had in flight overlapped that teardown.
+            Holder.startComparing("comparable", 4, 20);
+            waitFor(function () {
+                return Holder.hasCompared(42);
+            }, "a call answered by the live worker", function () {
+                worker.terminate();
+                waitFor(function () {
+                    return Holder.comparersFinished();
+                }, "every comparer to see its calls dropped", function () {
+                    comparingWorker = null;
+                    var results = Array.prototype.slice.call(Holder.stopComparing(5000));
+                    expect(results).toContain(0);
+                    results.forEach(function (result) {
+                        expect([42, 0]).toContain(result);
+                    });
+                    done();
+                });
+            });
         });
     });
 

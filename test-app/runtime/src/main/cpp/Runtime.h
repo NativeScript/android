@@ -209,6 +209,10 @@ class Runtime {
         jboolean PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring message, jstring fullStackTrace, jstring jsStackTrace, jboolean isDiscarded);
         void DestroyRuntime();
 
+        // Read under the isolate's Locker, which DestroyRuntime holds when it
+        // sets it.
+        bool IsDestroyed() const { return m_destroyed; }
+
         void Lock();
         void Unlock();
 
@@ -394,6 +398,7 @@ class Runtime {
 
         // Decided by ElectMainRuntime, before anything can read it.
         bool m_isMainThread = false;
+        bool m_destroyed = false;
 
         // This isolate's performance time origin, captured at isolate
         // creation: the monotonic clock reading now() is relative to, and the

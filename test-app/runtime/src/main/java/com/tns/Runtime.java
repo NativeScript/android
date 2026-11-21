@@ -1471,7 +1471,8 @@ public class Runtime {
     private static final PackagedArgs NO_ARGS = new PackagedArgs(0, null, null);
 
     // If a javaObject has no javaObjectID, meaning no JavaScript object exists
-    // for it yet, it is assigned one.
+    // for it yet, it is assigned one. Null when no id can be had: the runtime is
+    // shutting down and the call has to be dropped.
     private PackagedArgs packageArgs(Object... args) {
         int len = (args != null) ? args.length : 0;
         if (len == 0) {
@@ -1538,6 +1539,9 @@ public class Runtime {
                     // in with new objects only serialize on creating their wrappers.
                     long found = objectTable.findOrRegister(value, objectIds);
                     id = (int) found;
+                    if (id == ObjectTable.NO_ID) {
+                        return null;
+                    }
                     if ((found & ObjectTable.FRESH) != 0) {
                         fresh = FRESH_ARG;
                     }
@@ -1660,6 +1664,10 @@ public class Runtime {
 
         if (enableMultithreadedJavascript || isWorkThread) {
             PackagedArgs packagedArgs = packageArgs(tmpArgs);
+            if (packagedArgs == null) {
+                return discardCall(methodName, retType, "runtime id=" + getRuntimeId() + " (workerId=" + workerId
+                        + ") is shutting down");
+            }
             long[] primitiveResult = newPrimitiveResult(returnType);
             try {
                 // A hint: other threads may be writing the table, so native re-checks it under the
@@ -1668,10 +1676,9 @@ public class Runtime {
                         objectIdHint != ObjectTable.NO_ID ? objectIdHint : objectTable.findId(javaObject), methodName, MethodNameIds.idOf(methodName), returnType, isConstructor, packagedArgs.count, packagedArgs.values, packagedArgs.refs, primitiveResult);
                 ret = takePrimitiveResult(ret, returnType, primitiveResult);
             } catch (NativeScriptException e) {
-                // With multithreaded JS the owner can be torn down between the
-                // routing check and the native call, which then throws
-                // "Cannot find runtime"; that is the same lifecycle race the
-                // other dead-owner paths drop.
+                // With multithreaded JS the owner can stop accepting work while
+                // the call runs on this thread; an exception from such a call is
+                // the same lifecycle race the other dead-owner paths drop.
                 if (!isAcceptingWork()) {
                     return discardCall(methodName, retType, "runtime id=" + getRuntimeId() + " (workerId=" + workerId
                             + ") terminated during the call");

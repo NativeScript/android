@@ -336,6 +336,23 @@ public class ObjectTableTest {
     }
 
     @Test
+    public void registersNothingWhenNoIdIsGiven() {
+        ObjectTable table = new ObjectTable();
+        Object a = new Object();
+
+        long found = table.findOrRegister(a, new ObjectTable.IdSource() {
+            @Override
+            public int newId() {
+                return ObjectTable.NO_ID;
+            }
+        });
+        assertEquals(ObjectTable.NO_ID, (int) found);
+        assertFalse((found & ObjectTable.FRESH) != 0);
+        assertEquals(ObjectTable.NO_ID, table.findId(a));
+        assertEquals(0, table.size());
+    }
+
+    @Test
     public void matchesReferenceMapsUnderRandomOperations() {
         Random random = new Random(42);
         ObjectTable table = new ObjectTable();
