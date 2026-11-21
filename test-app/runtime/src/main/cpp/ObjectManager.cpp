@@ -1583,6 +1583,15 @@ std::vector<ObjectManager::LeakProbeEntry> ObjectManager::GetLeakProbeEntries() 
       entries.push_back(std::move(entry));
     }
     LeakProbeEntry& entry = entries[it->second];
+    if (const CanaryClass* cls = record->cls) {
+      const Global<Value>* kept[] = {&cls->prototype, &cls->callSuper, &cls->metadata,
+                                     &cls->implementationObject};
+      for (const Global<Value>* value : kept) {
+        if (!value->IsEmpty()) {
+          entry.recordValues.push_back(value->Get(isolate));
+        }
+      }
+    }
     if (!record->shell.IsEmpty()) {
       entry.recordValues.push_back(record->shell.Get(isolate));
     }
