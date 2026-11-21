@@ -105,6 +105,7 @@ wrapper.
 | `getConfig(key)` | Returns the current value of a config key. Throws `TypeError` on an unknown key. Readable from any isolate. |
 | `getWrapperLifetimeStats()` | Wrapper lifetime counters for the calling isolate (see [Wrapper lifetime](#wrapper-lifetime)). A fresh object on every call. |
 | `getWrapperClassCounts()` | Per Java class name (`<unknown>` for a link whose class was never recorded), the calling isolate's live `wrappers`, the `canaries` among them and the canary `states`, which include those made only for a weak-collection key (see [Wrapper lifetime](#wrapper-lifetime)). |
+| `findLeakCycles()` | Experimental and slow, debug builds only (release builds throw): joins a V8 heap snapshot and a Java heap dump to find the JS ↔ Java cycles canary mode keeps alive (see [Wrapper lifetime](#wrapper-lifetime)). |
 | `escapeException(x)` | Returns an `Error` branded so that, when it is thrown back across a native callback boundary, the native caller receives the original native exception `x` carries rather than the runtime's wrapper exception. Idempotent: a branded error is returned unchanged. Throws `TypeError` when called with no argument. The global `interop.escapeException` is this same function (see [Legacy globals](#legacy-globals)). |
 
 *Platform note (Android):* the original exception is the Java throwable `x`
@@ -260,6 +261,40 @@ because nothing kept the old one. `__releaseNativeCounterpart` drops the
 object's state with its link, and the released canary is a plain JS object
 from then on: what the weak collections keyed on its Java object stays keyed
 on it, and lives as long as it does.
+
+**Finding leaked cycles (experimental).** Each heap has its own collector,
+so neither sees a cycle that crosses into the other. `findLeakCycles()` joins
+them into one graph and asks what a single collector would keep: the JS heap
+from a V8 heap snapshot (its roots minus the runtime's handles to canary
+records), the Java heap from an HPROF dump (`android.os.Debug.dumpHprofData`;
+its GC roots minus the runtime's object table, `Reference` referents skipped),
+and the runtime's own edges between them (a live wrapper holds its Java object;
+a Java object holds its canary record: state, prototype and implementation
+object; a Java object held weakly for a resurrected wrapper holds that wrapper). A `WeakMap` value is followed from its key only. A Java object the
+runtime holds for a live wrapper, and that nothing else reaches, is leaked. For each, the report gives the path from the Java
+object to its own wrapper through fields, properties and the runtime's edges,
+a `signature` (the path's node labels from their smallest rotation, free of
+ids), and the Java classes of the leaked objects on it (`members`).
+`leakedOutsideCycles` counts leaked objects on no reported cycle: held by one,
+or past the search limits (`truncated`: after 256 searches, or a search that
+visited 2,000,000 nodes). V8 collects and the runtime settles the wrappers that
+died before the snapshot, and Java is collected twice before the dump, so
+objects only weak entries hold are gone and not counted. The report also gives
+`mode`, `probed` (the Java objects modeled), `jsNodes`, `javaObjects`,
+`dumpBytes` and `durationMs`. In `"resurrecting"` mode the report is empty and no dump is taken:
+resurrection breaks these cycles.
+
+The probe is built into debug runtimes only; in a release build the function
+exists but throws `findLeakCycles is available in debug builds only`. It suspends the whole process for the dump, writes the Java heap to
+the app's cache directory (deleted once parsed, and swept by the next probe if
+the process died first) and builds graphs of both heaps in native memory, so
+it takes seconds; on the main thread that can trip an ANR. The snapshot and
+the dump are taken one after the other, not atomically. Only the calling
+runtime's wrappers are modeled: an object held only through another runtime's
+(a worker's) wrappers can read as leaked, and probes in several runtimes run
+one at a time. Cycles through JNI global references native code holds are
+missed, since those are roots. The V8 object ids the snapshot assigns are
+cleared afterwards, unless DevTools is connected and relies on them.
 
 **Weak collections.** What could notice a new canary is whatever keys on the
 old one without keeping it, so in canary mode a builtin
