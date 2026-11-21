@@ -113,6 +113,9 @@ void ObjectManager::Init(Isolate* isolate) {
 
   if (WrapperLifetimeCanary::Enabled()) {
     m_instanceFieldTableKey.Reset(isolate, Private::New(isolate));
+    m_keyOfState.Reset(isolate, Private::New(isolate));
+    m_objectOfKey.Reset(isolate, Private::New(isolate));
+    m_releasedOfKey.Reset(isolate, Private::New(isolate));
     isolate->AddGCEpilogueCallback(CanaryGCEpilogue, this);
     m_canaryEpilogueAdded = true;
   }
@@ -1028,6 +1031,189 @@ std::map<std::string, ObjectManager::ClassCounts> ObjectManager::GetWrapperClass
   return counts;
 }
 
+bool ObjectManager::AddWeakCollectionFunctions(Local<Context> context, Local<Object> binding) {
+  auto isolate = m_isolate;
+  Local<Function> unwrap;
+  Local<Function> wrap;
+  return Function::New(context, UnwrapForWeakCollection).ToLocal(&unwrap) &&
+         Function::New(context, WrapForWeakCollection).ToLocal(&wrap) &&
+         binding->Set(context, ArgConverter::ConvertToV8String(isolate, "unwrap"), unwrap)
+             .FromMaybe(false) &&
+         binding->Set(context, ArgConverter::ConvertToV8String(isolate, "wrap"), wrap)
+             .FromMaybe(false);
+}
+
+// unwrap(value, create): the weak collections' key for a canary's Java object,
+// a frozen, null-prototype object that lives as long as the object's state,
+// that is, until Java collects the object. Lookups pass `create` false and never
+// make one: with no key yet, no entry can be keyed by it. The value itself for
+// anything that is not a canary, a Proxy included (it is a key of its own).
+namespace {
+// Null rather than a throw while the isolate has no runtime.
+ObjectManager* WeakCollectionManagerOf(Isolate* isolate) {
+  Runtime* runtime = Runtime::TryGetRuntime(isolate);
+  return runtime != nullptr ? runtime->GetObjectManager() : nullptr;
+}
+
+void RethrowToV8(const char* what) {
+  NativeScriptException nsEx(std::string("Error: c++ exception: ") + what);
+  nsEx.ReThrowToV8();
+}
+}  // namespace
+
+void ObjectManager::UnwrapForWeakCollection(const FunctionCallbackInfo<Value>& info) {
+  try {
+    Isolate* isolate = info.GetIsolate();
+    Local<Value> value = info[0];
+    bool create = info[1]->IsTrue();
+    info.GetReturnValue().Set(value);
+    if (!value->IsObject() || value->IsProxy()) {
+      return;
+    }
+    ObjectManager* thisPtr = WeakCollectionManagerOf(isolate);
+    if (thisPtr == nullptr) {
+      return;
+    }
+    Local<Object> holder = value.As<Object>();
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Private> keyOfState = thisPtr->m_keyOfState.Get(isolate);
+    Local<Value> key;
+    Local<Object> state;
+    if (create ? !thisPtr->CanaryStateForWrite(holder, &state)
+               : !thisPtr->ExistingCanaryState(holder, &state)) {
+      // A canary whose link was released keeps its key itself.
+      if (HasMetadataField(holder) && holder->GetPrivate(context, keyOfState).ToLocal(&key) &&
+          key->IsObject()) {
+        info.GetReturnValue().Set(key);
+      }
+      return;
+    }
+    if (state->GetPrivate(context, keyOfState).ToLocal(&key) && key->IsObject()) {
+      info.GetReturnValue().Set(key);
+      return;
+    }
+    if (!create) {
+      return;
+    }
+    Local<Object> newKey = Object::New(isolate, Null(isolate), nullptr, nullptr, 0);
+    if (!newKey
+             ->SetPrivate(context, thisPtr->m_objectOfKey.Get(isolate),
+                          Integer::NewFromUnsigned(isolate, static_cast<uint32_t>(LinkedIdOf(holder))))
+             .FromMaybe(false) ||
+        !newKey->SetIntegrityLevel(context, IntegrityLevel::kFrozen).FromMaybe(false) ||
+        !state->SetPrivate(context, keyOfState, newKey).FromMaybe(false)) {
+      return;
+    }
+    info.GetReturnValue().Set(newKey);
+  } catch (NativeScriptException& e) {
+    e.ReThrowToV8();
+  } catch (std::exception& e) {
+    RethrowToV8(e.what());
+  } catch (...) {
+    RethrowToV8("unknown");
+  }
+}
+
+// wrap(key): the Java object a key stands for, as its live canary or a new one
+// with its state, or undefined once Java collected it. Anything that is not a
+// key passes through.
+void ObjectManager::WrapForWeakCollection(const FunctionCallbackInfo<Value>& info) {
+  try {
+    Isolate* isolate = info.GetIsolate();
+    Local<Value> value = info[0];
+    info.GetReturnValue().Set(value);
+    if (!value->IsObject()) {
+      return;
+    }
+    ObjectManager* thisPtr = WeakCollectionManagerOf(isolate);
+    if (thisPtr == nullptr) {
+      return;
+    }
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> key = value.As<Object>();
+    Local<Value> idValue;
+    if (!key->GetPrivate(context, thisPtr->m_objectOfKey.Get(isolate)).ToLocal(&idValue) ||
+        !idValue->IsUint32()) {
+      return;
+    }
+    // The key of a released canary lives exactly as long as the canary.
+    Local<Value> released;
+    if (key->GetPrivate(context, thisPtr->m_releasedOfKey.Get(isolate)).ToLocal(&released) &&
+        released->IsObject()) {
+      info.GetReturnValue().Set(released);
+      return;
+    }
+    info.GetReturnValue().SetUndefined();
+    int id = static_cast<int>(idValue.As<Uint32>()->Value());
+    CanaryRecord* record = thisPtr->FindCanaryRecord(id);
+    if (record == nullptr || record->state.IsEmpty()) {
+      return;
+    }
+    Local<Value> recordKey;
+    if (!record->state.Get(isolate)->GetPrivate(context, thisPtr->m_keyOfState.Get(isolate))
+             .ToLocal(&recordKey) ||
+        !recordKey->StrictEquals(key)) {
+      return;
+    }
+    if (auto live = thisPtr->m_idToObject.Find(id)) {
+      info.GetReturnValue().Set(thisPtr->JsObjectFor(live));
+      return;
+    }
+    Local<Object> result = thisPtr->RebuildCanary(id);
+    if (result.IsEmpty() && thisPtr->FindCanaryRecord(id) != nullptr) {
+      // A plain object: a wrapper made from it the usual way is hydrated from its state.
+      JniLocalRef javaObject(thisPtr->JavaObjectOrNull(id));
+      if (!javaObject.IsNull()) {
+        result = thisPtr->GetOrCreateJSWrapper(javaObject);
+      }
+    }
+    if (!result.IsEmpty()) {
+      info.GetReturnValue().Set(result);
+    }
+  } catch (NativeScriptException& e) {
+    e.ReThrowToV8();
+  } catch (std::exception& e) {
+    RethrowToV8(e.what());
+  } catch (...) {
+    RethrowToV8("unknown");
+  }
+}
+
+void ObjectManager::KeepWeakCollectionKey(int javaObjectID) {
+  CanaryRecord* record = FindCanaryRecord(javaObjectID);
+  auto live = m_idToObject.Find(javaObjectID);
+  if (record == nullptr || record->state.IsEmpty() || live == nullptr || !live->canary ||
+      m_keyOfState.IsEmpty()) {
+    return;
+  }
+  Local<Context> context = m_isolate->GetCurrentContext();
+  Local<Private> keyOfState = m_keyOfState.Get(m_isolate);
+  Local<Value> key;
+  if (!record->state.Get(m_isolate)->GetPrivate(context, keyOfState).ToLocal(&key) ||
+      !key->IsObject()) {
+    return;
+  }
+  // Private symbols bypass the canary's write handler, and V8 lets them be
+  // added to the frozen key.
+  Local<Object> canary = Local<Object>::New(m_isolate, *live->target);
+  (void)canary->SetPrivate(context, keyOfState, key);
+  (void)key.As<Object>()->SetPrivate(context, m_releasedOfKey.Get(m_isolate), canary);
+}
+
+jobject ObjectManager::JavaObjectOrNull(int javaObjectID) {
+  JEnv env;
+  JNIEnv* raw = env;
+  AssertIsolateLocked();
+  // getJavaObjectByID throws for an id whose object was collected.
+  jobject object = raw->CallObjectMethod(m_javaRuntimeObject, GET_JAVAOBJECT_BY_ID_METHOD_ID,
+                                         javaObjectID);
+  if (raw->ExceptionCheck()) {
+    raw->ExceptionClear();
+    return nullptr;
+  }
+  return object;
+}
+
 void ObjectManager::ReleaseCollectedCanaryStates() {
   if (!m_deathInboxOpen) {
     return;
@@ -1334,6 +1520,9 @@ void ObjectManager::ReleaseAllRegistered() {
   }
   m_canaryRecords.clear();
   m_instanceFieldTableKey.Reset();
+  m_keyOfState.Reset();
+  m_objectOfKey.Reset();
+  m_releasedOfKey.Reset();
 
   auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
 
@@ -1455,6 +1644,9 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
   env.CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,
                      javaObjectID);
   m_lifetimeStats.releasedExplicitly++;
+  // What weak collections keyed on the object stays keyed on the released
+  // canary, now a plain JS object, for as long as it lives.
+  KeepWeakCollectionKey(javaObjectID);
   // Java no longer knows the id, so nothing could rebuild a canary from it.
   EraseCanaryRecord(javaObjectID);
 

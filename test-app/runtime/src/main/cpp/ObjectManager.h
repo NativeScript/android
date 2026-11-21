@@ -258,6 +258,12 @@ class ObjectManager {
   // Per Java class name (dotted), for ns:runtime's getWrapperClassCounts().
   std::map<std::string, ClassCounts> GetWrapperClassCounts();
 
+  // Canary mode: adds `unwrap` (a canary -> its Java object's weak-collection
+  // key) and `wrap` (key -> live or new canary, or undefined once Java
+  // collected the object) to binding, for js/weak-collections.js.
+  bool AddWeakCollectionFunctions(v8::Local<v8::Context> context,
+                                  v8::Local<v8::Object> binding);
+
  private:
   static void InitializeJNI();
 
@@ -438,6 +444,22 @@ class ObjectManager {
   bool m_canaryEpilogueAdded = false;
   int m_deathInboxRuntimeId = -1;
   v8::Persistent<v8::Private> m_instanceFieldTableKey;
+  // The weak-collection key of a canary's Java object hangs off its state
+  // object, and names the object's id. Once the canary's link is released,
+  // the canary holds the key and the key leads back to the canary.
+  v8::Persistent<v8::Private> m_keyOfState;
+  v8::Persistent<v8::Private> m_objectOfKey;
+  v8::Persistent<v8::Private> m_releasedOfKey;
+
+  // Moves id's weak-collection key from its state to its live canary, whose
+  // link is being released.
+  void KeepWeakCollectionKey(int javaObjectID);
+
+  static void UnwrapForWeakCollection(const v8::FunctionCallbackInfo<v8::Value>& info);
+  static void WrapForWeakCollection(const v8::FunctionCallbackInfo<v8::Value>& info);
+
+  // id's Java object, or null once Java collected it.
+  jobject JavaObjectOrNull(int javaObjectID);
 
   void JSObjectFinalizer(v8::Isolate* isolate,
                          ObjectWeakCallbackState* callbackState);

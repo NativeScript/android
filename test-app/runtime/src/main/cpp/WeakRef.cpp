@@ -1,4 +1,7 @@
 #include "WeakRef.h"
+#include "ObjectManager.h"
+#include "Runtime.h"
+#include "WrapperLifetimeCanary.h"
 #include "NativeScriptAssert.h"
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
@@ -17,4 +20,13 @@ WeakRef::WeakRef() {
 void WeakRef::Init(v8::Isolate* isolate, Local<v8::Context> context) {
     bool success = !BuiltinLoader::RunBuiltin(context, BuiltinId::kWeakRef).IsEmpty();
     NS_DCHECK(success);
+
+    if (!WrapperLifetimeCanary::Enabled()) {
+        return;
+    }
+    // Canary mode: the weak collections key Java objects, not their canaries.
+    auto binding = Object::New(isolate);
+    success = Runtime::GetObjectManager(isolate)->AddWeakCollectionFunctions(context, binding) &&
+              !BuiltinLoader::RunBuiltin(context, BuiltinId::kWeakCollections, binding).IsEmpty();
+    NS_CHECK(success);
 }

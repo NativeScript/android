@@ -37,12 +37,14 @@ const intrinsics = {
   Uint32Array,
   URIError,
   URL,
+  WeakMap,
   WeakRef,
   WeakSet,
 
   // Well-known symbols.
   SymbolFor: Symbol.for,
   SymbolIterator: Symbol.iterator,
+  SymbolKeyFor: Symbol.keyFor,
   SymbolToStringTag: Symbol.toStringTag,
 
   // Namespaces / prototypes.
@@ -108,6 +110,15 @@ const intrinsics = {
   StringPrototypeSlice: uncurryThis(String.prototype.slice),
   StringPrototypeStartsWith: uncurryThis(String.prototype.startsWith),
   SymbolPrototypeToString: uncurryThis(Symbol.prototype.toString),
+  WeakMapPrototypeDelete: uncurryThis(WeakMap.prototype.delete),
+  WeakMapPrototypeGet: uncurryThis(WeakMap.prototype.get),
+  // The upsert proposal: undefined where V8 does not ship it.
+  WeakMapPrototypeGetOrInsert: typeof WeakMap.prototype.getOrInsert === "function"
+      ? uncurryThis(WeakMap.prototype.getOrInsert) : undefined,
+  WeakMapPrototypeGetOrInsertComputed: typeof WeakMap.prototype.getOrInsertComputed === "function"
+      ? uncurryThis(WeakMap.prototype.getOrInsertComputed) : undefined,
+  WeakMapPrototypeHas: uncurryThis(WeakMap.prototype.has),
+  WeakMapPrototypeSet: uncurryThis(WeakMap.prototype.set),
   WeakRefPrototypeDeref: uncurryThis(WeakRef.prototype.deref),
   WeakSetPrototypeAdd: uncurryThis(WeakSet.prototype.add),
   WeakSetPrototypeDelete: uncurryThis(WeakSet.prototype.delete),

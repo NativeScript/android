@@ -91,6 +91,7 @@ set(RUNTIME_BUILTIN_JS
         ${RUNTIME_BUILTIN_JS_DIR}/require-factory.js
         ${RUNTIME_BUILTIN_JS_DIR}/structured-clone.js
         ${RUNTIME_BUILTIN_JS_DIR}/text-encoding.js
+        ${RUNTIME_BUILTIN_JS_DIR}/weak-collections.js
         ${RUNTIME_BUILTIN_JS_DIR}/weak-ref.js
         ${RUNTIME_BUILTIN_JS_DIR}/worker-events.js
 )
