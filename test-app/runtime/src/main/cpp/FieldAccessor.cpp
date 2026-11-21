@@ -68,7 +68,7 @@ Local<Value> FieldAccessor::GetJavaField(Isolate* isolate, const Local<Object>& 
             } else {
                 result = env.GetBooleanField(targetJavaObject, fieldId);
             }
-            fieldResult = Boolean::New(isolate, (result == JNI_TRUE));
+            fieldResult = handleScope.Escape(Boolean::New(isolate, (result == JNI_TRUE)));
             break;
         }
         case 'B': { //byte
