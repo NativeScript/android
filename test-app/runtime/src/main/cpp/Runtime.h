@@ -61,7 +61,9 @@ class Runtime {
         enum IsolateData {
             RUNTIME = 0,
             CONSTANTS = 1,
-            WORKER_WRAPPER = 2
+            WORKER_WRAPPER = 2,
+            // The isolate's ObjectManager, for the canary write handlers.
+            OBJECT_MANAGER = 3
         };
 
         /*
@@ -160,6 +162,7 @@ class Runtime {
             std::string uncaughtErrorPolicy;
             std::string wrapperLifetimeMode;
             std::string wrapperLifetimeScope;
+            bool multithreadedJavascript;
         };
 
         static void Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibsDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, const StartupOptions& options, jstring callingDir, int maxLogcatObjectSize,

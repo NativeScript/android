@@ -242,6 +242,7 @@ add_library(
         src/main/cpp/V8StringConstants.cpp
         src/main/cpp/WeakRef.cpp
         src/main/cpp/WrapperLifetime.cpp
+        src/main/cpp/WrapperLifetimeCanary.cpp
         src/main/cpp/WorkerEvents.cpp
         src/main/cpp/WorkerWrapper.cpp
         src/main/cpp/Timers.cpp

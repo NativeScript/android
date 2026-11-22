@@ -1,5 +1,6 @@
 #include "V8StringConstants.h"
 #include "Runtime.h"
+#include "WrapperLifetimeCanary.h"
 #include "RuntimeGates.h"
 #include "NativeScriptException.h"
 #include "CallbackHandlers.h"
@@ -97,7 +98,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_setManualInstrumentationModeLegac
     setManualInstrumentationModeFast_impl(_env, clazz, mode);
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_initNativeScript(JNIEnv* _env, jobject obj, jint runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jstring v8Flags, jboolean codeCache, jstring profilerOutputDir, jboolean discardUncaughtJsExceptions, jstring uncaughtErrorPolicy, jstring wrapperLifetimeMode, jstring wrapperLifetimeScope, jstring callingDir, jint maxLogcatObjectSize, jboolean forceLog) {
+extern "C" JNIEXPORT void Java_com_tns_Runtime_initNativeScript(JNIEnv* _env, jobject obj, jint runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jstring v8Flags, jboolean codeCache, jstring profilerOutputDir, jboolean discardUncaughtJsExceptions, jstring uncaughtErrorPolicy, jstring wrapperLifetimeMode, jstring wrapperLifetimeScope, jboolean multithreadedJavascript, jstring callingDir, jint maxLogcatObjectSize, jboolean forceLog) {
     JEnv::EntryScope envScope(_env);
     try {
         Runtime::StartupOptions options{
@@ -107,7 +108,8 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_initNativeScript(JNIEnv* _env, jo
             discardUncaughtJsExceptions == JNI_TRUE,
             ArgConverter::jstringToString(uncaughtErrorPolicy),
             ArgConverter::jstringToString(wrapperLifetimeMode),
-            ArgConverter::jstringToString(wrapperLifetimeScope)};
+            ArgConverter::jstringToString(wrapperLifetimeScope),
+            multithreadedJavascript == JNI_TRUE};
         Runtime::Init(_env, obj, runtimeId, filesPath, nativeLibDir, verboseLoggingEnabled, isDebuggable, packageName, options, callingDir, maxLogcatObjectSize, forceLog);
     } catch (NativeScriptException& e) {
         e.ReThrowToJava();
@@ -541,4 +543,13 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_invokeNonvirtualNative(JNIEnv*
         env->SetLongArrayRegion(primitiveResult, 0, 1, &result);
     }
     return objectResult;
+}
+
+extern "C" JNIEXPORT void Java_com_tns_Runtime_notifyCanaryObjectsCollected(JNIEnv* env, jclass, jint runtimeId, jintArray ids, jint count) {
+    if (count <= 0) {
+        return;
+    }
+    std::vector<jint> values(count);
+    env->GetIntArrayRegion(ids, 0, count, values.data());
+    WrapperLifetimeCanary::NotifyCollected(runtimeId, values.data(), count);
 }

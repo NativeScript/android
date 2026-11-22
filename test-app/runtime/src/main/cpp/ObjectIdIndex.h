@@ -96,6 +96,26 @@ class ObjectIdIndex {
     }
   }
 
+  // Calls f on every entry. f must not insert or erase.
+  template <typename F>
+  void ForEach(F&& f) const {
+    for (const auto& chunk : m_chunks) {
+      if (chunk == nullptr) {
+        continue;
+      }
+      for (const auto& leaf : chunk->leaves) {
+        if (leaf == nullptr) {
+          continue;
+        }
+        for (T* entry : leaf->slots) {
+          if (entry != nullptr) {
+            f(entry);
+          }
+        }
+      }
+    }
+  }
+
   // Empties the index, then calls f on every entry it held.
   template <typename F>
   void DrainAll(F&& f) {

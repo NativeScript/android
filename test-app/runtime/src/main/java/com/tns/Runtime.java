@@ -39,7 +39,7 @@ import dalvik.annotation.optimization.FastNative;
 public class Runtime {
     private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName,
                                          String v8Flags, boolean codeCache, String profilerOutputDir, boolean discardUncaughtJsExceptions, String uncaughtErrorPolicy,
-                                         String wrapperLifetimeMode, String wrapperLifetimeScope,
+                                         String wrapperLifetimeMode, String wrapperLifetimeScope, boolean multithreadedJavascript,
                                          String callingDir, int maxLogcatObjectSize, boolean forceLog);
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
@@ -313,7 +313,7 @@ public class Runtime {
         runtimesById = index;
     }
 
-    private static Runtime runtimeForId(int runtimeId) {
+    static Runtime runtimeForId(int runtimeId) {
         Runtime[] index = runtimesById;
         if (runtimeId >= 0 && runtimeId < index.length) {
             return index[runtimeId];
@@ -810,7 +810,7 @@ public class Runtime {
             initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName,
                     appConfig.getV8Flags(), appConfig.getCodeCache(), appConfig.getProfilerOutputDir(),
                     appConfig.getDiscardUncaughtJsExceptions(), appConfig.getUncaughtErrorPolicy(),
-                    appConfig.getWrapperLifetimeMode(), appConfig.getWrapperLifetimeScope(),
+                    appConfig.getWrapperLifetimeMode(), appConfig.getWrapperLifetimeScope(), multithreadedJavascript,
                     callingJsDir, appConfig.getMaxLogcatObjectSize(), forceConsoleLog);
 
             if (logger.isEnabled()) {
@@ -1284,6 +1284,32 @@ public class Runtime {
         }
     }
 
+    // The canary wrapper lifetime mode settles the canaries collected since the last batch:
+    // objects with JS state are held weakly and watched, the others are released. Overwrites
+    // the id of every object that is already gone with -1.
+    @RuntimeCallable
+    private void processCanaryBatch(int[] weaken, int weakenCount, int[] release, int releaseCount) {
+        objectTable.weakenWatched(weaken, weakenCount, runtimeId, WrapperLifetimeWatcher.queue());
+        objectTable.remove(release, releaseCount);
+        if (logger.isEnabled()) {
+            logger.write("processCanaryBatch weakened=" + weakenCount + " released=" + releaseCount);
+        }
+    }
+
+    // A canary is rebuilt for an object the canary mode held weakly.
+    @RuntimeCallable
+    private boolean strengthenInstance(int javaObjectID) {
+        return objectTable.strengthen(javaObjectID);
+    }
+
+    boolean removeWatched(ObjectTable.WatchedRef ref) {
+        return objectTable.removeWatched(ref);
+    }
+
+    // From WrapperLifetimeWatcher's thread: ids[0..count) of the runtime's watched objects
+    // were collected. Thread-safe; the runtime lets go of their JS state on its own thread.
+    static native void notifyCanaryObjectsCollected(int runtimeId, int[] ids, int count);
+
     @RuntimeCallable
     private Object getJavaObjectByID(int javaObjectID) throws Exception {
         if (logger.isEnabled()) {
@@ -1321,7 +1347,8 @@ public class Runtime {
     }
 
     // The class index is only needed to create a wrapper, and an object that already has
-    // an id almost always has one; native asks for the class itself when it does not.
+    // an id almost always has one; native asks for the index (getClassIndex) when it does
+    // not, e.g. for the object of a canary that died.
     @RuntimeCallable
     private long getOrCreateJavaObjectIDAndClass(Object obj) {
         long found = getOrCreateObjectId(obj);
@@ -1329,6 +1356,11 @@ public class Runtime {
             return found;
         }
         return packIdAndClass((int) found, obj);
+    }
+
+    @RuntimeCallable
+    private int getClassIndex(Object obj) {
+        return classIndexOf(obj.getClass());
     }
 
     @RuntimeCallable
@@ -1700,6 +1732,7 @@ public class Runtime {
             final Object[] arr = new Object[3];
 
             final boolean isCtor = isConstructor;
+            final boolean wasRegistered = objectIdHint != ObjectTable.NO_ID;
 
             Runnable r = new Runnable() {
                 @Override
@@ -1710,7 +1743,14 @@ public class Runtime {
                             try {
                                 javaObjectID = resolveJavaObjectID(javaObject, methodName);
                             } catch (NativeScriptException e) {
-                                arr[2] = e;
+                                if (wasRegistered) {
+                                    // As in native CallJSMethodNative: Java let go of a
+                                    // registered object, so there is nothing to call.
+                                    logDiscardedCall(methodName, describeInstance(javaObject)
+                                            + " is no longer registered with runtime id=" + getRuntimeId());
+                                } else {
+                                    arr[2] = e;
+                                }
                                 return;
                             }
                             final PackagedArgs packagedArgs = packageArgs(tmpArgs);

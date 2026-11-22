@@ -1,5 +1,6 @@
 package com.tns;
 
+import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 
 /**
@@ -226,6 +227,76 @@ final class ObjectTable {
         }
     }
 
+    /** remove for ids[0..count), under one lock. */
+    void remove(int[] ids, int count) {
+        if (count == 0) {
+            return;
+        }
+        synchronized (this) {
+            for (int i = 0; i < count; i++) {
+                removeLocked(ids[i]);
+            }
+        }
+    }
+
+    /**
+     * The canary of each of ids[0..count) died while its object has JS state: hold the
+     * object through a WatchedRef queued on queue. Overwrites the id of every entry that is
+     * gone, or whose object was already collected (and is removed), with NO_ID.
+     */
+    void weakenWatched(int[] ids, int count, int runtimeId, ReferenceQueue<Object> queue) {
+        if (count == 0) {
+            return;
+        }
+        synchronized (this) {
+            for (int i = 0; i < count; i++) {
+                int id = ids[i];
+                Leaf leaf = leafFor(id);
+                Object value = leaf == null ? null : leaf.values[id & LEAF_MASK];
+                if (value == null) {
+                    ids[i] = NO_ID;
+                } else if (value instanceof WeakRef) {
+                    if (((WeakRef) value).get() == null) {
+                        removeLocked(id);
+                        ids[i] = NO_ID;
+                    }
+                } else {
+                    leaf.values[id & LEAF_MASK] = new WatchedRef(value, queue, runtimeId, id);
+                }
+            }
+        }
+    }
+
+    /** Holds id's object strongly again; false if there is no entry or it was collected. */
+    boolean strengthen(int id) {
+        synchronized (this) {
+            Leaf leaf = leafFor(id);
+            Object value = leaf == null ? null : leaf.values[id & LEAF_MASK];
+            if (!(value instanceof WeakRef)) {
+                return value != null;
+            }
+            Object referent = ((WeakRef) value).get();
+            if (referent == null) {
+                removeLocked(id);
+                return false;
+            }
+            leaf.values[id & LEAF_MASK] = referent;
+            return true;
+        }
+    }
+
+    /** Removes ref's entry if ref is still the entry for its id. */
+    boolean removeWatched(WatchedRef ref) {
+        synchronized (this) {
+            Leaf leaf = leafFor(ref.id);
+            if (leaf == null || leaf.values[ref.id & LEAF_MASK] != ref) {
+                return false;
+            }
+            removeLocked(ref.id);
+            return true;
+        }
+    }
+
     private void removeLocked(int id) {
         Leaf leaf = leafFor(id);
         int i = id & LEAF_MASK;
@@ -251,9 +322,26 @@ final class ObjectTable {
 
     // Distinguishes the table's own weak entries from a registered object that happens to be
     // a WeakReference.
-    private static final class WeakRef extends WeakReference<Object> {
+    private static class WeakRef extends WeakReference<Object> {
         WeakRef(Object referent) {
             super(referent);
+        }
+
+        WeakRef(Object referent, ReferenceQueue<Object> queue) {
+            super(referent, queue);
+        }
+    }
+
+    // A weak entry whose object still has JS state (the canary wrapper lifetime mode):
+    // WrapperLifetimeWatcher reports its collection to the runtime that owns the state.
+    static final class WatchedRef extends WeakRef {
+        final int runtimeId;
+        final int id;
+
+        WatchedRef(Object referent, ReferenceQueue<Object> queue, int runtimeId, int id) {
+            super(referent, queue);
+            this.runtimeId = runtimeId;
+            this.id = id;
         }
     }
 

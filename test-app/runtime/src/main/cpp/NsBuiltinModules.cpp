@@ -175,6 +175,31 @@ void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
     set("collected", stats.collected);
     set("releasedExplicitly", stats.releasedExplicitly);
     set("releasedAccesses", stats.releasedAccesses);
+    set("canaryStates", stats.canaryStates);
+    set("canaryNativeDeaths", stats.canaryNativeDeaths);
+    set("canaryInterceptedWrites", stats.canaryInterceptedWrites);
+    set("canaryCachedWrites", stats.canaryCachedWrites);
+    set("canaryCachedFieldWrites", stats.canaryCachedFieldWrites);
+    set("canaryRebuilds", stats.canaryRebuilds);
+    info.GetReturnValue().Set(result);
+}
+
+void GetWrapperClassCountsCallback(const FunctionCallbackInfo<Value>& info) {
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> result = Object::New(isolate);
+    for (const auto& [name, counts] : Runtime::GetObjectManager(isolate)->GetWrapperClassCounts()) {
+        Local<Object> entry = Object::New(isolate);
+        auto set = [&](const char* key, uint64_t value) {
+            (void) entry->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, key),
+                                             Number::New(isolate, static_cast<double>(value)));
+        };
+        set("wrappers", counts.wrappers);
+        set("canaries", counts.canaries);
+        set("states", counts.states);
+        // A class name such as "__proto__" must stay an own property.
+        (void) result->CreateDataProperty(context, ArgConverter::ConvertToV8String(isolate, name), entry);
+    }
     info.GetReturnValue().Set(result);
 }
 
@@ -251,11 +276,14 @@ MaybeLocal<Object> NsModuleBinding(Local<Context> context) {
 MaybeLocal<Object> NsRuntimeBinding(Local<Context> context) {
     Isolate* isolate = v8::Isolate::GetCurrent();
     Local<Object> binding = Object::New(isolate);
-    Local<v8::Function> setConfig, getConfig, escapeException, getWrapperLifetimeStats;
+    Local<v8::Function> setConfig, getConfig, escapeException, getWrapperLifetimeStats,
+            getWrapperClassCounts;
     if (!v8::Function::New(context, SetConfigCallback).ToLocal(&setConfig) ||
         !v8::Function::New(context, GetConfigCallback).ToLocal(&getConfig) ||
         !v8::Function::New(context, GetWrapperLifetimeStatsCallback)
                  .ToLocal(&getWrapperLifetimeStats) ||
+        !v8::Function::New(context, GetWrapperClassCountsCallback)
+                 .ToLocal(&getWrapperClassCounts) ||
         !Interop::CreateEscapeException(context).ToLocal(&escapeException) ||
         !binding->Set(context, ArgConverter::ConvertToV8String(isolate, "setConfig"), setConfig)
                  .FromMaybe(false) ||
@@ -266,6 +294,9 @@ MaybeLocal<Object> NsRuntimeBinding(Local<Context> context) {
                  .FromMaybe(false) ||
         !binding->Set(context, ArgConverter::ConvertToV8String(isolate, "getWrapperLifetimeStats"),
                       getWrapperLifetimeStats)
+                 .FromMaybe(false) ||
+        !binding->Set(context, ArgConverter::ConvertToV8String(isolate, "getWrapperClassCounts"),
+                      getWrapperClassCounts)
                  .FromMaybe(false)) {
         return MaybeLocal<Object>();
     }

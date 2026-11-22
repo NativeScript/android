@@ -13,6 +13,7 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
+#include "WrapperLifetimeCanary.h"
 #include "include/v8.h"
 
 using namespace v8;
@@ -59,6 +60,10 @@ void ObjectManager::InitializeJNI() {
       runtimeClass, "getOrCreateJavaObjectIDAndClass", "(Ljava/lang/Object;)J");
   NS_CHECK(GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID != nullptr);
 
+  GET_CLASS_INDEX_METHOD_ID = env.GetMethodID(
+      runtimeClass, "getClassIndex", "(Ljava/lang/Object;)I");
+  NS_CHECK(GET_CLASS_INDEX_METHOD_ID != nullptr);
+
   FIND_JAVA_OBJECT_ID_METHOD_ID = env.GetMethodID(
       runtimeClass, "findJavaObjectID", "(Ljava/lang/Object;)I");
   NS_CHECK(FIND_JAVA_OBJECT_ID_METHOD_ID != nullptr);
@@ -78,6 +83,14 @@ void ObjectManager::InitializeJNI() {
   RELEASE_IF_COLLECTED_METHOD_ID =
       env.GetMethodID(runtimeClass, "releaseIfCollected", "(I)Z");
   NS_CHECK(RELEASE_IF_COLLECTED_METHOD_ID != nullptr);
+
+  PROCESS_CANARY_BATCH_METHOD_ID =
+      env.GetMethodID(runtimeClass, "processCanaryBatch", "([II[II)V");
+  NS_CHECK(PROCESS_CANARY_BATCH_METHOD_ID != nullptr);
+
+  STRENGTHEN_INSTANCE_METHOD_ID =
+      env.GetMethodID(runtimeClass, "strengthenInstance", "(I)Z");
+  NS_CHECK(STRENGTHEN_INSTANCE_METHOD_ID != nullptr);
 
   JAVA_LANG_CLASS = env.FindClass("java/lang/Class");
   NS_CHECK(JAVA_LANG_CLASS != nullptr);
@@ -101,6 +114,12 @@ void ObjectManager::Init(Isolate* isolate) {
       jsWrapperFuncTemplate->GetFunction(context).ToLocalChecked();
   m_poJsWrapperFunc = new Persistent<Function>(isolate, jsWrapperFunc);
   m_jsWrapperTemplate.Reset(isolate, jsWrapperFuncTemplate->InstanceTemplate());
+
+  if (WrapperLifetimeCanary::Enabled()) {
+    m_instanceFieldTableKey.Reset(isolate, Private::New(isolate));
+    isolate->AddGCEpilogueCallback(CanaryGCEpilogue, this);
+    m_canaryEpilogueAdded = true;
+  }
 }
 
 JniLocalRef ObjectManager::GetJavaObjectByJsObject(
@@ -343,6 +362,9 @@ jclass ObjectManager::GetJavaClass(const Local<Object>& instance) {
 void ObjectManager::SetJavaClass(const Local<Object>& instance, jclass clazz) {
   JSInstanceInfo* jsInfo = GetJSInstanceInfo(instance);
   jsInfo->objectClazz = clazz;
+  if (ObjectWeakCallbackState* state = m_idToObject.Find(jsInfo->javaObjectID)) {
+    state->objectClazz = clazz;
+  }
 }
 
 int ObjectManager::GetOrCreateObjectId(jobject object) {
@@ -374,7 +396,7 @@ Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID) {
 
   auto state = m_idToObject.Find(javaObjectID);
   if (state == nullptr) {
-    return handleScope.Escape(Local<Object>());
+    return handleScope.Escape(RebuildCanary(javaObjectID));
   }
 
   return handleScope.Escape(JsObjectFor(state));
@@ -407,7 +429,9 @@ void ObjectManager::ReleaseUnwrappedArgs(const JavaCallArgs& args) {
       continue;
     }
     auto javaObjectID = static_cast<jint>(values[i]);
-    if (HasJsObject(javaObjectID)) {
+    // A canary record means JS wrapped the id meanwhile (another thread, or
+    // the method lookup); its settle owns the Java entry, which may hold state.
+    if (HasJsObject(javaObjectID) || FindCanaryRecord(javaObjectID) != nullptr) {
       continue;
     }
     raw->CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,
@@ -425,7 +449,10 @@ void ObjectManager::ReleaseUnwrappedArgs(const JavaCallArgs& args) {
 
 Local<Object> ObjectManager::GetLinkedJsObjectByJavaObject(int javaObjectID) {
   auto state = m_idToObject.Find(javaObjectID);
-  if (state == nullptr || !state->linked) {
+  if (state == nullptr) {
+    return RebuildCanary(javaObjectID);
+  }
+  if (!state->linked) {
     return Local<Object>();
   }
   return JsObjectFor(state);
@@ -442,12 +469,16 @@ Local<Object> ObjectManager::GetOrCreateJSWrapper(jobject object) {
   jlong packed = env.CallLongMethod(
       m_javaRuntimeObject, GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID,
       object);
-  auto javaObjectID = static_cast<jint>(packed);
-  auto wrapper = GetJsObjectByJavaObject(javaObjectID);
-  if (!wrapper.IsEmpty()) {
-    return wrapper;
+  return GetOrCreateJSWrapper(static_cast<jint>(packed), static_cast<int>(packed >> 32), object);
+}
+
+Local<Object> ObjectManager::GetOrCreateJSWrapper(jint javaObjectID, int classIndex,
+                                                  jobject instance) {
+  // As GetJsObjectByJavaObject, then CreateJSWrapper, which rebuilds a canary itself.
+  if (auto state = m_idToObject.Find(javaObjectID)) {
+    return JsObjectFor(state);
   }
-  return CreateJSWrapper(javaObjectID, static_cast<int>(packed >> 32), object);
+  return CreateJSWrapper(javaObjectID, classIndex, instance);
 }
 
 Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, int classIndex,
@@ -464,6 +495,13 @@ const std::string& ObjectManager::WrapperClassFor(int classIndex,
                                                   jclass& clazz,
                                                   std::string& scratch,
                                                   MetadataNode*& node) {
+  if (classIndex <= 0 && instance != nullptr) {
+    // getOrCreateJavaObjectIDAndClass leaves the index out for an id Java
+    // already knew, such as a dead canary's object's. One call for it is
+    // cheaper than looking the class up by name.
+    JEnv env;
+    classIndex = env.CallIntMethod(m_javaRuntimeObject, GET_CLASS_INDEX_METHOD_ID, instance);
+  }
   if (classIndex > 0 &&
       static_cast<size_t>(classIndex) < m_wrapperClasses.size() &&
       m_wrapperClasses[classIndex] != nullptr) {
@@ -504,6 +542,18 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
                                                    MetadataNode* node) {
   auto isolate = m_isolate;
 
+  // Nothing from here to the link runs JS or settles canaries, so the record
+  // stays valid.
+  CanaryRecord* record = FindCanaryRecord(javaObjectID);
+  if (record != nullptr && record->cls != nullptr) {
+    // A JS-extended instance's canary starts from its record, not from its class.
+    auto rebuilt = RebuildCanary(javaObjectID, record);
+    if (!rebuilt.IsEmpty()) {
+      return rebuilt;
+    }
+    record = FindCanaryRecord(javaObjectID);
+  }
+
   if (node == nullptr) {
     node = MetadataNode::GetOrCreate(className);
   }
@@ -515,7 +565,7 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
       JEnv env;
       clazz = env.FindClass(className);
     }
-    Link(jsWrapper, javaObjectID, clazz);
+    Link(jsWrapper, javaObjectID, clazz, LinkKind::kPlain, nullptr, record);
   }
   return jsWrapper;
 }
@@ -524,7 +574,14 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
  * Link the JavaScript object and it's java counterpart with an ID
  */
 void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
-                         jclass clazz) {
+                         jclass clazz, LinkKind kind,
+                         const Persistent<ObjectTemplate>* instanceTemplate) {
+  Link(object, javaObjectID, clazz, kind, instanceTemplate, std::nullopt);
+}
+
+void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jclass clazz,
+                         LinkKind kind, const Persistent<ObjectTemplate>* instanceTemplate,
+                         std::optional<CanaryRecord*> record, bool hydrate) {
   if (!IsJsRuntimeObject(object)) {
     string errMsg("Trying to link invalid 'this' to a Java object");
     throw NativeScriptException(errMsg);
@@ -537,9 +594,17 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
 
   auto state = new ObjectWeakCallbackState(this, javaObjectID, clazz, isolate, object);
 
-  // subscribe for JS GC event
-  state->target->SetWeak(state, JSObjectFinalizerStatic,
-                         WeakCallbackType::kFinalizer);
+  // Array buffers carry no Metadata field and cannot hold the canary handlers.
+  state->canary = WrapperLifetimeCanary::Enabled() && HasMetadataField(object);
+  state->keepsState =
+      state->canary && WrapperLifetimeCanary::InScope(kind == LinkKind::kExtended);
+  if (state->canary) {
+    state->target->SetWeak(state, CanaryDiedStatic, WeakCallbackType::kParameter);
+  } else {
+    // subscribe for JS GC event
+    state->target->SetWeak(state, JSObjectFinalizerStatic,
+                           WeakCallbackType::kFinalizer);
+  }
 
   SetJsInfo(object, javaObjectID);
 
@@ -548,6 +613,614 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
   // wrapper's Java object.
   NS_DCHECK(inserted);
   (void) inserted;
+
+  if (state->canary) {
+    state->record = AdoptCanary(object, javaObjectID, kind, instanceTemplate,
+                                record.has_value() ? *record : FindCanaryRecord(javaObjectID),
+                                hydrate);
+  }
+}
+
+ObjectManager::CanaryRecord* ObjectManager::AdoptCanary(
+    const Local<Object>& object, uint32_t javaObjectID, LinkKind kind,
+    const Persistent<ObjectTemplate>* instanceTemplate, CanaryRecord* record, bool hydrate) {
+  if (record == nullptr) {
+    if (kind != LinkKind::kExtended) {
+      return nullptr;
+    }
+    // Java calls into JS through this object for as long as it lives, so the
+    // record is made now, not at the first write: a canary built later needs
+    // the prototype and fields this one was registered with.
+    NS_DCHECK(instanceTemplate != nullptr);
+    auto isolate = m_isolate;
+    Local<Value> implementationObject;
+    if (!V8GetPrivateValue(isolate, object, V8StringConstants::GetImplementationObject(isolate),
+                           implementationObject)) {
+      implementationObject = Local<Value>();
+    }
+    CanaryClass* cls = CanaryClassFor(
+        instanceTemplate, object->GetPrototype(),
+        object->GetInternalField(static_cast<int>(MetadataNodeKeys::CallSuper)).As<Value>(),
+        object->GetInternalField(static_cast<int>(MetadataNodeKeys::Metadata)).As<Value>(),
+        implementationObject);
+    record = NewCanaryRecord(javaObjectID);
+    record->cls = cls;
+    cls->records++;
+    return record;
+  }
+  if (!EnsureJavaStrong(javaObjectID, record)) {
+    return nullptr;
+  }
+  // Out of scope, a record never holds JS properties for the canary.
+  if (hydrate && !record->state.IsEmpty() &&
+      WrapperLifetimeCanary::InScope(kind == LinkKind::kExtended)) {
+    auto context = m_isolate->GetCurrentContext();
+    if (context.IsEmpty()) {
+      context = Runtime::GetRuntime(m_isolate)->GetContext();
+    }
+    WrapperLifetimeCanary::CopyOwnProperties(this, context, record->state.Get(m_isolate), object,
+                                             !record->stateNotPlain);
+  }
+  return record;
+}
+
+ObjectManager::CanaryRecord::~CanaryRecord() {
+  if (cls != nullptr && --cls->records == 0) {
+    if (cls->slot != nullptr && *cls->slot == cls) {
+      *cls->slot = nullptr;
+    }
+    delete cls;
+  }
+}
+
+ObjectManager::CanaryClass* ObjectManager::CanaryClassFor(
+    const Persistent<ObjectTemplate>* instanceTemplate, const Local<Value>& prototype,
+    const Local<Value>& callSuper, const Local<Value>& metadata,
+    const Local<Value>& implementationObject) {
+  auto address = reinterpret_cast<uintptr_t>(instanceTemplate);
+  CanaryClass*& slot = m_canaryClasses[((address >> 4) ^ (address >> 9)) % kCanaryClassSlots];
+  // Global == Local compares the objects, and an empty handle equals only an empty one.
+  if (slot != nullptr && slot->instanceTemplate == instanceTemplate &&
+      slot->prototype == prototype && slot->callSuper == callSuper &&
+      slot->metadata == metadata && slot->implementationObject == implementationObject) {
+    return slot;
+  }
+  auto isolate = m_isolate;
+  auto cls = new CanaryClass();
+  cls->instanceTemplate = instanceTemplate;
+  cls->prototype.Reset(isolate, prototype);
+  cls->callSuper.Reset(isolate, callSuper);
+  cls->metadata.Reset(isolate, metadata);
+  if (!implementationObject.IsEmpty()) {
+    cls->implementationObject.Reset(isolate, implementationObject);
+  }
+  if (slot != nullptr) {
+    slot->slot = nullptr;
+  }
+  slot = cls;
+  cls->slot = &slot;
+  return cls;
+}
+
+ObjectManager::CanaryRecord* ObjectManager::FindCanaryRecord(int javaObjectID) {
+  return m_canaryRecordCount == 0 ? nullptr : m_canaryRecords.Find(javaObjectID);
+}
+
+ObjectManager::CanaryRecord* ObjectManager::NewCanaryRecord(int javaObjectID) {
+  auto record = new CanaryRecord();
+  record->id = javaObjectID;
+  if (!m_canaryRecords.Insert(javaObjectID, record)) {
+    NS_DCHECK(false);
+    delete record;
+    return m_canaryRecords.Find(javaObjectID);
+  }
+  m_canaryRecordCount++;
+  return record;
+}
+
+void ObjectManager::EraseCanaryRecord(int javaObjectID) {
+  if (auto live = m_idToObject.Find(javaObjectID)) {
+    live->record = nullptr;
+  }
+  if (CanaryRecord* record = FindCanaryRecord(javaObjectID)) {
+    ForgetStateNames(record);
+    m_canaryRecords.Erase(javaObjectID);
+    m_canaryRecordCount--;
+    delete record;
+  }
+}
+
+void ObjectManager::CacheStateName(CanaryHandle* canary, const Local<Name>& property) {
+  CanaryRecord* record = canary->record;
+  if (record == nullptr || record->stateNotPlain || record->state.IsEmpty()) {
+    return;
+  }
+  size_t index = StateNameSet(record);
+  StateName* set = m_stateNames[index];
+  for (size_t way = 0; way < kStateNameWays; way++) {
+    if (set[way].record == record && set[way].name == property) {
+      return;
+    }
+  }
+  StateName& entry = set[m_stateNameVictims[index]];
+  m_stateNameVictims[index] = (m_stateNameVictims[index] + 1) % kStateNameWays;
+  entry.record = record;
+  entry.name.Reset(m_isolate, property);
+}
+
+void ObjectManager::ForgetStateName(CanaryHandle* canary, const Local<Name>& property) {
+  CanaryRecord* record = canary->record;
+  if (record == nullptr) {
+    return;
+  }
+  StateName* set = m_stateNames[StateNameSet(record)];
+  for (size_t way = 0; way < kStateNameWays; way++) {
+    if (set[way].record == record && set[way].name == property) {
+      set[way].record = nullptr;
+      set[way].name.Reset();
+    }
+  }
+}
+
+void ObjectManager::ForgetStateNames(CanaryRecord* record) {
+  StateName* set = m_stateNames[StateNameSet(record)];
+  for (size_t way = 0; way < kStateNameWays; way++) {
+    if (set[way].record == record) {
+      set[way].record = nullptr;
+      set[way].name.Reset();
+    }
+  }
+}
+
+FieldCallbackData* ObjectManager::CheckedInstanceField(CanaryHandle* canary,
+                                                       const Local<Object>& holder,
+                                                       const Local<Name>& property,
+                                                       uint32_t tag) {
+  Local<Value> prototype = holder->GetPrototype();
+  if (!prototype->IsObject()) {
+    return nullptr;
+  }
+  const FieldWrite* set = m_fieldWrites[FieldWriteSet(tag, prototype)];
+  for (size_t way = 0; way < kFieldWriteWays; way++) {
+    const FieldWrite& entry = set[way];
+    if (entry.name != property || entry.prototype != prototype) {
+      continue;
+    }
+    Local<Context> context = m_isolate->GetCurrentContext();
+    // The state has every own property of the canary.
+    CanaryRecord* record = canary->record;
+    if (record != nullptr && !record->state.IsEmpty() &&
+        record->state.Get(m_isolate)->HasRealNamedProperty(context, property).FromMaybe(true)) {
+      return nullptr;
+    }
+    Local<Value> object = prototype;
+    for (int i = 0; i < entry.depth; i++) {
+      Local<Object> below = object.As<Object>();
+      if (below->HasRealNamedProperty(context, property).FromMaybe(true)) {
+        return nullptr;
+      }
+      object = below->GetPrototype();
+      if (!object->IsObject()) {
+        return nullptr;
+      }
+    }
+    if (entry.depth > 0 && entry.owner != object) {
+      return nullptr;
+    }
+    // Every own property of a canary is in its state, so none can shadow the field.
+    NS_DCHECK(!holder->HasRealNamedProperty(context, property).FromMaybe(false));
+    m_lifetimeStats.canaryCachedFieldWrites++;
+    return entry.field;
+  }
+  return nullptr;
+}
+
+void ObjectManager::CacheInstanceField(const Local<Object>& holder, const Local<Object>& owner,
+                                       int depth, const Local<Name>& property,
+                                       FieldCallbackData* field) {
+  Local<Value> prototype = holder->GetPrototype();
+  if (!prototype->IsObject() || depth < 0) {
+    return;
+  }
+  uint32_t tag = FieldNameTag(property);
+  size_t nameIndex = FieldNameSet(tag);
+  uint32_t* tags = m_fieldNameTags[nameIndex];
+  if (std::find(tags, tags + kFieldNameWays, tag) == tags + kFieldNameWays) {
+    uint32_t* empty = std::find(tags, tags + kFieldNameWays, 0u);
+    if (empty == tags + kFieldNameWays) {
+      empty = &tags[m_fieldNameVictims[nameIndex]];
+      m_fieldNameVictims[nameIndex] = (m_fieldNameVictims[nameIndex] + 1) % kFieldNameWays;
+    }
+    *empty = tag;
+  }
+  size_t index = FieldWriteSet(tag, prototype);
+  FieldWrite* set = m_fieldWrites[index];
+  FieldWrite* entry = nullptr;
+  for (size_t way = 0; way < kFieldWriteWays && entry == nullptr; way++) {
+    if (set[way].name == property && set[way].prototype == prototype) {
+      entry = &set[way];
+    }
+  }
+  for (size_t way = 0; way < kFieldWriteWays && entry == nullptr; way++) {
+    if (set[way].prototype.IsEmpty()) {
+      entry = &set[way];
+    }
+  }
+  if (entry == nullptr) {
+    entry = &set[m_fieldWriteVictims[index]];
+    m_fieldWriteVictims[index] = (m_fieldWriteVictims[index] + 1) % kFieldWriteWays;
+  }
+  entry->name.Reset(m_isolate, property);
+  entry->prototype.Reset(m_isolate, prototype.As<Object>());
+  entry->prototype.SetWeak();
+  if (depth > 0) {
+    entry->owner.Reset(m_isolate, owner);
+    entry->owner.SetWeak();
+  } else {
+    entry->owner.Reset();
+  }
+  entry->field = field;
+  entry->depth = depth;
+}
+
+bool ObjectManager::EnsureJavaStrong(int javaObjectID, CanaryRecord* record) {
+  if (!record->javaWeak) {
+    return true;
+  }
+  JEnv env;
+  AssertIsolateLocked();
+  bool alive = env.CallBooleanMethod(m_javaRuntimeObject, STRENGTHEN_INSTANCE_METHOD_ID,
+                                     javaObjectID) == JNI_TRUE;
+  if (!alive) {
+    // Collected; the watcher's report has not arrived yet.
+    EraseCanaryRecord(javaObjectID);
+    return false;
+  }
+  record->javaWeak = false;
+  return true;
+}
+
+Local<Object> ObjectManager::RebuildCanary(int javaObjectID) {
+  return RebuildCanary(javaObjectID, FindCanaryRecord(javaObjectID));
+}
+
+Local<Object> ObjectManager::RebuildCanary(int javaObjectID, CanaryRecord* record) {
+  if (record == nullptr || record->cls == nullptr) {
+    return Local<Object>();
+  }
+  auto isolate = m_isolate;
+  EscapableHandleScope handleScope(isolate);
+  if (!EnsureJavaStrong(javaObjectID, record)) {
+    return handleScope.Escape(Local<Object>());
+  }
+  if (!record->shell.IsEmpty()) {
+    Local<Object> canary = record->shell.Get(isolate)->Clone(isolate);
+    m_lifetimeStats.canaryRebuilds++;
+    Link(canary, javaObjectID, record->clazz, LinkKind::kExtended, nullptr, record, false);
+    return handleScope.Escape(canary);
+  }
+
+  const CanaryClass* cls = record->cls;
+  NS_DCHECK(cls->instanceTemplate != nullptr);
+  if (cls->instanceTemplate == nullptr) {
+    return handleScope.Escape(Local<Object>());
+  }
+  auto context = isolate->GetCurrentContext();
+  Local<Object> canary;
+  if (!cls->instanceTemplate->Get(isolate)->NewInstance(context).ToLocal(&canary)) {
+    return handleScope.Escape(Local<Object>());
+  }
+  Local<Value> prototype = cls->prototype.Get(isolate);
+  if (!prototype.IsEmpty() && (prototype->IsObject() || prototype->IsNull()) &&
+      !prototype->StrictEquals(canary->GetPrototype())) {
+    (void) canary->SetPrototype(context, prototype);
+  }
+  canary->SetInternalField(static_cast<int>(MetadataNodeKeys::CallSuper),
+                           cls->callSuper.Get(isolate));
+  canary->SetInternalField(static_cast<int>(MetadataNodeKeys::Metadata),
+                           cls->metadata.Get(isolate));
+  if (!cls->implementationObject.IsEmpty()) {
+    V8SetPrivateValue(isolate, canary, V8StringConstants::GetImplementationObject(isolate),
+                      cls->implementationObject.Get(isolate));
+  }
+  m_lifetimeStats.canaryRebuilds++;
+  Link(canary, javaObjectID, record->clazz, LinkKind::kExtended, nullptr, record);
+  // Taken before JS can reach the canary, so it holds nothing JS adds later
+  // (#private brands, weak-collection keys); Link sets each clone's JsInfo.
+  Local<Object> shell = canary->Clone(isolate);
+  shell->SetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo), Undefined(isolate));
+  record->shell.Reset(isolate, shell);
+  return handleScope.Escape(canary);
+}
+
+ObjectManager::ObjectWeakCallbackState* ObjectManager::CanaryOf(const Local<Object>& holder) {
+  if (!HasMetadataField(holder)) {
+    return nullptr;
+  }
+  int id = LinkedIdOf(holder);
+  if (id == -1) {
+    return nullptr;
+  }
+  auto state = m_idToObject.Find(id);
+  // A `super` object shares its owner's id but is not the canary.
+  if (state == nullptr || !state->canary || !state->linked || *state->target != holder) {
+    return nullptr;
+  }
+  return state;
+}
+
+bool ObjectManager::IsCanary(const Local<Object>& holder) {
+  auto state = CanaryOf(holder);
+  return state != nullptr && state->keepsState;
+}
+
+bool ObjectManager::ExistingCanaryState(const Local<Object>& holder, Local<Object>* out) {
+  auto state = CanaryOf(holder);
+  if (state == nullptr || !state->keepsState) {
+    return false;
+  }
+  CanaryRecord* record = FindCanaryRecord(state->javaObjectID);
+  if (record == nullptr || record->state.IsEmpty()) {
+    return false;
+  }
+  *out = record->state.Get(m_isolate);
+  return true;
+}
+
+bool ObjectManager::CanaryStateForWrite(const Local<Object>& holder, Local<Object>* out) {
+  if (ExistingCanaryState(holder, out)) {
+    return true;
+  }
+  auto state = CanaryOf(holder);
+  if (state == nullptr || !state->keepsState) {
+    return false;
+  }
+  *out = AttachState(state, NewEmptyState());
+  return true;
+}
+
+Local<Object> ObjectManager::AttachState(CanaryHandle* canary, const Local<Object>& fresh) {
+  CanaryRecord* record = canary->record;
+  if (record == nullptr) {
+    record = FindCanaryRecord(canary->javaObjectID);
+  }
+  if (record == nullptr) {
+    record = NewCanaryRecord(canary->javaObjectID);
+  }
+  canary->record = record;
+  record->state.Reset(m_isolate, fresh);
+  m_lifetimeStats.canaryStates++;
+  return fresh;
+}
+
+Local<Object> ObjectManager::NewStateWith(CanaryHandle* canary, Local<Name> property,
+                                          Local<Value> value) {
+  // JS the write handler ran after it found no state (a Proxy trap on the
+  // prototype chain) may have made one for the canary since.
+  Local<Object> existing = StateOf(canary);
+  if (!existing.IsEmpty()) {
+    (void)existing->CreateDataProperty(m_isolate->GetCurrentContext(), property, value);
+    return existing;
+  }
+  Local<Object> fresh = NewEmptyState();
+  (void)fresh->CreateDataProperty(m_isolate->GetCurrentContext(), property, value);
+  return AttachState(canary, fresh);
+}
+
+// A fast-mode object with a null prototype: states made from one copy share
+// its map, so states that get the same names in the same order share their
+// maps' transitions. Object::New with a null prototype makes a dictionary.
+Local<Object> ObjectManager::NewEmptyState() {
+  if (m_emptyState.IsEmpty()) {
+    Local<Object> empty = Object::New(m_isolate);
+    (void)empty->SetPrototype(m_isolate->GetCurrentContext(), Null(m_isolate));
+    m_emptyState.Reset(m_isolate, empty);
+  }
+  return m_emptyState.Get(m_isolate)->Clone(m_isolate);
+}
+
+Local<Object> ObjectManager::StateOf(CanaryHandle* canary) {
+  CanaryRecord* record = canary->record;
+  return record != nullptr && !record->state.IsEmpty() ? record->state.Get(m_isolate)
+                                                       : Local<Object>();
+}
+
+bool ObjectManager::StateIsPlain(CanaryHandle* canary) {
+  return canary->record == nullptr || !canary->record->stateNotPlain;
+}
+
+void ObjectManager::SetStateNotPlain(CanaryHandle* canary) {
+  if (canary->record != nullptr) {
+    canary->record->stateNotPlain = true;
+  }
+}
+
+Local<Object> ObjectManager::StateForWrite(CanaryHandle* canary) {
+  Local<Object> existing = StateOf(canary);
+  if (!existing.IsEmpty()) {
+    return existing;
+  }
+  return AttachState(canary, NewEmptyState());
+}
+
+void ObjectManager::CanaryDiedStatic(
+    const WeakCallbackInfo<ObjectWeakCallbackState>& data) {
+  ObjectWeakCallbackState* state = data.GetParameter();
+  ObjectManager* thisPtr = state->thisPtr;
+  state->handle.Reset();
+  uint32_t id = state->javaObjectID;
+  if (thisPtr->m_idToObject.Find(id) == state) {
+    thisPtr->m_idToObject.Erase(id);
+  }
+  if (state->linked) {
+    if (CanaryRecord* record = thisPtr->FindCanaryRecord(id)) {
+      if (state->objectClazz != nullptr) {
+        record->clazz = state->objectClazz;
+      }
+    }
+    thisPtr->m_pendingCanaryDeaths.push_back(static_cast<jint>(id));
+  }
+  delete state;
+}
+
+void ObjectManager::CanaryGCEpilogue(Isolate* isolate, GCType type, GCCallbackFlags flags,
+                                     void* data) {
+  auto thisPtr = static_cast<ObjectManager*>(data);
+  if (!thisPtr->m_pendingCanaryDeaths.empty()) {
+    // Same as the finalizers': the next JS<->Java crossing flushes; this task
+    // covers a thread that goes idle first.
+    constexpr double kIdleFlushDelayMs = 4;
+    thisPtr->ScheduleFinalizedBatchFlush(kIdleFlushDelayMs);
+  }
+}
+
+bool ObjectManager::FlushCanaryDeaths() {
+  ReleaseCollectedCanaryStates();
+  if (m_pendingCanaryDeaths.empty()) {
+    return true;
+  }
+  if (!m_deathInboxOpen) {
+    auto runtime = Runtime::GetRuntime(m_isolate);
+    m_deathInboxRuntimeId = runtime->GetId();
+    WrapperLifetimeCanary::OpenDeathInbox(m_deathInboxRuntimeId, runtime->GetEventLoop());
+    m_deathInboxOpen = true;
+  }
+  auto deaths = std::move(m_pendingCanaryDeaths);
+  m_pendingCanaryDeaths.clear();
+  std::sort(deaths.begin(), deaths.end());
+  deaths.erase(std::unique(deaths.begin(), deaths.end()), deaths.end());
+
+  std::vector<jint> weaken;
+  std::vector<jint> release;
+  for (jint id : deaths) {
+    if (m_idToObject.Find(id) != nullptr) {
+      // A new canary was built since: the Java side stays strong.
+      continue;
+    }
+    // Weakening is idempotent: an id a failed batch already weakened is sent again.
+    if (FindCanaryRecord(id) == nullptr) {
+      release.push_back(id);
+    } else {
+      weaken.push_back(id);
+    }
+  }
+  if (weaken.empty() && release.empty()) {
+    return true;
+  }
+
+  JEnv env;
+  JNIEnv* raw = env;
+  auto toJava = [raw](const std::vector<jint>& ids) -> jintArray {
+    if (ids.empty()) {
+      return nullptr;
+    }
+    auto count = static_cast<jsize>(ids.size());
+    jintArray array = raw->NewIntArray(count);
+    if (array != nullptr) {
+      raw->SetIntArrayRegion(array, 0, count, ids.data());
+    }
+    return array;
+  };
+  JniLocalRef weakenArray(toJava(weaken));
+  JniLocalRef releaseArray(toJava(release));
+  bool failed = (!weaken.empty() && weakenArray.IsNull()) ||
+                (!release.empty() && releaseArray.IsNull());
+  if (!release.empty()) {
+    m_releaseCount++;
+  }
+  if (!failed) {
+    AssertIsolateLocked();
+    raw->CallVoidMethod(m_javaRuntimeObject, PROCESS_CANARY_BATCH_METHOD_ID,
+                        (jintArray) weakenArray, static_cast<jint>(weaken.size()),
+                        (jintArray) releaseArray, static_cast<jint>(release.size()));
+    failed = raw->ExceptionCheck();
+  }
+  if (failed) {
+    if (raw->ExceptionCheck()) {
+      raw->ExceptionDescribe();
+      raw->ExceptionClear();
+    }
+    // Java may have weakened some of them before failing: a canary rebuilt
+    // meanwhile must make its object strong again.
+    for (jint id : weaken) {
+      if (CanaryRecord* record = FindCanaryRecord(id)) {
+        record->javaWeak = true;
+      }
+    }
+    m_pendingCanaryDeaths.insert(m_pendingCanaryDeaths.end(), deaths.begin(), deaths.end());
+    return false;
+  }
+
+  m_lifetimeStats.collected += release.size();
+  if (!weaken.empty()) {
+    std::vector<jint> results(weaken.size());
+    raw->GetIntArrayRegion((jintArray) weakenArray, 0, static_cast<jsize>(weaken.size()),
+                           results.data());
+    for (size_t i = 0; i < weaken.size(); i++) {
+      if (results[i] < 0) {
+        // Never registered (a failed construction), or already collected.
+        EraseCanaryRecord(weaken[i]);
+        continue;
+      }
+      if (CanaryRecord* record = FindCanaryRecord(weaken[i])) {
+        record->javaWeak = true;
+        m_lifetimeStats.weakened++;
+      }
+    }
+  }
+  return true;
+}
+
+std::map<std::string, ObjectManager::ClassCounts> ObjectManager::GetWrapperClassCounts() {
+  std::map<std::string, ClassCounts> counts;
+  std::unordered_map<jclass, std::string> names;
+  auto nameOf = [&names](jclass clazz) -> const std::string& {
+    auto it = names.find(clazz);
+    if (it != names.end()) {
+      return it->second;
+    }
+    std::string name = clazz != nullptr ? GetClassName(clazz) : std::string("<unknown>");
+    std::replace(name.begin(), name.end(), '/', '.');
+    return names.emplace(clazz, std::move(name)).first->second;
+  };
+  m_idToObject.ForEach([&](ObjectWeakCallbackState* state) {
+    if (!state->linked) {
+      return;
+    }
+    ClassCounts& entry = counts[nameOf(state->objectClazz)];
+    entry.wrappers++;
+    if (state->canary) {
+      entry.canaries++;
+    }
+  });
+  m_canaryRecords.ForEach([&](CanaryRecord* record) {
+    if (record->state.IsEmpty()) {
+      return;
+    }
+    jclass clazz = record->clazz;
+    if (auto live = m_idToObject.Find(record->id)) {
+      clazz = live->objectClazz;
+    }
+    counts[nameOf(clazz)].states++;
+  });
+  return counts;
+}
+
+void ObjectManager::ReleaseCollectedCanaryStates() {
+  if (!m_deathInboxOpen) {
+    return;
+  }
+  for (int id : WrapperLifetimeCanary::TakeCollected(m_deathInboxRuntimeId)) {
+    // A live canary keeps its object strongly held, so Java cannot have
+    // collected an object that has one.
+    if (m_idToObject.Find(id) != nullptr) {
+      continue;
+    }
+    if (FindCanaryRecord(id) != nullptr) {
+      EraseCanaryRecord(id);
+      m_lifetimeStats.canaryNativeDeaths++;
+    }
+  }
 }
 
 bool ObjectManager::CloneLink(const Local<Object>& src,
@@ -670,7 +1343,8 @@ bool ObjectManager::ScheduleFinalizedBatchFlush(double delayMs) {
 void ObjectManager::FlushFinalizedBatch() {
   m_flushScheduled = false;
   m_flushBackingOff = false;
-  if (m_pendingWeaken.empty() && m_pendingCheck.empty()) {
+  if (m_pendingWeaken.empty() && m_pendingCheck.empty() &&
+      m_pendingCanaryDeaths.empty() && !m_deathInboxOpen) {
     return;
   }
   // A failed Java->JS call returns with its exception pending: JNI may not be used until it
@@ -680,6 +1354,15 @@ void ObjectManager::FlushFinalizedBatch() {
     return;
   }
   HandleScope handleScope(m_isolate);
+
+  if (!FlushCanaryDeaths()) {
+    constexpr double kRetryDelayMs = 100;
+    m_flushBackingOff = ScheduleFinalizedBatchFlush(kRetryDelayMs);
+    return;
+  }
+  if (m_pendingWeaken.empty() && m_pendingCheck.empty()) {
+    return;
+  }
 
   auto weaken = std::move(m_pendingWeaken);
   auto check = std::move(m_pendingCheck);
@@ -813,6 +1496,37 @@ void ObjectManager::ReleaseAllRegistered() {
 
   m_pendingWeaken.clear();
   m_pendingCheck.clear();
+  m_pendingCanaryDeaths.clear();
+  if (m_canaryEpilogueAdded) {
+    m_isolate->RemoveGCEpilogueCallback(CanaryGCEpilogue, this);
+    m_canaryEpilogueAdded = false;
+  }
+  if (WrapperLifetimeCanary::Enabled()) {
+    if (m_deathInboxOpen) {
+      WrapperLifetimeCanary::CloseDeathInbox(m_deathInboxRuntimeId);
+      m_deathInboxOpen = false;
+    }
+  }
+  m_idToObject.ForEach([](ObjectWeakCallbackState* state) { state->record = nullptr; });
+  for (auto& set : m_stateNames) {
+    for (StateName& entry : set) {
+      entry.record = nullptr;
+      entry.name.Reset();
+    }
+  }
+  for (auto& set : m_fieldWrites) {
+    for (FieldWrite& entry : set) {
+      entry.name.Reset();
+      entry.prototype.Reset();
+      entry.owner.Reset();
+      entry.field = nullptr;
+    }
+  }
+  std::fill(&m_fieldNameTags[0][0], &m_fieldNameTags[0][0] + kFieldNameSets * kFieldNameWays, 0u);
+  m_canaryRecords.DrainAll([](CanaryRecord* record) { delete record; });
+  m_canaryRecordCount = 0;
+  m_instanceFieldTableKey.Reset();
+  m_emptyState.Reset();
 
   auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
 
@@ -935,6 +1649,8 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
                      javaObjectID);
   m_releaseCount++;
   m_lifetimeStats.releasedExplicitly++;
+  // Java no longer knows the id, so nothing could rebuild a canary from it.
+  EraseCanaryRecord(javaObjectID);
 
   // The registration outlives the link: it is dropped by the finalizer once
   // the wrapper is collected.
@@ -965,6 +1681,8 @@ jclass ObjectManager::JAVA_LANG_CLASS = nullptr;
 jmethodID ObjectManager::GET_NAME_METHOD_ID = nullptr;
 jmethodID ObjectManager::GET_JAVAOBJECT_BY_ID_METHOD_ID = nullptr;
 jmethodID ObjectManager::GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID = nullptr;
+jmethodID ObjectManager::GET_CLASS_INDEX_METHOD_ID = nullptr;
+
 jmethodID ObjectManager::GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID =
     nullptr;
 jmethodID ObjectManager::FIND_JAVA_OBJECT_ID_METHOD_ID = nullptr;
@@ -972,3 +1690,5 @@ jmethodID ObjectManager::MAKE_INSTANCE_STRONG_METHOD_ID = nullptr;
 jmethodID ObjectManager::PROCESS_FINALIZED_BATCH_METHOD_ID = nullptr;
 jmethodID ObjectManager::RELEASE_NATIVE_INSTANCE_METHOD_ID = nullptr;
 jmethodID ObjectManager::RELEASE_IF_COLLECTED_METHOD_ID = nullptr;
+jmethodID ObjectManager::PROCESS_CANARY_BATCH_METHOD_ID = nullptr;
+jmethodID ObjectManager::STRENGTHEN_INSTANCE_METHOD_ID = nullptr;

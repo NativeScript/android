@@ -21,7 +21,7 @@ describe("Wrapper lifetime", function () {
     });
 
     it("reports the configured mode and scope (" + mode + "/" + scope + ")", function () {
-        expect(["resurrecting"]).toContain(mode);
+        expect(["resurrecting", "canary"]).toContain(mode);
         expect(["extended", "all"]).toContain(scope);
     });
 
@@ -37,7 +37,8 @@ describe("Wrapper lifetime", function () {
     it("exposes numeric counters", function () {
         var stats = runtime.getWrapperLifetimeStats();
         expect(Object.keys(stats).sort()).toEqual(
-            ["collected", "releasedAccesses", "releasedExplicitly", "resurrections", "weakened"]);
+            ["canaryCachedFieldWrites", "canaryCachedWrites", "canaryInterceptedWrites", "canaryNativeDeaths",
+             "canaryRebuilds", "canaryStates", "collected", "releasedAccesses", "releasedExplicitly", "resurrections", "weakened"]);
         Object.keys(stats).forEach(function (key) {
             expect(typeof stats[key]).toBe("number");
         });
