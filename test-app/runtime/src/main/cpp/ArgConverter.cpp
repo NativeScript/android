@@ -150,7 +150,10 @@ void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const 
             // hint Java read without the isolate lock, or -1) and the class index above.
             auto hintedObjectID = static_cast<jint>(bits);
             auto classIndex = static_cast<int>((bits >> 32) & 0x7fffffff);
+            // JS run since the call started (the method lookup) may have reached the
+            // argument another way and released its id; it is then resolved again.
             if ((bits & JavaCallArgs::FreshArg) != 0 &&
+                objectManager->ReleaseCount() == args.releasesAtStart &&
                 !objectManager->HasJsObject(hintedObjectID)) {
                 JniLocalRef arg(env->GetObjectArrayElement(args.refs, i));
                 jsArg = objectManager->CreateJSWrapper(hintedObjectID, classIndex, arg);
