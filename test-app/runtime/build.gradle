@@ -24,9 +24,16 @@ if (onlyX86) {
     println "OnlyX86 build triggered."
 }
 
-def useCCache = project.hasProperty("useCCache")
+// -PuseCCache (CI and packaging), its -PuseCcache spelling, or NS_USE_CCACHE=1 in the environment.
+def useCCache = project.hasProperty("useCCache") || project.hasProperty("useCcache") ||
+        System.getenv("NS_USE_CCACHE") == "1"
 if (useCCache) {
     println "Use CCache build triggered."
+}
+
+def benchVariants = project.hasProperty("benchVariants")
+if (benchVariants) {
+    println "Benchmark variant switch (NS_BENCH_VARIANTS) enabled: do not ship this build."
 }
 
 
@@ -118,6 +125,10 @@ android {
 
                 if (useCCache) {
                     arguments.add("-DUSE_CCACHE=true")
+                }
+
+                if (benchVariants) {
+                    arguments.add("-DNS_BENCH_VARIANTS=ON")
                 }
 
                 cppFlags "-std=c++20"

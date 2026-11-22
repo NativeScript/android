@@ -13,6 +13,15 @@ if (CCACHE_FOUND AND (USE_CCACHE))
     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
 endif (CCACHE_FOUND AND (USE_CCACHE))
 
+# Benchmark builds only (tools/perf): BenchVariant.h reads debug.ns.benchvariant
+# at load time so one APK can carry every label of an A/B. Never enable it for a
+# build that ships.
+option(NS_BENCH_VARIANTS "Read the run-time benchmark variant from debug.ns.benchvariant" OFF)
+if (NS_BENCH_VARIANTS)
+    MESSAGE(STATUS "## NS_BENCH_VARIANTS is ON: benchmark build, do not ship")
+    add_definitions(-DNS_BENCH_VARIANTS)
+endif ()
+
 # Command info: https://cmake.org/cmake/help/v3.4/command/message.html
 # we pass the android_ndk_root from gradle because for some reason
 # "-DANDROID_STL=c++_static" is just not enough for clang++ to find some libraries in the ndk
