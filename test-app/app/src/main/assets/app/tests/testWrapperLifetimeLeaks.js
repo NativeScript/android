@@ -8,6 +8,7 @@ describe("Wrapper lifetime leak probe", function () {
     // Alive for the whole suite: what leaks is the entry's value.
     var probeMap = new WeakMap();
     var report;
+    var canaryRebuilds;
 
     function cyclesThrough(edge) {
         return report.cycles.filter(function (cycle) {
@@ -35,10 +36,12 @@ describe("Wrapper lifetime leak probe", function () {
             java.lang.Runtime.getRuntime().gc();
             gc();
             java.lang.System.nanoTime();
+            var rebuildsBefore = runtime.getWrapperLifetimeStats().canaryRebuilds;
             (function () {
                 // A read: the rebuilt canary's copy stays current.
                 Holder.held.get(0).probeRebuiltList.size();
             })();
+            canaryRebuilds = runtime.getWrapperLifetimeStats().canaryRebuilds - rebuildsBefore;
             Holder.held = null;
             (function () {
                 // A JS property referencing its own object.
@@ -188,6 +191,7 @@ describe("Wrapper lifetime leak probe", function () {
             expect(cycles.length).toBe(0);
             return;
         }
+        expect(canaryRebuilds).toBeGreaterThan(0);
         expect(cycles.length).toBe(1);
     });
 
