@@ -85,11 +85,28 @@ class Runtime {
          */
         static void SetPendingIsolateSetup(PendingIsolateSetup setup);
 
-        static Runtime* GetRuntime(int runtimeId);
+        static Runtime* GetRuntime(int runtimeId) {
+            // A runtime is only destroyed on its own thread, which is busy in
+            // this call, so the calling thread's own runtime needs neither the
+            // lock nor the map.
+            auto& current = s_current;
+            if (runtimeId == current.id) [[likely]] {
+                return current.runtime;
+            }
+            return GetRuntimeSlow(runtimeId);
+        }
 
-        static Runtime* GetRuntime(v8::Isolate* isolate);
-
-        static Runtime* GetRuntimeFromIsolateData(v8::Isolate* isolate);
+        /*
+         * Hot path, called from V8 callbacks on the isolate's own thread. The
+         * slot is written once in PrepareV8Runtime before the isolate runs any
+         * JS, so reading it requires no lock.
+         */
+        static Runtime* GetRuntime(v8::Isolate* isolate) {
+            if (auto* runtime = TryGetRuntime(isolate)) [[likely]] {
+                return runtime;
+            }
+            return GetRuntimeSlow(isolate);
+        }
 
         /*
          * The runtime for this isolate, or null. Unlike the accessors above it
@@ -363,6 +380,14 @@ class Runtime {
         }
 
     private:
+        // Another thread's runtime, looked up under the lock; throws when the
+        // id names no live runtime.
+        static Runtime* GetRuntimeSlow(int runtimeId);
+
+        // Covers the window during isolate setup before the data slot is set;
+        // throws when the isolate has no runtime.
+        static Runtime* GetRuntimeSlow(v8::Isolate* isolate);
+
         Runtime(JNIEnv* env, jobject runtime, int id);
 
         int m_id;
@@ -490,7 +515,9 @@ class Runtime {
             Runtime* runtime = nullptr;
             int id = -1;
         };
-        static thread_local CurrentRuntime s_current;
+        // constinit lets other translation units read it without first
+        // calling its thread-local initialization hook.
+        static constinit thread_local CurrentRuntime s_current;
         static thread_local PendingIsolateSetup s_pendingIsolateSetup;
 
 #ifdef APPLICATION_IN_DEBUG
