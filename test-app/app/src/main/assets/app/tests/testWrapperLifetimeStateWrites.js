@@ -220,7 +220,11 @@ describe("Wrapper lifetime state writes", function () {
         })();
         object = null;
         collect();
+        var before = rebuilds();
         object = Holder.held;
+        if (canary) {
+            expect(rebuilds()).toBeGreaterThan(before);
+        }
         expect(Object.keys(object)).toEqual(["a", "c", "b"]);
         expect([object.a, object.b, object.c]).toEqual([3, 2, 1]);
     });
@@ -288,7 +292,12 @@ describe("Wrapper lifetime state writes", function () {
         object.plain = 5;
         object = null;
         collect();
-        expect(Holder.held.plain).toBe(5);
+        var before = rebuilds();
+        object = Holder.held;
+        if (canary) {
+            expect(rebuilds()).toBeGreaterThan(before);
+        }
+        expect(object.plain).toBe(5);
     });
 
     it("keeps fields a TypeScript-style subclass defines in its constructor", function () {
