@@ -31,15 +31,19 @@ bool HasOwn(Local<Context> context, Local<Object> state, Local<Name> property) {
 }
 
 // The object of `holder`'s prototype chain, `holder` included, with a real own
-// `property`, interceptors skipped; empty if there is none.
-Local<Object> OwnerOf(Local<Context> context, Local<Object> holder, Local<Name> property) {
+// `property`, interceptors skipped, and how many prototypes up from holder it
+// is; empty if there is none.
+Local<Object> OwnerOf(Local<Context> context, Local<Object> holder, Local<Name> property,
+                      int* steps) {
   Local<Object> object = holder;
+  *steps = 0;
   while (!object->HasRealNamedProperty(context, property).FromMaybe(false)) {
     Local<Value> prototype = object->GetPrototype();
     if (!prototype->IsObject()) {
       return Local<Object>();
     }
     object = prototype.As<Object>();
+    ++*steps;
   }
   return object;
 }
@@ -100,15 +104,20 @@ bool RewriteState(ObjectManager* objectManager, ObjectManager::CanaryHandle* can
     if ((attributes & ReadOnly) != 0) {
       return Intercepted::kNo;
     }
-    Local<Object> owner = OwnerOf(context, holder, property);
+    int steps;
+    Local<Object> owner = OwnerOf(context, holder, property, &steps);
     if (owner.IsEmpty()) {
       return Intercepted::kNo;
     }
     // A Java field's setter runs from here, sparing V8 a second lookup.
-    if (owner != holder &&
-        MetadataNode::TrySetInstanceField(isolate, context, objectManager->InstanceFieldTableKey(),
-                                          owner, holder, property, value)) {
-      return Intercepted::kYes;
+    if (owner != holder) {
+      FieldCallbackData* field = MetadataNode::InstanceFieldOf(
+          context, objectManager->InstanceFieldTableKey(), owner, property);
+      if (field != nullptr) {
+        objectManager->CacheInstanceField(holder, owner, steps - 1, property, field);
+        MetadataNode::SetInstanceFieldFromJs(isolate, holder, value, field);
+        return Intercepted::kYes;
+      }
     }
     Maybe<bool> accessor = owner->HasRealNamedCallbackProperty(context, property);
     if (accessor.IsNothing() || accessor.FromJust()) {
@@ -162,6 +171,10 @@ Intercepted Setter(Local<Name> property, Local<Value> value,
     objectManager->StateChanging(canary);
     (void)state->Set(isolate->GetCurrentContext(), property, value);
     return Intercepted::kNo;
+  }
+  if (FieldCallbackData* field = objectManager->CachedInstanceField(canary, holder, property)) {
+    MetadataNode::SetInstanceFieldFromJs(isolate, holder, value, field);
+    return Intercepted::kYes;
   }
   return MirrorUncachedWrite(objectManager, canary, holder, property, value, isolate);
 }

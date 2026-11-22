@@ -38,16 +38,19 @@ namespace tns {
 class MetadataNode {
     public:
         /*
-         * Canary mode: runs the Java instance field setter the class prototype
-         * `owner` carries for `property`, as a write through `receiver` would.
-         * False, and nothing done, when owner carries no runtime-installed field
-         * accessor for property. Field accessors are non-configurable, so one
-         * found on owner is still the runtime's.
+         * Canary mode: the Java instance field whose accessor the class
+         * prototype `owner` carries for `property`, or null when owner carries
+         * no runtime-installed field accessor for property. Field accessors are
+         * non-configurable, so one found on owner is still the runtime's.
          */
-        static bool TrySetInstanceField(v8::Isolate* isolate, v8::Local<v8::Context> context,
-                                        v8::Local<v8::Private> fieldTableKey,
-                                        v8::Local<v8::Object> owner, v8::Local<v8::Object> receiver,
-                                        v8::Local<v8::Name> property, v8::Local<v8::Value> value);
+        static FieldCallbackData* InstanceFieldOf(v8::Local<v8::Context> context,
+                                                  v8::Local<v8::Private> fieldTableKey,
+                                                  v8::Local<v8::Object> owner,
+                                                  v8::Local<v8::Name> property);
+        // Canary mode: runs field's setter as a write through receiver would,
+        // a failure thrown to JS.
+        static void SetInstanceFieldFromJs(v8::Isolate* isolate, v8::Local<v8::Object> receiver,
+                                           v8::Local<v8::Value> value, FieldCallbackData* field);
 
         static void Init(v8::Isolate* isolate);
 

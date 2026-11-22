@@ -21,6 +21,7 @@
 
 namespace tns {
 struct JavaCallArgs;
+struct FieldCallbackData;
 class MetadataNode;
 
 class ObjectManager {
@@ -234,12 +235,22 @@ class ObjectManager {
   void CacheStateName(CanaryHandle* canary, const v8::Local<v8::Name>& property);
   // Before the handlers delete or redefine `property` on the canary's state.
   void ForgetStateName(CanaryHandle* canary, const v8::Local<v8::Name>& property);
+  // The Java instance field a write of `property` on the canary `holder` runs
+  // the setter of, when a cached earlier write through an object with holder's
+  // prototype still applies; null otherwise.
+  inline FieldCallbackData* CachedInstanceField(CanaryHandle* canary,
+                                                const v8::Local<v8::Object>& holder,
+                                                const v8::Local<v8::Name>& property);
+  // After a write of `property` on the canary `holder` found `field`'s
+  // accessor on `owner`, `depth` prototypes above holder's prototype.
+  void CacheInstanceField(const v8::Local<v8::Object>& holder, const v8::Local<v8::Object>& owner,
+                          int depth, const v8::Local<v8::Name>& property, FieldCallbackData* field);
 
   // Set while the runtime copies properties between a canary and its state, so
   // the handlers let those defines through. The copy runs no JS, and only the
   // thread holding the isolate's lock touches this.
   // Canary mode: the private key under which a class prototype keeps its
-  // instance field accessors' data (MetadataNode::TrySetInstanceField); empty
+  // instance field accessors' data (MetadataNode::InstanceFieldOf); empty
   // in other modes.
   v8::Local<v8::Private> InstanceFieldTableKey() {
     return m_instanceFieldTableKey.Get(m_isolate);
@@ -436,6 +447,47 @@ class ObjectManager {
   uint8_t m_stateNameVictims[kStateNameSets] = {};
   void ForgetStateNames(CanaryRecord* record);
 
+  // Java instance fields the write handler ran the setter of, by the name
+  // written and the canary's prototype. Field accessors are non-configurable,
+  // so a hit rechecks only what lies below the accessor's owner: the canary's
+  // state and the prototypes in between. Sets are picked by addresses, which a
+  // moving collection may change; the entry then just misses.
+  struct FieldWrite {
+    v8::Global<v8::Name> name;
+    // Weak, as is owner: the cache keeps no prototype alive.
+    v8::Global<v8::Object> prototype;
+    // Empty when the owner is the prototype itself.
+    v8::Global<v8::Object> owner;
+    FieldCallbackData* field = nullptr;
+    int depth = 0;
+  };
+  // The low half of a name's tagged address: never 0, and only a filter, as a
+  // name can move or its address be reused.
+  static uint32_t FieldNameTag(const v8::Local<v8::Name>& name) {
+    return static_cast<uint32_t>(v8::internal::ValueHelper::ValueAsAddress(*name));
+  }
+  static constexpr size_t kFieldNameSets = 32;
+  static constexpr size_t kFieldNameWays = 4;
+  static size_t FieldNameSet(uint32_t tag) {
+    return ((tag >> 3) ^ (tag >> 9)) & (kFieldNameSets - 1);
+  }
+  // Tags of the names entries were made for, so a write of any other name
+  // reads one line and makes no V8 call. One name has entries for many
+  // prototypes (a field every LayoutParams subclass inherits).
+  uint32_t m_fieldNameTags[kFieldNameSets][kFieldNameWays] = {};
+  uint8_t m_fieldNameVictims[kFieldNameSets] = {};
+  static constexpr size_t kFieldWriteSets = 64;
+  static constexpr size_t kFieldWriteWays = 4;
+  static size_t FieldWriteSet(uint32_t tag, const v8::Local<v8::Value>& prototype) {
+    auto address = static_cast<uint32_t>(v8::internal::ValueHelper::ValueAsAddress(*prototype));
+    uint32_t mixed = (address ^ tag) * 0x9E3779B1u;
+    return (mixed >> 26) & (kFieldWriteSets - 1);
+  }
+  FieldWrite m_fieldWrites[kFieldWriteSets][kFieldWriteWays];
+  uint8_t m_fieldWriteVictims[kFieldWriteSets] = {};
+  FieldCallbackData* CheckedInstanceField(CanaryHandle* canary, const v8::Local<v8::Object>& holder,
+                                          const v8::Local<v8::Name>& property, uint32_t tag);
+
   // Settles canaries collected since the last flush: Java holds the objects
   // with records weakly and releases the others. False if the JNI call failed;
   // the ids are queued again.
@@ -588,6 +640,19 @@ inline v8::Local<v8::Object> ObjectManager::CachedPlainState(
     }
   }
   return v8::Local<v8::Object>();
+}
+
+inline FieldCallbackData* ObjectManager::CachedInstanceField(CanaryHandle* canary,
+                                                             const v8::Local<v8::Object>& holder,
+                                                             const v8::Local<v8::Name>& property) {
+  uint32_t tag = FieldNameTag(property);
+  const uint32_t* tags = m_fieldNameTags[FieldNameSet(tag)];
+  for (size_t way = 0; way < kFieldNameWays; way++) {
+    if (tags[way] == tag) {
+      return CheckedInstanceField(canary, holder, property, tag);
+    }
+  }
+  return nullptr;
 }
 }  // namespace tns
 

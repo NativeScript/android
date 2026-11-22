@@ -725,6 +725,97 @@ void ObjectManager::ForgetStateNames(CanaryRecord* record) {
   }
 }
 
+FieldCallbackData* ObjectManager::CheckedInstanceField(CanaryHandle* canary,
+                                                       const Local<Object>& holder,
+                                                       const Local<Name>& property,
+                                                       uint32_t tag) {
+  Local<Value> prototype = holder->GetPrototype();
+  if (!prototype->IsObject()) {
+    return nullptr;
+  }
+  const FieldWrite* set = m_fieldWrites[FieldWriteSet(tag, prototype)];
+  for (size_t way = 0; way < kFieldWriteWays; way++) {
+    const FieldWrite& entry = set[way];
+    if (entry.name != property || entry.prototype != prototype) {
+      continue;
+    }
+    Local<Context> context = m_isolate->GetCurrentContext();
+    // The state has every own property of the canary.
+    CanaryRecord* record = canary->record;
+    if (record != nullptr && !record->state.IsEmpty() &&
+        record->state.Get(m_isolate)->HasRealNamedProperty(context, property).FromMaybe(true)) {
+      return nullptr;
+    }
+    Local<Value> object = prototype;
+    for (int i = 0; i < entry.depth; i++) {
+      Local<Object> below = object.As<Object>();
+      if (below->HasRealNamedProperty(context, property).FromMaybe(true)) {
+        return nullptr;
+      }
+      object = below->GetPrototype();
+      if (!object->IsObject()) {
+        return nullptr;
+      }
+    }
+    if (entry.depth > 0 && entry.owner != object) {
+      return nullptr;
+    }
+    // Every own property of a canary is in its state, so none can shadow the field.
+    NS_DCHECK(!holder->HasRealNamedProperty(context, property).FromMaybe(false));
+    m_lifetimeStats.canaryCachedFieldWrites++;
+    return entry.field;
+  }
+  return nullptr;
+}
+
+void ObjectManager::CacheInstanceField(const Local<Object>& holder, const Local<Object>& owner,
+                                       int depth, const Local<Name>& property,
+                                       FieldCallbackData* field) {
+  Local<Value> prototype = holder->GetPrototype();
+  if (!prototype->IsObject() || depth < 0) {
+    return;
+  }
+  uint32_t tag = FieldNameTag(property);
+  size_t nameIndex = FieldNameSet(tag);
+  uint32_t* tags = m_fieldNameTags[nameIndex];
+  if (std::find(tags, tags + kFieldNameWays, tag) == tags + kFieldNameWays) {
+    uint32_t* empty = std::find(tags, tags + kFieldNameWays, 0u);
+    if (empty == tags + kFieldNameWays) {
+      empty = &tags[m_fieldNameVictims[nameIndex]];
+      m_fieldNameVictims[nameIndex] = (m_fieldNameVictims[nameIndex] + 1) % kFieldNameWays;
+    }
+    *empty = tag;
+  }
+  size_t index = FieldWriteSet(tag, prototype);
+  FieldWrite* set = m_fieldWrites[index];
+  FieldWrite* entry = nullptr;
+  for (size_t way = 0; way < kFieldWriteWays && entry == nullptr; way++) {
+    if (set[way].name == property && set[way].prototype == prototype) {
+      entry = &set[way];
+    }
+  }
+  for (size_t way = 0; way < kFieldWriteWays && entry == nullptr; way++) {
+    if (set[way].prototype.IsEmpty()) {
+      entry = &set[way];
+    }
+  }
+  if (entry == nullptr) {
+    entry = &set[m_fieldWriteVictims[index]];
+    m_fieldWriteVictims[index] = (m_fieldWriteVictims[index] + 1) % kFieldWriteWays;
+  }
+  entry->name.Reset(m_isolate, property);
+  entry->prototype.Reset(m_isolate, prototype.As<Object>());
+  entry->prototype.SetWeak();
+  if (depth > 0) {
+    entry->owner.Reset(m_isolate, owner);
+    entry->owner.SetWeak();
+  } else {
+    entry->owner.Reset();
+  }
+  entry->field = field;
+  entry->depth = depth;
+}
+
 bool ObjectManager::EnsureJavaStrong(int javaObjectID, CanaryRecord* record) {
   if (!record->javaWeak) {
     return true;
@@ -1350,6 +1441,15 @@ void ObjectManager::ReleaseAllRegistered() {
       entry.name.Reset();
     }
   }
+  for (auto& set : m_fieldWrites) {
+    for (FieldWrite& entry : set) {
+      entry.name.Reset();
+      entry.prototype.Reset();
+      entry.owner.Reset();
+      entry.field = nullptr;
+    }
+  }
+  std::fill(&m_fieldNameTags[0][0], &m_fieldNameTags[0][0] + kFieldNameSets * kFieldNameWays, 0u);
   m_canaryRecords.clear();
   m_instanceFieldTableKey.Reset();
 

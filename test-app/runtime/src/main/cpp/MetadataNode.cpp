@@ -665,23 +665,26 @@ void MetadataNode::FieldAccessorSetterCallback(const FunctionCallbackInfo<Value>
     }
 }
 
-bool MetadataNode::TrySetInstanceField(Isolate* isolate, Local<Context> context,
-                                       Local<Private> fieldTableKey, Local<Object> owner,
-                                       Local<Object> receiver, Local<Name> property,
-                                       Local<Value> value) {
+FieldCallbackData* MetadataNode::InstanceFieldOf(Local<Context> context,
+                                                 Local<Private> fieldTableKey,
+                                                 Local<Object> owner, Local<Name> property) {
     Local<Value> table;
     if (!owner->GetPrivate(context, fieldTableKey).ToLocal(&table) || !table->IsObject()) {
-        return false;
+        return nullptr;
     }
     Local<Value> entry;
     if (!table.As<Object>()->GetRealNamedProperty(context, property).ToLocal(&entry) ||
         !entry->IsExternal()) {
-        return false;
+        return nullptr;
     }
-    auto fieldData = static_cast<FieldCallbackData*>(
+    return static_cast<FieldCallbackData*>(
             entry.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+}
+
+void MetadataNode::SetInstanceFieldFromJs(Isolate* isolate, Local<Object> receiver,
+                                          Local<Value> value, FieldCallbackData* field) {
     try {
-        SetInstanceField(isolate, receiver, value, fieldData);
+        SetInstanceField(isolate, receiver, value, field);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -693,7 +696,6 @@ bool MetadataNode::TrySetInstanceField(Isolate* isolate, Local<Context> context,
         NativeScriptException nsEx(std::string("Error: c++ exception!"));
         nsEx.ReThrowToV8();
     }
-    return true;
 }
 
 void MetadataNode::PropertyAccessorGetterCallback(const FunctionCallbackInfo<Value>& info) {

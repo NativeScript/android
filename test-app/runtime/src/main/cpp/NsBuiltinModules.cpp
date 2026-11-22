@@ -179,6 +179,7 @@ void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
     set("canaryNativeDeaths", stats.canaryNativeDeaths);
     set("canaryInterceptedWrites", stats.canaryInterceptedWrites);
     set("canaryCachedWrites", stats.canaryCachedWrites);
+    set("canaryCachedFieldWrites", stats.canaryCachedFieldWrites);
     set("canaryRebuilds", stats.canaryRebuilds);
     info.GetReturnValue().Set(result);
 }
