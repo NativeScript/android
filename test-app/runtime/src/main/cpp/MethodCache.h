@@ -2,6 +2,7 @@
 #define METHODCACHE_H_
 
 #include <string>
+#include <vector>
 #include <map>
 #include "v8.h"
 #include "JEnv.h"
@@ -23,6 +24,8 @@ class MethodCache {
                 retType(MethodReturnType::Unknown), mid(nullptr), clazz(nullptr), isStatic(false), isInterfaceProxy(false) {
             }
             std::string signature;
+            // signature parsed into argument types; set before the entry is published.
+            std::vector<std::string> parsedSig;
             std::string returnType;
             MethodReturnType retType;
             jmethodID mid;

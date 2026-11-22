@@ -214,7 +214,8 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
                                         bool isInterface,
                                         const std::string &baseClassName,
                                         uint64_t defaultOverrides,
-                                        const vector<string> *contentMemberNames) {
+                                        const vector<string> *contentMemberNames,
+                                        jclass *resolvedClass) {
     bool success;
 
     DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
@@ -230,9 +231,15 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
     // The default-overriding class does not depend on the implementation object, whose
     // properties ResolveClass would otherwise read, getters included.
-    jclass generatedJavaClass = ResolveClass(isolate, baseClassName, fullClassName,
-                                             defaultOverrides != 0 ? Local<Object>() : implementationObject,
-                                             isInterface, contentMemberNames);
+    jclass generatedJavaClass = resolvedClass != nullptr ? *resolvedClass : nullptr;
+    if (generatedJavaClass == nullptr) {
+        generatedJavaClass = ResolveClass(isolate, baseClassName, fullClassName,
+                                          defaultOverrides != 0 ? Local<Object>() : implementationObject,
+                                          isInterface, contentMemberNames);
+        if (resolvedClass != nullptr) {
+            *resolvedClass = generatedJavaClass;
+        }
+    }
 
     int javaObjectID = objectManager->GenerateNewObjectID();
 
@@ -253,7 +260,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
             instance = env.NewObject(generatedJavaClass, mi.mid);
         } else {
             // resolve arguments before passing them on to the constructor
-            JsArgConverter argConverter(argWrapper.args, mi.signature);
+            JsArgConverter argConverter(argWrapper.args, mi.parsedSig);
             auto ctorArgs = argConverter.ToArgs();
 
             instance = env.NewObjectA(generatedJavaClass, mi.mid, ctorArgs);
@@ -268,6 +275,9 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
     jlong usedJavaMemory = env.CallLongMethod(runtime->GetJavaRuntime(), REGISTER_CONSTRUCTED_INSTANCE_ID,
                                               instance, javaObjectID);
+    // While the constructor ran, an instance of the same class that Java created could take
+    // this id until the registration above replaced it; a jweak cached then names that one.
+    objectManager->ForgetCachedJavaObject(javaObjectID);
 
     AdjustAmountOfExternalAllocatedMemory(isolate, usedJavaMemory);
 
@@ -505,9 +515,10 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                     methodName.c_str());
     }
 
+    const std::vector<std::string> *parsedSig = mi != nullptr ? &mi->parsedSig : nullptr;
     JsArgConverter argConverter = (entry != nullptr && entry->isExtensionFunction)
-                                        ? JsArgConverter(caller, args, *sig, entry)
-                                        : JsArgConverter(args, false, *sig, entry);
+                                        ? JsArgConverter(caller, args, *sig, entry, parsedSig)
+                                        : JsArgConverter(args, false, *sig, entry, parsedSig);
 
 
     if (!argConverter.IsValid()) {

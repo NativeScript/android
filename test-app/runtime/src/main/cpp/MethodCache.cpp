@@ -2,6 +2,7 @@
 
 #include <shared_mutex>
 #include "JniLocalRef.h"
+#include "JniSignatureParser.h"
 #include "JsArgToArrayConverter.h"
 #include "MetadataNode.h"
 #include "NativeScriptAssert.h"
@@ -69,6 +70,7 @@ const MethodCache::CacheMethodInfo& MethodCache::ResolveMethodSignature(const st
         NS_DCHECK(clazz != nullptr);
         method_info.clazz = clazz;
         method_info.signature = signature;
+        method_info.parsedSig = JniSignatureParser(signature).Parse();
         method_info.returnType = MetadataReader::ParseReturnType(method_info.signature);
         method_info.retType = MetadataReader::GetReturnType(method_info.returnType);
         method_info.isStatic = isStatic;
@@ -78,7 +80,7 @@ const MethodCache::CacheMethodInfo& MethodCache::ResolveMethodSignature(const st
                           env.GetMethodID(clazz, methodName, signature);
 
         std::unique_lock<std::shared_mutex> lock(signatureCacheMutex);
-        return s_mthod_ctor_signature_cache.emplace(encoded_method_signature, method_info).first->second;
+        return s_mthod_ctor_signature_cache.emplace(encoded_method_signature, std::move(method_info)).first->second;
     }
 
     return s_unresolved;
@@ -107,6 +109,7 @@ const MethodCache::CacheMethodInfo& MethodCache::ResolveConstructorSignature(con
         JEnv env;
         constructor_info.clazz = javaClass;
         constructor_info.signature = signature;
+        constructor_info.parsedSig = JniSignatureParser(signature).Parse();
         constructor_info.mid = env.GetMethodID(javaClass, "<init>", signature);
         // Runtime.resolveConstructorSignature answers this for no Java arguments only for an
         // interface proxy; any other class would need a one-argument call to resolve to it.
@@ -114,7 +117,7 @@ const MethodCache::CacheMethodInfo& MethodCache::ResolveConstructorSignature(con
         constructor_info.isInterfaceProxy = !hasJavaArgs && signature == "(Ljava/lang/reflect/InvocationHandler;)V";
 
         std::unique_lock<std::shared_mutex> lock(signatureCacheMutex);
-        return s_mthod_ctor_signature_cache.emplace(encoded_ctor_signature, constructor_info).first->second;
+        return s_mthod_ctor_signature_cache.emplace(encoded_ctor_signature, std::move(constructor_info)).first->second;
     }
 
     return s_unresolved;
@@ -140,7 +143,10 @@ void MethodCache::AppendType(string& type, Isolate* isolate, const v8::Local<v8:
     // Overloads resolve against what a Proxy wraps.
     auto value = ObjectManager::UnwrapProxy(jsValue);
 
-    if (value->IsObject()) {
+    // Cast markers and the null sentinel are never put on a Java wrapper.
+    bool isWrapper = value->IsObject() && ObjectManager::HasMetadataField(value.As<Object>());
+
+    if (value->IsObject() && !isWrapper) {
         auto context = isolate->GetCurrentContext();
         auto objVal = value->ToObject(context).ToLocalChecked();
         Local<Value> nullNode; //out
@@ -199,7 +205,7 @@ void MethodCache::AppendType(string& type, Isolate* isolate, const v8::Local<v8:
     } else if (value->IsObject()) {
         auto context = isolate->GetCurrentContext();
         auto object = value->ToObject(context).ToLocalChecked();
-        auto castType = NumericCasts::GetCastType(isolate, object);
+        auto castType = isWrapper ? CastType::None : NumericCasts::GetCastType(isolate, object);
         MetadataNode* node;
 
         switch (castType) {

@@ -51,13 +51,14 @@ class LRUCache {
             NS_CHECK((0 < m_capacity) && (m_capacity < 10000));
         }
 
-        // Obtain value of the cached function for k
-        value_type operator()(const key_type& k) {
+        // Obtain value of the cached function for k. validate=false skips the validity
+        // callback for a hit the caller knows is still valid.
+        value_type operator()(const key_type& k, bool validate = true) {
 
             // Attempt to find existing record
             auto it = m_key_to_value.find(k);
 
-            if (m_cacheValidCallback != nullptr && it != m_key_to_value.end()) {
+            if (validate && m_cacheValidCallback != nullptr && it != m_key_to_value.end()) {
                 //check if cache is still valid
                 if (!m_cacheValidCallback(k, (*it).second.first, m_state)) {
                     //cache is not valid anymore, evict the key
@@ -122,8 +123,6 @@ class LRUCache {
             m_key_tracker.clear();
         }
 
-    private:
-
         void evictKey(const key_type& key) {
             auto it = m_key_to_value.find(key);
             if (it != m_key_to_value.end()) {
@@ -134,6 +133,8 @@ class LRUCache {
                 m_key_to_value.erase(it);
             }
         }
+
+    private:
 
         // Record a fresh key-value pair in the cache
         void insert(const key_type& k, const value_type& v) {

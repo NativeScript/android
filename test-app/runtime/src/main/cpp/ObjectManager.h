@@ -49,6 +49,10 @@ class ObjectManager {
 
   void UpdateCache(int objectID, jobject obj);
 
+  // Drops the jweak cached for objectID, after Java may have registered a different object
+  // under it.
+  void ForgetCachedJavaObject(int objectID) { m_cache.evictKey(objectID); }
+
   jclass GetJavaClass(const v8::Local<v8::Object>& instance);
 
   void SetJavaClass(const v8::Local<v8::Object>& instance, jclass clazz);
@@ -186,8 +190,9 @@ class ObjectManager {
     // Cleared by ReleaseNativeCounterpart; the registration itself lives until the
     // wrapper is collected.
     bool linked = true;
-    // The Java side holds the object weakly; a finalization now only asks
-    // whether it is still alive.
+    // The Java side may hold the object weakly; a finalization now only asks
+    // whether it is still alive. While false, Java holds the object strongly under
+    // javaObjectID, so a jweak cached for that id still names it.
     bool javaWeakened = false;
     // Queued in a finalizer batch that has not been flushed yet.
     bool queued = false;
@@ -266,7 +271,9 @@ class ObjectManager {
   bool m_flushBackingOff = false;
   uint64_t m_releaseCount = 0;
 
-  jweak GetJavaObjectByID(uint32_t javaObjectID);
+  // validate=false only while the Java side holds the object strongly: its jweak
+  // cannot have been cleared then.
+  jweak GetJavaObjectByID(uint32_t javaObjectID, bool validate);
 
   jobject GetJavaObjectByIDImpl(uint32_t javaObjectID);
 
