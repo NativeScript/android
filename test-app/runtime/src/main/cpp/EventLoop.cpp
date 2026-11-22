@@ -792,17 +792,12 @@ EventLoop::PumpResult EventLoop::PumpUntil(double deadlineSeconds,
 }
 
 namespace {
-// Depth, not a flag: an fd callback can dispatch JS that lands back in
-// another callback through a nested drain.
-thread_local int t_looperCallbackDepth = 0;
-
 struct LooperCallbackScope {
-    LooperCallbackScope() { ++t_looperCallbackDepth; }
-    ~LooperCallbackScope() { --t_looperCallbackDepth; }
+    explicit LooperCallbackScope(int& depth) : depth_(depth) { ++depth_; }
+    ~LooperCallbackScope() { --depth_; }
+    int& depth_;
 };
 }  // namespace
-
-bool EventLoop::IsInLooperCallback() { return t_looperCallbackDepth > 0; }
 
 void EventLoop::WaitForInternalWork(int timeoutMs, bool pumpDeliverable) {
     const DrainFilter filter =
@@ -853,7 +848,7 @@ void EventLoop::WaitForInternalWork(int timeoutMs, bool pumpDeliverable) {
 }
 
 int EventLoop::EventFdCallback(int fd, int events, void* data) {
-    LooperCallbackScope callbackScope;
+    LooperCallbackScope callbackScope(static_cast<EventLoop*>(data)->looperCallbackDepth_);
     uint64_t value;
     // EFD_SEMAPHORE: consumes exactly one unit; while more remain the fd stays
     // readable and ALooper calls back next poll, interleaving with Java
@@ -867,7 +862,7 @@ int EventLoop::EventFdCallback(int fd, int events, void* data) {
 }
 
 int EventLoop::TimerFdCallback(int fd, int events, void* data) {
-    LooperCallbackScope callbackScope;
+    LooperCallbackScope callbackScope(static_cast<EventLoop*>(data)->looperCallbackDepth_);
     uint64_t expirations;
     if (read(fd, &expirations, sizeof(expirations)) != sizeof(expirations)) {
         return 1;

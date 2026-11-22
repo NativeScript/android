@@ -191,15 +191,15 @@ public:
     void RunNestableV8Tasks();
 
     /**
-     * True while the calling thread is inside one of this process's ALooper
-     * fd callbacks. Android's Looper::pollInner holds a Response& into its
-     * response vector across each callback; a nested ALooper_pollOnce on the
-     * same looper clears and reallocates that vector, so the outer poll
-     * resumes over freed memory. Any code that pumps the looper (module
+     * True while this loop's home thread is inside one of the loop's ALooper
+     * fd callbacks; ask it only from the home thread. Android's
+     * Looper::pollInner holds a Response& into its response vector across
+     * each callback; a nested ALooper_pollOnce on the same looper clears and
+     * reallocates that vector, so the outer poll resumes over freed memory. Any code that pumps the looper (module
      * evaluation, the boot backstop, the fetch yield) must consult this and
      * drain queues directly instead of polling when it is set.
      */
-    static bool IsInLooperCallback();
+    bool IsInLooperCallback() const { return looperCallbackDepth_ > 0; }
 
     /**
      * Marks this loop's isolate as termination-requested. Callable from any
@@ -419,6 +419,10 @@ private:
     std::atomic<uint64_t> claimCells_[kClaimCells] = {};
     // Set by NoteTerminationRequested (any thread), read by PumpUntil.
     std::atomic_bool terminationRequested_{false};
+    // Depth, not a flag: an fd callback can dispatch JS that lands back in
+    // another callback through a nested drain. Home thread only, like the fd
+    // callbacks that maintain it.
+    int looperCallbackDepth_ = 0;
     // ordered-lane source with its own bookkeeping (Timers); home-thread only
     OrderedTaskSource* timerSource_ = nullptr;
     // bare ordered tokens posted before the bind; flushed by Bind
