@@ -187,7 +187,9 @@ class ObjectManager {
   // The state object of a canary, created on its first write.
   bool CanaryStateForWrite(const v8::Local<v8::Object>& holder, v8::Local<v8::Object>* out);
   void CountCanaryWrite() { m_lifetimeStats.canaryInterceptedWrites++; }
-  // Lets go of the state of objects Java reported collected. Runtime thread.
+  // Lets go of the state of objects Java reported collected. Under the
+  // isolate's Locker: the runtime's thread, or a thread calling in under
+  // enableMultithreadedJavascript.
   void ReleaseCollectedCanaryStates();
 
   struct ClassCounts {
@@ -345,6 +347,7 @@ class ObjectManager {
   // Template of a canary rebuilt for a JS-extended instance.
   v8::Persistent<v8::ObjectTemplate> m_canaryTemplate;
   bool m_deathInboxOpen = false;
+  bool m_canaryEpilogueAdded = false;
   int m_deathInboxRuntimeId = -1;
 
   void JSObjectFinalizer(v8::Isolate* isolate,
