@@ -39,6 +39,7 @@ import dalvik.annotation.optimization.FastNative;
 public class Runtime {
     private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName,
                                          String v8Flags, boolean codeCache, String profilerOutputDir, boolean discardUncaughtJsExceptions, String uncaughtErrorPolicy,
+                                         String wrapperLifetimeMode, String wrapperLifetimeScope,
                                          String callingDir, int maxLogcatObjectSize, boolean forceLog);
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
@@ -809,6 +810,7 @@ public class Runtime {
             initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName,
                     appConfig.getV8Flags(), appConfig.getCodeCache(), appConfig.getProfilerOutputDir(),
                     appConfig.getDiscardUncaughtJsExceptions(), appConfig.getUncaughtErrorPolicy(),
+                    appConfig.getWrapperLifetimeMode(), appConfig.getWrapperLifetimeScope(),
                     callingJsDir, appConfig.getMaxLogcatObjectSize(), forceConsoleLog);
 
             if (logger.isEnabled()) {

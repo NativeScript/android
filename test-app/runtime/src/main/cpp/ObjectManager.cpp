@@ -106,31 +106,40 @@ void ObjectManager::Init(Isolate* isolate) {
 JniLocalRef ObjectManager::GetJavaObjectByJsObject(
     const Local<Object>& object) {
   JSInstanceInfo* jsInstanceInfo = GetJSInstanceInfo(object);
-
-  if (jsInstanceInfo != nullptr) {
-    jweak existingObject;
-    try {
-      existingObject = GetJavaObjectByID(jsInstanceInfo->javaObjectID,
-                                         jsInstanceInfo->javaWeakened);
-    } catch (const NativeScriptException& e) {
-      // this captures usually the error
-      auto className = GetClassName(jsInstanceInfo->objectClazz);
-      throw NativeScriptException("Failed to get Java object by ID. id=" +
-                                  std::to_string(jsInstanceInfo->javaObjectID) +
-                                  ", class=" + className + ". " +
-                                  e.GetErrorMessage());
+  if (jsInstanceInfo == nullptr) {
+    if (IsReleasedWrapper(object)) {
+      m_lifetimeStats.releasedAccesses++;
     }
-    if (m_useGlobalRefs) {
-      JniLocalRef javaObject(existingObject, true);
-      return javaObject;
-    } else {
-      JEnv env;
-      JniLocalRef javaObject(env.NewLocalRef(existingObject));
-      return javaObject;
-    }
+    return JniLocalRef();
   }
+  try {
+    return JavaObjectOf(jsInstanceInfo);
+  } catch (const NativeScriptException&) {
+    m_lifetimeStats.releasedAccesses++;
+    throw;
+  }
+}
 
-  return JniLocalRef();
+JniLocalRef ObjectManager::JavaObjectOf(JSInstanceInfo* jsInstanceInfo) {
+  jweak existingObject;
+  try {
+    existingObject = GetJavaObjectByID(jsInstanceInfo->javaObjectID,
+                                       jsInstanceInfo->javaWeakened);
+  } catch (const NativeScriptException& e) {
+    // this captures usually the error
+    auto className = GetClassName(jsInstanceInfo->objectClazz);
+    throw NativeScriptException("Failed to get Java object by ID. id=" +
+                                std::to_string(jsInstanceInfo->javaObjectID) +
+                                ", class=" + className + ". " +
+                                e.GetErrorMessage());
+  }
+  if (m_useGlobalRefs) {
+    JniLocalRef javaObject(existingObject, true);
+    return javaObject;
+  }
+  JEnv env;
+  JniLocalRef javaObject(env.NewLocalRef(existingObject));
+  return javaObject;
 }
 
 JniLocalRef ObjectManager::GetLiveJavaObjectByJsObject(
@@ -145,7 +154,7 @@ JniLocalRef ObjectManager::GetLiveJavaObjectByJsObject(
   // leave it pointing at memory nothing keeps alive any more.
   JniLocalRef javaObject;
   try {
-    javaObject = GetJavaObjectByJsObject(object);
+    javaObject = JavaObjectOf(jsInstanceInfo);
   } catch (const NativeScriptException&) {
     if (!ReleaseIfCollected(javaObjectID)) {
       throw;
@@ -285,6 +294,25 @@ bool ObjectManager::IsJsRuntimeObject(const v8::Local<v8::Object>& object) {
   int internalFieldCount = object->InternalFieldCount();
   return internalFieldCount == static_cast<int>(MetadataNodeKeys::END) ||
          internalFieldCount == V8_ARRAY_BUFFER_INTERNAL_FIELD_COUNT;
+}
+
+void ObjectManager::MarkLinkReleased(const Local<Object>& object) {
+  object->SetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo), Null(m_isolate));
+}
+
+bool ObjectManager::IsReleasedWrapper(const Local<Object>& object) {
+  auto target = UnwrapProxy(object);
+  if (!target->IsObject() || !HasMetadataField(target.As<Object>())) {
+    return false;
+  }
+  auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+  auto field = target.As<Object>()->GetInternalField(jsInfoIdx).As<Value>();
+  if (!field->IsUndefined()) {
+    return field->IsNull();
+  }
+  auto prototype = target.As<Object>()->GetPrototype();
+  return prototype->IsObject() && HasMetadataField(prototype.As<Object>()) &&
+         prototype.As<Object>()->GetInternalField(jsInfoIdx).As<Value>()->IsNull();
 }
 
 jweak ObjectManager::GetJavaObjectByID(uint32_t javaObjectID, bool validate) {
@@ -588,6 +616,7 @@ void ObjectManager::JSObjectFinalizer(Isolate* isolate,
   // Kept alive until the batch has asked the Java side whether it may die.
   po->SetWeak(callbackState, JSObjectFinalizerStatic,
               WeakCallbackType::kFinalizer);
+  m_lifetimeStats.resurrections++;
 
   if (callbackState->queued) {
     // Collected again before the flush, so whatever handed it back has let go.
@@ -730,7 +759,8 @@ void ObjectManager::FlushFinalizedBatch() {
     return;
   }
 
-  auto settle = [this, raw](const std::vector<jint>& ids, jintArray array) {
+  auto settle = [this, raw](const std::vector<jint>& ids, jintArray array,
+                            bool weakened) {
     if (ids.empty()) {
       return;
     }
@@ -747,10 +777,13 @@ void ObjectManager::FlushFinalizedBatch() {
         continue;
       }
       state->queued = false;
+      if (weakened) {
+        m_lifetimeStats.weakened++;
+      }
     }
   };
-  settle(weaken, (jintArray) weakenArray);
-  settle(check, (jintArray) checkArray);
+  settle(weaken, (jintArray) weakenArray, true);
+  settle(check, (jintArray) checkArray, false);
 }
 
 void ObjectManager::ReleaseCollectedWrapper(int javaObjectID) {
@@ -758,10 +791,10 @@ void ObjectManager::ReleaseCollectedWrapper(int javaObjectID) {
   if (state == nullptr) {
     return;
   }
+  m_lifetimeStats.collected++;
   Persistent<Object>* po = state->target;
   if (state->linked) {
-    auto object = po->Get(m_isolate);
-    object->SetInternalField(static_cast<int>(MetadataNodeKeys::JsInfo), Undefined(m_isolate));
+    MarkLinkReleased(po->Get(m_isolate));
   }
   m_idToObject.Erase(javaObjectID);
   po->Reset();
@@ -894,7 +927,6 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
     throw NativeScriptException("Trying to release a non native object!");
   }
 
-  auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
   auto javaObjectID = LinkedIdOf(owner);
 
   JEnv env;
@@ -902,6 +934,7 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
   env.CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,
                      javaObjectID);
   m_releaseCount++;
+  m_lifetimeStats.releasedExplicitly++;
 
   // The registration outlives the link: it is dropped by the finalizer once
   // the wrapper is collected.
@@ -910,7 +943,7 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
     state->linked = false;
   }
 
-  owner->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+  MarkLinkReleased(owner);
 
   // Every alias of the link is cleared with it.
   Local<Value> aliasesValue;
@@ -922,7 +955,7 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
       Local<Value> alias;
       if (aliases->Get(context, i).ToLocal(&alias) && alias->IsObject() &&
           IsJsRuntimeObject(alias.As<Object>())) {
-        alias.As<Object>()->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+        MarkLinkReleased(alias.As<Object>());
       }
     }
   }
