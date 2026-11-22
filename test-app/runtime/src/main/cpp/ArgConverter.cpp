@@ -152,12 +152,12 @@ void ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, JNIEnv* env, const 
             auto hintedObjectID = static_cast<jint>(bits);
             auto classIndex = static_cast<int>((bits >> 32) & 0x7fffffff);
             // JS run since the call started (the method lookup) may have reached the
-            // argument another way and released its id; it is then resolved again. In
-            // canary mode a settle may also have released a fresh id whose canary another
-            // thread made and dropped before this call took the lock.
+            // argument another way and released its id; it is then resolved again. Under
+            // multithreaded JS a canary settle may also release a fresh id before this call
+            // takes the lock, which the count cannot see.
             if ((bits & JavaCallArgs::FreshArg) != 0 &&
                 objectManager->ReleaseCount() == args.releasesAtStart &&
-                !WrapperLifetimeCanary::Enabled() &&
+                (!WrapperLifetimeCanary::Enabled() || !objectManager->MultithreadedJavascript()) &&
                 !objectManager->HasJsObject(hintedObjectID)) {
                 JniLocalRef arg(env->GetObjectArrayElement(args.refs, i));
                 jsArg = objectManager->CreateJSWrapper(hintedObjectID, classIndex, arg);

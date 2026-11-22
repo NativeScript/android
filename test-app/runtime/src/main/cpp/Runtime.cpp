@@ -240,6 +240,7 @@ void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir,
                               ? UncaughtErrorPolicy::Throw
                               : UncaughtErrorPolicy::Report;
   ConfigureWrapperLifetime(options.wrapperLifetimeMode, options.wrapperLifetimeScope);
+  m_objectManager->SetMultithreadedJavascript(options.multithreadedJavascript);
 
   DEBUG_WRITE("Initializing Telerik NativeScript");
 

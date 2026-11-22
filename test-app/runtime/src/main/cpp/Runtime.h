@@ -160,6 +160,7 @@ class Runtime {
             std::string uncaughtErrorPolicy;
             std::string wrapperLifetimeMode;
             std::string wrapperLifetimeScope;
+            bool multithreadedJavascript;
         };
 
         static void Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibsDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, const StartupOptions& options, jstring callingDir, int maxLogcatObjectSize,

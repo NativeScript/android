@@ -78,9 +78,15 @@ class ObjectManager {
     }
   }
 
-  // Ids JS released explicitly (ReleaseNativeCounterpart). While this does not move, an
-  // id Java registered for a call is still registered.
+  // Ids JS released explicitly (ReleaseNativeCounterpart), and canary settles that
+  // released ids. While this does not move, an id Java registered for a call is still
+  // registered.
   uint64_t ReleaseCount() const { return m_releaseCount; }
+
+  // enableMultithreadedJavascript: Java may call in from threads other than
+  // the runtime's own.
+  void SetMultithreadedJavascript(bool value) { m_multithreadedJavascript = value; }
+  bool MultithreadedJavascript() const { return m_multithreadedJavascript; }
 
   // Whether a wrapper was ever created for this id and not yet collected.
   bool HasJsObject(int javaObjectID) const {
@@ -408,6 +414,8 @@ class ObjectManager {
   volatile int m_currentObjectId;
 
   bool m_useGlobalRefs;
+
+  bool m_multithreadedJavascript = false;
 
   static jclass JAVA_LANG_CLASS;
 
