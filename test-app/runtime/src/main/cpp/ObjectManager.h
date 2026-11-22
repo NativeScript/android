@@ -329,19 +329,31 @@ class ObjectManager {
     CanaryRecord* record = nullptr;
   };
 
-  // Canary mode: what outlives the canaries of one Java object id, until Java
-  // collects the object. Its handles are reset only on the runtime's thread.
-  struct CanaryRecord {
-    // The object's JS properties; empty until the first write.
-    v8::Global<v8::Object> state;
-    // JS-extended instances: what a canary built later starts from, as the
-    // first canary had it once registered.
-    bool extended = false;
+  // Canary mode: what a canary built later for a JS-extended instance starts
+  // from, as the first canary had it once registered. The records of instances
+  // that registered with the same values share one; the last of them frees it.
+  struct CanaryClass {
     v8::Global<v8::Value> prototype;
     v8::Global<v8::Value> callSuper;
     v8::Global<v8::Value> metadata;
     v8::Global<v8::Value> implementationObject;
     const v8::Persistent<v8::ObjectTemplate>* instanceTemplate = nullptr;
+    uint32_t records = 0;
+    // The m_canaryClasses slot offering it to new records, or null.
+    CanaryClass** slot = nullptr;
+  };
+
+  // Canary mode: what outlives the canaries of one Java object id, until Java
+  // collects the object. Its handles are reset only on the runtime's thread.
+  struct CanaryRecord {
+    CanaryRecord() = default;
+    CanaryRecord(const CanaryRecord&) = delete;
+    CanaryRecord& operator=(const CanaryRecord&) = delete;
+    ~CanaryRecord();
+    // The object's JS properties; empty until the first write.
+    v8::Global<v8::Object> state;
+    // JS-extended instances only.
+    CanaryClass* cls = nullptr;
     // A copy of the last rebuilt canary, taken once it was hydrated and before
     // JS saw it, unlinked; a later rebuild clones it instead of hydrating.
     // Present only while it matches the state.
@@ -512,6 +524,15 @@ class ObjectManager {
   // the ids are queued again.
   bool FlushCanaryDeaths();
 
+  // The last class registered per instance template, by template address.
+  static constexpr size_t kCanaryClassSlots = 16;
+  CanaryClass* m_canaryClasses[kCanaryClassSlots] = {};
+  // A class for a new extended record with these values, shared when they match.
+  CanaryClass* CanaryClassFor(const v8::Persistent<v8::ObjectTemplate>* instanceTemplate,
+                              const v8::Local<v8::Value>& prototype,
+                              const v8::Local<v8::Value>& callSuper,
+                              const v8::Local<v8::Value>& metadata,
+                              const v8::Local<v8::Value>& implementationObject);
   std::unordered_map<int, std::unique_ptr<CanaryRecord>> m_canaryRecords;
   std::vector<jint> m_pendingCanaryDeaths;
   bool m_copyingCanaryProperties = false;

@@ -542,7 +542,7 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
   // Nothing from here to the link runs JS or settles canaries, so the record
   // stays valid.
   CanaryRecord* record = FindCanaryRecord(javaObjectID);
-  if (record != nullptr && record->extended) {
+  if (record != nullptr && record->cls != nullptr) {
     // A JS-extended instance's canary starts from its record, not from its class.
     auto rebuilt = RebuildCanary(javaObjectID, record);
     if (!rebuilt.IsEmpty()) {
@@ -630,20 +630,19 @@ ObjectManager::CanaryRecord* ObjectManager::AdoptCanary(
     // the prototype and fields this one was registered with.
     NS_DCHECK(instanceTemplate != nullptr);
     auto isolate = m_isolate;
-    auto created = std::make_unique<CanaryRecord>();
-    created->extended = true;
-    created->instanceTemplate = instanceTemplate;
-    created->prototype.Reset(isolate, object->GetPrototype());
-    created->callSuper.Reset(
-        isolate, object->GetInternalField(static_cast<int>(MetadataNodeKeys::CallSuper)).As<Value>());
-    created->metadata.Reset(
-        isolate, object->GetInternalField(static_cast<int>(MetadataNodeKeys::Metadata)).As<Value>());
     Local<Value> implementationObject;
-    if (V8GetPrivateValue(isolate, object, V8StringConstants::GetImplementationObject(isolate),
-                          implementationObject) &&
-        !implementationObject.IsEmpty()) {
-      created->implementationObject.Reset(isolate, implementationObject);
+    if (!V8GetPrivateValue(isolate, object, V8StringConstants::GetImplementationObject(isolate),
+                           implementationObject)) {
+      implementationObject = Local<Value>();
     }
+    CanaryClass* cls = CanaryClassFor(
+        instanceTemplate, object->GetPrototype(),
+        object->GetInternalField(static_cast<int>(MetadataNodeKeys::CallSuper)).As<Value>(),
+        object->GetInternalField(static_cast<int>(MetadataNodeKeys::Metadata)).As<Value>(),
+        implementationObject);
+    auto created = std::make_unique<CanaryRecord>();
+    created->cls = cls;
+    cls->records++;
     record = created.get();
     m_canaryRecords.emplace(javaObjectID, std::move(created));
     return record;
@@ -662,6 +661,44 @@ ObjectManager::CanaryRecord* ObjectManager::AdoptCanary(
                                              !record->stateNotPlain);
   }
   return record;
+}
+
+ObjectManager::CanaryRecord::~CanaryRecord() {
+  if (cls != nullptr && --cls->records == 0) {
+    if (cls->slot != nullptr && *cls->slot == cls) {
+      *cls->slot = nullptr;
+    }
+    delete cls;
+  }
+}
+
+ObjectManager::CanaryClass* ObjectManager::CanaryClassFor(
+    const Persistent<ObjectTemplate>* instanceTemplate, const Local<Value>& prototype,
+    const Local<Value>& callSuper, const Local<Value>& metadata,
+    const Local<Value>& implementationObject) {
+  auto address = reinterpret_cast<uintptr_t>(instanceTemplate);
+  CanaryClass*& slot = m_canaryClasses[((address >> 4) ^ (address >> 9)) % kCanaryClassSlots];
+  // Global == Local compares the objects, and an empty handle equals only an empty one.
+  if (slot != nullptr && slot->instanceTemplate == instanceTemplate &&
+      slot->prototype == prototype && slot->callSuper == callSuper &&
+      slot->metadata == metadata && slot->implementationObject == implementationObject) {
+    return slot;
+  }
+  auto isolate = m_isolate;
+  auto cls = new CanaryClass();
+  cls->instanceTemplate = instanceTemplate;
+  cls->prototype.Reset(isolate, prototype);
+  cls->callSuper.Reset(isolate, callSuper);
+  cls->metadata.Reset(isolate, metadata);
+  if (!implementationObject.IsEmpty()) {
+    cls->implementationObject.Reset(isolate, implementationObject);
+  }
+  if (slot != nullptr) {
+    slot->slot = nullptr;
+  }
+  slot = cls;
+  cls->slot = &slot;
+  return cls;
 }
 
 ObjectManager::CanaryRecord* ObjectManager::FindCanaryRecord(int javaObjectID) {
@@ -838,7 +875,7 @@ Local<Object> ObjectManager::RebuildCanary(int javaObjectID) {
 }
 
 Local<Object> ObjectManager::RebuildCanary(int javaObjectID, CanaryRecord* record) {
-  if (record == nullptr || !record->extended) {
+  if (record == nullptr || record->cls == nullptr) {
     return Local<Object>();
   }
   auto isolate = m_isolate;
@@ -853,27 +890,28 @@ Local<Object> ObjectManager::RebuildCanary(int javaObjectID, CanaryRecord* recor
     return handleScope.Escape(canary);
   }
 
-  NS_DCHECK(record->instanceTemplate != nullptr);
-  if (record->instanceTemplate == nullptr) {
+  const CanaryClass* cls = record->cls;
+  NS_DCHECK(cls->instanceTemplate != nullptr);
+  if (cls->instanceTemplate == nullptr) {
     return handleScope.Escape(Local<Object>());
   }
   auto context = isolate->GetCurrentContext();
   Local<Object> canary;
-  if (!record->instanceTemplate->Get(isolate)->NewInstance(context).ToLocal(&canary)) {
+  if (!cls->instanceTemplate->Get(isolate)->NewInstance(context).ToLocal(&canary)) {
     return handleScope.Escape(Local<Object>());
   }
-  Local<Value> prototype = record->prototype.Get(isolate);
+  Local<Value> prototype = cls->prototype.Get(isolate);
   if (!prototype.IsEmpty() && (prototype->IsObject() || prototype->IsNull()) &&
       !prototype->StrictEquals(canary->GetPrototype())) {
     (void) canary->SetPrototype(context, prototype);
   }
   canary->SetInternalField(static_cast<int>(MetadataNodeKeys::CallSuper),
-                           record->callSuper.Get(isolate));
+                           cls->callSuper.Get(isolate));
   canary->SetInternalField(static_cast<int>(MetadataNodeKeys::Metadata),
-                           record->metadata.Get(isolate));
-  if (!record->implementationObject.IsEmpty()) {
+                           cls->metadata.Get(isolate));
+  if (!cls->implementationObject.IsEmpty()) {
     V8SetPrivateValue(isolate, canary, V8StringConstants::GetImplementationObject(isolate),
-                      record->implementationObject.Get(isolate));
+                      cls->implementationObject.Get(isolate));
   }
   m_lifetimeStats.canaryRebuilds++;
   Link(canary, javaObjectID, record->clazz, LinkKind::kExtended, nullptr, record);
