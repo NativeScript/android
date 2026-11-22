@@ -60,6 +60,10 @@ void ObjectManager::InitializeJNI() {
       runtimeClass, "getOrCreateJavaObjectIDAndClass", "(Ljava/lang/Object;)J");
   NS_CHECK(GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID != nullptr);
 
+  GET_CLASS_INDEX_METHOD_ID = env.GetMethodID(
+      runtimeClass, "getClassIndex", "(Ljava/lang/Object;)I");
+  NS_CHECK(GET_CLASS_INDEX_METHOD_ID != nullptr);
+
   FIND_JAVA_OBJECT_ID_METHOD_ID = env.GetMethodID(
       runtimeClass, "findJavaObjectID", "(Ljava/lang/Object;)I");
   NS_CHECK(FIND_JAVA_OBJECT_ID_METHOD_ID != nullptr);
@@ -488,6 +492,13 @@ const std::string& ObjectManager::WrapperClassFor(int classIndex,
                                                   jclass& clazz,
                                                   std::string& scratch,
                                                   MetadataNode*& node) {
+  if (classIndex <= 0 && instance != nullptr) {
+    // getOrCreateJavaObjectIDAndClass leaves the index out for an id Java
+    // already knew, such as a dead canary's object's. One call for it is
+    // cheaper than looking the class up by name.
+    JEnv env;
+    classIndex = env.CallIntMethod(m_javaRuntimeObject, GET_CLASS_INDEX_METHOD_ID, instance);
+  }
   if (classIndex > 0 &&
       static_cast<size_t>(classIndex) < m_wrapperClasses.size() &&
       m_wrapperClasses[classIndex] != nullptr) {
@@ -1495,6 +1506,8 @@ jclass ObjectManager::JAVA_LANG_CLASS = nullptr;
 jmethodID ObjectManager::GET_NAME_METHOD_ID = nullptr;
 jmethodID ObjectManager::GET_JAVAOBJECT_BY_ID_METHOD_ID = nullptr;
 jmethodID ObjectManager::GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID = nullptr;
+jmethodID ObjectManager::GET_CLASS_INDEX_METHOD_ID = nullptr;
+
 jmethodID ObjectManager::GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID =
     nullptr;
 jmethodID ObjectManager::FIND_JAVA_OBJECT_ID_METHOD_ID = nullptr;

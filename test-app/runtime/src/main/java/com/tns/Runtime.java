@@ -1347,7 +1347,8 @@ public class Runtime {
     }
 
     // The class index is only needed to create a wrapper, and an object that already has
-    // an id almost always has one; native asks for the class itself when it does not.
+    // an id almost always has one; native asks for the index (getClassIndex) when it does
+    // not, e.g. for the object of a canary that died.
     @RuntimeCallable
     private long getOrCreateJavaObjectIDAndClass(Object obj) {
         long found = getOrCreateObjectId(obj);
@@ -1355,6 +1356,11 @@ public class Runtime {
             return found;
         }
         return packIdAndClass((int) found, obj);
+    }
+
+    @RuntimeCallable
+    private int getClassIndex(Object obj) {
+        return classIndexOf(obj.getClass());
     }
 
     @RuntimeCallable

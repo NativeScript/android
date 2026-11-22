@@ -520,6 +520,8 @@ class ObjectManager {
 
   static jmethodID GET_OR_CREATE_JAVA_OBJECT_ID_AND_CLASS_METHOD_ID;
 
+  static jmethodID GET_CLASS_INDEX_METHOD_ID;
+
   static jmethodID FIND_JAVA_OBJECT_ID_METHOD_ID;
 
   static jmethodID MAKE_INSTANCE_STRONG_METHOD_ID;
