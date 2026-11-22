@@ -64,6 +64,7 @@ require("./tests/testWrapperLifetime");
 require("./tests/testWrapperLifetimeModes");
 require("./tests/testWrapperLifetimeStateWrites");
 require("./tests/testWrapperLifetimeFieldWrites");
+require("./tests/testWrapperLifetimeRecordSharing");
 require("./tests/testsMemoryManagement");
 require("./tests/testFieldGetSet");
 require("./tests/extendedClassesTests");
