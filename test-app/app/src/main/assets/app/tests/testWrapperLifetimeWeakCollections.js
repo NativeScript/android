@@ -261,7 +261,8 @@ describe("Weak collections of Java objects", function () {
         }
         finish.fail = done.fail;
         eventually(function () {
-            return droppedCleaned;
+            // A collected registry runs no callbacks.
+            return droppedCleaned && registry !== null;
         }, finish, "the cleanup callback did not run");
     }, 20000);
 
@@ -299,7 +300,8 @@ describe("Weak collections of Java objects", function () {
             registry.register(new java.lang.Runnable({ run: function () {} }), "held");
         })();
         eventually(function () {
-            return cleaned;
+            // A collected registry runs no callbacks.
+            return cleaned && registry !== null;
         }, done, "the cleanup callback did not run");
     }, 20000);
 
@@ -407,6 +409,8 @@ describe("Weak collections of Java objects", function () {
                 return;
             }
             expect(Holder.held).not.toBe(null);
+            // A collected registry runs no callbacks, so this spec would pass without one.
+            expect(registry instanceof FinalizationRegistry).toBe(true);
             done();
         })();
     }, 20000);
