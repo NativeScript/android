@@ -71,6 +71,10 @@ class ObjectManager {
     }
   }
 
+  // Ids JS released explicitly (ReleaseNativeCounterpart). While this does not move, an
+  // id Java registered for a call is still registered.
+  uint64_t ReleaseCount() const { return m_releaseCount; }
+
   // Whether a wrapper was ever created for this id and not yet collected.
   bool HasJsObject(int javaObjectID) const {
     return m_idToObject.Find(javaObjectID) != nullptr;
@@ -260,6 +264,7 @@ class ObjectManager {
   bool m_flushScheduled = false;
   // A flush failed; crossings leave the retry to the delayed task.
   bool m_flushBackingOff = false;
+  uint64_t m_releaseCount = 0;
 
   jweak GetJavaObjectByID(uint32_t javaObjectID);
 

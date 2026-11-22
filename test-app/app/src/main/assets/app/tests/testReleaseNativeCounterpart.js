@@ -96,6 +96,27 @@ describe("Test native counterpart release", function () {
         expect(function () { global.__releaseNativeCounterpart(instance); }).toThrowError("Trying to release a non native object!");
     });
 
+    it("wraps a call argument whose link JS released and dropped during the method lookup", function () {
+        var Caller = com.tns.tests.FreshArgCaller;
+        var target = new Caller.Target({ take: function () { return "unreachable"; } });
+        var lookups = 0;
+        Object.defineProperty(target, "take", {
+            configurable: true,
+            get: function () {
+                lookups++;
+                (function () {
+                    global.__releaseNativeCounterpart(Caller.pending);
+                })();
+                gc();
+                return function (arg) {
+                    return arg.toString();
+                };
+            }
+        });
+        expect(Caller.callWithNewObject(target)).toBe("fresh");
+        expect(lookups).toBe(1);
+    });
+
     it("Calling the __releaseNativeCounterpart function with 0 arguments should throw exception", function(){
         var errorMessage = "";
 

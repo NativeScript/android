@@ -901,6 +901,7 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object>& object) {
   AssertIsolateLocked();
   env.CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,
                      javaObjectID);
+  m_releaseCount++;
 
   // The registration outlives the link: it is dropped by the finalizer once
   // the wrapper is collected.

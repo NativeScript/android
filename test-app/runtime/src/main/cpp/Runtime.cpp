@@ -635,6 +635,7 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
   DEBUG_WRITE("CallJSMethodNative called javaObjectID=%d", javaObjectID);
 
   m_objectManager->FlushFinalizedBatchIfPending();
+  args.releasesAtStart = m_objectManager->ReleaseCount();
 
   // javaObjectID may be a hint read without the isolate lock; resolve it exactly when it
   // does not name a linked wrapper.
