@@ -213,6 +213,6 @@ describe("Wrapper lifetime leak probe", function () {
             }
         })();
         // Read as leaked if unsettled: their Java objects are still held for them.
-        expect(runtime.findLeakCycles().leaked).toBeLessThan(report.leaked + 50);
+        expect(runtime.findLeakCycles().leaked).toBeLessThanOrEqual(report.leaked);
     }, 20000);
 });
