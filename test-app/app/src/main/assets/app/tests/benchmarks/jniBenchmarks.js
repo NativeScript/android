@@ -21,7 +21,9 @@ function median(values) {
     return sorted[Math.floor(sorted.length / 2)];
 }
 
-function report(name, nsPerOp, refNsPerOp) {
+// ops, when given, is every operation the row executed in this launch (warm-up, reference
+// calls and timed rounds): tools/perf/stat.sh divides counter deltas between two scales by it.
+function report(name, nsPerOp, refNsPerOp, ops) {
     var result = {
         name: name,
         median: Math.round(median(nsPerOp) * 10) / 10,
@@ -31,6 +33,9 @@ function report(name, nsPerOp, refNsPerOp) {
         result.ref = Math.round(median(refNsPerOp) * 10) / 10;
         result.refMin = Math.round(Math.min.apply(null, refNsPerOp) * 10) / 10;
     }
+    if (ops) {
+        result.ops = ops;
+    }
     console.log("JNIBENCH " + JSON.stringify(result));
     return result;
 }
@@ -39,7 +44,8 @@ function report(name, nsPerOp, refNsPerOp) {
 function measureJs(name, iterations, body) {
     if (skipped(name)) return null;
     iterations *= SCALE;
-    var sink = body(Math.max(1000, iterations >> 2));
+    var warmup = Math.max(1000, iterations >> 2);
+    var sink = body(warmup);
     var samples = [];
     for (var r = 0; r < ROUNDS; r++) {
         var start = performance.now();
@@ -48,7 +54,7 @@ function measureJs(name, iterations, body) {
         samples.push((elapsed * 1e6) / iterations);
     }
     globalThis.__jniBenchSink = sink;
-    return report(name, samples);
+    return report(name, samples, null, warmup + ROUNDS * iterations);
 }
 
 // Callback rows drift with the device's performance state independently of the other rows,
@@ -65,8 +71,9 @@ function measureCallback(name, cb, kind, iterations) {
     if (refCallback === null) {
         refCallback = new JniBench.Callback({ twoInts: function (a, b) { } });
     }
+    var warmup = Math.max(1000, iterations >> 2);
     JniBench.runCallbacks(refCallback, REF_CALLBACK_KIND, refIterations >> 2);
-    JniBench.runCallbacks(cb, kind, Math.max(1000, iterations >> 2));
+    JniBench.runCallbacks(cb, kind, warmup);
     var samples = [];
     var ref = [];
     for (var r = 0; r < ROUNDS; r++) {
@@ -74,7 +81,7 @@ function measureCallback(name, cb, kind, iterations) {
         var nanos = JniBench.runCallbacks(cb, kind, iterations);
         samples.push(Number(nanos) / iterations);
     }
-    return report(name, samples, ref);
+    return report(name, samples, ref, (refIterations >> 2) + warmup + ROUNDS * (refIterations + iterations));
 }
 
 
