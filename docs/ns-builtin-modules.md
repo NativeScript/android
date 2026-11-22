@@ -258,7 +258,11 @@ a write through an object whose prototype is a canary lands on that object;
 a prototype set later with `Object.setPrototypeOf` or `__proto__` is not
 state, and a rebuilt canary has the prototype it was built with (V8 reports
 no prototype change to the handler). Native `#private` fields are branded on
-the canary and do not carry over.
+the canary and do not carry over. A class that extends a Java class with
+`class X extends java.lang.Object` and no `extend()` (Java cannot call its
+overrides either) is linked as a plain wrapper: under `"extended"`, a canary
+built later for one of its objects has the Java class's prototype, not
+`X.prototype`, and none of the old canary's JS properties.
 A canary built after another died is a new JS object, which `===` cannot tell
 because nothing kept the old one, but which keys `WeakMap`, `WeakSet`,
 `WeakRef` and `FinalizationRegistry` entries separately.
