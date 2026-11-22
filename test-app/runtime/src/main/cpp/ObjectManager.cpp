@@ -972,7 +972,7 @@ bool ObjectManager::CanaryStateForWrite(const Local<Object>& holder, Local<Objec
   if (state == nullptr || !state->keepsState) {
     return false;
   }
-  *out = AttachState(state, Object::New(m_isolate, Null(m_isolate), nullptr, nullptr, 0));
+  *out = AttachState(state, NewEmptyState());
   return true;
 }
 
@@ -999,7 +999,21 @@ Local<Object> ObjectManager::NewStateWith(CanaryHandle* canary, Local<Name> prop
     (void)existing->CreateDataProperty(m_isolate->GetCurrentContext(), property, value);
     return existing;
   }
-  return AttachState(canary, Object::New(m_isolate, Null(m_isolate), &property, &value, 1));
+  Local<Object> fresh = NewEmptyState();
+  (void)fresh->CreateDataProperty(m_isolate->GetCurrentContext(), property, value);
+  return AttachState(canary, fresh);
+}
+
+// A fast-mode object with a null prototype: states made from one copy share
+// its map, so states that get the same names in the same order share their
+// maps' transitions. Object::New with a null prototype makes a dictionary.
+Local<Object> ObjectManager::NewEmptyState() {
+  if (m_emptyState.IsEmpty()) {
+    Local<Object> empty = Object::New(m_isolate);
+    (void)empty->SetPrototype(m_isolate->GetCurrentContext(), Null(m_isolate));
+    m_emptyState.Reset(m_isolate, empty);
+  }
+  return m_emptyState.Get(m_isolate)->Clone(m_isolate);
 }
 
 Local<Object> ObjectManager::StateOf(CanaryHandle* canary) {
@@ -1023,7 +1037,7 @@ Local<Object> ObjectManager::StateForWrite(CanaryHandle* canary) {
   if (!existing.IsEmpty()) {
     return existing;
   }
-  return AttachState(canary, Object::New(m_isolate, Null(m_isolate), nullptr, nullptr, 0));
+  return AttachState(canary, NewEmptyState());
 }
 
 void ObjectManager::CanaryDiedStatic(
@@ -1509,6 +1523,7 @@ void ObjectManager::ReleaseAllRegistered() {
   m_canaryRecords.DrainAll([](CanaryRecord* record) { delete record; });
   m_canaryRecordCount = 0;
   m_instanceFieldTableKey.Reset();
+  m_emptyState.Reset();
 
   auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
 

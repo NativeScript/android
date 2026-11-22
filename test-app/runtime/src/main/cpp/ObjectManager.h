@@ -544,6 +544,9 @@ class ObjectManager {
   bool m_canaryEpilogueAdded = false;
   int m_deathInboxRuntimeId = -1;
   v8::Persistent<v8::Private> m_instanceFieldTableKey;
+  // Cloned for each new state; never handed to JS.
+  v8::Global<v8::Object> m_emptyState;
+  v8::Local<v8::Object> NewEmptyState();
 
   void JSObjectFinalizer(v8::Isolate* isolate,
                          ObjectWeakCallbackState* callbackState);
