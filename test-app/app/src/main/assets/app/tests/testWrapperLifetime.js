@@ -38,7 +38,8 @@ describe("Wrapper lifetime", function () {
         var stats = runtime.getWrapperLifetimeStats();
         expect(Object.keys(stats).sort()).toEqual(
             ["canaryCachedFieldWrites", "canaryCachedWrites", "canaryInterceptedWrites", "canaryNativeDeaths",
-             "canaryRebuilds", "canaryStates", "collected", "releasedAccesses", "releasedExplicitly", "resurrections", "weakened"]);
+             "canaryRebuilds", "canaryStates", "collected", "releasedAccesses", "releasedExplicitly", "resurrections",
+             "weakCollectionNativeCalls", "weakened"]);
         Object.keys(stats).forEach(function (key) {
             expect(typeof stats[key]).toBe("number");
         });
