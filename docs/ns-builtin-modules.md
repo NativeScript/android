@@ -295,7 +295,9 @@ died before the snapshot, and Java is collected twice before the dump, so
 objects only weak entries hold are gone and not counted. The report also gives
 `mode`, `probed` (the Java objects modeled), `jsNodes`, `javaObjects`,
 `dumpBytes` and `durationMs`. In `"resurrecting"` mode the report is empty and no dump is taken:
-resurrection breaks these cycles.
+resurrection breaks these cycles. Under `"canary"` every wrapper is a canary
+in either scope, so under `"extended"` too a cycle through a plain wrapper,
+which resurrection used to break, is reported as a leak.
 
 The probe is built into debug runtimes only; in a release build the function
 exists but throws `findLeakCycles is available in debug builds only`. It suspends the whole process for the dump, writes the Java heap to
