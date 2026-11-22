@@ -757,6 +757,14 @@ describe("Wrapper lifetime modes", function () {
         }
     });
 
+    it("counts an object constructed from JS under its own class", function () {
+        var Counted = com.tns.tests.DummyClass.extend({});
+        var made = new Counted();
+        var entry = runtime.getWrapperClassCounts()[made.getClass().getName()];
+        expect(entry).toBeDefined();
+        expect(entry.wrappers).toBe(1);
+    });
+
     it("counts canary activity", function () {
         var before = stats();
         var runnable = new java.lang.Runnable({ run: function () {} });

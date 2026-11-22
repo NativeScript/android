@@ -362,6 +362,9 @@ jclass ObjectManager::GetJavaClass(const Local<Object>& instance) {
 void ObjectManager::SetJavaClass(const Local<Object>& instance, jclass clazz) {
   JSInstanceInfo* jsInfo = GetJSInstanceInfo(instance);
   jsInfo->objectClazz = clazz;
+  if (ObjectWeakCallbackState* state = m_idToObject.Find(jsInfo->javaObjectID)) {
+    state->objectClazz = clazz;
+  }
 }
 
 int ObjectManager::GetOrCreateObjectId(jobject object) {
