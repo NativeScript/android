@@ -350,6 +350,7 @@ class ObjectManager {
     CanaryRecord(const CanaryRecord&) = delete;
     CanaryRecord& operator=(const CanaryRecord&) = delete;
     ~CanaryRecord();
+    int id = -1;
     // The object's JS properties; empty until the first write.
     v8::Global<v8::Object> state;
     // JS-extended instances only.
@@ -533,7 +534,10 @@ class ObjectManager {
                               const v8::Local<v8::Value>& callSuper,
                               const v8::Local<v8::Value>& metadata,
                               const v8::Local<v8::Value>& implementationObject);
-  std::unordered_map<int, std::unique_ptr<CanaryRecord>> m_canaryRecords;
+  // Owns the records.
+  ObjectIdIndex<CanaryRecord> m_canaryRecords;
+  size_t m_canaryRecordCount = 0;
+  CanaryRecord* NewCanaryRecord(int javaObjectID);
   std::vector<jint> m_pendingCanaryDeaths;
   bool m_copyingCanaryProperties = false;
   bool m_deathInboxOpen = false;

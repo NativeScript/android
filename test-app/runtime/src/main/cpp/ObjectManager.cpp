@@ -640,11 +640,9 @@ ObjectManager::CanaryRecord* ObjectManager::AdoptCanary(
         object->GetInternalField(static_cast<int>(MetadataNodeKeys::CallSuper)).As<Value>(),
         object->GetInternalField(static_cast<int>(MetadataNodeKeys::Metadata)).As<Value>(),
         implementationObject);
-    auto created = std::make_unique<CanaryRecord>();
-    created->cls = cls;
+    record = NewCanaryRecord(javaObjectID);
+    record->cls = cls;
     cls->records++;
-    record = created.get();
-    m_canaryRecords.emplace(javaObjectID, std::move(created));
     return record;
   }
   if (!EnsureJavaStrong(javaObjectID, record)) {
@@ -702,21 +700,30 @@ ObjectManager::CanaryClass* ObjectManager::CanaryClassFor(
 }
 
 ObjectManager::CanaryRecord* ObjectManager::FindCanaryRecord(int javaObjectID) {
-  if (m_canaryRecords.empty()) {
-    return nullptr;
+  return m_canaryRecordCount == 0 ? nullptr : m_canaryRecords.Find(javaObjectID);
+}
+
+ObjectManager::CanaryRecord* ObjectManager::NewCanaryRecord(int javaObjectID) {
+  auto record = new CanaryRecord();
+  record->id = javaObjectID;
+  if (!m_canaryRecords.Insert(javaObjectID, record)) {
+    NS_DCHECK(false);
+    delete record;
+    return m_canaryRecords.Find(javaObjectID);
   }
-  auto it = m_canaryRecords.find(javaObjectID);
-  return it != m_canaryRecords.end() ? it->second.get() : nullptr;
+  m_canaryRecordCount++;
+  return record;
 }
 
 void ObjectManager::EraseCanaryRecord(int javaObjectID) {
   if (auto live = m_idToObject.Find(javaObjectID)) {
     live->record = nullptr;
   }
-  auto it = m_canaryRecords.find(javaObjectID);
-  if (it != m_canaryRecords.end()) {
-    ForgetStateNames(it->second.get());
-    m_canaryRecords.erase(it);
+  if (CanaryRecord* record = FindCanaryRecord(javaObjectID)) {
+    ForgetStateNames(record);
+    m_canaryRecords.Erase(javaObjectID);
+    m_canaryRecordCount--;
+    delete record;
   }
 }
 
@@ -975,9 +982,7 @@ Local<Object> ObjectManager::AttachState(CanaryHandle* canary, const Local<Objec
     record = FindCanaryRecord(canary->javaObjectID);
   }
   if (record == nullptr) {
-    auto created = std::make_unique<CanaryRecord>();
-    record = created.get();
-    m_canaryRecords.emplace(canary->javaObjectID, std::move(created));
+    record = NewCanaryRecord(canary->javaObjectID);
   }
   canary->record = record;
   record->state.Reset(m_isolate, fresh);
@@ -1171,16 +1176,16 @@ std::map<std::string, ObjectManager::ClassCounts> ObjectManager::GetWrapperClass
       entry.canaries++;
     }
   });
-  for (const auto& [id, record] : m_canaryRecords) {
+  m_canaryRecords.ForEach([&](CanaryRecord* record) {
     if (record->state.IsEmpty()) {
-      continue;
+      return;
     }
     jclass clazz = record->clazz;
-    if (auto live = m_idToObject.Find(id)) {
+    if (auto live = m_idToObject.Find(record->id)) {
       clazz = live->objectClazz;
     }
     counts[nameOf(clazz)].states++;
-  }
+  });
   return counts;
 }
 
@@ -1501,7 +1506,8 @@ void ObjectManager::ReleaseAllRegistered() {
     }
   }
   std::fill(&m_fieldNameTags[0][0], &m_fieldNameTags[0][0] + kFieldNameSets * kFieldNameWays, 0u);
-  m_canaryRecords.clear();
+  m_canaryRecords.DrainAll([](CanaryRecord* record) { delete record; });
+  m_canaryRecordCount = 0;
   m_instanceFieldTableKey.Reset();
 
   auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
