@@ -676,6 +676,47 @@ describe("Weak collections of Java objects", function () {
         }
     });
 
+    // Past 64 queued canaries the runtime prunes the queue as it builds more; the latest
+    // canary of an object built many times must survive the prunes the others' canaries make.
+    it("finds keyed Java objects through canaries built past the queue's prune while no lookup ran", function () {
+        var map = new WeakMap();
+        var list = new java.util.ArrayList();
+        Holder.held = list;
+        var count = 8;
+        (function () {
+            for (var i = 0; i < count; i++) {
+                var runnable = new java.lang.Runnable({ run: function () {} });
+                list.add(runnable);
+                map.set(runnable, i);
+            }
+        })();
+        gc();
+        map.has({});
+        var rebuilds = runtime.getWrapperLifetimeStats().canaryRebuilds;
+        for (var n = 0; n < 63; n++) {
+            (function () {
+                list.get(0).hashCode();
+            })();
+            gc();
+        }
+        var first = list.get(0);
+        var others = [];
+        for (var i = 1; i < count; i++) {
+            others.push(list.get(i));
+        }
+        if (canary) {
+            expect(runtime.getWrapperLifetimeStats().canaryRebuilds).toBeGreaterThan(rebuilds + 64);
+        }
+        var before = nativeCalls();
+        expect(map.get(first)).toBe(0);
+        for (var j = 0; j < others.length; j++) {
+            expect(map.get(others[j])).toBe(j + 1);
+        }
+        if (canary) {
+            expect(nativeCalls()).toBe(before + 1);
+        }
+    });
+
     it("finds a keyed Java object through a canary built and released while no lookup ran", function () {
         var map = new WeakMap();
         var set = new WeakSet();

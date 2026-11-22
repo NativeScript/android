@@ -1409,7 +1409,9 @@ void ObjectManager::MarkRekeyPending(ObjectWeakCallbackState* state) {
     return;
   }
   // Stale ids pile up only while JS makes no lookup that misses; prune them
-  // once they outnumber the live ones.
+  // once they outnumber the live ones. An id is queued once per canary built
+  // for it, and every copy looks live while its latest canary is pending, so
+  // keep one copy of each; takeRekeys does not depend on their order.
   if (m_rekeyPendingIds.size() >= 64 &&
       m_rekeyPendingIds.size() > 2 * static_cast<size_t>(*m_rekeyPendingCount)) {
     m_rekeyPendingIds.erase(
@@ -1419,6 +1421,9 @@ void ObjectManager::MarkRekeyPending(ObjectWeakCallbackState* state) {
                          return live == nullptr || !live->rekeyPending;
                        }),
         m_rekeyPendingIds.end());
+    std::sort(m_rekeyPendingIds.begin(), m_rekeyPendingIds.end());
+    m_rekeyPendingIds.erase(std::unique(m_rekeyPendingIds.begin(), m_rekeyPendingIds.end()),
+                            m_rekeyPendingIds.end());
   }
   state->rekeyPending = true;
   m_rekeyPendingIds.push_back(state->javaObjectID);
