@@ -233,6 +233,11 @@ class ObjectManager {
   // own data property; empty when that is not known.
   inline v8::Local<v8::Object> CachedPlainState(CanaryHandle* canary,
                                                 const v8::Local<v8::Name>& property);
+  // Whether the canary's state may have `property`; false only for a plain
+  // state that the handlers never added the name to as it is now.
+  inline bool StateMayHave(CanaryHandle* canary, const v8::Local<v8::Name>& property);
+  // After the handlers added `property` to the canary's state.
+  inline void NoteStateName(CanaryHandle* canary, const v8::Local<v8::Name>& property);
   // After the handlers rewrote `property`, an own data property of the canary's
   // plain state. An entry holds a global handle, so a name added to the state
   // waits for its first rewrite.
@@ -347,6 +352,13 @@ class ObjectManager {
     bool javaWeak = false;
     // A define reached the state with an accessor or non-default attributes.
     bool stateNotPlain = false;
+    // Tags (FieldNameTag) of the names the handlers added to a plain state, so a
+    // write of a name without one skips looking the state up. A name that moved
+    // since has another tag; its write takes the path for a name the state lacks,
+    // which also handles one the canary has. Past kStateTags, every write looks.
+    static constexpr uint8_t kStateTags = 6;
+    uint8_t stateTagCount = 0;
+    uint32_t stateTags[kStateTags];
   };
 
   using JSInstanceInfo = ObjectWeakCallbackState;
@@ -647,6 +659,41 @@ inline v8::Local<v8::Object> ObjectManager::CachedPlainState(
     }
   }
   return v8::Local<v8::Object>();
+}
+
+inline bool ObjectManager::StateMayHave(CanaryHandle* canary,
+                                        const v8::Local<v8::Name>& property) {
+  CanaryRecord* record = canary->record;
+  if (record == nullptr || record->stateNotPlain ||
+      record->stateTagCount > CanaryRecord::kStateTags) {
+    return true;
+  }
+  uint32_t tag = FieldNameTag(property);
+  for (uint8_t i = 0; i < record->stateTagCount; i++) {
+    if (record->stateTags[i] == tag) {
+      return true;
+    }
+  }
+  return false;
+}
+
+inline void ObjectManager::NoteStateName(CanaryHandle* canary,
+                                         const v8::Local<v8::Name>& property) {
+  CanaryRecord* record = canary->record;
+  if (record == nullptr || record->stateTagCount > CanaryRecord::kStateTags) {
+    return;
+  }
+  uint32_t tag = FieldNameTag(property);
+  for (uint8_t i = 0; i < record->stateTagCount; i++) {
+    if (record->stateTags[i] == tag) {
+      return;
+    }
+  }
+  if (record->stateTagCount == CanaryRecord::kStateTags) {
+    record->stateTagCount++;
+    return;
+  }
+  record->stateTags[record->stateTagCount++] = tag;
 }
 
 inline FieldCallbackData* ObjectManager::CachedInstanceField(CanaryHandle* canary,

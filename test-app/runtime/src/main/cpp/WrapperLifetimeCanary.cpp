@@ -90,7 +90,7 @@ bool RewriteState(ObjectManager* objectManager, ObjectManager::CanaryHandle* can
   Local<Context> context = isolate->GetCurrentContext();
   Local<Object> state = objectManager->StateOf(canary);
   // Own on the state means own on the canary: a rewrite of a JS property.
-  if (!state.IsEmpty() &&
+  if (!state.IsEmpty() && objectManager->StateMayHave(canary, property) &&
       RewriteState(objectManager, canary, context, state, property, value)) {
     return Intercepted::kNo;
   }
@@ -127,10 +127,12 @@ bool RewriteState(ObjectManager* objectManager, ObjectManager::CanaryHandle* can
   if (state.IsEmpty()) {
     objectManager->StateChanging(canary);
     objectManager->NewStateWith(canary, property, value);
+    objectManager->NoteStateName(canary, property);
   } else if (objectManager->StateIsPlain(canary)) {
-    // RewriteState found the name absent from the state.
+    // The state lacks the name, or has it as a plain data property.
     objectManager->StateChanging(canary);
     (void)state->CreateDataProperty(context, property, value);
+    objectManager->NoteStateName(canary, property);
   } else if (!HasOwn(context, state, property)) {
     objectManager->StateChanging(canary);
     (void)state->CreateDataProperty(context, property, value);
@@ -218,6 +220,7 @@ Intercepted Definer(Local<Name> property, const PropertyDescriptor& descriptor,
     objectManager->ForgetStateName(canary, property);
     (void)state->DefineProperty(info.GetIsolate()->GetCurrentContext(), property,
                                 const_cast<PropertyDescriptor&>(descriptor));
+    objectManager->NoteStateName(canary, property);
   }
   return Intercepted::kNo;
 }
