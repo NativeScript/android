@@ -58,6 +58,7 @@ require("./tests/exceptionHandlingTests");
 require("./tests/discardedExceptionsTest");
 require("./tests/dispatchCallbacksOnUiThreadTests");
 require("./tests/stringConversionTests");
+require("./tests/testTypeScriptExtendedConstruction");
 require("./tests/testsForTypescript");
 require("./tests/testGC");
 require("./tests/testWrapperLifetime");

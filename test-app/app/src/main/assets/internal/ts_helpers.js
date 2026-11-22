@@ -19,20 +19,15 @@
 
 	// For backward compatibility.
 	var __native = function (thiz) {
-		// we are setting the __container__ property to the base class when the super method is called
-		// if the constructor returns the __native(this) call we will use the old implementation
-		// copying all the properties to the result
-		// otherwise if we are using the result from the super() method call we won't need such logic
-		// as thiz already contains the parent properties
-		// this way we now support both implementations in typescript generated constructors:
-		// 1: super(); return __native(this);
-		// 2: return super() || this;
+		// TypeScript 2+ constructors pass the instance `super()` returned, which this returns as is.
+		// One compiled earlier sets its fields on its own `this` and passes that instead; this moves
+		// them to the instance.
 		if (thiz.__container__) {
-			var result = thiz.__proto__;
+			var result = thiz[nativeInstanceKey];
 
 			for (var prop in thiz) {
 				if (thiz.hasOwnProperty(prop)) {
-					thiz.__proto__[prop] = thiz[prop];
+					result[prop] = thiz[prop];
 					delete thiz[prop];
 				}
 			}
@@ -46,6 +41,17 @@
 			return thiz;
 		}
 	};
+
+	var nativeInstanceKey = Symbol("nativeInstance");
+
+	// Never make the native instance a prototype, not even of the constructor's own `this`:
+	// V8 gives a prototype a map of its own, so every store on the instance, such as each
+	// field initializer, would miss.
+	function linkContainer(thiz, instance) {
+		thiz.__container__ = true;
+		thiz[nativeInstanceKey] = instance;
+		return instance;
+	}
 
 	var __extends = function (Child, Parent) {
 		var extendNativeClass = !!Parent.extend && (Parent.extend.toString().indexOf("[native code]") > -1);
@@ -77,26 +83,14 @@
 
 		Parent.call = function (thiz) {
 			var Extended = extend(thiz);
-			thiz.__container__ = true;
-			if (arguments.length > 1) {
-				thiz.__proto__ = new (Function.prototype.bind.apply(Extended, [null].concat(Array.prototype.slice.call(arguments, 1))));
-			}
-			else {
-				thiz.__proto__ = new Extended()
-			}
-			return thiz.__proto__;
+			var instance = arguments.length > 1 ? Reflect.construct(Extended, Array.prototype.slice.call(arguments, 1)) : new Extended();
+			return linkContainer(thiz, instance);
 		};
 
 		Parent.apply = function (thiz, args) {
 			var Extended = extend(thiz);
-			thiz.__container__ = true;
-			if (args && args.length > 0) {
-				thiz.__proto__ = new (Function.prototype.bind.apply(Extended, [null].concat(Array.prototype.slice.call(args))));
-			}
-			else {
-				thiz.__proto__ = new Extended();
-			}
-			return thiz.__proto__;
+			var instance = args && args.length > 0 ? Reflect.construct(Extended, Array.prototype.slice.call(args)) : new Extended();
+			return linkContainer(thiz, instance);
 		};
 		__extends_ns(Child, Parent);
 		Child.__isPrototypeImplementationObject = true;
