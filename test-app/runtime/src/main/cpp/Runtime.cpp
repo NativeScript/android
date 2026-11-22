@@ -12,6 +12,7 @@
 #include <thread>
 
 #include "ArgConverter.h"
+#include "BenchVariant.h"
 #include "BuiltinLoader.h"
 #include "CallbackHandlers.h"
 #include "Constants.h"
@@ -98,6 +99,13 @@ void Runtime::Init(JavaVM* vm, void* reserved) {
                       "NativeScript Runtime Version %s, commit %s",
                       NATIVE_SCRIPT_RUNTIME_VERSION,
                       NATIVE_SCRIPT_RUNTIME_COMMIT_SHA);
+
+#ifdef NS_BENCH_VARIANTS
+  InitBenchVariant();
+  // tools/perf checks this line to reject a launch that ran the wrong variant.
+  __android_log_print(ANDROID_LOG_INFO, "TNS.Runtime", "NS_BENCH_VARIANT=%d",
+                      BenchVariant());
+#endif
 
   if (Runtime::s_jvm == nullptr) {
     s_jvm = vm;
@@ -1017,6 +1025,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath,
   globalTemplate->Set(
       ArgConverter::ConvertToV8String(isolate, "__time"),
       FunctionTemplate::New(isolate, CallbackHandlers::TimeCallback));
+#ifdef NS_BENCH_VARIANTS
+  globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__benchVariant"),
+                      v8::Integer::New(isolate, BenchVariant()),
+                      readOnlyFlags);
+#endif
 
   // queueMicrotask(callback) per spec:
   // https://developer.mozilla.org/en-US/docs/Web/API/Window/queueMicrotask
