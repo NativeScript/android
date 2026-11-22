@@ -235,6 +235,27 @@ describe("Tests typescript", function () {
 		expect(isInstanceOf).toEqual(true);
 	});
 	
+	it("When_a_typescript_class_without_a_constructor_is_created_with_arguments_it_should_pass_them_to_the_java_constructor", function () {
+
+		// TypeScript's output for `class NamedThread extends java.lang.Thread {}`.
+		var NamedThread = (function (_super) {
+		    __extends(NamedThread, _super);
+		    function NamedThread() {
+		        return _super !== null && _super.apply(this, arguments) || this;
+		    }
+		    NamedThread.prototype.run = function () {
+		    };
+		    return NamedThread;
+		})(java.lang.Thread);
+
+		var thread = new NamedThread("named");
+		expect(thread instanceof NamedThread).toBe(true);
+		expect(thread.getName()).toBe("named");
+
+		var unnamed = new NamedThread();
+		expect(unnamed instanceof NamedThread).toBe(true);
+	});
+
 	it("When_creating_a_typescript_instance_it_should_support_member_access", function () {
 
 		__log("TEST: When_creating_a_typescript_instance_it_should_support_member_access");

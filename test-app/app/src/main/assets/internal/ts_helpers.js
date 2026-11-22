@@ -91,7 +91,7 @@
 			var Extended = extend(thiz);
 			thiz.__container__ = true;
 			if (args && args.length > 0) {
-				thiz.__proto__ = new (Function.prototype.bind.apply(Extended, [null].concat(args)));
+				thiz.__proto__ = new (Function.prototype.bind.apply(Extended, [null].concat(Array.prototype.slice.call(args))));
 			}
 			else {
 				thiz.__proto__ = new Extended();
