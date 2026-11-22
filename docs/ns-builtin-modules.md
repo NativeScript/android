@@ -195,7 +195,7 @@ every build on cold paths only:
 | `canaryCachedWrites` | `"canary"` only: of those writes, rewrites of a name the handler knew to be a plain data property of the state, mirrored with one store |
 | `canaryCachedFieldWrites` | `"canary"` only: of those writes, Java field writes the handler placed from an earlier write of the same name through an object with the same prototype, without looking the name up along the prototype chain |
 | `canaryRebuilds` | `"canary"` only: canaries built anew for a JS-extended instance whose previous canary died while Java kept the object |
-| `weakCollectionNativeCalls` | `"canary"` only: calls the weak collections make into the runtime: to make the key of a canary's Java object, to find the canary for a key, and to learn about canaries built for keyed objects since the last such call. Lookups of a value that was never a key make none |
+| `weakCollectionNativeCalls` | `"canary"` only: calls the weak collections make into the runtime: to make the key of a canary's Java object, to find the canary for a key, and to learn about canaries built for keyed objects since the last such call. A lookup of a value that was never a key makes none of its own, but the first lookup that misses after the runtime built such canaries, whatever value it looks up, makes that last call |
 
 In `"canary"` mode only array buffers backed by Java buffers resurrect;
 `weakened` counts objects held weakly because their canary died while they
