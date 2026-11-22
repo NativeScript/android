@@ -1344,8 +1344,8 @@ void ObjectManager::UnwrapForWeakCollection(const FunctionCallbackInfo<Value>& i
 }
 
 // wrap(key): the Java object a key stands for, as its live canary or a new one
-// with its state, or undefined once Java collected it. Anything that is not a
-// key passes through.
+// (with its state, when it keeps one), or undefined once Java collected it.
+// Anything that is not a key passes through.
 void ObjectManager::WrapForWeakCollection(const FunctionCallbackInfo<Value>& info) {
   try {
     Isolate* isolate = info.GetIsolate();
@@ -1385,7 +1385,8 @@ void ObjectManager::WrapForWeakCollection(const FunctionCallbackInfo<Value>& inf
     }
     Local<Object> result = thisPtr->RebuildCanary(id);
     if (result.IsEmpty() && thisPtr->FindCanaryRecord(id) != nullptr) {
-      // A plain object: a wrapper made from it the usual way is hydrated from its state.
+      // A plain object: a wrapper made from it the usual way links to its record,
+      // and gets its state back in scope.
       JniLocalRef javaObject(thisPtr->JavaObjectOrNull(id));
       if (!javaObject.IsNull()) {
         result = thisPtr->GetOrCreateJSWrapper(javaObject);

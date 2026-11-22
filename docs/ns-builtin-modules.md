@@ -239,7 +239,9 @@ their JS properties:
   object for JS; when Java hands the object back later, its wrapper is a new
   object without the old one's JS properties. JS properties on plain native
   objects are therefore not preserved under `"extended"`: keep such state on a
-  JS object of your own, or use `"all"`, which gives every wrapper state.
+  JS object of your own, such as a `WeakMap` keyed by the native object (in
+  canary mode its entries live exactly as long as the Java object, see below),
+  or use `"all"`, which gives every wrapper state.
   Array buffers backed by Java buffers keep the `"resurrecting"` lifetime under
   either scope.
 

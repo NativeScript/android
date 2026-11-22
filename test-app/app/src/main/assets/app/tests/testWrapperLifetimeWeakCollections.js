@@ -3,6 +3,7 @@
 describe("Weak collections of Java objects", function () {
     var runtime = require("ns:runtime");
     var mode = runtime.getConfig("wrapperLifetimeMode");
+    var scope = runtime.getConfig("wrapperLifetimeScope");
     var canary = mode === "canary";
     var Holder = com.tns.tests.WrapperHolder;
 
@@ -158,8 +159,9 @@ describe("Weak collections of Java objects", function () {
         }, 0);
     });
 
-    // Under scope "all" a plain wrapper is a canary: its key hangs off its state, and deref
-    // makes a new wrapper the usual way, hydrated from the state.
+    // In canary mode a plain wrapper is a canary: its key hangs off its record, and deref
+    // makes a new wrapper the usual way, with the old one's JS properties under scope "all"
+    // only.
     it("keeps a WeakMap entry and a WeakRef target for a Java-held plain object across a wrapper change", function (done) {
         var map = new WeakMap();
         var ref = (function () {
@@ -176,9 +178,107 @@ describe("Weak collections of Java objects", function () {
             var target = ref.deref();
             expect(target).toBeDefined();
             expect(target.toString()).toBe("plain");
-            expect(target.tag).toBe("state");
+            if (canary && scope === "extended") {
+                expect(target.tag).toBeUndefined();
+            } else {
+                expect(target.tag).toBe("state");
+            }
             done();
         }, 0);
+    });
+
+    // A keyed plain wrapper under scope "extended" is a canary with a record and no state:
+    // the next one is a new, empty object that stands for the same key.
+    it("finds a keyed Java-held plain object through its next canary, which has no state, under scope extended", function (done) {
+        if (!canary || scope !== "extended") {
+            done();
+            return;
+        }
+        var NativeWeakRef = Object.getPrototypeOf(WeakRef);
+        var map = new WeakMap();
+        var set = new WeakSet();
+        var registry = new FinalizationRegistry(function () {});
+        var target = {};
+        var states = runtime.getWrapperLifetimeStats().canaryStates;
+        var first;
+        var refs = (function () {
+            var builder = new java.lang.StringBuilder("plain");
+            builder.tag = "lost";
+            map.set(builder, "value");
+            set.add(builder);
+            registry.register(target, "held", builder);
+            Holder.held = builder;
+            first = new NativeWeakRef(builder);
+            return [new WeakRef(builder), new WeakRef(builder)];
+        })();
+        setTimeout(function () {
+            collectBoth();
+            expect(first.deref()).toBeUndefined();
+            // No canary is alive: deref builds one.
+            var built = refs[0].deref();
+            expect(built).toBeDefined();
+            expect(built.toString()).toBe("plain");
+            expect(built.tag).toBeUndefined();
+            expect(Holder.held === built).toBe(true);
+            built = null;
+            collectBoth();
+            var again = Holder.held;
+            expect(again.tag).toBeUndefined();
+            expect(map.get(again)).toBe("value");
+            expect(map.has(again)).toBe(true);
+            expect(set.has(again)).toBe(true);
+            expect(refs[1].deref() === again).toBe(true);
+            expect(registry.unregister(again)).toBe(true);
+            expect(runtime.getWrapperLifetimeStats().canaryStates).toBe(states);
+            done();
+        }, 0);
+    });
+
+    it("runs a FinalizationRegistry callback for a plain object only once Java collected it", function (done) {
+        if (!canary) {
+            done();
+            return;
+        }
+        var heldCleaned = false;
+        var droppedCleaned = false;
+        var registry = new FinalizationRegistry(function (held) {
+            if (held === "held") {
+                heldCleaned = true;
+            } else if (held === "dropped") {
+                droppedCleaned = true;
+            }
+        });
+        (function () {
+            var held = new java.lang.StringBuilder("held");
+            Holder.held = held;
+            registry.register(held, "held");
+            registry.register(new java.lang.StringBuilder("dropped"), "dropped");
+        })();
+        function finish() {
+            expect(heldCleaned).toBe(false);
+            expect(Holder.held.toString()).toBe("held");
+            done();
+        }
+        finish.fail = done.fail;
+        eventually(function () {
+            return droppedCleaned;
+        }, finish, "the cleanup callback did not run");
+    }, 20000);
+
+    it("keeps what was keyed on a plain Java object after its link is released", function () {
+        if (!canary) {
+            return;
+        }
+        var map = new WeakMap();
+        var set = new WeakSet();
+        var builder = new java.lang.StringBuilder("released");
+        map.set(builder, "value");
+        set.add(builder);
+        __releaseNativeCounterpart(builder);
+        collectBoth();
+        expect(map.get(builder)).toBe("value");
+        expect(set.has(builder)).toBe(true);
+        expect(new WeakRef(builder).deref() === builder).toBe(true);
     });
 
     it("clears a WeakRef once Java collected the object", function (done) {
@@ -441,10 +541,7 @@ describe("Weak collections of Java objects", function () {
         setTimeout(function () {
             collectBoth();
             if (canary) {
-                // A plain wrapper is a canary under scope "all" only.
-                if (runtime.getConfig("wrapperLifetimeScope") === "all") {
-                    expect(firstCanaries[0].deref()).toBeUndefined();
-                }
+                expect(firstCanaries[0].deref()).toBeUndefined();
                 expect(firstCanaries[1].deref()).toBeUndefined();
             }
             var list = Holder.held;
