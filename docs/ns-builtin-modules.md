@@ -282,8 +282,8 @@ from a V8 heap snapshot (its roots minus the runtime's handles to canary
 records), the Java heap from an HPROF dump (`android.os.Debug.dumpHprofData`;
 its GC roots minus the runtime's object table, `Reference` referents skipped),
 and the runtime's own edges between them (a live wrapper holds its Java object;
-a Java object holds its canary record: state, prototype and implementation
-object; a Java object held weakly for a resurrected wrapper holds that wrapper). A `WeakMap` value is followed from its key only. A Java object the
+a Java object holds its canary record: state, weak-collection key, prototype
+and implementation object; a Java object held weakly for a resurrected wrapper holds that wrapper). A `WeakMap` value is followed from its key only. A Java object the
 runtime holds for a live wrapper, and that nothing else reaches, is leaked. For each, the report gives the path from the Java
 object to its own wrapper through fields, properties and the runtime's edges,
 a `signature` (the path's node labels from their smallest rotation, free of

@@ -1598,6 +1598,9 @@ std::vector<ObjectManager::LeakProbeEntry> ObjectManager::GetLeakProbeEntries() 
     if (!record->state.IsEmpty()) {
       entry.recordValues.push_back(record->state.Get(isolate));
     }
+    if (!record->key.IsEmpty()) {
+      entry.recordValues.push_back(record->key.Get(isolate));
+    }
   });
   return entries;
 }

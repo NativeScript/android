@@ -64,7 +64,7 @@ describe("Wrapper lifetime leak probe", function () {
                 planted.push(new WeakRef(held));
 
                 // A WeakMap value referencing its own key: in canary mode the key is the
-                // object's lifetime key, which its state holds.
+                // object's lifetime key, which its record holds.
                 var mapped = new java.lang.Runnable({ run: function () {} });
                 probeMap.set(mapped, { probeMapped: mapped });
                 planted.push(new WeakRef(mapped));
