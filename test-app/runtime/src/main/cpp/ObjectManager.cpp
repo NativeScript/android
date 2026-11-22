@@ -14,6 +14,7 @@
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include "WrapperLifetimeCanary.h"
+#include "include/v8-fast-api-calls.h"
 #include "include/v8.h"
 
 using namespace v8;
@@ -117,7 +118,7 @@ void ObjectManager::Init(Isolate* isolate) {
 
   if (WrapperLifetimeCanary::Enabled()) {
     m_instanceFieldTableKey.Reset(isolate, Private::New(isolate));
-    m_keyOfState.Reset(isolate, Private::New(isolate));
+    m_keyOfReleased.Reset(isolate, Private::New(isolate));
     m_objectOfKey.Reset(isolate, Private::New(isolate));
     m_releasedOfKey.Reset(isolate, Private::New(isolate));
     isolate->AddGCEpilogueCallback(CanaryGCEpilogue, this);
@@ -621,6 +622,9 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
     state->record = AdoptCanary(object, javaObjectID, kind, instanceTemplate,
                                 record.has_value() ? *record : FindCanaryRecord(javaObjectID),
                                 hydrate);
+    if (state->record != nullptr && !state->record->key.IsEmpty()) {
+      MarkRekeyPending(state);
+    }
   }
 }
 
@@ -983,14 +987,7 @@ bool ObjectManager::CanaryStateForWrite(const Local<Object>& holder, Local<Objec
 }
 
 Local<Object> ObjectManager::AttachState(CanaryHandle* canary, const Local<Object>& fresh) {
-  CanaryRecord* record = canary->record;
-  if (record == nullptr) {
-    record = FindCanaryRecord(canary->javaObjectID);
-  }
-  if (record == nullptr) {
-    record = NewCanaryRecord(canary->javaObjectID);
-  }
-  canary->record = record;
+  CanaryRecord* record = RecordForWrite(canary);
   record->state.Reset(m_isolate, fresh);
   m_lifetimeStats.canaryStates++;
   return fresh;
@@ -1020,6 +1017,18 @@ Local<Object> ObjectManager::NewEmptyState() {
     m_emptyState.Reset(m_isolate, empty);
   }
   return m_emptyState.Get(m_isolate)->Clone(m_isolate);
+}
+
+ObjectManager::CanaryRecord* ObjectManager::RecordForWrite(ObjectWeakCallbackState* canary) {
+  CanaryRecord* record = canary->record;
+  if (record == nullptr) {
+    record = FindCanaryRecord(canary->javaObjectID);
+  }
+  if (record == nullptr) {
+    record = NewCanaryRecord(canary->javaObjectID);
+  }
+  canary->record = record;
+  return record;
 }
 
 Local<Object> ObjectManager::StateOf(CanaryHandle* canary) {
@@ -1063,6 +1072,7 @@ void ObjectManager::CanaryDiedStatic(
     }
     thisPtr->m_pendingCanaryDeaths.push_back(static_cast<jint>(id));
   }
+  thisPtr->DropRekeyPending(state);
   delete state;
 }
 
@@ -1209,20 +1219,60 @@ std::map<std::string, ObjectManager::ClassCounts> ObjectManager::GetWrapperClass
   return counts;
 }
 
+namespace {
+// Only an object with a Metadata field can be a canary, released ones included;
+// a Proxy is a key of its own.
+bool MaybeCanary(Local<Value> value) {
+  return value->IsObject() && !value->IsProxy() &&
+         ObjectManager::HasMetadataField(value.As<Object>());
+}
+
+void MaybeCanaryCallback(const FunctionCallbackInfo<Value>& info) {
+  info.GetReturnValue().Set(MaybeCanary(info[0]));
+}
+
+#if NATIVESCRIPT_ENABLE_FAST_API
+bool FastMaybeCanary(Local<Value> receiver, Local<Value> value) {
+  return MaybeCanary(value);
+}
+
+const CFunction kFastMaybeCanary = CFunction::Make(FastMaybeCanary);
+#endif
+}  // namespace
+
 bool ObjectManager::AddWeakCollectionFunctions(Local<Context> context, Local<Object> binding) {
+#if NATIVESCRIPT_ENABLE_FAST_API
+  tns::SetFastMethodNoSideEffect(context, binding, "maybeCanary", MaybeCanaryCallback,
+                                 &kFastMaybeCanary);
+#else
+  tns::SetMethodNoSideEffect(context, binding, "maybeCanary", MaybeCanaryCallback);
+#endif
   auto isolate = m_isolate;
   Local<Function> unwrap;
   Local<Function> wrap;
+  Local<Function> takeRekeys;
+  std::shared_ptr<BackingStore> store =
+      ArrayBuffer::NewBackingStore(isolate, sizeof(int32_t));
+  m_rekeyPendingCount = static_cast<int32_t*>(store->Data());
+  *m_rekeyPendingCount = 0;
+  Local<Int32Array> pendingRekeys = Int32Array::New(ArrayBuffer::New(isolate, store), 0, 1);
+  m_rekeyPendingArray.Reset(isolate, pendingRekeys);
   return Function::New(context, UnwrapForWeakCollection).ToLocal(&unwrap) &&
          Function::New(context, WrapForWeakCollection).ToLocal(&wrap) &&
+         Function::New(context, TakeRekeysForWeakCollection).ToLocal(&takeRekeys) &&
          binding->Set(context, ArgConverter::ConvertToV8String(isolate, "unwrap"), unwrap)
              .FromMaybe(false) &&
          binding->Set(context, ArgConverter::ConvertToV8String(isolate, "wrap"), wrap)
+             .FromMaybe(false) &&
+         binding->Set(context, ArgConverter::ConvertToV8String(isolate, "takeRekeys"), takeRekeys)
+             .FromMaybe(false) &&
+         binding->Set(context, ArgConverter::ConvertToV8String(isolate, "pendingRekeys"),
+                      pendingRekeys)
              .FromMaybe(false);
 }
 
 // unwrap(value, create): the weak collections' key for a canary's Java object,
-// a frozen, null-prototype object that lives as long as the object's state,
+// a frozen, null-prototype object that lives as long as the object's record,
 // that is, until Java collects the object. Lookups pass `create` false and never
 // make one: with no key yet, no entry can be keyed by it. The value itself for
 // anything that is not a canary, a Proxy included (it is a key of its own).
@@ -1245,29 +1295,30 @@ void ObjectManager::UnwrapForWeakCollection(const FunctionCallbackInfo<Value>& i
     Local<Value> value = info[0];
     bool create = info[1]->IsTrue();
     info.GetReturnValue().Set(value);
-    if (!value->IsObject() || value->IsProxy()) {
+    // Canaries, released ones included, are runtime objects with a Metadata field.
+    if (!value->IsObject() || value->IsProxy() || !HasMetadataField(value.As<Object>())) {
       return;
     }
     ObjectManager* thisPtr = WeakCollectionManagerOf(isolate);
     if (thisPtr == nullptr) {
       return;
     }
+    thisPtr->m_lifetimeStats.weakCollectionNativeCalls++;
     Local<Object> holder = value.As<Object>();
     Local<Context> context = isolate->GetCurrentContext();
-    Local<Private> keyOfState = thisPtr->m_keyOfState.Get(isolate);
-    Local<Value> key;
-    Local<Object> state;
-    if (create ? !thisPtr->CanaryStateForWrite(holder, &state)
-               : !thisPtr->ExistingCanaryState(holder, &state)) {
+    ObjectWeakCallbackState* live = thisPtr->CanaryOf(holder);
+    CanaryRecord* record = live != nullptr ? thisPtr->FindCanaryRecord(live->javaObjectID) : nullptr;
+    if (record != nullptr && !record->key.IsEmpty()) {
+      info.GetReturnValue().Set(record->key.Get(isolate));
+      return;
+    }
+    if (live == nullptr) {
       // A canary whose link was released keeps its key itself.
-      if (HasMetadataField(holder) && holder->GetPrivate(context, keyOfState).ToLocal(&key) &&
+      Local<Value> key;
+      if (holder->GetPrivate(context, thisPtr->m_keyOfReleased.Get(isolate)).ToLocal(&key) &&
           key->IsObject()) {
         info.GetReturnValue().Set(key);
       }
-      return;
-    }
-    if (state->GetPrivate(context, keyOfState).ToLocal(&key) && key->IsObject()) {
-      info.GetReturnValue().Set(key);
       return;
     }
     if (!create) {
@@ -1276,12 +1327,12 @@ void ObjectManager::UnwrapForWeakCollection(const FunctionCallbackInfo<Value>& i
     Local<Object> newKey = Object::New(isolate, Null(isolate), nullptr, nullptr, 0);
     if (!newKey
              ->SetPrivate(context, thisPtr->m_objectOfKey.Get(isolate),
-                          Integer::NewFromUnsigned(isolate, static_cast<uint32_t>(LinkedIdOf(holder))))
+                          Integer::NewFromUnsigned(isolate, live->javaObjectID))
              .FromMaybe(false) ||
-        !newKey->SetIntegrityLevel(context, IntegrityLevel::kFrozen).FromMaybe(false) ||
-        !state->SetPrivate(context, keyOfState, newKey).FromMaybe(false)) {
+        !newKey->SetIntegrityLevel(context, IntegrityLevel::kFrozen).FromMaybe(false)) {
       return;
     }
+    thisPtr->RecordForWrite(live)->key.Reset(isolate, newKey);
     info.GetReturnValue().Set(newKey);
   } catch (NativeScriptException& e) {
     e.ReThrowToV8();
@@ -1307,6 +1358,7 @@ void ObjectManager::WrapForWeakCollection(const FunctionCallbackInfo<Value>& inf
     if (thisPtr == nullptr) {
       return;
     }
+    thisPtr->m_lifetimeStats.weakCollectionNativeCalls++;
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> key = value.As<Object>();
     Local<Value> idValue;
@@ -1324,13 +1376,7 @@ void ObjectManager::WrapForWeakCollection(const FunctionCallbackInfo<Value>& inf
     info.GetReturnValue().SetUndefined();
     int id = static_cast<int>(idValue.As<Uint32>()->Value());
     CanaryRecord* record = thisPtr->FindCanaryRecord(id);
-    if (record == nullptr || record->state.IsEmpty()) {
-      return;
-    }
-    Local<Value> recordKey;
-    if (!record->state.Get(isolate)->GetPrivate(context, thisPtr->m_keyOfState.Get(isolate))
-             .ToLocal(&recordKey) ||
-        !recordKey->StrictEquals(key)) {
+    if (record == nullptr || record->key.IsEmpty() || record->key.Get(isolate) != key) {
       return;
     }
     if (auto live = thisPtr->m_idToObject.Find(id)) {
@@ -1357,25 +1403,122 @@ void ObjectManager::WrapForWeakCollection(const FunctionCallbackInfo<Value>& inf
   }
 }
 
+void ObjectManager::MarkRekeyPending(ObjectWeakCallbackState* state) {
+  if (m_rekeyPendingCount == nullptr || state->rekeyPending) {
+    return;
+  }
+  // Stale ids pile up only while JS makes no lookup that misses; prune them
+  // once they outnumber the live ones.
+  if (m_rekeyPendingIds.size() >= 64 &&
+      m_rekeyPendingIds.size() > 2 * static_cast<size_t>(*m_rekeyPendingCount)) {
+    m_rekeyPendingIds.erase(
+        std::remove_if(m_rekeyPendingIds.begin(), m_rekeyPendingIds.end(),
+                       [this](uint32_t id) {
+                         auto live = m_idToObject.Find(id);
+                         return live == nullptr || !live->rekeyPending;
+                       }),
+        m_rekeyPendingIds.end());
+  }
+  state->rekeyPending = true;
+  m_rekeyPendingIds.push_back(state->javaObjectID);
+  ++*m_rekeyPendingCount;
+}
+
+// takeRekeys(): [canary, key, canary, key, ...] for every live canary of a
+// keyed object built since the last call. A canary whose link was released
+// since holds its key itself.
+void ObjectManager::TakeRekeysForWeakCollection(const FunctionCallbackInfo<Value>& info) {
+  try {
+    Isolate* isolate = info.GetIsolate();
+    ObjectManager* thisPtr = WeakCollectionManagerOf(isolate);
+    if (thisPtr == nullptr) {
+      info.GetReturnValue().Set(Array::New(isolate, 0));
+      return;
+    }
+    thisPtr->m_lifetimeStats.weakCollectionNativeCalls++;
+    std::vector<uint32_t>& ids = thisPtr->m_rekeyTakenIds;
+    ids.swap(thisPtr->m_rekeyPendingIds);
+    if (thisPtr->m_rekeyPendingCount != nullptr) {
+      *thisPtr->m_rekeyPendingCount = 0;
+    }
+    // Handles only until every pair is taken: an allocation could start a
+    // collection, whose weak callbacks free registrations.
+    constexpr size_t kInlinePairs = 8;
+    Local<Value> inlinePairs[2 * kInlinePairs];
+    LocalVector<Value> morePairs(isolate);
+    size_t count = 0;
+    bool released = false;
+    auto add = [&](Local<Value> canary, Local<Value> key) {
+      if (count < kInlinePairs) {
+        inlinePairs[2 * count] = canary;
+        inlinePairs[2 * count + 1] = key;
+      } else {
+        if (morePairs.empty()) {
+          morePairs.insert(morePairs.end(), inlinePairs, inlinePairs + 2 * kInlinePairs);
+        }
+        morePairs.push_back(canary);
+        morePairs.push_back(key);
+      }
+      count++;
+    };
+    for (uint32_t id : ids) {
+      auto live = thisPtr->m_idToObject.Find(id);
+      if (live == nullptr || !live->rekeyPending) {
+        continue;
+      }
+      live->rekeyPending = false;
+      Local<Object> canary = Local<Object>::New(isolate, *live->target);
+      if (live->record != nullptr && !live->record->key.IsEmpty()) {
+        add(canary, live->record->key.Get(isolate));
+      } else {
+        add(canary, Local<Value>());
+        released = true;
+      }
+    }
+    ids.clear();
+    Local<Value>* pairs = count <= kInlinePairs ? inlinePairs : morePairs.data();
+    if (released) {
+      Local<Context> context = isolate->GetCurrentContext();
+      Local<Private> keyOfReleased = thisPtr->m_keyOfReleased.Get(isolate);
+      size_t kept = 0;
+      for (size_t i = 0; i < count; i++) {
+        Local<Value> canary = pairs[2 * i];
+        Local<Value> key = pairs[2 * i + 1];
+        if (key.IsEmpty() &&
+            (!canary.As<Object>()->GetPrivate(context, keyOfReleased).ToLocal(&key) ||
+             !key->IsObject())) {
+          continue;
+        }
+        pairs[2 * kept] = canary;
+        pairs[2 * kept + 1] = key;
+        kept++;
+      }
+      count = kept;
+    }
+    info.GetReturnValue().Set(Array::New(isolate, pairs, 2 * count));
+  } catch (NativeScriptException& e) {
+    e.ReThrowToV8();
+  } catch (std::exception& e) {
+    RethrowToV8(e.what());
+  } catch (...) {
+    RethrowToV8("unknown");
+  }
+}
+
 void ObjectManager::KeepWeakCollectionKey(int javaObjectID) {
   CanaryRecord* record = FindCanaryRecord(javaObjectID);
   auto live = m_idToObject.Find(javaObjectID);
-  if (record == nullptr || record->state.IsEmpty() || live == nullptr || !live->canary ||
-      m_keyOfState.IsEmpty()) {
+  if (record == nullptr || record->key.IsEmpty() || live == nullptr || !live->canary ||
+      m_keyOfReleased.IsEmpty()) {
     return;
   }
   Local<Context> context = m_isolate->GetCurrentContext();
-  Local<Private> keyOfState = m_keyOfState.Get(m_isolate);
-  Local<Value> key;
-  if (!record->state.Get(m_isolate)->GetPrivate(context, keyOfState).ToLocal(&key) ||
-      !key->IsObject()) {
-    return;
-  }
+  Local<Object> key = record->key.Get(m_isolate);
   // Private symbols bypass the canary's write handler, and V8 lets them be
   // added to the frozen key.
   Local<Object> canary = Local<Object>::New(m_isolate, *live->target);
-  (void)canary->SetPrivate(context, keyOfState, key);
-  (void)key.As<Object>()->SetPrivate(context, m_releasedOfKey.Get(m_isolate), canary);
+  (void)canary->SetPrivate(context, m_keyOfReleased.Get(m_isolate), key);
+  (void)key->SetPrivate(context, m_releasedOfKey.Get(m_isolate), canary);
 }
 
 jobject ObjectManager::JavaObjectOrNull(int javaObjectID) {
@@ -1712,8 +1855,12 @@ void ObjectManager::ReleaseAllRegistered() {
   m_canaryRecords.DrainAll([](CanaryRecord* record) { delete record; });
   m_canaryRecordCount = 0;
   m_instanceFieldTableKey.Reset();
-  m_keyOfState.Reset();
+  m_keyOfReleased.Reset();
   m_emptyState.Reset();
+  m_rekeyPendingIds.clear();
+  m_rekeyTakenIds.clear();
+  m_rekeyPendingCount = nullptr;
+  m_rekeyPendingArray.Reset();
   m_objectOfKey.Reset();
   m_releasedOfKey.Reset();
 

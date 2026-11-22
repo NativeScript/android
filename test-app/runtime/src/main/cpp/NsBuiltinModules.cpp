@@ -175,6 +175,7 @@ void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
     set("collected", stats.collected);
     set("releasedExplicitly", stats.releasedExplicitly);
     set("releasedAccesses", stats.releasedAccesses);
+    set("weakCollectionNativeCalls", stats.weakCollectionNativeCalls);
     set("canaryStates", stats.canaryStates);
     set("canaryNativeDeaths", stats.canaryNativeDeaths);
     set("canaryInterceptedWrites", stats.canaryInterceptedWrites);

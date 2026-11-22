@@ -349,6 +349,18 @@ describe("Weak collections of Java objects", function () {
         }, 0);
     }, 20000);
 
+    it("gives no state to a Java object it only keys", function () {
+        var map = new WeakMap();
+        var set = new WeakSet();
+        var builder = new java.lang.StringBuilder("keyed");
+        var states = runtime.getWrapperLifetimeStats().canaryStates;
+        map.set(builder, 1);
+        set.add(builder);
+        expect(map.get(builder)).toBe(1);
+        expect(set.has(builder)).toBe(true);
+        expect(runtime.getWrapperLifetimeStats().canaryStates).toBe(states);
+    });
+
     it("makes no key for a call the standard collection rejects", function () {
         var runnable = new java.lang.Runnable({ run: function () {} });
         var registry = new FinalizationRegistry(function () {});
@@ -400,6 +412,187 @@ describe("Weak collections of Java objects", function () {
         expect(function () {
             registry.register(1, 1);
         }).toThrowError(TypeError, /invalid target/);
+    });
+
+    // A canary built for an object that has a key, by any path (here a Java field read, not
+    // a deref), stands for the key at once; a canary that was never a key makes no state.
+    it("finds what was keyed on a Java object through a canary built by a Java read", function (done) {
+        var map = new WeakMap();
+        var set = new WeakSet();
+        var registry = new FinalizationRegistry(function () {});
+        var token = new java.lang.StringBuilder("token");
+        var NativeWeakRef = Object.getPrototypeOf(WeakRef) === Function.prototype ? WeakRef : Object.getPrototypeOf(WeakRef);
+        var rebuilds = runtime.getWrapperLifetimeStats().canaryRebuilds;
+        var firstCanaries;
+        var refs = (function () {
+            var plain = new java.lang.StringBuilder("plain");
+            map.set(plain, "plain value");
+            set.add(plain);
+            var runnable = new java.lang.Runnable({ run: function () {} });
+            registry.register(runnable, "held", plain);
+            map.set(runnable, "extended value");
+            var list = new java.util.ArrayList();
+            list.add(plain);
+            list.add(runnable);
+            Holder.held = list;
+            firstCanaries = [new NativeWeakRef(plain), new NativeWeakRef(runnable)];
+            return [new WeakRef(plain), new WeakRef(runnable)];
+        })();
+        setTimeout(function () {
+            collectBoth();
+            if (canary) {
+                // A plain wrapper is a canary under scope "all" only.
+                if (runtime.getConfig("wrapperLifetimeScope") === "all") {
+                    expect(firstCanaries[0].deref()).toBeUndefined();
+                }
+                expect(firstCanaries[1].deref()).toBeUndefined();
+            }
+            var list = Holder.held;
+            var held = [list.get(0), list.get(1)];
+            if (canary) {
+                expect(runtime.getWrapperLifetimeStats().canaryRebuilds).toBeGreaterThan(rebuilds);
+            }
+            expect(map.get(held[0])).toBe("plain value");
+            expect(set.has(held[0])).toBe(true);
+            expect(map.get(held[1])).toBe("extended value");
+            expect(refs[0].deref() === held[0]).toBe(true);
+            expect(refs[1].deref() === held[1]).toBe(true);
+            expect(refs[1].deref() === refs[1].deref()).toBe(true);
+            expect(registry.unregister(held[0])).toBe(true);
+            expect(set.delete(held[0])).toBe(true);
+            expect(set.has(held[0])).toBe(false);
+            expect(map.delete(held[1])).toBe(true);
+            expect(map.has(held[1])).toBe(false);
+            var states = runtime.getWrapperLifetimeStats().canaryStates;
+            expect(map.has(token)).toBe(false);
+            expect(map.get(token)).toBeUndefined();
+            expect(set.delete(token)).toBe(false);
+            expect(registry.unregister(token)).toBe(false);
+            expect(runtime.getWrapperLifetimeStats().canaryStates).toBe(states);
+            var plainTarget = {};
+            expect(new WeakRef(plainTarget).deref()).toBe(plainTarget);
+            done();
+        }, 0);
+    });
+
+    // Keying a canary must not keep it alive: only WeakRef construction and deref do, until
+    // the job ends, as the standard says.
+    it("lets a canary that was just keyed die in the same job", function () {
+        var map = new WeakMap();
+        var set = new WeakSet();
+        var rebuilds = runtime.getWrapperLifetimeStats().canaryRebuilds;
+        (function () {
+            var runnable = heldRunnable();
+            map.set(runnable, "value");
+            set.add(runnable);
+        })();
+        collectBoth();
+        expect(map.get(Holder.held)).toBe("value");
+        expect(set.has(Holder.held)).toBe(true);
+        if (canary) {
+            expect(runtime.getWrapperLifetimeStats().canaryRebuilds).toBeGreaterThan(rebuilds);
+        }
+    });
+
+    function nativeCalls() {
+        return runtime.getWrapperLifetimeStats().weakCollectionNativeCalls;
+    }
+
+    it("never calls into the runtime for plain JS objects or lookups of values that were never keys", function () {
+        var map = new WeakMap();
+        var set = new WeakSet();
+        var registry = new FinalizationRegistry(function () {});
+        var plain = {};
+        var other = {};
+        map.set(plain, 1);
+        set.add(plain);
+        registry.register(plain, "held", plain);
+        var ref = new WeakRef(plain);
+        var javaObject = new java.lang.Object();
+        var runnable = new java.lang.Runnable({ run: function () {} });
+        // A miss takes whatever canaries earlier specs left to be told about.
+        map.has({});
+        var before = nativeCalls();
+        expect(map.get(plain)).toBe(1);
+        expect(map.has(other)).toBe(false);
+        expect(map.get(other)).toBeUndefined();
+        expect(map.delete(other)).toBe(false);
+        expect(set.has(plain)).toBe(true);
+        expect(set.has(other)).toBe(false);
+        expect(set.delete(other)).toBe(false);
+        expect(ref.deref()).toBe(plain);
+        expect(ref.get()).toBe(plain);
+        expect(registry.unregister(other)).toBe(false);
+        map.set(plain, 2);
+        set.add(plain);
+        expect(map.has(javaObject)).toBe(false);
+        expect(map.get(runnable)).toBeUndefined();
+        expect(set.has(runnable)).toBe(false);
+        expect(registry.unregister(runnable)).toBe(false);
+        var fresh = {};
+        map.set(fresh, 3);
+        set.add(fresh);
+        registry.register(fresh, "fresh", fresh);
+        expect(new WeakRef(fresh).deref()).toBe(fresh);
+        expect(map.getOrInsert ? map.getOrInsert({}, 4) : 4).toBe(4);
+        expect(nativeCalls()).toBe(before);
+    });
+
+    // The runtime only counts the canaries it builds for keyed objects; the first lookup
+    // that misses learns them all with one call.
+    it("finds a keyed Java object through canaries built while no lookup ran", function () {
+        var map = new WeakMap();
+        var set = new WeakSet();
+        var registry = new FinalizationRegistry(function () {});
+        var rebuilds = runtime.getWrapperLifetimeStats().canaryRebuilds;
+        (function () {
+            var runnable = heldRunnable();
+            map.set(runnable, "value");
+            set.add(runnable);
+            registry.register(runnable, "held", runnable);
+        })();
+        collectBoth();
+        (function () {
+            expect(set.has(Holder.held)).toBe(true);
+        })();
+        collectBoth();
+        // Built and dead again before any lookup saw it.
+        (function () {
+            Holder.held.hashCode();
+        })();
+        collectBoth();
+        var again = Holder.held;
+        if (canary) {
+            expect(runtime.getWrapperLifetimeStats().canaryRebuilds).toBeGreaterThan(rebuilds + 2);
+        }
+        var before = nativeCalls();
+        expect(map.has({})).toBe(false);
+        if (canary) {
+            expect(nativeCalls()).toBe(before + 1);
+        }
+        expect(map.has({})).toBe(false);
+        expect(map.get(again)).toBe("value");
+        expect(set.has(again)).toBe(true);
+        expect(registry.unregister(again)).toBe(true);
+        if (canary) {
+            expect(nativeCalls()).toBe(before + 1);
+        }
+    });
+
+    it("finds a keyed Java object through a canary built and released while no lookup ran", function () {
+        var map = new WeakMap();
+        var set = new WeakSet();
+        (function () {
+            var runnable = heldRunnable();
+            map.set(runnable, "value");
+            set.add(runnable);
+        })();
+        collectBoth();
+        var released = Holder.held;
+        __releaseNativeCounterpart(released);
+        expect(set.has(released)).toBe(true);
+        expect(map.get(released)).toBe("value");
+        expect(map.has({})).toBe(false);
     });
 
     it("installs the canary collections only in canary mode", function () {

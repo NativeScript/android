@@ -284,9 +284,13 @@ class ObjectManager {
   // Per Java class name (dotted), for ns:runtime's getWrapperClassCounts().
   std::map<std::string, ClassCounts> GetWrapperClassCounts();
 
-  // Canary mode: adds `unwrap` (a canary -> its Java object's weak-collection
-  // key) and `wrap` (key -> live or new canary, or undefined once Java
-  // collected the object) to binding, for js/weak-collections.js.
+  // Canary mode: adds `maybeCanary` (a V8 fast call, false for any value but a
+  // runtime object), `unwrap` (a canary -> its Java object's weak-collection
+  // key), `wrap` (key -> live or new canary, or undefined once Java collected
+  // the object), `takeRekeys` (the canaries built for objects that have a key
+  // since the last call, with their keys) and `pendingRekeys` (an Int32Array
+  // whose element counts those still alive) to binding, for
+  // js/weak-collections.js.
   bool AddWeakCollectionFunctions(v8::Local<v8::Context> context,
                                   v8::Local<v8::Object> binding);
 
@@ -333,6 +337,8 @@ class ObjectManager {
     bool keepsState = false;
     // A canary's record, cached; EraseCanaryRecord clears it.
     CanaryRecord* record = nullptr;
+    // A canary of a keyed object that takeRekeys has not returned yet.
+    bool rekeyPending = false;
   };
 
   // Canary mode: what a canary built later for a JS-extended instance starts
@@ -378,6 +384,8 @@ class ObjectManager {
     static constexpr uint8_t kStateTags = 6;
     uint8_t stateTagCount = 0;
     uint32_t stateTags[kStateTags];
+    // The object's weak-collection key, made on first use.
+    v8::Global<v8::Object> key;
   };
 
   using JSInstanceInfo = ObjectWeakCallbackState;
@@ -452,6 +460,8 @@ class ObjectManager {
   ObjectWeakCallbackState* CanaryOf(const v8::Local<v8::Object>& holder);
 
   CanaryRecord* FindCanaryRecord(int javaObjectID);
+  // canary's record, made if it has none.
+  CanaryRecord* RecordForWrite(ObjectWeakCallbackState* canary);
 
   // A new canary for a JS-extended instance whose canary died; empty when id
   // has no extended record or Java collected the object meanwhile.
@@ -553,19 +563,39 @@ class ObjectManager {
   // Cloned for each new state; never handed to JS.
   v8::Global<v8::Object> m_emptyState;
   v8::Local<v8::Object> NewEmptyState();
-  // The weak-collection key of a canary's Java object hangs off its state
-  // object, and names the object's id. Once the canary's link is released,
-  // the canary holds the key and the key leads back to the canary.
-  v8::Persistent<v8::Private> m_keyOfState;
+  // A weak-collection key names its object's id. Once the canary's link is
+  // released, the canary holds the key and the key leads back to the canary.
+  v8::Persistent<v8::Private> m_keyOfReleased;
   v8::Persistent<v8::Private> m_objectOfKey;
   v8::Persistent<v8::Private> m_releasedOfKey;
 
-  // Moves id's weak-collection key from its state to its live canary, whose
-  // link is being released.
+  // Gives id's weak-collection key to its live canary, whose link is being
+  // released.
   void KeepWeakCollectionKey(int javaObjectID);
 
   static void UnwrapForWeakCollection(const v8::FunctionCallbackInfo<v8::Value>& info);
   static void WrapForWeakCollection(const v8::FunctionCallbackInfo<v8::Value>& info);
+  static void TakeRekeysForWeakCollection(const v8::FunctionCallbackInfo<v8::Value>& info);
+
+  // Canaries of keyed objects that JS has not been told about: ids whose
+  // registration has rekeyPending set, plus stale ids of ones that died.
+  std::vector<uint32_t> m_rekeyPendingIds;
+  // takeRekeys swaps it with m_rekeyPendingIds, so neither reallocates.
+  std::vector<uint32_t> m_rekeyTakenIds;
+  // The element of binding.pendingRekeys: the live ones among them. Written
+  // from the canary weak callback too, which may not call into V8.
+  int32_t* m_rekeyPendingCount = nullptr;
+  // Keeps the count's memory alive.
+  v8::Persistent<v8::Int32Array> m_rekeyPendingArray;
+  void MarkRekeyPending(ObjectWeakCallbackState* state);
+  void DropRekeyPending(ObjectWeakCallbackState* state) {
+    if (state->rekeyPending) {
+      state->rekeyPending = false;
+      if (m_rekeyPendingCount != nullptr && *m_rekeyPendingCount > 0) {
+        --*m_rekeyPendingCount;
+      }
+    }
+  }
 
   // id's Java object, or null once Java collected it.
   jobject JavaObjectOrNull(int javaObjectID);

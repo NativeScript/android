@@ -77,6 +77,8 @@ struct WrapperLifetimeStats {
   // "canary" only: canaries built anew for a JS-extended instance whose
   // previous canary died while Java kept the object.
   uint64_t canaryRebuilds = 0;
+  // "canary" only: calls from js/weak-collections.js into the runtime.
+  uint64_t weakCollectionNativeCalls = 0;
 };
 
 }  // namespace tns

@@ -11,7 +11,7 @@
 // left as it is: Object.getPrototypeOf(WeakMap.prototype) is the native
 // prototype, and WeakMap.toString() is not native code.
 
-const { unwrap, wrap } = binding;
+const { maybeCanary, unwrap, wrap, takeRekeys, pendingRekeys } = binding;
 const {
   FinalizationRegistry: NativeFinalizationRegistry,
   FinalizationRegistryPrototypeRegister,
@@ -44,23 +44,54 @@ function canBeHeldWeakly(value) {
   return isObject(value) || (typeof value === "symbol" && SymbolKeyFor(value) === undefined);
 }
 
-// unwrap(value, true) makes the key on first use; lookups pass false so they
-// never create state for an object that was never a key. A key is made only
-// once the native method can no longer reject the call, so a failed call leaves
-// no state behind: the receiver is checked first with a method that cannot
-// insert anything.
+// unwrap(value, true) makes the key on first use. A key is made only once the
+// native method can no longer reject the call, so a failed call leaves no key
+// behind: the receiver is checked first with a method that cannot insert
+// anything.
 //
 // A canary is never stored as a key itself (its lifetime key is), so every
-// method first tries the value as is and unwraps it only when that misses:
-// plain JS keys never reach native code.
+// method first tries the value as is. canaryToKey holds every canary that
+// stands for a key and that this file has seen: the ones keyFor unwrapped, and
+// the ones takeRekeys returned. pendingRekeys[0] counts the live canaries the
+// runtime built for keyed objects since takeRekeys last ran; while it is 0, a
+// value missing from canaryToKey was never a key, and no native code runs.
+const canaryToKey = new NativeWeakMap();
+
+function takePendingRekeys() {
+  const pairs = takeRekeys();
+  for (let i = 0; i < pairs.length; i += 2) {
+    WeakMapPrototypeSet(canaryToKey, pairs[i], pairs[i + 1]);
+  }
+}
 
 // The lifetime key value stands for, or undefined when that is value itself.
 function otherKey(value) {
   if (!isObject(value)) {
     return undefined;
   }
-  const key = unwrap(value, false);
-  return key !== value ? key : undefined;
+  const key = WeakMapPrototypeGet(canaryToKey, value);
+  if (key !== undefined || pendingRekeys[0] === 0) {
+    return key;
+  }
+  takePendingRekeys();
+  return WeakMapPrototypeGet(canaryToKey, value);
+}
+
+// The key to store for value, an object, made on first use.
+function keyFor(value) {
+  // A V8 fast call: a plain JS object reaches neither canaryToKey nor unwrap.
+  if (!maybeCanary(value)) {
+    return value;
+  }
+  const known = otherKey(value);
+  if (known !== undefined) {
+    return known;
+  }
+  const key = unwrap(value, true);
+  if (key !== value) {
+    WeakMapPrototypeSet(canaryToKey, value, key);
+  }
+  return key;
 }
 
 // Unregistering it finds nothing: it is never a token.
@@ -79,7 +110,7 @@ class WeakMap extends NativeWeakMap {
   set(key, value) {
     // Also checks the receiver before a key is made.
     if (isObject(key) && !WeakMapPrototypeHas(this, key)) {
-      key = unwrap(key, true);
+      key = keyFor(key);
     }
     WeakMapPrototypeSet(this, key, value);
     return this;
@@ -107,7 +138,7 @@ if (WeakMapPrototypeGetOrInsert !== undefined) {
   ObjectDefineProperty(WeakMap.prototype, "getOrInsert", {
     value: function getOrInsert(key, value) {
       if (isObject(key) && !WeakMapPrototypeHas(this, key)) {
-        key = unwrap(key, true);
+        key = keyFor(key);
       }
       return WeakMapPrototypeGetOrInsert(this, key, value);
     },
@@ -131,7 +162,7 @@ if (WeakMapPrototypeGetOrInsertComputed !== undefined) {
       // Before the key exists, so a callback that throws leaves none; it sees
       // the key it was given, not the lifetime key.
       const value = callbackfn(key);
-      WeakMapPrototypeSet(this, unwrap(key, true), value);
+      WeakMapPrototypeSet(this, keyFor(key), value);
       return value;
     },
     writable: true,
@@ -143,7 +174,7 @@ class WeakSet extends NativeWeakSet {
   add(value) {
     // Also checks the receiver before a key is made.
     if (isObject(value) && !WeakSetPrototypeHas(this, value)) {
-      value = unwrap(value, true);
+      value = keyFor(value);
     }
     WeakSetPrototypeAdd(this, value);
     return this;
@@ -167,12 +198,19 @@ class WeakSet extends NativeWeakSet {
 }
 
 class WeakRef extends NativeWeakRef {
+  // A NativeWeakRef to the canary this was made with or last dereferenced to,
+  // or undefined when the target is not a key. A live canary is always what
+  // wrap returns for its key: Java cannot collect the object while it lives,
+  // and a released canary stays its key's object. Only the constructor and
+  // deref make one: a NativeWeakRef keeps its target until the job ends, which
+  // they do by spec anyway.
+  #canary;
+
   constructor(target) {
-    const key = isObject(target) ? unwrap(target, true) : target;
+    const key = isObject(target) ? keyFor(target) : target;
     super(key);
-    // The target itself, not only its key, stays alive until the job ends.
     if (key !== target) {
-      new NativeWeakRef(target);
+      this.#canary = new NativeWeakRef(target);
     }
   }
 
@@ -185,10 +223,25 @@ class WeakRef extends NativeWeakRef {
     if (!isObject(target)) {
       return target;
     }
+    // False for a native WeakRef given this method through call().
+    const cached = #canary in this;
+    if (cached) {
+      const last = this.#canary;
+      if (last === undefined) {
+        return target;
+      }
+      const live = WeakRefPrototypeDeref(last);
+      if (live !== undefined) {
+        return live;
+      }
+    }
     const result = wrap(target);
     // The native deref already keeps a target it returns as is.
     if (result !== target && result !== undefined) {
-      new NativeWeakRef(result);
+      const ref = new NativeWeakRef(result);
+      if (cached) {
+        this.#canary = ref;
+      }
     }
     return result;
   }
@@ -218,9 +271,9 @@ class FinalizationRegistry extends NativeFinalizationRegistry {
     FinalizationRegistryPrototypeUnregister(this, receiverProbe);
     FinalizationRegistryPrototypeRegister(
       this,
-      isObject(target) ? unwrap(target, true) : target,
+      isObject(target) ? keyFor(target) : target,
       heldValue,
-      isObject(unregisterToken) ? unwrap(unregisterToken, true) : unregisterToken,
+      isObject(unregisterToken) ? keyFor(unregisterToken) : unregisterToken,
     );
   }
 

@@ -104,7 +104,7 @@ wrapper.
 | `setConfig(key, value)` | Sets a runtime config key. Throws `TypeError` on an unknown key, an invalid value, or (for process-wide keys) when called from a worker isolate. |
 | `getConfig(key)` | Returns the current value of a config key. Throws `TypeError` on an unknown key. Readable from any isolate. |
 | `getWrapperLifetimeStats()` | Wrapper lifetime counters for the calling isolate (see [Wrapper lifetime](#wrapper-lifetime)). A fresh object on every call. |
-| `getWrapperClassCounts()` | Per Java class name (`<unknown>` for a link whose class was never recorded), the calling isolate's live `wrappers`, the `canaries` among them and the canary `states`, which include those made only for a weak-collection key (see [Wrapper lifetime](#wrapper-lifetime)). |
+| `getWrapperClassCounts()` | Per Java class name (`<unknown>` for a link whose class was never recorded), the calling isolate's live `wrappers`, the `canaries` among them and the canary `states` (see [Wrapper lifetime](#wrapper-lifetime)). |
 | `escapeException(x)` | Returns an `Error` branded so that, when it is thrown back across a native callback boundary, the native caller receives the original native exception `x` carries rather than the runtime's wrapper exception. Idempotent: a branded error is returned unchanged. Throws `TypeError` when called with no argument. The global `interop.escapeException` is this same function (see [Legacy globals](#legacy-globals)). |
 
 *Platform note (Android):* the original exception is the Java throwable `x`
@@ -189,17 +189,19 @@ every build on cold paths only:
 | `collected` | wrappers released because Java had collected their object |
 | `releasedExplicitly` | links released through `__releaseNativeCounterpart` |
 | `releasedAccesses` | lookups of the Java object of a wrapper whose link was released or whose Java object Java had already collected: calling its methods, using its fields or passing it to Java. Resolving an overloaded method looks its arguments up too, so one call can count more than once |
-| `canaryStates` | `"canary"` only: state objects created to hold JS properties, or to hold the key a weak collection made for the object, in which case no JS property was written |
+| `canaryStates` | `"canary"` only: state objects created to hold JS properties |
 | `canaryNativeDeaths` | `"canary"` only: state objects let go of because Java collected their object |
 | `canaryInterceptedWrites` | `"canary"` only: writes to canaries the write handler saw. Canaries without state have no handler |
 | `canaryCachedWrites` | `"canary"` only: of those writes, rewrites of a name the handler knew to be a plain data property of the state, mirrored with one store |
 | `canaryCachedFieldWrites` | `"canary"` only: of those writes, Java field writes the handler placed from an earlier write of the same name through an object with the same prototype, without looking the name up along the prototype chain |
 | `canaryRebuilds` | `"canary"` only: canaries built anew for a JS-extended instance whose previous canary died while Java kept the object |
+| `weakCollectionNativeCalls` | `"canary"` only: calls the weak collections make into the runtime: to make the key of a canary's Java object, to find the canary for a key, and to learn about canaries built for keyed objects since the last such call. Lookups of a value that was never a key make none |
 
 In `"canary"` mode only array buffers backed by Java buffers resurrect;
 `weakened` counts objects held weakly because their canary died while they
-had a record (JS state, or a JS-extended instance), and `collected` counts
-canaries whose object had none, which Java no longer holds for JS.
+had a record (JS state, a weak-collection key, or a JS-extended instance),
+and `collected` counts canaries whose object had none, which Java no longer
+holds for JS.
 
 `"canary"` is the resurrection-free model the iOS runtime and the Node-API
 runtimes share. Every wrapper of a Java object is a canary: a phantom-weak JS
@@ -274,21 +276,27 @@ on it, and lives as long as it does.
 old one without keeping it, so in canary mode a builtin
 (`js/weak-collections.js`) replaces `WeakMap`, `WeakSet`, `WeakRef` and
 `FinalizationRegistry` with subclasses that key a Java object whose wrapper is
-a canary by an opaque, frozen key its state holds. Entries and targets
-therefore live exactly as long as the Java object; `WeakRef.prototype.deref`
+a canary by an opaque, frozen key the object's record holds. Entries and
+targets therefore live exactly as long as the Java object; `WeakRef.prototype.deref`
 (and the `get` alias) returns the live canary, a new one with the object's
 state, or `undefined` once Java collected the object. `set`, `add`,
-`getOrInsert`, `new WeakRef` and `register` create the key; lookups never do,
-so probing an object gives it no state. A Proxy around a Java object stays a
+`getOrInsert`, `new WeakRef` and `register` create the key; lookups never do.
+Neither gives the object a state. A Proxy around a Java object stays a
 key of its own, and every other value passes through to the standard
 collection. The cost is the other side of the same rooting: a `WeakMap` value
-that references its Java key keeps the key, its state and so the Java object
+that references its Java key keeps the key, its record and so the Java object
 alive for as long as the map lives. And `deref` builds a canary, which holds
 the Java object strongly until it dies again, so a `WeakRef` to a Java object
 that is dereferenced on every frame or event may keep the object from ever
-being collected. In canary mode, an operation on an object costs a native
-call, and one that can create the key also checks its receiver first so that
-a call that fails leaves no key behind; that check names `has` (or
+being collected. In canary mode, an operation that can create the key costs a
+native call for a Java object the collection does not hold yet; a plain JS
+object costs only a V8 fast call that rules it out. Lookups (`get`, `has`,
+`delete`, `unregister`, `deref`) make no native call, except a `deref` that
+has to build a canary, and the first lookup that misses after the runtime
+built canaries for keyed objects, which makes one call for all of them. An
+operation that can create the
+key also checks its receiver first so that a call that fails leaves no key
+behind; that check names `has` (or
 `unregister`) in its `TypeError`. The collections are subclasses of the
 standard ones, which shows: `Object.getPrototypeOf(WeakMap.prototype)` is the
 standard prototype, and `WeakMap.toString()` is not native code.
