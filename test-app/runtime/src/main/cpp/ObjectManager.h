@@ -225,6 +225,10 @@ class ObjectManager {
   inline void StateChanging(CanaryHandle* canary);
   // The canary's state object, created on its first write.
   v8::Local<v8::Object> StateForWrite(CanaryHandle* canary);
+  // A new state for a canary that has none, holding `property` as a plain data
+  // property.
+  v8::Local<v8::Object> NewStateWith(CanaryHandle* canary, v8::Local<v8::Name> property,
+                                     v8::Local<v8::Value> value);
   // The canary's state when its plain state is known to have `property` as an
   // own data property; empty when that is not known.
   inline v8::Local<v8::Object> CachedPlainState(CanaryHandle* canary,
@@ -429,6 +433,9 @@ class ObjectManager {
   bool EnsureJavaStrong(int javaObjectID, CanaryRecord* record);
 
   void EraseCanaryRecord(int javaObjectID);
+
+  // Makes fresh the state of canary's record, creating the record if needed.
+  v8::Local<v8::Object> AttachState(CanaryHandle* canary, const v8::Local<v8::Object>& fresh);
 
   // Names that are own data properties of a plain state, the record's set
   // chosen by its address: an entry is cleared before its name leaves the

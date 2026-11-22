@@ -125,12 +125,8 @@ bool RewriteState(ObjectManager* objectManager, ObjectManager::CanaryHandle* can
     }
   }
   if (state.IsEmpty()) {
-    state = objectManager->StateForWrite(canary);
-    if (state.IsEmpty()) {
-      return Intercepted::kNo;
-    }
     objectManager->StateChanging(canary);
-    (void)state->CreateDataProperty(context, property, value);
+    objectManager->NewStateWith(canary, property, value);
   } else if (objectManager->StateIsPlain(canary)) {
     // RewriteState found the name absent from the state.
     objectManager->StateChanging(canary);

@@ -927,21 +927,36 @@ bool ObjectManager::CanaryStateForWrite(const Local<Object>& holder, Local<Objec
   if (state == nullptr || !state->keepsState) {
     return false;
   }
-  int id = state->javaObjectID;
-  // Allocated before the record is looked up: a collection it starts runs the
-  // canary callbacks, which read the records.
-  Local<Object> fresh = Object::New(m_isolate, Null(m_isolate), nullptr, nullptr, 0);
-  CanaryRecord* record = FindCanaryRecord(id);
+  *out = AttachState(state, Object::New(m_isolate, Null(m_isolate), nullptr, nullptr, 0));
+  return true;
+}
+
+Local<Object> ObjectManager::AttachState(CanaryHandle* canary, const Local<Object>& fresh) {
+  CanaryRecord* record = canary->record;
+  if (record == nullptr) {
+    record = FindCanaryRecord(canary->javaObjectID);
+  }
   if (record == nullptr) {
     auto created = std::make_unique<CanaryRecord>();
     record = created.get();
-    m_canaryRecords.emplace(id, std::move(created));
+    m_canaryRecords.emplace(canary->javaObjectID, std::move(created));
   }
-  state->record = record;
+  canary->record = record;
   record->state.Reset(m_isolate, fresh);
   m_lifetimeStats.canaryStates++;
-  *out = fresh;
-  return true;
+  return fresh;
+}
+
+Local<Object> ObjectManager::NewStateWith(CanaryHandle* canary, Local<Name> property,
+                                          Local<Value> value) {
+  // JS the write handler ran after it found no state (a Proxy trap on the
+  // prototype chain) may have made one for the canary since.
+  Local<Object> existing = StateOf(canary);
+  if (!existing.IsEmpty()) {
+    (void)existing->CreateDataProperty(m_isolate->GetCurrentContext(), property, value);
+    return existing;
+  }
+  return AttachState(canary, Object::New(m_isolate, Null(m_isolate), &property, &value, 1));
 }
 
 Local<Object> ObjectManager::StateOf(CanaryHandle* canary) {
@@ -965,9 +980,7 @@ Local<Object> ObjectManager::StateForWrite(CanaryHandle* canary) {
   if (!existing.IsEmpty()) {
     return existing;
   }
-  Local<Object> state;
-  return CanaryStateForWrite(Local<Object>::New(m_isolate, *canary->target), &state) ? state
-                                                                                     : Local<Object>();
+  return AttachState(canary, Object::New(m_isolate, Null(m_isolate), nullptr, nullptr, 0));
 }
 
 void ObjectManager::CanaryDiedStatic(
