@@ -2,7 +2,7 @@
 
 ## Before You Start
 
-Anyone wishing to contribute to the NativeScript project MUST read & sign the [NativeScript Contribution License Agreement](http://www.nativescript.org/cla). The NativeScript team cannot accept pull requests from users who have not signed the CLA first.
+Anyone wishing to contribute to the NativeScript project MUST read & sign the [NativeScript Contributor License Agreement (CLA)](https://github.com/NativeScript/.github/blob/master/CLA.md) (first-time contributors can sign directly on their pull request by commenting `I have read the CLA and I hereby sign the CLA`). The NativeScript team cannot accept pull requests without a signed CLA.
 
 ## Introduction
 
