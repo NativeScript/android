@@ -67,14 +67,20 @@ if [ -z "$RELEASE" ]; then
 fi
 [ ${#ABIS[@]} -gt 0 ] || ABIS=(arm64-v8a armeabi-v7a x86_64 x86)
 
-# The stamp records which release was installed, not which ABIs were asked for,
-# so a previous --abi run must not satisfy a later request for the full set.
-# The installed files are the source of truth.
+# $STAMP records the release the shared headers came from; each ABI's library
+# has its own stamp, since an --abi run installs only some of them.
+ABI_STAMP_NAME=".v8-release-stamp"
+
+abi_release() {
+    local stamp="$LIBS_DIR/$1/$ABI_STAMP_NAME"
+    [ -f "$LIBS_DIR/$1/libv8_monolith.a" ] && [ -f "$stamp" ] && cat "$stamp"
+}
+
 installed() {
     [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$RELEASE" ] || return 1
     [ -f "$CPP_DIR/include/v8.h" ] && [ -d "$CPP_DIR/v8_inspector/src" ] || return 1
     for abi in "${ABIS[@]}"; do
-        [ -f "$LIBS_DIR/$abi/libv8_monolith.a" ] || return 1
+        [ "$(abi_release "$abi")" = "$RELEASE" ] || return 1
     done
 }
 
@@ -132,6 +138,19 @@ for ABI in "${ABIS[@]}"; do
     [ -f "$src" ] || { echo "Archive for $ABI has no libv8_monolith.a" >&2; exit 1; }
     mkdir -p "$LIBS_DIR/$ABI"
     cp "$src" "$LIBS_DIR/$ABI/libv8_monolith.a"
+    echo "$RELEASE" > "$LIBS_DIR/$ABI/$ABI_STAMP_NAME"
+done
+
+# An ABI this run did not install keeps another release's library, which must
+# not be linked against the headers installed below: remove it, so a build of
+# that ABI fails until it is installed for this release too.
+for dir in "$LIBS_DIR"/*/; do
+    abi="$(basename "$dir")"
+    [ -f "$dir/libv8_monolith.a" ] || continue
+    if [ "$(abi_release "$abi")" != "$RELEASE" ]; then
+        echo "  removing $abi's library from another release; run with --abi $abi to install it"
+        rm -f "$dir/libv8_monolith.a" "$dir/$ABI_STAMP_NAME"
+    fi
 done
 
 echo "Installing public headers"

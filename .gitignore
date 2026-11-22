@@ -39,6 +39,7 @@ package-lock.json
 /.v8-prebuilt/
 test-app/runtime/src/main/libs/*/libv8_monolith.a
 test-app/runtime/src/main/libs/.v8-release-stamp
+test-app/runtime/src/main/libs/*/.v8-release-stamp
 test-app/runtime/src/main/cpp/include/**
 !test-app/runtime/src/main/cpp/include/zip.h
 !test-app/runtime/src/main/cpp/include/zipconf.h
