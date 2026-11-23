@@ -164,4 +164,31 @@ describe("Java->JS calls through a function other than the class's own", functio
         expect(ownRuns).toBe(1);
         expect(warnings("DispatchWarnJavaCreated")).toBe(1);
     });
+
+    // The getter on Object.prototype.value is installed only around extend(): while it
+    // is there, Object.defineProperty reads every accessor descriptor as having a value.
+    it("runs no inherited getter while extend() captures an accessor", function () {
+        var inheritedReads = 0;
+        var implementation = {
+            interfaces: [java.lang.Runnable],
+            run: function () {}
+        };
+        Object.defineProperty(implementation, "state", {
+            get: function () { return 1; },
+            enumerable: true,
+            configurable: true
+        });
+
+        Object.defineProperty(Object.prototype, "value", {
+            get: function () { inheritedReads++; return undefined; },
+            configurable: true
+        });
+        try {
+            java.lang.Object.extend("DispatchWarnAccessorCapture", implementation);
+        } finally {
+            delete Object.prototype.value;
+        }
+
+        expect(inheritedReads).toBe(0);
+    });
 });

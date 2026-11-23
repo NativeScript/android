@@ -42,11 +42,14 @@ DispatchOverrides::DispatchOverrides(Isolate* isolate, Local<Object> implementat
     Captured entry;
     entry.name.Reset(isolate, name.As<String>());
 
+    // A descriptor inherits from Object.prototype, and an accessor's has no own
+    // value: reading it there could run a getter.
     Local<Value> descriptor;
     Local<Value> value;
     if (implementationObject->GetOwnPropertyDescriptor(context, name.As<String>())
             .ToLocal(&descriptor) &&
         descriptor->IsObject() &&
+        descriptor.As<Object>()->HasOwnProperty(context, valueKey).FromMaybe(false) &&
         descriptor.As<Object>()->Get(context, valueKey).ToLocal(&value) &&
         value->IsFunction()) {
       entry.function.Reset(isolate, value.As<Function>());
