@@ -211,6 +211,7 @@ add_library(
         src/main/cpp/IsolateTracked.cpp
         src/main/cpp/JEnv.cpp
         src/main/cpp/DesugaredInterfaceCompanionClassNameResolver.cpp
+        src/main/cpp/DispatchOverrides.cpp
         src/main/cpp/JType.cpp
         src/main/cpp/JniSignatureParser.cpp
         src/main/cpp/JsArgConverter.cpp

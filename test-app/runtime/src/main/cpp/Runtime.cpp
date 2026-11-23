@@ -622,8 +622,10 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
   // javaObjectID may be a hint read without the isolate lock; resolve it exactly when it
   // names neither a linked wrapper nor a canary that can be rebuilt.
   Local<Object> jsObject;
+  DispatchOverrides* dispatchOverrides = nullptr;
   if (javaObjectID != -1) {
-    jsObject = m_objectManager->GetLinkedJsObjectByJavaObject(javaObjectID);
+    jsObject = m_objectManager->GetLinkedJsObjectByJavaObject(javaObjectID,
+                                                              &dispatchOverrides);
   }
   if (jsObject.IsEmpty() && javaObject != nullptr) {
     auto registeredAs = javaObjectID;
@@ -645,7 +647,8 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
       throw NativeScriptException("Cannot find object id for an instance of " +
                                   m_objectManager->GetClassName(javaObject));
     }
-    jsObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID);
+    jsObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID,
+                                                        &dispatchOverrides);
   }
   if (jsObject.IsEmpty()) {
     stringstream ss;
@@ -663,7 +666,8 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj,
   auto jsMethodName =
       GetCallbackMethodName(this, m_isolate, _env, methodName, methodNameId);
   auto jsResult = CallbackHandlers::CallJSMethod(m_isolate, env, jsObject,
-                                                 jsMethodName, args);
+                                                 jsMethodName, args,
+                                                 dispatchOverrides, methodNameId);
 
   // Type::Null is the id of void.class: the Java caller discards the result.
   if (retType == static_cast<jint>(Type::Null)) {
@@ -708,8 +712,9 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
 
   DEBUG_WRITE("createJSInstanceNative class %s", jniName.c_str());
   const Persistent<ObjectTemplate>* instanceTemplate = nullptr;
-  jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager,
-                                                     jniName, &instanceTemplate);
+  DispatchOverrides* dispatchOverrides = nullptr;
+  jsInstance = MetadataNode::CreateExtendedJSWrapper(
+      isolate, m_objectManager, jniName, &instanceTemplate, &dispatchOverrides);
 
   if (jsInstance.IsEmpty()) {
     throw NativeScriptException(
@@ -728,7 +733,8 @@ void Runtime::CreateJSInstanceNative(JNIEnv* _env, jobject obj,
 
   jclass clazz = env.FindClass(jniName);
   m_objectManager->Link(jsInstance, javaObjectID, clazz,
-                        ObjectManager::LinkKind::kExtended, instanceTemplate);
+                        ObjectManager::LinkKind::kExtended, instanceTemplate,
+                        dispatchOverrides);
 }
 
 jint Runtime::GenerateNewObjectId(JNIEnv* env, jobject obj) {

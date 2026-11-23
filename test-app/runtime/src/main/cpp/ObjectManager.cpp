@@ -358,9 +358,7 @@ jclass ObjectManager::GetJavaClass(const Local<Object>& instance) {
   DEBUG_WRITE("GetClass called");
 
   JSInstanceInfo* jsInfo = GetJSInstanceInfo(instance);
-  jclass clazz = jsInfo->objectClazz;
-
-  return clazz;
+  return jsInfo != nullptr ? jsInfo->objectClazz : nullptr;
 }
 
 void ObjectManager::SetJavaClass(const Local<Object>& instance, jclass clazz) {
@@ -394,14 +392,27 @@ void ObjectManager::RegisterStrong(jobject object, int javaObjectID) {
                      object, javaObjectID);
 }
 
-Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID) {
+Local<Object> ObjectManager::GetJsObjectByJavaObject(
+    int javaObjectID, DispatchOverrides** dispatchOverrides) {
   auto isolate = m_isolate;
   EscapableHandleScope handleScope(isolate);
 
   auto state = m_idToObject.Find(javaObjectID);
   if (state == nullptr) {
-    return handleScope.Escape(RebuildCanary(javaObjectID));
+    auto canary = RebuildCanary(javaObjectID);
+#ifdef APPLICATION_IN_DEBUG
+    // A rebuilt canary is linked under javaObjectID.
+    if (dispatchOverrides != nullptr && !canary.IsEmpty()) {
+      *dispatchOverrides = m_idToObject.Find(javaObjectID)->dispatchOverrides;
+    }
+#endif
+    return handleScope.Escape(canary);
   }
+#ifdef APPLICATION_IN_DEBUG
+  if (dispatchOverrides != nullptr) {
+    *dispatchOverrides = state->dispatchOverrides;
+  }
+#endif
 
   return handleScope.Escape(JsObjectFor(state));
 }
@@ -451,14 +462,26 @@ void ObjectManager::ReleaseUnwrappedArgs(const JavaCallArgs& args) {
   }
 }
 
-Local<Object> ObjectManager::GetLinkedJsObjectByJavaObject(int javaObjectID) {
+Local<Object> ObjectManager::GetLinkedJsObjectByJavaObject(
+    int javaObjectID, DispatchOverrides** dispatchOverrides) {
   auto state = m_idToObject.Find(javaObjectID);
   if (state == nullptr) {
-    return RebuildCanary(javaObjectID);
+    auto canary = RebuildCanary(javaObjectID);
+#ifdef APPLICATION_IN_DEBUG
+    if (dispatchOverrides != nullptr && !canary.IsEmpty()) {
+      *dispatchOverrides = m_idToObject.Find(javaObjectID)->dispatchOverrides;
+    }
+#endif
+    return canary;
   }
   if (!state->linked) {
     return Local<Object>();
   }
+#ifdef APPLICATION_IN_DEBUG
+  if (dispatchOverrides != nullptr) {
+    *dispatchOverrides = state->dispatchOverrides;
+  }
+#endif
   return JsObjectFor(state);
 }
 
@@ -569,7 +592,7 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
       JEnv env;
       clazz = env.FindClass(className);
     }
-    Link(jsWrapper, javaObjectID, clazz, LinkKind::kPlain, nullptr, record);
+    Link(jsWrapper, javaObjectID, clazz, LinkKind::kPlain, nullptr, nullptr, record);
   }
   return jsWrapper;
 }
@@ -579,12 +602,14 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID,
  */
 void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID,
                          jclass clazz, LinkKind kind,
-                         const Persistent<ObjectTemplate>* instanceTemplate) {
-  Link(object, javaObjectID, clazz, kind, instanceTemplate, std::nullopt);
+                         const Persistent<ObjectTemplate>* instanceTemplate,
+                         DispatchOverrides* dispatchOverrides) {
+  Link(object, javaObjectID, clazz, kind, instanceTemplate, dispatchOverrides, std::nullopt);
 }
 
 void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jclass clazz,
                          LinkKind kind, const Persistent<ObjectTemplate>* instanceTemplate,
+                         DispatchOverrides* dispatchOverrides,
                          std::optional<CanaryRecord*> record, bool hydrate) {
   if (!IsJsRuntimeObject(object)) {
     string errMsg("Trying to link invalid 'this' to a Java object");
@@ -597,6 +622,9 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
               object->GetIdentityHash(), javaObjectID);
 
   auto state = new ObjectWeakCallbackState(this, javaObjectID, clazz, isolate, object);
+#ifdef APPLICATION_IN_DEBUG
+  state->dispatchOverrides = dispatchOverrides;
+#endif
 
   // Array buffers carry no Metadata field and cannot hold the canary handlers.
   state->canary = WrapperLifetimeCanary::Enabled() && HasMetadataField(object);
@@ -619,7 +647,7 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
   (void) inserted;
 
   if (state->canary) {
-    state->record = AdoptCanary(object, javaObjectID, kind, instanceTemplate,
+    state->record = AdoptCanary(object, javaObjectID, kind, instanceTemplate, dispatchOverrides,
                                 record.has_value() ? *record : FindCanaryRecord(javaObjectID),
                                 hydrate);
     if (state->record != nullptr && !state->record->key.IsEmpty()) {
@@ -630,7 +658,8 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
 
 ObjectManager::CanaryRecord* ObjectManager::AdoptCanary(
     const Local<Object>& object, uint32_t javaObjectID, LinkKind kind,
-    const Persistent<ObjectTemplate>* instanceTemplate, CanaryRecord* record, bool hydrate) {
+    const Persistent<ObjectTemplate>* instanceTemplate, DispatchOverrides* dispatchOverrides,
+    CanaryRecord* record, bool hydrate) {
   if (record == nullptr) {
     if (kind != LinkKind::kExtended) {
       return nullptr;
@@ -649,7 +678,7 @@ ObjectManager::CanaryRecord* ObjectManager::AdoptCanary(
         instanceTemplate, object->GetPrototype(),
         object->GetInternalField(static_cast<int>(MetadataNodeKeys::CallSuper)).As<Value>(),
         object->GetInternalField(static_cast<int>(MetadataNodeKeys::Metadata)).As<Value>(),
-        implementationObject);
+        implementationObject, dispatchOverrides);
     record = NewCanaryRecord(javaObjectID);
     record->cls = cls;
     cls->records++;
@@ -683,18 +712,20 @@ ObjectManager::CanaryRecord::~CanaryRecord() {
 ObjectManager::CanaryClass* ObjectManager::CanaryClassFor(
     const Persistent<ObjectTemplate>* instanceTemplate, const Local<Value>& prototype,
     const Local<Value>& callSuper, const Local<Value>& metadata,
-    const Local<Value>& implementationObject) {
+    const Local<Value>& implementationObject, DispatchOverrides* dispatchOverrides) {
   auto address = reinterpret_cast<uintptr_t>(instanceTemplate);
   CanaryClass*& slot = m_canaryClasses[((address >> 4) ^ (address >> 9)) % kCanaryClassSlots];
   // Global == Local compares the objects, and an empty handle equals only an empty one.
   if (slot != nullptr && slot->instanceTemplate == instanceTemplate &&
       slot->prototype == prototype && slot->callSuper == callSuper &&
-      slot->metadata == metadata && slot->implementationObject == implementationObject) {
+      slot->metadata == metadata && slot->implementationObject == implementationObject &&
+      slot->dispatchOverrides == dispatchOverrides) {
     return slot;
   }
   auto isolate = m_isolate;
   auto cls = new CanaryClass();
   cls->instanceTemplate = instanceTemplate;
+  cls->dispatchOverrides = dispatchOverrides;
   cls->prototype.Reset(isolate, prototype);
   cls->callSuper.Reset(isolate, callSuper);
   cls->metadata.Reset(isolate, metadata);
@@ -903,7 +934,8 @@ Local<Object> ObjectManager::RebuildCanary(int javaObjectID, CanaryRecord* recor
   if (!record->shell.IsEmpty()) {
     Local<Object> canary = record->shell.Get(isolate)->Clone(isolate);
     m_lifetimeStats.canaryRebuilds++;
-    Link(canary, javaObjectID, record->clazz, LinkKind::kExtended, nullptr, record, false);
+    Link(canary, javaObjectID, record->clazz, LinkKind::kExtended, nullptr,
+         record->cls->dispatchOverrides, record, false);
     return handleScope.Escape(canary);
   }
 
@@ -931,7 +963,8 @@ Local<Object> ObjectManager::RebuildCanary(int javaObjectID, CanaryRecord* recor
                       cls->implementationObject.Get(isolate));
   }
   m_lifetimeStats.canaryRebuilds++;
-  Link(canary, javaObjectID, record->clazz, LinkKind::kExtended, nullptr, record);
+  Link(canary, javaObjectID, record->clazz, LinkKind::kExtended, nullptr, cls->dispatchOverrides,
+       record);
   // Taken before JS can reach the canary, so it holds nothing JS adds later
   // (#private brands, weak-collection keys); Link sets each clone's JsInfo.
   Local<Object> shell = canary->Clone(isolate);

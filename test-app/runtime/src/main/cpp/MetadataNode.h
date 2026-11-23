@@ -70,10 +70,12 @@ class MetadataNode {
 
         static MetadataNode* GetNodeFromHandle(v8::Isolate* isolate, const v8::Local<v8::Object>& value);
 
-        // instanceTemplate receives the template the wrapper was made from, which
-        // lives as long as this runtime's metadata cache.
+        // instanceTemplate and dispatchOverrides receive the template the wrapper was
+        // made from and its class's DispatchOverrides (null in release builds), which
+        // live as long as this runtime's metadata cache.
         static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate* isolate, ObjectManager* objectManager, const std::string& proxyClassName,
-                                                             const v8::Persistent<v8::ObjectTemplate>** instanceTemplate);
+                                                             const v8::Persistent<v8::ObjectTemplate>** instanceTemplate,
+                                                             DispatchOverrides** dispatchOverrides);
 
         static v8::Local<v8::Object> GetImplementationObject(v8::Isolate* isolate, const v8::Local<v8::Object>& object);
 
@@ -350,6 +352,8 @@ class MetadataNode {
             // The class cache's global ref for fullClassName once resolved; that cache never
             // drops or replaces an entry.
             jclass resolvedClass = nullptr;
+            // Owned by the MetadataNodeCache; null in release builds.
+            DispatchOverrides* dispatchOverrides = nullptr;
         };
 
         struct TypeMetadata {
@@ -393,6 +397,7 @@ class MetadataNode {
             v8::Persistent<v8::ObjectTemplate>* instanceTemplate;
             std::string extendedName;
             MetadataNode* node;
+            DispatchOverrides* dispatchOverrides = nullptr;
         };
 
         /*

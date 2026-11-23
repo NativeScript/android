@@ -44,7 +44,8 @@ namespace tns {
                                      uint64_t defaultOverrides = 0,
                                      const std::vector<std::string> *contentMemberNames = nullptr,
                                      jclass *resolvedClass = nullptr,
-                                     const v8::Persistent<v8::ObjectTemplate> *instanceTemplate = nullptr);
+                                     const v8::Persistent<v8::ObjectTemplate> *instanceTemplate = nullptr,
+                                     DispatchOverrides *dispatchOverrides = nullptr);
 
         // Whether GetImplementedInterfaces would list any interface, without calling Java.
         static bool HasImplementedInterfaces(v8::Isolate *isolate, const v8::Local<v8::Object> &implementationObject);
@@ -99,7 +100,8 @@ namespace tns {
 
         static v8::Local<v8::Value>
         CallJSMethod(v8::Isolate *isolate, JNIEnv *_env, const v8::Local<v8::Object> &jsObject,
-                     const v8::Local<v8::String> &methodName, const JavaCallArgs &args);
+                     const v8::Local<v8::String> &methodName, const JavaCallArgs &args,
+                     DispatchOverrides *dispatchOverrides = nullptr, int methodNameId = -1);
 
         static v8::Local<v8::Value>
         GetJavaField(v8::Isolate *isolate, const v8::Local<v8::Object> &caller,
