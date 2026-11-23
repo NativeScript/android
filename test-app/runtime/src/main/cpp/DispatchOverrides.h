@@ -63,8 +63,11 @@ class DispatchOverrides {
  private:
   struct Captured {
     v8::Global<v8::String> name;
-    // Empty when the property was an accessor or held no function.
+    // Empty unless the property was a data property holding a function.
     v8::Global<v8::Function> function;
+    // False for an accessor, whose calls are never checked: what they resolve
+    // to depends on its getter.
+    bool dataProperty = false;
   };
 
   // Indexed by the id Java's MethodNameIds gives the method name; ids are

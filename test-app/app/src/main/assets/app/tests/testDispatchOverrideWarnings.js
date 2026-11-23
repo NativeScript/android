@@ -103,6 +103,22 @@ describe("Java->JS calls through a function other than the class's own", functio
         expect(warnings("DispatchWarnPrototypeMethod")).toBe(1);
     });
 
+    it("calls an instance's function for a member the class defined as null and warns", function () {
+        var ownRuns = 0;
+        var C = java.lang.Object.extend("DispatchWarnNullMember", {
+            interfaces: [java.lang.Runnable],
+            run: null
+        });
+        var instance = new C();
+        instance.run = function () { ownRuns++; };
+
+        runFromJava(instance);
+        runFromJava(instance);
+
+        expect(ownRuns).toBe(2);
+        expect(warnings("DispatchWarnNullMember")).toBe(1);
+    });
+
     it("warns once however often and on however many instances the call repeats", function () {
         var ownRuns = 0;
         var C = java.lang.Object.extend("DispatchWarnRepeated", {

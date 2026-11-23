@@ -45,14 +45,16 @@ DispatchOverrides::DispatchOverrides(Isolate* isolate, Local<Object> implementat
     // A descriptor inherits from Object.prototype, and an accessor's has no own
     // value: reading it there could run a getter.
     Local<Value> descriptor;
-    Local<Value> value;
     if (implementationObject->GetOwnPropertyDescriptor(context, name.As<String>())
             .ToLocal(&descriptor) &&
         descriptor->IsObject() &&
-        descriptor.As<Object>()->HasOwnProperty(context, valueKey).FromMaybe(false) &&
-        descriptor.As<Object>()->Get(context, valueKey).ToLocal(&value) &&
-        value->IsFunction()) {
-      entry.function.Reset(isolate, value.As<Function>());
+        descriptor.As<Object>()->HasOwnProperty(context, valueKey).FromMaybe(false)) {
+      entry.dataProperty = true;
+      Local<Value> value;
+      if (descriptor.As<Object>()->Get(context, valueKey).ToLocal(&value) &&
+          value->IsFunction()) {
+        entry.function.Reset(isolate, value.As<Function>());
+      }
     }
 
     captured_.push_back(std::move(entry));
@@ -79,13 +81,16 @@ void DispatchOverrides::CheckSlow(Isolate* isolate, Local<Context> context,
     }
 
     if (captured != nullptr) {
-      if (captured->function.IsEmpty()) {
+      if (!captured->dataProperty) {
         entry.quiet = true;
         return;
       }
-      entry.expected.Reset(isolate, captured->function);
-      if (entry.expected == method) {
-        return;
+      // A data property that held no function never matches what Java calls.
+      if (!captured->function.IsEmpty()) {
+        entry.expected.Reset(isolate, captured->function);
+        if (entry.expected == method) {
+          return;
+        }
       }
     } else if (!DefinedAfterExtend(isolate, context, instance, methodName)) {
       // The class does not implement the method, so the call resolved to
