@@ -151,9 +151,17 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
         src/main/cpp/v8_inspector/ns-v8-tracing-agent-impl.cpp
         src/main/cpp/v8_inspector/Utils.cpp
     )
+
+    # ns:runtime findLeakCycles(); release builds keep a stub that throws.
+    set(
+        DEBUG_TOOL_SOURCES
+
+        src/main/cpp/LeakProbe.cpp
+    )
 else ()
     # When building in Release mode we do not include the V8 inspector sources
     set(INSPECTOR_SOURCES)
+    set(DEBUG_TOOL_SOURCES)
 endif ()
 
 # The Node-API test addons back the NapiTests/NapiCoverageTests specs of the
@@ -269,6 +277,7 @@ add_library(
 
         # V8 inspector source files will be included only in Release mode
         ${INSPECTOR_SOURCES}
+        ${DEBUG_TOOL_SOURCES}
 
         # Node-API test addons, local Debug builds only
         ${NAPI_TEST_SOURCES}

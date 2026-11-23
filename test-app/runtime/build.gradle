@@ -99,6 +99,10 @@ android {
 
             // embed runtime binding generator in runtime, while keeping it in a separate project
             java.srcDirs = [bindingGeneratorSourcePath, defaultSrcPath]
+            // The Java side of debug-only native tools (CMake's DEBUG_TOOL_SOURCES).
+            if (!optimized || optimizedWithInspector) {
+                java.srcDirs += "src/debugTools/java"
+            }
         }
     }
 
