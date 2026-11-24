@@ -1,3 +1,69 @@
+## [9.1.2](https://github.com/NativeScript/android/compare/v9.1.1...v9.1.2) (2026-11-24)
+
+
+### Bug Fixes
+
+* **build:** declare buildMetadata's real inputs ([#2095](https://github.com/NativeScript/android/issues/2095)) ([b24937a](https://github.com/NativeScript/android/commit/b24937a5aa26615e7be98e93842c5ce64443bc1d))
+* call JS overrides of default methods ([#2118](https://github.com/NativeScript/android/issues/2118)) ([979901e](https://github.com/NativeScript/android/commit/979901e8862cf64ebee9cdd7e9df32faa309ad18))
+* convert callback results the return type can hold ([#2097](https://github.com/NativeScript/android/issues/2097)) ([e15d21a](https://github.com/NativeScript/android/commit/e15d21a8f3ee8e3da7ce5cf5975bb0792752f61b))
+* **DexFactory:** GC before registering injected proxies ([#2110](https://github.com/NativeScript/android/issues/2110)) ([98e808f](https://github.com/NativeScript/android/commit/98e808f26765788ce2d33dc440e1edbbd6b01cae))
+* export V8 internals used by public headers ([#2048](https://github.com/NativeScript/android/issues/2048)) ([560b3bf](https://github.com/NativeScript/android/commit/560b3bf9549f6659ec66d6a129a3b4008f2577a5))
+* **inspector:** serve source map streams the way Chromium does ([#2091](https://github.com/NativeScript/android/issues/2091)) ([fbda060](https://github.com/NativeScript/android/commit/fbda060d6860dcc4cd07966f98c4882d2498fee1))
+* interface extends with extra interfaces ([#2121](https://github.com/NativeScript/android/issues/2121)) ([fa2929f](https://github.com/NativeScript/android/commit/fa2929f690de0a9db786e5c0af0f9abdb4f99000))
+* keep the base class of runtime-resolved types in large apps ([#2111](https://github.com/NativeScript/android/issues/2111)) ([b8cc3cf](https://github.com/NativeScript/android/commit/b8cc3cf883e01f6ae0fce3888e446edf0938c382))
+* keep the Worker object rooted until its thread ends, and report the end as nsworkerended ([#2044](https://github.com/NativeScript/android/issues/2044)) ([d24703c](https://github.com/NativeScript/android/commit/d24703c6b152f50a06067ef91b21b84d80c13f60))
+* load prebuilt classes for anonymous extends ([#2101](https://github.com/NativeScript/android/issues/2101)) ([39bbec1](https://github.com/NativeScript/android/commit/39bbec194d2f647dd7f77e30822258178af64ad7))
+* **MetadataNode:** keep a class untouched when its .null is read ([#2119](https://github.com/NativeScript/android/issues/2119)) ([29cd319](https://github.com/NativeScript/android/commit/29cd3190bdb4c45dd106dfe9bbb388f68fb7302a))
+* proxy generation races and naming bugs ([#2117](https://github.com/NativeScript/android/issues/2117)) ([8c54d4b](https://github.com/NativeScript/android/commit/8c54d4b0aec43f9655dc8d60ebeb34b5ba236a94))
+* restore interface methods hidden on API 28 ([#2122](https://github.com/NativeScript/android/issues/2122)) ([749fae8](https://github.com/NativeScript/android/commit/749fae83405ec02d7ea4181c972cb41ddf9e42ad))
+* **runtime:** deliver a posted undefined as undefined, not null ([#2087](https://github.com/NativeScript/android/issues/2087)) ([ddfc8b0](https://github.com/NativeScript/android/commit/ddfc8b0ffc1aeadfebdaab6c609f5f397dcf70b6))
+* **runtime:** keep clone-only message reads read-only, and see an uncloneable brand created mid-clone ([#2088](https://github.com/NativeScript/android/issues/2088)) ([1fc95e2](https://github.com/NativeScript/android/commit/1fc95e24a2411343510066095155300e3ada3ad4))
+* **runtime:** resolve fresh call arguments again after an explicit release ([#2151](https://github.com/NativeScript/android/issues/2151)) ([66c0118](https://github.com/NativeScript/android/commit/66c011834670fe1b834ba4ab91c89b6f8ff597dd))
+* **runtime:** route Java->JS calls to the runtime that created the binding ([#2015](https://github.com/NativeScript/android/issues/2015)) ([9621d97](https://github.com/NativeScript/android/commit/9621d979be868cecf1f201a8d53f4ddd0748c54e))
+* typed array arguments leak and type confusion ([#2102](https://github.com/NativeScript/android/issues/2102)) ([ee62de7](https://github.com/NativeScript/android/commit/ee62de7b2aabff1455cfd3bd7071075618ff2093))
+* unwrap Proxy receivers and arguments before Java dispatch ([#2061](https://github.com/NativeScript/android/issues/2061)) ([bdda733](https://github.com/NativeScript/android/commit/bdda73309de4d50d75b03ce995d15d1f0d1c3d56))
+* **worker:** drop callbacks from closing workers ([#2108](https://github.com/NativeScript/android/issues/2108)) ([7228595](https://github.com/NativeScript/android/commit/7228595003f45040df050b8e2b9a67091ef1ca2e))
+* **worker:** handle terminate() landing inside require() ([#2115](https://github.com/NativeScript/android/issues/2115)) ([3c798e2](https://github.com/NativeScript/android/commit/3c798e2cd8b1249c1936f69de84d7ddabcc7a648))
+* **worker:** keep the worker isolate alive while terminate() uses it, and let it stop a closing worker ([#2067](https://github.com/NativeScript/android/issues/2067)) ([602e8ab](https://github.com/NativeScript/android/commit/602e8ab177f547e7c05eb868a3612b222d225abd))
+* **worker:** let a heap-limit terminate or nested console call re-enter the inspector lock ([#2070](https://github.com/NativeScript/android/issues/2070)) ([b5226a1](https://github.com/NativeScript/android/commit/b5226a168ca7d2693c26548ca6ef7fd303624b38))
+* **worker:** open a handle scope per delivered message, and fix two messaging specs ([#2090](https://github.com/NativeScript/android/issues/2090)) ([fef72d5](https://github.com/NativeScript/android/commit/fef72d5132fc8b02cac373a87f9847f7fe4b0cc3))
+* **worker:** route worker_threads errors like the web surface, and fire once listeners once ([#2089](https://github.com/NativeScript/android/issues/2089)) ([1fd6b65](https://github.com/NativeScript/android/commit/1fd6b654a0ad359f971c2a8a79bfa031197a66cc))
+* **worker:** tear down a worker runtime whose Java bootstrap failed ([#2069](https://github.com/NativeScript/android/issues/2069)) ([80f9750](https://github.com/NativeScript/android/commit/80f9750cfde30949273df871f215a5447801008f))
+
+
+### Features
+
+* MessagePort, MessageChannel, BroadcastChannel, and node:worker_threads ([#2043](https://github.com/NativeScript/android/issues/2043)) ([4880940](https://github.com/NativeScript/android/commit/488094083e93a5a0d404cf227fdbeaeaa9a9297a))
+* **runtime:** ns:interop builtin modules, interop globals as compat ([#2074](https://github.com/NativeScript/android/issues/2074)) ([9a139b8](https://github.com/NativeScript/android/commit/9a139b874cf6706b72f73b0c78fa3f21f7832226))
+* serialize DOMException per Web IDL [Serializable] ([#2040](https://github.com/NativeScript/android/issues/2040)) ([1da7e60](https://github.com/NativeScript/android/commit/1da7e6076ef25bc02c4d5e8527093786da6e8ebf))
+* **worker:** accept platform options under android, deprecate androidPriority ([#2041](https://github.com/NativeScript/android/issues/2041)) ([34fd3ce](https://github.com/NativeScript/android/commit/34fd3cea9bc0a290112d2ba8a5ddd54e7995f2c1))
+* **worker:** resourceLimits for worker isolates ([#2042](https://github.com/NativeScript/android/issues/2042)) ([0ffff1b](https://github.com/NativeScript/android/commit/0ffff1bad66aa33088defc0859c85774e86aa983))
+
+
+### Performance Improvements
+
+* ArrayBuffer.from without the isDirect() call ([#2076](https://github.com/NativeScript/android/issues/2076)) ([1a402f0](https://github.com/NativeScript/android/commit/1a402f0f2c1f78e236eb4600702495c6e3e61ec9))
+* cheaper object construction; drop markingMode full ([#2093](https://github.com/NativeScript/android/issues/2093)) ([fef13a1](https://github.com/NativeScript/android/commit/fef13a1e56afa93b067fec02ca5a0bedc2dde570))
+* cut JNI bridge per-call overhead ([#2092](https://github.com/NativeScript/android/issues/2092)) ([132f5cf](https://github.com/NativeScript/android/commit/132f5cf427409545f52830e8eb753c57d72a39f9))
+* faster object lifecycle and JNI calls ([#2099](https://github.com/NativeScript/android/issues/2099)) ([35cca0e](https://github.com/NativeScript/android/commit/35cca0e3e48464d2b739f31527264456963e034f))
+* fold identical code when linking the optimized runtime ([#2106](https://github.com/NativeScript/android/issues/2106)) ([8fe217a](https://github.com/NativeScript/android/commit/8fe217a92400d9912b52e6eda675e2078428dada))
+* guard ObjectTable with a monitor instead of StampedLock ([#2103](https://github.com/NativeScript/android/issues/2103)) ([66c5344](https://github.com/NativeScript/android/commit/66c53446976c934c4d30ae9fd69c01f6804c68cc))
+* return primitive callback results as raw bits ([#2096](https://github.com/NativeScript/android/issues/2096)) ([3c530c9](https://github.com/NativeScript/android/commit/3c530c9f04130b108a3df317da6ab70b80003bc6))
+* **runtime:** skip unread BroadcastChannel deliveries and let idle channels be collected ([#2086](https://github.com/NativeScript/android/issues/2086)) ([696bb27](https://github.com/NativeScript/android/commit/696bb278fa3ee5c6cf1cc44137d6184ec1f0bff1))
+* size metadata ids and offsets per app ([#2113](https://github.com/NativeScript/android/issues/2113)) ([159736d](https://github.com/NativeScript/android/commit/159736dae789a9f3b309b661a78bf32b52f54128))
+* smaller metadata, mapped instead of copied ([#2112](https://github.com/NativeScript/android/issues/2112)) ([b70544e](https://github.com/NativeScript/android/commit/b70544ea096ff6c026b8f0bb576deb6d708ee7e4))
+
+
+
+## [9.1.1](https://github.com/NativeScript/android/compare/v9.1.0...v9.1.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* keep the query on relative and root-absolute imports from served modules ([#2038](https://github.com/NativeScript/android/issues/2038)) ([60d03e9](https://github.com/NativeScript/android/commit/60d03e98f215d63f3043cce926197f8044950ad1))
+
+
+
 # [9.1.0](https://github.com/NativeScript/android/compare/v9.0.5...v9.1.0) (2026-08-27)
 
 
