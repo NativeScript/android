@@ -34,6 +34,17 @@ describe("URLPattern", function () {
   });
 
 
+  it("accepts non-ASCII group names", function () {
+    const pattern = new URLPattern({ pathname: "/:caf\u00E9/:\u540D\u524D" });
+    const result = pattern.exec({ pathname: "/a/b" });
+    expect(result.pathname.groups["caf\u00E9"]).toBe("a");
+    expect(result.pathname.groups["\u540D\u524D"]).toBe("b");
+  });
+
+  it("rejects a group name that does not start with an identifier start", function () {
+    expect(() => new URLPattern({ pathname: "/:\u0663x" })).toThrowError(TypeError);
+  });
+
   it("parses with undefined base", function () {
     const pattern = new URLPattern("https://google.com", undefined);
     expect(pattern.protocol).toBe("https");
@@ -46,4 +57,22 @@ describe("URLPattern", function () {
     expect(pattern.hostname).toBe("google.com");
   });
 
+  it("test() matches a URL against a pattern with a capture group", function () {
+    const pattern = new URLPattern("https://example.com/books/:id");
+    expect(pattern.test("https://example.com/books/123")).toBe(true);
+    expect(pattern.test("https://example.com/movies/123")).toBe(false);
+  });
+
+  it("exec() extracts named capture groups", function () {
+    const pattern = new URLPattern("https://example.com/books/:id");
+    const result = pattern.exec("https://example.com/books/123");
+    expect(result).not.toBeNull();
+    expect(result.pathname.input).toBe("/books/123");
+    expect(result.pathname.groups.id).toBe("123");
+  });
+
+  it("exec() returns null when the URL does not match", function () {
+    const pattern = new URLPattern("https://example.com/books/:id");
+    expect(pattern.exec("https://example.com/movies/123")).toBeNull();
+  });
 });

@@ -113,6 +113,7 @@ require("./tests/testPostFrameCallback");
 require("./tests/testPerformance");
 require("./tests/console/logTests.js");
 require('./tests/testURLImpl.js');
+require('./tests/testURLPattern.js');
 require('./tests/testURLSearchParamsImpl.js');
 require('./tests/testQueueMicrotask');
 require('./tests/testErrorEvents');
