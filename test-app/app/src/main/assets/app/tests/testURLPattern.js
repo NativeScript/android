@@ -57,4 +57,22 @@ describe("URLPattern", function () {
     expect(pattern.hostname).toBe("google.com");
   });
 
+  it("test() matches a URL against a pattern with a capture group", function () {
+    const pattern = new URLPattern("https://example.com/books/:id");
+    expect(pattern.test("https://example.com/books/123")).toBe(true);
+    expect(pattern.test("https://example.com/movies/123")).toBe(false);
+  });
+
+  it("exec() extracts named capture groups", function () {
+    const pattern = new URLPattern("https://example.com/books/:id");
+    const result = pattern.exec("https://example.com/books/123");
+    expect(result).not.toBeNull();
+    expect(result.pathname.input).toBe("/books/123");
+    expect(result.pathname.groups.id).toBe("123");
+  });
+
+  it("exec() returns null when the URL does not match", function () {
+    const pattern = new URLPattern("https://example.com/books/:id");
+    expect(pattern.exec("https://example.com/movies/123")).toBeNull();
+  });
 });
