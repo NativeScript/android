@@ -69,7 +69,9 @@ v8_regex_provider::regex_search(std::string_view input,
         auto array = matches.As<v8::Array>();
         auto len = array->Length();
         ret.reserve(len);
-        for (int i = 0; i < len; i++) {
+        // Element 0 is the whole match. ada pairs exec_result[i] with
+        // group_name_list[i], so it expects only the capture groups.
+        for (uint32_t i = 1; i < len; i++) {
             v8::Local<v8::Value> item;
             if (!array->Get(isolate->GetCurrentContext(), i).ToLocal(&item)) {
                 return std::nullopt;
@@ -146,7 +148,7 @@ v8::Local<v8::FunctionTemplate> URLPatternImpl::GetCtor(v8::Isolate *isolate) {
               v8::FunctionTemplate::New(isolate, &Exec));
 
     tmpl->SetLazyDataProperty(
-            ArgConverter::ConvertToV8String(isolate, "hasRegexpGroups"),
+            ArgConverter::ConvertToV8String(isolate, "hasRegExpGroups"),
             GetHasRegexpGroups);
 
     tmpl->SetLazyDataProperty(
