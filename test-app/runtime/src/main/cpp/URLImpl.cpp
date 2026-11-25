@@ -4,10 +4,12 @@
 
 #include "URLImpl.h"
 
+#include <optional>
+
 using namespace tns;
 using namespace ada;
 
-URLImpl::URLImpl(url_aggregator url) : url_(url) {}
+URLImpl::URLImpl(url_aggregator url) : url_(std::move(url)) {}
 
 URLImpl *URLImpl::GetPointer(v8::Local<v8::Object> object) {
     if (object->InternalFieldCount() < 1) {
@@ -90,85 +92,48 @@ void URLImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto value = args[0];
     auto isolate = args.GetIsolate();
     auto context = isolate->GetCurrentContext();
-    if (count >= 1 && !value->IsString()) {
+    if (count < 1 || !value->IsString()) {
         isolate->ThrowException(
                 v8::Exception::TypeError(v8::String::Empty(isolate)));
         return;
     }
 
-    url_aggregator url;
-
     auto url_string = ArgConverter::ConvertToString(args[0].As<v8::String>());
 
+    std::optional<std::string> base_string;
     if (count > 1) {
         if (args[1]->IsString()) {
-            auto base_string = ArgConverter::ConvertToString(args[1].As<v8::String>());
-            std::string_view base_string_view(base_string.data(), base_string.length());
-
-            if (!can_parse(url_string, &base_string_view)) {
-                isolate->ThrowException(
-                        v8::Exception::TypeError(v8::String::Empty(isolate)));
-                return;
-            }
-            auto base_url = ada::parse<ada::url_aggregator>(base_string_view, nullptr);
-
-            auto result = ada::parse<ada::url_aggregator>(url_string, &base_url.value());
-
-            if (result) {
-                url = result.value();
-            } else {
-                isolate->ThrowException(
-                        v8::Exception::TypeError(v8::String::Empty(isolate)));
-                return;
-            }
+            base_string = ArgConverter::ConvertToString(args[1].As<v8::String>());
         } else if (args[1]->IsObject()) {
-            auto base_string = ArgConverter::ConvertToString(
-                    args[1]->ToString(context).ToLocalChecked());
-            std::string_view base_string_view(base_string.data(), base_string.length());
-            if (!can_parse(std::string_view(url_string.data(), url_string.length()),
-                           &base_string_view)) {
-                isolate->ThrowException(
-                        v8::Exception::TypeError(v8::String::Empty(isolate)));
+            v8::Local<v8::String> base;
+            if (!args[1]->ToString(context).ToLocal(&base)) {
                 return;
             }
-
-
-            auto base_url = ada::parse<ada::url_aggregator>(base_string_view, nullptr);
-
-            auto result = ada::parse<ada::url_aggregator>(url_string, &base_url.value());
-
-            if (result) {
-                url = result.value();
-            } else {
-                isolate->ThrowException(
-                        v8::Exception::TypeError(v8::String::Empty(isolate)));
-                return;
-            }
-        } else {
-            // treat 2nd arg as undefined otherwise.
-            auto result = ada::parse<ada::url_aggregator>(url_string, nullptr);
-            if (result) {
-                url = result.value();
-            } else {
-                isolate->ThrowException(
-                        v8::Exception::TypeError(v8::String::Empty(isolate)));
-                return;
-            }
+            base_string = ArgConverter::ConvertToString(base);
         }
-    } else {
-        auto result = ada::parse<ada::url_aggregator>(url_string, nullptr);
-        if (result) {
-            url = result.value();
-        } else {
-            isolate->ThrowException(
-                    v8::Exception::TypeError(v8::String::Empty(isolate)));
-            return;
+        // Any other 2nd argument is treated as undefined.
+    }
+
+    auto parse = [&]() {
+        if (!base_string) {
+            return ada::parse<url_aggregator>(url_string, nullptr);
         }
+        auto base = ada::parse<url_aggregator>(*base_string, nullptr);
+        if (!base) {
+            return base;
+        }
+        return ada::parse<url_aggregator>(url_string, &base.value());
+    };
+    auto result = parse();
+    if (!result) {
+        isolate->ThrowException(
+                v8::Exception::TypeError(v8::String::Empty(isolate)));
+        return;
     }
 
     auto ret = args.This();
 
-    auto urlImpl = new URLImpl(url);
+    auto urlImpl = new URLImpl(std::move(result.value()));
 
 
     ret->SetAlignedPointerInInternalField(0, urlImpl, v8::kEmbedderDataTypeTagDefault);
@@ -495,17 +460,26 @@ void URLImpl::ToString(const v8::FunctionCallbackInfo<v8::Value> &info) {
 
 
 void URLImpl::CanParse(const v8::FunctionCallbackInfo<v8::Value> &info) {
+    // ada::parse rather than ada::can_parse: the constructor already links it,
+    // and can_parse pulls in a second instantiation of ada's parser.
+    auto isolate = info.GetIsolate();
+    auto context = isolate->GetCurrentContext();
+    v8::Local<v8::String> input;
+    if (!info[0]->ToString(context).ToLocal(&input)) {
+        return;
+    }
+    auto url_string = ArgConverter::ConvertToString(input);
     bool value;
-    auto count = info.Length();
-
-
-    if (count > 1) {
-        auto url_string = ArgConverter::ConvertToString(info[0].As<v8::String>());
-        auto base_string = ArgConverter::ConvertToString(info[1].As<v8::String>());
-        std::string_view base_string_view(base_string.data(), base_string.length());
-        value = can_parse(url_string, &base_string_view);
+    if (info.Length() > 1 && !info[1]->IsUndefined()) {
+        v8::Local<v8::String> base_input;
+        if (!info[1]->ToString(context).ToLocal(&base_input)) {
+            return;
+        }
+        auto base = ada::parse<url_aggregator>(
+                ArgConverter::ConvertToString(base_input), nullptr);
+        value = base && ada::parse<url_aggregator>(url_string, &base.value());
     } else {
-        value = can_parse(ArgConverter::ConvertToString(info[0].As<v8::String>()).c_str(), nullptr);
+        value = ada::parse<url_aggregator>(url_string, nullptr).has_value();
     }
 
     info.GetReturnValue().Set(value);
