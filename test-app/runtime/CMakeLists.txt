@@ -124,6 +124,9 @@ if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD OR NOT CMAKE_BUILD_TYPE ST
     # (Debug). AGP builds the release variant as RelWithDebInfo, whose default -O2 would
     # otherwise win.
     string(APPEND CMAKE_CXX_FLAGS_RELWITHDEBINFO " -O3")
+    # ada at -Os instead of -O3: about 50 KB less per ABI for URL parses that
+    # are 7-19% (tens of nanoseconds) slower.
+    set_source_files_properties(src/main/cpp/ada/ada.cpp PROPERTIES COMPILE_OPTIONS "-Os")
 else ()
     set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -g")
 endif ()
