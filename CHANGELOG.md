@@ -1,3 +1,12 @@
+## [9.1.3](https://github.com/NativeScript/android/compare/v9.1.2...v9.1.3) (2026-11-26)
+
+
+### Bug Fixes
+
+* don't use prebuilt classes that mismatch JS ([#2155](https://github.com/NativeScript/android/issues/2155)) ([da0262c](https://github.com/NativeScript/android/commit/da0262c0864d87c8f58ad67956c9b8dd3070fdf6))
+
+
+
 ## [9.1.2](https://github.com/NativeScript/android/compare/v9.1.1...v9.1.2) (2026-11-24)
 
 
