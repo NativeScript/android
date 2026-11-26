@@ -230,6 +230,9 @@ describe("parser/js_parser tests", function () {
                 expect(interfacesOf(parts => parts[4] === "AliasedObject")).toEqual(["java.util.Observer", "java.util.Formattable"]);
                 expect(interfacesOf(parts => parts[5].split(',').indexOf("run") > -1)).toEqual(["java.lang.Runnable"]);
                 expect(interfacesOf(parts => parts[4] === "ImportedInterfaceObject")).toBeUndefined();
+                // A destructured binding names the member, not the object it is taken from.
+                expect(interfacesOf(parts => parts[4] === "DestructuredObject")).toEqual(["java.io.Closeable", "java.util.Observer"]);
+                expect(interfacesOf(parts => parts[4] === "DefaultedDestructuredObject")).toBeUndefined();
                 expect(stdout + stderr).toContain("cannot determine the Java interface(s) _imported__WEBPACK_IMPORTED_MODULE_0__.Observer of class ImportedInterfaceObject");
                 expect(lines.filter(l => l.indexOf("org.nativescript.aliases.") > -1)).toEqual([]);
 

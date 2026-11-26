@@ -736,12 +736,35 @@ var es5_visitors = (function() {
 
     var MAX_ALIAS_DEPTH = 32;
 
-    // The initializer of a variable that is never reassigned, or null.
-    function _constantInitializer(binding) {
-        if (!binding || !binding.constant || !binding.path.isVariableDeclarator()) {
+    /*
+     *	What a variable that is never reassigned stands for, or null: the initializer of
+     *	`const name = init`, or for `const { member } = init` and `const { member: name } = init`
+     *	the member of it. Any other pattern binds something the parser cannot tell.
+     */
+    function _constantValue(binding, name) {
+        if (!binding || !binding.constant || !binding.path.isVariableDeclarator() || !binding.path.node.init) {
             return null;
         }
-        return binding.path.node.init || null;
+        var declarator = binding.path.node;
+        if (types.isIdentifier(declarator.id)) {
+            return { init: declarator.init, member: null };
+        }
+        if (types.isObjectPattern(declarator.id)) {
+            var properties = declarator.id.properties;
+            for (var i = 0; i < properties.length; i++) {
+                var property = properties[i];
+                if (types.isObjectProperty(property) && !property.computed &&
+                    types.isIdentifier(property.value, { name: name })) {
+                    if (types.isIdentifier(property.key)) {
+                        return { init: declarator.init, member: property.key.name };
+                    }
+                    if (types.isStringLiteral(property.key)) {
+                        return { init: declarator.init, member: property.key.value };
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     /*
@@ -782,8 +805,12 @@ var es5_visitors = (function() {
                 // A global, such as the `com` or `android` package roots.
                 return node.name;
             }
-            var init = _constantInitializer(binding);
-            return init ? _resolveJavaTypeName(init, binding.path.scope, depth + 1) : null;
+            var value = _constantValue(binding, node.name);
+            var owner = value ? _resolveJavaTypeName(value.init, binding.path.scope, depth + 1) : null;
+            if (owner === null) {
+                return null;
+            }
+            return value.member === null ? owner : owner + "." + value.member;
         }
 
         return null;
@@ -823,9 +850,9 @@ var es5_visitors = (function() {
 
         if (types.isIdentifier(node) && depth < MAX_ALIAS_DEPTH) {
             var binding = scope && scope.getBinding(node.name);
-            var init = _constantInitializer(binding);
-            if (init) {
-                return _resolveInterfaceList(init, binding.path.scope, depth + 1);
+            var value = _constantValue(binding, node.name);
+            if (value && value.member === null) {
+                return _resolveInterfaceList(value.init, binding.path.scope, depth + 1);
             }
         }
 

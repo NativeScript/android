@@ -101,3 +101,35 @@ var ComputedMember = (function (_super) {
     };
     return ComputedMember;
 }(java.lang.Object));
+
+const { Closeable } = java.io;
+const { Observer: ObserverMember } = java.util;
+const { Formattable: DefaultedFormattable = null } = java.util;
+
+var DestructuredObject = (function (_super) {
+    __extends(DestructuredObject, _super);
+    function DestructuredObject() {
+        var _this = _super.call(this) || this;
+        return global.__native(_this);
+    }
+    DestructuredObject.prototype.close = function () {
+    };
+    DestructuredObject = __decorate([
+        Interfaces([Closeable, ObserverMember])
+    ], DestructuredObject);
+    return DestructuredObject;
+}(java.lang.Object));
+
+var DefaultedDestructuredObject = (function (_super) {
+    __extends(DefaultedDestructuredObject, _super);
+    function DefaultedDestructuredObject() {
+        var _this = _super.call(this) || this;
+        return global.__native(_this);
+    }
+    DefaultedDestructuredObject.prototype.formatTo = function () {
+    };
+    DefaultedDestructuredObject = __decorate([
+        Interfaces([DefaultedFormattable])
+    ], DefaultedDestructuredObject);
+    return DefaultedDestructuredObject;
+}(java.lang.Object));

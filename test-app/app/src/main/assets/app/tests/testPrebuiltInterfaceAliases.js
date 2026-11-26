@@ -1,6 +1,29 @@
 describe("Interfaces of prebuilt classes", function () {
     var RunnableAlias = java.lang.Runnable;
 
+    // With -PuseContentBindings a class the generator saw only part of asks for another name,
+    // so no prebuilt class answers it and nothing is rejected.
+    var contentKeyed = (function () {
+        try {
+            java.lang.Class.forName("com.tns.gen.ContentKeyedBindings", false, com.tns.Runtime.class.getClassLoader());
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }());
+
+    function expectRejectedPrebuilt(instance, className, reason) {
+        // A content-keyed name may also be the name of another class with the same content.
+        if (contentKeyed) {
+            return;
+        }
+        var name = String(instance.getClass().getName());
+        expect(runtimeGeneratedEntries(name).length).toBe(1);
+        expect(name).toMatch(new RegExp("_" + className + "_runtime$"));
+        var prebuiltName = "com.tns.gen." + name.replace(/_runtime$/, "");
+        expect(com.tns.tests.LogcatUtil.countJsWarnings(prebuiltName, reason)).toBe(1);
+    }
+
     function runtimeGeneratedEntries(loadedName) {
         var lines = com.tns.DexFactory.getRuntimeGeneratedClasses();
         var result = [];
@@ -84,11 +107,8 @@ describe("Interfaces of prebuilt classes", function () {
         };
         var instance = new LateMember();
 
-        var name = String(instance.getClass().getName());
-        expect(name).toMatch(/_LateMember_runtime$/);
         expect(String(java.lang.String.valueOf(instance))).toBe("late member");
-        var prebuiltName = "com.tns.gen." + name.replace(/_runtime$/, "");
-        expect(com.tns.tests.LogcatUtil.countJsWarnings(prebuiltName, "was built without toString")).toBe(1);
+        expectRejectedPrebuilt(instance, "LateMember", "was built without toString");
     });
 
     it("generates a class in place of a prebuilt one that lacks a listed interface, and warns", function () {
@@ -108,8 +128,6 @@ describe("Interfaces of prebuilt classes", function () {
         LateInterface.prototype.interfaces = [java.lang.Runnable];
         var instance = new LateInterface();
 
-        var name = String(instance.getClass().getName());
-        expect(name).toMatch(/_LateInterface_runtime$/);
         expect(java.lang.Runnable.class.isAssignableFrom(instance.getClass())).toBe(true);
         runFromJava(instance);
         expect(runs).toBe(1);
@@ -118,7 +136,6 @@ describe("Interfaces of prebuilt classes", function () {
         runFromJava(com.tns.tests.JavaCreated.newInstance(instance.getClass()));
         expect(runs).toBe(2);
 
-        var prebuiltName = "com.tns.gen." + name.replace(/_runtime$/, "");
-        expect(com.tns.tests.LogcatUtil.countJsWarnings(prebuiltName, "does not implement java.lang.Runnable")).toBe(1);
+        expectRejectedPrebuilt(instance, "LateInterface", "does not implement java.lang.Runnable");
     });
 });
