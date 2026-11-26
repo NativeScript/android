@@ -1023,9 +1023,6 @@ public class Runtime {
      */
     @RuntimeCallable
     private static String[] getDefaultMethodNames(String interfaceName) {
-        if (android.os.Build.VERSION.SDK_INT < 24) {
-            return new String[0];
-        }
         try {
             Class<?> iface = classStorageService.retrieveClass(interfaceName.replace('/', '.'));
             String[] names = DefaultMethods.names(iface);

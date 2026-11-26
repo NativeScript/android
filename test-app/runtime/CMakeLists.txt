@@ -355,3 +355,8 @@ find_library(system-android android)
 # Command info: https://cmake.org/cmake/help/v3.4/command/target_link_libraries.html
 # Specifies libraries CMake should link to your target library.
 target_link_libraries(NativeScript ${system-log} ${system-z} ${system-android})
+
+if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
+    # Android's packed relocation format, which the loader reads from API 23.
+    target_link_options(NativeScript PRIVATE "-Wl,--pack-dyn-relocs=android")
+endif ()

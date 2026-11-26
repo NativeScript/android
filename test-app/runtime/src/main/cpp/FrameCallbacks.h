@@ -25,15 +25,12 @@ namespace tns {
  * frameTimeNanos is the platform's raw frame time -- CLOCK_MONOTONIC
  * nanoseconds, the System.nanoTime() base -- and performanceMillis is the same
  * instant on this isolate's performance timeline, so it compares directly with
- * performance.now(). Both are exact on either implementation below.
+ * performance.now(). Both are exact.
  *
- * Two implementations sit behind the one JS surface:
- *   - AChoreographer (NDK, API 24+), reached through dlsym.
- *   - android.view.Choreographer (com.tns.FrameCallbacks), for API 21-23,
- *     where the NDK API does not exist.
- * Scheduling is per calling thread, so a worker schedules against its own
- * looper. Cancellation on either surface only marks the entry: a posted frame
- * callback cannot be recalled, so the dispatch drops it instead.
+ * Frames come from the NDK's AChoreographer. Scheduling is per calling thread,
+ * so a worker schedules against its own looper. Cancellation on either surface
+ * only marks the entry: a posted frame callback cannot be recalled, so the
+ * dispatch drops it instead.
  */
 class FrameCallbacks {
 public:

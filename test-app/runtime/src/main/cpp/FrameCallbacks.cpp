@@ -1,6 +1,7 @@
 #include "FrameCallbacks.h"
 
 #include <android/api-level.h>
+#include <android/choreographer.h>
 #include <android/looper.h>
 #include <dlfcn.h>
 #include <time.h>
@@ -9,13 +10,10 @@
 #include "NativeScriptAssert.h"
 #include <memory>
 #include <mutex>
-#include <sstream>
 #include <string>
 #include <vector>
 
 #include "ArgConverter.h"
-#include "JEnv.h"
-#include "JniLocalRef.h"
 #include "NativeScriptException.h"
 #include "Performance.h"
 #include "Runtime.h"
@@ -28,35 +26,22 @@ namespace tns {
 
 namespace {
 
-// ---- AChoreographer (NDK, API 24+), resolved through dlsym.
+// ---- AChoreographer. The 64-bit frame-time variants are API 29, above the
+// minimum, so they are resolved through dlsym.
 
-struct AChoreographer;
-
-typedef void (*AChoreographer_frameCallback)(long frameTimeNanos, void* data);
-typedef void (*AChoreographer_frameCallback64)(int64_t frameTimeNanos,
-                                               void* data);
-typedef AChoreographer* (*func_getInstance)();
-typedef void (*func_postFrameCallback)(AChoreographer*,
-                                       AChoreographer_frameCallback, void*);
 typedef void (*func_postFrameCallback64)(AChoreographer*,
                                          AChoreographer_frameCallback64, void*);
-typedef void (*func_postFrameCallbackDelayed)(AChoreographer*,
-                                              AChoreographer_frameCallback,
-                                              void*, long);
 typedef void (*func_postFrameCallbackDelayed64)(AChoreographer*,
                                                 AChoreographer_frameCallback64,
                                                 void*, uint32_t);
 
-func_getInstance getInstance_ = nullptr;
-func_postFrameCallback postFrameCallback_ = nullptr;
-func_postFrameCallbackDelayed postFrameCallbackDelayed_ = nullptr;
 func_postFrameCallback64 postFrameCallback64_ = nullptr;
 func_postFrameCallbackDelayed64 postFrameCallbackDelayed64_ = nullptr;
 
-void ResolveChoreographer() {
+void ResolveChoreographer64() {
     static std::once_flag once;
     std::call_once(once, [] {
-        if (android_get_device_api_level() < 24) {
+        if (android_get_device_api_level() < 29) {
             return;
         }
 
@@ -65,40 +50,12 @@ void ResolveChoreographer() {
             return;
         }
 
-        getInstance_ = reinterpret_cast<func_getInstance>(
-                dlsym(lib, "AChoreographer_getInstance"));
-        postFrameCallback_ = reinterpret_cast<func_postFrameCallback>(
-                dlsym(lib, "AChoreographer_postFrameCallback"));
-        postFrameCallbackDelayed_ = reinterpret_cast<func_postFrameCallbackDelayed>(
-                dlsym(lib, "AChoreographer_postFrameCallbackDelayed"));
-
-        if (android_get_device_api_level() >= 29) {
-            postFrameCallback64_ = reinterpret_cast<func_postFrameCallback64>(
-                    dlsym(lib, "AChoreographer_postFrameCallback64"));
-            postFrameCallbackDelayed64_ =
-                    reinterpret_cast<func_postFrameCallbackDelayed64>(
-                            dlsym(lib, "AChoreographer_postFrameCallbackDelayed64"));
-        }
+        postFrameCallback64_ = reinterpret_cast<func_postFrameCallback64>(
+                dlsym(lib, "AChoreographer_postFrameCallback64"));
+        postFrameCallbackDelayed64_ =
+                reinterpret_cast<func_postFrameCallbackDelayed64>(
+                        dlsym(lib, "AChoreographer_postFrameCallbackDelayed64"));
     });
-}
-
-bool NativeChoreographerAvailable() {
-    ResolveChoreographer();
-    return getInstance_ != nullptr && postFrameCallback_ != nullptr &&
-           postFrameCallbackDelayed_ != nullptr;
-}
-
-// ---- Implementation selection.
-
-enum class Impl { kAuto, kNative, kJava };
-
-Impl forcedImpl_ = Impl::kAuto;
-
-bool UseNativeChoreographer() {
-    if (forcedImpl_ == Impl::kJava) {
-        return false;
-    }
-    return NativeChoreographerAvailable();
 }
 
 /*
@@ -125,24 +82,6 @@ int64_t WidenFrameTimeNanos(long ts) {
 
 // ---- Scheduled callbacks.
 
-jclass FRAME_CALLBACKS_CLASS = nullptr;
-jmethodID FRAME_CALLBACKS_CTOR = nullptr;
-jmethodID FRAME_CALLBACKS_POST = nullptr;
-jmethodID FRAME_CALLBACKS_RELEASE = nullptr;
-
-void ResolveFrameCallbacksClass(JEnv& env) {
-    static std::once_flag once;
-    std::call_once(once, [&env] {
-        // JEnv::FindClass caches a global ref to the class
-        FRAME_CALLBACKS_CLASS = env.FindClass("com/tns/FrameCallbacks");
-        NS_CHECK(FRAME_CALLBACKS_CLASS != nullptr);
-        FRAME_CALLBACKS_CTOR = env.GetMethodID(FRAME_CALLBACKS_CLASS, "<init>", "(J)V");
-        FRAME_CALLBACKS_POST = env.GetMethodID(FRAME_CALLBACKS_CLASS, "post", "(J)V");
-        FRAME_CALLBACKS_RELEASE =
-                env.GetMethodID(FRAME_CALLBACKS_CLASS, "release", "()V");
-    });
-}
-
 /*
  * Entries are identified to the platform by id rather than by address: an id
  * that no longer resolves is simply a frame arriving after its entry went
@@ -161,17 +100,6 @@ struct FrameCallbackEntry {
 
     ~FrameCallbackEntry() {
         callback_.Reset();
-        ReleaseJavaCallback();
-    }
-
-    void ReleaseJavaCallback() {
-        if (javaCallback_ == nullptr) {
-            return;
-        }
-        JEnv env;
-        env.CallVoidMethod(javaCallback_, FRAME_CALLBACKS_RELEASE);
-        env.DeleteGlobalRef(javaCallback_);
-        javaCallback_ = nullptr;
     }
 
     bool IsScheduled() const {
@@ -211,7 +139,6 @@ struct FrameCallbackEntry {
      * touch entries carrying this flag.
      */
     bool isAnimationFrame_;
-    jobject javaCallback_ = nullptr;
 
 private:
     bool removed_ = false;
@@ -238,7 +165,7 @@ FrameCallbackEntry* FindEntryById(EntryId id) {
 
 /*
  * Detaches the entry from the registry and hands back its owner, so the
- * destructor -- which calls into Java -- runs with the mutex released.
+ * destructor runs with the mutex released.
  */
 std::unique_ptr<FrameCallbackEntry> TakeEntry(EntryId id) {
     std::lock_guard<std::mutex> lock(entriesMutex_);
@@ -252,7 +179,7 @@ std::unique_ptr<FrameCallbackEntry> TakeEntry(EntryId id) {
 }
 
 /*
- * Never throws: on the NDK path this runs inside a C callback in libandroid,
+ * Never throws: this runs inside a C callback in libandroid,
  * which a C++ exception may not unwind through. A JS exception the runtime
  * still owns is handed to Java the way Timers::FireTimer does -- the frame
  * dispatch is driven by the thread's looper, so a pending Java exception is
@@ -322,9 +249,10 @@ void OnNativeFrame64(int64_t ts, void* data) {
     Dispatch((EntryId) (uintptr_t) data, ts);
 }
 
-void PostNative(EntryId id, long delayMillis) {
+void Post(EntryId id, long delayMillis) {
     ALooper_prepare(0);
-    AChoreographer* instance = getInstance_();
+    ResolveChoreographer64();
+    AChoreographer* instance = AChoreographer_getInstance();
     void* data = reinterpret_cast<void*>((uintptr_t) id);
 
     if (postFrameCallback64_ != nullptr && postFrameCallbackDelayed64_ != nullptr) {
@@ -338,31 +266,10 @@ void PostNative(EntryId id, long delayMillis) {
     }
 
     if (delayMillis > 0) {
-        postFrameCallbackDelayed_(instance, &OnNativeFrame32, data, delayMillis);
+        AChoreographer_postFrameCallbackDelayed(instance, &OnNativeFrame32, data,
+                                                delayMillis);
     } else {
-        postFrameCallback_(instance, &OnNativeFrame32, data);
-    }
-}
-
-void PostJava(FrameCallbackEntry* entry, long delayMillis) {
-    JEnv env;
-    ResolveFrameCallbacksClass(env);
-
-    if (entry->javaCallback_ == nullptr) {
-        JniLocalRef instance(env.NewObject(FRAME_CALLBACKS_CLASS, FRAME_CALLBACKS_CTOR,
-                                           (jlong) entry->id_));
-        entry->javaCallback_ = env.NewGlobalRef(instance);
-    }
-
-    env.CallVoidMethod(entry->javaCallback_, FRAME_CALLBACKS_POST,
-                       (jlong) delayMillis);
-}
-
-void Post(FrameCallbackEntry* entry, long delayMillis) {
-    if (UseNativeChoreographer()) {
-        PostNative(entry->id_, delayMillis);
-    } else {
-        PostJava(entry, delayMillis);
+        AChoreographer_postFrameCallback(instance, &OnNativeFrame32, data);
     }
 }
 
@@ -411,7 +318,7 @@ void FrameCallbacks::PostFrameCallback(const FunctionCallbackInfo<Value>& args) 
         bool shouldPost = !existing->IsScheduled();
         existing->MarkScheduled();
         if (shouldPost) {
-            Post(existing, delayMillis);
+            Post(existing->id_, delayMillis);
         }
         return;
     }
@@ -431,7 +338,7 @@ void FrameCallbacks::PostFrameCallback(const FunctionCallbackInfo<Value>& args) 
     }
 
     entry->MarkScheduled();
-    Post(entry, delayMillis);
+    Post(entry->id_, delayMillis);
 }
 
 void FrameCallbacks::RemoveFrameCallback(const FunctionCallbackInfo<Value>& args) {
@@ -484,7 +391,7 @@ void FrameCallbacks::RequestAnimationFrame(const FunctionCallbackInfo<Value>& ar
     }
 
     entry->MarkScheduled();
-    Post(entry, 0);
+    Post(entry->id_, 0);
     args.GetReturnValue().Set(Number::New(isolate, (double) id));
 }
 
@@ -508,8 +415,7 @@ void FrameCallbacks::CancelAnimationFrame(const FunctionCallbackInfo<Value>& arg
 }
 
 void FrameCallbacks::RemoveIsolateEntries(Isolate* isolate) {
-    // Detached first, destroyed after the mutex is released: the destructors
-    // call into Java.
+    // Detached first, destroyed after the mutex is released.
     std::vector<std::unique_ptr<FrameCallbackEntry>> doomed;
     {
         std::lock_guard<std::mutex> lock(entriesMutex_);
@@ -540,53 +446,6 @@ void FrameCallbacks::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate
     globalTemplate->Set(
             ArgConverter::ConvertToV8String(isolate, "__removeFrameCallback"),
             FunctionTemplate::New(isolate, RemoveFrameCallback));
-
-#ifdef APPLICATION_IN_DEBUG
-    /*
-     * Test-only override, absent from release runtimes: the NDK path is the
-     * only one a modern device would ever select, so the Java bridge would
-     * otherwise ship without device coverage. Takes "auto", "native" or
-     * "java" and returns the implementation subsequent posts will use.
-     */
-    globalTemplate->Set(
-            ArgConverter::ConvertToV8String(isolate, "__setFrameCallbackImpl"),
-            FunctionTemplate::New(
-                    isolate, [](const FunctionCallbackInfo<Value>& args) {
-                        Isolate* isolate = args.GetIsolate();
-                        std::string requested =
-                                args.Length() > 0 && args[0]->IsString()
-                                        ? ArgConverter::ConvertToString(
-                                                  args[0].As<String>())
-                                        : "auto";
-                        if (requested == "java") {
-                            forcedImpl_ = Impl::kJava;
-                        } else if (requested == "native") {
-                            forcedImpl_ = Impl::kNative;
-                        } else {
-                            forcedImpl_ = Impl::kAuto;
-                        }
-                        args.GetReturnValue().Set(ArgConverter::ConvertToV8String(
-                                isolate,
-                                UseNativeChoreographer() ? "native" : "java"));
-                    }));
-#endif
 }
 
 }  // namespace tns
-
-extern "C" JNIEXPORT void JNICALL Java_com_tns_FrameCallbacks_nativeDoFrame(
-        JNIEnv* env, jclass clazz, jlong entryId, jlong frameTimeNanos) {
-    try {
-        tns::Dispatch((tns::EntryId) entryId, (int64_t) frameTimeNanos);
-    } catch (tns::NativeScriptException& e) {
-        e.ReThrowToJava();
-    } catch (std::exception& e) {
-        std::stringstream ss;
-        ss << "Error: c++ exception: " << e.what() << std::endl;
-        tns::NativeScriptException nsEx(ss.str());
-        nsEx.ReThrowToJava();
-    } catch (...) {
-        tns::NativeScriptException nsEx(std::string("Error: c++ exception!"));
-        nsEx.ReThrowToJava();
-    }
-}
