@@ -206,6 +206,46 @@ describe("parser/js_parser tests", function () {
             });
         });
 
+        it("Generate bindings for interfaces listed through local aliases, and none for classes it cannot fully describe", function (done) {
+            let input = path.normalize(path.join(prefix, "extends_with_interface_aliases", "app")),
+                generatedJavaClassesRoot = path.normalize(path.join(prefix, "extends_with_interface_aliases", "src", "main", "java"));
+
+            clearOutput();
+
+            execGradle(input, generatedJavaClassesRoot, function (error, stdout, stderr) {
+                if (error) {
+                    console.error(`exec error: ${error}`);
+                    return done.fail(error);
+                }
+
+                logExecResult(stdout, stderr);
+
+                let lines = fs.readFileSync(sbgBindingOutoutFile, "utf-8").toString().trim().split('\n');
+                // <base>*<file>*<line>*<column>*<class name>*<methods>*<java name>*<path>*<interfaces>
+                let interfacesOf = function (predicate) {
+                    let line = lines.find(l => predicate(l.split('*')));
+                    return line === undefined ? undefined : line.split('*')[8].split(',');
+                };
+
+                expect(interfacesOf(parts => parts[4] === "AliasedObject")).toEqual(["java.util.Observer", "java.util.Formattable"]);
+                expect(interfacesOf(parts => parts[5].split(',').indexOf("run") > -1)).toEqual(["java.lang.Runnable"]);
+                expect(interfacesOf(parts => parts[4] === "ImportedInterfaceObject")).toBeUndefined();
+                // A destructured binding names the member, not the object it is taken from.
+                expect(interfacesOf(parts => parts[4] === "DestructuredObject")).toEqual(["java.io.Closeable", "java.util.Observer"]);
+                expect(interfacesOf(parts => parts[4] === "DefaultedDestructuredObject")).toBeUndefined();
+                expect(stdout + stderr).toContain("cannot determine the Java interface(s) _imported__WEBPACK_IMPORTED_MODULE_0__.Observer of class ImportedInterfaceObject");
+                expect(lines.filter(l => l.indexOf("org.nativescript.aliases.") > -1)).toEqual([]);
+
+                // Classes with members the parser cannot name are left to the runtime.
+                let methodsOf = l => (l.split('*')[5] || "").split(',');
+                expect(lines.filter(l => methodsOf(l).indexOf("toString") > -1)).toEqual([]);
+                expect(lines.filter(l => methodsOf(l).indexOf("finalize") > -1)).toEqual([]);
+                expect(interfacesOf(parts => parts[4] === "ComputedMember")).toBeUndefined();
+
+                done();
+            });
+        });
+
         it("Generated metadata for bindings should return proper JavaClass name despite emitted TS ES5 code", function (done) {
             let input = path.normalize(path.join(prefix, "decorated_extends_ts", "app")),
                 generatedJavaClassesRoot = path.normalize(path.join(prefix, "decorated_extends_ts", "src", "main", "java"));
@@ -329,6 +369,8 @@ describe("parser/js_parser tests", function () {
 
                 expect(rows["LiteralMembers"][5]).toBe("identifierMember,quotedMember,shorthandMember,dataMember,~getterMember,~setterMember,run");
                 expect(rows["LiteralMembers"][8]).toBe("java.lang.Runnable");
+                // The runtime finds this class by call site, so a list missing members would be wrong.
+                expect(rows["UnnamedMembers"]).toBeUndefined();
 
                 // Accessors are marked with `~`; a redefined name keeps its first
                 // position and the kind of its last definition.

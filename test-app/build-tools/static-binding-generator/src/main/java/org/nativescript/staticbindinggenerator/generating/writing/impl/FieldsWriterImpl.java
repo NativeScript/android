@@ -9,6 +9,8 @@ public class FieldsWriterImpl implements FieldsWriter {
     private static final String THIZ_KEYWORD = "thiz";
     private static final String RUNTIME_TAG_FIELD_DECLARATION = "private volatile int runtimeTag__ns;";
     private static final String OBJECT_ID_FIELD_DECLARATION = "private int objectId__ns;";
+    // DexFactory reads it to tell whether this class was built from every member its JS class has.
+    private static final String JS_MEMBERS_FIELD_NAME = "members__ns";
 
     private final Writer writer;
 
@@ -22,6 +24,20 @@ public class FieldsWriterImpl implements FieldsWriter {
         writer.writeln(RUNTIME_TAG_FIELD_DECLARATION);
         writer.write(TABULATION_LITERAL);
         writer.writeln(OBJECT_ID_FIELD_DECLARATION);
+        writer.writeln();
+    }
+
+    @Override
+    public void writeJsMembersField(String[] memberNames) {
+        writer.write(TABULATION_LITERAL);
+        writer.write("private static final String[] " + JS_MEMBERS_FIELD_NAME + " = {");
+        for (int i = 0; i < memberNames.length; i++) {
+            if (i > 0) {
+                writer.write(", ");
+            }
+            writer.write("\"" + memberNames[i].replace("\\", "\\\\").replace("\"", "\\\"") + "\"");
+        }
+        writer.writeln("};");
         writer.writeln();
     }
 

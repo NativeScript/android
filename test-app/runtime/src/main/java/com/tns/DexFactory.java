@@ -30,6 +30,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,6 +46,14 @@ import dalvik.system.DexClassLoader;
 
 public class DexFactory {
     static final String COM_TNS_GEN_PREFIX = "com.tns.gen.";
+    // Appended to the name of a class generated in place of a prebuilt one that does not match.
+    static final String MISMATCHED_PREBUILT_SUFFIX = "_runtime";
+    // The static binding generator lists in it the members it saw of a call site's JS class.
+    private static final String PREBUILT_JS_MEMBERS_FIELD = "members__ns";
+    // Functions __extends puts on a TypeScript class's prototype, which no Java method overrides.
+    private static final Set<String> TS_HELPER_MEMBERS = new HashSet<String>(Arrays.asList("constructor", "__parent", "__child"));
+
+    private static final HashSet<String> warnedPrebuiltMismatches = new HashSet<String>();
 
     private final Logger logger;
     private final File dexDir;
@@ -233,6 +242,17 @@ public class DexFactory {
         // Once injected, the class generated for the interface loads by the same name.
         if (overridesDefaults && pregeneratedClass != null && generatedClassNames.contains(pregeneratedClass.getName())) {
             pregeneratedClass = null;
+        }
+        // An anonymous class's prebuilt counterpart is found by call site alone, so it is only
+        // used when it was built from everything the script defines. The class generated instead
+        // needs a name of its own: the APK's class would answer the prebuilt one first.
+        if (pregeneratedClass != null && !hasExplicitName && !isNamedProxy) {
+            String mismatch = describePrebuiltMismatch(pregeneratedClass, methodOverrides, implementedInterfaces);
+            if (mismatch != null) {
+                warnPrebuiltClassMismatch(pregeneratedClass.getName(), mismatch);
+                pregeneratedClass = null;
+                fullClassName += MISMATCHED_PREBUILT_SUFFIX;
+            }
         }
         if (pregeneratedClass != null) {
             return pregeneratedClass;
@@ -452,6 +472,103 @@ public class DexFactory {
         } finally {
             tempFile.delete();
         }
+    }
+
+    // Why prebuiltClass cannot stand for the JS class, or null when it can.
+    private static String describePrebuiltMismatch(Class<?> prebuiltClass, String[] methodOverrides, String[] implementedInterfaces) {
+        String missing = missingInterfaces(prebuiltClass, implementedInterfaces);
+        if (missing != null) {
+            return "does not implement " + missing + ", which its JavaScript class lists";
+        }
+        String unseen = unseenMembers(prebuiltClass, methodOverrides);
+        if (unseen != null) {
+            return "was built without " + unseen + " of its JavaScript class (defined outside the class body, or by a getter)";
+        }
+        return null;
+    }
+
+    // The JS functions the static binding generator did not see when it built prebuiltClass,
+    // joined, or null. Java could never call them through it.
+    private static String unseenMembers(Class<?> prebuiltClass, String[] methodOverrides) {
+        if (methodOverrides == null || methodOverrides.length == 0) {
+            return null;
+        }
+        String[] seen;
+        try {
+            Field field = prebuiltClass.getDeclaredField(PREBUILT_JS_MEMBERS_FIELD);
+            field.setAccessible(true);
+            seen = (String[]) field.get(null);
+        } catch (NoSuchFieldException e) {
+            return null;
+        } catch (IllegalAccessException e) {
+            return null;
+        }
+        HashSet<String> seenMembers = new HashSet<String>(Arrays.asList(seen));
+        StringBuilder unseen = null;
+        for (String member : methodOverrides) {
+            if (seenMembers.contains(member) || TS_HELPER_MEMBERS.contains(member) || !isJavaIdentifier(member)) {
+                continue;
+            }
+            if (unseen == null) {
+                unseen = new StringBuilder(member);
+            } else {
+                unseen.append(", ").append(member);
+            }
+        }
+        return unseen == null ? null : unseen.toString();
+    }
+
+    // No Java method can have any other name.
+    private static boolean isJavaIdentifier(String name) {
+        if (name.isEmpty() || !Character.isJavaIdentifierStart(name.charAt(0))) {
+            return false;
+        }
+        for (int i = 1; i < name.length(); i++) {
+            if (!Character.isJavaIdentifierPart(name.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // The interfaces in implementedInterfaces that prebuiltClass does not implement, joined, or
+    // null if it implements them all.
+    private static String missingInterfaces(Class<?> prebuiltClass, String[] implementedInterfaces) {
+        if (implementedInterfaces == null) {
+            return null;
+        }
+        StringBuilder missing = null;
+        for (String implementedInterface : implementedInterfaces) {
+            if (implementedInterface == null || implementedInterface.isEmpty()) {
+                continue;
+            }
+            boolean implemented;
+            try {
+                implemented = Class.forName(implementedInterface).isAssignableFrom(prebuiltClass);
+            } catch (ClassNotFoundException e) {
+                // Generating the class reports it.
+                implemented = false;
+            }
+            if (!implemented) {
+                if (missing == null) {
+                    missing = new StringBuilder(implementedInterface);
+                } else {
+                    missing.append(", ").append(implementedInterface);
+                }
+            }
+        }
+        return missing == null ? null : missing.toString();
+    }
+
+    private static void warnPrebuiltClassMismatch(String prebuiltClassName, String mismatch) {
+        synchronized (warnedPrebuiltMismatches) {
+            if (!warnedPrebuiltMismatches.add(prebuiltClassName)) {
+                return;
+            }
+        }
+        Log.w("JS", "The prebuilt class " + prebuiltClassName + " " + mismatch
+                + ", so the class is generated at runtime instead. Rebuild the app if its JavaScript"
+                + " changed since; otherwise, please report this with the class's source.");
     }
 
     private static boolean hasImplementedInterfaces(String[] implementedInterfaces) {
