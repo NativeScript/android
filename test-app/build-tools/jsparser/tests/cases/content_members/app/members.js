@@ -9,12 +9,16 @@ var LiteralMembers = java.lang.Object.extend("LiteralMembers", {
     dataMember: 1,
     get getterMember() { return 1; },
     set setterMember(value) {},
-    [computedName]: function () {},
-    ...other,
     42: function () {},
     __proto__: null,
     identifierMember: function () {},
     interfaces: [java.lang.Runnable],
+    run: function () {}
+});
+
+var UnnamedMembers = java.lang.Object.extend("UnnamedMembers", {
+    [computedName]: function () {},
+    ...other,
     run: function () {}
 });
 

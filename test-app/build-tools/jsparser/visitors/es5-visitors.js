@@ -119,15 +119,20 @@ var es5_visitors = (function() {
         }
 
         var decorateNodes = traverseForDecorate(path, config, 3);
+        var decorateScope = decorateNodes ? _getParent(path, 3, config).scope : null;
 
         var isDecoratedWithExtend = false,
             customExtendDecoratorName,
             customExtendDecoratorValue,
-            implementedInterfaces = [];
+            implementedInterfaces = [],
+            unresolvedInterfaces = [];
 
         if (!decorateNodes) {
             // 7 -> Takes 7 levels up to get to the scope where the class is declared
             decorateNodes = traverseForDecorateSpecial(path, config, 7);
+            if (decorateNodes) {
+                decorateScope = _getParent(path, 7, config).parentPath.scope;
+            }
         }
 
         if (decorateNodes) {
@@ -138,12 +143,9 @@ var es5_visitors = (function() {
                     if (currentDecorator.callee.name === config.interfacesDecoratorName) {
                         currentDecorator.callee.skipMeOnVisit = true;
 
-                        var interfaces = currentDecorator.arguments[0].elements;
-
-                        for (var i in interfaces) {
-                            var interfaceName = _getWholeInterfaceNameFromInterfacesNode(interfaces[i]);
-                            implementedInterfaces.push(interfaceName);
-                        }
+                        var interfaceList = _resolveInterfaceList(currentDecorator.arguments[0], decorateScope);
+                        implementedInterfaces = implementedInterfaces.concat(interfaceList.names);
+                        unresolvedInterfaces = unresolvedInterfaces.concat(interfaceList.unresolved);
                     }
 
                     // JavaProxy
@@ -157,6 +159,18 @@ var es5_visitors = (function() {
                     }
                 }
             }
+        }
+
+        if (unresolvedInterfaces.length) {
+            _warnUnresolvedInterfaces(unresolvedInterfaces, "class " + (isDecoratedWithExtend ? customExtendDecoratorValue : declaredClassName || extendClass), config);
+            return;
+        }
+
+        // The runtime looks an anonymous class up by its call site alone, so its prebuilt class
+        // has to list every member. A named class keeps the members the parser can name.
+        if (overriddenMethodNames.hasUnnamedMembers && !isDecoratedWithExtend) {
+            _skipIncompleteClass(config, "a computed prototype member");
+            return;
         }
 
         if (isDecoratedWithExtend) {
@@ -514,9 +528,10 @@ var es5_visitors = (function() {
             className = arg0.value ? arg0.value : "";
 
             // Get all methods from the implementation object
-            var methodsAndInterfaces = _getOverridenMethodsAndImplementedInterfaces(arg1, config);
+            var methodsAndInterfaces = _getOverridenMethodsAndImplementedInterfaces(arg1, config, path.scope);
             var overriddenMethodNames = methodsAndInterfaces[0];
             var implementedInterfaces = methodsAndInterfaces[1];
+            var unresolvedInterfaces = methodsAndInterfaces[2];
 
             var isCorrectExtendClassName = _testJavaProxyName(className);
             var isCorrectClassName = _testClassName(className);
@@ -525,6 +540,21 @@ var es5_visitors = (function() {
                     message: "JSParser Error: The 'extend' you are trying to make has an invalid name. Example: '...extend(\"a.b.C\", {...overrides...})'), for class: " + extendClass + " file: " + config.fullPathName,
                     errCode: 1
                 }
+            }
+
+            // The runtime looks an anonymous class up by its call site alone, so its prebuilt
+            // class has to list every member. Vendor code calls `.extend({ ...spread })` too,
+            // so this is not worth a warning.
+            if (methodsAndInterfaces[3] && !isCorrectExtendClassName) {
+                _skipIncompleteClass(config, "a spread or computed member");
+                return;
+            }
+
+            if (unresolvedInterfaces.length) {
+                var extendDescription = (className ? "class " + className + ", " : "") +
+                    "the extend of " + extendClass.slice().reverse().join(".") + " at line " + path.node.property.loc.start.line;
+                _warnUnresolvedInterfaces(unresolvedInterfaces, extendDescription, config);
+                return;
             }
 
             var lineToWrite = "";
@@ -643,10 +673,12 @@ var es5_visitors = (function() {
     // NOTE: It's a near-identical method to _getOverridenMethods for optimisation reasons
     // we do not want to check for interfaces while creating an interface
     // and likewise, we do not want to iterate twice through the impl. object's properties to read the interfaces
-    function _getOverridenMethodsAndImplementedInterfaces(node, config) {
+    function _getOverridenMethodsAndImplementedInterfaces(node, config, scope) {
         var result = [];
         var overriddenMethodNames = [];
         var implementedInterfaces = [];
+        var unresolvedInterfaces = [];
+        var hasUnnamedMembers = false;
 
         var interfacesFound = false;
 
@@ -668,7 +700,12 @@ var es5_visitors = (function() {
             	will get 'method1' and 'method3'
             */
             for (var index in objectProperties) {
-                var keyName = _getMemberKeyName(objectProperties[index]);
+                var property = objectProperties[index];
+                if (types.isSpreadElement(property) || property.computed) {
+                    hasUnnamedMembers = true;
+                    continue;
+                }
+                var keyName = _getMemberKeyName(property);
                 // Without this guard, valid (non-NS) `.extend({ ...other, foo })`
                 // calls in bundled vendor code (e.g. Zod schemas) would crash the parser.
                 if (keyName === null) {
@@ -678,51 +715,137 @@ var es5_visitors = (function() {
                 // if the user has declared interfaces that he is implementing
                 if (!interfacesFound &&
                     keyName.toLowerCase() === "interfaces" &&
-                    types.isArrayExpression(objectProperties[index].value)) {
+                    types.isObjectProperty(property)) {
                     interfacesFound = true;
-                    var interfaces = objectProperties[index].value.elements;
-
-                    for (var i in interfaces) {
-                        var interfaceName = _getWholeInterfaceNameFromInterfacesNode(interfaces[i]);
-                        implementedInterfaces.push(interfaceName);
-                    }
+                    var interfaceList = _resolveInterfaceList(property.value, scope);
+                    implementedInterfaces = interfaceList.names;
+                    unresolvedInterfaces = interfaceList.unresolved;
                 } else {
-                    _addLiteralMember(overriddenMethodNames, keyName, _isAccessor(objectProperties[index]));
+                    _addLiteralMember(overriddenMethodNames, keyName, _isAccessor(property));
                 }
             }
         }
 
         result.push(overriddenMethodNames);
         result.push(implementedInterfaces);
+        result.push(unresolvedInterfaces);
+        result.push(hasUnnamedMembers);
 
         return result;
     }
 
-    function _getWholeInterfaceNameFromInterfacesNode(node) {
-        var interfaceName = "";
+    var MAX_ALIAS_DEPTH = 32;
 
-        if (types.isMemberExpression(node)) {
-            interfaceName += _resolveInterfacePath(node.object);
-            interfaceName += node.property.name;
+    // The initializer of a variable that is never reassigned, or null.
+    function _constantInitializer(binding) {
+        if (!binding || !binding.constant || !binding.path.isVariableDeclarator()) {
+            return null;
         }
-
-        return interfaceName;
+        return binding.path.node.init || null;
     }
 
-    function _resolveInterfacePath(node) {
-        var subNode = "";
+    /*
+     *	The dotted Java name an expression stands for, following local aliases such as
+     *	`const IMarker = com.example.IMarker`, or null when only running the script could tell:
+     *	an import, a parameter, a reassigned variable, a call.
+     */
+    function _resolveJavaTypeName(node, scope, depth) {
+        depth = depth || 0;
+        if (!node || depth > MAX_ALIAS_DEPTH) {
+            return null;
+        }
 
         if (types.isMemberExpression(node)) {
-            if (types.isMemberExpression(node.object)) {
-                subNode += _resolveInterfacePath(node.object);
-                subNode += node.property.name + ".";
+            var propertyName;
+            if (!node.computed && types.isIdentifier(node.property)) {
+                propertyName = node.property.name;
+            } else if (node.computed && types.isStringLiteral(node.property)) {
+                propertyName = node.property.value;
             } else {
-                subNode += node.object.name + ".";
-                subNode += node.property.name + ".";
+                return null;
+            }
+
+            // `global.com.example.IMarker` names the same type as `com.example.IMarker`.
+            if (types.isIdentifier(node.object) &&
+                (node.object.name === "global" || node.object.name === "globalThis") &&
+                !(scope && scope.getBinding(node.object.name))) {
+                return propertyName;
+            }
+
+            var owner = _resolveJavaTypeName(node.object, scope, depth + 1);
+            return owner === null ? null : owner + "." + propertyName;
+        }
+
+        if (types.isIdentifier(node)) {
+            var binding = scope && scope.getBinding(node.name);
+            if (!binding) {
+                // A global, such as the `com` or `android` package roots.
+                return node.name;
+            }
+            var init = _constantInitializer(binding);
+            return init ? _resolveJavaTypeName(init, binding.path.scope, depth + 1) : null;
+        }
+
+        return null;
+    }
+
+    function _describeNode(node) {
+        if (types.isIdentifier(node)) {
+            return node.name;
+        }
+        if (types.isMemberExpression(node) && !node.computed && types.isIdentifier(node.property)) {
+            return _describeNode(node.object) + "." + node.property.name;
+        }
+        return node ? "<" + node.type + ">" : "<empty>";
+    }
+
+    /*
+     *	The Java names in an interfaces list (`@Interfaces([...])` or extend's `interfaces: [...]`).
+     *	`unresolved` lists the entries that could not be named statically: a class built from the
+     *	rest would not implement them.
+     */
+    function _resolveInterfaceList(node, scope, depth) {
+        depth = depth || 0;
+        var result = { names: [], unresolved: [] };
+
+        if (types.isArrayExpression(node)) {
+            node.elements.forEach(function (element) {
+                var name = types.isSpreadElement(element) ? null : _resolveJavaTypeName(element, scope);
+                // A Java interface always has a package; a bare name is an unknown global.
+                if (name && name.indexOf(".") > 0) {
+                    result.names.push(name);
+                } else {
+                    result.unresolved.push(_describeNode(element));
+                }
+            });
+            return result;
+        }
+
+        if (types.isIdentifier(node) && depth < MAX_ALIAS_DEPTH) {
+            var binding = scope && scope.getBinding(node.name);
+            var init = _constantInitializer(binding);
+            if (init) {
+                return _resolveInterfaceList(init, binding.path.scope, depth + 1);
             }
         }
 
-        return subNode;
+        result.unresolved.push(_describeNode(node));
+        return result;
+    }
+
+    // A class built from part of its members would never call the others from Java; the
+    // runtime generates the class from all of them instead.
+    function _skipIncompleteClass(config, reason) {
+        if (config.logger) {
+            config.logger.info("Not prebuilding a class in " + config.fullPathName + ": it has " + reason);
+        }
+    }
+
+    // No class is better than one missing interfaces: printed whatever the parser's log settings.
+    function _warnUnresolvedInterfaces(unresolved, classDescription, config) {
+        console.warn("WARNING: the static binding generator cannot determine the Java interface(s) " +
+            unresolved.join(", ") + " of " + classDescription + " in " + config.fullPathName +
+            ", so it does not prebuild that class. List the interfaces by their full Java name to prebuild it.");
     }
 
     function _getWholeName(node) {
@@ -825,6 +948,8 @@ var es5_visitors = (function() {
                 name = left.property.name;
             } else if (left.computed && types.isStringLiteral(left.property)) {
                 name = left.property.value;
+            } else {
+                overriddenMethods.hasUnnamedMembers = true;
             }
             return name !== null && MEMBER_NAME_PATTERN.test(name) ? name : null;
         }
