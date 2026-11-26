@@ -183,6 +183,25 @@ public class GeneratorTest {
     }
 
     @Test
+    public void testACallSiteClassListsTheMembersTheParserSaw() throws Exception {
+        Generator generator = new Generator(null, new ArrayList<DataRow>());
+        Iterable<String> options = new ArrayList<String>(Arrays.asList("-cp", dependenciesDir));
+
+        Binding callSite = generator.generateBinding(new DataRow("java.lang.Object*app_main*9*29*Members*toString,helper***"));
+        String callSiteName = callSite.getFile().getName();
+        Class<?> callSiteClass = InMemoryJavaCompiler.compile("com.tns.gen.java.lang." + callSiteName.substring(0, callSiteName.length() - ".java".length()), callSite.getContent(), options);
+        java.lang.reflect.Field members = callSiteClass.getDeclaredField("members__ns");
+        members.setAccessible(true);
+        Assert.assertArrayEquals(new String[]{"toString", "helper"}, (String[]) members.get(null));
+
+        Binding named = generator.generateBinding(new DataRow(Utils.getDataRowsFromResource("datarow-named-extend.txt").get(0)));
+        Class<?> namedClass = InMemoryJavaCompiler.compile(named.getClassname(), named.getContent(), options);
+        for (java.lang.reflect.Field field : namedClass.getDeclaredFields()) {
+            Assert.assertNotEquals("members__ns", field.getName());
+        }
+    }
+
+    @Test
     public void testCanCompileBindingClassExtendingAnExtendedClassWithMethodsWithTheSameSignature() throws Exception {
         URL u = ListView.class.getResource('/' + ListView.class.getName().replace('.', '/') + ".class");
         File f = new File(u.toURI()).getParentFile().getParentFile().getParentFile();

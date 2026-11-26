@@ -75,6 +75,7 @@ require("./tests/testTypedArrayArgs");
 require("./tests/dex-interface-implementation");
 require("./tests/testClassForNameDiscovery");
 require("./tests/testPrebuiltExtendClasses");
+require("./tests/testPrebuiltInterfaceAliases");
 require("./tests/testProxyRegistrationGc");
 require("./tests/testInterfaceImplementation");
 require("./tests/testPrimitiveCallbackReturns");

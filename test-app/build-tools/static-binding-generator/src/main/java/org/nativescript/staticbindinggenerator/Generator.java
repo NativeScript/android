@@ -152,12 +152,15 @@ public class Generator {
         // interface's one shared class cannot implement them for a single call site.
         boolean isSharedInterfaceClass = isInterface && !hasSpecifiedName && !hasImplementedInterfaces(dataRow);
 
+        // The runtime finds a class named after its call site by that name alone.
+        boolean callSiteNamed = false;
         if (hasSpecifiedName) {
             name = getSimpleClassname(dataRow.getFilename());
         } else {
             if (isSharedInterfaceClass) {
                 name = getSimpleClassname(clazz.getClassName());
             } else {
+                callSiteNamed = true;
                 name = getSimpleClassname(clazz.getClassName().replace("$", "_")) + "_";
                 // Generate a unique identifier that prevents naming collisions
                 // especially with .mjs files and complex structures
@@ -177,7 +180,8 @@ public class Generator {
 
         Writer w = new Writer();
 
-        writeBinding(w, dataRow, clazz, packageName, name);
+        String[] jsMembers = callSiteNamed ? dataRow.getMethods() : null;
+        writeBinding(w, dataRow, clazz, packageName, name, jsMembers);
         String classname = dataRow.getFilename();
 
         try {
@@ -332,7 +336,7 @@ public class Generator {
         return identifier.toString();
     }
 
-    private void writeBinding(Writer w, DataRow dataRow, JavaClass clazz, String packageName, String name) {
+    private void writeBinding(Writer w, DataRow dataRow, JavaClass clazz, String packageName, String name, String[] jsMembers) {
         GenericsAwareClassHierarchyParser genericsAwareClassHierarchyParser = new GenericsAwareClassHierarchyParserImpl(new GenericSignatureReader(), classes);
         List<JavaClass> userImplementedInterfaces = getInterfacesFromCache(Arrays.asList(dataRow.getInterfaces()));
 
@@ -347,7 +351,7 @@ public class Generator {
         writePackageNameToWriter(w, packageName);
         writeImportsToWriter(w, clazz, packageName);
         writeClassBeginningToWriter(w, clazz, userImplementedInterfaces, name, dataRow, genView, interfaceGenericHierarchyViews);
-        writeFieldsToWriter(w, clazz);
+        writeFieldsToWriter(w, clazz, jsMembers);
         writeConstructorsToWriter(w, clazz, dataRow, name, genView);
         writeMethodsToWriter(w, genView, interfaceGenericHierarchyViews, clazz, Arrays.asList(dataRow.getMethods()), userImplementedInterfaces, packageName);
         writeClassEndToWriter(w);
@@ -445,7 +449,7 @@ public class Generator {
         packageNameWriter.writePackageName(packageName);
     }
 
-    private void writeFieldsToWriter(Writer writer, JavaClass clazz) {
+    private void writeFieldsToWriter(Writer writer, JavaClass clazz, String[] jsMembers) {
         FieldsWriter fieldsWriter = new FieldsWriterImpl(writer);
         boolean isApplicationClass = androidClassChecker.isApplicationClass(clazz);
 
@@ -455,6 +459,9 @@ public class Generator {
         }
 
         fieldsWriter.writeRuntimeTagField();
+        if (jsMembers != null) {
+            fieldsWriter.writeJsMembersField(jsMembers);
+        }
     }
 
     private void writeConstructorsToWriter(Writer writer, JavaClass clazz, DataRow dataRow, String generatedClassName, GenericHierarchyView genericHierarchyView) {
