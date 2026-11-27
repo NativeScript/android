@@ -2618,9 +2618,25 @@ MetadataEntry MetadataNode::GetChildMetadataForPackage(MetadataNode *node, const
 }
 
 namespace {
+    // Unmapped on destruction unless the reader keeps it, so a file that fails
+    // to map, or metadata that fails to parse, does not strand the files
+    // mapped before it.
     struct MappedMetadataFile {
         uint8_t* data;
         size_t length;
+
+        MappedMetadataFile(uint8_t* data, size_t length) : data(data), length(length) {}
+        MappedMetadataFile(const MappedMetadataFile&) = delete;
+        MappedMetadataFile& operator=(const MappedMetadataFile&) = delete;
+        ~MappedMetadataFile() {
+            if (data != nullptr) {
+                munmap(data, length);
+            }
+        }
+
+        void KeepMapped() {
+            data = nullptr;
+        }
     };
 
     /*
@@ -2702,6 +2718,8 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
           throw NativeScriptException(ss.str());
         }
     }
+    // Only opened to tell a missing folder from a missing file.
+    closedir(dir);
 
     auto nodes = MapMetadataFile(baseDir, "treeNodeStream.dat");
     auto names = MapMetadataFile(baseDir, "treeStringsStream.dat");
@@ -2713,7 +2731,8 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
 
     // The tree is built from the nodes; the names and the values stay mapped for
     // the life of the process.
-    munmap(nodes.data, nodes.length);
+    names.KeepMapped();
+    values.KeepMapped();
 }
 
 void MetadataNode::BuildMetadata(uint32_t nodesLength, uint8_t* nodeData, uint32_t nameLength, uint8_t* nameData, uint32_t valueLength, uint8_t* valueData) {
